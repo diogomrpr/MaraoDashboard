@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Marao Dashboard",
+        "description": "Instale o construtor, os cartões e o tema Marao Dashboard, com suporte para câmaras Frigate e UniFi Protect."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "O Marao Dashboard já está configurado."
+    }
+  }
+}

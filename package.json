@@ -1,0 +1,12 @@
+{
+  "name": "marao-dashboard",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Tests for the Marao Dashboard builder, custom cards, theme, and camera events",
+  "scripts": {
+    "test": "npm run test:static",
+    "test:frontend": "node --test tests/frontend/*.test.js",
+    "test:static": "node --check custom_components/marao_dashboard/frontend/MaraoDashboard.js && node --check custom_components/marao_dashboard/frontend/MaraoCameraCard.js && npm run test:frontend"
+  }
+}

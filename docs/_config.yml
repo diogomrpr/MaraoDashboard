@@ -1,0 +1,10 @@
+title: Marao Dashboard
+description: A visual dashboard builder, custom cards, theme, and camera events for Home Assistant
+
+url: https://diogomrpr.github.io
+baseurl: /MaraoDashboard
+
+exclude:
+  - docs
+  - Gemfile
+  - Gemfile.lock

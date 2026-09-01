@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="{{ site.description }}">
+    <title>{% if page.title and page.title != site.title %}{{ page.title }} · {% endif %}{{ site.title }}</title>
+    <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="{{ '/' | relative_url }}">Marao Dashboard</a>
+      <nav aria-label="Documentation">
+        <a href="{{ '/installation.html' | relative_url }}">Install</a>
+        <a href="{{ '/builder.html' | relative_url }}">Build</a>
+        <a href="{{ '/cards.html' | relative_url }}">Cards</a>
+        <a href="{{ '/theme.html' | relative_url }}">Theme</a>
+        <a href="{{ '/cameras.html' | relative_url }}">Cameras</a>
+        <a href="{{ '/development.html' | relative_url }}">Develop</a>
+        <a href="https://github.com/diogomrpr/MaraoDashboard">GitHub</a>
+      </nav>
+    </header>
+    <main>{{ content }}</main>
+    <footer>Marao Dashboard documentation</footer>
+  </body>
+</html>

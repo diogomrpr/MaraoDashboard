@@ -1,0 +1,13 @@
+[tool.pytest.ini_options]
+minversion = "9.0"
+asyncio_mode = "auto"
+testpaths = ["tests/components/marao_dashboard"]
+pythonpath = ["."]
+addopts = "-ra"
+
+[tool.coverage.run]
+source = ["custom_components/marao_dashboard"]
+omit = ["*/frontend/*"]
+
+[tool.coverage.report]
+show_missing = true

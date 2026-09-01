@@ -1,0 +1,12 @@
+.DS_Store
+node_modules/
+dist/
+.venv*/
+__pycache__/
+*.py[cod]
+.coverage
+.pytest_cache/
+_site/
+docs/_site/
+docs/.jekyll-cache/
+docs/vendor/bundle/

@@ -1,0 +1,6 @@
+# Tests run entirely against Home Assistant's in-process test harness.
+pytest==9.0.3
+pytest-asyncio==1.3.0
+pytest-cov==7.1.0
+pytest-homeassistant-custom-component==0.13.331
+home-assistant-frontend
