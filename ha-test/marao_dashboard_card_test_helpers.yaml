@@ -1,0 +1,428 @@
+input_boolean:
+  marao_dashboard_test_one:
+    name: Marao Dashboard Test One
+  marao_dashboard_test_two:
+    name: Marao Dashboard Test Two
+  marao_dashboard_test_three:
+    name: Marao Dashboard Test Three
+  marao_dashboard_test_light:
+    name: Marao Dashboard Test Light
+  marao_dashboard_test_switch:
+    name: Marao Dashboard Test Switch
+  marao_dashboard_test_climate_heater:
+    name: Marao Dashboard Test Climate Heater
+  marao_dashboard_test_single_mode_climate_heater:
+    name: Marao Dashboard Test Single Mode Climate Heater
+  marao_dashboard_test_dishwasher_salt:
+    name: Marao Dashboard Test Dishwasher Salt
+  marao_dashboard_test_dishwasher_rinse_aid:
+    name: Marao Dashboard Test Dishwasher Rinse Aid
+  marao_dashboard_test_washing_machine:
+    name: Marao Dashboard Test Washing Machine
+  marao_dashboard_test_lock:
+    name: Marao Dashboard Test Lock
+
+input_number:
+  marao_dashboard_test_light_brightness:
+    name: Marao Dashboard Test Light Brightness
+    min: 1
+    max: 255
+    step: 1
+    mode: slider
+  marao_dashboard_test_cover_position:
+    name: Marao Dashboard Test Cover Position
+    min: 0
+    max: 100
+    step: 1
+    mode: slider
+  marao_dashboard_test_garage_door_position:
+    name: Marao Dashboard Test Garage Door Position
+    min: 0
+    max: 100
+    step: 1
+    mode: slider
+  marao_dashboard_test_fan_percentage:
+    name: Marao Dashboard Test Fan Percentage
+    min: 0
+    max: 100
+    step: 1
+    mode: slider
+  marao_dashboard_test_temperature:
+    name: Marao Dashboard Test Temperature
+    min: -20
+    max: 50
+    step: 0.5
+    mode: slider
+    unit_of_measurement: "°C"
+  marao_dashboard_test_humidity:
+    name: Marao Dashboard Test Humidity
+    min: 0
+    max: 100
+    step: 1
+    mode: slider
+    unit_of_measurement: "%"
+  marao_dashboard_test_power:
+    name: Marao Dashboard Test Power
+    min: 0
+    max: 5000
+    step: 1
+    mode: slider
+    unit_of_measurement: W
+  marao_dashboard_test_battery:
+    name: Marao Dashboard Test Battery
+    min: 0
+    max: 100
+    step: 1
+    mode: slider
+    unit_of_measurement: "%"
+  marao_dashboard_test_number:
+    name: Marao Dashboard Test Number
+    min: 0
+    max: 100
+    step: 1
+    mode: slider
+  marao_dashboard_test_dishwasher_progress:
+    name: Marao Dashboard Test Dishwasher Progress
+    min: 0
+    max: 100
+    step: 1
+    mode: slider
+    unit_of_measurement: "%"
+  marao_dashboard_test_dishwasher_remaining:
+    name: Marao Dashboard Test Dishwasher Remaining
+    min: 0
+    max: 180
+    step: 1
+    mode: slider
+    unit_of_measurement: min
+
+input_select:
+  marao_dashboard_test_weather_condition:
+    name: Marao Dashboard Test Weather Condition
+    options:
+      - sunny
+      - cloudy
+      - rainy
+      - windy
+  marao_dashboard_test_scene:
+    name: Marao Dashboard Test Scene
+    options:
+      - Relax
+      - Movie
+      - Dinner
+      - Night
+      - Off
+  marao_dashboard_test_media:
+    name: Marao Dashboard Test Media
+    options:
+      - idle
+      - playing
+      - paused
+  marao_dashboard_test_alarm:
+    name: Marao Dashboard Test Alarm
+    options:
+      - disarmed
+      - armed_home
+      - armed_away
+      - arming
+      - triggered
+  marao_dashboard_test_vacuum:
+    name: Marao Dashboard Test Vacuum
+    options:
+      - docked
+      - cleaning
+      - paused
+      - returning
+      - error
+  marao_dashboard_test_dishwasher_state:
+    name: Marao Dashboard Test Dishwasher State
+    options:
+      - idle
+      - run
+      - pause
+      - finish
+      - error
+  marao_dashboard_test_dishwasher_program:
+    name: Marao Dashboard Test Dishwasher Program
+    options:
+      - Auto
+      - Eco
+      - Intensive
+      - Quick
+
+climate:
+  - platform: generic_thermostat
+    name: Marao Dashboard Test Climate
+    unique_id: marao_dashboard_test_climate
+    heater: switch.marao_dashboard_test_climate_heater
+    target_sensor: sensor.marao_dashboard_test_temperature
+    min_temp: 16
+    max_temp: 30
+    target_temp: 21
+    cold_tolerance: 0.5
+    hot_tolerance: 0.5
+    precision: 0.5
+  - platform: generic_thermostat
+    name: Marao Dashboard Test Single Mode Climate
+    unique_id: marao_dashboard_test_single_mode_climate
+    heater: switch.marao_dashboard_test_single_mode_climate_heater
+    target_sensor: sensor.marao_dashboard_test_temperature
+    min_temp: 16
+    max_temp: 30
+    target_temp: 21
+    cold_tolerance: 0.5
+    hot_tolerance: 0.5
+    precision: 0.5
+
+homeassistant:
+  customize:
+    climate.marao_dashboard_test_single_mode_climate:
+      hvac_modes:
+        - "off"
+
+template:
+  - light:
+      - name: Marao Dashboard Test Light
+        default_entity_id: light.marao_dashboard_test_light
+        unique_id: marao_dashboard_test_light
+        state: "{{ is_state('input_boolean.marao_dashboard_test_light', 'on') }}"
+        level: "{{ states('input_number.marao_dashboard_test_light_brightness') | int }}"
+        turn_on:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.marao_dashboard_test_light
+        turn_off:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.marao_dashboard_test_light
+        set_level:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_light_brightness
+            data:
+              value: "{{ brightness }}"
+  - switch:
+      - name: Marao Dashboard Test Switch
+        default_entity_id: switch.marao_dashboard_test_switch
+        unique_id: marao_dashboard_test_switch
+        state: "{{ is_state('input_boolean.marao_dashboard_test_switch', 'on') }}"
+        turn_on:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.marao_dashboard_test_switch
+        turn_off:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.marao_dashboard_test_switch
+      - name: Marao Dashboard Test Climate Heater
+        default_entity_id: switch.marao_dashboard_test_climate_heater
+        unique_id: marao_dashboard_test_climate_heater
+        state: "{{ is_state('input_boolean.marao_dashboard_test_climate_heater', 'on') }}"
+        turn_on:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.marao_dashboard_test_climate_heater
+        turn_off:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.marao_dashboard_test_climate_heater
+      - name: Marao Dashboard Test Single Mode Climate Heater
+        default_entity_id: switch.marao_dashboard_test_single_mode_climate_heater
+        unique_id: marao_dashboard_test_single_mode_climate_heater
+        state: "{{ is_state('input_boolean.marao_dashboard_test_single_mode_climate_heater', 'on') }}"
+        turn_on:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.marao_dashboard_test_single_mode_climate_heater
+        turn_off:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.marao_dashboard_test_single_mode_climate_heater
+  - cover:
+      - name: Marao Dashboard Test Cover
+        default_entity_id: cover.marao_dashboard_test_cover
+        unique_id: marao_dashboard_test_cover
+        position: "{{ states('input_number.marao_dashboard_test_cover_position') | int }}"
+        open_cover:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_cover_position
+            data:
+              value: 100
+        close_cover:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_cover_position
+            data:
+              value: 0
+        set_cover_position:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_cover_position
+            data:
+              value: "{{ position }}"
+      - name: Marao Dashboard Test Garage Door
+        default_entity_id: cover.marao_dashboard_test_garage_door
+        unique_id: marao_dashboard_test_garage_door
+        device_class: garage
+        position: "{{ states('input_number.marao_dashboard_test_garage_door_position') | int }}"
+        open_cover:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_garage_door_position
+            data:
+              value: 100
+        close_cover:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_garage_door_position
+            data:
+              value: 0
+        set_cover_position:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_garage_door_position
+            data:
+              value: "{{ position }}"
+  - lock:
+      - name: Marao Dashboard Test Lock
+        default_entity_id: lock.marao_dashboard_test_lock
+        unique_id: marao_dashboard_test_lock
+        state: "{{ is_state('input_boolean.marao_dashboard_test_lock', 'on') }}"
+        lock:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.marao_dashboard_test_lock
+        unlock:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.marao_dashboard_test_lock
+  - fan:
+      - name: Marao Dashboard Test Fan
+        default_entity_id: fan.marao_dashboard_test_fan
+        unique_id: marao_dashboard_test_fan
+        state: "{{ states('input_number.marao_dashboard_test_fan_percentage') | int > 0 }}"
+        percentage: "{{ states('input_number.marao_dashboard_test_fan_percentage') | int }}"
+        turn_on:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_fan_percentage
+            data:
+              value: 50
+        turn_off:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_fan_percentage
+            data:
+              value: 0
+        set_percentage:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_fan_percentage
+            data:
+              value: "{{ percentage }}"
+  - alarm_control_panel:
+      - name: Marao Dashboard Test Alarm
+        default_entity_id: alarm_control_panel.marao_dashboard_test_alarm
+        unique_id: marao_dashboard_test_alarm
+        state: "{{ states('input_select.marao_dashboard_test_alarm') }}"
+        arm_home:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.marao_dashboard_test_alarm
+            data:
+              option: armed_home
+        arm_night:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.marao_dashboard_test_alarm
+            data:
+              option: armed_home
+        arm_away:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.marao_dashboard_test_alarm
+            data:
+              option: armed_away
+        disarm:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.marao_dashboard_test_alarm
+            data:
+              option: disarmed
+        trigger:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.marao_dashboard_test_alarm
+            data:
+              option: triggered
+  - vacuum:
+      - name: Marao Dashboard Test Vacuum
+        default_entity_id: vacuum.marao_dashboard_test_vacuum
+        unique_id: marao_dashboard_test_vacuum
+        state: "{{ states('input_select.marao_dashboard_test_vacuum') }}"
+        start:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.marao_dashboard_test_vacuum
+            data:
+              option: cleaning
+        pause:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.marao_dashboard_test_vacuum
+            data:
+              option: paused
+        stop:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.marao_dashboard_test_vacuum
+            data:
+              option: docked
+        return_to_base:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.marao_dashboard_test_vacuum
+            data:
+              option: returning
+  - sensor:
+      - name: Marao Dashboard Test Weather
+        unique_id: marao_dashboard_test_weather_sensor
+        state: "{{ states('input_select.marao_dashboard_test_weather_condition') }}"
+      - name: Marao Dashboard Test Temperature
+        unique_id: marao_dashboard_test_temperature_sensor
+        state: "{{ states('input_number.marao_dashboard_test_temperature') }}"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+      - name: Marao Dashboard Test Humidity
+        unique_id: marao_dashboard_test_humidity_sensor
+        state: "{{ states('input_number.marao_dashboard_test_humidity') }}"
+        unit_of_measurement: "%"
+        device_class: humidity
+        state_class: measurement
+      - name: Marao Dashboard Test Power
+        unique_id: marao_dashboard_test_power_sensor
+        state: "{{ states('input_number.marao_dashboard_test_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Marao Dashboard Test Battery
+        unique_id: marao_dashboard_test_battery_sensor
+        state: "{{ states('input_number.marao_dashboard_test_battery') }}"
+        unit_of_measurement: "%"
+        device_class: battery
+        state_class: measurement
+      - name: Marao Dashboard Test Dishwasher Progress
+        unique_id: marao_dashboard_test_dishwasher_progress_sensor
+        state: "{{ states('input_number.marao_dashboard_test_dishwasher_progress') }}"
+        unit_of_measurement: "%"
+      - name: Marao Dashboard Test Dishwasher Remaining
+        unique_id: marao_dashboard_test_dishwasher_remaining_sensor
+        state: "{{ states('input_number.marao_dashboard_test_dishwasher_remaining') }}"
+        unit_of_measurement: min
+  - binary_sensor:
+      - name: Marao Dashboard Test Washing Machine
+        unique_id: marao_dashboard_test_washing_machine_binary_sensor
+        state: "{{ is_state('input_boolean.marao_dashboard_test_washing_machine', 'on') }}"
+        device_class: running

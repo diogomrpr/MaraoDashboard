@@ -1,0 +1,184 @@
+hc_popup_group_card:
+  template: hc_single_title_card
+  show_name: true
+  show_icon: true
+  show_label: true
+  show_state: false
+  variables:
+    group_type: lights
+    title: Items
+    icon: mdi:shape-outline
+    entities: []
+    popup_hash: "#items"
+    battery_threshold: 20
+  icon: "[[[ return variables.icon ]]]"
+  name: |
+    [[[
+      return variables.title_key
+        ? (window.MaraoDashboard?.localize?.(variables.title_key, hass) || variables.title)
+        : variables.title;
+    ]]]
+  tap_action:
+    action: navigate
+    navigation_path: "[[[ return variables.popup_hash ]]]"
+    haptic: heavy
+  hold_action:
+    action: none
+  label: |
+    [[[
+      const ids = Array.isArray(variables.entities) ? variables.entities : [];
+      const known = ids.filter((id) => states[id]);
+      const bad = (id) => !states[id] || ['unavailable', 'unknown'].includes(states[id].state);
+      const count = (fn) => known.filter(fn).length;
+
+      if (variables.group_type === 'blinds') {
+        const open = count((id) => !bad(id) && states[id].state !== 'closed');
+        return open
+          ? (window.MaraoDashboard?.localize?.('common.open_count', hass, { count: open }) || `${open} open`)
+          : (window.MaraoDashboard?.localize?.('common.all_closed', hass) || 'All closed');
+      }
+      if (variables.group_type === 'lights') {
+        const on = count((id) => states[id].state === 'on');
+        return on
+          ? (window.MaraoDashboard?.localize?.('common.on_count', hass, { count: on }) || `${on} on`)
+          : (window.MaraoDashboard?.localize?.('common.all_off', hass) || 'All off');
+      }
+      if (variables.group_type === 'climate') {
+        const on = count((id) => !bad(id) && states[id].state !== 'off');
+        return on
+          ? (window.MaraoDashboard?.localize?.('common.on_count', hass, { count: on }) || `${on} on`)
+          : (window.MaraoDashboard?.localize?.('common.all_off', hass) || 'All off');
+      }
+
+      const threshold = Number(variables.battery_threshold ?? 20);
+      const attention = count((id) => {
+        const value = Number(states[id].state);
+        return bad(id) || Number.isFinite(value) && value <= threshold;
+      });
+      return attention
+        ? (window.MaraoDashboard?.localize?.('common.need_attention_count', hass, { count: attention }) || `${attention} need attention`)
+        : (window.MaraoDashboard?.localize?.('common.all_good', hass) || 'All good');
+    ]]]
+  styles:
+    grid:
+      - grid-template-areas: |
+          "n i" "l i"
+      - grid-template-columns: minmax(0, 1fr) 56px
+      - grid-template-rows: min-content min-content
+      - align-content: center
+      - column-gap: 12px
+      - row-gap: 4px
+    card:
+      - padding: 12px
+      - min-height: 100px
+      - background: |
+          [[[
+            const ids = Array.isArray(variables.entities) ? variables.entities : [];
+            const active = ids.some((id) => {
+              const state = states[id]?.state;
+              if (!state || state === 'unavailable' || state === 'unknown') return variables.group_type === 'maintenance';
+              if (variables.group_type === 'lights') return state === 'on';
+              if (variables.group_type === 'blinds') return state !== 'closed';
+              if (variables.group_type === 'climate') return state !== 'off';
+              const value = Number(state);
+              return Number.isFinite(value) && value <= Number(variables.battery_threshold ?? 20);
+            });
+            return active ? 'var(--primary-color)' : 'var(--ha-card-background)';
+          ]]]
+    name:
+      - text-align: left
+      - font-size: var(--font-size-primary)
+      - font-weight: var(--font-weight-primary)
+      - justify-self: start
+      - color: |
+          [[[
+            const ids = Array.isArray(variables.entities) ? variables.entities : [];
+            const active = ids.some((id) => {
+              const state = states[id]?.state;
+              if (!state || state === 'unavailable' || state === 'unknown') return variables.group_type === 'maintenance';
+              if (variables.group_type === 'lights') return state === 'on';
+              if (variables.group_type === 'blinds') return state !== 'closed';
+              if (variables.group_type === 'climate') return state !== 'off';
+              const value = Number(state);
+              return Number.isFinite(value) && value <= Number(variables.battery_threshold ?? 20);
+            });
+            return active ? 'var(--active-text-color)' : 'var(--primary-text-color)';
+          ]]]
+    label:
+      - text-align: left
+      - font-size: var(--font-size-secondary)
+      - font-weight: var(--font-weight-secondary)
+      - justify-self: start
+      - color: |
+          [[[
+            const ids = Array.isArray(variables.entities) ? variables.entities : [];
+            const active = ids.some((id) => {
+              const state = states[id]?.state;
+              if (!state || state === 'unavailable' || state === 'unknown') return variables.group_type === 'maintenance';
+              if (variables.group_type === 'lights') return state === 'on';
+              if (variables.group_type === 'blinds') return state !== 'closed';
+              if (variables.group_type === 'climate') return state !== 'off';
+              const value = Number(state);
+              return Number.isFinite(value) && value <= Number(variables.battery_threshold ?? 20);
+            });
+            return active ? 'var(--active-text-color)' : 'var(--subtext-color)';
+          ]]]
+    icon:
+      - width: 68%
+      - color: |
+          [[[
+            const ids = Array.isArray(variables.entities) ? variables.entities : [];
+            const active = ids.some((id) => {
+              const state = states[id]?.state;
+              if (!state || state === 'unavailable' || state === 'unknown') return variables.group_type === 'maintenance';
+              if (variables.group_type === 'lights') return state === 'on';
+              if (variables.group_type === 'blinds') return state !== 'closed';
+              if (variables.group_type === 'climate') return state !== 'off';
+              const value = Number(state);
+              return Number.isFinite(value) && value <= Number(variables.battery_threshold ?? 20);
+            });
+            return active ? 'var(--active-text-color)' : 'var(--icon-color)';
+          ]]]
+    img_cell:
+      - background: var(--opacity-contrast-100)
+      - border-radius: 50%
+      - width: 56px
+      - height: 56px
+      - align-self: center
+      - justify-self: end
+
+hc_blinds_popup_card:
+  template: hc_popup_group_card
+  variables:
+    group_type: blinds
+    title: Blinds
+    title_key: overview.blinds
+    icon: mdi:blinds
+    popup_hash: "#blinds-popup"
+
+hc_lights_popup_card:
+  template: hc_popup_group_card
+  variables:
+    group_type: lights
+    title: Lights
+    title_key: overview.lights
+    icon: mdi:lightbulb
+    popup_hash: "#lights-popup"
+
+hc_climate_popup_card:
+  template: hc_popup_group_card
+  variables:
+    group_type: climate
+    title: Climate
+    title_key: overview.climate
+    icon: mdi:thermostat
+    popup_hash: "#climate-popup"
+
+hc_maintenance_popup_card:
+  template: hc_popup_group_card
+  variables:
+    group_type: maintenance
+    title: Maintenance
+    title_key: overview.maintenance
+    icon: mdi:wrench
+    popup_hash: "#maintenance-popup"

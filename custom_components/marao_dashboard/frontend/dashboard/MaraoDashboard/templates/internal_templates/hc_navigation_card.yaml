@@ -1,0 +1,331 @@
+hc_navigation_card:
+  template: hc_single_title_card
+  show_name: true
+  show_icon: true
+  show_state: false
+  show_label: true
+  variables:
+    hc_label_prefix:
+    hc_icon_color: ""
+    hc_color: "var(--color-blue)"
+  label: |
+    [[[
+      const prefix = variables.hc_label_prefix ?? ((window.MaraoDashboard?.localize?.('common.on', hass) || 'On') + ' - ');
+      return prefix + states[entity.entity_id].state;
+    ]]]
+  styles:
+    grid:
+      - grid-template-areas: |
+          "n n"
+          "l l"
+      - grid-template-rows: min-content min-content
+      - align-content: center
+      - row-gap: 4px
+    card:
+      - padding: 14px 20px
+      - height: auto
+    name:
+      - text-align: left
+      - font-size: 18px
+      - font-weight: 800
+      - justify-self: start
+      - align-self: start
+    label:
+      - justify-self: start
+      - align-self: start
+      - font-size: 16px
+      - font-weight: 600
+      - color: var(--subtext-color)
+    img_cell:
+      - position: absolute
+      - top: 50%
+      - right: 12px
+      - left: auto
+      - width: 60px
+      - height: 60px
+      - overflow: hidden
+      - transform: translateY(-50%)
+    icon:
+      - position: static
+      - width: 52px
+      - opacity: 90%
+      - color: "var(--primary-color)"
+
+hc_navigation_card_security:
+  template: hc_navigation_card
+  state:
+    - value: arming
+      label: "[[[ return window.MaraoDashboard?.localize?.('security.arming', hass) || 'Arming...' ]]]"
+      icon: marao_dashboard:shield
+      styles:
+        icon:
+          - color: var(--color-orange)
+          - animation: flash 5s infinite
+        label:
+          - animation: flash 5s infinite
+    - value: armed_home
+      label: "[[[ return window.MaraoDashboard?.localize?.('security.armed_home', hass) || 'Armed Home' ]]]"
+      icon: marao_dashboard:shield-check
+      styles:
+        card:
+          - background: var(--color-green)
+        icon:
+          - color: var(--active-text-color)
+        name:
+          - color: var(--active-text-color)
+        label:
+          - color: var(--active-text-color)
+    - value: armed_away
+      label: "[[[ return window.MaraoDashboard?.localize?.('security.armed_away', hass) || 'Armed Away' ]]]"
+      icon: marao_dashboard:shield-keyhole
+      styles:
+        card:
+          - background: var(--color-green)
+        name:
+          - color: var(--active-text-color)
+        label:
+          - color: var(--active-text-color)
+        icon:
+          - color: var(--active-text-color)
+    - value: disarmed
+      label: "[[[ return window.MaraoDashboard?.localize?.('security.disarmed', hass) || 'Disarmed' ]]]"
+      icon: marao_dashboard:shield
+      styles:
+        icon:
+          - color: var(--primary-color)
+    - value: triggered
+      label: "[[[ return window.MaraoDashboard?.localize?.('security.triggered', hass) || 'Triggered!' ]]]"
+      icon: marao_dashboard:shield-exclamation
+      styles:
+        icon:
+          - color: var(--active-text-color)
+          - animation: flash 2s infinite
+        name:
+          - color: var(--active-text-color)
+        state:
+          - color: var(--active-text-color)
+        label:
+          - color: var(--active-text-color)
+
+  extra_styles: |
+    @keyframes flash {
+      0% {opacity: 100%;}
+      50% {opacity: 0%;}
+      100% {opacity: 100%;}
+    }
+
+hc_room_card:
+  template: hc_navigation_card
+  variables:
+    light_entities: |
+      [[[
+        const ids = states[entity.entity_id]?.attributes?.entity_id;
+        if (Array.isArray(ids)) {
+          return ids;
+        }
+        return entity?.entity_id ? [entity.entity_id] : [];
+      ]]]
+    lights_target_entity: |
+      [[[
+        return entity.entity_id;
+      ]]]
+    room_navigation_path: /marao-dashboard/rooms
+  tap_action:
+    action: navigate
+    navigation_path: "[[[ return variables.room_navigation_path ]]]"
+    haptic: heavy
+  label: |
+    [[[
+      const ids = Array.isArray(variables.light_entities)
+        ? variables.light_entities
+        : (states[entity.entity_id]?.attributes?.entity_id || []);
+      const onCount = ids.filter((id) => states[id] && states[id].state === 'on').length;
+      if (onCount === 0) {
+        return '';
+      }
+      return window.MaraoDashboard?.localize?.('common.on_count', hass, { count: onCount }) || `${onCount} on`;
+    ]]]
+  state:
+    - value: "on"
+      styles:
+        card:
+          - background: var(--room-card-active-background)
+        name:
+          - color: var(--active-text-color)
+        label:
+          - color: var(--active-text-color)
+        icon:
+          - color: var(--active-text-color)
+    - value: "off"
+      styles:
+        icon:
+          - color: var(--room-card-icon-color)
+  styles:
+    grid:
+      - grid-template-areas: |
+          "n n"
+          "l l"
+      - grid-template-rows: min-content min-content
+      - align-content: start
+      - row-gap: 4px
+    card:
+      - min-height: 128px
+      - padding: 16px 12px 12px
+      - justify-content: flex-start
+      - position: relative
+      - background: |
+          [[[
+            const ids = Array.isArray(variables.light_entities)
+              ? variables.light_entities
+              : [variables.lights_target_entity];
+            return ids.some((id) => states[id]?.state === 'on')
+              ? 'var(--room-card-active-background)'
+              : 'var(--ha-card-background)';
+          ]]]
+    img_cell:
+      - top: auto
+      - right: 8px
+      - bottom: 8px
+      - left: auto
+      - width: 116px
+      - height: 88px
+      - transform: none
+      - overflow: hidden
+    icon:
+      - position: static
+      - width: 108px
+      - max-height: 80px
+      - opacity: 78%
+      - color: |
+          [[[
+            const ids = Array.isArray(variables.light_entities)
+              ? variables.light_entities
+              : [variables.lights_target_entity];
+            return ids.some((id) => states[id]?.state === 'on')
+              ? 'var(--active-text-color)'
+              : 'var(--room-card-icon-color)';
+          ]]]
+    name:
+      - align-self: start
+      - grid-row: 1 !important
+      - position: absolute
+      - top: 16px
+      - left: 12px
+      - right: 72px
+      - z-index: 3
+      - margin-top: 0
+      - line-height: 1.15
+      - color: |
+          [[[
+            const ids = Array.isArray(variables.light_entities)
+              ? variables.light_entities
+              : [variables.lights_target_entity];
+            return ids.some((id) => states[id]?.state === 'on') ? 'var(--active-text-color)' : 'inherit';
+          ]]]
+    label:
+      - align-self: start
+      - position: absolute
+      - top: 42px
+      - left: 12px
+      - right: 72px
+      - z-index: 3
+      - margin-top: 0
+      - min-height: 18px
+      - line-height: 1.15
+      - padding-bottom: 0
+      - color: |
+          [[[
+            const ids = Array.isArray(variables.light_entities)
+              ? variables.light_entities
+              : [variables.lights_target_entity];
+            return ids.some((id) => states[id]?.state === 'on') ? 'var(--active-text-color)' : 'var(--subtext-color)';
+          ]]]
+    custom_fields:
+      lights_button:
+        - position: absolute
+        - left: 12px
+        - bottom: 12px
+        - margin: 0
+        - z-index: 2
+        - display: |
+            [[[
+              const ids = Array.isArray(variables.light_entities)
+                ? variables.light_entities
+                : [variables.lights_target_entity];
+              return ids.filter(Boolean).length ? 'block' : 'none';
+            ]]]
+  custom_fields:
+    lights_button:
+      card:
+        type: custom:button-card
+        entity: |
+          [[[
+            const ids = Array.isArray(variables.light_entities)
+              ? variables.light_entities
+              : [variables.lights_target_entity];
+            return ids[0] || variables.lights_target_entity;
+          ]]]
+        show_name: false
+        show_state: false
+        show_icon: true
+        icon: |
+          [[[
+            const ids = Array.isArray(variables.light_entities)
+              ? variables.light_entities
+              : [variables.lights_target_entity];
+            return ids.some((id) => states[id]?.state === 'on')
+              ? 'mdi:lightbulb-group'
+              : 'mdi:lightbulb-group-off-outline';
+          ]]]
+        tap_action:
+          action: call-service
+          service: light.turn_off
+          data:
+            entity_id: |
+              [[[
+                const ids = Array.isArray(variables.light_entities)
+                  ? variables.light_entities
+                  : [variables.lights_target_entity];
+                return ids.filter(Boolean);
+              ]]]
+          haptic: heavy
+        hold_action:
+          action: none
+        double_tap_action:
+          action: none
+        styles:
+          card:
+            - width: 48px
+            - height: 48px
+            - padding: 0
+            - border-radius: 999px
+            - box-shadow: none
+            - background: |
+                [[[
+                  const ids = Array.isArray(variables.light_entities)
+                    ? variables.light_entities
+                    : [variables.lights_target_entity];
+                  return ids.some((id) => states[id]?.state === 'on')
+                    ? 'var(--active-overlay-color)'
+                    : 'var(--ha-card-background)';
+                ]]]
+            - border: |
+                [[[
+                  const ids = Array.isArray(variables.light_entities)
+                    ? variables.light_entities
+                    : [variables.lights_target_entity];
+                  return ids.some((id) => states[id]?.state === 'on')
+                    ? 'none'
+                    : '1px solid var(--divider-color)';
+                ]]]
+          icon:
+            - width: 56%
+            - color: |
+                [[[
+                  const ids = Array.isArray(variables.light_entities)
+                    ? variables.light_entities
+                    : [variables.lights_target_entity];
+                  return ids.some((id) => states[id]?.state === 'on')
+                    ? 'var(--active-text-color)'
+                    : 'var(--room-card-icon-color)';
+                ]]]

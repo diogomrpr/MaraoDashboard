@@ -1,12 +1,25 @@
 {
   "name": "marao-dashboard",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "type": "module",
-  "description": "Tests for the Marao Dashboard builder, custom cards, theme, and camera events",
+  "description": "Marao Dashboard Home Assistant dashboard development tools",
   "scripts": {
-    "test": "npm run test:static",
+    "setup": "npm ci",
+    "build:editor": "node scripts/build-editor.js",
+    "check:editor": "node scripts/build-editor.js --check",
+    "build:hacs": "npm run build:editor && node scripts/build-hacs-dist.js",
     "test:frontend": "node --test tests/frontend/*.test.js",
-    "test:static": "node --check custom_components/marao_dashboard/frontend/MaraoDashboard.js && node --check custom_components/marao_dashboard/frontend/MaraoCameraCard.js && npm run test:frontend"
+    "test:static": "npm run check:editor && npm run test:frontend && npm run build:hacs && node --check dist/custom_components/marao_dashboard/frontend/MaraoDashboard.js && node scripts/validate-yaml.js",
+    "test:python": "pytest --cov=custom_components.marao_dashboard --cov-report=term-missing",
+    "test": "npm run test:static && npm run test:python",
+    "test:ha:e2e": "node scripts/test-ha-dashboard-e2e.js",
+    "ha:sync": "npm run build:hacs && node scripts/sync-ha-local.js",
+    "ha:sync:dry-run": "node scripts/sync-ha-local.js --dry-run"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "monaco-editor": "0.56.0",
+    "playwright": "1.61.1",
+    "yaml": "2.7.0"
   }
 }

@@ -1,0 +1,286 @@
+hc_access_card:
+  template: hc_base_card
+  show_state: false
+  show_label: true
+  variables:
+    popup_hash: "#access"
+  icon: |
+    [[[
+      const state = entity?.state;
+      const domain = entity?.entity_id?.split('.')[0];
+      const deviceClass = entity?.attributes?.device_class;
+      if (domain === 'lock') {
+        return state === 'locked' ? 'mdi:lock' : 'mdi:lock-open-variant';
+      }
+      if (deviceClass === 'garage') {
+        return state === 'closed' ? 'mdi:garage' : 'mdi:garage-open';
+      }
+      return state === 'closed' ? 'mdi:door-closed' : 'mdi:door-open';
+    ]]]
+  label: |
+    [[[
+      const state = entity?.state || 'unknown';
+      const key = `common.${state}`;
+      const fallback = state.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+      return window.MaraoDashboard?.localize?.(key, hass) || fallback;
+    ]]]
+  tap_action:
+    action: navigate
+    navigation_path: "[[[ return variables.popup_hash ]]]"
+    haptic: heavy
+  hold_action:
+    action: none
+  state:
+    - value: "closed"
+      styles:
+        card:
+          - background: var(--color-green)
+        name:
+          - color: var(--primary-text-color)
+        label:
+          - color: var(--primary-text-color)
+        icon:
+          - color: var(--primary-text-color)
+    - value: "locked"
+      styles:
+        card:
+          - background: var(--color-green)
+        name:
+          - color: var(--primary-text-color)
+        label:
+          - color: var(--primary-text-color)
+        icon:
+          - color: var(--primary-text-color)
+    - value: "open"
+      styles:
+        card:
+          - background: var(--color-red)
+        name:
+          - color: var(--active-text-color)
+        label:
+          - color: var(--active-text-color)
+        icon:
+          - color: var(--active-text-color)
+    - value: "unlocked"
+      styles:
+        card:
+          - background: var(--color-red)
+        name:
+          - color: var(--active-text-color)
+        label:
+          - color: var(--active-text-color)
+        icon:
+          - color: var(--active-text-color)
+    - value: "opening"
+      styles:
+        card:
+          - background: var(--color-orange)
+        name:
+          - color: var(--active-text-color)
+        label:
+          - color: var(--active-text-color)
+        icon:
+          - color: var(--active-text-color)
+    - value: "closing"
+      styles:
+        card:
+          - background: var(--color-orange)
+        name:
+          - color: var(--active-text-color)
+        label:
+          - color: var(--active-text-color)
+        icon:
+          - color: var(--active-text-color)
+
+hc_access_action_base:
+  template: hc_single_title_card
+  show_name: true
+  show_icon: true
+  show_label: true
+  show_state: false
+  variables:
+    action_service: ""
+    action_requires_hold: false
+    action_label_key: common.open
+    action_color: var(--primary-color)
+  name: |
+    [[[
+      return window.MaraoDashboard?.localize?.(variables.action_label_key, hass) || variables.action_label_key;
+    ]]]
+  label: |
+    [[[
+      return '';
+    ]]]
+  hold_action:
+    action: none
+  styles:
+    grid:
+      - grid-template-areas: '"i n" "i l"'
+      - grid-template-columns: 56px 1fr
+      - grid-template-rows: min-content min-content
+      - column-gap: 12px
+    card:
+      - min-height: 84px
+      - padding: 14px
+      - background: "[[[ return variables.action_color ]]]"
+    img_cell:
+      - background: var(--opacity-contrast-100)
+      - border-radius: 50%
+      - width: 48px
+      - height: 48px
+      - align-self: center
+      - justify-self: center
+    icon:
+      - width: 62%
+      - color: var(--active-text-color)
+    name:
+      - justify-self: start
+      - align-self: end
+      - font-size: var(--font-size-primary)
+      - font-weight: var(--font-weight-primary)
+      - color: var(--active-text-color)
+    label:
+      - justify-self: start
+      - align-self: start
+      - font-size: var(--font-size-secondary)
+      - font-weight: var(--font-weight-secondary)
+      - color: var(--active-text-color)
+      - opacity: 0.75
+
+hc_access_action_card:
+  template: hc_access_action_base
+  tap_action:
+    action: call-service
+    service: "[[[ return variables.action_service ]]]"
+    data:
+      entity_id: "[[[ return entity.entity_id ]]]"
+
+    haptic: heavy
+hc_access_slide_action_card:
+  template: hc_access_action_base
+  label: |
+    [[[
+      const state = entity?.state;
+      if (state === 'opening') {
+        return window.MaraoDashboard?.localize?.('common.opening', hass) || 'Opening';
+      }
+      if (state === 'open') {
+        return window.MaraoDashboard?.localize?.('common.open', hass) || 'Open';
+      }
+      if (state === 'unlocking') {
+        return window.MaraoDashboard?.localize?.('common.unlocking', hass) || 'Unlocking...';
+      }
+      const key = entity?.entity_id?.startsWith('lock.') ? 'access.slide_to_unlock' : 'access.slide_to_open';
+      return window.MaraoDashboard?.localize?.(key, hass) || 'Slide to open';
+    ]]]
+  tap_action:
+    action: none
+  hold_action:
+    action: none
+  custom_fields:
+    slider: |
+      [[[
+        return `<marao-slide-to-open entity="${entity.entity_id}" state="${entity.state}"></marao-slide-to-open>`;
+      ]]]
+  styles:
+    grid:
+      - grid-template-areas: '"i n" "i l" "slider slider"'
+      - grid-template-columns: 52px 1fr
+      - grid-template-rows: min-content min-content 64px
+      - column-gap: 12px
+      - row-gap: 8px
+    card:
+      - min-height: 156px
+      - background: |
+          [[[
+            return ['open', 'opening', 'unlocking', 'unavailable'].includes(entity?.state)
+              ? 'var(--ha-card-background)'
+              : variables.action_color;
+          ]]]
+    icon:
+      - color: |
+          [[[
+            return ['open', 'opening', 'unlocking', 'unavailable'].includes(entity?.state)
+              ? 'var(--icon-color)'
+              : 'var(--active-text-color)';
+          ]]]
+    name:
+      - color: |
+          [[[
+            return ['open', 'opening', 'unlocking', 'unavailable'].includes(entity?.state)
+              ? 'var(--primary-text-color)'
+              : 'var(--active-text-color)';
+          ]]]
+    label:
+      - font-size: var(--font-size-primary)
+      - color: |
+          [[[
+            return ['open', 'opening', 'unlocking', 'unavailable'].includes(entity?.state)
+              ? 'var(--subtext-color)'
+              : 'var(--active-text-color)';
+          ]]]
+    custom_fields:
+      slider:
+        - grid-area: slider
+        - width: 100%
+        - min-width: 0
+
+hc_access_hold_action_card:
+  template: hc_access_action_base
+  label: "[[[ return window.MaraoDashboard?.localize?.('access.hold_1_second', hass) || 'Hold 1 second' ]]]"
+  tap_action:
+    action: none
+  press_action:
+    action: javascript
+    javascript: |
+      [[[
+        window.MaraoDashboard = window.MaraoDashboard || {};
+        const timers = window.MaraoDashboard.accessHoldTimers || (window.MaraoDashboard.accessHoldTimers = {});
+        const key = `${entity.entity_id}:${variables.action_service}`;
+        window.clearTimeout(timers[key]);
+        timers[key] = window.setTimeout(() => {
+          const [domain, service] = String(variables.action_service || '').split('.');
+          if (domain && service) {
+            hass.callService(domain, service, { entity_id: entity.entity_id });
+            window.dispatchEvent(new CustomEvent('haptic', { detail: 'heavy' }));
+          }
+          delete timers[key];
+        }, 1000);
+      ]]]
+    haptic: heavy
+  release_action:
+    action: javascript
+    javascript: |
+      [[[
+        const timers = window.MaraoDashboard?.accessHoldTimers;
+        const key = `${entity.entity_id}:${variables.action_service}`;
+        if (timers?.[key]) {
+          window.clearTimeout(timers[key]);
+          delete timers[key];
+        }
+      ]]]
+  hold_action:
+    action: none
+  double_tap_action:
+    action: none
+  styles:
+    card:
+      - background: |
+          [[[
+            return `linear-gradient(90deg, var(--active-overlay-color), var(--active-overlay-color)) left / 0% 100% no-repeat, ${variables.action_color}`;
+          ]]]
+      - background-size: 0% 100%, auto
+      - background-repeat: no-repeat
+      - transition: background-size 200ms linear
+    label:
+      - justify-self: start
+      - align-self: start
+      - font-size: var(--font-size-secondary)
+      - font-weight: var(--font-weight-secondary)
+      - color: var(--active-text-color)
+      - opacity: 0.75
+  extra_styles: |
+    ha-card:active {
+      background-size: 100% 100%, auto !important;
+      transition: background-size 1s linear !important;
+    }

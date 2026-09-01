@@ -1,0 +1,10 @@
+{
+  "url": "http://homeassistant.local:8123",
+  "username": "test",
+  "password": "test",
+  "sshHost": "homeassistant.local",
+  "sshUser": "root",
+  "sshPort": 22,
+  "sshKeyPath": ".ha-local-ssh/id_ed25519",
+  "remoteConfigPath": "/config"
+}

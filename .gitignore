@@ -1,12 +1,56 @@
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100/
+.Trashes/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Editor/runtime noise
+*.swp
+*.swo
+*~
 node_modules/
-dist/
 .venv*/
 __pycache__/
 *.py[cod]
-.coverage
+.coverage*
+coverage.xml
+htmlcov/
+.playwright-browsers/
+playwright-report/
+test-results/
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+*.egg-info/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Generated build output
+dist/
 _site/
 docs/_site/
 docs/.jekyll-cache/
 docs/vendor/bundle/
+
+# Legacy/generated Home Assistant local test artifacts
+.ha-test/
+.ha-test-backups/
+
+# Local Home Assistant VM sync config
+.ha-local.json
+.ha-local-sync-state.json
+.ha-local-ssh/
+marao-dashboard-local-dev
+marao-dashboard-local-dev.pub
+
+# Standalone dashboard generator subproject
+/tools/marao-dashboard-generator/

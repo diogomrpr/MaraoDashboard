@@ -1,0 +1,31 @@
+hc_timeline_card:
+  template: hc_single_title_card
+  show_name: false
+  show_icon: false
+  show_state: false
+  show_label: false
+  variables:
+    timeline_name: State timeline
+  tap_action:
+    action: none
+  hold_action:
+    action: none
+  custom_fields:
+    timeline: |
+      [[[
+        const name = encodeURIComponent(variables.timeline_name || entity?.attributes?.friendly_name || 'State timeline');
+        return `<marao-state-timeline-card entity="${entity.entity_id}" data-name="${name}"></marao-state-timeline-card>`;
+      ]]]
+  styles:
+    grid:
+      - grid-template-areas: '"timeline"'
+      - grid-template-columns: minmax(0, 1fr)
+    card:
+      - padding: 0
+      - background: none
+      - border: 0
+      - box-shadow: none
+    custom_fields:
+      timeline:
+        - width: 100%
+        - min-width: 0

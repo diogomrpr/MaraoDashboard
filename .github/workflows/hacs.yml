@@ -1,4 +1,4 @@
-name: HACS
+name: Validate HACS
 
 on:
   push:
@@ -20,7 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: hacs/action@main
+      - name: HACS validation
+        uses: hacs/action@main
         with:
           category: integration
           ignore: brands

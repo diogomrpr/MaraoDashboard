@@ -1,1 +1,7 @@
+# Auto detect text files and perform LF normalization
 * text=auto eol=lf
+
+# Minified Monaco bundles preserve significant raw whitespace in template strings.
+custom_components/marao_dashboard/frontend/MaraoDashboardPanel.js -whitespace
+custom_components/marao_dashboard/frontend/MaraoDashboardEditorWorker.js -whitespace
+custom_components/marao_dashboard/frontend/MaraoDashboardJsonWorker.js -whitespace

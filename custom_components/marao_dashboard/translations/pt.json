@@ -3,11 +3,41 @@
     "step": {
       "user": {
         "title": "Marao Dashboard",
-        "description": "Instale o construtor, os cartões e o tema Marao Dashboard, com suporte para câmaras Frigate e UniFi Protect."
+        "description": "Instale o construtor, os cartões e o tema do Marao Dashboard. Os cartões da comunidade necessários são instalados separadamente através do HACS."
       }
     },
     "abort": {
-      "single_instance_allowed": "O Marao Dashboard já está configurado."
+      "already_configured": "O Marao Dashboard já está configurado."
+    }
+  },
+  "issues": {
+    "missing_dashboard_dependencies": {
+      "title": "Não foram detetadas dependências do Marao Dashboard",
+      "description": "O dashboard atual utiliza estes cartões da comunidade, mas os respetivos recursos não foram detetados: {dependencies}. Instale-os ou registe-os através do HACS e selecione Verificar novamente no construtor Marao. Um recurso renomeado manualmente também pode aparecer como não detetado."
+    },
+    "legacy_vendor_resources": {
+      "title": "Remova os recursos antigos de cartões incluídos pelo Marao",
+      "description": "O Marao já não inclui cartões de terceiros. Remova estas entradas antigas dos recursos Lovelace em YAML e reinicie o Home Assistant: {resources}"
+    }
+  },
+  "services": {
+    "generate_dashboard": {
+      "name": "Gerar dashboard",
+      "description": "Gera o dashboard YAML do Marao Dashboard a partir de dashboard.json.",
+      "fields": {
+        "config_path": {
+          "name": "Caminho da configuração",
+          "description": "Caminho para o ficheiro JSON do dashboard, relativo a /config salvo se for absoluto."
+        },
+        "dashboard_key": {
+          "name": "Chave do dashboard",
+          "description": "Substituição opcional da chave do dashboard Lovelace."
+        },
+        "dry_run": {
+          "name": "Simulação",
+          "description": "Valida e mostra os ficheiros previstos sem escrever YAML nem alterar configuration.yaml."
+        }
+      }
     }
   }
 }

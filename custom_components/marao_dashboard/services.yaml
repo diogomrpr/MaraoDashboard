@@ -1,0 +1,17 @@
+generate_dashboard:
+  fields:
+    config_path:
+      example: dashboard/MaraoDashboard/dashboard.json
+      required: false
+      selector:
+        text:
+    dashboard_key:
+      example: marao-dashboard
+      required: false
+      selector:
+        text:
+    dry_run:
+      required: false
+      default: false
+      selector:
+        boolean:

@@ -1,0 +1,418 @@
+hc_climate_card:
+  template: hc_single_title_card
+  variables:
+    show_graph: true
+    graph_entity:
+    graph_color: var(--color-red)
+    setpoint_label:
+    mode_selector_hash:
+    show_mode_buttons: false
+  show_label: true
+  show_state: true
+  tap_action:
+    action: |
+      [[[
+        const modes = entity?.attributes?.hvac_modes || [];
+        return variables.mode_selector_hash && modes.length > 1 ? 'navigate' : 'call-service';
+      ]]]
+    service: climate.toggle
+    target:
+      entity_id: "[[[ return entity.entity_id ]]]"
+    navigation_path: |
+      [[[
+        const modes = entity?.attributes?.hvac_modes || [];
+        return variables.mode_selector_hash && modes.length > 1 ? variables.mode_selector_hash : undefined;
+      ]]]
+    haptic: heavy
+  hold_action:
+    action: more-info
+
+    haptic: heavy
+  state_display: |
+    [[[
+      const attrs = states[entity.entity_id]?.attributes ?? {};
+      const mode = states[entity.entity_id]?.state;
+      const single = Number(attrs.temperature ?? attrs.target_temperature);
+      const low = Number(attrs.target_temp_low ?? attrs.target_temperature_low);
+      const high = Number(attrs.target_temp_high ?? attrs.target_temperature_high);
+      const setpointLabel =
+        variables.setpoint_label ||
+        window.MaraoDashboard?.localize?.('climate.target_temperature', hass) ||
+        'Target Temperature';
+      const prefix = `${setpointLabel}: `;
+
+      if (mode === 'heat' && Number.isFinite(single)) {
+        return `${prefix}${Math.round(single)}°`;
+      }
+      if (mode === 'cool' && Number.isFinite(single)) {
+        return `${prefix}${Math.round(single)}°`;
+      }
+      if (mode === 'heat' && Number.isFinite(low)) {
+        return `${prefix}${Math.round(low)}°`;
+      }
+      if (mode === 'cool' && Number.isFinite(high)) {
+        return `${prefix}${Math.round(high)}°`;
+      }
+      if (Number.isFinite(low) && Number.isFinite(high)) {
+        return `${prefix}${Math.round(low)}-${Math.round(high)}°`;
+      }
+      if (Number.isFinite(low)) {
+        return `${prefix}${Math.round(low)}°`;
+      }
+      if (Number.isFinite(high)) {
+        return `${prefix}${Math.round(high)}°`;
+      }
+      if (Number.isFinite(single)) {
+        return `${prefix}${Math.round(single)}°`;
+      }
+      return `${prefix}—`;
+    ]]]
+  label: |
+    [[[
+      const current = Number(states[entity.entity_id]?.attributes?.current_temperature);
+
+      if (Number.isFinite(current)) {
+        return `${Math.round(current)}<sup style="font-size: 40px;">°</sup>`;
+      }
+      return '—';
+    ]]]
+  show_icon: false
+  styles:
+    grid:
+      - grid-template-areas: |
+          'l buttons'
+          'n buttons'
+          's buttons'
+          'mode_buttons mode_buttons'
+          'graph graph'
+      - grid-template-rows: repeat(3, min-content) min-content min-content
+    card:
+      - padding: 20px
+      - overflow: hidden
+      - background: |
+          [[[
+            const mode = entity?.state;
+            const colors = {
+              heat: 'var(--color-red)',
+              heating: 'var(--color-red)',
+              cool: 'var(--color-blue)',
+              cooling: 'var(--color-blue)',
+              cold: 'var(--color-blue)',
+              heat_cool: 'var(--color-purple)',
+              auto: 'var(--color-gold)',
+              dry: 'var(--color-yellow)',
+              drying: 'var(--color-yellow)',
+              fan_only: 'var(--color-green)',
+              fan: 'var(--color-green)',
+            };
+            return mode && !['off', 'unavailable', 'unknown'].includes(mode)
+              ? colors[mode] ?? 'var(--primary-color)'
+              : 'var(--ha-card-background)';
+          ]]]
+    name:
+      - justify-self: start
+      - align-self: end
+      - font-weight: 600
+      - font-size: 18px
+      - z-index: 2
+      - margin-bottom: 0
+      - pointer-events: none
+      - color: |
+          [[[
+            return entity?.state && !['off', 'unavailable', 'unknown'].includes(entity.state)
+              ? 'var(--active-text-color)'
+              : 'var(--primary-text-color)';
+          ]]]
+    label:
+      - font-size: 70px
+      - justify-self: start
+      - align-self: start
+      - font-weight: 700
+      - z-index: 2
+      - color: |
+          [[[
+            return entity?.state && !['off', 'unavailable', 'unknown'].includes(entity.state)
+              ? 'var(--active-text-color)'
+              : 'var(--primary-text-color)';
+          ]]]
+    state:
+      - justify-self: start
+      - color: |
+          [[[
+            return entity?.state && !['off', 'unavailable', 'unknown'].includes(entity.state)
+              ? 'var(--active-text-color)'
+              : 'var(--subtext-color)';
+          ]]]
+      - font-size: 18px
+      - margin-top: 4px
+      - font-weight: 500
+      - z-index: 2
+    custom_fields:
+      mode_buttons:
+        - display: |
+            [[[
+              const modes = entity?.attributes?.hvac_modes || [];
+              return variables.show_mode_buttons && modes.length > 1 ? 'block' : 'none';
+            ]]]
+        - margin-top: 14px
+        - z-index: 3
+        - align-self: stretch
+        - overflow: visible
+      graph:
+        - display: |
+            [[[ return variables.show_graph && variables.graph_entity ? 'block' : 'none' ]]]
+        - position: absolute
+        - left: 0
+        - bottom: -1px
+        - width: 100%
+        - z-index: 1
+
+  custom_fields:
+    mode_buttons: |
+      [[[
+        const modes = entity?.attributes?.hvac_modes || [];
+        if (modes.length <= 1) {
+          return '';
+        }
+
+        const label = (key, fallback) => window.MaraoDashboard?.localize?.(key, hass) || fallback;
+        const labels = {
+          off: label('climate.mode.off', 'Off'),
+          heat: label('climate.mode.heat', 'Heat'),
+          cool: label('climate.mode.cool', 'Cool'),
+          heat_cool: label('climate.mode.heat_cool', 'Heat/Cool'),
+          auto: label('climate.mode.auto', 'Auto'),
+          fan_only: label('climate.mode.fan_only', 'Fan'),
+          dry: label('climate.mode.dry', 'Dry'),
+        };
+        const escapeHtml = (value) =>
+          String(value).replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+          }[char]));
+        const escapeJs = (value) => String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const buttonStyle = [
+          'height:52px',
+          'min-width:0',
+          'border-radius:16px',
+          'border:1px solid var(--divider-color)',
+          'background:var(--ha-card-background)',
+          'color:var(--primary-text-color)',
+          'font:inherit',
+          'font-size:18px',
+          'font-weight:700',
+          'box-shadow:none',
+          'cursor:pointer',
+        ].join(';');
+        const activeStyle = [
+          buttonStyle,
+          'border-color:var(--primary-color)',
+          'background:var(--primary-color)',
+          'color:var(--active-text-color)',
+        ].join(';');
+        const buttons = modes.map((mode) => {
+          const style = mode === entity.state ? activeStyle : buttonStyle;
+          return `
+            <button
+              type="button"
+              style="${style}"
+              onclick="event.stopPropagation(); const host = this.getRootNode().host; host.dispatchEvent(new CustomEvent('haptic', { bubbles: true, composed: true, detail: 'heavy' })); (host.hass || host._hass).callService('climate', 'set_hvac_mode', { entity_id: '${escapeJs(entity.entity_id)}', hvac_mode: '${escapeJs(mode)}' });"
+            >
+              ${escapeHtml(labels[mode] || mode)}
+            </button>
+          `;
+        }).join('');
+
+        return `
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;width:100%;">
+            ${buttons}
+          </div>
+        `;
+      ]]]
+    buttons:
+      card:
+        type: custom:button-card
+        styles:
+          grid:
+            - grid-template-areas: |
+                'item_1'
+                'item_2'
+                'item_3'
+            - row-gap: 1.20
+          card:
+            - padding: 10px
+            - border-radius: 50px
+            - box-shadow: none
+            - background-color: var(--button-card-background)
+            - z-index: 3
+          custom_fields:
+            item_2:
+              - opacity: 0.7
+        custom_fields:
+          item_1:
+            card:
+              type: custom:button-card
+              icon: mdi:chevron-up
+              styles: &icon_style
+                icon:
+                  - width: 25px
+                card:
+                  - padding: 10px
+                  - border-radius: 500px
+                  - box-shadow: none
+                  - background: none
+              tap_action:
+                action: call-service
+                service: climate.set_temperature
+                data: |
+                  [[[
+                    const attrs = states[entity.entity_id]?.attributes ?? {};
+                    const mode = states[entity.entity_id]?.state;
+                    const step = Number(
+                      attrs.target_temp_step
+                      ?? attrs.target_temperature_step
+                      ?? 1
+                    );
+                    const delta = Number.isFinite(step) ? step : 1;
+                    const single = Number(attrs.temperature ?? attrs.target_temperature);
+                    const low = Number(attrs.target_temp_low ?? attrs.target_temperature_low);
+                    const high = Number(attrs.target_temp_high ?? attrs.target_temperature_high);
+
+                    if (mode === 'heat_cool' && Number.isFinite(low) && Number.isFinite(high)) {
+                      return {
+                        target_temp_low: low + delta,
+                        target_temp_high: high + delta,
+                      };
+                    }
+
+                    const target =
+                      Number.isFinite(single)
+                        ? single
+                        : mode === 'cool'
+                          ? high
+                          : low;
+
+                    return Number.isFinite(target)
+                      ? { temperature: target + delta }
+                      : {};
+                  ]]]
+                target:
+                  entity_id: "[[[ return entity.entity_id ]]]"
+                haptic: heavy
+              show: |
+                [[[
+                  const mode = states[entity.entity_id]?.state;
+                  return mode === 'heat' || mode === 'cool' || mode === 'heat_cool';
+                ]]]
+          item_2: |
+            [[[
+              const attrs = states[entity.entity_id]?.attributes ?? {};
+              const mode = states[entity.entity_id]?.state;
+              const single = Number(attrs.temperature ?? attrs.target_temperature);
+              const low = Number(attrs.target_temp_low ?? attrs.target_temperature_low);
+              const high = Number(attrs.target_temp_high ?? attrs.target_temperature_high);
+
+              if (mode === 'heat' && Number.isFinite(single)) {
+                return `${Math.round(single)}°`;
+              }
+              if (mode === 'cool' && Number.isFinite(single)) {
+                return `${Math.round(single)}°`;
+              }
+              if (mode === 'heat' && Number.isFinite(low)) {
+                return `${Math.round(low)}°`;
+              }
+              if (mode === 'cool' && Number.isFinite(high)) {
+                return `${Math.round(high)}°`;
+              }
+              if (Number.isFinite(low) && Number.isFinite(high)) {
+                return `${Math.round(low)}-${Math.round(high)}°`;
+              }
+              if (Number.isFinite(low)) {
+                return `${Math.round(low)}°`;
+              }
+              if (Number.isFinite(high)) {
+                return `${Math.round(high)}°`;
+              }
+              if (Number.isFinite(single)) {
+                return `${Math.round(single)}°`;
+              }
+              return '—';
+            ]]]
+          item_3:
+            card:
+              type: custom:button-card
+              icon: mdi:chevron-down
+              styles: *icon_style
+              tap_action:
+                action: call-service
+                service: climate.set_temperature
+                data: |
+                  [[[
+                    const attrs = states[entity.entity_id]?.attributes ?? {};
+                    const mode = states[entity.entity_id]?.state;
+                    const step = Number(
+                      attrs.target_temp_step
+                      ?? attrs.target_temperature_step
+                      ?? 1
+                    );
+                    const delta = Number.isFinite(step) ? step : 1;
+                    const single = Number(attrs.temperature ?? attrs.target_temperature);
+                    const low = Number(attrs.target_temp_low ?? attrs.target_temperature_low);
+                    const high = Number(attrs.target_temp_high ?? attrs.target_temperature_high);
+
+                    if (mode === 'heat_cool' && Number.isFinite(low) && Number.isFinite(high)) {
+                      return {
+                        target_temp_low: low - delta,
+                        target_temp_high: high - delta,
+                      };
+                    }
+
+                    const target =
+                      Number.isFinite(single)
+                        ? single
+                        : mode === 'cool'
+                          ? high
+                          : low;
+
+                    return Number.isFinite(target)
+                      ? { temperature: target - delta }
+                      : {};
+                  ]]]
+                target:
+                  entity_id: "[[[ return entity.entity_id ]]]"
+                haptic: heavy
+              show: |
+                [[[
+                  const mode = states[entity.entity_id]?.state;
+                  return mode === 'heat' || mode === 'cool' || mode === 'heat_cool';
+                ]]]
+    graph:
+      card:
+        type: custom:mini-graph-card
+        entities:
+          - entity: "[[[ return variables.graph_entity || entity.entity_id ]]]"
+            show_fill: true
+            show_line: false
+        show:
+          name: false
+          icon: false
+          state: false
+          points: false
+          labels: false
+        height: 100
+        line_width: 2
+        line_color: "[[[ return variables.graph_color ]]]"
+        card_mod:
+          style: |
+            ha-card {
+              background: none;
+              box-shadow: none;
+              --ha-card-border-width: 0;
+              z-index: 1;
+            }
+        tap_action:
+          action: more-info
+          haptic: heavy

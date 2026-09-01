@@ -3,11 +3,41 @@
     "step": {
       "user": {
         "title": "Marao Dashboard",
-        "description": "Install the Marao dashboard builder, custom cards, theme, and camera support for Frigate and UniFi Protect."
+        "description": "Install the Marao Dashboard builder, cards, and theme. Required community cards are installed separately through HACS."
       }
     },
     "abort": {
-      "single_instance_allowed": "Marao Dashboard is already configured."
+      "already_configured": "Marao Dashboard is already configured."
+    }
+  },
+  "issues": {
+    "missing_dashboard_dependencies": {
+      "title": "Marao Dashboard dependencies were not detected",
+      "description": "The current dashboard uses these independently installed community cards, but their resources were not detected: {dependencies}. Install or register them through HACS, then use Recheck in the Marao builder. A manually renamed resource may also appear as not detected."
+    },
+    "legacy_vendor_resources": {
+      "title": "Remove old Marao bundled-card resources",
+      "description": "Marao no longer bundles third-party dashboard cards. Remove these legacy entries from your YAML Lovelace resources, then restart Home Assistant: {resources}"
+    }
+  },
+  "services": {
+    "generate_dashboard": {
+      "name": "Generate dashboard",
+      "description": "Generate the Marao Dashboard YAML dashboard from dashboard.json.",
+      "fields": {
+        "config_path": {
+          "name": "Config path",
+          "description": "Path to the dashboard JSON config, relative to /config unless absolute."
+        },
+        "dashboard_key": {
+          "name": "Dashboard key",
+          "description": "Optional Lovelace dashboard key override."
+        },
+        "dry_run": {
+          "name": "Dry run",
+          "description": "Validate and report planned files without writing YAML or patching configuration.yaml."
+        }
+      }
     }
   }
 }

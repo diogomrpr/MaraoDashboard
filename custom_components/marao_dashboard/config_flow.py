@@ -1,26 +1,30 @@
 """Config flow for Marao Dashboard."""
 
+from __future__ import annotations
+
 from typing import Any
 
 import voluptuous as vol
 
 from homeassistant import config_entries
 
-from . import DOMAIN
+from .const import DOMAIN
 
 
 class MaraoDashboardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Create the single Marao Dashboard entry."""
+    """Handle a config flow for Marao Dashboard."""
 
     VERSION = 1
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Handle the user setup step."""
+        """Create the single Marao Dashboard config entry."""
 
-        if self._async_current_entries():
-            return self.async_abort(reason="single_instance_allowed")
+        await self.async_set_unique_id(DOMAIN)
+        self._abort_if_unique_id_configured()
+
         if user_input is None:
             return self.async_show_form(step_id="user", data_schema=vol.Schema({}))
+
         return self.async_create_entry(title="Marao Dashboard", data={})

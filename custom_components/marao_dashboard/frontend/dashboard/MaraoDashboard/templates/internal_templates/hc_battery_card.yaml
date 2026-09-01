@@ -1,0 +1,95 @@
+hc_battery_card:
+  template: hc_base_card
+  show_name: true
+  show_icon: true
+  show_state: true
+  show_last_changed: true
+  variables:
+    hc_card_color: var(--primary-color)
+    on_icon: mdi:battery
+  state:
+    - operator: '>='
+      value: 80
+      icon: "[[[ return variables.on_icon ]]]"
+      styles:
+        card:
+          - background: var(--color-green)
+        name:
+          - color: var(--color-black)
+        state:
+          - color: var(--color-black)
+        icon:
+          - color: var(--color-black)
+        img_cell:
+          - background: var(--opacity-contrast-100)
+        label:
+          - color: var(--color-black)
+    - operator: '>='
+      value: 20
+      icon: "[[[ return variables.on_icon ]]]"
+      styles:
+        card:
+          - background: var(--color-yellow)
+        name:
+          - color: var(--color-black)
+        state:
+          - color: var(--color-black)
+        icon:
+          - color: var(--color-black)
+        img_cell:
+          - background: var(--opacity-contrast-100)
+        label:
+          - color: var(--color-black)
+    - operator: '<'
+      value: 20
+      icon: "[[[ return variables.on_icon ]]]"
+      styles:
+        card:
+          - background: var(--color-red)
+        name:
+          - color: var(--color-black)
+        state:
+          - color: var(--color-black)
+        icon:
+          - color: var(--color-black)
+        img_cell:
+          - background: var(--opacity-contrast-100)
+        label:
+          - color: var(--color-black)
+  styles:
+    grid:
+      - grid-template-areas: |
+          's i'
+          'n i'
+          'l i'
+      - grid-template-rows: repeat(3, min-content)
+      - grid-template-columns: minmax(0, 1fr) 48px
+      - align-content: center
+      - row-gap: 4px
+    card:
+      - padding: 12px
+    state:
+      - justify-self: start
+      - font-size: 18px
+      - font-weight: 800
+      - padding-bottom: 0
+    name:
+      - text-align: left
+      - font-size: 18px
+      - font-weight: 700
+      - justify-self: start
+      - align-self: end
+      - overflow: hidden
+    label:
+      - text-align: left
+      - color: var(--subtext-color)
+      - font-weight: 500
+      - font-size: 18px
+      - justify-self: start
+      - align-self: center
+      - overflow: hidden
+    img_cell:
+      - width: 48px
+      - height: 48px
+      - align-self: center
+      - margin-bottom: 0

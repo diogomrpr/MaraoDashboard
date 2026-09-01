@@ -1,70 +1,60 @@
 # Marao Dashboard
 
-Marao Dashboard is a complete Home Assistant dashboard system. It includes a
-visual builder, responsive custom cards, a coordinated light and dark theme,
-and camera event support for Frigate and UniFi Protect.
+Marao Dashboard builds a complete, phone-friendly Home Assistant dashboard from
+a visual JSON editor. It combines generated overview and room views, reusable
+cards and pop-up controls, a coordinated theme, and local version history.
 
-## What it includes
+## Highlights
 
-- A visual builder that creates a storage-mode dashboard from Home Assistant
-  areas and entities.
-- Overview and room views generated with the modern Sections layout.
-- Five first-party elements: `marao-dashboard-builder`, `marao-header-card`,
-  `marao-room-card`, `marao-entity-card`, and `marao-camera-card`.
-- A light and dark theme registered by the integration.
-- Live camera feeds with recent Frigate or UniFi Protect events in a popover.
-- No edits to `configuration.yaml` and no bundled third-party card libraries.
+- Edit rooms, entities, cards, and optional pages from an admin-only Home
+  Assistant panel.
+- Generate a complete YAML dashboard while preserving marked custom-card
+  sections between rebuilds.
+- Use a responsive Marao theme and consistent controls for common Home
+  Assistant domains.
+- Add live camera previews with optional Frigate or UniFi Protect event pop-ups.
+- Restore recent generated dashboard versions from local history.
 
-## Install with HACS
+## Installation
 
-1. In HACS, open **Custom repositories**.
-2. Add `https://github.com/diogomrpr/MaraoDashboard` as an **Integration**.
-3. Download Marao Dashboard and restart Home Assistant.
-4. Go to **Settings → Devices & services → Add integration** and select
+Marao Dashboard is a HACS custom **Integration**. Its seven dashboard-card
+dependencies are separate HACS **Dashboard** downloads; Marao does not package
+third-party card code.
+
+1. Install the [required dashboard dependencies](docs/docs/installation/dependencies.md).
+2. Add `https://github.com/diogomrpr/MaraoDashboard` to HACS as a custom
+   **Integration** repository and download Marao Dashboard.
+3. Restart Home Assistant.
+4. Go to **Settings > Devices & services > Add integration**, then add
    **Marao Dashboard**.
-5. Refresh the browser so Home Assistant loads the cards and theme.
+5. Open the Marao Dashboard Editor from the sidebar and generate the dashboard.
 
-## Build a dashboard
+See the [full documentation](https://diogomrpr.github.io/MaraoDashboard/) for
+configuration, camera-provider requirements, updates, and troubleshooting.
 
-Add a Manual card to any temporary or existing dashboard:
+## Development
 
-```yaml
-type: custom:marao-dashboard-builder
+Install the locked Node and Python test dependencies, then run the test suite:
+
+```sh
+npm ci
+python3.14 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-test.txt
+npm test
 ```
 
-Choose the areas to include, enter a title and URL path, then review and create
-the dashboard. The builder requires a Home Assistant administrator account. It
-only writes after **Create dashboard** is selected, and it requires an explicit
-confirmation before replacing an existing dashboard.
+Useful focused checks are `npm run test:static` and `npm run test:python`. The
+local Home Assistant browser test, `npm run test:ha:e2e`, is opt-in and requires
+the local environment described in the
+[development guide](docs/docs/development/local-development.md).
 
-## Use the cards directly
+Third-party dashboard dependencies must remain independently installed through
+HACS. Do not copy their JavaScript bundles into this repository or a release.
 
-Every card can also be added by hand. For example:
+## Contributing and license
 
-```yaml
-type: custom:marao-entity-card
-entity: light.living_room
-```
-
-```yaml
-type: custom:marao-camera-card
-entity: camera.front_door
-```
-
-The camera card normally detects Frigate or UniFi Protect automatically. See
-the [camera guide](docs/cameras.md) for provider overrides.
-
-## Documentation
-
-- [Installation](docs/installation.md)
-- [Dashboard builder](docs/builder.md)
-- [Custom cards](docs/cards.md)
-- [Theme](docs/theme.md)
-- [Frigate and UniFi Protect cameras](docs/cameras.md)
-- [Development](docs/development.md)
-
-## License
-
-Marao Dashboard is distributed under the repository's MIT license.
+See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Marao
+Dashboard is distributed under the repository's license.
 
 Inspired by [HaCasa](https://github.com/damianeickhoff/HaCasa).

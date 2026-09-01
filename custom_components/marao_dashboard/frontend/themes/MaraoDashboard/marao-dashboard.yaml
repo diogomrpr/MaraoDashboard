@@ -1,0 +1,205 @@
+Marao Dashboard:
+  --control-circular-slider-color: var(--primary-color)
+  masonry-view-card-margin: 15px
+  card-mod-theme: Marao Dashboard
+  card-mod-root: |
+    @media (orientation: portrait) {
+      .header{
+          display: none;
+      }
+      #view {
+          padding: 0 !important;
+          max-height: 100vh !important;
+      }
+      .button-card-main {
+        font-size: 5rem;
+      }
+    }
+
+  ha-card-border-radius: 20px
+  ha-card-border-width: 0px
+
+  # Marao Dashboard Colors
+  color-green: '#3F7E4B'
+  color-red: '#D8514B'
+  color-blue: '#5FA2D9'
+  color-yellow: '#F2A84A'
+  color-purple: '#8A5A7B'
+  color-peach: '#E86A4F'
+  color-orange: '#F2A84A'
+  color-gold: '#FFD479'
+  color-black: '#0F1722'
+  color-white: '#F5F7FA'
+  color-grey: '#8794A8'
+  color-dark-gray: '#C3CFDD'
+  color-light-gray-nav: '#202B3C'
+  
+  # HomeAssistant Theme Variables
+  primary-color: '#2F6B4F'
+  ha-card-backgound-active: 'var(--primary-color)'
+  accent-color: '#5FA2D9'
+  state-input_boolean-active-color: var(--primary-color)
+  state-alarm_control_panel-disarmed-color: var(--icon-color)
+  ha-card-box-shadow: none
+  background: var(--ha-card-background)
+  background-icon-color-default: var(--button-card-background)
+  room-card-active-background: var(--primary-color)
+  room-card-icon-color: var(--primary-color)
+  active-text-color: '#FFFFFF'
+  active-overlay-color: rgba(255,255,255,.24)
+  contrast-10: rgba(245,247,250,.1)
+  divider-color: '#2D3A4C'
+  icon-color-default: var(--icon-color)
+  slider-color: rgba(95,162,217,.28)
+  text-color: var(--primary-text-color)
+  warning-color: '#F2A84A'
+  error-color: '#D8514B'
+  success-color: '#3F7E4B'
+  weather-sunny-background: 'linear-gradient(180deg, #6FB6E8 0%, #5FA2D9 100%)'
+  weather-clear-night-background: 'linear-gradient(180deg, #202B3C 0%, #0F1722 100%)'
+  weather-clear-background: 'linear-gradient(180deg, #6FB6E8 0%, #5FA2D9 100%)'
+  weather-cloudy-background: 'linear-gradient(180deg, #C3CFDD 0%, #8BA3BF 100%)'
+  weather-rain-background: 'linear-gradient(180deg, #4A6C8F 0%, #202B3C 100%)'
+  weather-storm-background: 'linear-gradient(180deg, #202B3C 0%, #0F1722 100%)'
+
+  # slider styling
+  md-slider-active-track-color: '#5FA2D9'
+  md-slider-inactive-track-color: rgba(255,255,255,.2)
+  md-slider-handle-color: '#F5F7FA'
+  md-slider-focus-handle-color: '#F5F7FA'
+  md-slider-hover-handle-color: '#dbdbdb'
+  md-slider-handle-shadow-color: none
+  md-slider-pressed-handle-color: '#dbdbdb'
+  md-slider-handle-width: 0px
+  md-slider-handle-height: 0px
+  md-ripple-hover-color: transparent
+  md-slider-label-container-color: transparent
+  md-slider-label-container-height: 0px
+  md-slider-label-text-color: transparent
+  md-slider-hover-state-layer-color: '#F5F7FA'
+  md-slider-pressed-state-layer-color: '#F5F7FA'
+
+  # font
+  primary-font-family: montserrat, Roboto, system-ui
+  paper-font-common-base_-_font-family: var(--primary-font-family)
+  paper-font-common-code_-_font-family: var(--primary-font-family)
+  paper-font-body1_-_font-family: var(--primary-font-family)
+  paper-font-subhead_-_font-family: var(--primary-font-family)
+  paper-font-headline_-_font-family: var(--primary-font-family)
+  paper-font-caption_-_font-family: var(--primary-font-family)
+  paper-font-title_-_font-family: var(--primary-font-family)
+  ha-card-header-font-family: var(--primary-font-family)
+  mdc-typography-body1-font-family: var(--primary-font-family)
+  mdc-typography-font-family: var(--primary-font-family)
+
+  font-size-primary: 18px
+  font-size-secondary: 16px
+  font-size-state: 12px
+  font-size-caption: 14px
+  font-weight-primary: 700
+  font-weight-secondary: 500
+  
+  # browser_mod.popup
+  dialog-backdrop-filter: blur(2em) brightness(0.75)
+  popup-background-color: rgba(32,43,60,0.94)
+  popup-border-width: 1px
+  popup-border-radius: 1em
+  popup-padding-x: 0px
+  popup-padding-y: 0px
+  popup-min-width: 440px
+  tablet-popup-header-color: rgba(195, 207, 221, 0.08)
+  tablet-popup-content-padding: 1.1em 2.2em 1.6em 1.5em
+  tablet-popup-button-padding: 0.1em 2em 1.8em 2em
+  tablet-popup-border-style: 1.5px solid #2D3A4C
+  tablet-popup-align-dialog: center
+  tablet-popup-margin-top: 0px
+
+####################### MODES ####################
+  modes:
+    light:
+
+      # Marao Dashboard Variables
+      color-black: '#17201B'
+      color-white: '#FFFFFF'
+      color-grey: '#6F7D72'
+      color-dark-gray: '#445347'
+      color-light-gray-nav: '#FFFFFF'
+      icon-color: '#445347'
+      opacity-contrast-100: rgba(47,107,79,.12)
+      opacity-contrast-0: rgba(255,255,255,.70)
+      subtext-color: '#6F7D72'
+      button-card-background: '#E7EEE8'
+      weather-card-overlay: 'linear-gradient(0deg, rgba(246,248,244,0.72) 0%, rgba(246,248,244,0.92) 93%)'
+      active-text-color: '#FFFFFF'
+      active-overlay-color: rgba(255,255,255,.34)
+      contrast-10: rgba(23,32,27,.10)
+      slider-color: rgba(47,107,79,.22)
+      md-slider-inactive-track-color: rgba(23,32,27,.18)
+      md-slider-handle-color: '#17201B'
+      md-slider-focus-handle-color: '#17201B'
+      md-slider-hover-handle-color: '#2F6B4F'
+      md-slider-pressed-handle-color: '#2F6B4F'
+      md-slider-hover-state-layer-color: '#2F6B4F'
+      md-slider-pressed-state-layer-color: '#2F6B4F'
+      weather-clear-night-background: 'linear-gradient(180deg, #4A6C8F 0%, #202B3C 100%)'
+      weather-cloudy-background: 'linear-gradient(180deg, #E7EEE8 0%, #C3CFDD 100%)'
+      weather-rain-background: 'linear-gradient(180deg, #8BA3BF 0%, #4A6C8F 100%)'
+      weather-storm-background: 'linear-gradient(180deg, #8BA3BF 0%, #4A6C8F 100%)'
+
+      # HomeAssistant Variables
+      primary-background-color: '#F4F7F2'
+      secondary-background-color: '#E7EEE8'
+      primary-text-color: '#17201B'
+      ha-card-background: '#FFFFFF'
+      card-background-color: '#FFFFFF'
+      app-header-background-color: var(--primary-background-color)
+      app-header-text-color: var(--primary-text-color)     
+      secondary-text-color: '#445347'
+      disabled-text-color: '#8A978D'
+      sidebar-icon-color: '#445347'
+      state-alarm_control_panel-disarmed-color: var(--icon-color)
+      ha-card-box-shadow: 0 1px 2px rgba(23,32,27,.08)
+      
+
+    dark:
+  
+      # Marao Dashboard Variables
+      color-black: '#0F1722'
+      color-white: '#F5F7FA'
+      color-grey: '#8794A8'
+      color-dark-gray: '#C3CFDD'
+      color-light-gray-nav: '#202B3C'
+      icon-color: '#C3CFDD'
+      opacity-contrast-0: rgba(245,247,250,.10)
+      opacity-contrast-100: rgba(245,247,250,.16)
+      subtext-color: '#8794A8'
+      button-card-background: '#202B3C'
+      weather-card-overlay: 'linear-gradient(0deg, rgba(15,23,34,0.72) 0%, rgba(15,23,34,0.96) 93%)'
+      active-text-color: '#FFFFFF'
+      active-overlay-color: rgba(255,255,255,.24)
+      contrast-10: rgba(245,247,250,.1)
+      slider-color: rgba(95,162,217,.28)
+      md-slider-inactive-track-color: rgba(255,255,255,.2)
+      md-slider-handle-color: '#F5F7FA'
+      md-slider-focus-handle-color: '#F5F7FA'
+      md-slider-hover-handle-color: '#dbdbdb'
+      md-slider-pressed-handle-color: '#dbdbdb'
+      md-slider-hover-state-layer-color: '#F5F7FA'
+      md-slider-pressed-state-layer-color: '#F5F7FA'
+      weather-clear-night-background: 'linear-gradient(180deg, #202B3C 0%, #0F1722 100%)'
+      weather-cloudy-background: 'linear-gradient(180deg, #8BA3BF 0%, #4A6C8F 100%)'
+      weather-rain-background: 'linear-gradient(180deg, #4A6C8F 0%, #202B3C 100%)'
+      weather-storm-background: 'linear-gradient(180deg, #202B3C 0%, #0F1722 100%)'
+
+      # HomeAssistant Variables
+      ha-card-background: '#182335'
+      card-background-color: '#182335'
+      primary-background-color: '#0F1722'
+      secondary-background-color: '#202B3C'
+      primary-text-color: '#F5F7FA'
+      secondary-text-color: '#C3CFDD'
+      disabled-text-color: '#8794A8'
+      state-alarm_control_panel-disarmed-color: var(--icon-color)
+      app-header-background-color: var(--primary-background-color)
+      app-header-text-color: '#F5F7FA'
+      ha-card-box-shadow: none

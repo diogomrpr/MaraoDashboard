@@ -1,0 +1,193 @@
+hc_media_card:
+  template: hc_single_title_card
+  show_entity_picture: true
+  show_label: true
+  show_state: true
+  show_name: false
+  variables:
+    hc_show_background_art: true
+    hc_background_color: var(--color-purple)
+    popup_hash: "#media"
+  tap_action:
+    action: navigate
+    navigation_path: "[[[ return variables.popup_hash ]]]"
+    haptic: heavy
+  hold_action:
+    action: more-info
+    haptic: heavy
+  state_display: >
+    [[[ return states[entity.entity_id].attributes.media_artist ||
+    (window.MaraoDashboard?.localize?.('common.idle', hass) || 'Idle') ]]]
+  label: >
+    [[[ return states[entity.entity_id].attributes.media_title ||
+    (window.MaraoDashboard?.localize?.('common.nothing_playing', hass) || 'Nothing is playing') ]]]
+  styles:
+    grid:
+      - grid-template-areas: |
+          'i l l l'
+          'i s s s'
+          'i prev play next'
+      - grid-template-columns: repeat(4, 1fr)
+      - grid-template-rows: 1fr 1fr min-content
+    card:
+      - padding: 10px
+      - background: |
+              [[[
+                if (variables.hc_show_background_art) {
+                    return "var(--opacity-contrast-0)";
+                }
+                return variables.hc_background_color;
+              ]]]
+      - padding-right: 15px
+    icon:
+      - justify-self: start
+      - width: 40%
+      - z-index: 1
+      - border-radius: 10px
+      - transform: scale(1.5)
+      - color: var(--active-text-color)
+    entity_picture:
+      - width: 80%
+    img_cell:
+      - justify-self: start
+      - width: 110px
+      - z-index: 1
+      - border-radius: 10px
+      - height: 110px
+      - margin-right: 15px
+    label:
+      - justify-self: center
+      - z-index: 1
+      - color: var(--active-text-color)
+      - align-self: center
+      - font-family: montserrat
+      - font-weight: 800
+      - font-size: 18px
+    state:
+      - justify-self: center
+      - font-family: montserrat
+      - font-size: 18px
+      - color: var(--active-text-color)
+      - z-index: 1
+      - align-self: start
+    custom_fields:
+      background_cover:
+        - display: >
+            [[[
+              if (variables.hc_show_background_art) {
+                  return "block";
+              }
+              return "none";
+            ]]]
+        - transform: scale(1.3)
+        - filter: blur(5px) opacity(0.2)
+        - position: absolute
+        - width: 120%
+        - opacity: 80%
+        - height: 100%
+        - background: |
+            [[[
+              const assetPath = window.MaraoDashboard?.assetPath || variables.marao_dashboard_asset_path || '/local/images';
+              if (entity.attributes.entity_picture == undefined){
+                return 'center / cover no-repeat url("' + assetPath + '/music/idle-media.gif")'
+              } else {
+                return 'center / cover no-repeat url("' + states[entity.entity_id].attributes.entity_picture + '")';
+              }
+            ]]]
+  custom_fields:
+    background_cover: ""
+    play:
+      card:
+        type: custom:button-card
+        icon: mdi:play
+        entity: "[[[ return entity.entity_id ]]]"
+        show_name: false
+        styles: &item_styles
+          icon:
+            - width: 50%
+            - color: var(--primary-text-color)
+          img_cell:
+            - width: 40px
+            - height: 40px
+            - border-radius: 50px
+            - background: var(--ha-card-background)
+          card:
+            - background: none
+            - box-shadow: none
+            - "--mdc-ripple-color": transparent
+        state:
+          - value: playing
+            icon: mdi:pause
+        tap_action:
+          action: perform-action
+          perform_action: media_player.media_play_pause
+          target:
+            entity_id: "[[[ return entity.entity_id ]]]"
+          haptic: heavy
+    next:
+      card:
+        type: custom:button-card
+        icon: mdi:skip-next
+        entity: "[[[ return entity.entity_id ]]]"
+        show_name: false
+        styles: *item_styles
+        tap_action:
+          action: perform-action
+          perform_action: media_player.media_next_track
+          target:
+            entity_id: "[[[ return entity.entity_id ]]]"
+          haptic: heavy
+    prev:
+      card:
+        type: custom:button-card
+        icon: mdi:skip-previous
+        entity: "[[[ return entity.entity_id ]]]"
+        show_name: false
+        styles: *item_styles
+        tap_action:
+          action: perform-action
+          perform_action: media_player.media_previous_track
+          target:
+            entity_id: "[[[ return entity.entity_id ]]]"
+
+          haptic: heavy
+hc_media_app_card:
+  template: hc_single_title_card
+  show_name: true
+  show_icon: true
+  show_state: false
+  show_label: false
+  variables:
+    app_source: ""
+  tap_action:
+    action: perform-action
+    perform_action: media_player.select_source
+    target:
+      entity_id: "[[[ return entity.entity_id ]]]"
+    data:
+      source: "[[[ return variables.app_source ]]]"
+    haptic: heavy
+  styles:
+    grid:
+      - grid-template-areas: '"i n"'
+      - grid-template-columns: 52px minmax(0, 1fr)
+      - grid-template-rows: 1fr
+      - column-gap: 12px
+    card:
+      - min-height: 116px
+      - padding: 14px
+      - background: var(--ha-card-background)
+    img_cell:
+      - width: 52px
+      - height: 52px
+      - border-radius: 50%
+      - background: var(--opacity-contrast-100)
+      - justify-self: start
+      - align-self: center
+    icon:
+      - width: 58%
+      - color: var(--icon-color)
+    name:
+      - justify-self: center
+      - font-size: var(--font-size-secondary)
+      - font-weight: var(--font-weight-primary)

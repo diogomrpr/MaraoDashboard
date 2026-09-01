@@ -1,0 +1,109 @@
+hc_single_title_card:
+  tap_action:
+    haptic: heavy
+  hold_action:
+    haptic: heavy
+  double_tap_action:
+    haptic: heavy
+  extra_styles: |
+    #container.no-label.no-state:has(> #name):not(:has(> :not(#img-cell):not(#name))) #name {
+      grid-row: 1 / -1 !important;
+      align-self: center !important;
+    }
+
+hc_base_card:
+  template: hc_single_title_card
+  variables:
+    enable_slider: false
+    card_color: var(--primary-color)
+    custom_label: ""
+  show_name: true
+  show_icon: true
+  show_label: true
+  show_state: false
+  styles:
+    grid:
+      - grid-template-areas: |
+          "n i" "l i"
+      - grid-template-columns: minmax(0, 1fr) 56px
+      - grid-template-rows: min-content min-content
+      - align-content: center
+      - column-gap: 12px
+      - row-gap: 4px
+    card:
+      - padding: 12px
+      - min-height: 100px
+    name:
+      - text-align: left
+      - font-size: var(--font-size-primary)
+      - font-weight: var(--font-weight-primary)
+      - line-height: 1.15
+      - max-width: 100%
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - justify-self: start
+      - align-self: end
+    label:
+      - text-align: left
+      - font-size: var(--font-size-secondary)
+      - font-weight: var(--font-weight-secondary)
+      - line-height: 1.15
+      - max-width: 100%
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - justify-self: start
+      - align-self: start
+      - color: var(--subtext-color)
+      - padding-bottom: |
+          [[[
+            if (variables.enable_slider && states[entity.entity_id].attributes.brightness) {
+                return '10px';
+            }
+              return '0';
+          ]]]
+    icon:
+      - width: 68%
+      - color: var(--icon-color)
+    img_cell:
+      - background: var(--opacity-contrast-100)
+      - border-radius: 50%
+      - width: 56px
+      - height: 56px
+      - align-self: center
+      - justify-self: end
+  state:
+    - value: "on"
+      styles:
+        card:
+          - background: "[[[ return variables.card_color ]]]"
+        name:
+          - color: var(--active-text-color)
+        label:
+          - color: var(--active-text-color)
+        state:
+          - color: var(--active-text-color)
+        icon:
+          - color: var(--active-text-color)
+    - value: "off"
+      styles:
+        icon:
+          - color: var(--active-text-color)
+        img_cell:
+          - background: var(--button-card-background)
+        card:
+          - border-width: 1px
+          - border-color: "[[[ return variables.card_color ]]]"
+    - value: "unavailable"
+      styles:
+        name:
+          - text-decoration: line-through
+        icon:
+          - color: var(--icon-color)
+        img_cell:
+          - background: var(--background-icon-color-default)
+        card:
+          - opacity: 0.6
+          - pointer-events: none
+      label: "[[[ return window.MaraoDashboard?.localize?.('common.unknown', hass) || 'Unknown' ]]]"

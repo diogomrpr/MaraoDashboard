@@ -1,0 +1,53 @@
+hc_camera_card:
+  template: hc_single_title_card
+  variables:
+    popup_hash: "#camera"
+    event_provider: auto
+    frigate_camera: ""
+    frigate_instance_id: ""
+    unifi_protect_media_source: ""
+    event_limit: 12
+  show_name: true
+  show_icon: true
+  show_state: false
+  show_label: false
+  show_entity_picture: true
+  show_live_stream: true
+  live_stream_aspect_ratio: "16:9"
+  live_stream_fit_mode: cover
+  tap_action:
+    action: navigate
+    navigation_path: "[[[ return variables.popup_hash ]]]"
+    haptic: heavy
+  hold_action:
+    action: more-info
+    haptic: heavy
+  styles:
+    grid:
+      - grid-template-areas: '"i" "n"'
+      - grid-template-columns: minmax(0, 1fr)
+      - grid-template-rows: minmax(0, 1fr) min-content
+    card:
+      - padding: 0
+      - overflow: hidden
+    img_cell:
+      - width: 100%
+      - aspect-ratio: 16 / 9
+      - overflow: hidden
+      - border-radius: var(--ha-card-border-radius) var(--ha-card-border-radius) 0 0
+    icon:
+      - width: 20%
+      - color: var(--icon-color)
+    entity_picture:
+      - width: 100%
+      - height: 100%
+      - object-fit: cover
+    name:
+      - justify-self: start
+      - width: calc(100% - 24px)
+      - padding: 12px
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - font-size: var(--font-size-primary)
+      - font-weight: var(--font-weight-primary)

@@ -2,7 +2,27 @@ name: Tests
 
 on:
   push:
+    paths:
+      - ".github/workflows/tests.yml"
+      - "custom_components/**"
+      - "frontend_src/**"
+      - "scripts/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - "pyproject.toml"
+      - "requirements-test.txt"
   pull_request:
+    paths:
+      - ".github/workflows/tests.yml"
+      - "custom_components/**"
+      - "frontend_src/**"
+      - "scripts/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - "pyproject.toml"
+      - "requirements-test.txt"
   workflow_dispatch:
 
 permissions:
@@ -11,23 +31,29 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: Check the dashboard frontend
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Run static checks
         run: npm run test:static
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.14"
 
-      - name: Install test dependencies
+      - name: Install Python test dependencies
         run: python -m pip install -r requirements-test.txt
 
-      - name: Test the integration
-        run: pytest -q
+      - name: Run pytest
+        run: pytest --cov=custom_components.marao_dashboard --cov-report=term-missing
