@@ -363,15 +363,8 @@ if (integrationDirectories.length !== 1 || integrationDirectories[0] !== "marao_
   console.error(`HACS repositories must contain one integration: ${integrationDirectories.join(", ")}`);
 }
 
-function directoryContainsFiles(root) {
-  if (!fs.existsSync(root)) return false;
-  return fs.readdirSync(root, { withFileTypes: true }).some((entry) =>
-    entry.isFile() || (entry.isDirectory() && directoryContainsFiles(path.join(root, entry.name)))
-  );
-}
-
 for (const relativeRoot of [`${frontendRoot}/vendor`, `${distFrontendRoot}/vendor`]) {
-  if (directoryContainsFiles(path.join(repoRoot, relativeRoot))) {
+  if (fs.existsSync(path.join(repoRoot, relativeRoot))) {
     hasError = true;
     console.error(
       `Third-party dashboard bundles must not be packaged under ${relativeRoot}; install them independently with HACS.`

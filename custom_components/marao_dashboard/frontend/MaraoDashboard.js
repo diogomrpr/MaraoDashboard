@@ -1050,7 +1050,7 @@ window.MaraoDashboard = {
   popupScrollGuardInstalled: true,
   popupScrollGuardVersion: POPUP_SCROLL_GUARD_VERSION,
   translations: TRANSLATIONS,
-  version: "Marao Dashboard v0.3.0"
+  version: "Marao Dashboard v0.3.1"
 };
 
 console.info("%c Marao Dashboard loaded", "color: #d4b392; font-weight: 700;");

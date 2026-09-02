@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
 
-import {
+const source = await fs.readFile(
+  new URL("../../custom_components/marao_dashboard/frontend/MaraoFrigateEventsCard.js", import.meta.url),
+  "utf8",
+);
+const {
   cameraEventProvider,
   frigateEventPath,
   frigateIdentity,
@@ -11,7 +16,7 @@ import {
   normalizeFrigateEvents,
   normalizeProtectEvents,
   protectThumbnailMediaSource,
-} from "../../custom_components/marao_dashboard/frontend/MaraoFrigateEventsCard.js";
+} = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
 
 test("Frigate event helpers normalize API data and build safe integration URLs", () => {
   const events = normalizeFrigateEvents(JSON.stringify([

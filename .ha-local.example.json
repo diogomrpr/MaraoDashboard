@@ -1,8 +1,11 @@
 {
-  "url": "http://homeassistant.local:8123",
+  "url": "http://homeassistant-test.invalid:8123",
   "username": "test",
   "password": "test",
-  "sshHost": "homeassistant.local",
+  "dependencyMode": "missing",
+  "allowDashboardWrites": false,
+  "allowRemoteWrites": false,
+  "sshHost": "homeassistant-test.invalid",
   "sshUser": "root",
   "sshPort": 22,
   "sshKeyPath": ".ha-local-ssh/id_ed25519",

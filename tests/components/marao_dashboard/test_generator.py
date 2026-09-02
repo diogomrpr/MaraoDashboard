@@ -10,6 +10,7 @@ from custom_components.marao_dashboard.generator import (
     MaraoDashboardLoader,
     build_base_dashboard_config,
     ensure_dashboard_config,
+    generated_popup_files_need_repair,
     load_dashboard_config,
     make_slug,
     migrate_legacy_theme,
@@ -96,6 +97,153 @@ def test_dashboard_json_loader_rejects_invalid_json(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Invalid dashboard JSON"):
         load_dashboard_config(config_path)
+
+
+def test_detects_comment_only_generated_popup_as_needing_repair(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "dashboard"
+    popup_dir = root / "components" / "popups"
+    popup_dir.mkdir(parents=True)
+    popup = popup_dir / "overview_climate.yaml"
+    popup.write_text(
+        """type: custom:bubble-card
+card_type: pop-up
+hash: '#overview-climate'
+cards:
+  # marao:generated:start
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end
+""",
+        encoding="utf-8",
+    )
+    (root / ".marao-generated.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "plain": [],
+                "containers": ["components/popups/overview_climate.yaml"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert generated_popup_files_need_repair(root)
+
+    popup.write_text(
+        """type: custom:bubble-card
+card_type: pop-up
+hash: '#overview-climate'
+cards:
+  # marao:generated:start
+  - type: custom:button-card
+    entity: climate.office
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end
+""",
+        encoding="utf-8",
+    )
+
+    assert not generated_popup_files_need_repair(root)
+
+
+def test_manifest_membership_does_not_override_marker_validation(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "dashboard"
+    popup_dir = root / "components" / "popups"
+    popup_dir.mkdir(parents=True)
+    popup = popup_dir / "user_popup.yaml"
+    popup.write_text(
+        """type: custom:bubble-card
+card_type: pop-up
+hash: '#user-popup'
+cards:
+""",
+        encoding="utf-8",
+    )
+
+    (root / ".marao-generated.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "plain": [],
+                "containers": ["components/popups/user_popup.yaml"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert not generated_popup_files_need_repair(root)
+
+    popup.write_text(
+        """type: custom:bubble-card
+card_type: pop-up
+hash: '#user-popup'
+cards:
+  # marao:generated:start
+  # marao:generated:start
+  # marao:generated:end
+  # marao:custom:start
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end
+""",
+        encoding="utf-8",
+    )
+    assert not generated_popup_files_need_repair(root)
+
+
+def test_invalid_manifest_does_not_trigger_popup_repair(tmp_path: Path) -> None:
+    root = tmp_path / "dashboard"
+    popup_dir = root / "components" / "popups"
+    popup_dir.mkdir(parents=True)
+    (popup_dir / "overview_climate.yaml").write_text(
+        """type: custom:bubble-card
+card_type: pop-up
+hash: '#overview-climate'
+cards:
+  # marao:generated:start
+  # marao:generated:end
+  # marao:custom:start
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end
+""",
+        encoding="utf-8",
+    )
+    (root / ".marao-generated.json").write_text("{not-json", encoding="utf-8")
+
+    assert not generated_popup_files_need_repair(root)
+
+
+def test_marker_only_stale_popup_does_not_trigger_repair(tmp_path: Path) -> None:
+    root = tmp_path / "dashboard"
+    popup_dir = root / "components" / "popups"
+    popup_dir.mkdir(parents=True)
+    (popup_dir / "stale.yaml").write_text(
+        """type: custom:bubble-card
+card_type: pop-up
+hash: '#stale'
+cards:
+  # marao:generated:start
+  # marao:generated:end
+  # marao:custom:start
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end
+""",
+        encoding="utf-8",
+    )
+
+    assert not generated_popup_files_need_repair(root)
 
 
 def test_dashboard_json_loader_rejects_non_object(tmp_path: Path) -> None:
@@ -970,6 +1118,16 @@ def test_legacy_theme_names_migrate_to_single_theme() -> None:
 
     assert migrate_legacy_theme(config)
     assert config["theme"] == "Marao Dashboard"
+
+
+@pytest.mark.parametrize("theme", [[], {"name": "Unexpected"}])
+def test_non_string_theme_is_rejected_without_breaking_migration(theme: object) -> None:
+    config = {"name": "Marao Dashboard", "theme": theme, "rooms": []}
+
+    assert not migrate_legacy_theme(config)
+    assert config["theme"] == theme
+    with pytest.raises(ValueError, match="theme must be a string"):
+        resolve_dashboard_config(config)
 
 
 def test_write_empty_base_dashboard(tmp_path: Path) -> None:

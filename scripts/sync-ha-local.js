@@ -10,6 +10,21 @@ const repoRoot = path.resolve(__dirname, "..");
 const configPath = path.join(repoRoot, ".ha-local.json");
 const statePath = path.join(repoRoot, ".ha-local-sync-state.json");
 const dryRun = process.argv.includes("--dry-run");
+const requestTimeoutMs = 15000;
+
+function assertRemoteWritesAllowed(config, isDryRun) {
+  if (
+    Object.hasOwn(config, "allowRemoteWrites") &&
+    typeof config.allowRemoteWrites !== "boolean"
+  ) {
+    throw new Error(".ha-local.json allowRemoteWrites must be a boolean.");
+  }
+  if (!isDryRun && config.allowRemoteWrites !== true) {
+    throw new Error(
+      "Set allowRemoteWrites to true in .ha-local.json only after confirming the SSH target is a disposable test instance."
+    );
+  }
+}
 
 function readConfig() {
   if (!fs.existsSync(configPath)) {
@@ -196,7 +211,6 @@ function request(method, url, options = {}) {
   const target = new URL(url);
   const transport = target.protocol === "https:" ? https : http;
   const body = options.body || "";
-  const allowedStatuses = new Set(options.allowedStatuses || []);
 
   return new Promise((resolve, reject) => {
     const req = transport.request(
@@ -215,7 +229,7 @@ function request(method, url, options = {}) {
           data += chunk;
         });
         res.on("end", () => {
-          if ((res.statusCode < 200 || res.statusCode >= 300) && !allowedStatuses.has(res.statusCode)) {
+          if (res.statusCode < 200 || res.statusCode >= 300) {
             reject(new Error(`${method} ${target.pathname} returned ${res.statusCode}: ${data}`));
             return;
           }
@@ -223,6 +237,11 @@ function request(method, url, options = {}) {
         });
       }
     );
+    req.setTimeout(requestTimeoutMs, () => {
+      req.destroy(
+        new Error(`${method} ${target.pathname} timed out after ${requestTimeoutMs} ms.`)
+      );
+    });
     req.on("error", reject);
     req.write(body);
     req.end();
@@ -273,16 +292,8 @@ async function getAccessToken(config) {
   return token.access_token;
 }
 
-async function restartHomeAssistant(config) {
-  const token = await getAccessToken(config);
-  await request("POST", `${config.url.replace(/\/$/, "")}/api/services/homeassistant/restart`, {
-    body: "{}",
-    allowedStatuses: [504],
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  });
+function restartHomeAssistant(config) {
+  runSsh(config, "ha core restart");
 }
 
 async function reloadThemes(config) {
@@ -298,6 +309,7 @@ async function reloadThemes(config) {
 
 async function main() {
   const config = readConfig();
+  assertRemoteWritesAllowed(config, dryRun);
   const paths = assertBuiltPaths();
   const integrationHash = hashDir(paths.integrationRoot);
   const previousState = readState();
@@ -341,7 +353,11 @@ async function main() {
   console.log("For dashboard/frontend-only changes, refresh the browser and clear Home Assistant frontend cache if needed.");
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { assertRemoteWritesAllowed };

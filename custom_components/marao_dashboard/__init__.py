@@ -49,7 +49,9 @@ from .editor import EDITOR_CATALOG
 from .generator import (
     build_base_dashboard_config,
     ensure_dashboard_config,
+    generated_popup_files_need_repair,
     load_dashboard_config,
+    make_slug,
     migrate_legacy_theme,
     plan_dashboard,
     write_dashboard_config,
@@ -480,6 +482,21 @@ def _should_repair_base_dashboard(
         return False
 
     changed = migrate_legacy_theme(config)
+    slug = make_slug(config.get("slug") or config.get("name"))
+    if generated_popup_files_need_repair(
+        Path(hass.config.path(DASHBOARD_BASE_DIR)) / slug
+    ):
+        try:
+            plan_dashboard(
+                config, hass.config.path(DASHBOARD_BASE_DIR), registry_entities
+            )
+        except ValueError:
+            if changed:
+                write_dashboard_config(config, config_path)
+            return False
+        if changed:
+            write_dashboard_config(config, config_path)
+        return True
 
     if config.get("name") == BASE_DASHBOARD_NAME and config.get("slug") == BASE_DASHBOARD_SLUG:
         rooms_path = Path(hass.config.path(DASHBOARD_BASE_DIR, BASE_DASHBOARD_SLUG, "views", "rooms"))

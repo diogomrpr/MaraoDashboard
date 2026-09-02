@@ -2,7 +2,7 @@
 asyncio_mode = "auto"
 testpaths = ["tests/components/marao_dashboard"]
 pythonpath = ["."]
-addopts = "-ra"
+addopts = "-ra -p tests.coverage_bootstrap"
 
 [tool.coverage.run]
 source = ["custom_components/marao_dashboard"]

@@ -203,6 +203,39 @@ def load_dashboard_config(path: str | Path) -> dict[str, Any]:
     return config
 
 
+def generated_popup_files_need_repair(output_dir: str | Path) -> bool:
+    """Return whether a Marao-owned popup has the generated null-cards defect."""
+
+    root = Path(output_dir)
+    try:
+        manifest_containers = set(_load_generation_manifest(root)["containers"])
+    except (OSError, ValueError):
+        return False
+
+    popup_dir = root / "components" / "popups"
+    for popup_path in popup_dir.glob("*.yaml"):
+        try:
+            source = popup_path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        relative_path = popup_path.relative_to(root).as_posix()
+        if relative_path not in manifest_containers:
+            continue
+        try:
+            _extract_custom_cards(source, relative_path)
+            popup = yaml.load(source, Loader=MaraoDashboardLoader)
+        except (ValueError, yaml.YAMLError):
+            continue
+        if (
+            isinstance(popup, dict)
+            and popup.get("type") == "custom:bubble-card"
+            and popup.get("card_type") == "pop-up"
+            and popup.get("cards") is None
+        ):
+            return True
+    return False
+
+
 def write_dashboard_config(config: dict[str, Any], path: str | Path) -> None:
     """Write a dashboard JSON config without touching generated YAML."""
 
@@ -245,7 +278,11 @@ def _is_empty_base_dashboard_config(config: dict[str, Any]) -> bool:
 
 
 def migrate_legacy_theme(config: dict[str, Any]) -> bool:
-    if config.get("theme") not in {"Marao Dashboard Gold", "Marao Dashboard Peach"}:
+    theme = config.get("theme")
+    if not isinstance(theme, str) or theme not in (
+        "Marao Dashboard Gold",
+        "Marao Dashboard Peach",
+    ):
         return False
     config["theme"] = BASE_DASHBOARD_THEME
     return True
@@ -295,8 +332,11 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     ):
         raise ValueError("navigation entries must be page paths or route objects")
 
-    theme = config.get("theme") or BASE_DASHBOARD_THEME
-    if theme in {"Marao Dashboard Gold", "Marao Dashboard Peach"}:
+    configured_theme = config.get("theme")
+    if configured_theme is not None and not isinstance(configured_theme, str):
+        raise ValueError("theme must be a string")
+    theme = configured_theme or BASE_DASHBOARD_THEME
+    if theme in ("Marao Dashboard Gold", "Marao Dashboard Peach"):
         theme = BASE_DASHBOARD_THEME
 
     normalized = {**config}

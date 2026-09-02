@@ -4,6 +4,8 @@ from pathlib import Path
 import json
 import shutil
 import textwrap
+
+import pytest
 import yaml
 
 from homeassistant.components import frontend
@@ -168,6 +170,142 @@ async def test_setup_entry_marker_prevents_regeneration(hass) -> None:
     assert "marao-dashboard-card-test:" not in config_source
     assert "/hacsfiles/MaraoDashboard/MaraoDashboard.js" not in config_source
     assert set(MARAO_DASHBOARD_MODULES) <= set(hass.data[DATA_EXTRA_MODULE_URL].urls)
+
+
+@pytest.mark.parametrize(
+    "invalid_config",
+    [
+        {"name": "User JSON", "rooms": "not-a-list"},
+        {"name": "User JSON", "rooms": [], "theme": []},
+        {"name": "User JSON", "rooms": [], "theme": {"name": "Unexpected"}},
+    ],
+)
+async def test_setup_preserves_malformed_but_loadable_user_config(
+    hass, invalid_config: dict[str, object]
+) -> None:
+    _reset_dashboard_files(hass)
+    Path(hass.config.path("configuration.yaml")).write_text(
+        "default_config:\n", encoding="utf-8"
+    )
+    dashboard_json = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    dashboard_json.parent.mkdir(parents=True)
+    source = json.dumps(invalid_config, separators=(",", ":")) + "\n"
+    dashboard_json.write_text(source, encoding="utf-8")
+    output_dir = dashboard_json.parent / "user-json"
+    popup = output_dir / "components" / "popups" / "overview_climate.yaml"
+    popup.parent.mkdir(parents=True)
+    popup_source = """type: custom:bubble-card
+card_type: pop-up
+hash: '#overview-climate'
+cards:
+  # marao:generated:start
+  # marao:generated:end
+  # marao:custom:start
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end
+"""
+    popup.write_text(popup_source, encoding="utf-8")
+    (output_dir / ".marao-generated.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "plain": [],
+                "containers": ["components/popups/overview_climate.yaml"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Marao Dashboard",
+        data={BASE_DASHBOARD_CREATED: True},
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert dashboard_json.read_text(encoding="utf-8") == source
+    assert popup.read_text(encoding="utf-8") == popup_source
+
+
+async def test_setup_repairs_comment_only_generated_popup(hass) -> None:
+    _reset_dashboard_files(hass)
+    Path(hass.config.path("configuration.yaml")).write_text(
+        "default_config:\n", encoding="utf-8"
+    )
+    _create_area_entity(hass, "Kitchen", "climate.kitchen")
+    entry = MockConfigEntry(domain=DOMAIN, title="Marao Dashboard", data={})
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    popup = Path(
+        hass.config.path(
+            "dashboard/MaraoDashboard/dashboard/components/popups/overview_climate.yaml"
+        )
+    )
+    source = popup.read_text(encoding="utf-8")
+    generated_start = "  # marao:generated:start\n"
+    generated_end = "  # marao:generated:end\n"
+    content_start = source.index(generated_start) + len(generated_start)
+    content_end = source.index(generated_end)
+    popup.write_text(source[:content_start] + source[content_end:], encoding="utf-8")
+    assert yaml.safe_load(popup.read_text(encoding="utf-8"))["cards"] is None
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    repaired = yaml.safe_load(popup.read_text(encoding="utf-8"))
+    assert isinstance(repaired["cards"], list)
+    assert repaired["cards"]
+
+
+async def test_setup_removes_stale_comment_only_generated_popup(hass) -> None:
+    _reset_dashboard_files(hass)
+    Path(hass.config.path("configuration.yaml")).write_text(
+        "default_config:\n", encoding="utf-8"
+    )
+    _create_area_entity(hass, "Kitchen", "climate.kitchen")
+    entry = MockConfigEntry(domain=DOMAIN, title="Marao Dashboard", data={})
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    popup = Path(
+        hass.config.path(
+            "dashboard/MaraoDashboard/dashboard/components/popups/overview_climate.yaml"
+        )
+    )
+    source = popup.read_text(encoding="utf-8")
+    generated_start = "  # marao:generated:start\n"
+    generated_end = "  # marao:generated:end\n"
+    content_start = source.index(generated_start) + len(generated_start)
+    content_end = source.index(generated_end)
+    popup.write_text(source[:content_start] + source[content_end:], encoding="utf-8")
+
+    dashboard_json = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    config = json.loads(dashboard_json.read_text(encoding="utf-8"))
+    config["rooms"] = []
+    dashboard_json.write_text(json.dumps(config), encoding="utf-8")
+    er.async_get(hass).async_remove("climate.kitchen")
+    hass.states.async_remove("climate.kitchen")
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    overview = Path(
+        hass.config.path("dashboard/MaraoDashboard/dashboard/views/main/00-overview.yaml")
+    )
+    assert not popup.exists()
+    assert "overview_climate.yaml" not in overview.read_text(encoding="utf-8")
 
 
 async def test_setup_preserves_standalone_card_resources(hass) -> None:
