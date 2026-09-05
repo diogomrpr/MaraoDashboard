@@ -9,8 +9,10 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.components import frontend, panel_custom, websocket_api
+from homeassistant.components import frontend, lovelace, panel_custom, websocket_api
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.lovelace import LOVELACE_DATA
+from homeassistant.components.lovelace.const import MODE_YAML
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
@@ -19,14 +21,15 @@ from homeassistant.helpers import area_registry as ar, device_registry as dr, en
 from .config_patch import (
     patch_frontend_themes,
     patch_lovelace_dashboard,
-    remove_lovelace_dashboard,
 )
 from .const import (
     BASE_DASHBOARD_CREATED,
     BASE_DASHBOARD_NAME,
     BASE_DASHBOARD_SLUG,
     CARD_TEST_DASHBOARD_FILE,
+    CARD_TEST_DASHBOARD_ICON,
     CARD_TEST_DASHBOARD_KEY,
+    CARD_TEST_DASHBOARD_NAME,
     DASHBOARD_BASE_DIR,
     DEFAULT_DASHBOARD_CONFIG,
     DOMAIN,
@@ -39,17 +42,14 @@ from .const import (
     MARAO_DASHBOARD_PANEL_MODULE,
     MARAO_DASHBOARD_STATIC_URL,
 )
-from .dependency_runtime import (
-    async_clear_dependency_issues,
-    async_dependency_statuses,
+from .legacy_migration import (
+    async_clear_legacy_resource_issue,
     async_migrate_legacy_vendor_resources,
-    async_refresh_dependency_issue,
 )
 from .editor import EDITOR_CATALOG
 from .generator import (
     build_base_dashboard_config,
     ensure_dashboard_config,
-    generated_popup_files_need_repair,
     load_dashboard_config,
     make_slug,
     migrate_legacy_theme,
@@ -85,6 +85,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     for module_url in MARAO_DASHBOARD_MODULES:
         frontend.add_extra_js_url(hass, module_url)
     await hass.async_add_executor_job(_install_dashboard_assets, hass)
+    await hass.async_add_executor_job(_ensure_card_test_dashboard_config, hass)
+    _register_card_test_dashboard(hass)
     await panel_custom.async_register_panel(
         hass,
         frontend_url_path=MANAGEMENT_PANEL_PATH,
@@ -128,29 +130,60 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             data={**entry.data, BASE_DASHBOARD_CREATED: True},
         )
     await hass.async_add_executor_job(_ensure_current_history, hass)
-    await hass.async_add_executor_job(
-        remove_lovelace_dashboard,
-        config_path,
+    return True
+
+
+def _ensure_card_test_dashboard_config(hass: HomeAssistant) -> None:
+    """Persist the fake-entity card gallery dashboard entry."""
+
+    patch_lovelace_dashboard(
+        hass.config.path("configuration.yaml"),
         CARD_TEST_DASHBOARD_KEY,
+        CARD_TEST_DASHBOARD_NAME,
+        CARD_TEST_DASHBOARD_ICON,
         CARD_TEST_DASHBOARD_FILE,
     )
-    try:
-        dependency_config = await hass.async_add_executor_job(
-            load_dashboard_config, _dashboard_config_path(hass)
-        )
-    except (FileNotFoundError, ValueError):
-        pass
-    else:
-        await async_refresh_dependency_issue(
-            hass, dependency_config, registry_entities
-        )
-    return True
+
+
+def _register_card_test_dashboard(hass: HomeAssistant) -> None:
+    """Register the card gallery immediately, even when config was just patched."""
+
+    dashboard_config = {
+        "mode": MODE_YAML,
+        "title": CARD_TEST_DASHBOARD_NAME,
+        "icon": CARD_TEST_DASHBOARD_ICON,
+        "show_in_sidebar": True,
+        "filename": CARD_TEST_DASHBOARD_FILE,
+    }
+
+    lovelace_data = hass.data.get(LOVELACE_DATA)
+    if not lovelace_data or CARD_TEST_DASHBOARD_KEY in lovelace_data.dashboards:
+        return
+    lovelace_data.yaml_dashboards[CARD_TEST_DASHBOARD_KEY] = dashboard_config
+    lovelace_data.dashboards[CARD_TEST_DASHBOARD_KEY] = lovelace.dashboard.LovelaceYAML(
+        hass, CARD_TEST_DASHBOARD_KEY, dashboard_config
+    )
+    frontend.async_register_built_in_panel(
+        hass,
+        "lovelace",
+        sidebar_title=CARD_TEST_DASHBOARD_NAME,
+        sidebar_icon=CARD_TEST_DASHBOARD_ICON,
+        frontend_url_path=CARD_TEST_DASHBOARD_KEY,
+        config={"mode": MODE_YAML},
+        show_in_sidebar=True,
+        update=False,
+    )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload Marao Dashboard."""
 
     frontend.async_remove_panel(hass, MANAGEMENT_PANEL_PATH, warn_if_unknown=False)
+    frontend.async_remove_panel(hass, CARD_TEST_DASHBOARD_KEY, warn_if_unknown=False)
+    lovelace_data = hass.data.get(LOVELACE_DATA)
+    if lovelace_data:
+        lovelace_data.dashboards.pop(CARD_TEST_DASHBOARD_KEY, None)
+        lovelace_data.yaml_dashboards.pop(CARD_TEST_DASHBOARD_KEY, None)
     for module_url in MARAO_DASHBOARD_MODULES:
         frontend.remove_extra_js_url(hass, module_url)
     hass.data.get(DOMAIN, {}).pop("base_dashboard", None)
@@ -160,7 +193,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Remove state that must not outlive the Marao config entry."""
 
-    async_clear_dependency_issues(hass)
+    async_clear_legacy_resource_issue(hass)
 
 
 def _register_services(hass: HomeAssistant) -> None:
@@ -182,14 +215,6 @@ def _register_services(hass: HomeAssistant) -> None:
             call.data["dry_run"],
             registry_entities,
             history_path,
-        )
-        dependency_helper = (
-            async_dependency_statuses
-            if call.data["dry_run"]
-            else async_refresh_dependency_issue
-        )
-        result["dependencies"] = await dependency_helper(
-            hass, config, registry_entities
         )
         return result
 
@@ -222,9 +247,6 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
         payload = await hass.async_add_executor_job(
             _management_payload, hass, registry_entities, areas
         )
-        payload["dependencies"] = await async_dependency_statuses(
-            hass, json.loads(payload["config"]), registry_entities
-        )
         connection.send_result(msg["id"], payload)
 
     @websocket_api.require_admin
@@ -254,9 +276,6 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
         generated["history"] = await hass.async_add_executor_job(
             list_dashboard_history, hass.config.path(DASHBOARD_BASE_DIR)
         )
-        generated["dependencies"] = await async_refresh_dependency_issue(
-            hass, json.loads(msg["config"]), registry_entities
-        )
         connection.send_result(msg["id"], generated)
 
     @websocket_api.require_admin
@@ -282,41 +301,11 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
         restored["history"] = await hass.async_add_executor_job(
             list_dashboard_history, hass.config.path(DASHBOARD_BASE_DIR)
         )
-        restored_config = await hass.async_add_executor_job(
-            load_dashboard_config, _dashboard_config_path(hass)
-        )
-        registry_entities = _registry_entities(hass)
-        restored["dependencies"] = await async_refresh_dependency_issue(
-            hass, restored_config, registry_entities
-        )
         connection.send_result(msg["id"], restored)
-
-    @websocket_api.require_admin
-    @websocket_api.websocket_command(
-        {"type": "marao_dashboard/dependencies/recheck"}
-    )
-    @websocket_api.async_response
-    async def websocket_recheck_dependencies(
-        hass: HomeAssistant,
-        connection: websocket_api.ActiveConnection,
-        msg: dict[str, Any],
-    ) -> None:
-        try:
-            config = await hass.async_add_executor_job(
-                load_dashboard_config, _dashboard_config_path(hass)
-            )
-        except (FileNotFoundError, ValueError) as err:
-            connection.send_error(msg["id"], "invalid_config", str(err))
-            return
-        dependencies = await async_refresh_dependency_issue(
-            hass, config, _registry_entities(hass)
-        )
-        connection.send_result(msg["id"], {"dependencies": dependencies})
 
     websocket_api.async_register_command(hass, websocket_get_config)
     websocket_api.async_register_command(hass, websocket_generate_config)
     websocket_api.async_register_command(hass, websocket_restore_history)
-    websocket_api.async_register_command(hass, websocket_recheck_dependencies)
     hass.data[DOMAIN][WEBSOCKET_REGISTERED] = True
 
 
@@ -333,7 +322,6 @@ def _management_payload(
         "config_path": f"/config/{DEFAULT_DASHBOARD_CONFIG}",
         "dashboard_url": f"/{planned.dashboard_key}/overview",
         "history": list_dashboard_history(hass.config.path(DASHBOARD_BASE_DIR)),
-        "dependencies": [],
         "editor": {
             "catalog": EDITOR_CATALOG,
             "entities": registry_entities or [],
@@ -483,9 +471,8 @@ def _should_repair_base_dashboard(
 
     changed = migrate_legacy_theme(config)
     slug = make_slug(config.get("slug") or config.get("name"))
-    if generated_popup_files_need_repair(
-        Path(hass.config.path(DASHBOARD_BASE_DIR)) / slug
-    ):
+    dashboard_dir = Path(hass.config.path(DASHBOARD_BASE_DIR)) / slug
+    if _generated_dashboard_needs_self_contained_repair(dashboard_dir):
         try:
             plan_dashboard(
                 config, hass.config.path(DASHBOARD_BASE_DIR), registry_entities
@@ -523,6 +510,27 @@ def _should_repair_base_dashboard(
 
     write_dashboard_config(refreshed, config_path)
     return True
+
+
+def _generated_dashboard_needs_self_contained_repair(dashboard_dir: Path) -> bool:
+    """Detect old generated resources so the next setup rewrites them."""
+
+    if not dashboard_dir.is_dir():
+        return False
+    for path in dashboard_dir.rglob("*.yaml"):
+        try:
+            source = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if any(marker in source for marker in (
+            "custom:button-card",
+            "custom:bubble-card",
+            "custom:navbar-card",
+            "button_card_templates:",
+            "kiosk_mode:",
+        )):
+            return True
+    return False
 
 
 def _generate_dashboard(

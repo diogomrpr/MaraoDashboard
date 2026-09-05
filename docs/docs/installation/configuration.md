@@ -17,17 +17,12 @@ The integration then:
 - Serves Marao's dashboard runtime, editor, and camera-events card directly
   from `/marao_dashboard_static` through Home Assistant's frontend and static
   APIs.
-- Copies the dashboard YAML template library under
-  `www/community/MaraoDashboard/dashboard`.
+- Copies generated dashboard YAML under `www/community/MaraoDashboard/dashboard`.
 - Copies the theme YAML under `themes/MaraoDashboard` and ensures the standard
   `frontend.themes` include is present.
 - Adds a `marao-dashboard` YAML dashboard entry.
 
-No manual Marao Lovelace resource is required.
-
-Marao does not register or copy third-party cards. Install the
-[required dashboard dependencies]({{ '/docs/installation/dependencies.html' | relative_url }})
-before generating the dashboard.
+No manual Marao Lovelace resource or third-party card is required.
 
 The generated dashboard is written to:
 
@@ -215,7 +210,7 @@ fields as rooms plus `remote_entity`, `volume_remote_entity`, and `apps`.
 
 The generator always produces the Overview and Rooms views. It produces
 Security, Energy, Wallbox, and Media only when that object exists in `pages`.
-Overview tiles open generated Bubble Card popups: Lights includes only `on`
+Overview tiles open generated Marao popups: Lights includes only `on`
 lights, while Covers includes every room cover.
 
 ## Keep hand-written cards across regeneration
@@ -253,14 +248,11 @@ That include owns both the bottom spacer and the floating navigation bar, so the
 last dashboard card can scroll above the action bar. Do not add a separate
 bottom spacer in views; keep custom room `cards` before the generated navbar.
 
-## Frontend dependencies
+## Frontend runtime
 
-The seven third-party cards are independent HACS Dashboard downloads. In
-storage resource mode, HACS normally registers them. In YAML resource mode,
-copy the resource list from the
-[dependency guide]({{ '/docs/installation/dependencies.html' | relative_url }}).
-Keep only one resource URL for each custom card; duplicate resources can load
-different versions of the same custom element.
+The integration registers its Marao card runtime through Home Assistant's
+frontend API. Generated graphs use native Home Assistant cards, and the
+floating navbar hides the top header while this dashboard is active.
 
 ## Restart and open
 

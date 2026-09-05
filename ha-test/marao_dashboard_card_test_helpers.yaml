@@ -151,6 +151,8 @@ input_select:
       - Quick
 
 climate:
+  - platform: marao_test_climate
+    name: Marao Dashboard Test Multi Mode Climate
   - platform: generic_thermostat
     name: Marao Dashboard Test Climate
     unique_id: marao_dashboard_test_climate
@@ -178,7 +180,7 @@ homeassistant:
   customize:
     climate.marao_dashboard_test_single_mode_climate:
       hvac_modes:
-        - "off"
+        - "heat"
 
 template:
   - light:
@@ -401,6 +403,41 @@ template:
         unit_of_measurement: "%"
         device_class: humidity
         state_class: measurement
+      - name: Marao Dashboard Test Climate Heat
+        unique_id: marao_dashboard_test_climate_heat
+        state: "heat"
+        attributes:
+          current_temperature: 20
+      - name: Marao Dashboard Test Climate Cool
+        unique_id: marao_dashboard_test_climate_cool
+        state: "cool"
+        attributes:
+          current_temperature: 20
+      - name: Marao Dashboard Test Climate Heat Cool
+        unique_id: marao_dashboard_test_climate_heat_cool
+        state: "heat_cool"
+        attributes:
+          current_temperature: 20
+      - name: Marao Dashboard Test Climate Auto
+        unique_id: marao_dashboard_test_climate_auto
+        state: "auto"
+        attributes:
+          current_temperature: 20
+      - name: Marao Dashboard Test Climate Dry
+        unique_id: marao_dashboard_test_climate_dry
+        state: "dry"
+        attributes:
+          current_temperature: 20
+      - name: Marao Dashboard Test Climate Fan
+        unique_id: marao_dashboard_test_climate_fan
+        state: "fan_only"
+        attributes:
+          current_temperature: 20
+      - name: Marao Dashboard Test Climate Off
+        unique_id: marao_dashboard_test_climate_off
+        state: "off"
+        attributes:
+          current_temperature: 20
       - name: Marao Dashboard Test Power
         unique_id: marao_dashboard_test_power_sensor
         state: "{{ states('input_number.marao_dashboard_test_power') }}"
@@ -421,6 +458,16 @@ template:
         unique_id: marao_dashboard_test_dishwasher_remaining_sensor
         state: "{{ states('input_number.marao_dashboard_test_dishwasher_remaining') }}"
         unit_of_measurement: min
+  - trigger:
+      - platform: time_pattern
+        seconds: "/5"
+    sensor:
+      - name: Marao Dashboard Test Graph History
+        unique_id: marao_dashboard_test_graph_history
+        state: "{{ 100 + ((as_timestamp(now()) | int) % 60) }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
   - binary_sensor:
       - name: Marao Dashboard Test Washing Machine
         unique_id: marao_dashboard_test_washing_machine_binary_sensor

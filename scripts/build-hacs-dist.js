@@ -10,6 +10,6 @@ fs.cpSync(integrationRoot, distRoot, {
   recursive: true,
   filter: (source) => {
     const name = path.basename(source);
-    return name !== "vendor" && name !== ".DS_Store" && name !== "__pycache__" && !name.endsWith(".pyc");
+    return name !== ".DS_Store" && name !== "__pycache__" && !name.endsWith(".pyc");
   },
 });

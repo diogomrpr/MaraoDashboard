@@ -15,7 +15,7 @@ This card is fairly simple. The most important part is that you change the backg
 
 ### View code
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_navigationbar_card
     variables:
       icon_color_1: white

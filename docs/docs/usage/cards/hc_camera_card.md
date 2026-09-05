@@ -18,12 +18,12 @@ Marao detects the provider from Home Assistant, so the basic configuration is
 the same for both:
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_camera_card
     entity: camera.front_door
 ```
 
-Generated dashboards create the Bubble Card popup automatically.
+Generated dashboards create the Marao popup automatically.
 
 ## Frigate overrides
 
@@ -64,17 +64,17 @@ and the events must be visible in Home Assistant's Media browser.
 
 ## Manual popup
 
-For a manually authored dashboard, pair the card with a Bubble Card popup that
+For a manually authored dashboard, pair the card with a Marao popup that
 uses the same hash:
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_camera_card
     entity: camera.front_door
     variables:
       popup_hash: "#camera-front-door"
 
-  - type: custom:bubble-card
+  - type: custom:marao-popup-card
     card_type: pop-up
     hash: "#camera-front-door"
     entity: camera.front_door
@@ -92,7 +92,7 @@ added to the card configuration.
 
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
-| popup_hash | `#camera` | No | Bubble Card popup hash. Generated dashboards set a unique value. |
+| popup_hash | `#camera` | No | Marao popup hash. Generated dashboards set a unique value. |
 | event_provider | `auto` | No | Provider override: `frigate` or `unifiprotect`. |
 | frigate_camera | Camera entity metadata | No | Frigate camera name override. |
 | frigate_instance_id | Camera entity metadata | No | Frigate integration instance ID override. |

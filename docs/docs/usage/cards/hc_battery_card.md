@@ -11,7 +11,7 @@ The `hc_battery_card` is used to show battery percentages. It changes color base
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_battery_card
     entity: <your battery sensor>
     name: Front Door Sensor

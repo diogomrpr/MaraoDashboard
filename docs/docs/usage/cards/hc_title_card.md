@@ -13,14 +13,14 @@ The `hc_title_card_backbtn` is a card that shows a title and a back button. The 
 ## Title Card
 ![Title Card Light](../../../assets/images/cards/hc_title_card/titlecard_light.png)
 
-## Back Button Card
+## Back button
 ![Backbtn Card Light](../../../assets/images/cards/hc_title_card/titlecard_backbtn_light.png)
 
 
 ## Usage Title
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_title_card
     name: <title>
     label: <subtitle>
@@ -32,7 +32,7 @@ The `hc_title_card_backbtn` is a card that shows a title and a back button. The 
 ## Usage Backbutton
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_title_card_backbtn
     name: The Climate
 ```

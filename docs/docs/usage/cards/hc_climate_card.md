@@ -6,14 +6,14 @@ parent: Cards
 
 # Climate Card
 
-With the `hc_climate_card` you can control your climate. The big number shows the set temperature and you can see the current temperature on the bottom. The buttons provide to change the set temperature.
+The `hc_climate_card` shows the current and target temperatures and uses up/down buttons to change the target. Its background identifies the active HVAC mode; `off`, `unknown`, and `unavailable` retain the neutral card background.
 
 ![Climate Card Light](../../../assets/images/cards/hc_climate_card/climatecard_light.png)
 
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_climate_card
     entity: <climate entity>
 ```
@@ -27,6 +27,17 @@ With the `hc_climate_card` you can control your climate. The big number shows th
 | show_graph | false | No | If true, a graph will be shown as background. |
 | graph_entity |  | No | The entity that will be shown in the graph. |
 | graph_color | var(--color-red) | No | The color will be used for the graph. |
+
+## State colors
+
+| HVAC mode | Theme color |
+|------------|-------------|
+| Heat / heating | `--color-red` |
+| Cool / cooling | `--color-blue` |
+| Heat/Cool | `--color-purple` |
+| Auto | `--color-gold` |
+| Dry / drying | `--color-yellow` |
+| Fan only | `--color-green` |
 
 ## Contribution
 - [ptC7H12](https://github.com/ptC7H12)

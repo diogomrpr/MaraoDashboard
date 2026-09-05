@@ -15,7 +15,7 @@ The `hc_security_card` is used for enabling or disabling your alarm. It's config
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_security_card
     entity: <your_alarm_entity>
     variables:

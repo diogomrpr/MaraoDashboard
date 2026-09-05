@@ -32,12 +32,9 @@ from custom_components.marao_dashboard.const import (
     MARAO_DASHBOARD_MODULES,
     MARAO_DASHBOARD_STATIC_URL,
 )
-from custom_components.marao_dashboard.dependency_runtime import (
-    DEPENDENCY_ISSUE_ID,
+from custom_components.marao_dashboard.legacy_migration import (
     LEGACY_RESOURCES_ISSUE_ID,
-    async_dependency_statuses,
     async_migrate_legacy_vendor_resources,
-    async_refresh_dependency_issue,
 )
 from custom_components.marao_dashboard.editor import EDITOR_CATALOG
 
@@ -107,16 +104,10 @@ async def test_setup_entry_installs_base_dashboard_once(hass) -> None:
     assert "weather.home" in generated_source
     assert "light.kitchen_main" in generated_source
     assert Path(hass.config.path("themes/MaraoDashboard/marao-dashboard.yaml")).exists()
-    assert Path(
-        hass.config.path(
-            "www/community/MaraoDashboard/dashboard/MaraoDashboard/"
-            "templates/internal_templates/_base_templates/hc_base_card.yaml"
-        )
-    ).exists()
     assert "marao-dashboard:" in config_source
-    assert "marao-dashboard-card-test:" not in config_source
+    assert "marao-dashboard-card-test:" in config_source
     assert 'filename: "dashboard/MaraoDashboard/dashboard/dashboard.yaml"' in config_source
-    assert 'filename: "www/community/MaraoDashboard/dashboard/MaraoDashboard/main.yaml"' not in config_source
+    assert 'filename: "www/community/MaraoDashboard/dashboard/MaraoDashboard/main.yaml"' in config_source
     assert "themes: !include_dir_merge_named themes" in config_source
     assert "extra_module_url:" not in config_source
     assert "/hacsfiles/MaraoDashboard/MaraoDashboard.js" not in config_source
@@ -129,6 +120,8 @@ async def test_setup_entry_installs_base_dashboard_once(hass) -> None:
     assert not any("marao_dashboard_static" in url for url in resource_urls)
     assert set(MARAO_DASHBOARD_MODULES) <= set(hass.data[DATA_EXTRA_MODULE_URL].urls)
     assert all(url.startswith(MARAO_DASHBOARD_STATIC_URL) for url in MARAO_DASHBOARD_MODULES)
+    assert "marao-dashboard-card-test" in hass.data[LOVELACE_DATA].dashboards
+    assert "marao-dashboard-card-test" in hass.data[DATA_PANELS]
     assert hass.data[DOMAIN]["websocket_registered"]
     assert "marao-dashboard-editor" in hass.data[DATA_PANELS]
     history = list(
@@ -139,8 +132,7 @@ async def test_setup_entry_installs_base_dashboard_once(hass) -> None:
     assert "marao_dashboard/config/get" in websocket_commands
     assert "marao_dashboard/config/generate" in websocket_commands
     assert "marao_dashboard/history/restore" in websocket_commands
-    assert "marao_dashboard/dependencies/recheck" in websocket_commands
-    assert ir.async_get(hass).async_get_issue(DOMAIN, DEPENDENCY_ISSUE_ID) is not None
+    assert "marao_dashboard/dependencies/recheck" not in websocket_commands
 
 
 async def test_setup_entry_marker_prevents_regeneration(hass) -> None:
@@ -167,7 +159,7 @@ async def test_setup_entry_marker_prevents_regeneration(hass) -> None:
     assert dashboard.read_text(encoding="utf-8") == "user edited dashboard\n"
     assert dashboard_json.read_text(encoding="utf-8") == '{"name":"User JSON","rooms":[]}\n'
     assert config_source.count("marao-dashboard:") == 1
-    assert "marao-dashboard-card-test:" not in config_source
+    assert "marao-dashboard-card-test:" in config_source
     assert "/hacsfiles/MaraoDashboard/MaraoDashboard.js" not in config_source
     assert set(MARAO_DASHBOARD_MODULES) <= set(hass.data[DATA_EXTRA_MODULE_URL].urls)
 
@@ -228,84 +220,6 @@ cards:
 
     assert dashboard_json.read_text(encoding="utf-8") == source
     assert popup.read_text(encoding="utf-8") == popup_source
-
-
-async def test_setup_repairs_comment_only_generated_popup(hass) -> None:
-    _reset_dashboard_files(hass)
-    Path(hass.config.path("configuration.yaml")).write_text(
-        "default_config:\n", encoding="utf-8"
-    )
-    _create_area_entity(hass, "Kitchen", "climate.kitchen")
-    entry = MockConfigEntry(domain=DOMAIN, title="Marao Dashboard", data={})
-    entry.add_to_hass(hass)
-
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    popup = Path(
-        hass.config.path(
-            "dashboard/MaraoDashboard/dashboard/components/popups/overview_climate.yaml"
-        )
-    )
-    source = popup.read_text(encoding="utf-8")
-    generated_start = "  # marao:generated:start\n"
-    generated_end = "  # marao:generated:end\n"
-    content_start = source.index(generated_start) + len(generated_start)
-    content_end = source.index(generated_end)
-    popup.write_text(source[:content_start] + source[content_end:], encoding="utf-8")
-    assert yaml.safe_load(popup.read_text(encoding="utf-8"))["cards"] is None
-
-    assert await hass.config_entries.async_unload(entry.entry_id)
-    await hass.async_block_till_done()
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    repaired = yaml.safe_load(popup.read_text(encoding="utf-8"))
-    assert isinstance(repaired["cards"], list)
-    assert repaired["cards"]
-
-
-async def test_setup_removes_stale_comment_only_generated_popup(hass) -> None:
-    _reset_dashboard_files(hass)
-    Path(hass.config.path("configuration.yaml")).write_text(
-        "default_config:\n", encoding="utf-8"
-    )
-    _create_area_entity(hass, "Kitchen", "climate.kitchen")
-    entry = MockConfigEntry(domain=DOMAIN, title="Marao Dashboard", data={})
-    entry.add_to_hass(hass)
-
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    popup = Path(
-        hass.config.path(
-            "dashboard/MaraoDashboard/dashboard/components/popups/overview_climate.yaml"
-        )
-    )
-    source = popup.read_text(encoding="utf-8")
-    generated_start = "  # marao:generated:start\n"
-    generated_end = "  # marao:generated:end\n"
-    content_start = source.index(generated_start) + len(generated_start)
-    content_end = source.index(generated_end)
-    popup.write_text(source[:content_start] + source[content_end:], encoding="utf-8")
-
-    dashboard_json = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
-    config = json.loads(dashboard_json.read_text(encoding="utf-8"))
-    config["rooms"] = []
-    dashboard_json.write_text(json.dumps(config), encoding="utf-8")
-    er.async_get(hass).async_remove("climate.kitchen")
-    hass.states.async_remove("climate.kitchen")
-
-    assert await hass.config_entries.async_unload(entry.entry_id)
-    await hass.async_block_till_done()
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    overview = Path(
-        hass.config.path("dashboard/MaraoDashboard/dashboard/views/main/00-overview.yaml")
-    )
-    assert not popup.exists()
-    assert "overview_climate.yaml" not in overview.read_text(encoding="utf-8")
 
 
 async def test_setup_preserves_standalone_card_resources(hass) -> None:
@@ -380,18 +294,14 @@ async def test_remove_entry_clears_repairs_but_unload_preserves_them(hass) -> No
         }
     )
     hass.data[LOVELACE_DATA].resource_mode = MODE_YAML
+    source = config_path.read_text(encoding="utf-8")
     assert await async_migrate_legacy_vendor_resources(hass) == 0
 
-    issue_registry = ir.async_get(hass)
-    assert issue_registry.async_get_issue(DOMAIN, DEPENDENCY_ISSUE_ID) is not None
-    assert issue_registry.async_get_issue(DOMAIN, LEGACY_RESOURCES_ISSUE_ID) is not None
-
     assert await hass.config_entries.async_unload(entry.entry_id)
-    assert issue_registry.async_get_issue(DOMAIN, DEPENDENCY_ISSUE_ID) is not None
+    issue_registry = ir.async_get(hass)
     assert issue_registry.async_get_issue(DOMAIN, LEGACY_RESOURCES_ISSUE_ID) is not None
 
     assert await hass.config_entries.async_remove(entry.entry_id) == {"require_restart": False}
-    assert issue_registry.async_get_issue(DOMAIN, DEPENDENCY_ISSUE_ID) is None
     assert issue_registry.async_get_issue(DOMAIN, LEGACY_RESOURCES_ISSUE_ID) is None
 
 
@@ -461,98 +371,13 @@ async def test_yaml_resource_mode_reports_legacy_resources_without_mutation(hass
     )
     hass.data[LOVELACE_DATA].resource_mode = MODE_YAML
     source = config_path.read_text(encoding="utf-8")
-    statuses = await async_dependency_statuses(
-        hass, {"name": "Marao Dashboard", "rooms": []}
-    )
-    by_id = {item["id"]: item for item in statuses}
-
     assert await async_migrate_legacy_vendor_resources(hass) == 0
 
     items = {item["id"]: item for item in resources.async_items()}
     assert legacy["id"] in items
     assert standalone["id"] in items
-    assert by_id["button_card"]["status"] == "installed"
-    assert by_id["bubble_card"]["status"] == "not_detected"
     assert config_path.read_text(encoding="utf-8") == source
     assert ir.async_get(hass).async_get_issue(DOMAIN, LEGACY_RESOURCES_ISSUE_ID) is not None
-
-
-async def test_dependency_statuses_resolve_area_linked_rooms(hass) -> None:
-    _reset_dashboard_files(hass)
-    Path(hass.config.path("configuration.yaml")).write_text(
-        "default_config:\n", encoding="utf-8"
-    )
-    _create_area_entity(hass, "Kitchen", "light.kitchen_main")
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title="Marao Dashboard",
-        data={BASE_DASHBOARD_CREATED: True},
-    )
-    entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    config = {"name": "Areas", "rooms": [{"name": "Kitchen", "area": "Kitchen"}]}
-    statuses = await async_dependency_statuses(
-        hass, config, _registry_entities(hass)
-    )
-    required = {item["id"] for item in statuses if item["required"]}
-    assert {"my_cards", "bubble_card"} <= required
-    assert "mini_graph_card" not in required
-
-    config["rooms"][0].update(
-        {
-            "entities": ["light.kitchen_main"],
-            "exclude": ["light.kitchen_main"],
-        }
-    )
-    excluded_statuses = await async_dependency_statuses(
-        hass, config, _registry_entities(hass)
-    )
-    assert {
-        item["id"] for item in excluded_statuses if item["required"]
-    } == {"button_card", "navbar_card", "kiosk_mode", "card_mod"}
-
-
-async def test_dependency_repair_clears_after_required_resources_are_detected(hass) -> None:
-    _reset_dashboard_files(hass)
-    Path(hass.config.path("configuration.yaml")).write_text("default_config:\n", encoding="utf-8")
-    config = {"name": "Marao Dashboard", "slug": "dashboard", "rooms": []}
-    config_path = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(json.dumps(config), encoding="utf-8")
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title="Marao Dashboard",
-        data={BASE_DASHBOARD_CREATED: True},
-    )
-    entry.add_to_hass(hass)
-
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-    assert ir.async_get(hass).async_get_issue(DOMAIN, DEPENDENCY_ISSUE_ID) is not None
-
-    resources = hass.data[LOVELACE_DATA].resources
-    for url in (
-        "/hacsfiles/button-card/button-card.js?hacstag=7",
-        "/hacsfiles/lovelace-navbar-card/navbar-card.js",
-        "/hacsfiles/kiosk-mode/kiosk-mode.js",
-    ):
-        await resources.async_create_item(
-            {CONF_URL: url, CONF_RESOURCE_TYPE_WS: "module"}
-        )
-    frontend.add_extra_js_url(
-        hass, "/hacsfiles/lovelace-card-mod/card-mod.js?hacstag=4"
-    )
-
-    statuses = await async_refresh_dependency_issue(hass, config)
-    by_id = {item["id"]: item for item in statuses}
-    assert all(by_id[item]["status"] == "installed" for item in (
-        "button_card", "navbar_card", "kiosk_mode", "card_mod"
-    ))
-    assert by_id["my_cards"]["required"] is False
-    assert by_id["my_cards"]["status"] == "not_detected"
-    assert ir.async_get(hass).async_get_issue(DOMAIN, DEPENDENCY_ISSUE_ID) is None
 
 
 async def test_generate_dashboard_service_dry_run_does_not_write(hass) -> None:
@@ -571,9 +396,6 @@ async def test_generate_dashboard_service_dry_run_does_not_write(hass) -> None:
     config_source = Path(hass.config.path("configuration.yaml")).read_text(
         encoding="utf-8"
     )
-    issue_before = ir.async_get(hass).async_get_issue(DOMAIN, DEPENDENCY_ISSUE_ID)
-    assert issue_before is not None
-
     response = await hass.services.async_call(
         DOMAIN,
         GENERATE_DASHBOARD_SERVICE,
@@ -585,14 +407,11 @@ async def test_generate_dashboard_service_dry_run_does_not_write(hass) -> None:
     assert response["dry_run"]
     assert response["dashboard_key"] == "marao-dry-run"
     assert "dashboard/MaraoDashboard/dry-run/dashboard.yaml" in response["filename"]
-    assert len(response["dependencies"]) == 7
+    assert "dependencies" not in response
     assert not dashboard.exists()
     assert Path(hass.config.path("configuration.yaml")).read_text(
         encoding="utf-8"
     ) == config_source
-    issue_after = ir.async_get(hass).async_get_issue(DOMAIN, DEPENDENCY_ISSUE_ID)
-    assert issue_after is not None
-    assert issue_after.translation_placeholders == issue_before.translation_placeholders
 
 
 async def test_generate_dashboard_service_writes_dashboard_and_raw_room_cards(hass) -> None:
@@ -714,9 +533,6 @@ async def test_management_payload_includes_editor_context(hass) -> None:
 
 
 def test_editor_catalog_maps_to_installed_templates() -> None:
-    template_dir = Path(
-        "custom_components/marao_dashboard/frontend/dashboard/MaraoDashboard/templates/internal_templates"
-    )
     card_ids = {card["id"] for card in EDITOR_CATALOG["cards"]}
 
     assert len(card_ids) == len(EDITOR_CATALOG["cards"])
@@ -740,18 +556,13 @@ def test_editor_catalog_maps_to_installed_templates() -> None:
         "hc_vacuum_card",
         "hc_washing_machine_card",
     }
+    assert Path("custom_components/marao_dashboard/frontend/MaraoCards.js").exists()
     for card in EDITOR_CATALOG["cards"]:
-        template_path = template_dir / f"{card['id']}.yaml"
-        assert template_path.exists()
         assert all(
             {"key", "label", "kind", "selector", "advanced", "description"}
             <= variable.keys()
             for variable in card["variables"]
         )
-        template = yaml.safe_load(template_path.read_text(encoding="utf-8"))[card["id"]]
-        declared_variables = set(template.get("variables", {}))
-        catalog_variables = {variable["key"] for variable in card["variables"]}
-        assert declared_variables <= catalog_variables
     for page in EDITOR_CATALOG["pages"].values():
         assert page["description"]
         assert all(

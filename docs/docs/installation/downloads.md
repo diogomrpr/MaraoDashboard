@@ -17,7 +17,6 @@ and static APIs.
 
 - Install and configure [HACS](https://www.hacs.xyz/docs/use/).
 - Create a Home Assistant backup.
-- Install the [seven dashboard dependencies]({{ '/docs/installation/dependencies.html' | relative_url }}).
 - Make sure you can restart Home Assistant and edit `configuration.yaml` if a
   manual recovery is needed.
 
@@ -37,14 +36,13 @@ custom_components/
 └── marao_dashboard/
 ```
 
-After the integration is added, Marao copies only its generated-dashboard YAML
-template library and theme YAML into these locations:
+After the integration is added, Marao copies its generated-dashboard YAML and
+theme assets into these locations:
 
 ```text
 www/community/MaraoDashboard/
 └── dashboard/
     └── MaraoDashboard/
-        ├── templates/
         ├── views/
         └── main.yaml
 
@@ -53,8 +51,8 @@ themes/
     └── marao-dashboard.yaml
 ```
 
-Third-party card bundles do not belong in this directory. Their HACS downloads
-remain under their own `www/community/<repository>` directories.
+Unrelated HACS card bundles remain under their own directories and are not
+modified by Marao.
 
 Do not add a Marao JavaScript resource manually. The integration registers its
 own modules with Home Assistant when it loads.

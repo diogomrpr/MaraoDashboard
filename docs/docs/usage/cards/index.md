@@ -15,7 +15,7 @@ All of the cards are using the default entries from Home Assistant and variables
 For example, the light cards requires you to add a `light entity` which you can enter through the `entity:` entry.
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_light_card
     entity: light.livingroom
 ```
@@ -24,7 +24,7 @@ For example, the light cards requires you to add a `light entity` which you can 
 It is also possible to change the name of the light by giving the `name:` entry, like so:
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_light_card
     entity: light.livingroom
     name: My Awesome Light
@@ -34,7 +34,7 @@ It is also possible to change the name of the light by giving the `name:` entry,
 With variables, you can change certain aspects in the card, eg. enabling the slider
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_light_card
     entity: light.livingroom
     name: My Awesome Light

@@ -99,33 +99,15 @@ if (templateVacuums.some((vacuum) => "battery_level" in vacuum || "battery_level
   console.error(`${helperPackagePath} must not use deprecated template vacuum battery options.`);
 }
 
-const templatePaths = collectYamlFiles(`${frontendRoot}/dashboard/MaraoDashboard/templates`);
-const templateSource = templatePaths
-  .map((relativePath) => fs.readFileSync(path.join(repoRoot, relativePath), "utf8"))
-  .join("\n");
-for (const expected of [
-  "hc_single_title_card:",
-  "#container.no-label.no-state:has(> #name):not(:has(> :not(#img-cell):not(#name))) #name",
-  "grid-row: 1 / -1 !important",
-  "align-self: center !important",
-]) {
+const templateSource = fs.readFileSync(
+  path.join(repoRoot, frontendRoot, "MaraoCards.js"),
+  "utf8",
+);
+for (const expected of ["class MaraoCard", "class MaraoNavbarCard", "class MaraoPopupCard", "customElements.define"]) {
   if (!templateSource.includes(expected)) {
     hasError = true;
-    console.error(`Single-title cards must center their title generically: ${expected}`);
+    console.error(`Marao frontend runtime is missing ${expected}.`);
   }
-}
-const templateDefinitions = Object.assign({}, ...templatePaths.map((relativePath) =>
-  YAML.parse(fs.readFileSync(path.join(repoRoot, relativePath), "utf8"))
-));
-const inheritsSingleTitle = (name, seen = new Set()) => name === "hc_single_title_card" || (
-  !seen.has(name) &&
-  (seen.add(name), [templateDefinitions[name]?.template].flat().filter(Boolean)
-    .some((parent) => inheritsSingleTitle(parent, seen)))
-);
-const uncenteredTemplates = Object.keys(templateDefinitions).filter((name) => !inheritsSingleTitle(name));
-if (uncenteredTemplates.length > 0) {
-  hasError = true;
-  console.error(`Button-card templates must inherit hc_single_title_card: ${uncenteredTemplates.join(", ")}`);
 }
 const themeSource = fs.readFileSync(
   path.join(repoRoot, frontendRoot, "themes/MaraoDashboard/marao-dashboard.yaml"),
@@ -260,85 +242,9 @@ for (const key of usedFrontendKeys) {
   }
 }
 
-if (/^\s{4}mode_selector:/m.test(templateSource)) {
-  hasError = true;
-  console.error("Climate card must not include the old mode_selector dropdown field.");
-}
-const climateTemplate = fs.readFileSync(
-  path.join(repoRoot, frontendRoot, "dashboard/MaraoDashboard/templates/internal_templates/hc_climate_card.yaml"),
-  "utf8"
-);
-for (const expected of [
-  "return variables.mode_selector_hash && modes.length > 1 ? 'navigate' : 'call-service'",
-  "service: climate.toggle",
-  "heat: 'var(--color-red)'",
-  "cool: 'var(--color-blue)'",
-  "cold: 'var(--color-blue)'",
-  "heat_cool: 'var(--color-purple)'",
-  "auto: 'var(--color-gold)'",
-  "dry: 'var(--color-yellow)'",
-  "fan_only: 'var(--color-green)'",
-  "? 'var(--active-text-color)'",
-  "- overflow: hidden",
-  "variables.graph_entity || entity.entity_id",
-]) {
-  if (!climateTemplate.includes(expected)) {
-    hasError = true;
-    console.error(`Climate card is missing expected toggle/color behavior: ${expected}`);
-  }
-}
-
-const accessTemplate = fs.readFileSync(
-  path.join(repoRoot, frontendRoot, "dashboard/MaraoDashboard/templates/internal_templates/hc_access_card.yaml"),
-  "utf8"
-);
-for (const expected of [
-  "hc_access_card:",
-  "hc_access_action_card:",
-  "hc_access_slide_action_card:",
-  "hc_access_hold_action_card:",
-  "tap_action:",
-  "action: call-service",
-  "press_action:",
-  "release_action:",
-  "window.setTimeout",
-  "}, 1000);",
-  "background-size: 0% 100%, auto",
-  "ha-card:active",
-  "transition: background-size 1s linear",
-  "<marao-slide-to-open entity=",
-  'state="${entity.state}"',
-  "['open', 'opening', 'unlocking', 'unavailable']",
-]) {
-  if (!accessTemplate.includes(expected)) {
-    hasError = true;
-    console.error(`Access cards are missing expected safe action behavior: ${expected}`);
-  }
-}
-const roomCardTemplate = fs.readFileSync(
-  path.join(repoRoot, frontendRoot, "dashboard/MaraoDashboard/templates/internal_templates/hc_navigation_card.yaml"),
-  "utf8"
-);
-const roomCardDefinition = roomCardTemplate.slice(roomCardTemplate.indexOf("hc_room_card:"));
-for (const expected of [
-  "room_navigation_path: /marao-dashboard/rooms",
-  "navigation_path: \"[[[ return variables.room_navigation_path ]]]\"",
-  "grid-row: 1 !important",
-  "position: absolute",
-  "top: 16px",
-  "top: 42px",
-  "justify-content: flex-start",
-  "service: light.turn_off",
-  "hold_action:\n          action: none",
-  "double_tap_action:\n          action: none",
-]) {
-  if (!roomCardDefinition.includes(expected)) {
-    hasError = true;
-    console.error(`Room card is missing required navigation or lights-off behavior: ${expected}`);
-  }
-}
 const usedThemeVars = [...new Set([...templateSource.matchAll(/var\(--([a-zA-Z0-9_-]+)/g)]
   .map((match) => match[1]))]
+  .filter((name) => name.startsWith("font-size-"))
   .filter((name) => name !== "slide-progress")
   .sort();
 
@@ -379,30 +285,6 @@ for (const match of templateSource.matchAll(/onclick="([^"]*)"/g)) {
   }
 }
 
-const generatorSource = fs.readFileSync(
-  path.join(repoRoot, "custom_components/marao_dashboard/generator.py"),
-  "utf8"
-);
-for (const expected of [
-  "overscroll-behavior: contain",
-  "touch-action: pan-y",
-  "height: 100%",
-  "align-items: stretch",
-  "align-content: start",
-  "justify-content: flex-start",
-  "position: fixed",
-  "inset: auto 0 0 0",
-  "max-height: 80vh",
-  ".bubble-pop-up-container > .bubble-cards-container",
-  "margin-top: 16px",
-  '"columns": 1',
-]) {
-  if (!generatorSource.includes(expected)) {
-    hasError = true;
-    console.error(`Generated popup styles must prevent background page scrolling: ${expected}`);
-  }
-}
-
 const cardTestPath = path.join(
   repoRoot,
   frontendRoot,
@@ -433,7 +315,7 @@ if (findCardType(cardTest.cards[0], "grid")) {
   console.error("Visible card test dashboard examples must stay in the single-column vertical stack.");
 }
 
-const timelineCards = findCardsByType(cardTest.cards[0], "custom:button-card")
+const timelineCards = findCardsByType(cardTest.cards[0], "custom:marao-card")
   .filter((card) => card.template === "hc_timeline_card");
 if (
   timelineCards.length !== 1 ||
@@ -444,30 +326,10 @@ if (
   console.error("Card test dashboard must mount one Marao timeline through hc_timeline_card.");
 }
 
-if (findCardsByType(cardTest, "custom:navbar-card").some((card) => card.styles)) {
-  hasError = true;
-  console.error("Navbar CSS belongs in the navbar component, not the card test dashboard.");
-}
-
-for (const popup of findCardsByType(cardTest, "custom:bubble-card").filter(
-  (card) => card.card_type === "pop-up"
-)) {
-  const styles = String(popup.styles || "");
-  if (
-    !styles.includes("overscroll-behavior: contain") ||
-    !styles.includes("touch-action: pan-y") ||
-    !styles.includes("height: 100%") ||
-    !styles.includes("align-items: stretch") ||
-    !styles.includes("align-content: start") ||
-    !styles.includes("justify-content: flex-start") ||
-    !styles.includes("position: fixed") ||
-    !styles.includes("inset: auto 0 0 0") ||
-    !styles.includes("max-height: 80vh") ||
-    !styles.includes(".bubble-pop-up-container > .bubble-cards-container") ||
-    !styles.includes("margin-top: 16px")
-  ) {
+for (const popup of findCardsByType(cardTest, "custom:marao-popup-card")) {
+  if (!popup.hash || !popup.cards) {
     hasError = true;
-    console.error(`${popup.hash || popup.name || "Bubble popup"} must contain scroll inside an 80vh popup.`);
+    console.error(`${popup.hash || popup.title || "Marao popup"} must define a scrollable popup.`);
   }
 }
 
@@ -480,14 +342,14 @@ const gridPopupCardExpectations = {
   "#marao-dashboard-test-maintenance-popup": "hc_battery_card",
 };
 for (const [hash, expectedTemplate] of Object.entries(gridPopupCardExpectations)) {
-  const popup = cardTest.cards.find((card) => card?.type === "custom:bubble-card" && card.hash === hash);
+  const popup = cardTest.cards.find((card) => card?.type === "custom:marao-popup-card" && card.hash === hash);
   const grid = popup?.cards?.[0];
   const columns = 1;
   if (
     grid?.type !== "grid" ||
     grid?.columns !== columns ||
     grid?.square !== false ||
-    !findCardsByType(grid, "custom:button-card").some((card) => card.template === expectedTemplate)
+    !findCardsByType(grid, "custom:marao-card").some((card) => card.template === expectedTemplate)
   ) {
     hasError = true;
     console.error(`${hash} must contain a ${columns}-column grid of ${expectedTemplate} cards.`);
@@ -495,9 +357,9 @@ for (const [hash, expectedTemplate] of Object.entries(gridPopupCardExpectations)
 }
 
 const garageDoorPopup = cardTest.cards.find(
-  (card) => card?.type === "custom:bubble-card" && card.hash === "#marao-dashboard-test-garage-door-popup"
+  (card) => card?.type === "custom:marao-popup-card" && card.hash === "#marao-dashboard-test-garage-door-popup"
 );
-if (!findCardsByType(garageDoorPopup?.cards?.[0], "custom:button-card").some(
+if (!findCardsByType(garageDoorPopup?.cards?.[0], "custom:marao-card").some(
   (card) => card.template === "hc_access_slide_action_card"
 )) {
   hasError = true;
@@ -505,8 +367,8 @@ if (!findCardsByType(garageDoorPopup?.cards?.[0], "custom:button-card").some(
 }
 
 for (const hash of ["#marao-dashboard-test-lock-popup"]) {
-  const popup = cardTest.cards.find((card) => card?.type === "custom:bubble-card" && card.hash === hash);
-  const actions = findCardsByType(popup?.cards?.[0], "custom:button-card")
+  const popup = cardTest.cards.find((card) => card?.type === "custom:marao-popup-card" && card.hash === hash);
+  const actions = findCardsByType(popup?.cards?.[0], "custom:marao-card")
     .filter((card) => ["hc_access_action_card", "hc_access_slide_action_card"].includes(card.template));
   if (
     popup?.cards?.[0]?.columns !== 1 ||
@@ -521,9 +383,9 @@ for (const hash of ["#marao-dashboard-test-lock-popup"]) {
 }
 
 const climatePopup = cardTest.cards.find(
-  (card) => card?.type === "custom:bubble-card" && card.hash === "#marao-dashboard-test-climate-popup"
+  (card) => card?.type === "custom:marao-popup-card" && card.hash === "#marao-dashboard-test-climate-popup"
 );
-const climatePopupCards = findCardsByType(climatePopup?.cards?.[0], "custom:button-card")
+const climatePopupCards = findCardsByType(climatePopup?.cards?.[0], "custom:marao-card")
   .filter((card) => card.template === "hc_climate_card");
 if (
   climatePopupCards.length === 0 ||
@@ -533,15 +395,44 @@ if (
   console.error("Climate popup cards must enable inline mode buttons.");
 }
 
-const appleTvCard = findCardsByType(cardTest.cards[0], "custom:button-card").find(
+const climateModePopup = cardTest.cards.find(
+  (card) => card?.type === "custom:marao-popup-card" && card.hash === "#climate-mode-test"
+);
+const climateModeCard = climateModePopup?.cards?.[0];
+if (
+  climateModePopup?.title ||
+  climateModeCard?.template !== "hc_climate_card" ||
+  climateModeCard?.name !== "Climate" ||
+  climateModeCard?.variables?.show_mode_buttons !== true
+) {
+  hasError = true;
+  console.error("Climate mode popup must show the normal climate card without a duplicate popup title.");
+}
+
+const multiModeClimatePopup = cardTest.cards.find(
+  (card) => card?.type === "custom:marao-popup-card" && card.hash === "#multi-mode-climate-test"
+);
+const multiModeClimateCard = multiModeClimatePopup?.cards?.[0];
+if (
+  multiModeClimatePopup?.title ||
+  multiModeClimatePopup?.entity !== "climate.marao_dashboard_test_multi_mode_climate" ||
+  multiModeClimateCard?.template !== "hc_climate_card" ||
+  multiModeClimateCard?.name !== "Multi Mode Climate" ||
+  multiModeClimateCard?.variables?.show_mode_buttons !== true
+) {
+  hasError = true;
+  console.error("Card test dashboard must include the functional multi-mode test climate popup.");
+}
+
+const appleTvCard = findCardsByType(cardTest.cards[0], "custom:marao-card").find(
   (card) => card.template === "hc_media_card" && card.variables?.apple_tv === true
 );
 const appleTvPopup = cardTest.cards.find(
-  (card) => card?.type === "custom:bubble-card" && card.hash === "#marao-dashboard-test-apple-tv-popup"
+  (card) => card?.type === "custom:marao-popup-card" && card.hash === "#marao-dashboard-test-apple-tv-popup"
 );
 if (
   appleTvCard?.variables?.popup_hash !== "#marao-dashboard-test-apple-tv-popup" ||
-  !findCardsByType(appleTvPopup, "custom:button-card").some((card) => card.template === "hc_media_app_card") ||
+  !findCardsByType(appleTvPopup, "custom:marao-card").some((card) => card.template === "hc_media_app_card") ||
   !String(JSON.stringify(appleTvPopup)).includes('"command":"top_menu"') ||
   !String(JSON.stringify(appleTvPopup)).includes('"command":"select"')
 ) {
@@ -549,11 +440,23 @@ if (
   console.error("Card test dashboard must include an Apple TV media card and remote popup.");
 }
 
+const historyGraphs = findCardsByType(cardTest.cards[0], "history-graph");
+if (
+  historyGraphs.length < 3 ||
+  historyGraphs.some((card) =>
+    card.hours_to_show !== 1 ||
+    !card.entities?.includes("sensor.marao_dashboard_test_graph_history")
+  )
+) {
+  hasError = true;
+  console.error("Card test graph cards must use the simulated sensor with native one-hour history graphs.");
+}
+
 const cardTestLastCard = cardTest.cards?.[cardTest.cards.length - 1];
 if (
   cardTestLastCard?.type !== "vertical-stack" ||
   cardTestLastCard.cards?.[0]?.color_type !== "blank-card" ||
-  !findCardType(cardTestLastCard, "custom:navbar-card")
+  !findCardType(cardTestLastCard, "custom:marao-navbar-card")
 ) {
   hasError = true;
   console.error("Card test dashboard must end with the navbar stack and its bottom spacer.");

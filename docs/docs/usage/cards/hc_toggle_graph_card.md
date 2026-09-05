@@ -11,7 +11,7 @@ The `hc_toggle_graph_card` extends `hc_graph_card` by linking a sensor graph to 
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_toggle_graph_card
     entity: <your sensor entity>
     name: Heater
@@ -43,4 +43,4 @@ The `hc_toggle_graph_card` extends `hc_graph_card` by linking a sensor graph to 
 
 ## More info
 
-This card inherits graph behavior from `hc_graph_card`, including the Mini Graph Card dependency.
+This card inherits graph behavior from `hc_graph_card` and uses Home Assistant's native history graph rendering.

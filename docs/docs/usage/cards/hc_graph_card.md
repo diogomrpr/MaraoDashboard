@@ -14,7 +14,7 @@ The `hc_graph_card` is used for showing a graph of a sensor. It also shows the c
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_graph_card
     entity: <sensor entity>
     variables:

@@ -11,7 +11,7 @@ The `hc_vacuum_card` is used to control a robot vacuum. It includes return-to-ba
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_vacuum_card
     entity: <your vacuum entity>
     variables:

@@ -23,7 +23,7 @@ There are a lot of guides online on how to do this.
 ### View code
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_scene_card
     entity: input_select.scene_selector # Create this one yourself!
     variables:

@@ -1,3 +1,9 @@
+const MARAO_RESOURCE_QUERY = new URL(import.meta.url).search;
+const [{ haptic }] = await Promise.all([
+  import(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`),
+  import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`),
+]);
+
 const MARAO_FONT_URL = "https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900";
 
 if (
@@ -510,10 +516,9 @@ class MaraoSlideToOpen extends HTMLElement {
     if (this._state() === "unlocking") {
       return window.MaraoDashboard?.localize?.("common.unlocking", this._hassInstance()) || "Unlocking...";
     }
-    const key = (this._entityId() || "").startsWith("lock.")
-      ? "access.slide_to_unlock"
-      : "access.slide_to_open";
-    return window.MaraoDashboard?.localize?.(key, this._hassInstance()) || "Slide to open";
+    const isLock = (this._entityId() || "").startsWith("lock.");
+    const key = isLock ? "common.unlock" : "access.slide_to_open";
+    return window.MaraoDashboard?.localize?.(key, this._hassInstance()) || (isLock ? "Unlock" : "Slide to open");
   }
 
   _render() {
@@ -526,12 +531,12 @@ class MaraoSlideToOpen extends HTMLElement {
         .track {
           position: relative;
           width: 100%;
-          height: 64px;
+          min-height: 64px;
           overflow: hidden;
           border: 1px solid var(--divider-color);
           border-radius: 32px;
           box-sizing: border-box;
-          background: var(--button-card-background);
+          background: var(--marao-card-background);
           touch-action: none;
           user-select: none;
           -webkit-user-select: none;
@@ -547,32 +552,39 @@ class MaraoSlideToOpen extends HTMLElement {
           pointer-events: none;
         }
         .label {
-          position: absolute;
-          inset: 0;
+          position: relative;
           display: grid;
           place-items: center;
-          padding: 0 72px;
+          min-height: 64px;
+          padding: 8px 16px 8px 72px;
+          box-sizing: border-box;
           color: var(--primary-text-color);
           font: var(--font-weight-primary) var(--font-size-primary) var(--primary-font-family);
+          line-height: 1.15;
+          overflow-wrap: anywhere;
           text-align: center;
           pointer-events: none;
         }
         .thumb {
           position: absolute;
-          top: 4px;
+          top: calc(50% - 27px);
           left: 4px;
-          display: grid;
+          display: flex;
           width: 54px;
           height: 54px;
-          place-items: center;
+          align-items: center;
+          justify-content: center;
           border: 2px solid var(--primary-color);
           border-radius: 50%;
           box-sizing: border-box;
           color: var(--primary-color);
           background: var(--active-text-color);
           box-shadow: var(--ha-card-box-shadow);
-          font-size: 32px;
+          font-size: 44px;
+          font-family: sans-serif;
+          font-weight: 500;
           line-height: 1;
+          padding: 0 0 4px 2px;
           pointer-events: none;
         }
         .track[aria-disabled="true"] { opacity: 0.6; }
@@ -627,6 +639,7 @@ class MaraoSlideToOpen extends HTMLElement {
     if (point.clientX > bounds.left + 72) return;
     event.preventDefault();
     event.stopPropagation();
+    haptic("heavy");
     this._pointerId = point.pointerId ?? point.identifier;
     this._startX = point.clientX;
     this._startProgress = this._progress;
@@ -682,7 +695,7 @@ class MaraoSlideToOpen extends HTMLElement {
     const [domain] = entityId.split(".", 1);
     const service = domain === "lock" ? "unlock" : "open_cover";
     hass.callService(domain, service, { entity_id: entityId });
-    this.dispatchEvent(new CustomEvent("haptic", { bubbles: true, composed: true, detail: "heavy" }));
+    haptic("heavy");
   }
 
   getCardSize() {
@@ -880,9 +893,9 @@ class MaraoStateTimelineCard extends HTMLElement {
         :host { display: block; width: 100%; }
         ha-card { box-sizing: border-box; min-height: 168px; padding: 13px 20px; background: var(--ha-card-background); color: var(--primary-text-color); }
         header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-        h2 { margin: 0; min-width: 0; overflow: hidden; font-size: 18px; font-weight: 700; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
-        header span { flex: 0 0 auto; color: var(--subtext-color); font-size: 12px; }
-        .plot { position: relative; height: 48px; border: 1px solid var(--divider-color); border-radius: 8px; box-sizing: border-box; overflow: visible; background: var(--button-card-background); touch-action: none; user-select: none; -webkit-user-select: none; }
+        h2 { margin: 0; min-width: 0; overflow: hidden; font-size: var(--font-size-primary, 18px); font-weight: var(--font-weight-primary, 700); letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
+        header span { flex: 0 0 auto; color: var(--subtext-color); font-size: var(--font-size-state, 12px); font-weight: var(--font-weight-secondary, 500); }
+        .plot { position: relative; height: 48px; border: 1px solid var(--divider-color); border-radius: 8px; box-sizing: border-box; overflow: visible; background: var(--marao-card-background); touch-action: none; user-select: none; -webkit-user-select: none; }
         .segments { position: absolute; inset: 0; overflow: hidden; border-radius: 7px; }
         .segment { position: absolute; top: 0; bottom: 0; }
         .ticks { position: absolute; inset: 0; pointer-events: none; }
@@ -890,16 +903,16 @@ class MaraoStateTimelineCard extends HTMLElement {
         .tick.first { transform: none; }
         .tick.last { transform: translateX(-100%); }
         .tick i { display: block; height: 100%; border-left: 1px solid var(--divider-color); opacity: .7; }
-        .tick b { display: block; margin-top: 4px; color: var(--subtext-color); font-size: 18px; font-weight: 500; letter-spacing: 0; white-space: nowrap; }
+        .tick b { display: block; margin-top: 4px; color: var(--subtext-color); font-size: var(--font-size-secondary, 18px); font-weight: var(--font-weight-secondary, 500); letter-spacing: 0; white-space: nowrap; }
         .plot.staggered .tick:nth-child(even) b { transform: translateY(22px); }
         .plot.staggered + .legend { margin-top: 50px; }
         .cursor { position: absolute; z-index: 2; top: -5px; bottom: -5px; width: 2px; display: none; background: var(--primary-text-color); pointer-events: none; }
-        .tooltip { position: absolute; z-index: 3; top: -51px; display: none; min-width: 96px; padding: 6px 8px; border: 1px solid var(--divider-color); border-radius: 6px; box-sizing: border-box; transform: translateX(-50%); background: var(--ha-card-background); color: var(--primary-text-color); font-size: 18px; line-height: 1.25; text-align: center; white-space: nowrap; pointer-events: none; box-shadow: var(--ha-card-box-shadow); }
+        .tooltip { position: absolute; z-index: 3; top: -51px; display: none; min-width: 96px; padding: 6px 8px; border: 1px solid var(--divider-color); border-radius: 6px; box-sizing: border-box; transform: translateX(-50%); background: var(--ha-card-background); color: var(--primary-text-color); font-size: var(--font-size-primary, 18px); line-height: 1.25; text-align: center; white-space: nowrap; pointer-events: none; box-shadow: var(--ha-card-box-shadow); }
         .plot.tracking .cursor, .plot.tracking .tooltip { display: block; }
-        .legend { display: flex; gap: 8px; min-height: 16px; margin-top: 30px; overflow: hidden; color: var(--subtext-color); font-size: 16px; }
+        .legend { display: flex; gap: 8px; min-height: 16px; margin-top: 30px; overflow: hidden; color: var(--subtext-color); font-size: var(--font-size-secondary, 16px); font-weight: var(--font-weight-secondary, 500); }
         .legend span { display: flex; min-width: 0; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .legend i { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
-        .status { display: grid; height: 64px; place-items: center; border: 1px solid var(--divider-color); border-radius: 8px; background: var(--button-card-background); color: var(--subtext-color); font-size: 18px; }
+        .status { display: grid; min-height: 64px; place-items: center; border: 1px solid var(--divider-color); border-radius: 8px; background: var(--marao-card-background); color: var(--subtext-color); font-size: var(--font-size-primary, 18px); font-weight: var(--font-weight-secondary, 500); }
       </style>
       <ha-card>
         <header><h2>${escapeHtml(name)}</h2><span>${escapeHtml(entity ? this._stateLabel(entity.state) : "")}</span></header>

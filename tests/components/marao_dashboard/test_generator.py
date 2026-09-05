@@ -10,7 +10,6 @@ from custom_components.marao_dashboard.generator import (
     MaraoDashboardLoader,
     build_base_dashboard_config,
     ensure_dashboard_config,
-    generated_popup_files_need_repair,
     load_dashboard_config,
     make_slug,
     migrate_legacy_theme,
@@ -97,153 +96,6 @@ def test_dashboard_json_loader_rejects_invalid_json(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Invalid dashboard JSON"):
         load_dashboard_config(config_path)
-
-
-def test_detects_comment_only_generated_popup_as_needing_repair(
-    tmp_path: Path,
-) -> None:
-    root = tmp_path / "dashboard"
-    popup_dir = root / "components" / "popups"
-    popup_dir.mkdir(parents=True)
-    popup = popup_dir / "overview_climate.yaml"
-    popup.write_text(
-        """type: custom:bubble-card
-card_type: pop-up
-hash: '#overview-climate'
-cards:
-  # marao:generated:start
-  # marao:generated:end
-  # marao:custom:start
-  # Add custom Lovelace cards here.
-  # marao:custom:end
-  # marao:generated-footer:start
-  # marao:generated-footer:end
-""",
-        encoding="utf-8",
-    )
-    (root / ".marao-generated.json").write_text(
-        json.dumps(
-            {
-                "version": 1,
-                "plain": [],
-                "containers": ["components/popups/overview_climate.yaml"],
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    assert generated_popup_files_need_repair(root)
-
-    popup.write_text(
-        """type: custom:bubble-card
-card_type: pop-up
-hash: '#overview-climate'
-cards:
-  # marao:generated:start
-  - type: custom:button-card
-    entity: climate.office
-  # marao:generated:end
-  # marao:custom:start
-  # Add custom Lovelace cards here.
-  # marao:custom:end
-  # marao:generated-footer:start
-  # marao:generated-footer:end
-""",
-        encoding="utf-8",
-    )
-
-    assert not generated_popup_files_need_repair(root)
-
-
-def test_manifest_membership_does_not_override_marker_validation(
-    tmp_path: Path,
-) -> None:
-    root = tmp_path / "dashboard"
-    popup_dir = root / "components" / "popups"
-    popup_dir.mkdir(parents=True)
-    popup = popup_dir / "user_popup.yaml"
-    popup.write_text(
-        """type: custom:bubble-card
-card_type: pop-up
-hash: '#user-popup'
-cards:
-""",
-        encoding="utf-8",
-    )
-
-    (root / ".marao-generated.json").write_text(
-        json.dumps(
-            {
-                "version": 1,
-                "plain": [],
-                "containers": ["components/popups/user_popup.yaml"],
-            }
-        ),
-        encoding="utf-8",
-    )
-    assert not generated_popup_files_need_repair(root)
-
-    popup.write_text(
-        """type: custom:bubble-card
-card_type: pop-up
-hash: '#user-popup'
-cards:
-  # marao:generated:start
-  # marao:generated:start
-  # marao:generated:end
-  # marao:custom:start
-  # marao:custom:end
-  # marao:generated-footer:start
-  # marao:generated-footer:end
-""",
-        encoding="utf-8",
-    )
-    assert not generated_popup_files_need_repair(root)
-
-
-def test_invalid_manifest_does_not_trigger_popup_repair(tmp_path: Path) -> None:
-    root = tmp_path / "dashboard"
-    popup_dir = root / "components" / "popups"
-    popup_dir.mkdir(parents=True)
-    (popup_dir / "overview_climate.yaml").write_text(
-        """type: custom:bubble-card
-card_type: pop-up
-hash: '#overview-climate'
-cards:
-  # marao:generated:start
-  # marao:generated:end
-  # marao:custom:start
-  # marao:custom:end
-  # marao:generated-footer:start
-  # marao:generated-footer:end
-""",
-        encoding="utf-8",
-    )
-    (root / ".marao-generated.json").write_text("{not-json", encoding="utf-8")
-
-    assert not generated_popup_files_need_repair(root)
-
-
-def test_marker_only_stale_popup_does_not_trigger_repair(tmp_path: Path) -> None:
-    root = tmp_path / "dashboard"
-    popup_dir = root / "components" / "popups"
-    popup_dir.mkdir(parents=True)
-    (popup_dir / "stale.yaml").write_text(
-        """type: custom:bubble-card
-card_type: pop-up
-hash: '#stale'
-cards:
-  # marao:generated:start
-  # marao:generated:end
-  # marao:custom:start
-  # marao:custom:end
-  # marao:generated-footer:start
-  # marao:generated-footer:end
-""",
-        encoding="utf-8",
-    )
-
-    assert not generated_popup_files_need_repair(root)
 
 
 def test_dashboard_json_loader_rejects_non_object(tmp_path: Path) -> None:
@@ -373,27 +225,8 @@ def test_navbar_sizes_to_routes_and_views_have_bottom_spacer(tmp_path: Path) -> 
 
     assert "type: vertical-stack" in navbar
     assert "height: 128px" in navbar
-    assert "type: custom:navbar-card" in navbar
-    assert "tap_action: true" in navbar
-    assert "url: true" in navbar
-    assert navbar_config["haptic"] == {
-        "double_tap_action": True,
-        "hold_action": True,
-        "tap_action": True,
-        "url": True,
-    }
-    assert all(
-        selector in navbar_config["styles"]
-        for selector in (
-            ".navbar {",
-            ".navbar-card {",
-            ".navbar-card.mobile.floating {",
-            ".route {",
-            ".button {",
-        )
-    )
-    assert "--marao-navbar-route-size: 58px" in navbar
-    assert "touch-action: none" in navbar
+    assert navbar_config["type"] == "custom:marao-navbar-card"
+    assert len(navbar_config["routes"]) == 3
     for view in views:
         source = view.read_text(encoding="utf-8")
         assert "# marao:custom:start" in source
@@ -593,10 +426,43 @@ def test_room_climate_card_opens_generated_mode_popup(tmp_path: Path) -> None:
     source = room_view.read_text(encoding="utf-8")
 
     assert "mode_selector_hash: '#climate-mode-climate-office'" in source
-    assert "card_type: pop-up" in source
+    assert "type: custom:marao-popup-card" in source
     assert "hash: '#climate-mode-climate-office'" in source
     assert "show_mode_buttons: true" in source
     assert source.index("# marao:custom:start") < source.index("components/navigation/navbar.yaml")
+
+
+def test_room_graph_cards_use_native_recorder_history(tmp_path: Path) -> None:
+    generated = write_dashboard(
+        {
+            "name": "Generated Test",
+            "rooms": [
+                {
+                    "name": "Office",
+                    "entities": [
+                        {"entity_id": "sensor.power", "template": "hc_graph_card"},
+                        {
+                            "entity_id": "switch.heater",
+                            "variables": {
+                                "show_graph": True,
+                                "power_entity": "sensor.heater_power",
+                            },
+                        },
+                    ],
+                }
+            ],
+        },
+        tmp_path,
+    )
+
+    source = (tmp_path / generated.slug / "views/rooms/00-office.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert source.count("type: history-graph") == 2
+    assert "sensor.power" in source
+    assert "sensor.heater_power" in source
+    assert "show_names: false" in source
 
 
 def test_room_access_cards_open_generated_action_popups(tmp_path: Path) -> None:
@@ -875,8 +741,7 @@ def test_overview_only_generates_standalone_popups_with_entities(tmp_path: Path)
     ]
     for path in popup_paths:
         popup = yaml.safe_load(path.read_text(encoding="utf-8"))
-        assert popup["type"] == "custom:bubble-card"
-        assert popup["card_type"] == "pop-up"
+        assert popup["type"] == "custom:marao-popup-card"
         assert popup["hash"]
         assert isinstance(popup["cards"], list) and popup["cards"]
 

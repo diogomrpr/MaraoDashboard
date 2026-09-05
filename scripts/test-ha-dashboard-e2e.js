@@ -3,151 +3,58 @@ const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..");
 const configPath = path.join(repoRoot, ".ha-local.json");
-const requestTimeoutMs = 15000;
-const websocketTimeoutMs = 60000;
-const dependencyIds = [
-  "button_card",
-  "my_cards",
-  "kiosk_mode",
-  "card_mod",
-  "mini_graph_card",
-  "bubble_card",
-  "navbar_card",
-];
-const dependencyByCardType = {
-  "custom:button-card": "button_card",
-  "custom:my-button": "my_cards",
-  "custom:my-slider": "my_cards",
-  "custom:my-slider-v2": "my_cards",
-  "custom:mini-graph-card": "mini_graph_card",
-  "custom:bubble-card": "bubble_card",
-  "custom:navbar-card": "navbar_card",
-};
+const timeoutMs = 15000;
 
-async function request(method, url, options = {}) {
+function request(method, url, options = {}) {
   const target = new URL(url);
   const transport = target.protocol === "https:" ? require("https") : require("http");
   const body = options.body || "";
-
   return new Promise((resolve, reject) => {
-    const req = transport.request(
-      target,
-      {
-        method,
-        headers: {
-          "Content-Length": Buffer.byteLength(body),
-          ...(options.headers || {}),
-        },
-      },
-      (res) => {
-        let data = "";
-        res.setEncoding("utf8");
-        res.on("data", (chunk) => {
-          data += chunk;
-        });
-        res.on("end", () => {
-          clearTimeout(timeout);
-          if (res.statusCode < 200 || res.statusCode >= 300) {
-            reject(
-              new Error(
-                `${method} ${target.pathname} returned ${res.statusCode}: ${redactDiagnostic(data)}`
-              )
-            );
-            return;
-          }
-          resolve(data ? JSON.parse(data) : {});
-        });
-      }
-    );
-    const timeoutMs = options.timeoutMs ?? requestTimeoutMs;
-    const timeout = setTimeout(() => {
-      req.destroy(new Error(`${method} ${target.pathname} timed out after ${timeoutMs} ms.`));
-    }, timeoutMs);
-    req.on("error", (error) => {
-      clearTimeout(timeout);
-      reject(error);
+    const req = transport.request(target, {
+      method,
+      headers: { "Content-Length": Buffer.byteLength(body), ...(options.headers || {}) },
+    }, (res) => {
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          reject(new Error(`${method} ${target.pathname} returned ${res.statusCode}: ${data}`));
+          return;
+        }
+        resolve(data ? JSON.parse(data) : {});
+      });
     });
+    req.setTimeout(timeoutMs, () => req.destroy(new Error(`${method} ${target.pathname} timed out`)));
+    req.on("error", reject);
     req.write(body);
     req.end();
   });
 }
 
-async function getAccessToken(config, baseUrl) {
+async function accessToken(config, baseUrl) {
   const clientId = `${baseUrl}/`;
   const flow = await request("POST", `${baseUrl}/auth/login_flow`, {
-    body: JSON.stringify({
-      client_id: clientId,
-      handler: ["homeassistant", null],
-      redirect_uri: `${baseUrl}/?auth_callback=1`,
-    }),
+    body: JSON.stringify({ client_id: clientId, handler: ["homeassistant", null], redirect_uri: `${baseUrl}/?auth_callback=1` }),
     headers: { "Content-Type": "application/json" },
   });
   const login = await request("POST", `${baseUrl}/auth/login_flow/${flow.flow_id}`, {
-    body: JSON.stringify({
-      client_id: clientId,
-      username: config.username,
-      password: config.password,
-    }),
+    body: JSON.stringify({ client_id: clientId, username: config.username, password: config.password }),
     headers: { "Content-Type": "application/json" },
   });
-  const token = await request("POST", `${baseUrl}/auth/token`, {
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code: login.result,
-      client_id: clientId,
-    }).toString(),
+  return request("POST", `${baseUrl}/auth/token`, {
+    body: new URLSearchParams({ grant_type: "authorization_code", code: login.result, client_id: clientId }).toString(),
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
-  return {
-    ...token,
-    hassUrl: baseUrl,
-    clientId,
-    expires: Date.now() + token.expires_in * 1000,
-  };
 }
 
 function readConfig() {
-  if (!fs.existsSync(configPath)) {
-    throw new Error("Missing .ha-local.json. Copy .ha-local.example.json and adjust it first.");
-  }
+  if (!fs.existsSync(configPath)) throw new Error("Missing .ha-local.json.");
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
   for (const key of ["url", "username", "password"]) {
-    if (!config[key] || typeof config[key] !== "string") {
-      throw new Error(`.ha-local.json requires a string ${key}.`);
-    }
-  }
-  if (
-    Object.hasOwn(config, "dependencyMode") &&
-    (typeof config.dependencyMode !== "string" ||
-      !["auto", "missing", "installed"].includes(config.dependencyMode))
-  ) {
-    throw new Error('.ha-local.json dependencyMode must be "auto", "missing", or "installed".');
-  }
-  if (config.allowDashboardWrites !== true) {
-    throw new Error(
-      "Set allowDashboardWrites to true in .ha-local.json only after confirming it targets a disposable test instance."
-    );
+    if (typeof config[key] !== "string" || !config[key]) throw new Error(`.ha-local.json requires ${key}.`);
   }
   return config;
-}
-
-function redactDiagnostic(value) {
-  return String(value || "").replace(
-    /(?:https?:\/\/|\/)[^\s"'<>]*/gi,
-    (candidate) => {
-      const query = candidate.search(/[?#]/);
-      return query === -1 ? candidate : `${candidate.slice(0, query)}?[redacted]`;
-    }
-  );
-}
-
-function safeDiagnosticUrl(value) {
-  try {
-    const url = new URL(value);
-    return `${url.origin}${url.pathname}`;
-  } catch {
-    return redactDiagnostic(value);
-  }
 }
 
 function normalizedPathname(value) {
@@ -155,635 +62,361 @@ function normalizedPathname(value) {
   return pathname === "/" ? pathname : pathname.replace(/\/+$/, "");
 }
 
-function missingElementName(value) {
-  return String(value || "")
-    .match(/custom element doesn't exist:\s*([a-z0-9-]+)/i)?.[1]
-    ?.toLowerCase();
-}
-
 function conditionalCardIsActive(card, entityStates = {}) {
   if (card?.type !== "conditional") return true;
-  if (!Array.isArray(card.conditions) || card.conditions.length === 0) return false;
-
-  return card.conditions.every((condition) => {
-    if (!condition || typeof condition !== "object" || typeof condition.entity !== "string") {
-      return false;
-    }
-    if (!Object.hasOwn(entityStates, condition.entity)) return false;
-    const actual = entityStates[condition.entity];
-    if (Object.hasOwn(condition, "state")) {
-      const expected = Array.isArray(condition.state) ? condition.state : [condition.state];
-      return expected.includes(actual);
-    }
-    if (Object.hasOwn(condition, "state_not")) {
-      const excluded = Array.isArray(condition.state_not)
-        ? condition.state_not
-        : [condition.state_not];
-      return !excluded.includes(actual);
-    }
+  return (card.conditions || []).every((condition) => {
+    const actual = entityStates[condition?.entity];
+    if (actual === undefined) return false;
+    if (condition.state !== undefined) return (Array.isArray(condition.state) ? condition.state : [condition.state]).includes(actual);
+    if (condition.state_not !== undefined) return !(Array.isArray(condition.state_not) ? condition.state_not : [condition.state_not]).includes(actual);
     return false;
   });
 }
 
-function buildViewChecks(dashboard, dashboardUrl, dependencies, entityStates = {}) {
-  const dashboardPath = String(dashboardUrl || "").split("/").filter(Boolean);
-  const missingIds = new Set(
-    dependencies
-      .filter((dependency) => dependency.status !== "installed")
-      .map((dependency) => dependency.id)
-  );
-  const increment = (counts, key) => {
-    counts[key] = (counts[key] || 0) + 1;
-  };
-  const collectTemplateMissingElements = (value, found, seenTemplates) => {
-    if (Array.isArray(value)) {
-      value.forEach((item) => collectTemplateMissingElements(item, found, seenTemplates));
+function buildViewChecks(dashboard, dashboardUrl, entityStates = {}) {
+  const walk = (value, counts) => {
+    if (Array.isArray(value)) return value.forEach((item) => walk(item, counts));
+    if (!value || typeof value !== "object") return;
+    if (value.type === "conditional") {
+      if (conditionalCardIsActive(value, entityStates)) walk(value.card, counts);
       return;
     }
-    if (!value || typeof value !== "object") return;
-
-    const dependencyId = dependencyByCardType[value.type];
-    if (dependencyId && missingIds.has(dependencyId)) {
-      found.add(value.type.slice(7));
-    }
-    const templates = Array.isArray(value.template) ? value.template : [value.template];
-    for (const templateName of templates.filter((item) => typeof item === "string")) {
-      if (seenTemplates.has(templateName)) continue;
-      const template = dashboard.button_card_templates?.[templateName];
-      if (!template) continue;
-      seenTemplates.add(templateName);
-      collectTemplateMissingElements(template, found, seenTemplates);
-    }
-    for (const item of Object.values(value)) {
-      collectTemplateMissingElements(item, found, seenTemplates);
-    }
+    if (value.type === "custom:marao-card") counts["marao-card"] = (counts["marao-card"] || 0) + 1;
+    if (value.type === "custom:marao-popup-card") counts["marao-popup-card"] = (counts["marao-popup-card"] || 0) + 1;
+    if (value.type === "custom:marao-navbar-card") counts["marao-navbar-card"] = (counts["marao-navbar-card"] || 0) + 1;
+    Object.values(value).forEach((item) => walk(item, counts));
   };
-
   return (dashboard.views || []).map((view, index) => {
     const configuredCounts = {};
-    const expectedMissingCounts = {};
-    const expectedRenderedCounts = {};
-    const allowedMissingElements = new Set();
-    const visitCard = (card, shouldRender = true) => {
-      if (!card || typeof card !== "object") return;
-
-      let childrenShouldRender = shouldRender;
-      if (card.type === "conditional") {
-        childrenShouldRender = shouldRender && conditionalCardIsActive(card, entityStates);
-      }
-
-      const dependencyId = dependencyByCardType[card.type];
-      if (dependencyId) {
-        const elementName = card.type.slice(7);
-        increment(configuredCounts, elementName);
-        if (shouldRender && missingIds.has(dependencyId)) {
-          increment(expectedMissingCounts, elementName);
-          allowedMissingElements.add(elementName);
-          childrenShouldRender = false;
-        } else if (shouldRender) {
-          increment(expectedRenderedCounts, elementName);
-          if (dependencyId === "button_card") {
-            collectTemplateMissingElements(card, allowedMissingElements, new Set());
-          }
-        }
-      }
-      if (Array.isArray(card.cards)) {
-        card.cards.forEach((child) => visitCard(child, childrenShouldRender));
-      }
-      if (card.card && typeof card.card === "object") {
-        visitCard(card.card, childrenShouldRender);
-      }
-      if (Array.isArray(card.elements)) {
-        card.elements.forEach((element) =>
-          visitCard(element.card || element, childrenShouldRender)
-        );
-      }
-    };
-    (view.cards || []).forEach((card) => visitCard(card));
-    const viewPath = String(view.path ?? index).replace(/^\/+/, "");
-    return {
-      allowedMissingElements: [...allowedMissingElements],
-      configuredCounts,
-      expectedMissingCounts,
-      expectedRenderedCounts,
-      name: view.title || viewPath || `view ${index + 1}`,
-      path: viewPath,
-      url: `/${dashboardPath[0]}/${viewPath}`,
-    };
+    walk(view.cards || [], configuredCounts);
+    const pathName = String(view.path ?? index).replace(/^\/+/, "");
+    return { name: view.title || pathName, path: pathName, url: `/${String(dashboardUrl).split("/").filter(Boolean)[0]}/${pathName}`, configuredCounts };
   });
 }
 
-async function waitForSettledPage(page, diagnostics) {
-  const started = Date.now();
-  const deadline = started + 10000;
-  let previousSignature = "";
-  let quietSince = started;
+async function main() {
+  let chromium;
+  try { ({ chromium } = require("playwright")); } catch { throw new Error("Playwright is not installed."); }
+  const config = readConfig();
+  const baseUrl = config.url.replace(/\/$/, "");
+  const tokens = await accessToken(config, baseUrl);
+  const browser = await chromium.launch();
+  const context = await browser.newContext();
+  await context.addInitScript((value) => localStorage.setItem("hassTokens", JSON.stringify(value)), {
+    ...tokens, hassUrl: baseUrl, clientId: `${baseUrl}/`, expires: Date.now() + tokens.expires_in * 1000,
+  });
+  await context.addInitScript(() => {
+    window.__maraoHaptics = [];
+    window.addEventListener("haptic", (event) => window.__maraoHaptics.push(event.detail));
+  });
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => { if (["error", "warning"].includes(message.type())) errors.push(message.text()); });
+  const deepSnapshot = () => page.evaluate(() => {
+    const elements = [];
+    const visit = (root) => {
+      for (const child of root?.children || []) { elements.push(child); visit(child.shadowRoot); visit(child); }
+    };
+    visit(document.documentElement);
+    return {
+      tags: elements.map((element) => element.localName),
+      errors: elements.filter((element) => element.localName === "hui-error-card").map((element) => element.textContent?.trim() || "error"),
+      warnings: elements.filter((element) => element.localName === "hui-warning").map((element) => element.textContent?.trim() || "warning"),
+      nav: elements.some((element) => element.localName === "marao-navbar-card"),
+      maraoCards: elements.filter((element) => element.localName === "marao-card").length,
+      popups: elements.filter((element) => element.localName === "marao-popup-card").length,
+    };
+  });
+  try {
+    await page.goto(`${baseUrl}/marao-dashboard/overview`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(3000);
+    const overview = await deepSnapshot();
+    if (overview.errors.length || overview.warnings.length) throw new Error(`Overview rendered warnings/errors: ${JSON.stringify(overview)}`);
+    if (!overview.nav) throw new Error("Overview did not render custom:marao-navbar-card.");
 
-  while (Date.now() < deadline) {
-    const dom = await page.evaluate(() => {
-      const counts = {};
+    const dashboard = await page.evaluate(async () => {
+      const hass = document.querySelector("home-assistant")?.hass;
+      if (!hass) throw new Error("Home Assistant frontend API unavailable.");
+      const payload = await hass.callWS({ type: "marao_dashboard/config/get" });
+      const url = payload.dashboard_url || "/marao-dashboard/overview";
+      const key = url.split("/").filter(Boolean)[0];
+      return {
+        payload,
+        config: await hass.callWS({ type: "lovelace/config", url_path: key, force: true }),
+        cardTest: await hass.callWS({ type: "lovelace/config", url_path: "marao-dashboard-card-test", force: true }),
+        states: Object.fromEntries(Object.entries(hass.states || {}).map(([entity, state]) => [entity, state.state])),
+      };
+    });
+    const serialized = JSON.stringify(dashboard.config);
+    for (const type of ["custom:marao-card", "custom:marao-navbar-card"]) {
+      if (!serialized.includes(type)) throw new Error(`Generated dashboard is missing ${type}.`);
+    }
+    if (["custom:button-card", "custom:bubble-card", "custom:navbar-card"].some((type) => serialized.includes(type))) {
+      throw new Error("Generated dashboard still references a retired upstream card.");
+    }
+    const checks = buildViewChecks(dashboard.config, dashboard.payload.dashboard_url, dashboard.states);
+    for (const view of checks) {
+      await page.goto(`${baseUrl}/${view.url}`, { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(700);
+      const result = await deepSnapshot();
+      if (result.errors.length || result.warnings.length) throw new Error(`${view.name} rendered warnings/errors: ${JSON.stringify(result)}`);
+      if (!result.nav) throw new Error(`${view.name} did not render custom:marao-navbar-card.`);
+    }
+    const cardTestSerialized = JSON.stringify(dashboard.cardTest);
+    for (const type of ["custom:marao-card", "custom:marao-popup-card", "custom:marao-navbar-card"]) {
+      if (!cardTestSerialized.includes(type)) throw new Error(`Card test dashboard is missing ${type}.`);
+    }
+    await page.goto(`${baseUrl}/marao-dashboard-card-test/card-test`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1200);
+    const cardTest = await deepSnapshot();
+    if (cardTest.errors.length || cardTest.warnings.length) throw new Error(`Card test dashboard rendered warnings/errors: ${JSON.stringify(cardTest)}`);
+    if (!cardTest.nav || cardTest.maraoCards < 10 || cardTest.popups < 1) throw new Error(`Card test dashboard rendered too few Marao cards: ${JSON.stringify(cardTest)}`);
+    const historyGraphs = page.locator("hui-history-graph-card");
+    if (await historyGraphs.count() < 3) throw new Error("Card test dashboard did not render its native history graphs.");
+    const renderedGraphs = await historyGraphs.evaluateAll((cards) => cards.filter((card) => {
+      const canvases = [];
+      const visit = (root) => {
+        root?.querySelectorAll?.("canvas").forEach((canvas) => canvases.push(canvas));
+        root?.querySelectorAll?.("*").forEach((element) => element.shadowRoot && visit(element.shadowRoot));
+      };
+      visit(card.shadowRoot);
+      return canvases.some((canvas) => canvas.width > 0 && canvas.height > 0);
+    }).length);
+    if (renderedGraphs < 3) throw new Error(`Only ${renderedGraphs} native history graphs created a visible chart canvas.`);
+    const coloredCards = await page.evaluate(() => {
+      const cards = [];
       const visit = (root) => {
         for (const child of root?.children || []) {
-          counts[child.localName] = (counts[child.localName] || 0) + 1;
+          if (child.localName === "marao-card") {
+            const card = child.shadowRoot?.querySelector("ha-card");
+            if (card?.style.getPropertyValue("--marao-card-background")) cards.push(card);
+          }
           visit(child.shadowRoot);
           visit(child);
         }
       };
       visit(document.documentElement);
-      return { counts, ready: Boolean(counts["hui-view"]) };
+      return cards.length;
     });
-    const signature = JSON.stringify([
-      dom.counts,
-      diagnostics.console.length,
-      diagnostics.responses.length,
-      diagnostics.pages.length,
-    ]);
-    if (signature !== previousSignature) {
-      previousSignature = signature;
-      quietSince = Date.now();
+    if (coloredCards < 4) throw new Error(`Card test dashboard did not apply state colors (${coloredCards} colored cards).`);
+    const climatePalette = Object.fromEntries(await page.locator("marao-card").evaluateAll((cards) => cards.map((card) => [
+      card.shadowRoot?.querySelector(".title")?.textContent?.trim(),
+      card.shadowRoot?.querySelector("ha-card")?.style.getPropertyValue("--marao-card-background"),
+    ]).filter(([name]) => name?.startsWith("Climate · "))));
+    const expectedClimatePalette = {
+      "Climate · Heat": "var(--color-red)",
+      "Climate · Cool": "var(--color-blue)",
+      "Climate · Heat/Cool": "var(--color-purple)",
+      "Climate · Auto": "var(--color-gold)",
+      "Climate · Dry": "var(--color-yellow)",
+      "Climate · Fan": "var(--color-green)",
+      "Climate · Off": "",
+    };
+    if (JSON.stringify(climatePalette) !== JSON.stringify(expectedClimatePalette)) {
+      throw new Error(`Climate state palette did not render correctly: ${JSON.stringify(climatePalette)}`);
     }
-    if (dom.ready && Date.now() - started >= 1500 && Date.now() - quietSince >= 1000) {
-      return;
+    await page.locator('marao-card input[type="range"]').first().dispatchEvent("pointerdown");
+    if (await page.evaluate(() => window.__maraoHaptics.at(-1)) !== "heavy") {
+      throw new Error("Slider presses must emit strong haptic feedback.");
     }
-    await page.waitForTimeout(150);
-  }
-  throw new Error("Generated dashboard did not settle within 10 seconds.");
-}
-
-async function main() {
-  let chromium;
-  try {
-    ({ chromium } = require("playwright"));
-  } catch {
-    throw new Error("Playwright is not installed. Run npm install before npm run test:ha:e2e.");
-  }
-
-  const config = readConfig();
-  const baseUrl = config.url.replace(/\/$/, "");
-  const tokens = await getAccessToken(config, baseUrl);
-  const failures = [];
-  const consoleDiagnostics = [];
-  const responseDiagnostics = [];
-  const pageDiagnostics = [];
-  const browser = await chromium.launch();
-  const context = await browser.newContext();
-  await context.addInitScript(
-    (value) => localStorage.setItem("hassTokens", JSON.stringify(value)),
-    tokens
-  );
-  const page = await context.newPage();
-
-  page.on("console", (message) => {
-    const text = message.text();
-    if (
-      ["warning", "error"].includes(message.type()) ||
-      /custom element doesn't exist|failed to load resource|must be migrated|migration available/i.test(text)
-    ) {
-      consoleDiagnostics.push({ type: message.type(), text: redactDiagnostic(text) });
-    }
-  });
-  page.on("response", (response) => {
-    if (response.status() >= 400) {
-      responseDiagnostics.push(`${response.status()} ${safeDiagnosticUrl(response.url())}`);
-    }
-  });
-  page.on("pageerror", (error) => pageDiagnostics.push(redactDiagnostic(error.message)));
-
-  try {
-    await page.goto(`${baseUrl}/marao-dashboard-editor`, { waitUntil: "domcontentloaded" });
-    await page.waitForFunction(() => {
-      const allDeep = (root, found = []) => {
-        for (const child of root?.children || []) {
-          found.push(child);
-          allDeep(child.shadowRoot, found);
-          allDeep(child, found);
-        }
-        return found;
-      };
-      const panel = allDeep(document.documentElement).find(
-        (element) => element.localName === "marao-dashboard-panel"
-      );
-      return panel?.shadowRoot?.querySelectorAll(".dependency-row").length === 7;
-    }, undefined, { timeout: 15000 });
-
-    await page.evaluate(() => {
-      const allDeep = (root, found = []) => {
-        for (const child of root?.children || []) {
-          found.push(child);
-          allDeep(child.shadowRoot, found);
-          allDeep(child, found);
-        }
-        return found;
-      };
-      const panel = allDeep(document.documentElement).find(
-        (element) => element.localName === "marao-dashboard-panel"
-      );
-      const button = panel?.shadowRoot?.getElementById("recheck-dependencies");
-      const status = panel?.shadowRoot?.getElementById("status");
-      if (!button || !status) throw new Error("Builder dependency recheck control was not found.");
-      status.textContent = "";
-      status.className = "status";
-      button.click();
-    });
-    await page.waitForFunction(() => {
-      const allDeep = (root, found = []) => {
-        for (const child of root?.children || []) {
-          found.push(child);
-          allDeep(child.shadowRoot, found);
-          allDeep(child, found);
-        }
-        return found;
-      };
-      const panel = allDeep(document.documentElement).find(
-        (element) => element.localName === "marao-dashboard-panel"
-      );
-      const button = panel?.shadowRoot?.getElementById("recheck-dependencies");
-      const status = panel?.shadowRoot?.getElementById("status");
-      return Boolean(
-        button &&
-        !button.disabled &&
-        Boolean(status?.textContent?.trim()) &&
-        (status?.classList.contains("success") || status?.classList.contains("error"))
-      );
-    }, undefined, { timeout: websocketTimeoutMs });
-    const recheckResult = await page.evaluate(() => {
-      const allDeep = (root, found = []) => {
-        for (const child of root?.children || []) {
-          found.push(child);
-          allDeep(child.shadowRoot, found);
-          allDeep(child, found);
-        }
-        return found;
-      };
-      const panel = allDeep(document.documentElement).find(
-        (element) => element.localName === "marao-dashboard-panel"
-      );
-      const status = panel?.shadowRoot?.getElementById("status");
-      return {
-        ok: Boolean(status?.classList.contains("success")),
-        text: status?.textContent?.trim() || "",
-      };
-    });
-    if (!recheckResult.ok) {
-      throw new Error(`Builder dependency recheck failed: ${recheckResult.text || "unknown error"}`);
-    }
-
-    const inspection = await page.evaluate(async ({ timeoutMs }) => {
-      const allDeep = (root, found = []) => {
-        for (const child of root?.children || []) {
-          found.push(child);
-          allDeep(child.shadowRoot, found);
-          allDeep(child, found);
-        }
-        return found;
-      };
-      const homeAssistant = document.querySelector("home-assistant");
-      const hass = homeAssistant?.hass;
-      if (!hass) throw new Error("Home Assistant frontend did not expose its runtime API.");
-
-      const callWSWithTimeout = (message) => new Promise((resolve, reject) => {
-        const timer = window.setTimeout(
-          () => reject(new Error(`Timed out waiting for ${message.type}.`)),
-          timeoutMs
-        );
-        try {
-          hass.callWS(message).then(
-            (result) => {
-              window.clearTimeout(timer);
-              resolve(result);
-            },
-            (error) => {
-              window.clearTimeout(timer);
-              reject(error);
-            }
-          );
-        } catch (error) {
-          window.clearTimeout(timer);
-          reject(error);
-        }
-      });
-
-      const payload = await callWSWithTimeout({ type: "marao_dashboard/config/get" });
-      const generated = await callWSWithTimeout({
-        type: "marao_dashboard/config/generate",
-        config: payload.config,
-      });
-      const generatedDependencies = generated.dependencies || [];
-      const dependencies = generatedDependencies.length
-        ? generatedDependencies
-        : payload.dependencies || [];
-      const dashboardUrl = generated.dashboard_url || payload.dashboard_url;
-      const dashboardPath = String(dashboardUrl || "").split("/").filter(Boolean);
-      const dashboard = await callWSWithTimeout({
-        type: "lovelace/config",
-        url_path: dashboardPath[0],
-        force: true,
-      });
-      const repairPayload = await callWSWithTimeout({ type: "repairs/list_issues" });
-      const maraoRepairs = (
-        Array.isArray(repairPayload) ? repairPayload : repairPayload.issues || []
-      ).filter((issue) => issue.domain === "marao_dashboard");
-      const panel = allDeep(document.documentElement).find(
-        (element) => element.localName === "marao-dashboard-panel"
-      );
-      const rows = [...(panel?.shadowRoot?.querySelectorAll(".dependency-row") || [])].map(
-        (row) => ({
-          id: row.dataset.dependencyId,
-          required: Boolean(row.querySelector(".is-required")),
-          status: row.querySelector(".is-installed") ? "installed" : "not_detected",
-          hacsUrl: row.querySelector('a[href*="hacs_repository"]')?.href || "",
-        })
-      );
-      const rechecked = rows.map(({ id, required, status }) => ({ id, required, status }));
-      const saveButton = panel?.shadowRoot?.getElementById("save");
-      const openDashboard = panel?.shadowRoot?.getElementById("open-dashboard");
-
-      const popups = [];
-      const conditionalStates = {};
-      const visitConfig = (value, configPath = []) => {
-        if (Array.isArray(value)) {
-          value.forEach((item, index) => visitConfig(item, [...configPath, index]));
-          return;
-        }
-        if (!value || typeof value !== "object") return;
-        if (value.type === "custom:bubble-card" && value.card_type === "pop-up") {
-          popups.push({
-            path: configPath.join("."),
-            hash: value.hash || "",
-            standalone: Array.isArray(value.cards),
+    const sliderProgress = await page.evaluate(() => {
+      const sliders = [];
+      const visit = (root) => {
+        root?.querySelectorAll?.('input[type="range"]').forEach((input) => {
+          const track = input.parentElement?.querySelector(".slider-track");
+          const fill = track?.querySelector(".slider-fill");
+          const trackWidth = track?.getBoundingClientRect().width || 0;
+          const fillWidth = fill?.getBoundingClientRect().width || 0;
+          const progress = Number.parseFloat(input.style.getPropertyValue("--marao-slider-progress")) || 0;
+          sliders.push({
+            label: input.getAttribute("aria-label"),
+            target: Number(input.value),
+            current: Number(input.dataset.sliderCurrent ?? input.value),
+            progress: input.style.getPropertyValue("--marao-slider-progress"),
+            trackRadius: track ? getComputedStyle(track).borderRadius : "",
+            fillRadius: fill ? getComputedStyle(fill).borderRadius : "",
+            fillWidth,
+            expectedFillWidth: trackWidth ? Math.min(trackWidth, 28 + (progress / 100) * Math.max(0, trackWidth - 28)) : 0,
           });
-        }
-        if (value.type === "conditional" && Array.isArray(value.conditions)) {
-          for (const condition of value.conditions) {
-            if (typeof condition?.entity === "string" && hass.states[condition.entity]) {
-              conditionalStates[condition.entity] = hass.states[condition.entity].state;
-            }
-          }
-        }
-        for (const [key, item] of Object.entries(value)) {
-          visitConfig(item, [...configPath, key]);
-        }
-      };
-      visitConfig(dashboard);
-
-      return {
-        conditionalStates,
-        dashboard,
-        dashboardUrl,
-        dependencies,
-        generatedDependencies,
-        maraoRepairs,
-        openDashboardUrl: openDashboard?.getAttribute("href") || "",
-        popups,
-        rechecked,
-        rows,
-        saveDisabled: !saveButton || saveButton.disabled === true,
-      };
-    }, { timeoutMs: websocketTimeoutMs });
-    inspection.viewChecks = buildViewChecks(
-      inspection.dashboard,
-      inspection.dashboardUrl,
-      inspection.dependencies,
-      inspection.conditionalStates
-    );
-
-    const actualIds = inspection.dependencies.map((dependency) => dependency.id);
-    if (JSON.stringify(actualIds) !== JSON.stringify(dependencyIds)) {
-      failures.push(`dependency catalog mismatch: ${JSON.stringify(actualIds)}`);
-    }
-    for (const dependency of inspection.dependencies) {
-      for (const field of [
-        "id",
-        "name",
-        "repository",
-        "hacs_url",
-        "tested_version",
-        "used_by",
-        "required",
-        "status",
-      ]) {
-        if (!(field in dependency)) failures.push(`${dependency.id || "dependency"} is missing ${field}`);
-      }
-      if (!dependency.hacs_url?.includes("hacs_repository")) {
-        failures.push(`${dependency.id} has no direct HACS installation URL`);
-      }
-      if (!inspection.rows.some((row) =>
-        row.id === dependency.id &&
-        row.required === dependency.required &&
-        row.status === dependency.status &&
-        row.hacsUrl.includes("hacs_repository")
-      )) {
-        failures.push(`builder checklist does not match ${dependency.id}`);
-      }
-      for (const [source, statuses] of [
-        ["recheck", inspection.rechecked],
-        ["generation", inspection.generatedDependencies],
-      ]) {
-        const checked = statuses.find((item) => item.id === dependency.id);
-        if (!checked || checked.status !== dependency.status || checked.required !== dependency.required) {
-          failures.push(`${source} dependency status does not match ${dependency.id}`);
-        }
-      }
-    }
-    if (inspection.saveDisabled) failures.push("Save & Generate is disabled after loading the builder");
-    if (inspection.openDashboardUrl !== inspection.dashboardUrl) {
-      failures.push(
-        `builder dashboard link is ${inspection.openDashboardUrl}, expected ${inspection.dashboardUrl}`
-      );
-    }
-    for (const popup of inspection.popups.filter((item) => !item.standalone)) {
-      failures.push(`legacy Bubble Card popup at ${popup.path} (${popup.hash || "no hash"})`);
-    }
-    if (!inspection.dashboardUrl?.startsWith("/")) {
-      failures.push(`generation returned an invalid dashboard URL: ${inspection.dashboardUrl}`);
-    }
-    if (inspection.viewChecks.length === 0) {
-      failures.push("generated dashboard contains no views");
-    }
-    const configuredCardCount = inspection.viewChecks.reduce(
-      (total, view) => total + Object.values(view.configuredCounts).reduce((sum, count) => sum + count, 0),
-      0
-    );
-    if (configuredCardCount === 0) {
-      failures.push("generated dashboard contains no recognized dashboard cards");
-    }
-
-    const missingDependencies = inspection.dependencies.filter(
-      (dependency) => dependency.status !== "installed"
-    );
-    const requiredMissingDependencies = missingDependencies.filter(
-      (dependency) => dependency.required
-    );
-    const dependencyRepairs = inspection.maraoRepairs.filter(
-      (issue) => issue.issue_id === "missing_dashboard_dependencies"
-    );
-    if (requiredMissingDependencies.length > 0) {
-      if (dependencyRepairs.length !== 1) {
-        failures.push(
-          `expected one aggregated missing-dependency Repair, found ${dependencyRepairs.length}`
-        );
-      } else if (dependencyRepairs[0].is_fixable !== false) {
-        failures.push("missing-dependency Repair must be non-fixable");
-      }
-    } else if (dependencyRepairs.length > 0) {
-      failures.push("missing-dependency Repair remained after all required cards were detected");
-    }
-    for (const issue of inspection.maraoRepairs.filter(
-      (item) => item.issue_id !== "missing_dashboard_dependencies"
-    )) {
-      failures.push(`unexpected Marao Repair remained: ${issue.issue_id || "unknown"}`);
-    }
-    if (config.dependencyMode === "missing" && missingDependencies.length !== dependencyIds.length) {
-      failures.push("local test config expects all seven dependencies to be not detected");
-    }
-    if (config.dependencyMode === "installed" && missingDependencies.length > 0) {
-      failures.push(
-        `local test config expects all seven dependencies installed: ${missingDependencies
-          .map((item) => item.name)
-          .join(", ")}`
-      );
-    }
-    for (const diagnostic of consoleDiagnostics) {
-      failures.push(`builder console ${diagnostic.type}: ${diagnostic.text}`);
-    }
-    for (const diagnostic of responseDiagnostics) {
-      failures.push(`builder response error: ${diagnostic}`);
-    }
-    for (const diagnostic of pageDiagnostics) {
-      failures.push(`builder page error: ${diagnostic}`);
-    }
-    if (failures.length > 0) {
-      throw new Error(`Marao Dashboard builder e2e failed:\n${failures.map((failure) => `- ${failure}`).join("\n")}`);
-    }
-
-    for (const view of inspection.viewChecks) {
-      consoleDiagnostics.length = 0;
-      responseDiagnostics.length = 0;
-      pageDiagnostics.length = 0;
-      const targetUrl = `${baseUrl}${view.url}`;
-      try {
-        await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
-        await waitForSettledPage(page, {
-          console: consoleDiagnostics,
-          responses: responseDiagnostics,
-          pages: pageDiagnostics,
         });
-      } catch (error) {
-        failures.push(`${view.name}: ${redactDiagnostic(error.message)}`);
-        continue;
-      }
-      const actualPath = normalizedPathname(page.url());
-      const expectedPath = normalizedPathname(targetUrl);
-      if (actualPath !== expectedPath) {
-        failures.push(`${view.name}: opened ${actualPath}, expected ${expectedPath}`);
-      }
-
-      const rendered = await page.evaluate(() => {
-        const allDeep = (root, found = []) => {
-          for (const child of root?.children || []) {
-            found.push(child);
-            allDeep(child.shadowRoot, found);
-            allDeep(child, found);
-          }
-          return found;
-        };
-        const elements = allDeep(document.documentElement);
-        const elementCounts = {};
-        for (const element of elements) {
-          elementCounts[element.localName] = (elementCounts[element.localName] || 0) + 1;
-        }
-        const diagnosticText = (element) => [
-          element.shadowRoot?.textContent,
-          element.textContent,
-          element._config?.message,
-          element._config?.error,
-          element.config?.message,
-          element.config?.error,
-        ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
-        return {
-          elementCounts,
-          errors: elements
-            .filter((element) => element.localName === "hui-error-card")
-            .map(diagnosticText),
-          migrationNotice: elements.some(
-            (element) => element.id === "bubble-card-migration-notice-host"
-          ),
-          warnings: elements
-            .filter((element) => element.localName === "hui-warning")
-            .map(diagnosticText),
-        };
-      });
-      const prefix = `${view.name} (${view.path})`;
-      const errors = rendered.errors.map(redactDiagnostic);
-      const warnings = rendered.warnings.map(redactDiagnostic);
-      for (const warning of warnings) {
-        failures.push(`${prefix}: visible Home Assistant warning: ${warning}`);
-      }
-      if (rendered.migrationNotice) {
-        failures.push(`${prefix}: Bubble Card displayed its legacy popup migration warning`);
-      }
-      for (const diagnostic of pageDiagnostics) failures.push(`${prefix}: page error: ${diagnostic}`);
-      for (const diagnostic of responseDiagnostics) failures.push(`${prefix}: response error: ${diagnostic}`);
-
-      const allowedMissingElements = new Set(view.allowedMissingElements);
-      const visibleMissingCounts = {};
-      for (const error of errors) {
-        const elementName = missingElementName(error);
-        if (!elementName || !allowedMissingElements.has(elementName)) {
-          failures.push(`${prefix}: unexpected dashboard error: ${error || "empty error card"}`);
-        } else {
-          visibleMissingCounts[elementName] = (visibleMissingCounts[elementName] || 0) + 1;
-        }
-      }
-      for (const diagnostic of consoleDiagnostics) {
-        const elementName = missingElementName(diagnostic.text);
-        if (!elementName || !allowedMissingElements.has(elementName)) {
-          failures.push(`${prefix}: console ${diagnostic.type}: ${diagnostic.text}`);
-        }
-      }
-      for (const [elementName, expectedCount] of Object.entries(view.expectedMissingCounts)) {
-        const actualCount = visibleMissingCounts[elementName] || 0;
-        if (actualCount < expectedCount) {
-          failures.push(
-            `${prefix}: rendered ${actualCount}/${expectedCount} expected ${elementName} dependency errors`
-          );
-        }
-      }
-      for (const [elementName, expectedCount] of Object.entries(view.expectedRenderedCounts)) {
-        const actualCount = rendered.elementCounts[elementName] || 0;
-        if (actualCount < expectedCount) {
-          failures.push(
-            `${prefix}: rendered ${actualCount}/${expectedCount} configured ${elementName} cards`
-          );
-        }
-      }
+        root?.querySelectorAll?.("*").forEach((element) => element.shadowRoot && visit(element.shadowRoot));
+      };
+      visit(document);
+      return sliders;
+    });
+    if (sliderProgress.some((slider) => !slider.progress)) throw new Error(`Card test sliders did not render live progress fills: ${JSON.stringify(sliderProgress)}`);
+    if (sliderProgress.some((slider) => slider.trackRadius !== "14px" || slider.fillRadius !== "14px")) {
+      throw new Error(`Card test sliders did not render rounded tracks: ${JSON.stringify(sliderProgress)}`);
     }
-
-    const mode = missingDependencies.length > 0 ? "missing/partial-dependency" : "installed-dependency";
-    if (failures.length > 0) {
-      throw new Error(
-        `Marao Dashboard ${mode} e2e failed:\n${failures
-          .map((failure) => `- ${redactDiagnostic(failure)}`)
-          .join("\n")}`
-      );
+    if (sliderProgress.some((slider) => Math.abs(slider.fillWidth - slider.expectedFillWidth) > 2)) {
+      throw new Error(`Card test slider fills did not meet the thumb edge: ${JSON.stringify(sliderProgress)}`);
     }
-    console.log(
-      `Marao Dashboard ${mode} e2e OK (${inspection.viewChecks.length} views; ${configuredCardCount} configured cards)`
+    const independentSlider = page.locator('input[aria-label="position"]');
+    await independentSlider.fill("60");
+    const independentCheck = await independentSlider.evaluate((input) => ({
+      target: Number(input.value),
+      current: Number(input.dataset.sliderCurrent),
+      progress: Number.parseFloat(input.style.getPropertyValue("--marao-slider-progress")),
+    }));
+    if (independentCheck.target !== 60 || independentCheck.current <= independentCheck.target || independentCheck.progress > independentCheck.target) {
+      throw new Error(`Cover slider progress exceeded its target thumb: ${JSON.stringify(independentCheck)}`);
+    }
+    await page.getByText("Bubble popup", { exact: true }).click();
+    await page.waitForTimeout(50);
+    const popupLayout = await page.evaluate(() => {
+      const sheet = document.querySelector(".marao-popup-sheet");
+      const columns = [];
+      const visit = (root) => {
+        root?.querySelectorAll?.("#columns > div:nth-child(1)").forEach((element) => columns.push(element));
+        root?.querySelectorAll?.("*").forEach((element) => element.shadowRoot && visit(element.shadowRoot));
+      };
+      visit(document);
+      if (!sheet) return null;
+      const style = getComputedStyle(sheet);
+      const rect = sheet.getBoundingClientRect();
+      return {
+        animationName: style.animationName,
+        width: Math.round(rect.width),
+        maxWidth: style.maxWidth,
+        columnWidth: columns[0] ? Math.round(columns[0].getBoundingClientRect().width) : null,
+      };
+    });
+    if (!popupLayout || popupLayout.animationName !== "marao-popup-slide-up") {
+      throw new Error(`Card test popup did not use the slide-up animation: ${JSON.stringify(popupLayout)}`);
+    }
+    if (popupLayout.columnWidth && popupLayout.maxWidth !== `${popupLayout.columnWidth}px`) {
+      throw new Error(`Card test popup did not match the first column width: ${JSON.stringify(popupLayout)}`);
+    }
+    await page.locator(".marao-popup-close").click();
+    await page.getByText("Lock access", { exact: true }).click();
+    const lockActionBackgrounds = await page.locator(".marao-popup-sheet marao-card").evaluateAll((cards) =>
+      cards.map((card) => card.shadowRoot?.querySelector("ha-card")?.style.getPropertyValue("--marao-card-background"))
     );
+    if (!lockActionBackgrounds.includes("var(--color-red)") || !lockActionBackgrounds.includes("var(--color-green)")) {
+      throw new Error(`Lock popup did not render red unlock and green lock cards: ${JSON.stringify(lockActionBackgrounds)}`);
+    }
+    const lockSliderLabel = (await page.locator(".marao-popup-sheet marao-slide-to-open .label").innerText()).trim();
+    if (!["Unlock", "Destrancar"].includes(lockSliderLabel)) {
+      throw new Error(`Lock slider label must be the localized single-word Unlock label, got: ${lockSliderLabel}`);
+    }
+    await page.locator(".marao-popup-close").click();
+    await page.getByText("Climate", { exact: true }).click();
+    if ((await page.locator(".marao-popup-head h2").innerText()).trim()) {
+      throw new Error("Climate mode popup still rendered a duplicate heading.");
+    }
+    const climateModes = page.locator(".marao-popup-sheet [data-climate-mode]");
+    if (await climateModes.count() < 2) throw new Error("Multi-mode climate did not render its mode choices.");
+    const climateModeLayout = await page.locator(".marao-popup-sheet .climate-modes").evaluate((element) => ({
+      columns: getComputedStyle(element).gridTemplateColumns.split(" ").length,
+      buttonHeight: Math.round(element.querySelector("button").getBoundingClientRect().height),
+      buttonFontSize: parseFloat(getComputedStyle(element.querySelector("button")).fontSize),
+      labels: [...element.querySelectorAll("button")].map((button) => button.textContent.trim()),
+      backgrounds: [...element.querySelectorAll("button")].map((button) => getComputedStyle(button).backgroundColor),
+    }));
+    if (
+      climateModeLayout.columns !== 2 ||
+      climateModeLayout.buttonHeight < 56 ||
+      climateModeLayout.buttonFontSize < 18 ||
+      new Set(climateModeLayout.backgrounds).size !== 1 ||
+      climateModeLayout.labels.some((label) => label[0] !== label[0].toUpperCase())
+    ) {
+      throw new Error(`Climate modes must use a large two-column grid: ${JSON.stringify(climateModeLayout)}`);
+    }
+    const climateStateFontSize = await page.locator(".marao-popup-sheet .climate-card .state").evaluate(
+      (element) => parseFloat(getComputedStyle(element).fontSize)
+    );
+    if (climateStateFontSize < 18) throw new Error(`Climate state text is too small: ${climateStateFontSize}px`);
+    const climateTemperature = page.locator('.marao-popup-sheet [data-number-step="increase"]').first();
+    if (await climateTemperature.count() !== 1) throw new Error("Climate target temperature stepper did not render.");
+    const climateSetpointContrast = await page.locator(".marao-popup-sheet .climate-stepper").evaluate((element) => {
+      const rgb = (value) => value.match(/[\d.]+/g).slice(0, 3).map(Number);
+      const luminance = (value) => rgb(value).map((channel) => {
+        channel /= 255;
+        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+      }).reduce((total, channel, index) => total + channel * [0.2126, 0.7152, 0.0722][index], 0);
+      const styles = getComputedStyle(element);
+      const light = Math.max(luminance(styles.backgroundColor), luminance(styles.color));
+      const dark = Math.min(luminance(styles.backgroundColor), luminance(styles.color));
+      return (light + 0.05) / (dark + 0.05);
+    });
+    if (climateSetpointContrast < 4.5) {
+      throw new Error(`Climate setpoint contrast is too low: ${climateSetpointContrast.toFixed(2)}:1`);
+    }
+    const climateTargetBefore = await page.locator(".marao-popup-sheet .number-value").first().innerText();
+    await climateTemperature.click();
+    await page.waitForTimeout(500);
+    const climateTargetAfter = await page.locator(".marao-popup-sheet .number-value").first().innerText();
+    if (climateTargetAfter === climateTargetBefore) throw new Error("Climate target temperature increase button did not update the target.");
+    if (/[°º]/.test(climateTargetAfter)) throw new Error(`Climate target still shows a temperature unit: ${climateTargetAfter}`);
+    await page.locator('.marao-popup-sheet [data-number-step="decrease"]').first().click();
+    await page.waitForTimeout(500);
+    await page.locator(".marao-popup-close").click();
+    await page.getByText("Multi Mode Climate", { exact: true }).first().click();
+    const multiModeClimateModes = page.locator(".marao-popup-sheet [data-climate-mode]");
+    if (await multiModeClimateModes.count() < 6) {
+      throw new Error("Multi-mode climate example did not render all common HVAC modes.");
+    }
+    await multiModeClimateModes.filter({ hasText: "Cool" }).click();
+    await page.waitForTimeout(500);
+    if ((await page.locator(".marao-popup-sheet .climate-card .state").innerText()).trim() !== "Cool") {
+      throw new Error("Multi-mode climate example did not apply the selected mode.");
+    }
+    await page.locator(".marao-popup-close").click();
+    const currentTemperature = page.locator("marao-card").filter({ hasText: "Current temperature control" }).first();
+    if (await currentTemperature.locator('input[type="range"]').count()) {
+      throw new Error("Number card still rendered a slider instead of the shared number stepper.");
+    }
+    const currentTemperatureValue = currentTemperature.locator(".number-value");
+    const currentTemperatureBefore = await currentTemperatureValue.innerText();
+    await currentTemperature.locator('[data-number-step="increase"]').click();
+    await page.waitForTimeout(500);
+    if (await page.evaluate(() => window.__maraoHaptics.at(-1)) !== "heavy") {
+      throw new Error("Button presses must emit strong haptic feedback.");
+    }
+    const currentTemperatureAfter = await currentTemperatureValue.innerText();
+    if (currentTemperatureAfter === currentTemperatureBefore) throw new Error("Number card increase button did not update its value.");
+    const climateReadings = await page.evaluate(() => {
+      const readings = [];
+      const visit = (root) => {
+        root?.querySelectorAll?.(".climate").forEach((element) => readings.push(element.textContent || ""));
+        root?.querySelectorAll?.("*").forEach((element) => element.shadowRoot && visit(element.shadowRoot));
+      };
+      visit(document);
+      return readings;
+    });
+    const currentTemperatureNumber = String(parseFloat(currentTemperatureAfter));
+    if (!climateReadings.some((reading) => reading.includes(currentTemperatureNumber) && !/[°º]/.test(reading))) {
+      throw new Error("Climate current temperature did not update without a temperature unit.");
+    }
+    await currentTemperature.locator('[data-number-step="decrease"]').click();
+    await page.waitForTimeout(500);
+    await page.getByText("Apple TV", { exact: true }).first().click();
+    const remoteButtons = page.locator(".marao-popup-sheet .body.icon-only");
+    if (await remoteButtons.count() < 9) throw new Error("Apple TV remote buttons did not render as icon-only controls.");
+    if ((await remoteButtons.allTextContents()).some((label) => label.trim())) {
+      throw new Error("Apple TV remote buttons rendered text instead of icons only.");
+    }
+    await page.locator(".marao-popup-close").click();
+    await page.getByText("Garage door access", { exact: true }).click();
+    const actionTrack = page.locator(".marao-popup-sheet marao-slide-to-open .track");
+    if (await actionTrack.count() !== 1) throw new Error("Garage door popup did not render a slide-to-open control.");
+    const actionBox = await actionTrack.boundingBox();
+    if (!actionBox) throw new Error("Garage door slide-to-open control has no visible track.");
+    await page.mouse.move(actionBox.x + 28, actionBox.y + actionBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(actionBox.x + actionBox.width - 18, actionBox.y + actionBox.height / 2, { steps: 12 });
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    if (await actionTrack.getAttribute("aria-valuenow") !== "0") throw new Error("Slide-to-open control did not reset after the action.");
+    await page.locator(".marao-popup-close").click();
+    const popupCount = (serialized.match(/custom:marao-popup-card/g) || []).length;
+    console.log(`Marao Dashboard e2e OK (${checks.length} generated view(s); ${cardTest.maraoCards} card-test cards; ${coloredCards} state-colored cards; ${popupCount} generated popup configuration(s))`);
   } finally {
     await browser.close();
   }
 }
 
-if (require.main === module) {
-  main().catch((error) => {
-    console.error(redactDiagnostic(error.message));
-    process.exit(1);
-  });
-}
+if (require.main === module) main().catch((error) => { console.error(error.message || error); process.exitCode = 1; });
 
-module.exports = {
-  buildViewChecks,
-  conditionalCardIsActive,
-  normalizedPathname,
-};
+module.exports = { accessToken, buildViewChecks, conditionalCardIsActive, normalizedPathname, readConfig };

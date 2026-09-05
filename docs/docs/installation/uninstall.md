@@ -43,16 +43,5 @@ lovelace:
       filename: dashboard/MaraoDashboard/dashboard/dashboard.yaml
 ```
 
-## Independent dashboard dependencies
-
-Uninstalling Marao does not remove Button Card, My Cards, Kiosk Mode, Card Mod,
-Mini Graph Card, Bubble Card, or Navbar Card. HACS manages them independently,
-and other dashboards may use them.
-
-Remove one of those repositories only after confirming that no other dashboard
-references it. HACS normally removes its storage-managed resource with the
-repository. YAML-resource users must also remove that project's manual entry
-from `lovelace.resources` or `frontend.extra_module_url`.
-
 If this installation was upgraded from an older Marao release, also remove any
 leftover resource URL containing `/MaraoDashboard/vendor/`.

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Marao Dashboard",
-        "description": "Install the Marao Dashboard builder, cards, and theme. Required community cards are installed separately through HACS."
+        "description": "Install the Marao Dashboard builder, cards, and theme. The dashboard cards are provided by Marao."
       }
     },
     "abort": {
@@ -11,10 +11,6 @@
     }
   },
   "issues": {
-    "missing_dashboard_dependencies": {
-      "title": "Marao Dashboard dependencies were not detected",
-      "description": "The current dashboard uses these independently installed community cards, but their resources were not detected: {dependencies}. Install or register them through HACS, then use Recheck in the Marao builder. A manually renamed resource may also appear as not detected."
-    },
     "legacy_vendor_resources": {
       "title": "Remove old Marao bundled-card resources",
       "description": "Marao no longer bundles third-party dashboard cards. Remove these legacy entries from your YAML Lovelace resources, then restart Home Assistant: {resources}"

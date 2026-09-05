@@ -219,6 +219,7 @@ export function validateConfig(config) {
     if (room.columns != null && (!Number.isInteger(room.columns) || room.columns < 1 || room.columns > 6)) errors.push(`Room ${index + 1} columns must be between 1 and 6.`);
   }
   if (config.navigation != null && !Array.isArray(config.navigation)) errors.push("Navigation must be a list.");
+  if (Array.isArray(config.navigation) && config.navigation.length > 5) errors.push("Navigation supports at most five entries.");
   if (config.pages?.custom != null && !Array.isArray(config.pages.custom)) errors.push("Custom pages must be a list.");
   for (const [index, page] of (config.pages?.custom || []).entries()) {
     if (!String(page.name || "").trim()) errors.push(`Custom page ${index + 1} needs a name.`);

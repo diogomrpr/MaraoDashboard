@@ -31,10 +31,10 @@ Like mentioned in the installation, you need to be able to edit your files. Ther
     cards:
         - type: vertical-stack
           cards:
-            - type: custom:button-card
+            - type: custom:marao-card
               template: hc_header_card
               entity: weather.buienradar
-            - type: custom:button-card
+            - type: custom:marao-card
               template: hc_title_card
               name: "Welcome Home"
               label: "What are you up to"
@@ -47,7 +47,7 @@ From here on out, we can add some cards.
     Adding a card is really easy. For example we are going to add a light button. You just grab this code:
 
     ```yaml
-         - type: custom:button-card
+         - type: custom:marao-card
            template: hc_light_card
            entity: <your light entity>
     ```
@@ -60,7 +60,7 @@ Now to see the change you made just go to your dashboard in Home Assistant, pres
 
 ## Explanation
 
-So we just added a card, and it works! Great, but how? And why? Well, Marao Dashboard uses something called `templates` which is a part of the `custom:button-card` intergration. Practically what happends is that we already created all the cards you will see later on and the only thing you have to do, is show them on the dashboard with that piece of code you added.
+So we just added a card, and it works! Great, but how? And why? Well, Marao Dashboard uses something called `templates` which is a part of the `custom:marao-card` intergration. Practically what happends is that we already created all the cards you will see later on and the only thing you have to do, is show them on the dashboard with that piece of code you added.
 
 Every card we create uses the `name`,`label` and `entity` values from HA itself. We use those values to fill our information we want to show by default without you thinking about it.
 

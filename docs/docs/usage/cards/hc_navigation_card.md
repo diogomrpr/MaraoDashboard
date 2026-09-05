@@ -19,7 +19,7 @@ This card is also used for the security card. Use the tabs beneath to switch bet
 ## Usage Navigation Card
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_navigation_card
     name: <title of the card>
     entity: <entity for label>
@@ -50,7 +50,7 @@ This card is also used for the security card. Use the tabs beneath to switch bet
 ## Usage Security Navigation Card
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_navigation_card_security
     name: <title of the card>
     entity: <security entity>

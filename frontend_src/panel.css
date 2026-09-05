@@ -34,21 +34,6 @@ ha-sortable { display: block; }
 .expansion-heading .grow { flex: 1; }
 .expansion-body { padding: 0 20px 20px; }
 .helper { color: var(--secondary-text-color); font-size: 13px; line-height: 1.45; }
-.dependency-list { display: grid; gap: 10px; }
-.dependency-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; padding: 14px; border: 1px solid var(--divider-color); border-radius: 10px; }
-.dependency-main { min-width: 0; }
-.dependency-main > strong { display: block; margin-bottom: 7px; }
-.dependency-meta, .dependency-links, .dependency-badges { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 14px; }
-.dependency-meta { color: var(--secondary-text-color); font-size: 12px; }
-.dependency-meta code { overflow-wrap: anywhere; }
-.dependency-links { margin-top: 8px; font-size: 13px; }
-.dependency-links a { color: var(--primary-color); font-weight: 500; }
-.dependency-badges { justify-content: flex-end; align-content: flex-start; }
-.dependency-badge { display: inline-flex; align-items: center; min-height: 26px; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-.dependency-badge.is-installed { color: var(--success-color); background: color-mix(in srgb, var(--success-color) 14%, transparent); }
-.dependency-badge.is-missing { color: var(--error-color); background: color-mix(in srgb, var(--error-color) 12%, transparent); }
-.dependency-badge.is-required { color: var(--primary-color); background: color-mix(in srgb, var(--primary-color) 12%, transparent); }
-.dependency-badge.is-optional { color: var(--secondary-text-color); background: var(--secondary-background-color); }
 .subsection-title { margin: 20px 0 8px; font-size: 16px; font-weight: 600; }
 .navigation-list { display: grid; gap: 8px; }
 .navigation-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--divider-color); border-radius: 10px; }
@@ -114,6 +99,4 @@ ha-sortable { display: block; }
   .row-actions { grid-column: 1 / -1; justify-content: flex-end; }
   .room-header, .expansion-heading { flex-wrap: wrap; }
   .room-header .row-actions { flex-basis: 100%; }
-  .dependency-row { grid-template-columns: 1fr; }
-  .dependency-badges { justify-content: flex-start; }
 }

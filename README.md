@@ -17,40 +17,39 @@ cards and pop-up controls, a coordinated theme, and local version history.
 
 ## Installation
 
-Marao Dashboard is a HACS custom **Integration**. Its seven dashboard-card
-dependencies are separate HACS **Dashboard** downloads; Marao does not package
-third-party card code.
+Marao Dashboard is a self-contained HACS custom **Integration**. Its generated
+cards, floating navigation, bottom-sheet popovers, theme, and fullscreen shell
+runtime are served by Marao itself.
 
-1. Install the [required dashboard dependencies](docs/docs/installation/dependencies.md).
-2. Add `https://github.com/diogomrpr/MaraoDashboard` to HACS as a custom
+1. Add `https://github.com/diogomrpr/MaraoDashboard` to HACS as a custom
    **Integration** repository and download Marao Dashboard.
-3. Restart Home Assistant.
-4. Go to **Settings > Devices & services > Add integration**, then add
+2. Restart Home Assistant.
+3. Go to **Settings > Devices & services > Add integration**, then add
    **Marao Dashboard**.
-5. Open the Marao Dashboard Editor from the sidebar and generate the dashboard.
+4. Open the Marao Dashboard Editor from the sidebar and generate the dashboard.
 
 See the [full documentation](https://diogomrpr.github.io/MaraoDashboard/) for
 configuration, camera-provider requirements, updates, and troubleshooting.
 
 ## Development
 
-Install the locked Node and Python test dependencies, then run the test suite:
+Install the locked Node and Python test dependencies:
 
 ```sh
 npm ci
 python3.14 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-test.txt
-npm test
 ```
 
-Useful focused checks are `npm run test:static` and `npm run test:python`. The
-local Home Assistant browser test, `npm run test:ha:e2e`, is opt-in and requires
-the local environment described in the
-[development guide](docs/docs/development/local-development.md).
+During development, run only the focused check for the code or card being
+changed. Before a push, tag, or release, `npm run verify:publish` runs the full
+suite and the local Home Assistant browser check. That check requires the
+disposable environment described in the
+[development guide](docs/docs/development/local-development.md) and must never
+target a live Home Assistant instance.
 
-Third-party dashboard dependencies must remain independently installed through
-HACS. Do not copy their JavaScript bundles into this repository or a release.
+Marao does not install, update, replace, or remove unrelated HACS cards.
 
 ## Contributing and license
 

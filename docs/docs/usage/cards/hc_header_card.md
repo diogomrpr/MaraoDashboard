@@ -14,7 +14,7 @@ The header card will always show the weather conditions and the date. Its possib
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_header_card
     entity: weather.buienradar
     variables:

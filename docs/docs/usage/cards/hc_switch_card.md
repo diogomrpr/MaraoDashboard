@@ -14,7 +14,7 @@ With the `hc_switch_card` you can control your switch. It gives the ability to a
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_switch_card
     entity: <your switch entity>
 ```

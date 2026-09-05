@@ -13,9 +13,8 @@ templates, pop-up controls, a theme, and local version history.
 
 ## Start here
 
-1. [Install the seven dashboard dependencies]({{ '/docs/installation/dependencies.html' | relative_url }}).
-2. [Download Marao Dashboard with HACS]({{ '/docs/installation/downloads.html' | relative_url }}).
-3. [Configure and generate the dashboard]({{ '/docs/installation/configuration.html' | relative_url }}).
+1. [Download Marao Dashboard with HACS]({{ '/docs/installation/downloads.html' | relative_url }}).
+2. [Configure and generate the dashboard]({{ '/docs/installation/configuration.html' | relative_url }}).
 
 ## How it works
 
@@ -28,9 +27,8 @@ Camera support is available as one of the generated card types. It can show a
 live Home Assistant feed and open recent events from Frigate or the official
 UniFi Protect integration.
 
-Third-party cards are ordinary, independent HACS Dashboard downloads. Marao
-does not bundle or silently replace them; see the dependency page for resource
-configuration, upgrade cleanup, and troubleshooting.
+Marao owns the generated card runtime. Other custom cards installed in the
+same Home Assistant instance remain independent and untouched.
 
 ## Help and development
 

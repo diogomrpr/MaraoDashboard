@@ -11,7 +11,7 @@ The `hc_washing_machine_card` is used to show a washing machine binary sensor st
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_washing_machine_card
     entity: <your washing machine binary sensor>
     name: Washing Machine

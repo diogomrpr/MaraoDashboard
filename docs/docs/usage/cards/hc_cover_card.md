@@ -11,7 +11,7 @@ The `hc_cover_card` is used to control a cover, blind, or shutter. It shows the 
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_cover_card
     entity: <your cover entity>
     name: Living Room Blind
@@ -31,4 +31,4 @@ The `hc_cover_card` is used to control a cover, blind, or shutter. It shows the 
 
 ## More info
 
-This card uses `custom:my-slider-v2` in `position` mode. The cover entity should expose the `current_position` attribute for the percentage label and slider to work correctly.
+This card uses `custom:marao-card` in `position` mode. The cover entity should expose the `current_position` attribute for the percentage label and slider to work correctly.

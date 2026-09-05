@@ -14,7 +14,7 @@ With the `hc_fan_card` you can control your fan. It has the option to add a osci
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_fan_card
     entity: <fan entity>
     variables:

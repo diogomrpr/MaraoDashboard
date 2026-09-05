@@ -15,7 +15,6 @@ smallest relevant layer and add a regression test for behavior changes.
 - Follow [Theme design]({{ '/docs/development/theme.html' | relative_url }})
   when adding or changing theme variables.
 - Follow [Template design]({{ '/docs/development/template.html' | relative_url }})
-  when editing the reusable `hc_*` card templates.
+  when editing the reusable `hc_*` Marao card variants.
 
-Third-party dashboard cards remain independent HACS dependencies. Development
-and release builds must not copy their JavaScript bundles into Marao.
+Development and release builds must contain only Marao-owned frontend code.

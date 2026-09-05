@@ -17,7 +17,6 @@ from .const import (
     BASE_DASHBOARD_SLUG,
     BASE_DASHBOARD_THEME,
     DASHBOARD_KEY_PREFIX,
-    MARAO_DASHBOARD_TEMPLATE_INCLUDE,
 )
 
 SUPPORTED_DOMAINS = {
@@ -203,39 +202,6 @@ def load_dashboard_config(path: str | Path) -> dict[str, Any]:
     return config
 
 
-def generated_popup_files_need_repair(output_dir: str | Path) -> bool:
-    """Return whether a Marao-owned popup has the generated null-cards defect."""
-
-    root = Path(output_dir)
-    try:
-        manifest_containers = set(_load_generation_manifest(root)["containers"])
-    except (OSError, ValueError):
-        return False
-
-    popup_dir = root / "components" / "popups"
-    for popup_path in popup_dir.glob("*.yaml"):
-        try:
-            source = popup_path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        relative_path = popup_path.relative_to(root).as_posix()
-        if relative_path not in manifest_containers:
-            continue
-        try:
-            _extract_custom_cards(source, relative_path)
-            popup = yaml.load(source, Loader=MaraoDashboardLoader)
-        except (ValueError, yaml.YAMLError):
-            continue
-        if (
-            isinstance(popup, dict)
-            and popup.get("type") == "custom:bubble-card"
-            and popup.get("card_type") == "pop-up"
-            and popup.get("cards") is None
-        ):
-            return True
-    return False
-
-
 def write_dashboard_config(config: dict[str, Any], path: str | Path) -> None:
     """Write a dashboard JSON config without touching generated YAML."""
 
@@ -327,6 +293,8 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     navigation = config.get("navigation")
     if navigation is not None and not isinstance(navigation, list):
         raise ValueError("navigation must be a list")
+    if isinstance(navigation, list) and len(navigation) > 5:
+        raise ValueError("navigation supports at most five entries")
     if isinstance(navigation, list) and any(
         not isinstance(item, (str, dict)) for item in navigation
     ):
@@ -496,16 +464,6 @@ def write_dashboard(
         "dashboard.yaml": {
             "title": resolved["name"],
             "theme": resolved["theme"],
-            "button_card_templates": TaggedScalar(
-                "!include_dir_merge_named", MARAO_DASHBOARD_TEMPLATE_INCLUDE
-            ),
-            "kiosk_mode": {
-                "non_admin_settings": {
-                    "hide_header": True,
-                    "ignore_entity_settings": True,
-                },
-                "mobile_settings": {"hide_header": True},
-            },
             "views": [
                 TaggedScalar("!include", f"{include_root}/{path}")
                 for path in [*main_views, *room_views, *custom_views]
@@ -563,7 +521,7 @@ def write_dashboard(
     )
 
     for relative_path, data in plain_files.items():
-        _write_text(output_dir / relative_path, yaml_dump(data))
+        _write_text(output_dir / relative_path, yaml_dump(_rewrite_external_card_types(data)))
         files.append(str(output_dir / relative_path))
 
     for relative_path, data in card_files.items():
@@ -738,6 +696,7 @@ def _extract_custom_cards(source: str, relative_path: str) -> str:
 
 
 def _render_card_container(data: dict[str, Any], custom_cards: str) -> str:
+    data = _rewrite_external_card_types(data)
     cards = list(data.get("cards") or [])
     footer_cards: list[Any] = []
     if cards and _is_navigation_include(cards[-1]):
@@ -754,6 +713,30 @@ def _render_card_container(data: dict[str, Any], custom_cards: str) -> str:
 
 def _is_navigation_include(card: Any) -> bool:
     return isinstance(card, TaggedScalar) and card.tag == "!include" and "navigation/navbar.yaml" in card.value
+
+
+def _rewrite_external_card_types(value: Any) -> Any:
+    """Translate retired upstream card types in generated Marao-owned YAML."""
+
+    if isinstance(value, dict):
+        return {
+            key: (
+                {
+                    "custom:button-card": "custom:marao-card",
+                    "custom:bubble-card": "custom:marao-popup-card",
+                    "custom:navbar-card": "custom:marao-navbar-card",
+                    "custom:my-slider": "custom:marao-card",
+                    "custom:my-slider-v2": "custom:marao-card",
+                    "custom:mini-graph-card": "sensor",
+                }.get(item, item)
+                if key == "type" and isinstance(item, str)
+                else _rewrite_external_card_types(item)
+            )
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_rewrite_external_card_types(item) for item in value]
+    return value
 
 
 def _indent_cards(cards: list[Any]) -> str:
@@ -1059,7 +1042,8 @@ def _navigation_bar(config: dict[str, Any], dashboard_key: str, language: str = 
 
     configured = config.get("navigation")
     if configured is None:
-        routes = list(available.values())
+        # Keep the automatic menu within the component's five-route contract.
+        routes = list(available.values())[:5]
     else:
         explicit = any(
             isinstance(item, str)
@@ -1074,61 +1058,15 @@ def _navigation_bar(config: dict[str, Any], dashboard_key: str, language: str = 
                 routes.append(available[page_path])
             elif isinstance(route, dict) and route.get("url") and route.get("label"):
                 routes.append(route)
+    if len(routes) > 5:
+        raise ValueError("navigation supports at most five entries")
     return {
         "type": "vertical-stack",
         "cards": [
             _action_bar_spacer(),
             {
-                "type": "custom:navbar-card",
-                "haptic": {
-                    "double_tap_action": True,
-                    "hold_action": True,
-                    "tap_action": True,
-                    "url": True,
-                },
-                "mobile": {"mode": "floating", "show_labels": False},
-                "desktop": {
-                    "min_width": 1024,
-                    "mode": "floating",
-                    "position": "bottom",
-                    "show_labels": False,
-                },
+                "type": "custom:marao-navbar-card",
                 "routes": routes,
-                "styles": """
-:host {
-  --navbar-border-radius: 999px;
-  --marao-navbar-route-size: 58px;
-}
-.navbar {
-  align-items: center;
-}
-.navbar-card {
-  box-sizing: border-box !important;
-  justify-content: center !important;
-  width: fit-content !important;
-  max-width: calc(100vw - 24px) !important;
-  padding-left: 16px !important;
-  padding-right: 16px !important;
-  gap: 0 !important;
-}
-.navbar-card.mobile.floating {
-  margin-bottom: 18px;
-  padding-top: 8px !important;
-  padding-bottom: 8px !important;
-  touch-action: none;
-}
-.route {
-  flex: 0 0 var(--marao-navbar-route-size);
-  width: var(--marao-navbar-route-size);
-  min-width: var(--marao-navbar-route-size);
-}
-.button {
-  width: 40px;
-  max-width: 40px;
-  height: 40px;
-  border-radius: 50%;
-}
-""".strip(),
             },
         ],
     }
@@ -1143,7 +1081,7 @@ def _overview_view(
     if weather_entity:
         cards.append(
             {
-                "type": "custom:button-card",
+                "type": "custom:marao-card",
                 "template": "hc_weather_card",
                 "entity": weather_entity,
                 "variables": {"show_forecast": True},
@@ -1197,7 +1135,7 @@ def _overview_nav_card(
 ) -> dict[str, Any]:
     ids = [entity["entity_id"] for entity in entities]
     return {
-        "type": "custom:button-card",
+        "type": "custom:marao-card",
         "template": "hc_navigation_card",
         "entity": ids[0],
         "name": name,
@@ -1245,7 +1183,7 @@ def _scene_card(entity: dict[str, Any]) -> dict[str, Any]:
             "haptic": "heavy",
         }
     return {
-        "type": "custom:button-card",
+        "type": "custom:marao-card",
         "template": entity.get("template") or "hc_switch_card",
         "entity": entity["entity_id"],
         "name": entity.get("name") or _friendly_name(entity["entity_id"]),
@@ -1282,7 +1220,7 @@ def _security_view(config: dict[str, Any], include_root: str, language: str = "e
     if alarm:
         cards.append(
             {
-                "type": "custom:button-card",
+                "type": "custom:marao-card",
                 "template": alarm.get("template") or "hc_security_card",
                 "entity": alarm["entity_id"],
                 "name": alarm.get("name") or _friendly_name(alarm["entity_id"]),
@@ -1323,7 +1261,7 @@ def _page_action_card(entity: dict[str, Any]) -> dict[str, Any]:
     else:
         action = {"action": "toggle", "haptic": "heavy"}
     card = {
-        "type": "custom:button-card",
+        "type": "custom:marao-card",
         "template": entity.get("template") or "hc_switch_card",
         "entity": entity["entity_id"],
         "name": entity.get("name") or _friendly_name(entity["entity_id"]),
@@ -1376,7 +1314,7 @@ def _energy_view(config: dict[str, Any], include_root: str, language: str = "en"
             variables = {"toggle_entity": toggle_entity, **variables}
         load_cards.append(
             {
-                "type": "custom:button-card",
+                "type": "custom:marao-card",
                 "template": load.get("template") or (
                     "hc_toggle_graph_card" if toggle_entity else "hc_graph_card"
                 ),
@@ -1400,7 +1338,7 @@ def _energy_graph_card(
     entity: dict[str, Any], name: str, icon: str, popup_hash: str | None
 ) -> dict[str, Any]:
     card = {
-        "type": "custom:button-card",
+        "type": "custom:marao-card",
         "template": entity.get("template") or "hc_graph_card",
         "entity": entity["entity_id"],
         "name": entity.get("name") or name,
@@ -1413,7 +1351,22 @@ def _energy_graph_card(
             "navigation_path": popup_hash,
             "haptic": "heavy",
         }
-    return card
+    return {
+        "type": "vertical-stack",
+        "cards": [
+            card,
+            _history_graph_card(entity["entity_id"]),
+        ],
+    }
+
+
+def _history_graph_card(entity_id: str) -> dict[str, Any]:
+    return {
+        "type": "history-graph",
+        "entities": [entity_id],
+        "hours_to_show": 24,
+        "show_names": False,
+    }
 
 
 def _energy_popups(config: dict[str, Any], language: str = "en") -> dict[str, dict[str, Any]]:
@@ -1441,7 +1394,7 @@ def _wallbox_view(config: dict[str, Any], include_root: str, language: str = "en
     if status:
         cards.append(
             {
-                "type": "custom:button-card",
+                "type": "custom:marao-card",
                 "template": status.get("template") or "hc_base_card",
                 "entity": status["entity_id"],
                 "name": status.get("name") or "Wallbox Status",
@@ -1463,7 +1416,7 @@ def _wallbox_view(config: dict[str, Any], include_root: str, language: str = "en
     if control:
         cards.append(
             {
-                "type": "custom:button-card",
+                "type": "custom:marao-card",
                 "template": control.get("template") or "hc_number_card",
                 "entity": control["entity_id"],
                 "name": control.get("name") or "Charging Current",
@@ -1479,7 +1432,7 @@ def _wallbox_view(config: dict[str, Any], include_root: str, language: str = "en
                     "square": False,
                     "cards": [
                         {
-                            "type": "custom:button-card",
+                            "type": "custom:marao-card",
                             "entity": control["entity_id"],
                             "name": f"{value:g} A",
                             "show_state": False,
@@ -1500,7 +1453,7 @@ def _wallbox_view(config: dict[str, Any], include_root: str, language: str = "en
     if pause_resume := _page_entity(page, "pause_resume_entity"):
         cards.append(
             {
-                "type": "custom:button-card",
+                "type": "custom:marao-card",
                 "template": pause_resume.get("template") or "hc_switch_card",
                 "entity": pause_resume["entity_id"],
                 "name": pause_resume.get("name") or "Pause / Resume",
@@ -1526,7 +1479,7 @@ def _media_view(config: dict[str, Any], include_root: str, language: str = "en")
         apps = apple_tv["apps"] if apple_tv else []
         app_cards = [
             {
-                "type": "custom:button-card",
+                "type": "custom:marao-card",
                 "template": "hc_media_app_card",
                 "entity": player["entity_id"],
                 "name": app.get("name") or app["source"],
@@ -1560,7 +1513,7 @@ def _rooms_view(
         primary_entity = (lights or all_room_entities or [{"entity_id": "sun.sun"}])[0]["entity_id"]
         room_cards.append(
             {
-                "type": "custom:button-card",
+                "type": "custom:marao-card",
                 "template": "hc_room_card",
                 "entity": primary_entity,
                 "name": room["name"],
@@ -1693,7 +1646,7 @@ def _entity_container_cards(
 
 def _page_shortcut_card(shortcut: dict[str, Any], dashboard_key: str) -> dict[str, Any]:
     card = {
-        "type": "custom:button-card",
+        "type": "custom:marao-card",
         "template": "hc_navigation_card",
         "entity": shortcut.get("entity_id") or "sun.sun",
         "name": shortcut.get("name") or _friendly_name(shortcut["page"]),
@@ -1712,7 +1665,7 @@ def _page_shortcut_card(shortcut: dict[str, Any], dashboard_key: str) -> dict[st
 
 def _action_bar_spacer() -> dict[str, Any]:
     return {
-        "type": "custom:button-card",
+        "type": "custom:marao-card",
         "color_type": "blank-card",
         "styles": {"card": [{"height": "128px"}]},
     }
@@ -1720,7 +1673,7 @@ def _action_bar_spacer() -> dict[str, Any]:
 
 def _title_card(name: str) -> dict[str, Any]:
     return {
-        "type": "custom:button-card",
+        "type": "custom:marao-card",
         "name": name,
         "tap_action": {"action": "none"},
         "hold_action": {"action": "none"},
@@ -1745,7 +1698,7 @@ def _entity_card(entity: dict[str, Any]) -> dict[str, Any]:
     domain = entity["entity_id"].split(".", 1)[0]
     template = entity.get("template") or _domain_template(entity)
     card = {
-        "type": "custom:button-card",
+        "type": "custom:marao-card",
         "template": template,
         "entity": entity["entity_id"],
         "name": entity.get("name") or _friendly_name(entity["entity_id"]),
@@ -1757,6 +1710,23 @@ def _entity_card(entity: dict[str, Any]) -> dict[str, Any]:
         card["variables"] = variables
     elif domain == "climate":
         card["variables"] = {"show_graph": False, "show_mode_buttons": True}
+    variables = card.get("variables") if isinstance(card.get("variables"), dict) else {}
+    graph_entity = (
+        variables.get("graph_entity")
+        or variables.get("power_entity")
+        or entity.get("graph_entity")
+    )
+    if template in {"hc_graph_card", "hc_toggle_graph_card"}:
+        graph_entity = graph_entity or entity["entity_id"]
+        return {
+            "type": "vertical-stack",
+            "cards": [card, _history_graph_card(graph_entity)],
+        }
+    if variables.get("show_graph") and graph_entity:
+        return {
+            "type": "vertical-stack",
+            "cards": [card, _history_graph_card(graph_entity)],
+        }
     return card
 
 
@@ -1849,7 +1819,7 @@ def _media_button(
 ) -> dict[str, Any]:
     target_entity_id = target_entity_id or entity_id
     card = {
-        "type": "custom:button-card",
+        "type": "custom:marao-card",
         "entity": entity_id,
         "name": name,
         "icon": icon,
@@ -1945,7 +1915,7 @@ def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
                 "square": False,
                 "cards": [
                     {
-                        "type": "custom:button-card",
+                        "type": "custom:marao-card",
                         "template": "hc_media_app_card",
                         "entity": entity_id,
                         "name": app.get("name") or app["source"],
@@ -2052,7 +2022,7 @@ def _access_action_card(
     requires_slide: bool = False,
 ) -> dict[str, Any]:
     return {
-        "type": "custom:button-card",
+        "type": "custom:marao-card",
         "template": (
             "hc_access_slide_action_card"
             if requires_slide
@@ -2143,12 +2113,12 @@ def _climate_mode_popup(entity: dict[str, Any], language: str = "en") -> dict[st
                     **entity,
                     "variables": {
                         "show_graph": False,
-                        "show_mode_buttons": True,
                         **(
                             entity.get("variables")
                             if isinstance(entity.get("variables"), dict)
                             else {}
                         ),
+                        "show_mode_buttons": True,
                     },
                 }
             )
@@ -2245,44 +2215,16 @@ def _popup_header(
     popup_hash: str, entity_id: str, name: str, icon: str, height: str
 ) -> dict[str, Any]:
     return {
-        "type": "custom:bubble-card",
-        "card_type": "pop-up",
+        "type": "custom:marao-popup-card",
         "hash": popup_hash,
-        "button_type": "state",
         "entity": entity_id,
         "name": name,
         "icon": icon,
         "show_icon": True,
         "show_name": True,
         "show_state": True,
-        "scrolling_effect": False,
-        "close_by_clicking_outside": True,
-        "styles": (
-            ".bubble-pop-up,\n"
-            ".bubble-pop-up-container {\n"
-            "  overscroll-behavior: contain !important;\n"
-            "  touch-action: pan-y !important;\n"
-            "}\n"
-            ".bubble-pop-up-container {\n"
-            "  height: 100% !important;\n"
-            "  align-items: stretch !important;\n"
-            "  align-content: start !important;\n"
-            "  justify-content: flex-start !important;\n"
-            "}\n"
-            ".bubble-pop-up {\n"
-            "  position: fixed !important;\n"
-            "  inset: auto 0 0 0 !important;\n"
-            f"  height: min({height}, 80vh) !important;\n"
-            "  max-height: 80vh !important;\n"
-            "  margin: 0 !important;\n"
-            "  overflow-y: auto !important;\n"
-            "}\n"
-            ".bubble-pop-up-container > .bubble-cards-container,\n"
-            ".bubble-pop-up-container > ha-sortable {\n"
-            "  align-self: stretch !important;\n"
-            "  margin-top: 16px !important;\n"
-            "}\n"
-        ),
+        "height": height,
+        "max_height": "80dvh",
     }
 
 

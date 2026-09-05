@@ -17,12 +17,14 @@ Assistant integration layout.
    ```
 
 4. Make the change and add the smallest useful regression test.
-5. Run `npm test`.
-6. Open a pull request against `main` explaining the problem and the change.
+5. Run only the focused test for the code or card you changed.
+6. Before publishing, run `npm run verify:publish`.
+7. Open a pull request against `main` explaining the problem and the change.
 
 Dashboard/frontend changes can also be checked against a local Home Assistant VM
-with `npm run ha:sync`. The browser e2e check is opt-in: run
-`npm run test:ha:e2e` only when the local VM is configured.
+with `npm run ha:sync`. The publish verification includes the browser E2E check
+and therefore requires the disposable local VM described in the development
+documentation. Never run it against a live Home Assistant instance.
 
 ## Dashboard dependencies
 

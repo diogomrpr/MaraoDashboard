@@ -17,11 +17,6 @@ import {
   slugify,
   validateConfig,
 } from "./editor-model.js";
-import {
-  dependenciesFromPayload,
-  recheckDependencies,
-  renderDependencyChecklist,
-} from "./dependency-checklist.js";
 
 const PANEL_ASSET_VERSION = new URL(import.meta.url).search;
 const PANEL_CSS = new URL(`./MaraoDashboardPanel.css${PANEL_ASSET_VERSION}`, import.meta.url).href;
@@ -40,10 +35,6 @@ const TEXT = {
     addCard: "Add card", noCards: "No entity cards yet.", dirty: "Unsaved changes", clean: "Saved",
     format: "Format JSON", advanced: "Advanced options", restore: "Restore", cancel: "Cancel",
     create: "Create", update: "Update", delete: "Delete", duplicate: "Duplicate",
-    dependencies: "Card dependencies", dependencyHelp: "Check the dashboard cards detected in this Home Assistant instance. Missing cards do not block generation.",
-    recheck: "Recheck", dependenciesChecked: "Dependency status refreshed.", dependencyId: "ID",
-    testedVersion: "Tested version", usedBy: "Used by", openInHacs: "Open in HACS", repository: "Repository",
-    installed: "Installed", notDetected: "Not detected", required: "Required", optional: "Optional", noDependencies: "No dependencies reported.",
   },
   pt: {
     subtitle: "Configure divisões, cartões e páginas geradas.", visual: "Visual", json: "JSON",
@@ -52,10 +43,6 @@ const TEXT = {
     addCard: "Adicionar cartão", noCards: "Ainda não existem cartões.", dirty: "Alterações por guardar", clean: "Guardado",
     format: "Formatar JSON", advanced: "Opções avançadas", restore: "Restaurar", cancel: "Cancelar",
     create: "Criar", update: "Atualizar", delete: "Eliminar", duplicate: "Duplicar",
-    dependencies: "Dependências dos cartões", dependencyHelp: "Verifique os cartões do dashboard detetados nesta instância do Home Assistant. Cartões em falta não impedem a geração.",
-    recheck: "Verificar novamente", dependenciesChecked: "Estado das dependências atualizado.", dependencyId: "ID",
-    testedVersion: "Versão testada", usedBy: "Utilizado por", openInHacs: "Abrir no HACS", repository: "Repositório",
-    installed: "Instalado", notDetected: "Não detetado", required: "Obrigatório", optional: "Opcional", noDependencies: "Nenhuma dependência reportada.",
   },
 };
 
@@ -106,8 +93,6 @@ class MaraoDashboardPanel extends HTMLElement {
     this._busy = false;
     this._dirty = false;
     this._tab = "visual";
-    this._dependencies = [];
-    this._checkingDependencies = false;
     this._expandedSections = { rooms: true, pages: true };
     this._collapsedRooms = new Set();
   }
@@ -181,7 +166,6 @@ class MaraoDashboardPanel extends HTMLElement {
       this._entities = payload.editor.entities;
       this._areas = payload.editor.areas;
       this._history = payload.history;
-      this._dependencies = dependenciesFromPayload(payload);
       this._model = normalizeConfig(JSON.parse(payload.config));
       this._savedSource = this._source();
       this._dirty = false;
@@ -217,7 +201,6 @@ class MaraoDashboardPanel extends HTMLElement {
     const root = this.shadowRoot.getElementById("visual-view");
     root.innerHTML = `
       <div class="section-grid">
-        <ha-card class="span-two"><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:puzzle-outline"></ha-icon><h2>${this._t("dependencies")}</h2><span class="grow"></span><ha-button id="recheck-dependencies">${this._t("recheck")}</ha-button></div><p class="helper">${this._t("dependencyHelp")}</p><div id="dependency-list"></div></div></ha-card>
         <ha-card class="span-two"><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:navigation-variant-outline"></ha-icon><h2>${this._t("navigation")}</h2><span class="grow"></span><ha-button id="add-nav-page">${this._t("addNavPage")}</ha-button></div><div id="navbar-list"></div></div></ha-card>
         <ha-card><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:tune"></ha-icon><h2>${this._t("general")}</h2></div><div id="general-form"></div></div></ha-card>
         <ha-card><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:home-outline"></ha-icon><h2>${this._t("overview")}</h2></div><div id="overview-form"></div></div></ha-card>
@@ -231,7 +214,6 @@ class MaraoDashboardPanel extends HTMLElement {
         this._expandedSections[key] = event.target.expanded;
       });
     }
-    this._renderDependencies(root.querySelector("#dependency-list"));
     this._renderNavigation(root.querySelector("#navbar-list"));
     this._mountGeneralForm(root.querySelector("#general-form"));
     this._mountOverviewForm(root.querySelector("#overview-form"));
@@ -242,43 +224,10 @@ class MaraoDashboardPanel extends HTMLElement {
       this._openRoomDialog();
     });
     root.querySelector("#add-nav-page").addEventListener("click", () => this._openNavigationDialog());
-    root.querySelector("#recheck-dependencies").addEventListener("click", () => this._recheckDependencies());
     root.querySelector("#add-custom-page").addEventListener("click", (event) => {
       event.stopPropagation();
       this._openCustomPageDialog();
     });
-  }
-
-  _renderDependencies(host) {
-    host.innerHTML = renderDependencyChecklist(this._dependencies, {
-      dependencyId: this._t("dependencyId"),
-      hacs: this._t("openInHacs"),
-      installed: this._t("installed"),
-      noDependencies: this._t("noDependencies"),
-      notDetected: this._t("notDetected"),
-      optional: this._t("optional"),
-      repository: this._t("repository"),
-      required: this._t("required"),
-      testedVersion: this._t("testedVersion"),
-      usedBy: this._t("usedBy"),
-    });
-  }
-
-  async _recheckDependencies() {
-    if (!this._hass || this._checkingDependencies) return;
-    this._checkingDependencies = true;
-    const button = this.shadowRoot.getElementById("recheck-dependencies");
-    if (button) button.disabled = true;
-    try {
-      this._dependencies = await recheckDependencies(this._hass);
-      this._renderDependencies(this.shadowRoot.getElementById("dependency-list"));
-      this._setStatus(this._t("dependenciesChecked"), "success");
-    } catch (error) {
-      this._setStatus(this._error(error), "error");
-    } finally {
-      this._checkingDependencies = false;
-      if (button?.isConnected) button.disabled = false;
-    }
   }
 
   _availablePages() {
@@ -326,6 +275,10 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   _openNavigationDialog() {
+    if (this._navigationEntries().length >= 5) {
+      this._setStatus("The Marao navbar supports at most five entries.", "error");
+      return;
+    }
     const used = new Set(this._navigationEntries().map((entry) => typeof entry === "string" ? entry : entry?.page).filter(Boolean));
     const options = this._availablePages().filter((page) => !used.has(page.path)).map((page) => ({ value: page.path, label: page.name }));
     if (!options.length) { this._setStatus("Every generated page is already in the navigation bar.", "success"); return; }

@@ -11,7 +11,7 @@ The `hc_dishwasher_card` is used to show dishwasher operation state, program pro
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_dishwasher_card
     entity: <your dishwasher operation state sensor>
     name: Dishwasher

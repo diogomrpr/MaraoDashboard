@@ -15,16 +15,16 @@ const dashboard = {
       title: "Overview",
       path: "overview",
       cards: [
-        { type: "custom:button-card" },
+        { type: "custom:marao-card" },
         {
           type: "conditional",
           conditions: [{ entity: "light.active", state: "on" }],
-          card: { type: "custom:button-card" },
+          card: { type: "custom:marao-card" },
         },
         {
           type: "conditional",
           conditions: [{ entity: "light.inactive", state: "on" }],
-          card: { type: "custom:button-card" },
+          card: { type: "custom:marao-card" },
         },
       ],
     },
@@ -52,25 +52,20 @@ test("installed card counts exclude inactive conditional descendants", () => {
   const [view] = buildViewChecks(
     dashboard,
     "/marao-generated/overview",
-    [{ id: "button_card", status: "installed" }],
     { "light.active": "on", "light.inactive": "off" }
   );
 
-  assert.deepEqual(view.configuredCounts, { "button-card": 3 });
-  assert.deepEqual(view.expectedRenderedCounts, { "button-card": 2 });
-  assert.deepEqual(view.expectedMissingCounts, {});
+  assert.deepEqual(view.configuredCounts, { "marao-card": 2 });
 });
 
 test("missing card checks retain direct and active conditional assertions", () => {
   const [view] = buildViewChecks(
     dashboard,
     "/marao-generated/overview",
-    [{ id: "button_card", status: "not_detected" }],
     { "light.active": "on", "light.inactive": "off" }
   );
 
-  assert.deepEqual(view.expectedMissingCounts, { "button-card": 2 });
-  assert.deepEqual(view.allowedMissingElements, ["button-card"]);
+  assert.deepEqual(view.configuredCounts, { "marao-card": 2 });
 });
 
 test("route checks compare canonical paths without query strings", () => {

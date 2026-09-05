@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Marao Dashboard",
-        "description": "Instale o construtor, os cartões e o tema do Marao Dashboard. Os cartões da comunidade necessários são instalados separadamente através do HACS."
+        "description": "Instale o construtor, os cartões e o tema do Marao Dashboard. Os cartões do dashboard são fornecidos pelo Marao."
       }
     },
     "abort": {
@@ -11,10 +11,6 @@
     }
   },
   "issues": {
-    "missing_dashboard_dependencies": {
-      "title": "Não foram detetadas dependências do Marao Dashboard",
-      "description": "O dashboard atual utiliza estes cartões da comunidade, mas os respetivos recursos não foram detetados: {dependencies}. Instale-os ou registe-os através do HACS e selecione Verificar novamente no construtor Marao. Um recurso renomeado manualmente também pode aparecer como não detetado."
-    },
     "legacy_vendor_resources": {
       "title": "Remova os recursos antigos de cartões incluídos pelo Marao",
       "description": "O Marao já não inclui cartões de terceiros. Remova estas entradas antigas dos recursos Lovelace em YAML e reinicie o Home Assistant: {resources}"

@@ -15,13 +15,13 @@ background and includes previous/play/next controls.
 ## Usage
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_media_card
     entity: <media entity>
 ```
 
 Generated dashboards create the corresponding popup automatically. For a
-manually authored dashboard, add a Bubble Card popup with the same `popup_hash`
+manually authored dashboard, add a Marao popup with the same `popup_hash`
 as the media card.
 
 ## Apple TV
@@ -56,4 +56,4 @@ volume services are used.
 |----------|---------|----------|------------|
 | hc_show_background_art | true | No | If true, the background will show the album art. If nothing is playing, an animated GIF will play. |
 | hc_background_color | var(--color-purple) | No | The background color used when `hc_show_background_art` is `false`. |
-| popup_hash | `#media` | No | Bubble Card popup hash for manually authored dashboards. Generated dashboards set a unique value. |
+| popup_hash | `#media` | No | Marao popup hash for manually authored dashboards. Generated dashboards set a unique value. |

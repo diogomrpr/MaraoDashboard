@@ -4,16 +4,16 @@ icon: mdi:test-tube
 cards:
   - type: vertical-stack
     cards:
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_header_card
         entity: sensor.marao_dashboard_test_weather
         variables:
           person_entity: person.test
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_title_card
         name: Marao Dashboard Card Test
-        label: All bundled card templates
+        label: All Marao card templates
         variables:
           entity1: input_boolean.marao_dashboard_test_one
           entity1_name: One
@@ -22,13 +22,13 @@ cards:
           entity3: input_boolean.marao_dashboard_test_three
           entity3_name: Three
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_weather_card
         entity: sensor.marao_dashboard_test_weather
         variables:
           show_forecast: false
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_glance_card
         variables:
           entity1: sensor.marao_dashboard_test_temperature
@@ -41,60 +41,121 @@ cards:
           entity3_name: Power
           entity3_icon: mdi:flash
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_light_card
         entity: light.marao_dashboard_test_light
         name: Light + slider
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_cover_card
         entity: cover.marao_dashboard_test_cover
         name: Cover + slider
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_access_card
         entity: lock.marao_dashboard_test_lock
         name: Lock access
         variables:
           popup_hash: "#marao-dashboard-test-lock-popup"
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_access_card
         entity: cover.marao_dashboard_test_garage_door
         name: Garage door access
         variables:
           popup_hash: "#marao-dashboard-test-garage-door-popup"
 
-      - type: custom:button-card
-        template: hc_switch_card
-        entity: switch.marao_dashboard_test_switch
-        name: Switch + graph
-        variables:
-          power_entity: sensor.marao_dashboard_test_power
-          show_graph: true
+      - type: vertical-stack
+        cards:
+          - type: custom:marao-card
+            template: hc_switch_card
+            entity: switch.marao_dashboard_test_switch
+            name: Switch + graph
+            variables:
+              power_entity: sensor.marao_dashboard_test_graph_history
+              show_graph: true
+          - type: history-graph
+            entities:
+              - sensor.marao_dashboard_test_graph_history
+            hours_to_show: 1
+            show_names: false
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_fan_card
         entity: fan.marao_dashboard_test_fan
         name: Fan + slider
         variables:
           enable_slider: true
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_climate_card
         entity: climate.marao_dashboard_test_climate
         name: Climate
         variables:
           mode_selector_hash: "#climate-mode-test"
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_climate_card
         entity: climate.marao_dashboard_test_single_mode_climate
         name: Single Mode Climate
         variables:
           mode_selector_hash: "#single-mode-climate-should-not-open"
 
-      - type: custom:button-card
+      - type: custom:marao-card
+        template: hc_climate_card
+        entity: climate.marao_dashboard_test_multi_mode_climate
+        name: Multi Mode Climate
+        variables:
+          mode_selector_hash: "#multi-mode-climate-test"
+
+      - type: custom:marao-card
+        template: hc_climate_card
+        entity: sensor.marao_dashboard_test_climate_heat
+        name: Climate · Heat
+        tap_action: { action: none }
+
+      - type: custom:marao-card
+        template: hc_climate_card
+        entity: sensor.marao_dashboard_test_climate_cool
+        name: Climate · Cool
+        tap_action: { action: none }
+
+      - type: custom:marao-card
+        template: hc_climate_card
+        entity: sensor.marao_dashboard_test_climate_heat_cool
+        name: Climate · Heat/Cool
+        tap_action: { action: none }
+
+      - type: custom:marao-card
+        template: hc_climate_card
+        entity: sensor.marao_dashboard_test_climate_auto
+        name: Climate · Auto
+        tap_action: { action: none }
+
+      - type: custom:marao-card
+        template: hc_climate_card
+        entity: sensor.marao_dashboard_test_climate_dry
+        name: Climate · Dry
+        tap_action: { action: none }
+
+      - type: custom:marao-card
+        template: hc_climate_card
+        entity: sensor.marao_dashboard_test_climate_fan
+        name: Climate · Fan
+        tap_action: { action: none }
+
+      - type: custom:marao-card
+        template: hc_climate_card
+        entity: sensor.marao_dashboard_test_climate_off
+        name: Climate · Off
+        tap_action: { action: none }
+
+      - type: custom:marao-card
+        template: hc_number_card
+        entity: input_number.marao_dashboard_test_temperature
+        name: Current temperature control
+
+      - type: custom:marao-card
         template: hc_media_card
         entity: input_select.marao_dashboard_test_media
         name: Apple TV
@@ -102,41 +163,55 @@ cards:
           apple_tv: true
           popup_hash: "#marao-dashboard-test-apple-tv-popup"
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_security_card
         entity: alarm_control_panel.marao_dashboard_test_alarm
         variables:
           hc_security_code: "1234"
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_sensor_card
         entity: sensor.marao_dashboard_test_temperature
         name: Sensor
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_battery_card
         entity: sensor.marao_dashboard_test_battery
         name: Battery
 
-      - type: custom:button-card
-        template: hc_graph_card
-        entity: sensor.marao_dashboard_test_temperature
-        name: Graph
+      - type: vertical-stack
+        cards:
+          - type: custom:marao-card
+            template: hc_graph_card
+            entity: sensor.marao_dashboard_test_graph_history
+            name: Graph
+          - type: history-graph
+            entities:
+              - sensor.marao_dashboard_test_graph_history
+            hours_to_show: 1
+            show_names: false
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_timeline_card
         entity: lock.marao_dashboard_test_lock
         variables:
           timeline_name: Lock state - last 24 hours
 
-      - type: custom:button-card
-        template: hc_toggle_graph_card
-        entity: sensor.marao_dashboard_test_power
-        name: Toggle graph
-        variables:
-          toggle_entity: switch.marao_dashboard_test_switch
+      - type: vertical-stack
+        cards:
+          - type: custom:marao-card
+            template: hc_toggle_graph_card
+            entity: sensor.marao_dashboard_test_graph_history
+            name: Toggle graph
+            variables:
+              toggle_entity: switch.marao_dashboard_test_switch
+          - type: history-graph
+            entities:
+              - sensor.marao_dashboard_test_graph_history
+            hours_to_show: 1
+            show_names: false
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_scene_card
         entity: input_select.marao_dashboard_test_scene
         variables:
@@ -151,17 +226,17 @@ cards:
           icon_5: mdi:power
           name_5: Off
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_number_card
         entity: input_number.marao_dashboard_test_number
         name: Number
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_vacuum_card
         entity: vacuum.marao_dashboard_test_vacuum
         name: Vacuum
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_dishwasher_card
         entity: input_select.marao_dashboard_test_dishwasher_state
         variables:
@@ -171,11 +246,11 @@ cards:
           remaining_time_entity: sensor.marao_dashboard_test_dishwasher_remaining
           active_program_entity: input_select.marao_dashboard_test_dishwasher_program
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_washing_machine_card
         entity: binary_sensor.marao_dashboard_test_washing_machine
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_navigation_card
         entity: switch.marao_dashboard_test_switch
         name: Bubble popup
@@ -184,7 +259,7 @@ cards:
           action: navigate
           navigation_path: "#marao-dashboard-card-test-popup"
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_room_card
         entity: light.marao_dashboard_test_light
         name: Room card
@@ -195,21 +270,21 @@ cards:
           lights_target_entity: light.marao_dashboard_test_light
           room_navigation_path: /marao-dashboard/rooms
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_blinds_popup_card
         variables:
           popup_hash: "#marao-dashboard-test-blinds-popup"
           entities:
             - cover.marao_dashboard_test_cover
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_lights_popup_card
         variables:
           popup_hash: "#marao-dashboard-test-lights-popup"
           entities:
             - light.marao_dashboard_test_light
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_climate_popup_card
         variables:
           popup_hash: "#marao-dashboard-test-climate-popup"
@@ -217,124 +292,99 @@ cards:
             - climate.marao_dashboard_test_climate
             - climate.marao_dashboard_test_single_mode_climate
 
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_maintenance_popup_card
         variables:
           popup_hash: "#marao-dashboard-test-maintenance-popup"
           entities:
             - sensor.marao_dashboard_test_battery
 
-  - type: custom:bubble-card
-    card_type: pop-up
+  - type: custom:marao-popup-card
     hash: "#climate-mode-test"
-    button_type: state
     entity: climate.marao_dashboard_test_climate
     name: Climate Mode
     icon: mdi:thermostat
-    close_by_clicking_outside: true
-    styles: &popup_scroll_lock |
-      .bubble-pop-up,
-      .bubble-pop-up-container {
-        overscroll-behavior: contain !important;
-        touch-action: pan-y !important;
-      }
-      .bubble-pop-up-container {
-        height: 100% !important;
-        align-items: stretch !important;
-        align-content: start !important;
-        justify-content: flex-start !important;
-      }
-      .bubble-pop-up {
-        position: fixed !important;
-        inset: auto 0 0 0 !important;
-        height: min(780px, 80vh) !important;
-        max-height: 80vh !important;
-        margin: 0 !important;
-        overflow-y: auto !important;
-      }
-      .bubble-pop-up-container > .bubble-cards-container,
-      .bubble-pop-up-container > ha-sortable {
-        align-self: stretch !important;
-        margin-top: 16px !important;
-      }
+    height: auto
+    max_height: 80dvh
     cards:
-      - type: custom:button-card
+      - type: custom:marao-card
         template: hc_climate_card
         entity: climate.marao_dashboard_test_climate
-        name: Climate mode
+        name: Climate
         variables:
           show_mode_buttons: true
 
-  - type: custom:bubble-card
-    card_type: pop-up
+  - type: custom:marao-popup-card
+    hash: "#multi-mode-climate-test"
+    entity: climate.marao_dashboard_test_multi_mode_climate
+    name: Multi Mode Climate
+    icon: mdi:thermostat
+    height: auto
+    max_height: 80dvh
+    cards:
+      - type: custom:marao-card
+        template: hc_climate_card
+        entity: climate.marao_dashboard_test_multi_mode_climate
+        name: Multi Mode Climate
+        variables:
+          show_mode_buttons: true
+
+  - type: custom:marao-popup-card
     hash: "#marao-dashboard-card-test-popup"
-    button_type: state
     entity: switch.marao_dashboard_test_switch
-    name: Bubble Card
+    name: Marao Popup
     icon: mdi:card-account-details-outline
-    close_by_clicking_outside: true
-    styles: *popup_scroll_lock
+    height: auto
+    max_height: 80dvh
     cards:
       - type: grid
         columns: 1
         square: false
         cards:
-          - type: custom:button-card
+          - type: custom:marao-card
             template: hc_sensor_card
             entity: sensor.marao_dashboard_test_temperature
             name: Popup sensor
 
-  - type: custom:bubble-card
-    card_type: pop-up
+  - type: custom:marao-popup-card
     hash: "#marao-dashboard-test-blinds-popup"
-    button_type: name
     name: Blinds
     icon: mdi:blinds
-    close_by_clicking_outside: true
-    styles: *popup_scroll_lock
     cards:
       - type: grid
         columns: 1
         square: false
         cards:
-          - type: custom:button-card
+          - type: custom:marao-card
             template: hc_cover_card
             entity: cover.marao_dashboard_test_cover
             name: Marao Dashboard Test Cover
 
-  - type: custom:bubble-card
-    card_type: pop-up
+  - type: custom:marao-popup-card
     hash: "#marao-dashboard-test-lights-popup"
-    button_type: name
     name: Lights
     icon: mdi:lightbulb
-    close_by_clicking_outside: true
-    styles: *popup_scroll_lock
     cards:
       - type: grid
         columns: 1
         square: false
         cards:
-          - type: custom:button-card
+          - type: custom:marao-card
             template: hc_light_card
             entity: light.marao_dashboard_test_light
             name: Marao Dashboard Test Light
 
-  - type: custom:bubble-card
-    card_type: pop-up
+  - type: custom:marao-popup-card
     hash: "#marao-dashboard-test-lock-popup"
-    button_type: state
     entity: lock.marao_dashboard_test_lock
     name: Lock
     icon: mdi:lock
-    close_by_clicking_outside: true
-    styles: *popup_scroll_lock
     cards:
       - type: grid
         columns: 1
         square: false
         cards:
-          - type: custom:button-card
+          - type: custom:marao-card
             template: hc_access_slide_action_card
             entity: lock.marao_dashboard_test_lock
             name: Unlock
@@ -344,7 +394,7 @@ cards:
               action_requires_hold: false
               action_label_key: common.unlock
               action_color: var(--color-red)
-          - type: custom:button-card
+          - type: custom:marao-card
             template: hc_access_action_card
             entity: lock.marao_dashboard_test_lock
             name: Lock
@@ -355,21 +405,17 @@ cards:
               action_label_key: common.lock
               action_color: var(--color-green)
 
-  - type: custom:bubble-card
-    card_type: pop-up
+  - type: custom:marao-popup-card
     hash: "#marao-dashboard-test-garage-door-popup"
-    button_type: state
     entity: cover.marao_dashboard_test_garage_door
     name: Garage Door
     icon: mdi:garage
-    close_by_clicking_outside: true
-    styles: *popup_scroll_lock
     cards:
       - type: grid
         columns: 1
         square: false
         cards:
-          - type: custom:button-card
+          - type: custom:marao-card
             template: hc_access_slide_action_card
             entity: cover.marao_dashboard_test_garage_door
             name: Open
@@ -379,7 +425,7 @@ cards:
               action_requires_hold: false
               action_label_key: common.open
               action_color: var(--color-red)
-          - type: custom:button-card
+          - type: custom:marao-card
             template: hc_access_action_card
             entity: cover.marao_dashboard_test_garage_door
             name: Close
@@ -390,70 +436,58 @@ cards:
               action_label_key: common.close
               action_color: var(--color-green)
 
-  - type: custom:bubble-card
-    card_type: pop-up
+  - type: custom:marao-popup-card
     hash: "#marao-dashboard-test-climate-popup"
-    button_type: name
     name: Climate
     icon: mdi:thermostat
-    close_by_clicking_outside: true
-    styles: *popup_scroll_lock
     cards:
       - type: vertical-stack
         cards:
-          - type: custom:button-card
+          - type: custom:marao-card
             template: hc_climate_card
             entity: climate.marao_dashboard_test_climate
             name: Marao Dashboard Test Climate
             variables:
               show_mode_buttons: true
-          - type: custom:button-card
+          - type: custom:marao-card
             template: hc_climate_card
             entity: climate.marao_dashboard_test_single_mode_climate
             name: Marao Dashboard Test Single Mode Climate
             variables:
               show_mode_buttons: true
 
-  - type: custom:bubble-card
-    card_type: pop-up
+  - type: custom:marao-popup-card
     hash: "#marao-dashboard-test-maintenance-popup"
-    button_type: name
     name: Maintenance
     icon: mdi:wrench
-    close_by_clicking_outside: true
-    styles: *popup_scroll_lock
     cards:
       - type: grid
         columns: 1
         square: false
         cards:
-          - type: custom:button-card
+          - type: custom:marao-card
             template: hc_battery_card
             entity: sensor.marao_dashboard_test_battery
             name: Marao Dashboard Test Battery
 
-  - type: custom:bubble-card
-    card_type: pop-up
+  - type: custom:marao-popup-card
     hash: "#marao-dashboard-test-apple-tv-popup"
-    button_type: state
     entity: input_select.marao_dashboard_test_media
     name: Apple TV
     icon: mdi:remote-tv
-    close_by_clicking_outside: true
-    styles: *popup_scroll_lock
     cards:
       - type: grid
         columns: 2
         square: false
         cards:
-          - type: custom:button-card
+          - type: custom:marao-card
             template: hc_media_app_card
             entity: input_select.marao_dashboard_test_media
             name: YouTube
             icon: mdi:youtube
             variables:
               app_source: YouTube
-          - type: custom:button-card
+          - type: custom:marao-card
             template: hc_media_app_card
             entity: input_select.marao_dashboard_test_media
             name: Plex
@@ -464,31 +498,12 @@ cards:
         columns: 3
         square: false
         cards:
-          - &apple_tv_action
-            type: custom:button-card
+          -
+            type: custom:marao-card
             entity: input_select.marao_dashboard_test_media
             show_name: false
             show_state: false
             show_label: false
-            styles: &apple_tv_action_styles
-              grid:
-                - grid-template-areas: '"i"'
-              card:
-                - height: 90px
-                - padding: 14px 10px
-                - border-radius: 28px
-                - background: var(--ha-card-background)
-                - box-shadow: var(--ha-card-box-shadow)
-              icon:
-                - width: 34px
-                - color: var(--primary-text-color)
-              img_cell:
-                - width: 52px
-                - height: 52px
-                - border-radius: 50%
-                - background: var(--opacity-contrast-100)
-                - justify-self: center
-                - align-self: center
             icon: mdi:arrow-u-left-top
             tap_action:
               action: perform-action
@@ -497,30 +512,12 @@ cards:
                 entity_id: remote.marao_dashboard_test_apple_tv
               data:
                 command: menu
-          - &apple_tv_dpad
-            type: custom:button-card
+          -
+            type: custom:marao-card
             entity: input_select.marao_dashboard_test_media
             show_name: false
             show_state: false
             show_label: false
-            styles: &apple_tv_dpad_styles
-              grid:
-                - grid-template-areas: '"i"'
-              card:
-                - height: 88px
-                - padding: 0
-                - border-radius: 30px
-                - background: var(--ha-card-background)
-                - box-shadow: var(--ha-card-box-shadow)
-              icon:
-                - width: 42px
-                - color: var(--primary-text-color)
-              img_cell:
-                - width: 100%
-                - height: 100%
-                - background: none
-                - justify-self: center
-                - align-self: center
             icon: mdi:chevron-up
             tap_action:
               action: perform-action
@@ -529,7 +526,11 @@ cards:
                 entity_id: remote.marao_dashboard_test_apple_tv
               data:
                 command: up
-          - <<: *apple_tv_action
+          - type: custom:marao-card
+            entity: input_select.marao_dashboard_test_media
+            show_name: false
+            show_state: false
+            show_label: false
             icon: mdi:home-outline
             tap_action:
               action: perform-action
@@ -542,7 +543,11 @@ cards:
         columns: 3
         square: false
         cards:
-          - <<: *apple_tv_dpad
+          - type: custom:marao-card
+            entity: input_select.marao_dashboard_test_media
+            show_name: false
+            show_state: false
+            show_label: false
             icon: mdi:chevron-left
             tap_action:
               action: perform-action
@@ -551,7 +556,11 @@ cards:
                 entity_id: remote.marao_dashboard_test_apple_tv
               data:
                 command: left
-          - <<: *apple_tv_dpad
+          - type: custom:marao-card
+            entity: input_select.marao_dashboard_test_media
+            show_name: false
+            show_state: false
+            show_label: false
             icon: mdi:checkbox-blank-circle
             styles:
               grid:
@@ -578,7 +587,11 @@ cards:
                 entity_id: remote.marao_dashboard_test_apple_tv
               data:
                 command: select
-          - <<: *apple_tv_dpad
+          - type: custom:marao-card
+            entity: input_select.marao_dashboard_test_media
+            show_name: false
+            show_state: false
+            show_label: false
             icon: mdi:chevron-right
             tap_action:
               action: perform-action
@@ -591,7 +604,11 @@ cards:
         columns: 3
         square: false
         cards:
-          - <<: *apple_tv_action
+          - type: custom:marao-card
+            entity: input_select.marao_dashboard_test_media
+            show_name: false
+            show_state: false
+            show_label: false
             icon: mdi:rewind-10
             tap_action:
               action: perform-action
@@ -600,7 +617,11 @@ cards:
                 entity_id: input_select.marao_dashboard_test_media
               data:
                 seek_position: 0
-          - <<: *apple_tv_dpad
+          - type: custom:marao-card
+            entity: input_select.marao_dashboard_test_media
+            show_name: false
+            show_state: false
+            show_label: false
             icon: mdi:chevron-down
             tap_action:
               action: perform-action
@@ -609,7 +630,11 @@ cards:
                 entity_id: remote.marao_dashboard_test_apple_tv
               data:
                 command: down
-          - <<: *apple_tv_action
+          - type: custom:marao-card
+            entity: input_select.marao_dashboard_test_media
+            show_name: false
+            show_state: false
+            show_label: false
             icon: mdi:fast-forward-30
             tap_action:
               action: perform-action
@@ -622,14 +647,22 @@ cards:
         columns: 3
         square: false
         cards:
-          - <<: *apple_tv_action
+          - type: custom:marao-card
+            entity: input_select.marao_dashboard_test_media
+            show_name: false
+            show_state: false
+            show_label: false
             icon: mdi:volume-minus
             tap_action:
               action: perform-action
               perform_action: media_player.volume_down
               target:
                 entity_id: input_select.marao_dashboard_test_media
-          - <<: *apple_tv_action
+          - type: custom:marao-card
+            entity: input_select.marao_dashboard_test_media
+            show_name: false
+            show_state: false
+            show_label: false
             icon: mdi:play
             styles:
               grid:
@@ -655,7 +688,11 @@ cards:
               perform_action: media_player.media_play_pause
               target:
                 entity_id: input_select.marao_dashboard_test_media
-          - <<: *apple_tv_action
+          - type: custom:marao-card
+            entity: input_select.marao_dashboard_test_media
+            show_name: false
+            show_state: false
+            show_label: false
             icon: mdi:volume-plus
             tap_action:
               action: perform-action
@@ -665,13 +702,13 @@ cards:
 
   - type: vertical-stack
     cards:
-      - type: custom:button-card
+      - type: custom:marao-card
         color_type: blank-card
         styles:
           card:
             - height: 128px
 
-      - type: custom:navbar-card
+      - type: custom:marao-navbar-card
         mobile:
           mode: floating
           show_labels: false

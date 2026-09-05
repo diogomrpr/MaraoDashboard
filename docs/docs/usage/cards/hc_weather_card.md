@@ -59,7 +59,7 @@ Now, you should have a new sensor called `sensor.weather_entity_forecast` which 
 ### View code
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_weather_card
     entity: sensor.weather_entity_forecast
     variables:

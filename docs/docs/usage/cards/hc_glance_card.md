@@ -18,7 +18,7 @@ You can add minimun 1 and maximum 3 entities. The card will automatically adjust
 
 
 ```yaml
-  - type: custom:button-card
+  - type: custom:marao-card
     template: hc_glance_card
     variables:
         entity1: <Your sensor>
