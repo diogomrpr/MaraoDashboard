@@ -18,6 +18,7 @@ from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.marao_dashboard import (
+    _generated_dashboard_needs_self_contained_repair,
     _management_payload,
     _editor_areas,
     _registry_entities,
@@ -34,7 +35,7 @@ from custom_components.marao_dashboard.const import (
 )
 from custom_components.marao_dashboard.legacy_migration import (
     LEGACY_RESOURCES_ISSUE_ID,
-    async_migrate_legacy_vendor_resources,
+    async_migrate_legacy_resources,
 )
 from custom_components.marao_dashboard.editor import EDITOR_CATALOG
 
@@ -56,6 +57,21 @@ def _reset_dashboard_files(hass) -> None:
     """Keep the shared Home Assistant test config isolated between test runs."""
 
     shutil.rmtree(hass.config.path("dashboard/MaraoDashboard"), ignore_errors=True)
+
+
+def test_generated_dashboard_repairs_legacy_blank_spacer(tmp_path: Path) -> None:
+    dashboard_dir = tmp_path / "dashboard"
+    dashboard_dir.mkdir()
+    dashboard = dashboard_dir / "dashboard.yaml"
+
+    dashboard.write_text("color_type: blank-card\n", encoding="utf-8")
+    assert _generated_dashboard_needs_self_contained_repair(dashboard_dir)
+
+    dashboard.write_text(
+        "type: custom:marao-navbar-card\nroutes: []\n",
+        encoding="utf-8",
+    )
+    assert not _generated_dashboard_needs_self_contained_repair(dashboard_dir)
 
 
 async def test_setup_entry_installs_base_dashboard_once(hass) -> None:
@@ -295,7 +311,7 @@ async def test_remove_entry_clears_repairs_but_unload_preserves_them(hass) -> No
     )
     hass.data[LOVELACE_DATA].resource_mode = MODE_YAML
     source = config_path.read_text(encoding="utf-8")
-    assert await async_migrate_legacy_vendor_resources(hass) == 0
+    assert await async_migrate_legacy_resources(hass) == 0
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     issue_registry = ir.async_get(hass)
@@ -305,7 +321,7 @@ async def test_remove_entry_clears_repairs_but_unload_preserves_them(hass) -> No
     assert issue_registry.async_get_issue(DOMAIN, LEGACY_RESOURCES_ISSUE_ID) is None
 
 
-async def test_storage_mode_migrates_only_legacy_vendor_resources(hass) -> None:
+async def test_storage_mode_migrates_only_legacy_marao_resources(hass) -> None:
     _reset_dashboard_files(hass)
     Path(hass.config.path("configuration.yaml")).write_text("default_config:\n", encoding="utf-8")
     entry = MockConfigEntry(
@@ -324,9 +340,33 @@ async def test_storage_mode_migrates_only_legacy_vendor_resources(hass) -> None:
             CONF_RESOURCE_TYPE_WS: "module",
         }
     )
+    await resources.async_create_item(
+        {
+            CONF_URL: "/hacsfiles/MaraoDashboard/MaraoFrigateEventsCard.js?v=old",
+            CONF_RESOURCE_TYPE_WS: "module",
+        }
+    )
+    await resources.async_create_item(
+        {
+            CONF_URL: "/hacsfiles/MaraoDashboard/MaraoDashboard.js?v=old",
+            CONF_RESOURCE_TYPE_WS: "module",
+        }
+    )
     standalone = await resources.async_create_item(
         {
             CONF_URL: "/hacsfiles/button-card/button-card.js?hacstag=7",
+            CONF_RESOURCE_TYPE_WS: "module",
+        }
+    )
+    external_lookalike = await resources.async_create_item(
+        {
+            CONF_URL: "https://example.com/hacsfiles/MaraoDashboard/MaraoDashboard.js",
+            CONF_RESOURCE_TYPE_WS: "module",
+        }
+    )
+    local_near_miss = await resources.async_create_item(
+        {
+            CONF_URL: "/hacsfiles/MaraoDashboard/MaraoDashboard.js.backup",
             CONF_RESOURCE_TYPE_WS: "module",
         }
     )
@@ -338,7 +378,15 @@ async def test_storage_mode_migrates_only_legacy_vendor_resources(hass) -> None:
 
     items = {item["id"]: item for item in resources.async_items()}
     assert standalone["id"] in items
+    assert external_lookalike["id"] in items
+    assert local_near_miss["id"] in items
     assert not any("/MaraoDashboard/vendor/" in item[CONF_URL] for item in items.values())
+    assert not any("/MaraoDashboard/MaraoFrigateEventsCard.js" in item[CONF_URL] for item in items.values())
+    assert not any(
+        item[CONF_URL].split("?", 1)[0]
+        == "/hacsfiles/MaraoDashboard/MaraoDashboard.js"
+        for item in items.values()
+    )
     assert ir.async_get(hass).async_get_issue(DOMAIN, LEGACY_RESOURCES_ISSUE_ID) is None
 
 
@@ -363,6 +411,18 @@ async def test_yaml_resource_mode_reports_legacy_resources_without_mutation(hass
             CONF_RESOURCE_TYPE_WS: "module",
         }
     )
+    legacy_frontend = await resources.async_create_item(
+        {
+            CONF_URL: "/hacsfiles/MaraoDashboard/MaraoFrigateEventsCard.js?hacstag=old",
+            CONF_RESOURCE_TYPE_WS: "module",
+        }
+    )
+    legacy_main = await resources.async_create_item(
+        {
+            CONF_URL: "/hacsfiles/MaraoDashboard/MaraoDashboard.js?hacstag=old",
+            CONF_RESOURCE_TYPE_WS: "module",
+        }
+    )
     standalone = await resources.async_create_item(
         {
             CONF_URL: "/hacsfiles/button-card/button-card.js",
@@ -371,10 +431,12 @@ async def test_yaml_resource_mode_reports_legacy_resources_without_mutation(hass
     )
     hass.data[LOVELACE_DATA].resource_mode = MODE_YAML
     source = config_path.read_text(encoding="utf-8")
-    assert await async_migrate_legacy_vendor_resources(hass) == 0
+    assert await async_migrate_legacy_resources(hass) == 0
 
     items = {item["id"]: item for item in resources.async_items()}
     assert legacy["id"] in items
+    assert legacy_frontend["id"] in items
+    assert legacy_main["id"] in items
     assert standalone["id"] in items
     assert config_path.read_text(encoding="utf-8") == source
     assert ir.async_get(hass).async_get_issue(DOMAIN, LEGACY_RESOURCES_ISSUE_ID) is not None
@@ -553,8 +615,9 @@ def test_editor_catalog_maps_to_installed_templates() -> None:
         "hc_switch_card",
         "hc_timeline_card",
         "hc_toggle_graph_card",
-        "hc_vacuum_card",
-        "hc_washing_machine_card",
+            "hc_vacuum_card",
+            "hc_wallbox_current_card",
+            "hc_washing_machine_card",
     }
     assert Path("custom_components/marao_dashboard/frontend/MaraoCards.js").exists()
     for card in EDITOR_CATALOG["cards"]:

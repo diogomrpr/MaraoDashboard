@@ -45,7 +45,7 @@ the dashboard generator:
 }
 ```
 
-App shortcuts appear first. The remote below follows the Apple TV layout: back,
+App shortcuts appear first in a two-column grid. The remote below follows the Apple TV layout: back,
 up, home; left, select, right; rewind, down, fast-forward; then volume,
 play/pause, volume. Without `volume_remote_entity`, the normal media-player
 volume services are used.

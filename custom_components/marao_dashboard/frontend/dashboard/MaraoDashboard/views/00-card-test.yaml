@@ -22,11 +22,39 @@ cards:
           entity3: input_boolean.marao_dashboard_test_three
           entity3_name: Three
 
+      - type: grid
+        columns: 1
+        square: false
+        cards:
+          - type: custom:marao-card
+            template: hc_navigation_card
+            name: Rooms page
+            icon: mdi:sofa-outline
+            show_state: false
+            tap_action:
+              action: navigate
+              navigation_path: /marao-dashboard/rooms
+          - type: custom:marao-card
+            template: hc_navigation_card
+            name: Media page
+            icon: mdi:television-play-outline
+            show_state: false
+            tap_action:
+              action: navigate
+              navigation_path: /marao-dashboard/media
+
       - type: custom:marao-card
         template: hc_weather_card
         entity: sensor.marao_dashboard_test_weather
         variables:
           show_forecast: false
+
+      - type: custom:marao-card
+        template: hc_camera_card
+        entity: camera.marao_dashboard_test_camera
+        name: Camera + events
+        variables:
+          popup_hash: "#marao-dashboard-test-camera-popup"
 
       - type: custom:marao-card
         template: hc_glance_card
@@ -42,9 +70,21 @@ cards:
           entity3_icon: mdi:flash
 
       - type: custom:marao-card
+        template: hc_base_card
+        entity: sensor.marao_dashboard_test_temperature
+        name: Base card
+
+      - type: custom:marao-card
         template: hc_light_card
         entity: light.marao_dashboard_test_light
         name: Light + slider
+
+      - type: custom:marao-card
+        template: hc_light_card
+        entity: light.marao_dashboard_test_light
+        name: Light without slider
+        variables:
+          enable_slider: false
 
       - type: custom:marao-card
         template: hc_cover_card
@@ -65,6 +105,16 @@ cards:
         variables:
           popup_hash: "#marao-dashboard-test-garage-door-popup"
 
+      - type: custom:marao-card
+        template: hc_access_action_card
+        entity: cover.marao_dashboard_test_open_only_door
+        name: Open-only door
+        icon: mdi:door-open
+        variables:
+          action_service: cover.open_cover
+          action_label_key: common.open
+          action_color: var(--color-red)
+
       - type: vertical-stack
         cards:
           - type: custom:marao-card
@@ -80,12 +130,43 @@ cards:
             hours_to_show: 1
             show_names: false
 
+      - type: custom:marao-energy-period-card
+        entity: sensor.marao_dashboard_test_month_energy
+        name: Month Power
+        period: month
+        popup_hash: "#marao-dashboard-test-energy-month-popup"
+
+      - type: custom:marao-energy-period-card
+        entity: sensor.marao_dashboard_test_today_energy
+        name: Today Power
+        period: day
+        popup_hash: "#marao-dashboard-test-energy-today-popup"
+
+      - type: custom:marao-energy-period-card
+        entity: sensor.marao_dashboard_test_month_cost
+        name: Month Cost
+        period: month
+        popup_hash: "#marao-dashboard-test-energy-month-cost-popup"
+
+      - type: custom:marao-energy-period-card
+        entity: sensor.marao_dashboard_test_today_cost
+        name: Today Cost
+        period: day
+        popup_hash: "#marao-dashboard-test-energy-today-cost-popup"
+
       - type: custom:marao-card
         template: hc_fan_card
         entity: fan.marao_dashboard_test_fan
         name: Fan + slider
         variables:
           enable_slider: true
+
+      - type: custom:marao-card
+        template: hc_fan_card
+        entity: fan.marao_dashboard_test_fan
+        name: Fan without slider
+        variables:
+          enable_slider: false
 
       - type: custom:marao-card
         template: hc_climate_card
@@ -151,11 +232,6 @@ cards:
         tap_action: { action: none }
 
       - type: custom:marao-card
-        template: hc_number_card
-        entity: input_number.marao_dashboard_test_temperature
-        name: Current temperature control
-
-      - type: custom:marao-card
         template: hc_media_card
         entity: input_select.marao_dashboard_test_media
         name: Apple TV
@@ -168,6 +244,16 @@ cards:
         entity: alarm_control_panel.marao_dashboard_test_alarm
         variables:
           hc_security_code: "1234"
+
+      - type: custom:marao-card
+        template: hc_access_hold_action_card
+        entity: alarm_control_panel.marao_dashboard_test_alarm
+        name: Arm away · hold
+        icon: mdi:shield-lock
+        variables:
+          action_service: alarm_control_panel.alarm_arm_away
+          action_label_key: security.arm_away
+          action_color: var(--color-red)
 
       - type: custom:marao-card
         template: hc_sensor_card
@@ -232,6 +318,18 @@ cards:
         name: Number
 
       - type: custom:marao-card
+        template: hc_wallbox_current_card
+        entity: input_number.marao_dashboard_test_wallbox_current
+        name: Wallbox charging current
+        variables:
+          shortcuts: [6, 12, 16]
+
+      - type: custom:marao-card
+        template: hc_wallbox_current_card
+        entity: input_number.marao_dashboard_test_wallbox_current
+        name: Wallbox current without shortcuts
+
+      - type: custom:marao-card
         template: hc_vacuum_card
         entity: vacuum.marao_dashboard_test_vacuum
         name: Vacuum
@@ -272,6 +370,9 @@ cards:
 
       - type: custom:marao-card
         template: hc_blinds_popup_card
+        entity: cover.marao_dashboard_test_cover
+        name: Blinds popup
+        icon: mdi:blinds
         variables:
           popup_hash: "#marao-dashboard-test-blinds-popup"
           entities:
@@ -279,6 +380,9 @@ cards:
 
       - type: custom:marao-card
         template: hc_lights_popup_card
+        entity: light.marao_dashboard_test_light
+        name: Lights popup
+        icon: mdi:lightbulb-group
         variables:
           popup_hash: "#marao-dashboard-test-lights-popup"
           entities:
@@ -286,6 +390,9 @@ cards:
 
       - type: custom:marao-card
         template: hc_climate_popup_card
+        entity: climate.marao_dashboard_test_climate
+        name: Climate popup
+        icon: mdi:thermostat
         variables:
           popup_hash: "#marao-dashboard-test-climate-popup"
           entities:
@@ -294,6 +401,9 @@ cards:
 
       - type: custom:marao-card
         template: hc_maintenance_popup_card
+        entity: sensor.marao_dashboard_test_battery
+        name: Maintenance popup
+        icon: mdi:wrench
         variables:
           popup_hash: "#marao-dashboard-test-maintenance-popup"
           entities:
@@ -313,6 +423,19 @@ cards:
         name: Climate
         variables:
           show_mode_buttons: true
+
+  - type: custom:marao-popup-card
+    hash: "#marao-dashboard-test-camera-popup"
+    entity: camera.marao_dashboard_test_camera
+    name: Camera events
+    icon: mdi:cctv
+    height: auto
+    max_height: 80dvh
+    cards:
+      - type: custom:marao-camera-events-card
+        entity: camera.marao_dashboard_test_camera
+        title: Camera events
+        event_provider: marao_test
 
   - type: custom:marao-popup-card
     hash: "#multi-mode-climate-test"
@@ -471,6 +594,58 @@ cards:
             name: Marao Dashboard Test Battery
 
   - type: custom:marao-popup-card
+    hash: "#marao-dashboard-test-energy-month-popup"
+    name: Month Power
+    icon: mdi:flash
+    height: auto
+    max_height: 80dvh
+    cards:
+      - type: custom:marao-energy-period-card
+        entity: sensor.marao_dashboard_test_month_energy
+        name: Month Power
+        period: month
+        popup: true
+
+  - type: custom:marao-popup-card
+    hash: "#marao-dashboard-test-energy-today-popup"
+    name: Today Power
+    icon: mdi:flash-outline
+    height: auto
+    max_height: 80dvh
+    cards:
+      - type: custom:marao-energy-period-card
+        entity: sensor.marao_dashboard_test_today_energy
+        name: Today Power
+        period: day
+        popup: true
+
+  - type: custom:marao-popup-card
+    hash: "#marao-dashboard-test-energy-month-cost-popup"
+    name: Month Cost
+    icon: mdi:currency-eur
+    height: auto
+    max_height: 80dvh
+    cards:
+      - type: custom:marao-energy-period-card
+        entity: sensor.marao_dashboard_test_month_cost
+        name: Month Cost
+        period: month
+        popup: true
+
+  - type: custom:marao-popup-card
+    hash: "#marao-dashboard-test-energy-today-cost-popup"
+    name: Today Cost
+    icon: mdi:cash-clock
+    height: auto
+    max_height: 80dvh
+    cards:
+      - type: custom:marao-energy-period-card
+        entity: sensor.marao_dashboard_test_today_cost
+        name: Today Cost
+        period: day
+        popup: true
+
+  - type: custom:marao-popup-card
     hash: "#marao-dashboard-test-apple-tv-popup"
     entity: input_select.marao_dashboard_test_media
     name: Apple TV
@@ -485,6 +660,7 @@ cards:
             entity: input_select.marao_dashboard_test_media
             name: YouTube
             icon: mdi:youtube
+            show_state: false
             variables:
               app_source: YouTube
           - type: custom:marao-card
@@ -492,6 +668,7 @@ cards:
             entity: input_select.marao_dashboard_test_media
             name: Plex
             icon: mdi:plex
+            show_state: false
             variables:
               app_source: Plex
       - type: grid
@@ -702,12 +879,6 @@ cards:
 
   - type: vertical-stack
     cards:
-      - type: custom:marao-card
-        color_type: blank-card
-        styles:
-          card:
-            - height: 128px
-
       - type: custom:marao-navbar-card
         mobile:
           mode: floating
@@ -726,3 +897,15 @@ cards:
             icon_selected: mdi:test-tube
             label: Cards
             url: /marao-dashboard-card-test/card-test
+          - icon: mdi:shield-home-outline
+            icon_selected: mdi:shield-home
+            label: Security
+            url: /marao-dashboard/security
+          - icon: mdi:lightning-bolt-outline
+            icon_selected: mdi:lightning-bolt
+            label: Energy
+            url: /marao-dashboard/energy
+          - icon: mdi:ev-plug-type2
+            icon_selected: mdi:ev-plug-type2
+            label: Wallbox
+            url: /marao-dashboard/wallbox

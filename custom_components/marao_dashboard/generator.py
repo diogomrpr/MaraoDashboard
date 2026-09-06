@@ -794,6 +794,7 @@ def build_base_dashboard_config(registry_entities: Iterable[dict[str, Any]]) -> 
             "name": entity.get("name") or _friendly_name(entity_id),
             "icon": entity.get("icon"),
             "device_class": entity.get("device_class"),
+            "supported_features": entity.get("supported_features"),
         }
         if area_id and area_name:
             key = str(area_id)
@@ -881,6 +882,7 @@ def _add_entity(target: dict[str, dict[str, Any]], entity: dict[str, Any]) -> No
         "name": entity.get("name") or _friendly_name(entity_id),
         "icon": entity.get("icon"),
         "device_class": entity.get("device_class"),
+        "supported_features": entity.get("supported_features"),
         "device_model": entity.get("device_model"),
         "manufacturer": entity.get("manufacturer"),
     }
@@ -1063,7 +1065,6 @@ def _navigation_bar(config: dict[str, Any], dashboard_key: str, language: str = 
     return {
         "type": "vertical-stack",
         "cards": [
-            _action_bar_spacer(),
             {
                 "type": "custom:marao-navbar-card",
                 "routes": routes,
@@ -1239,7 +1240,11 @@ def _security_view(config: dict[str, Any], include_root: str, language: str = "e
         )
 
     cards.extend(_page_action_card(entity) for entity in _entities_from_values(page.get("actions")))
-    cards.extend(_access_popup(entity, language) for entity in access_entities if _is_access_entity(entity))
+    cards.extend(
+        _access_popup(entity, language)
+        for entity in access_entities
+        if _is_access_entity(entity) and not _is_open_only_access(entity)
+    )
     cards.append(TaggedScalar("!include", f"{include_root}/components/navigation/navbar.yaml"))
     return {
         "title": _t(language, "nav.security"),
@@ -1284,22 +1289,17 @@ def _energy_view(config: dict[str, Any], include_root: str, language: str = "en"
             )
         )
 
-    for fields, title in (
-        (("month_energy", "month_cost"), "Month"),
-        (("today_energy", "today_cost"), "Today"),
+    period_cards = []
+    for field, title, period, icon, popup in (
+        ("month_energy", "Month Power", "month", "mdi:flash", "#energy-month-power"),
+        ("today_energy", "Today Power", "day", "mdi:flash-outline", "#energy-today-power"),
+        ("month_cost", "Month Cost", "month", "mdi:currency-eur", "#energy-month-cost"),
+        ("today_cost", "Today Cost", "day", "mdi:cash-clock", "#energy-today-cost"),
     ):
-        summary_cards = [
-            _energy_graph_card(
-                entity,
-                f"{title} {'Power' if field.endswith('energy') else 'Cost'}",
-                "mdi:calendar-month-outline" if title == "Month" else "mdi:calendar-today-outline",
-                f"#energy-{'month' if title == 'Month' else 'today'}",
-            )
-            for field in fields
-            if (entity := _page_entity(page, field))
-        ]
-        if summary_cards:
-            cards.append({"type": "grid", "columns": 2, "square": False, "cards": summary_cards})
+        if entity := _page_entity(page, field):
+            period_cards.append(_energy_period_card(entity, title, period, icon, popup))
+    if period_cards:
+        cards.append({"type": "grid", "columns": 2, "square": False, "cards": period_cards})
 
     load_cards = []
     for load in page.get("loads", []):
@@ -1360,6 +1360,21 @@ def _energy_graph_card(
     }
 
 
+def _energy_period_card(
+    entity: dict[str, Any], title: str, period: str, icon: str, popup_hash: str | None,
+    *, popup: bool = False,
+) -> dict[str, Any]:
+    return {
+        "type": "custom:marao-energy-period-card",
+        "entity": entity["entity_id"],
+        "name": title,
+        "period": period,
+        "popup_hash": popup_hash,
+        "popup": popup,
+        "icon": entity.get("icon") or icon,
+    }
+
+
 def _history_graph_card(entity_id: str) -> dict[str, Any]:
     return {
         "type": "history-graph",
@@ -1373,8 +1388,10 @@ def _energy_popups(config: dict[str, Any], language: str = "en") -> dict[str, di
     page = _page_config(config, "energy")
     groups = {
         "energy_house_power": ("#energy-house-power", "House Power", "mdi:flash", ["house_power"]),
-        "energy_month": ("#energy-month", "Month Energy", "mdi:calendar-month-outline", ["month_energy", "month_cost"]),
-        "energy_today": ("#energy-today", "Today Energy", "mdi:calendar-today-outline", ["today_energy", "today_cost"]),
+        "energy_month_power": ("#energy-month-power", "Month Power", "mdi:flash", ["month_energy"]),
+        "energy_today_power": ("#energy-today-power", "Today Power", "mdi:flash-outline", ["today_energy"]),
+        "energy_month_cost": ("#energy-month-cost", "Month Cost", "mdi:currency-eur", ["month_cost"]),
+        "energy_today_cost": ("#energy-today-cost", "Today Cost", "mdi:cash-clock", ["today_cost"]),
     }
     popups: dict[str, dict[str, Any]] = {}
     for name, (popup_hash, title, icon, fields) in groups.items():
@@ -1382,7 +1399,19 @@ def _energy_popups(config: dict[str, Any], language: str = "en") -> dict[str, di
         if entities:
             popups[name] = {
                 **_popup_header(popup_hash, entities[0]["entity_id"], title, icon, "720px"),
-                "cards": [_energy_graph_card(entity, title, icon, None) for entity in entities],
+                "cards": [
+                    _energy_period_card(
+                        entity,
+                        title,
+                        "month" if "month" in name else "day" if "today" in name else "day",
+                        icon,
+                        None,
+                        popup=True,
+                    )
+                    if name != "energy_house_power"
+                    else _energy_graph_card(entity, title, icon, None)
+                    for entity in entities
+                ],
             }
     return popups
 
@@ -1414,41 +1443,17 @@ def _wallbox_view(config: dict[str, Any], include_root: str, language: str = "en
 
     control = _page_entity(page, "current_control_entity")
     if control:
+        presets = page.get("current_presets", [])
+        shortcuts = presets if isinstance(presets, list) and all(isinstance(value, (int, float)) for value in presets) else []
         cards.append(
             {
                 "type": "custom:marao-card",
-                "template": control.get("template") or "hc_number_card",
+                "template": control.get("template") or "hc_wallbox_current_card",
                 "entity": control["entity_id"],
                 "name": control.get("name") or "Charging Current",
+                "variables": {"shortcuts": shortcuts[:3]},
             }
         )
-        presets = page.get("current_presets", [6, 12, 16])
-        if isinstance(presets, list) and all(isinstance(value, (int, float)) for value in presets):
-            service = "input_number.set_value" if control["entity_id"].startswith("input_number.") else "number.set_value"
-            cards.append(
-                {
-                    "type": "grid",
-                    "columns": min(max(len(presets), 1), 3),
-                    "square": False,
-                    "cards": [
-                        {
-                            "type": "custom:marao-card",
-                            "entity": control["entity_id"],
-                            "name": f"{value:g} A",
-                            "show_state": False,
-                            "show_icon": False,
-                            "tap_action": {
-                                "action": "perform-action",
-                                "perform_action": service,
-                                "target": {"entity_id": control["entity_id"]},
-                                "data": {"value": value},
-                                "haptic": "heavy",
-                            },
-                        }
-                        for value in presets
-                    ],
-                }
-            )
 
     if pause_resume := _page_entity(page, "pause_resume_entity"):
         cards.append(
@@ -1484,6 +1489,7 @@ def _media_view(config: dict[str, Any], include_root: str, language: str = "en")
                 "entity": player["entity_id"],
                 "name": app.get("name") or app["source"],
                 "icon": app.get("icon") or "mdi:play-box-outline",
+                "show_state": False,
                 "variables": {"app_source": app["source"]},
             }
             for app in apps
@@ -1663,14 +1669,6 @@ def _page_shortcut_card(shortcut: dict[str, Any], dashboard_key: str) -> dict[st
     return card
 
 
-def _action_bar_spacer() -> dict[str, Any]:
-    return {
-        "type": "custom:marao-card",
-        "color_type": "blank-card",
-        "styles": {"card": [{"height": "128px"}]},
-    }
-
-
 def _title_card(name: str) -> dict[str, Any]:
     return {
         "type": "custom:marao-card",
@@ -1738,6 +1736,16 @@ def _domain_template(entity: dict[str, Any]) -> str:
 
 def _room_entity_card(entity: dict[str, Any]) -> dict[str, Any]:
     if _is_access_entity(entity):
+        if _is_open_only_access(entity):
+            return _access_action_card(
+                entity,
+                name=entity.get("name") or _friendly_name(entity["entity_id"]),
+                icon="mdi:door-open",
+                service="cover.open_cover",
+                label_key="common.open",
+                requires_hold=False,
+                color="var(--color-red)",
+            )
         variables = {
             "popup_hash": _access_popup_hash(entity["entity_id"]),
             **(entity.get("variables") if isinstance(entity.get("variables"), dict) else {}),
@@ -1920,6 +1928,7 @@ def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
                         "entity": entity_id,
                         "name": app.get("name") or app["source"],
                         "icon": app.get("icon") or "mdi:play-box-outline",
+                        "show_state": False,
                         "variables": {"app_source": app["source"]},
                     }
                     for app in apps
@@ -2008,6 +2017,17 @@ def _is_access_entity(entity: dict[str, Any]) -> bool:
     return device_class in {"door", "garage", "gate"} or any(
         token in name for token in ("door", "garage", "gate")
     )
+
+
+def _is_open_only_access(entity: dict[str, Any]) -> bool:
+    """Recognize cover entities that expose open but no close operation."""
+    if entity["entity_id"].split(".", 1)[0] != "cover" or "supported_features" not in entity:
+        return False
+    try:
+        features = int(entity["supported_features"])
+    except (TypeError, ValueError):
+        return False
+    return bool(features & 1) and not bool(features & 2)
 
 
 def _access_action_card(

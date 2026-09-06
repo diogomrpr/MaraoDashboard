@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import shutil
 from typing import Any
 
@@ -44,7 +45,7 @@ from .const import (
 )
 from .legacy_migration import (
     async_clear_legacy_resource_issue,
-    async_migrate_legacy_vendor_resources,
+    async_migrate_legacy_resources,
 )
 from .editor import EDITOR_CATALOG
 from .generator import (
@@ -106,7 +107,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         None,
         [LEGACY_FRONTEND_MODULE],
     )
-    await async_migrate_legacy_vendor_resources(hass)
+    await async_migrate_legacy_resources(hass)
     registry_entities = _registry_entities(hass)
     should_repair = await hass.async_add_executor_job(
         _should_repair_base_dashboard, hass, registry_entities
@@ -528,7 +529,16 @@ def _generated_dashboard_needs_self_contained_repair(dashboard_dir: Path) -> boo
             "custom:navbar-card",
             "button_card_templates:",
             "kiosk_mode:",
+            "color_type: blank-card",
         )):
+            return True
+        # Older generated Energy pages could retain period cards after their
+        # configured entity was cleared.  Regenerate those files on startup so
+        # stale error cards are never left in an otherwise valid dashboard.
+        if "custom:marao-energy-period-card" in source and re.search(
+            r"type:\s*custom:marao-energy-period-card[\s\S]{0,200}entity:\s*(?:['\"]{2}|null)?\s*(?:\n|$)",
+            source,
+        ):
             return True
     return False
 
@@ -693,6 +703,7 @@ def _registry_entities(hass: HomeAssistant) -> list[dict[str, Any]]:
                 "name": entry.name or entry.original_name or (state.name if state else None),
                 "icon": entry.icon or (state.attributes.get("icon") if state else None),
                 "device_class": state.attributes.get("device_class") if state else None,
+                "supported_features": state.attributes.get("supported_features") if state else None,
                 "device_model": device.model if device else None,
                 "manufacturer": device.manufacturer if device else None,
                 "area_id": area_id,
@@ -716,6 +727,7 @@ def _registry_entities(hass: HomeAssistant) -> list[dict[str, Any]]:
                 "name": state.name,
                 "icon": state.attributes.get("icon"),
                 "device_class": state.attributes.get("device_class"),
+                "supported_features": state.attributes.get("supported_features"),
                 "device_model": None,
                 "manufacturer": None,
                 "area_id": None,

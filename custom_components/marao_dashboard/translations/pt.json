@@ -12,8 +12,8 @@
   },
   "issues": {
     "legacy_vendor_resources": {
-      "title": "Remova os recursos antigos de cartões incluídos pelo Marao",
-      "description": "O Marao já não inclui cartões de terceiros. Remova estas entradas antigas dos recursos Lovelace em YAML e reinicie o Home Assistant: {resources}"
+      "title": "Remova os recursos frontend antigos do Marao",
+      "description": "O Marao agora carrega o seu próprio frontend através da integração. Remova estas entradas antigas do Marao ou de cartões incluídos dos recursos Lovelace em YAML e reinicie o Home Assistant: {resources}"
     }
   },
   "services": {

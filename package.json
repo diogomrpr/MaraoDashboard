@@ -1,6 +1,6 @@
 {
   "name": "marao-dashboard",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Marao Dashboard Home Assistant dashboard development tools",
   "scripts": {
@@ -13,7 +13,9 @@
     "test:python": "pytest --cov=custom_components.marao_dashboard --cov-report=term-missing",
     "test": "npm run test:static && npm run test:python",
     "test:ha:e2e": "node scripts/test-ha-dashboard-e2e.js",
+    "test:ha:alignment": "node scripts/test-ha-card-alignment.js",
     "test:ha:accessibility": "node scripts/test-ha-dashboard-accessibility.js",
+    "ha:preview:accessibility": "node scripts/test-ha-dashboard-accessibility.js --preview",
     "verify:publish": "npm test && npm run test:ha:e2e && npm run test:ha:accessibility",
     "preversion": "npm run verify:publish",
     "ha:sync": "npm run build:hacs && node scripts/sync-ha-local.js",

@@ -21,6 +21,8 @@ input_boolean:
     name: Marao Dashboard Test Washing Machine
   marao_dashboard_test_lock:
     name: Marao Dashboard Test Lock
+  marao_dashboard_test_wallbox_pause:
+    name: Marao Dashboard Test Wallbox Pause
 
 input_number:
   marao_dashboard_test_light_brightness:
@@ -81,6 +83,41 @@ input_number:
     max: 100
     step: 1
     mode: slider
+  marao_dashboard_test_wallbox_current:
+    name: Marao Dashboard Test Wallbox Current
+    min: 6
+    max: 32
+    step: 1
+    mode: slider
+    unit_of_measurement: A
+  marao_dashboard_test_month_energy:
+    name: Marao Dashboard Test Month Energy
+    min: 0
+    max: 1000
+    step: 1
+    mode: slider
+    unit_of_measurement: kWh
+  marao_dashboard_test_today_energy:
+    name: Marao Dashboard Test Today Energy
+    min: 0
+    max: 100
+    step: 1
+    mode: slider
+    unit_of_measurement: kWh
+  marao_dashboard_test_month_cost:
+    name: Marao Dashboard Test Month Cost
+    min: 0
+    max: 500
+    step: 0.01
+    mode: slider
+    unit_of_measurement: EUR
+  marao_dashboard_test_today_cost:
+    name: Marao Dashboard Test Today Cost
+    min: 0
+    max: 100
+    step: 0.01
+    mode: slider
+    unit_of_measurement: EUR
   marao_dashboard_test_dishwasher_progress:
     name: Marao Dashboard Test Dishwasher Progress
     min: 0
@@ -176,6 +213,10 @@ climate:
     hot_tolerance: 0.5
     precision: 0.5
 
+camera:
+  - platform: marao_test_camera
+    name: Marao Dashboard Test Camera
+
 homeassistant:
   customize:
     climate.marao_dashboard_test_single_mode_climate:
@@ -244,6 +285,8 @@ template:
       - name: Marao Dashboard Test Cover
         default_entity_id: cover.marao_dashboard_test_cover
         unique_id: marao_dashboard_test_cover
+        optimistic: true
+        state: "{{ 'open' if states('input_number.marao_dashboard_test_cover_position') | int > 0 else 'closed' }}"
         position: "{{ states('input_number.marao_dashboard_test_cover_position') | int }}"
         open_cover:
           - action: input_number.set_value
@@ -267,6 +310,8 @@ template:
         default_entity_id: cover.marao_dashboard_test_garage_door
         unique_id: marao_dashboard_test_garage_door
         device_class: garage
+        optimistic: true
+        state: "{{ 'open' if states('input_number.marao_dashboard_test_garage_door_position') | int > 0 else 'closed' }}"
         position: "{{ states('input_number.marao_dashboard_test_garage_door_position') | int }}"
         open_cover:
           - action: input_number.set_value
@@ -286,6 +331,15 @@ template:
               entity_id: input_number.marao_dashboard_test_garage_door_position
             data:
               value: "{{ position }}"
+      - name: Marao Dashboard Test Open Only Door
+        default_entity_id: cover.marao_dashboard_test_open_only_door
+        unique_id: marao_dashboard_test_open_only_door
+        device_class: door
+        state: "closed"
+        open_cover:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.marao_dashboard_test_wallbox_pause
   - lock:
       - name: Marao Dashboard Test Lock
         default_entity_id: lock.marao_dashboard_test_lock
@@ -443,6 +497,43 @@ template:
         state: "{{ states('input_number.marao_dashboard_test_power') }}"
         unit_of_measurement: W
         device_class: power
+        state_class: measurement
+      - name: Marao Dashboard Test Month Energy
+        unique_id: marao_dashboard_test_month_energy_sensor
+        state: "{{ states('input_number.marao_dashboard_test_month_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Marao Dashboard Test Today Energy
+        unique_id: marao_dashboard_test_today_energy_sensor
+        state: "{{ states('input_number.marao_dashboard_test_today_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Marao Dashboard Test Month Cost
+        unique_id: marao_dashboard_test_month_cost_sensor
+        state: "{{ states('input_number.marao_dashboard_test_month_cost') }}"
+        unit_of_measurement: EUR
+        state_class: measurement
+      - name: Marao Dashboard Test Today Cost
+        unique_id: marao_dashboard_test_today_cost_sensor
+        state: "{{ states('input_number.marao_dashboard_test_today_cost') }}"
+        unit_of_measurement: EUR
+        state_class: measurement
+      - name: Marao Dashboard Test Wallbox Status
+        unique_id: marao_dashboard_test_wallbox_status_sensor
+        state: "{{ 'paused' if is_state('input_boolean.marao_dashboard_test_wallbox_pause', 'on') else 'charging' }}"
+      - name: Marao Dashboard Test Wallbox Power
+        unique_id: marao_dashboard_test_wallbox_power_sensor
+        state: "{{ states('input_number.marao_dashboard_test_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Marao Dashboard Test Wallbox Maximum Current
+        unique_id: marao_dashboard_test_wallbox_max_current_sensor
+        state: "32"
+        unit_of_measurement: A
+        device_class: current
         state_class: measurement
       - name: Marao Dashboard Test Battery
         unique_id: marao_dashboard_test_battery_sensor

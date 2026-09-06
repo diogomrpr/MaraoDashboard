@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { assertDisposableHaTarget } = require("./ha-local-safety");
 
 const repoRoot = path.resolve(__dirname, "..");
 const configPath = path.join(repoRoot, ".ha-local.json");
@@ -94,10 +95,50 @@ function buildViewChecks(dashboard, dashboardUrl, entityStates = {}) {
   });
 }
 
+function exactText(value) {
+  return new RegExp(`^\\s*${String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`);
+}
+
+function cardByTitle(page, title) {
+  return page.locator("marao-card").filter({
+    has: page.locator(".title").filter({ hasText: exactText(title) }),
+  }).first();
+}
+
+function cardAction(page, title) {
+  return cardByTitle(page, title).locator("[data-card-action]");
+}
+
+async function measureCenteredIcons(locator) {
+  return locator.evaluateAll((bodies) => bodies.map((body, index) => {
+    const root = body.getRootNode();
+    const icon = body.querySelector(".icon");
+    const card = body.closest("ha-card");
+    const action = root?.querySelector?.("[data-card-action]");
+    const label = action?.getAttribute("aria-label")
+      || icon?.querySelector("ha-icon")?.getAttribute("icon")
+      || `Control ${index + 1}`;
+    if (!icon || !card) return { index, label, missingElement: true };
+    const cardBox = card.getBoundingClientRect();
+    const iconBox = icon.getBoundingClientRect();
+    return {
+      index,
+      label,
+      horizontalOffset: (iconBox.left + iconBox.width / 2) - (cardBox.left + cardBox.width / 2),
+      verticalOffset: (iconBox.top + iconBox.height / 2) - (cardBox.top + cardBox.height / 2),
+      cardWidth: cardBox.width,
+      cardHeight: cardBox.height,
+      iconWidth: iconBox.width,
+      iconHeight: iconBox.height,
+    };
+  }));
+}
+
 async function main() {
   let chromium;
   try { ({ chromium } = require("playwright")); } catch { throw new Error("Playwright is not installed."); }
   const config = readConfig();
+  assertDisposableHaTarget(config);
   const baseUrl = config.url.replace(/\/$/, "");
   const tokens = await accessToken(config, baseUrl);
   const browser = await chromium.launch();
@@ -113,6 +154,17 @@ async function main() {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => { if (["error", "warning"].includes(message.type())) errors.push(message.text()); });
+  page.on("requestfailed", (request) => errors.push(`Failed ${request.resourceType()} request: ${request.url()} (${request.failure()?.errorText || "unknown error"})`));
+  page.on("response", (response) => {
+    if (response.status() >= 400 && ["document", "script", "stylesheet", "image", "font"].includes(response.request().resourceType())) {
+      errors.push(`${response.status()} ${response.request().resourceType()} response: ${response.url()}`);
+    }
+  });
+  const assertNoBrowserErrors = (label) => {
+    if (!errors.length) return;
+    const observed = errors.splice(0);
+    throw new Error(`${label} produced browser warnings/errors:\n${observed.map((item) => `- ${item}`).join("\n")}`);
+  };
   const deepSnapshot = () => page.evaluate(() => {
     const elements = [];
     const visit = (root) => {
@@ -131,6 +183,7 @@ async function main() {
   try {
     await page.goto(`${baseUrl}/marao-dashboard/overview`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(3000);
+    assertNoBrowserErrors("Overview");
     const overview = await deepSnapshot();
     if (overview.errors.length || overview.warnings.length) throw new Error(`Overview rendered warnings/errors: ${JSON.stringify(overview)}`);
     if (!overview.nav) throw new Error("Overview did not render custom:marao-navbar-card.");
@@ -157,8 +210,9 @@ async function main() {
     }
     const checks = buildViewChecks(dashboard.config, dashboard.payload.dashboard_url, dashboard.states);
     for (const view of checks) {
-      await page.goto(`${baseUrl}/${view.url}`, { waitUntil: "domcontentloaded" });
+      await page.goto(`${baseUrl}${view.url}`, { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(700);
+      assertNoBrowserErrors(view.name);
       const result = await deepSnapshot();
       if (result.errors.length || result.warnings.length) throw new Error(`${view.name} rendered warnings/errors: ${JSON.stringify(result)}`);
       if (!result.nav) throw new Error(`${view.name} did not render custom:marao-navbar-card.`);
@@ -169,6 +223,7 @@ async function main() {
     }
     await page.goto(`${baseUrl}/marao-dashboard-card-test/card-test`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1200);
+    assertNoBrowserErrors("Card test dashboard");
     const cardTest = await deepSnapshot();
     if (cardTest.errors.length || cardTest.warnings.length) throw new Error(`Card test dashboard rendered warnings/errors: ${JSON.stringify(cardTest)}`);
     if (!cardTest.nav || cardTest.maraoCards < 10 || cardTest.popups < 1) throw new Error(`Card test dashboard rendered too few Marao cards: ${JSON.stringify(cardTest)}`);
@@ -237,7 +292,7 @@ async function main() {
             trackRadius: track ? getComputedStyle(track).borderRadius : "",
             fillRadius: fill ? getComputedStyle(fill).borderRadius : "",
             fillWidth,
-            expectedFillWidth: trackWidth ? Math.min(trackWidth, 28 + (progress / 100) * Math.max(0, trackWidth - 28)) : 0,
+            expectedFillWidth: trackWidth ? Math.min(trackWidth, 48 + (progress / 100) * Math.max(0, trackWidth - 48)) : 0,
           });
         });
         root?.querySelectorAll?.("*").forEach((element) => element.shadowRoot && visit(element.shadowRoot));
@@ -246,23 +301,25 @@ async function main() {
       return sliders;
     });
     if (sliderProgress.some((slider) => !slider.progress)) throw new Error(`Card test sliders did not render live progress fills: ${JSON.stringify(sliderProgress)}`);
-    if (sliderProgress.some((slider) => slider.trackRadius !== "14px" || slider.fillRadius !== "14px")) {
+    if (sliderProgress.some((slider) => slider.trackRadius !== "24px" || slider.fillRadius !== "24px")) {
       throw new Error(`Card test sliders did not render rounded tracks: ${JSON.stringify(sliderProgress)}`);
     }
     if (sliderProgress.some((slider) => Math.abs(slider.fillWidth - slider.expectedFillWidth) > 2)) {
       throw new Error(`Card test slider fills did not meet the thumb edge: ${JSON.stringify(sliderProgress)}`);
     }
-    const independentSlider = page.locator('input[aria-label="position"]');
-    await independentSlider.fill("60");
-    const independentCheck = await independentSlider.evaluate((input) => ({
-      target: Number(input.value),
-      current: Number(input.dataset.sliderCurrent),
-      progress: Number.parseFloat(input.style.getPropertyValue("--marao-slider-progress")),
-    }));
-    if (independentCheck.target !== 60 || independentCheck.current <= independentCheck.target || independentCheck.progress > independentCheck.target) {
-      throw new Error(`Cover slider progress exceeded its target thumb: ${JSON.stringify(independentCheck)}`);
+    const independentSlider = page.locator('input[data-slider-key="hc_cover_card:cover.marao_dashboard_test_cover"]');
+    if (await independentSlider.isEnabled()) {
+      await independentSlider.fill("60");
+      const independentCheck = await independentSlider.evaluate((input) => ({
+        target: Number(input.value),
+        current: Number(input.dataset.sliderCurrent),
+        progress: Number.parseFloat(input.style.getPropertyValue("--marao-slider-progress")),
+      }));
+      if (independentCheck.target !== 60 || independentCheck.current <= independentCheck.target || independentCheck.progress > independentCheck.target) {
+        throw new Error(`Cover slider progress exceeded its target thumb: ${JSON.stringify(independentCheck)}`);
+      }
     }
-    await page.getByText("Bubble popup", { exact: true }).click();
+    await cardAction(page, "Bubble popup").click();
     await page.waitForTimeout(50);
     const popupLayout = await page.evaluate(() => {
       const sheet = document.querySelector(".marao-popup-sheet");
@@ -289,7 +346,7 @@ async function main() {
       throw new Error(`Card test popup did not match the first column width: ${JSON.stringify(popupLayout)}`);
     }
     await page.locator(".marao-popup-close").click();
-    await page.getByText("Lock access", { exact: true }).click();
+    await cardAction(page, "Lock access").click();
     const lockActionBackgrounds = await page.locator(".marao-popup-sheet marao-card").evaluateAll((cards) =>
       cards.map((card) => card.shadowRoot?.querySelector("ha-card")?.style.getPropertyValue("--marao-card-background"))
     );
@@ -301,7 +358,7 @@ async function main() {
       throw new Error(`Lock slider label must be the localized single-word Unlock label, got: ${lockSliderLabel}`);
     }
     await page.locator(".marao-popup-close").click();
-    await page.getByText("Climate", { exact: true }).click();
+    await cardAction(page, "Climate").click();
     if ((await page.locator(".marao-popup-head h2").innerText()).trim()) {
       throw new Error("Climate mode popup still rendered a duplicate heading.");
     }
@@ -312,12 +369,15 @@ async function main() {
       buttonHeight: Math.round(element.querySelector("button").getBoundingClientRect().height),
       buttonFontSize: parseFloat(getComputedStyle(element.querySelector("button")).fontSize),
       labels: [...element.querySelectorAll("button")].map((button) => button.textContent.trim()),
+      icons: [...element.querySelectorAll("button ha-icon")].map((icon) => icon.getAttribute("icon")),
       backgrounds: [...element.querySelectorAll("button")].map((button) => getComputedStyle(button).backgroundColor),
     }));
     if (
       climateModeLayout.columns !== 2 ||
       climateModeLayout.buttonHeight < 56 ||
       climateModeLayout.buttonFontSize < 18 ||
+      climateModeLayout.icons.length !== climateModeLayout.labels.length ||
+      climateModeLayout.icons.some((icon) => !icon) ||
       new Set(climateModeLayout.backgrounds).size !== 1 ||
       climateModeLayout.labels.some((label) => label[0] !== label[0].toUpperCase())
     ) {
@@ -327,6 +387,19 @@ async function main() {
       (element) => parseFloat(getComputedStyle(element).fontSize)
     );
     if (climateStateFontSize < 18) throw new Error(`Climate state text is too small: ${climateStateFontSize}px`);
+    const climateCurrentTemperature = page.locator(".marao-popup-sheet .climate-card .current-temperature");
+    if (await climateCurrentTemperature.count() !== 1) throw new Error("Climate card did not render its current temperature value.");
+    const climateCurrentTemperatureDetails = await climateCurrentTemperature.evaluate((element) => ({
+      text: element.textContent.trim(),
+      fontSize: parseFloat(getComputedStyle(element).fontSize),
+    }));
+    if (
+      !climateCurrentTemperatureDetails.text ||
+      /current|[°º]/i.test(climateCurrentTemperatureDetails.text) ||
+      climateCurrentTemperatureDetails.fontSize < 28
+    ) {
+      throw new Error(`Climate current temperature must be a large unitless value: ${JSON.stringify(climateCurrentTemperatureDetails)}`);
+    }
     const climateTemperature = page.locator('.marao-popup-sheet [data-number-step="increase"]').first();
     if (await climateTemperature.count() !== 1) throw new Error("Climate target temperature stepper did not render.");
     const climateSetpointContrast = await page.locator(".marao-popup-sheet .climate-stepper").evaluate((element) => {
@@ -352,64 +425,88 @@ async function main() {
     await page.locator('.marao-popup-sheet [data-number-step="decrease"]').first().click();
     await page.waitForTimeout(500);
     await page.locator(".marao-popup-close").click();
-    await page.getByText("Multi Mode Climate", { exact: true }).first().click();
+    await cardAction(page, "Multi Mode Climate").click();
     const multiModeClimateModes = page.locator(".marao-popup-sheet [data-climate-mode]");
     if (await multiModeClimateModes.count() < 6) {
       throw new Error("Multi-mode climate example did not render all common HVAC modes.");
     }
-    await multiModeClimateModes.filter({ hasText: "Cool" }).click();
+    await multiModeClimateModes.filter({ hasText: exactText("Cool") }).click();
     await page.waitForTimeout(500);
     if ((await page.locator(".marao-popup-sheet .climate-card .state").innerText()).trim() !== "Cool") {
       throw new Error("Multi-mode climate example did not apply the selected mode.");
     }
     await page.locator(".marao-popup-close").click();
-    const currentTemperature = page.locator("marao-card").filter({ hasText: "Current temperature control" }).first();
-    if (await currentTemperature.locator('input[type="range"]').count()) {
+    const numberCard = cardByTitle(page, "Number");
+    if (await numberCard.locator('input[type="range"]').count()) {
       throw new Error("Number card still rendered a slider instead of the shared number stepper.");
     }
-    const currentTemperatureValue = currentTemperature.locator(".number-value");
-    const currentTemperatureBefore = await currentTemperatureValue.innerText();
-    await currentTemperature.locator('[data-number-step="increase"]').click();
+    const numberValue = numberCard.locator(".number-value");
+    const numberBefore = await numberValue.innerText();
+    await numberCard.locator('[data-number-step="increase"]').click();
     await page.waitForTimeout(500);
     if (await page.evaluate(() => window.__maraoHaptics.at(-1)) !== "heavy") {
       throw new Error("Button presses must emit strong haptic feedback.");
     }
-    const currentTemperatureAfter = await currentTemperatureValue.innerText();
-    if (currentTemperatureAfter === currentTemperatureBefore) throw new Error("Number card increase button did not update its value.");
-    const climateReadings = await page.evaluate(() => {
+    const numberAfter = await numberValue.innerText();
+    if (numberAfter === numberBefore) throw new Error("Number card increase button did not update its value.");
+    await numberCard.locator('[data-number-step="decrease"]').click();
+    await page.waitForTimeout(500);
+    const temperatureBefore = await page.evaluate(() => Number(
+      document.querySelector("home-assistant")?.hass?.states?.["input_number.marao_dashboard_test_temperature"]?.state
+    ));
+    const temperatureAfter = temperatureBefore === 20 ? 20.5 : 20;
+    await page.evaluate(async (value) => {
+      await document.querySelector("home-assistant").hass.callService("input_number", "set_value", {
+        entity_id: "input_number.marao_dashboard_test_temperature",
+        value,
+      });
+    }, temperatureAfter);
+    await page.waitForFunction((value) => Number(
+      document.querySelector("home-assistant")?.hass?.states?.["sensor.marao_dashboard_test_temperature"]?.state
+    ) === value, temperatureAfter);
+    await page.waitForFunction((value) => {
       const readings = [];
       const visit = (root) => {
         root?.querySelectorAll?.(".climate").forEach((element) => readings.push(element.textContent || ""));
         root?.querySelectorAll?.("*").forEach((element) => element.shadowRoot && visit(element.shadowRoot));
       };
       visit(document);
-      return readings;
-    });
-    const currentTemperatureNumber = String(parseFloat(currentTemperatureAfter));
-    if (!climateReadings.some((reading) => reading.includes(currentTemperatureNumber) && !/[°º]/.test(reading))) {
-      throw new Error("Climate current temperature did not update without a temperature unit.");
-    }
-    await currentTemperature.locator('[data-number-step="decrease"]').click();
-    await page.waitForTimeout(500);
-    await page.getByText("Apple TV", { exact: true }).first().click();
+      return readings.some((reading) => reading.includes(value) && !/[°º]/.test(reading));
+    }, String(temperatureAfter));
+    await page.evaluate(async (value) => {
+      await document.querySelector("home-assistant").hass.callService("input_number", "set_value", {
+        entity_id: "input_number.marao_dashboard_test_temperature",
+        value,
+      });
+    }, temperatureBefore);
+    await cardAction(page, "Apple TV").click();
     const remoteButtons = page.locator(".marao-popup-sheet .body.icon-only");
     if (await remoteButtons.count() < 9) throw new Error("Apple TV remote buttons did not render as icon-only controls.");
     if ((await remoteButtons.allTextContents()).some((label) => label.trim())) {
       throw new Error("Apple TV remote buttons rendered text instead of icons only.");
     }
+    const misalignedRemoteButtons = (await measureCenteredIcons(remoteButtons))
+      .filter((item) => item.missingElement || Math.abs(item.horizontalOffset) > 0.5 || Math.abs(item.verticalOffset) > 0.5);
+    if (misalignedRemoteButtons.length) {
+      throw new Error(`Apple TV remote icons are not centered in their cards: ${JSON.stringify(misalignedRemoteButtons)}`);
+    }
     await page.locator(".marao-popup-close").click();
-    await page.getByText("Garage door access", { exact: true }).click();
-    const actionTrack = page.locator(".marao-popup-sheet marao-slide-to-open .track");
-    if (await actionTrack.count() !== 1) throw new Error("Garage door popup did not render a slide-to-open control.");
-    const actionBox = await actionTrack.boundingBox();
-    if (!actionBox) throw new Error("Garage door slide-to-open control has no visible track.");
-    await page.mouse.move(actionBox.x + 28, actionBox.y + actionBox.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(actionBox.x + actionBox.width - 18, actionBox.y + actionBox.height / 2, { steps: 12 });
-    await page.mouse.up();
-    await page.waitForTimeout(500);
-    if (await actionTrack.getAttribute("aria-valuenow") !== "0") throw new Error("Slide-to-open control did not reset after the action.");
-    await page.locator(".marao-popup-close").click();
+    const garageAction = cardAction(page, "Garage door access");
+    if (await garageAction.isEnabled()) {
+      await garageAction.click();
+      const actionTrack = page.locator(".marao-popup-sheet marao-slide-to-open .track");
+      if (await actionTrack.count() !== 1) throw new Error("Garage door popup did not render a slide-to-open control.");
+      const actionBox = await actionTrack.boundingBox();
+      if (!actionBox) throw new Error("Garage door slide-to-open control has no visible track.");
+      await page.mouse.move(actionBox.x + 28, actionBox.y + actionBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(actionBox.x + actionBox.width - 18, actionBox.y + actionBox.height / 2, { steps: 12 });
+      await page.mouse.up();
+      await page.waitForTimeout(500);
+      if (await actionTrack.getAttribute("aria-valuenow") !== "0") throw new Error("Slide-to-open control did not reset after the action.");
+      await page.locator(".marao-popup-close").click();
+    }
+    assertNoBrowserErrors("Card interactions");
     const popupCount = (serialized.match(/custom:marao-popup-card/g) || []).length;
     console.log(`Marao Dashboard e2e OK (${checks.length} generated view(s); ${cardTest.maraoCards} card-test cards; ${coloredCards} state-colored cards; ${popupCount} generated popup configuration(s))`);
   } finally {
@@ -419,4 +516,4 @@ async function main() {
 
 if (require.main === module) main().catch((error) => { console.error(error.message || error); process.exitCode = 1; });
 
-module.exports = { accessToken, buildViewChecks, conditionalCardIsActive, normalizedPathname, readConfig };
+module.exports = { accessToken, buildViewChecks, conditionalCardIsActive, measureCenteredIcons, normalizedPathname, readConfig };

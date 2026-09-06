@@ -1,74 +1,61 @@
 ---
 hide_table_of_contents: true
-title: Navigationbar Card
+title: Navigation bar card
 layout: page
 parent: Cards
 ---
 
-# Navigation bar Card
-This is a navigation bar for the bottom of your dashboard. You can add a entity to a button so it shows a green dot if something is active.
+# Navigation bar card
 
-![Navigation bar Card](../../../assets/images/cards/hc_navigationbar_card/navigationcard_light.png)
+`custom:marao-navbar-card` is Marao's project-owned floating mobile
+navigation. The builder and generator create it automatically as the final
+card in each generated view. It supports one to five routes and sizes the bar
+from the number of entries.
 
-## Usage
-This card is fairly simple. The most important part is that you change the background color on each view to the desired color, in this case `var(--primary-color)`. So, if you go to your second page, you remove the variable `background_color_1` and add the `background_color_2`.
+![Navigation bar card](../../../assets/images/cards/hc_navigationbar_card/navigationcard_light.png)
 
-### View code
-```yaml
-  - type: custom:marao-card
-    template: hc_navigationbar_card
-    variables:
-      icon_color_1: white
-      background_color_1: var(--primary-color)
-      navigation_path_1: home
-      icon_1: marao_dashboard:house
-      navigation_path_2: climate
-      icon_2: marao_dashboard:thermometer
-      navigation_path_3: devices
-      icon_3: marao_dashboard:plug
-      entity_3: switch.all_switches
-      navigation_path_4: media
-      icon_4: marao_dashboard:music
-      entity_4: 'media_player.all_media'
-```        
+## Manual usage
 
-## Variables
+    type: custom:marao-navbar-card
+    routes:
+      - label: Home
+        icon: mdi:home-variant-outline
+        icon_selected: mdi:home-variant
+        url: /marao-dashboard/overview
+      - label: Rooms
+        icon: mdi:sofa-outline
+        icon_selected: mdi:sofa
+        url: /marao-dashboard/rooms
 
-| Variable | Default | Required | Description|
-|----------|---------|----------|------------| 
-| icon_color_1       | var(--color-dark-gray)      | No       | Color of the first icon              |
-| background_color_1 | var(--color-light-gray-nav) | No       | Background color of the first button |
-| navigation_path_1  | ''                          | yes      | Navigation path for the first button |
-| icon_1             |                             | No       | Icon for the first button            |
-| entity_1           |                             | No       | Entity for the first button          |
-| active_state_1     | 'on'                        | No       | Active state for the first button    |
-| icon_color_2       | var(--color-dark-gray)      | No       | Color of the second icon             |
-| background_color_2 | var(--color-light-gray-nav) | No       | Background color of the second button|
-| navigation_path_2  | ''                          | No       | Navigation path for the second button|
-| icon_2             |                             | No       | Icon for the second button           |
-| entity_2           |                             | No       | Entity for the second button         |
-| active_state_2     | 'on'                        | No       | Active state for the second button   |
-| icon_color_3       | var(--color-dark-gray)      | No       | Color of the third icon              |
-| background_color_3 | var(--color-light-gray-nav) | No       | Background color of the third button |
-| navigation_path_3  | ''                          | No       | Navigation path for the third button |
-| icon_3             |                             | No       | Icon for the third button            |
-| entity_3           |                             | No       | Entity for the third button          |
-| active_state_3     | 'on'                        | No       | Active state for the third button    |
-| icon_color_4       | var(--color-dark-gray)      | No       | Color of the fourth icon             |
-| background_color_4 | var(--color-light-gray-nav) | No       | Background color of the fourth button|
-| navigation_path_4  | ''                          | No       | Navigation path for the fourth button|
-| icon_4             |                             | No       | Icon for the fourth button           |
-| entity_4           | ''                          | No       | Entity for the fourth button         |
-| active_state_4     | 'on'                        | No       | Active state for the fourth button   |
-| icon_color_5       | var(--color-dark-gray)      | No       | Color of the fifth icon              |
-| background_color_5 | var(--color-light-gray-nav) | No       | Background color of the fifth button |
-| navigation_path_5  | ''                          | No       | Navigation path for the fifth button |
-| icon_5             |                             | No       | Icon for the fifth button            |
-| entity_5           |                             | No       | Entity for the fifth button          |
-| active_state_5     | 'on'                        | No       | Active state for the fifth button    |
-| icon_color_6       | var(--color-dark-gray)      | No       | Color of the sixth icon              |
-| background_color_6 | var(--color-light-gray-nav) | No       | Background color of the sixth button |
-| navigation_path_6  | ''                          | No       | Navigation path for the sixth button |
-| icon_6             |                             | No       | Icon for the sixth button            |
-| entity_6           |                             | No       | Entity for the sixth button          |
-| active_state_6     | 'on'                        | No       | Active state for the sixth button    |
+Use the builder for generated dashboards so its route order, available pages,
+translations, and five-entry validation stay aligned. A manually authored
+view must also leave enough bottom content space for the floating bar.
+
+## Route fields
+
+| Field | Required | Description |
+|:--|:--:|:--|
+| `label` | Yes | Localized route name and the icon's internal accessible name. |
+| `url` | Yes | Dashboard route. `path` is accepted as a compatibility alias. |
+| `icon` | No | Inactive Material Design icon; defaults to `mdi:circle-outline`. |
+| `icon_selected` | No | Filled/selected icon; falls back to `icon`. |
+
+The bar deliberately shows icons without visible labels. The `label` is still
+required for semantics and may be exposed as an optional tooltip; navigation
+must never depend on a tooltip.
+
+## Layout and behavior
+
+- Every control is visibly at least 48 by 48 CSS pixels.
+- Active icon backgrounds are perfect circles and use the Marao theme.
+- Gaps remain compact while route width auto-scales.
+- iPhone positioning derives from `env(safe-area-inset-bottom)` and keeps the
+  accepted lowered offset without an extra generic bottom margin.
+- Other mobile devices use the normal compact bottom offset.
+- Button presses use Marao's strong haptic feedback.
+- Open Marao popups remain above the navbar.
+- The navbar activates Marao's route-scoped fullscreen shell, which hides Home
+  Assistant's native top bar only while the dashboard is active.
+
+Do not add a second navbar dependency or manually register a Lovelace resource.
+The Marao integration owns and registers this component.

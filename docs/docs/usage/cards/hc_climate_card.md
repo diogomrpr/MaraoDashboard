@@ -6,7 +6,10 @@ parent: Cards
 
 # Climate Card
 
-The `hc_climate_card` shows the current and target temperatures and uses up/down buttons to change the target. Its background identifies the active HVAC mode; `off`, `unknown`, and `unavailable` retain the neutral card background.
+The `hc_climate_card` shows a large, unitless current temperature and a target
+temperature stepper. Its background identifies the active HVAC mode; `off`,
+`unknown`, and `unavailable` retain the neutral card background. When multiple
+HVAC modes are available, the mode buttons use representative icons and labels.
 
 ![Climate Card Light](../../../assets/images/cards/hc_climate_card/climatecard_light.png)
 

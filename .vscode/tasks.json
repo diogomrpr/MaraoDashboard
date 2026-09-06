@@ -34,6 +34,59 @@
         "panel": "shared"
       },
       "detail": "Builds Marao Dashboard, copies it to the configured Home Assistant VM over SSH, and restarts only when integration code changed."
+    },
+    {
+      "label": "HA: Preview Mobile Accessibility",
+      "type": "process",
+      "command": "npm",
+      "args": [
+        "run",
+        "ha:preview:accessibility",
+        "--",
+        "--scenario",
+        "${input:maraoAccessibilityProfile}",
+        "--theme",
+        "${input:maraoAccessibilityTheme}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "detail": "Opens the disposable local dashboard in a desktop browser using the selected mobile text or zoom profile."
+    }
+  ],
+  "inputs": [
+    {
+      "id": "maraoAccessibilityProfile",
+      "type": "pickString",
+      "description": "Mobile accessibility profile",
+      "default": "iphone-bold-text-200",
+      "options": [
+        "iphone-normal",
+        "iphone-bold",
+        "iphone-text-200",
+        "iphone-page-zoom-200",
+        "iphone-bold-text-200",
+        "android-normal",
+        "android-bold",
+        "android-text-200",
+        "android-page-zoom-200",
+        "android-bold-text-200",
+        "narrow-320",
+        "iphone-landscape",
+        "android-landscape"
+      ]
+    },
+    {
+      "id": "maraoAccessibilityTheme",
+      "type": "pickString",
+      "description": "Marao theme mode",
+      "default": "light",
+      "options": [
+        "light",
+        "dark"
+      ]
     }
   ]
 }

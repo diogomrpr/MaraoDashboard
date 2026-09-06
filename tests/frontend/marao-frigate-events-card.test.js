@@ -6,6 +6,10 @@ const source = await fs.readFile(
   new URL("../../custom_components/marao_dashboard/frontend/MaraoFrigateEventsCard.js", import.meta.url),
   "utf8",
 );
+const dashboardSource = await fs.readFile(
+  new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url),
+  "utf8",
+);
 const {
   cameraEventProvider,
   frigateEventPath,
@@ -16,7 +20,25 @@ const {
   normalizeFrigateEvents,
   normalizeProtectEvents,
   protectThumbnailMediaSource,
+  registerMaraoCameraEventCards,
 } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+
+test("camera event registration can be retried after the registry becomes available", () => {
+  const previousRegistry = globalThis.customElements;
+  const registered = new Map();
+  globalThis.customElements = {
+    get: (name) => registered.get(name),
+    define: (name, klass) => registered.set(name, klass),
+  };
+  try {
+    registerMaraoCameraEventCards();
+    assert.deepEqual([...registered.keys()], ["marao-frigate-events-card", "marao-camera-events-card"]);
+    registerMaraoCameraEventCards();
+    assert.equal(registered.size, 2);
+  } finally {
+    globalThis.customElements = previousRegistry;
+  }
+});
 
 test("Frigate event helpers normalize API data and build safe integration URLs", () => {
   const events = normalizeFrigateEvents(JSON.stringify([
@@ -57,6 +79,108 @@ test("Frigate event helpers normalize API data and build safe integration URLs",
     "/api/frigate/main/notifications/abc/clip.mp4",
   );
   assert.throws(() => frigateEventPath("main", "abc", "preview"));
+});
+
+test("camera event actions keep a visible 48px target and strong feedback", () => {
+  assert.match(source, /\.icon-button \{ flex: 0 0 48px; width: 48px; min-width: 48px; height: 48px;/);
+  assert.match(source, /MaraoDashboard\?\.haptic\?\.\("heavy"\)/);
+  assert.match(source, /\.icon-button:active \{ transform: scale\(\.94\); \}/);
+  assert.match(source, /button:disabled \{ cursor: default; opacity: \.55;/);
+  assert.doesNotMatch(source, /:focus-visible/);
+});
+
+test("camera event UI routes visible copy through complete English and Portuguese catalogs", () => {
+  const keys = [...source.matchAll(/"(camera_events\.[a-z0-9_.]+)"/g)].map((match) => match[1]);
+  for (const key of new Set(keys)) {
+    assert.equal(dashboardSource.split(`"${key}"`).length - 1, 2, key);
+  }
+
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    MaraoDashboard: {
+      localize(key, _hass, placeholders = {}) {
+        const values = {
+          "camera_events.title": "Eventos da câmara",
+          "camera_events.refresh": "Atualizar eventos",
+          "camera_events.loading_events": "A carregar eventos…",
+        };
+        return (values[key] || key).replace(/\{(\w+)\}/g, (_match, name) => placeholders[name] ?? `{${name}}`);
+      },
+    },
+  };
+  try {
+    const card = new MaraoFrigateEventsCard();
+    card.shadowRoot = { innerHTML: "" };
+    card._config = { entity: "camera.test" };
+    card._hass = { states: {}, connection: { connected: true } };
+    card._status = "loading";
+    card._render();
+    assert.match(card.shadowRoot.innerHTML, /Eventos da câmara/);
+    assert.match(card.shadowRoot.innerHTML, /aria-label="Atualizar eventos" title="Atualizar eventos"/);
+    assert.match(card.shadowRoot.innerHTML, /A carregar eventos…/);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test("camera event text uses the shared scalable typography tokens", () => {
+  for (const token of [
+    "--font-size-primary",
+    "--font-size-secondary",
+    "--font-size-caption",
+    "--font-weight-primary",
+    "--font-weight-secondary",
+  ]) assert.match(source, new RegExp(token));
+});
+
+test("camera event actions are blocked while Home Assistant is disconnected", () => {
+  const card = new MaraoFrigateEventsCard();
+  card._hass = { connected: false, connection: { connected: false } };
+  assert.equal(card._connectionAvailable(), false);
+  card._hass = { states: {}, connection: { connected: true } };
+  assert.equal(card._connectionAvailable(), true);
+});
+
+test("camera event loading waits for Home Assistant and retries after reconnect", () => {
+  const card = new MaraoFrigateEventsCard();
+  const loads = [];
+  card._connected = true;
+  card._config = { entity: "camera.test", event_provider: "marao_test", limit: 1 };
+  card._loadedKey = "unchanged";
+  card._load = (...args) => loads.push(args);
+
+  card.hass = { connected: false, connection: { connected: false }, states: {} };
+  assert.equal(card._loadedKey, "unchanged");
+  assert.equal(loads.length, 0);
+
+  card.hass = { connected: true, connection: { connected: true }, states: {} };
+  assert.equal(loads.length, 1);
+  assert.equal(loads[0][2], "marao_test");
+});
+
+test("the gallery camera fixture renders an event and detail without calling an event API", async () => {
+  let apiCalls = 0;
+  const card = new MaraoCameraEventsCard();
+  card._config = { entity: "camera.marao_dashboard_test_camera", event_provider: "marao_test", limit: 1 };
+  card._hass = {
+    connected: true,
+    connection: { connected: true },
+    callWS() {
+      apiCalls += 1;
+      throw new Error("The test fixture must not call Home Assistant event APIs");
+    },
+  };
+
+  await card._load({}, "safe-fixture", "marao_test");
+  assert.equal(card._status, "ready");
+  assert.equal(card._events.length, 1);
+  assert.equal(card._events[0].label, "Person detected");
+  assert.match(card._events[0].thumbnailUrl, /^data:image\/svg\+xml/);
+  await card._openEvent(0);
+  assert.equal(card._selected.status, "ready");
+  assert.equal(card._selected.kind, "snapshot");
+  assert.match(card._selected.url, /^data:image\/svg\+xml/);
+  assert.equal(apiCalls, 0);
 });
 
 test("Frigate events are requested and media is signed through Home Assistant", async () => {
@@ -104,6 +228,7 @@ test("camera event provider is explicit first, then inferred from the Home Assis
   };
 
   assert.equal(cameraEventProvider({ entity: "camera.protect", event_provider: "frigate" }, hass), "frigate");
+  assert.equal(cameraEventProvider({ entity: "camera.regular", event_provider: "marao_test" }, hass), "marao_test");
   assert.equal(cameraEventProvider({ entity: "camera.protect", provider: "Protect" }, hass), "unifi_protect");
   assert.equal(cameraEventProvider({ entity: "camera.protect", event_provider: "auto" }, hass), "unifi_protect");
   assert.equal(cameraEventProvider({ entity: "camera.regular", unifi_protect_media_source: "media-source://unifiprotect/nvr:browse:camera" }, hass), "unifi_protect");

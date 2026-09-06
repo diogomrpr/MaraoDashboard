@@ -5,51 +5,82 @@ parent: Development
 nav_order: 0
 ---
 
-# Theme Design
-This code is part of a theming system where many of the styles are internal and should not be modified directly to avoid unintended consequences. However, a set of predefined variables has been provided to allow for 
-customization within templates. These variables can be safely used to adjust the appearance while maintaining the integrity of the overall theme.
+# Theme design
 
-Its important to follow this guidelines, otherwise your template won't be accepted as an internal project template, but we are open for discussion or feedback.
+The **Marao Dashboard** theme is part of the card contract. Reuse its semantic
+variables instead of hard-coding a color, font, radius, or surface in an
+individual template. Update light and dark modes together and follow the
+[dashboard quality contract]({{ '/docs/development/dashboard-quality.html' | relative_url }}).
 
-## Colors
+## Typography
 
-Every color mentioned in this document will be visible in this tabel.
-The `Marao Dashboard` theme defines both Home Assistant `light` and `dark`
-modes, so the same theme follows the frontend theme mode selected in the user
-profile. Keep surfaces mode-aware and keep accents shared.
+Marao uses [Montserrat](https://fonts.google.com/specimen/Montserrat), followed
+by the existing Roboto and system-font fallbacks. Use
+`var(--primary-font-family)` and the shared size/weight tokens:
 
-| Color value    | Variables   |
-|:---------------|:---------------------|:-------------------------|
-| <span class="d-inline-block p-2 mr-1 v-align-middle bg-green"></span> `var(--primary-color)` | `#2F6B4F` |
-| <span class="d-inline-block p-2 mr-1 v-align-middle bg-green"></span> `var(--color-green)` | `#3F7E4B` |
-| <span class="d-inline-block p-2 mr-1 v-align-middle bg-red"></span> `var(--color-red)` | `#D8514B` | 
-| <span class="d-inline-block p-2 mr-1 v-align-middle bg-blue"></span> `var(--color-blue)` | `#5FA2D9` |
-| <span class="d-inline-block p-2 mr-1 v-align-middle bg-yellow"></span> `var(--color-yellow)` | `#F2A84A` |
-| <span class="d-inline-block p-2 mr-1 v-align-middle bg-purple"></span> `var(--color-purple)` | `#8A5A7B` |
-| <span class="d-inline-block p-2 mr-1 v-align-middle bg-orange"></span> `var(--color-orange)` | `#F2A84A` |
-| <span class="d-inline-block p-2 mr-1 v-align-middle bg-gold"></span> `var(--color-gold)` | `#FFD479` | 
-| <span class="d-inline-block p-2 mr-1 v-align-middle bg-gray-blue"></span> `var(--icon-color)` `var(--subtext-color)` | `#8794A8` | 
-| <span class="d-inline-block p-2 mr-1 v-align-middle bg-black"></span> `var(--primary-text-color)` | `#F5F7FA` | 
+| Token | Base value |
+|:--|:--|
+| `--font-size-primary` | `18px` |
+| `--font-size-secondary` | `16px` |
+| `--font-size-state` | `12px` |
+| `--font-size-caption` | `14px` |
+| `--font-weight-primary` | `700` |
+| `--font-weight-secondary` | `500` |
 
-## Text
+These values are the normal baseline, not fixed card geometry. Cards must grow
+and wrap under bold text, 200% text, 200% browser zoom, and bold plus 200% text.
+Do not shrink or transform text to preserve a fixed layout. Essential text
+wraps; secondary metadata may use an ellipsis.
 
-Text is a important part for your dashboard, that's why we defined a few aspects to make sure everything looks good on every view.
+Use `var(--primary-text-color)` for primary copy and
+`var(--subtext-color)` for secondary copy. Climate temperature values
+intentionally omit degree symbols and units.
 
-### Font
-Marao Dashboard uses the font [Montserrat](https://fonts.google.com/specimen/Montserrat)
+## Semantic colors
 
-### Color
-For all our texts use `var(--primary-text-color)`. The theme maps it to
-`#17201B` in light mode and `#F5F7FA` in dark mode. You don't have to define
-this in the template since it is defined in the theme file.
+The theme supplies mode-aware surfaces and text. Always prefer the semantic
+token that expresses the role:
 
-When using a subtext, you use the variable <span class="d-inline-block p-2 mr-1 v-align-middle bg-gray-blue"></span>`var(--subtext-color)`.
+| Purpose | Token |
+|:--|:--|
+| Page surface | `--primary-background-color` |
+| Card surface | `--ha-card-background` |
+| Marao inactive card | `--marao-card-background` |
+| Primary text | `--primary-text-color` |
+| Secondary text | `--subtext-color` |
+| Default icon | `--icon-color` |
+| Active text/icon | `--active-text-color` |
+| Primary accent | `--primary-color` |
+| Slider track | `--slider-color` |
+| Divider | `--divider-color` |
+| Warning, error, success | `--warning-color`, `--error-color`, `--success-color` |
 
-### Size and weight
+The domain palette is:
 
-| Font value    | Size   |
-|:---------------|:---------------------|
-| var(--font-size-primary) | `14px` |
-| var(--font-size-secondary) | `12px` |
-| var(--font-weight-primary) | `700` |
-| var(--font-weight-primary) | `500` |
+| Token | Value | Typical state |
+|:--|:--|:--|
+| `--color-green` | `#3F7E4B` | active/safe, fan |
+| `--color-red` | `#D8514B` | heat, open access, alarm |
+| `--color-blue` | `#5FA2D9` | cover, cool |
+| `--color-yellow` | `#F2A84A` | dry, warning |
+| `--color-purple` | `#8A5A7B` | heat/cool |
+| `--color-gold` | `#FFD479` | automatic climate |
+
+State colors belong in the shared Marao state mapping. Do not reproduce that
+mapping in a generated card. Active cards pair their background with readable
+text and icon treatment; inactive, loading, disabled, unknown, and unavailable
+states remain distinct. Never communicate a state by color alone.
+
+## Contrast and shape
+
+- Verify theme changes independently in light and dark mode.
+- Normal text should reach a 4.5:1 contrast ratio.
+- Large text and meaningful control boundaries should reach 3:1.
+- Slider tracks must contrast with their card background.
+- A circular icon background must retain equal dimensions and
+  `border-radius: 50%`.
+- Use the shared `--ha-card-border-radius` and elevation variables.
+
+Add a new token only when an existing semantic token cannot represent the role.
+Document it here, define it for both theme modes, use it through the shared
+runtime, and add the smallest focused visual regression check.

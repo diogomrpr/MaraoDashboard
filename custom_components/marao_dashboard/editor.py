@@ -183,6 +183,16 @@ EDITOR_CATALOG: dict[str, Any] = {
             "variables": [],
         },
         {
+            "id": "hc_wallbox_current_card",
+            "label": "Wallbox charging current",
+            "icon": "mdi:ev-plug-type2",
+            "domains": ["number", "input_number"],
+            "description": "Large charging-current value with up/down controls and optional shortcuts.",
+            "variables": [
+                _field("shortcuts", "Charging shortcuts", "number_list", default=[]),
+            ],
+        },
+        {
             "id": "hc_vacuum_card",
             "label": "Vacuum",
             "icon": "mdi:robot-vacuum",

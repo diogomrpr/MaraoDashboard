@@ -5,6 +5,7 @@ const https = require("https");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { assertDisposableHaTarget } = require("./ha-local-safety");
 
 const repoRoot = path.resolve(__dirname, "..");
 const configPath = path.join(repoRoot, ".ha-local.json");
@@ -110,6 +111,7 @@ function assertBuiltPaths() {
   const frontendRoot = path.join(integrationRoot, "frontend");
   const helperPackage = path.join(repoRoot, "ha-test/marao_dashboard_card_test_helpers.yaml");
   const testClimateRoot = path.join(repoRoot, "ha-test/custom_components/marao_test_climate");
+  const testCameraRoot = path.join(repoRoot, "ha-test/custom_components/marao_test_camera");
   if (!fs.existsSync(integrationRoot) || !fs.existsSync(frontendRoot)) {
     throw new Error("Missing dist output. Run npm run build:hacs before syncing.");
   }
@@ -119,7 +121,10 @@ function assertBuiltPaths() {
   if (!fs.existsSync(testClimateRoot)) {
     throw new Error("Missing ha-test/custom_components/marao_test_climate.");
   }
-  return { integrationRoot, frontendRoot, helperPackage, testClimateRoot };
+  if (!fs.existsSync(testCameraRoot)) {
+    throw new Error("Missing ha-test/custom_components/marao_test_camera.");
+  }
+  return { integrationRoot, frontendRoot, helperPackage, testClimateRoot, testCameraRoot };
 }
 
 function run(command, args, options = {}) {
@@ -172,6 +177,7 @@ function syncFiles(config, paths) {
       console.log(`Would replace ${config.remoteConfigPath}/www/community/MaraoDashboard from ${dashboardRoot}`);
       console.log(`Would replace ${config.remoteConfigPath}/custom_components/marao_dashboard from ${paths.integrationRoot}`);
       console.log(`Would replace ${config.remoteConfigPath}/custom_components/marao_test_climate from ${paths.testClimateRoot}`);
+      console.log(`Would replace ${config.remoteConfigPath}/custom_components/marao_test_camera from ${paths.testCameraRoot}`);
       console.log(`Would remove legacy ${config.remoteConfigPath}/custom_components/marao_dashboard_generator`);
       console.log(`Would install/update ${remotePackage} from ${paths.helperPackage}`);
       return;
@@ -190,6 +196,7 @@ function syncFiles(config, paths) {
     runScp(config, dashboardRoot, `${remoteTmp}/MaraoDashboard`);
     runScp(config, paths.integrationRoot, `${remoteTmp}/marao_dashboard`);
     runScp(config, paths.testClimateRoot, `${remoteTmp}/marao_test_climate`);
+    runScp(config, paths.testCameraRoot, `${remoteTmp}/marao_test_camera`);
     runScp(config, paths.helperPackage, `${remoteTmp}/marao_dashboard_card_test_helpers.yaml`);
     runSsh(
       config,
@@ -199,11 +206,13 @@ function syncFiles(config, paths) {
         `rm -rf ${shellQuote(`${config.remoteConfigPath}/www/community/MaraoDashboard`)}`,
         `rm -rf ${shellQuote(`${config.remoteConfigPath}/custom_components/marao_dashboard`)}`,
         `rm -rf ${shellQuote(`${config.remoteConfigPath}/custom_components/marao_test_climate`)}`,
+        `rm -rf ${shellQuote(`${config.remoteConfigPath}/custom_components/marao_test_camera`)}`,
         `rm -rf ${shellQuote(`${config.remoteConfigPath}/custom_components/marao_dashboard_generator`)}`,
         `rm -rf ${shellQuote(`${config.remoteConfigPath}/themes/MaraoDashboard`)}`,
         `mv ${shellQuote(`${remoteTmp}/MaraoDashboard`)} ${shellQuote(`${config.remoteConfigPath}/www/community/MaraoDashboard`)}`,
         `mv ${shellQuote(`${remoteTmp}/marao_dashboard`)} ${shellQuote(`${config.remoteConfigPath}/custom_components/marao_dashboard`)}`,
         `mv ${shellQuote(`${remoteTmp}/marao_test_climate`)} ${shellQuote(`${config.remoteConfigPath}/custom_components/marao_test_climate`)}`,
+        `mv ${shellQuote(`${remoteTmp}/marao_test_camera`)} ${shellQuote(`${config.remoteConfigPath}/custom_components/marao_test_camera`)}`,
         `mv ${shellQuote(`${remoteTmp}/marao_dashboard_card_test_helpers.yaml`)} ${shellQuote(remotePackage)}`,
         `mkdir -p ${shellQuote(`${config.remoteConfigPath}/themes`)}`,
         `cp -R ${shellQuote(`${config.remoteConfigPath}/www/community/MaraoDashboard/themes/MaraoDashboard`)} ${shellQuote(`${config.remoteConfigPath}/themes/MaraoDashboard`)}`,
@@ -317,6 +326,7 @@ async function reloadThemes(config) {
 
 async function main() {
   const config = readConfig();
+  assertDisposableHaTarget(config, { requireSsh: true });
   assertRemoteWritesAllowed(config, dryRun);
   const paths = assertBuiltPaths();
   const integrationHash = hashDir(paths.integrationRoot);

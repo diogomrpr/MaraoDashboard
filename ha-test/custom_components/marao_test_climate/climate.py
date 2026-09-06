@@ -27,6 +27,7 @@ class MaraoTestClimate(ClimateEntity):
     _attr_hvac_modes = [
         HVACMode.HEAT,
         HVACMode.COOL,
+        HVACMode.HEAT_COOL,
         HVACMode.AUTO,
         HVACMode.DRY,
         HVACMode.FAN_ONLY,

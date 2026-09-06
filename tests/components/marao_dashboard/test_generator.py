@@ -203,7 +203,7 @@ def test_write_dashboard_localizes_generated_labels(tmp_path: Path) -> None:
     assert "Office Modo" in source
 
 
-def test_navbar_sizes_to_routes_and_views_have_bottom_spacer(tmp_path: Path) -> None:
+def test_navbar_sizes_to_routes_and_reserves_its_own_bottom_space(tmp_path: Path) -> None:
     generated = write_dashboard(
         {
             "name": "Generated Test",
@@ -216,7 +216,8 @@ def test_navbar_sizes_to_routes_and_views_have_bottom_spacer(tmp_path: Path) -> 
     root = tmp_path / generated.slug
     navbar_path = root / "components/navigation/navbar.yaml"
     navbar = navbar_path.read_text(encoding="utf-8")
-    navbar_config = yaml.safe_load(navbar)["cards"][1]
+    navbar_cards = yaml.safe_load(navbar)["cards"]
+    navbar_config = navbar_cards[0]
     views = [
         root / "views/main/00-overview.yaml",
         root / "views/main/02-rooms.yaml",
@@ -224,7 +225,7 @@ def test_navbar_sizes_to_routes_and_views_have_bottom_spacer(tmp_path: Path) -> 
     ]
 
     assert "type: vertical-stack" in navbar
-    assert "height: 128px" in navbar
+    assert len(navbar_cards) == 1
     assert navbar_config["type"] == "custom:marao-navbar-card"
     assert len(navbar_config["routes"]) == 3
     for view in views:
@@ -505,6 +506,28 @@ def test_room_access_cards_open_generated_action_popups(tmp_path: Path) -> None:
     assert source.index("# marao:custom:start") < source.index("components/navigation/navbar.yaml")
 
 
+def test_open_only_door_generates_direct_open_action_without_popup(tmp_path: Path) -> None:
+    generated = write_dashboard(
+        {
+            "name": "Generated Test",
+            "rooms": [{
+                "name": "Entry",
+                "entities": {"cover": [{
+                    "entity_id": "cover.entry_door",
+                    "device_class": "door",
+                    "supported_features": 1,
+                }]},
+            }],
+        },
+        tmp_path,
+    )
+
+    source = (tmp_path / generated.slug / "views/rooms/00-entry.yaml").read_text(encoding="utf-8")
+    assert "template: hc_access_action_card" in source
+    assert "action_service: cover.open_cover" in source
+    assert "popup_hash: '#access-cover-entry-door'" not in source
+
+
 def test_room_media_card_opens_generated_apple_tv_remote_popup(tmp_path: Path) -> None:
     generated = write_dashboard(
         {
@@ -535,6 +558,9 @@ def test_room_media_card_opens_generated_apple_tv_remote_popup(tmp_path: Path) -
     source = (tmp_path / generated.slug / "views/rooms/00-living-room.yaml").read_text(
         encoding="utf-8"
     )
+    view = yaml.load(source, Loader=MaraoDashboardLoader)
+    popup = next(card for card in view["cards"] if card.get("hash") == "#media-media-player-living-room-tv")
+    app_grid = next(card for card in popup["cards"] if card.get("cards", [{}])[0].get("template") == "hc_media_app_card")
 
     assert "popup_hash: '#media-media-player-living-room-tv'" in source
     assert "hash: '#media-media-player-living-room-tv'" in source
@@ -543,6 +569,8 @@ def test_room_media_card_opens_generated_apple_tv_remote_popup(tmp_path: Path) -
     assert "command: top_menu" in source
     assert "command: KEY_VOLDOWN" in source
     assert "perform_action: media_player.media_seek" in source
+    assert app_grid["columns"] == 2
+    assert all(card["show_state"] is False for card in app_grid["cards"])
 
 
 def test_room_camera_card_opens_generated_frigate_events_popup(tmp_path: Path) -> None:
@@ -703,8 +731,17 @@ def test_generates_configured_julian_pages_and_derived_overview_popups(tmp_path:
     assert "lock.front_door" in (root / "views/main/01-security.yaml").read_text(encoding="utf-8")
     assert "sensor.house_power" in (root / "views/main/03-energy.yaml").read_text(encoding="utf-8")
     assert (root / "components/popups/energy_house_power.yaml").exists()
-    assert "input_number.set_value" in (root / "views/main/04-wallbox.yaml").read_text(encoding="utf-8")
-    assert "app_source: YouTube" in (root / "views/main/05-media.yaml").read_text(encoding="utf-8")
+    wallbox = (root / "views/main/04-wallbox.yaml").read_text(encoding="utf-8")
+    assert "template: hc_wallbox_current_card" in wallbox
+    assert "shortcuts:" in wallbox
+    media = yaml.load(
+        (root / "views/main/05-media.yaml").read_text(encoding="utf-8"),
+        Loader=MaraoDashboardLoader,
+    )
+    app_grid = next(card for card in media["cards"] if card.get("cards", [{}])[0].get("template") == "hc_media_app_card")
+    assert app_grid["columns"] == 2
+    assert app_grid["cards"][0]["variables"]["app_source"] == "YouTube"
+    assert app_grid["cards"][0]["show_state"] is False
 
 
 def test_overview_only_generates_standalone_popups_with_entities(tmp_path: Path) -> None:

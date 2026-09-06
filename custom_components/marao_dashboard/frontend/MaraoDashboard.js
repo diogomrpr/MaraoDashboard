@@ -1,8 +1,20 @@
 const MARAO_RESOURCE_QUERY = new URL(import.meta.url).search;
-const [{ haptic }] = await Promise.all([
+async function waitForHomeAssistantRegistry() {
+  while (!globalThis.customElements?.get("home-assistant")) {
+    await new Promise((resolve) => {
+      if (typeof globalThis.requestAnimationFrame === "function") globalThis.requestAnimationFrame(resolve);
+      else globalThis.setTimeout(resolve, 16);
+    });
+  }
+}
+await waitForHomeAssistantRegistry();
+const [cardsModule, cameraEventsModule] = await Promise.all([
   import(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`),
   import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`),
 ]);
+const { callServiceWithNotification, haptic, registerMaraoCards } = cardsModule;
+registerMaraoCards();
+cameraEventsModule.registerMaraoCameraEventCards();
 
 const MARAO_FONT_URL = "https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900";
 
@@ -255,6 +267,7 @@ const TRANSLATIONS = {
     "common.closing": "Closing",
     "common.running": "Running",
     "common.idle": "Idle",
+    "common.loading": "Loading…",
     "common.unknown": "Unknown",
     "common.unavailable": "Unavailable",
     "common.all_off": "All off",
@@ -266,7 +279,51 @@ const TRANSLATIONS = {
     "common.need_attention_count": "{count} need attention",
     "common.battery": "Battery",
     "common.nothing_playing": "Nothing is playing",
+    "camera_events.title": "Camera events",
+    "camera_events.event": "Event",
+    "camera_events.back": "Back to events",
+    "camera_events.refresh": "Refresh events",
+    "camera_events.loading_events": "Loading events…",
+    "camera_events.loading_event": "Loading event…",
+    "camera_events.no_recent_events": "No recent events.",
+    "camera_events.open_event": "Open {event}{date}",
+    "camera_events.error.entity_required": "marao-frigate-events-card requires an entity",
+    "camera_events.error.frigate_ids_required": "Frigate instance and event IDs are required",
+    "camera_events.error.unsupported_frigate_media_kind": "Unsupported Frigate media kind: {kind}",
+    "camera_events.error.invalid_protect_event_source": "Invalid UniFi Protect event media source",
+    "camera_events.error.frigate_not_linked": "This camera is not linked to a Frigate instance.",
+    "camera_events.error.unsupported_provider": "Unsupported camera event provider: {provider}",
+    "camera_events.error.api_unavailable": "Home Assistant's camera event API is unavailable.",
+    "camera_events.error.load_failed": "Unable to load camera events from {provider}.",
+    "camera_events.error.protect_camera_not_matched": "Unable to match this camera in the UniFi Protect media source.",
+    "camera_events.error.invalid_protect_media_source": "Invalid UniFi Protect media source.",
+    "camera_events.error.no_protect_event_folders": "No UniFi Protect event folders are available for this camera.",
+    "camera_events.error.resolve_protect_media_failed": "Unable to resolve UniFi Protect media URL",
+    "camera_events.error.sign_frigate_media_failed": "Unable to sign Frigate media URL",
+    "camera_events.error.event_load_failed": "Unable to load this event.",
+    "camera_events.card.frigate_name": "Marão Frigate Events Card",
+    "camera_events.card.frigate_description": "Recent Frigate events for a camera",
+    "camera_events.card.name": "Marão Camera Events Card",
+    "camera_events.card.description": "Recent Frigate or UniFi Protect events for a camera",
+    "camera_events.test.person_detected": "Person detected",
+    "actions.open": "Open {name}",
+    "actions.toggle": "Toggle {name}",
+    "actions.failed": "Action failed: {error}",
+    "actions.for_target": "{action} {name}",
+    "controls.increase": "Increase {name}",
+    "controls.decrease": "Decrease {name}",
+    "controls.brightness": "Brightness",
+    "controls.position": "Position",
+    "controls.percentage": "Percentage",
+    "controls.command.up": "Up",
+    "controls.command.down": "Down",
+    "controls.command.left": "Left",
+    "controls.command.right": "Right",
+    "controls.command.select": "Select",
     "climate.target_temperature": "Target Temperature",
+    "climate.current_temperature": "Current {value}",
+    "climate.modes": "Climate modes",
+    "climate.set_mode": "Set climate mode to {mode}",
     "climate.mode.off": "Off",
     "climate.mode.heat": "Heat",
     "climate.mode.cool": "Cool",
@@ -281,13 +338,21 @@ const TRANSLATIONS = {
     "overview.climate": "Climate",
     "overview.maintenance": "Maintenance",
     "access.hold_1_second": "Hold 1 second",
+    "access.hold_to_activate": "Hold to {action}",
     "access.slide_to_open": "Slide to open",
     "access.slide_to_unlock": "Slide to unlock",
+    "popup.close": "Close popup",
     "timeline.title": "State timeline",
     "timeline.loading": "Loading history...",
     "timeline.no_history": "No history in the last 24 hours",
     "timeline.history_unavailable": "History unavailable",
+    "energy.previous_period": "Previous period",
+    "energy.next_period": "Next period",
+    "energy.current_period": "Current period",
+    "energy.no_data": "No recorded values for this period",
+    "wallbox.shortcuts": "Charging current shortcuts",
     "security.arming": "Arming...",
+    "security.arm_away": "Arm away",
     "security.armed_home": "Armed Home",
     "security.armed_away": "Armed Away",
     "security.disarmed": "Disarmed",
@@ -308,6 +373,7 @@ const TRANSLATIONS = {
     "common.closing": "A fechar",
     "common.running": "Em execução",
     "common.idle": "Inativo",
+    "common.loading": "A carregar…",
     "common.unknown": "Desconhecido",
     "common.unavailable": "Indisponível",
     "common.all_off": "Tudo desligado",
@@ -319,7 +385,51 @@ const TRANSLATIONS = {
     "common.need_attention_count": "{count} precisam de atenção",
     "common.battery": "Bateria",
     "common.nothing_playing": "Nada em reprodução",
+    "camera_events.title": "Eventos da câmara",
+    "camera_events.event": "Evento",
+    "camera_events.back": "Voltar aos eventos",
+    "camera_events.refresh": "Atualizar eventos",
+    "camera_events.loading_events": "A carregar eventos…",
+    "camera_events.loading_event": "A carregar evento…",
+    "camera_events.no_recent_events": "Sem eventos recentes.",
+    "camera_events.open_event": "Abrir {event}{date}",
+    "camera_events.error.entity_required": "O cartão marao-frigate-events-card requer uma entidade",
+    "camera_events.error.frigate_ids_required": "Os IDs da instância e do evento do Frigate são obrigatórios",
+    "camera_events.error.unsupported_frigate_media_kind": "Tipo de conteúdo multimédia do Frigate não suportado: {kind}",
+    "camera_events.error.invalid_protect_event_source": "Fonte multimédia de evento do UniFi Protect inválida",
+    "camera_events.error.frigate_not_linked": "Esta câmara não está associada a uma instância do Frigate.",
+    "camera_events.error.unsupported_provider": "Fornecedor de eventos de câmara não suportado: {provider}",
+    "camera_events.error.api_unavailable": "A API de eventos de câmara do Home Assistant está indisponível.",
+    "camera_events.error.load_failed": "Não foi possível carregar eventos da câmara de {provider}.",
+    "camera_events.error.protect_camera_not_matched": "Não foi possível associar esta câmara na fonte multimédia do UniFi Protect.",
+    "camera_events.error.invalid_protect_media_source": "Fonte multimédia do UniFi Protect inválida.",
+    "camera_events.error.no_protect_event_folders": "Não existem pastas de eventos do UniFi Protect para esta câmara.",
+    "camera_events.error.resolve_protect_media_failed": "Não foi possível resolver o URL multimédia do UniFi Protect",
+    "camera_events.error.sign_frigate_media_failed": "Não foi possível assinar o URL multimédia do Frigate",
+    "camera_events.error.event_load_failed": "Não foi possível carregar este evento.",
+    "camera_events.card.frigate_name": "Cartão de eventos Frigate Marão",
+    "camera_events.card.frigate_description": "Eventos recentes do Frigate para uma câmara",
+    "camera_events.card.name": "Cartão de eventos de câmara Marão",
+    "camera_events.card.description": "Eventos recentes do Frigate ou UniFi Protect para uma câmara",
+    "camera_events.test.person_detected": "Pessoa detetada",
+    "actions.open": "Abrir {name}",
+    "actions.toggle": "Alternar {name}",
+    "actions.failed": "A ação falhou: {error}",
+    "actions.for_target": "{action} {name}",
+    "controls.increase": "Aumentar {name}",
+    "controls.decrease": "Diminuir {name}",
+    "controls.brightness": "Luminosidade",
+    "controls.position": "Posição",
+    "controls.percentage": "Percentagem",
+    "controls.command.up": "Cima",
+    "controls.command.down": "Baixo",
+    "controls.command.left": "Esquerda",
+    "controls.command.right": "Direita",
+    "controls.command.select": "Selecionar",
     "climate.target_temperature": "Temperatura alvo",
+    "climate.current_temperature": "Atual {value}",
+    "climate.modes": "Modos de climatização",
+    "climate.set_mode": "Definir modo para {mode}",
     "climate.mode.off": "Desligado",
     "climate.mode.heat": "Aquecer",
     "climate.mode.cool": "Arrefecer",
@@ -334,13 +444,21 @@ const TRANSLATIONS = {
     "overview.climate": "Climatização",
     "overview.maintenance": "Manutenção",
     "access.hold_1_second": "Premir 1 segundo",
+    "access.hold_to_activate": "Manter premido para {action}",
     "access.slide_to_open": "Deslize para abrir",
     "access.slide_to_unlock": "Deslize para desbloquear",
+    "popup.close": "Fechar janela",
     "timeline.title": "Histórico de estados",
     "timeline.loading": "A carregar histórico...",
     "timeline.no_history": "Sem histórico nas últimas 24 horas",
     "timeline.history_unavailable": "Histórico indisponível",
+    "energy.previous_period": "Período anterior",
+    "energy.next_period": "Período seguinte",
+    "energy.current_period": "Período atual",
+    "energy.no_data": "Não existem valores registados neste período",
+    "wallbox.shortcuts": "Atalhos de corrente de carregamento",
     "security.arming": "A armar...",
+    "security.arm_away": "Armar fora",
     "security.armed_home": "Armado em casa",
     "security.armed_away": "Armado fora",
     "security.disarmed": "Desarmado",
@@ -456,6 +574,9 @@ function installMaraoTapGuard(eventRoot = window) {
   eventRoot.addEventListener("click", blockAccidentalTap, { capture: true });
 }
 
+const MARAO_SLIDE_INTENT_PX = 10;
+const MARAO_SLIDE_COMPLETE_AT = 0.92;
+
 class MaraoSlideToOpen extends HTMLElement {
   static get observedAttributes() {
     return ["state"];
@@ -466,6 +587,10 @@ class MaraoSlideToOpen extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._progress = 0;
     this._pointerId = null;
+    this._capturedPointerId = null;
+    this._horizontalIntent = false;
+    this._hapticMilestones = new Set();
+    this._completionTimer = null;
   }
 
   setConfig(config) {
@@ -480,6 +605,11 @@ class MaraoSlideToOpen extends HTMLElement {
 
   connectedCallback() {
     this._render();
+  }
+
+  disconnectedCallback() {
+    clearTimeout(this._completionTimer);
+    this._resetGesture(this.shadowRoot?.querySelector(".track"));
   }
 
   attributeChangedCallback(_name, oldValue, newValue) {
@@ -500,9 +630,11 @@ class MaraoSlideToOpen extends HTMLElement {
 
   _disabled() {
     const entityId = this._entityId() || "";
+    const hass = this._hassInstance();
+    if (!hass?.callService || hass.connected === false || hass.connection?.connected === false) return true;
     const inactiveStates = entityId.startsWith("lock.")
-      ? ["unlocking", "unavailable"]
-      : ["open", "opening", "unavailable"];
+      ? ["unlocking", "unknown", "unavailable"]
+      : ["open", "opening", "unknown", "unavailable"];
     return inactiveStates.includes(this._state());
   }
 
@@ -521,10 +653,24 @@ class MaraoSlideToOpen extends HTMLElement {
     return window.MaraoDashboard?.localize?.(key, this._hassInstance()) || (isLock ? "Unlock" : "Slide to open");
   }
 
+  _semanticLabel(action) {
+    const entityId = this._entityId();
+    const name = this._config?.name
+      || this._hassInstance()?.states?.[entityId]?.attributes?.friendly_name
+      || entityId;
+    if (!name) return action;
+    return window.MaraoDashboard?.localize?.(
+      "actions.for_target",
+      this._hassInstance(),
+      { action, name },
+    ) || `${action} ${name}`;
+  }
+
   _render() {
     if (!this.shadowRoot) return;
     const disabled = this._disabled();
     const label = this._label();
+    const semanticLabel = this._semanticLabel(label);
     this.shadowRoot.innerHTML = `
       <style>
         :host { position: relative; z-index: 2; display: block; width: 100%; pointer-events: auto; }
@@ -537,12 +683,16 @@ class MaraoSlideToOpen extends HTMLElement {
           border-radius: 32px;
           box-sizing: border-box;
           background: var(--marao-card-background);
-          touch-action: none;
+          touch-action: pan-y;
           user-select: none;
           -webkit-user-select: none;
         }
         .track[aria-disabled="false"] { cursor: grab; }
         .track.dragging { cursor: grabbing; }
+        .track.completing { animation: marao-slide-complete 280ms ease-out; }
+        @keyframes marao-slide-complete {
+          50% { box-shadow: inset 0 0 0 4px var(--primary-color); }
+        }
         .fill {
           position: absolute;
           inset: 0;
@@ -593,20 +743,25 @@ class MaraoSlideToOpen extends HTMLElement {
           color: var(--icon-color);
           background: var(--ha-card-background);
         }
+        @media (prefers-reduced-motion: reduce) {
+          .track.completing { animation: none; }
+        }
       </style>
-      <div class="track" role="slider" tabindex="${disabled ? -1 : 0}" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-disabled="${disabled}">
+      <div class="track" role="slider" tabindex="${disabled ? -1 : 0}" aria-label="${escapeHtml(semanticLabel)}" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0%" aria-disabled="${disabled}">
         <div class="fill"></div>
-        <span class="label">${label}</span>
+        <span class="label">${escapeHtml(label)}</span>
         <span class="thumb">›</span>
       </div>
     `;
     const track = this.shadowRoot.querySelector(".track");
     if (disabled) return;
     if (navigator.maxTouchPoints > 0) {
-      const touch = (event) =>
-        Array.from(event.changedTouches).find((item) =>
+      const touch = (event) => {
+        const points = [...Array.from(event.touches || []), ...Array.from(event.changedTouches || [])];
+        return points.find((item) =>
           this._pointerId === null || item.identifier === this._pointerId
         );
+      };
       track.addEventListener("touchstart", (event) => this._start(event, touch(event)), { passive: false });
       track.addEventListener("touchmove", (event) => this._move(event, touch(event)), { passive: false });
       track.addEventListener("touchend", (event) => this._end(event, touch(event)), { passive: false });
@@ -629,63 +784,127 @@ class MaraoSlideToOpen extends HTMLElement {
     const travel = Math.max(0, track.clientWidth - 62);
     fill.style.transform = `scaleX(${this._progress})`;
     thumb.style.transform = `translateX(${travel * this._progress}px)`;
-    track.setAttribute("aria-valuenow", String(Math.round(this._progress * 100)));
+    const percentage = Math.round(this._progress * 100);
+    track.setAttribute("aria-valuenow", String(percentage));
+    track.setAttribute("aria-valuetext", `${percentage}%`);
   }
 
   _start(event, point) {
-    if (!point || (point.pointerId !== undefined && event.button !== 0) || this._disabled()) return;
+    if (
+      !point
+      || this._pointerId !== null
+      || (point.pointerId !== undefined && event.button !== undefined && event.button !== 0)
+      || this._disabled()
+    ) return;
     const track = event.currentTarget;
     const bounds = track.getBoundingClientRect();
     if (point.clientX > bounds.left + 72) return;
-    event.preventDefault();
-    event.stopPropagation();
-    haptic("heavy");
     this._pointerId = point.pointerId ?? point.identifier;
     this._startX = point.clientX;
+    this._startY = point.clientY;
     this._startProgress = this._progress;
-    track.classList.add("dragging");
-    if (point.pointerId !== undefined) track.setPointerCapture(point.pointerId);
+    this._horizontalIntent = false;
+    this._hapticMilestones.clear();
   }
 
   _move(event, point) {
     if (!point || (point.pointerId ?? point.identifier) !== this._pointerId) return;
+    const track = event.currentTarget;
+    const deltaX = point.clientX - this._startX;
+    const deltaY = point.clientY - this._startY;
+    if (!this._horizontalIntent) {
+      if (Math.hypot(deltaX, deltaY) < MARAO_SLIDE_INTENT_PX) return;
+      if (Math.abs(deltaY) >= Math.abs(deltaX)) {
+        this._resetGesture(track);
+        return;
+      }
+      this._horizontalIntent = true;
+      track.classList.add("dragging");
+      if (point.pointerId !== undefined) {
+        track.setPointerCapture?.(point.pointerId);
+        this._capturedPointerId = point.pointerId;
+      }
+      haptic("heavy");
+    }
     event.preventDefault();
     event.stopPropagation();
-    const track = event.currentTarget;
     const travel = Math.max(1, track.clientWidth - 62);
-    this._setProgress(this._startProgress + (point.clientX - this._startX) / travel);
+    const previousProgress = this._progress;
+    this._setProgress(this._startProgress + deltaX / travel);
+    this._hapticProgress(previousProgress, this._progress);
   }
 
   _end(event, point) {
     if (!point || (point.pointerId ?? point.identifier) !== this._pointerId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    if (point.pointerId !== undefined) event.currentTarget.releasePointerCapture?.(point.pointerId);
-    this._pointerId = null;
-    event.currentTarget.classList.remove("dragging");
-    if (this._progress >= 0.92) this._trigger();
-    this._setProgress(0);
+    const track = event.currentTarget;
+    const bounds = track.getBoundingClientRect();
+    const releasedInside = point.clientX >= bounds.left
+      && point.clientX <= bounds.right
+      && point.clientY >= bounds.top
+      && point.clientY <= bounds.bottom;
+    const completed = this._horizontalIntent
+      && releasedInside
+      && this._progress >= MARAO_SLIDE_COMPLETE_AT;
+    if (this._horizontalIntent) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    this._resetGesture(track);
+    if (completed) this._trigger();
   }
 
   _cancel(event, point) {
-    if (!point || (point.pointerId ?? point.identifier) !== this._pointerId) return;
+    if (this._pointerId === null) return;
+    if (point && (point.pointerId ?? point.identifier) !== this._pointerId) return;
+    this._resetGesture(event.currentTarget);
+  }
+
+  _resetGesture(track) {
+    if (
+      this._capturedPointerId !== null
+      && (track?.hasPointerCapture?.(this._capturedPointerId) ?? true)
+    ) {
+      track?.releasePointerCapture?.(this._capturedPointerId);
+    }
     this._pointerId = null;
-    event.currentTarget.classList.remove("dragging");
+    this._capturedPointerId = null;
+    this._horizontalIntent = false;
+    this._hapticMilestones.clear();
+    track?.classList?.remove("dragging");
     this._setProgress(0);
+  }
+
+  _hapticProgress(previousProgress, nextProgress) {
+    if (nextProgress <= previousProgress) return;
+    for (let milestone = 1; milestone <= 9; milestone += 1) {
+      const value = milestone / 10;
+      if (
+        previousProgress < value
+        && nextProgress >= value
+        && !this._hapticMilestones.has(milestone)
+      ) {
+        this._hapticMilestones.add(milestone);
+        haptic("heavy");
+      }
+    }
   }
 
   _key(event) {
     if (event.key === "Escape") {
       event.preventDefault();
       this._setProgress(0);
-    } else if (["ArrowRight", "End"].includes(event.key)) {
-      event.preventDefault();
-      this._setProgress(1);
-    } else if (["Enter", " "].includes(event.key) && this._progress >= 0.92) {
-      event.preventDefault();
-      this._trigger();
-      this._setProgress(0);
+      this._hapticMilestones.clear();
     }
+  }
+
+  _animateCompletion() {
+    const track = this.shadowRoot?.querySelector(".track");
+    if (!track) return;
+    clearTimeout(this._completionTimer);
+    track.classList.remove("completing");
+    void track.offsetWidth;
+    track.classList.add("completing");
+    this._completionTimer = setTimeout(() => track.classList.remove("completing"), 300);
   }
 
   _trigger() {
@@ -694,8 +913,9 @@ class MaraoSlideToOpen extends HTMLElement {
     if (!entityId || !hass) return;
     const [domain] = entityId.split(".", 1);
     const service = domain === "lock" ? "unlock" : "open_cover";
-    hass.callService(domain, service, { entity_id: entityId });
-    haptic("heavy");
+    this._animateCompletion();
+    callServiceWithNotification(hass, domain, service, { entity_id: entityId });
+    haptic("success");
   }
 
   getCardSize() {
@@ -707,14 +927,15 @@ if (!customElements.get("marao-slide-to-open")) {
   customElements.define("marao-slide-to-open", MaraoSlideToOpen);
 }
 
-const escapeHtml = (value) =>
-  String(value ?? "").replace(/[&<>"']/g, (character) => ({
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     '"': "&quot;",
     "'": "&#39;",
   })[character]);
+}
 
 class MaraoStateTimelineCard extends HTMLElement {
   constructor() {
@@ -984,6 +1205,136 @@ if (!customElements.get("marao-state-timeline-card")) {
   });
 }
 
+class MaraoEnergyPeriodCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._offset = 0;
+    this._history = [];
+  }
+
+  setConfig(config) {
+    // Accept the legacy generated key while keeping `entity` canonical.  This
+    // lets dashboards generated before the period-card migration render while
+    // they are regenerated, instead of producing an error card.
+    const entity = config?.entity || config?.entity_id || null;
+    this._config = { period: "day", popup: false, ...config, entity };
+    this._offset = 0;
+    this._load();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+    if (!this._history?.length) this._load();
+  }
+
+  getCardSize() { return this._config?.popup ? 5 : 2; }
+
+  _range() {
+    const now = new Date();
+    let start;
+    if (this._config.period === "month") {
+      start = new Date(now.getFullYear(), now.getMonth() + this._offset, 1);
+    } else {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + this._offset);
+      start.setHours(0, 0, 0, 0);
+    }
+    const end = this._config.period === "month"
+      ? new Date(start.getFullYear(), start.getMonth() + 1, 1)
+      : new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    return { start, end };
+  }
+
+  _periodLabel() {
+    const { start } = this._range();
+    const language = this._hass?.locale?.language || this._hass?.language || navigator.language;
+    return this._config.period === "month"
+      ? new Intl.DateTimeFormat(language, { month: "long", year: "numeric" }).format(start)
+      : new Intl.DateTimeFormat(language, { weekday: "short", day: "numeric", month: "short" }).format(start);
+  }
+
+  async _load() {
+    if (!this._hass?.callApi || !this._config?.entity || this._loading) return;
+    this._loading = true;
+    const { start, end } = this._range();
+    const query = new URLSearchParams({
+      filter_entity_id: this._config.entity,
+      end_time: end.toISOString(),
+      minimal_response: "",
+      no_attributes: "",
+    });
+    try {
+      const response = await this._hass.callApi("GET", `history/period/${start.toISOString()}?${query}`);
+      this._history = Array.isArray(response?.[0]) ? response[0] : [];
+      this._error = false;
+    } catch (_error) {
+      this._history = [];
+      this._error = true;
+    } finally {
+      this._loading = false;
+      this._render();
+    }
+  }
+
+  _values() {
+    return this._history.map((record) => ({
+      value: Number(record.state),
+      time: new Date(record.last_changed || record.last_updated).getTime(),
+    })).filter((item) => Number.isFinite(item.value) && Number.isFinite(item.time));
+  }
+
+  _render() {
+    if (!this.shadowRoot || !this._config) return;
+    const entity = this._hass?.states?.[this._config.entity];
+    const title = this._config.name || entity?.attributes?.friendly_name || this._config.entity;
+    const values = this._values();
+    const current = entity?.state && Number.isFinite(Number(entity.state)) ? entity.state : "—";
+    const period = this._periodLabel();
+    const range = this._range();
+    const min = values.length ? Math.min(...values.map((item) => item.value)) : 0;
+    const max = values.length ? Math.max(...values.map((item) => item.value)) : 1;
+    const spread = max - min || 1;
+    const points = values.map((item) => {
+      const x = ((item.time - range.start.getTime()) / Math.max(1, range.end - range.start)) * 100;
+      const y = 100 - ((item.value - min) / spread) * 88 - 6;
+      return `${Math.max(0, Math.min(100, x))},${Math.max(6, Math.min(94, y))}`;
+    }).join(" ");
+    const previous = localize("energy.previous_period", this._hass);
+    const next = localize("energy.next_period", this._hass);
+    const currentLabel = localize("energy.current_period", this._hass);
+    const body = this._config.popup
+      ? `<h2>${escapeHtml(title)}</h2><div class="period-nav"><button data-period="previous" aria-label="${escapeHtml(previous)}">‹</button><strong>${escapeHtml(period)}</strong><button data-period="next" aria-label="${escapeHtml(next)}"${this._offset >= 0 ? " disabled" : ""}>›</button></div><div class="chart" role="img" aria-label="${escapeHtml(`${title} ${period}`)}">${points ? `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${points}" /></svg><div class="scale"><span>${escapeHtml(String(max))}</span><span>${escapeHtml(String(min))}</span></div>` : `<span class="empty">${escapeHtml(this._error ? localize("timeline.history_unavailable", this._hass) : localize("energy.no_data", this._hass))}</span>`}</div>`
+      : `<span class="value">${escapeHtml(String(current))}</span><span class="period">${escapeHtml(period)}</span>`;
+    const surfaceTag = this._config.popup ? "div" : "button";
+    const surfaceAttributes = this._config.popup ? "" : ` type="button" aria-label="${escapeHtml(title)}"`;
+    this.shadowRoot.innerHTML = `<style>
+      :host{display:block;width:100%;} .surface{display:flex;min-height:112px;width:100%;box-sizing:border-box;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:18px 20px;border:0;border-radius:var(--ha-card-border-radius,18px);background:var(--ha-card-background);color:var(--primary-text-color);font:inherit;text-align:left;cursor:pointer;} .surface:focus{outline:none;} h2{margin:0;font-size:var(--font-size-primary,18px);font-weight:var(--font-weight-primary,700);} .value{font-size:2rem;font-weight:800;line-height:1.1;} .period{color:var(--secondary-text-color);font-size:var(--font-size-secondary,14px);} .period-nav{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;width:100%;gap:8px;margin-bottom:12px;text-align:center;} .period-nav strong{font-size:var(--font-size-primary,18px);text-transform:capitalize;} .period-nav button{width:48px;height:48px;border:0;border-radius:50%;background:var(--secondary-background-color);color:var(--primary-text-color);font-size:34px;line-height:1;} .period-nav button:disabled{opacity:.35;} .chart{position:relative;min-height:190px;border-radius:14px;background:var(--secondary-background-color);overflow:hidden;} svg{display:block;width:100%;height:190px;} polyline{fill:none;stroke:var(--primary-color);stroke-width:2.5;vector-effect:non-scaling-stroke;} .scale{position:absolute;inset:8px 8px auto;display:flex;justify-content:space-between;color:var(--secondary-text-color);font-size:12px;} .scale span:last-child{align-self:flex-end;margin-top:158px;} .empty{display:grid;min-height:190px;place-items:center;padding:16px;color:var(--secondary-text-color);text-align:center;}
+    </style><${surfaceTag} class="surface"${surfaceAttributes}>${this._config.popup ? body : `<h2>${escapeHtml(title)}</h2>${body}`}</${surfaceTag}>`;
+    if (this._config.popup) {
+      this.shadowRoot.querySelectorAll("[data-period]").forEach((button) => button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this._offset += button.dataset.period === "previous" ? -1 : 1;
+        window.MaraoDashboard?.haptic?.("heavy");
+        this._history = [];
+        this._load();
+      }));
+    } else {
+      this.shadowRoot.querySelector(".surface")?.addEventListener("click", () => {
+        window.MaraoDashboard?.haptic?.("heavy");
+        const hash = this._config.popup_hash;
+        if (hash) window.history.pushState({}, "", `${window.location.pathname}${window.location.search}${hash}`), window.dispatchEvent(new HashChangeEvent("hashchange"));
+      });
+    }
+  }
+}
+
+if (!customElements.get("marao-energy-period-card")) {
+  customElements.define("marao-energy-period-card", MaraoEnergyPeriodCard);
+  window.customCards = window.customCards || [];
+  window.customCards.push({ type: "marao-energy-period-card", name: "Marao Energy Period", description: "Period-aware energy value and history graph." });
+}
+
 function installPopupScrollGuard() {
   if (window.MaraoDashboard?.popupScrollGuardVersion === POPUP_SCROLL_GUARD_VERSION) return;
 
@@ -1059,6 +1410,7 @@ installPopupScrollGuard();
 window.MaraoDashboard = {
   ...(window.MaraoDashboard || {}),
   assetPath: "/marao_dashboard_static/images",
+  haptic,
   localize,
   popupScrollGuardInstalled: true,
   popupScrollGuardVersion: POPUP_SCROLL_GUARD_VERSION,

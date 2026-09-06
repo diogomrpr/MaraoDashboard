@@ -1,0 +1,8 @@
+{
+  "domain": "marao_test_camera",
+  "name": "Marao Test Camera",
+  "codeowners": [],
+  "documentation": "https://github.com/digasmart/MaraoDashboard",
+  "iot_class": "local_push",
+  "version": "1.0.0"
+}

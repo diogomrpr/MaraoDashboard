@@ -60,6 +60,7 @@ for (const relativePath of pathsToValidate) {
 
   const doc = YAML.parseDocument(normalizeHomeAssistantTags(source), {
     prettyErrors: true,
+    uniqueKeys: true,
   });
 
   if (doc.errors.length > 0) {
@@ -81,7 +82,7 @@ if (/platform:\s*template\b/.test(helperPackageSource)) {
 for (const [platform, count] of Object.entries({
   light: 1,
   switch: 3,
-  cover: 2,
+  cover: 3,
   lock: 1,
   fan: 1,
   alarm_control_panel: 1,
@@ -97,6 +98,46 @@ const templateVacuums = helperPackage.template?.flatMap((block) => block.vacuum 
 if (templateVacuums.some((vacuum) => "battery_level" in vacuum || "battery_level_template" in vacuum)) {
   hasError = true;
   console.error(`${helperPackagePath} must not use deprecated template vacuum battery options.`);
+}
+if (
+  helperPackage.camera?.length !== 1 ||
+  helperPackage.camera[0]?.platform !== "marao_test_camera"
+) {
+  hasError = true;
+  console.error(`${helperPackagePath} must define one safe local marao_test_camera entity.`);
+}
+for (const relativePath of [
+  "ha-test/custom_components/marao_test_camera/manifest.json",
+  "ha-test/custom_components/marao_test_camera/camera.py",
+]) {
+  if (!fs.existsSync(path.join(repoRoot, relativePath))) {
+    hasError = true;
+    console.error(`Missing safe local camera helper: ${relativePath}`);
+  }
+}
+const syncSource = fs.readFileSync(path.join(repoRoot, "scripts/sync-ha-local.js"), "utf8");
+for (const expected of [
+  "ha-test/custom_components/marao_test_camera",
+  "paths.testCameraRoot",
+  "/custom_components/marao_test_camera",
+]) {
+  if (!syncSource.includes(expected)) {
+    hasError = true;
+    console.error(`Local Home Assistant sync must include the safe test camera: ${expected}`);
+  }
+}
+for (const expected of [
+  "marao_dashboard_test_wallbox_current:",
+  "name: Marao Dashboard Test Month Energy",
+  "name: Marao Dashboard Test Today Energy",
+  "name: Marao Dashboard Test Month Cost",
+  "name: Marao Dashboard Test Today Cost",
+  "cover.marao_dashboard_test_open_only_door",
+]) {
+  if (!helperPackageSource.includes(expected)) {
+    hasError = true;
+    console.error(`Card test fixture is missing the safe fake entity ${expected}.`);
+  }
 }
 
 const templateSource = fs.readFileSync(
@@ -131,6 +172,56 @@ if (/font-size:\s*(?:10|11|12|13)px\b/.test(templateSource)) {
 const dashboardSource = collectYamlFiles(`${frontendRoot}/dashboard/MaraoDashboard`)
   .map((relativePath) => fs.readFileSync(path.join(repoRoot, relativePath), "utf8"))
   .join("\n");
+const gallerySource = fs.readFileSync(
+  path.join(repoRoot, `${frontendRoot}/dashboard/MaraoDashboard/views/00-card-test.yaml`),
+  "utf8",
+);
+for (const expectedCard of [
+  "hc_camera_card",
+  "hc_light_card",
+  "hc_cover_card",
+  "hc_access_card",
+  "hc_access_action_card",
+  "hc_switch_card",
+  "hc_climate_card",
+  "hc_fan_card",
+  "hc_media_card",
+  "hc_media_app_card",
+  "hc_sensor_card",
+  "hc_number_card",
+  "hc_wallbox_current_card",
+  "hc_vacuum_card",
+  "hc_battery_card",
+  "hc_dishwasher_card",
+  "hc_washing_machine_card",
+  "hc_graph_card",
+  "hc_toggle_graph_card",
+  "hc_timeline_card",
+  "hc_navigation_card",
+  "marao-energy-period-card",
+]) {
+  if (!gallerySource.includes(expectedCard)) {
+    hasError = true;
+    console.error(`Card test gallery is missing ${expectedCard}.`);
+  }
+}
+for (const expectedGalleryVariant of [
+  "name: Light without slider",
+  "name: Fan without slider",
+  "name: Open-only door",
+  "name: Climate",
+  "name: Marao Dashboard Test Single Mode Climate",
+  "name: Month Power",
+  "name: Today Power",
+  "name: Month Cost",
+  "name: Today Cost",
+  "shortcuts: [6, 12, 16]",
+]) {
+  if (!gallerySource.includes(expectedGalleryVariant)) {
+    hasError = true;
+    console.error(`Card test gallery is missing behavior variant: ${expectedGalleryVariant}.`);
+  }
+}
 const literalCardColors = dashboardSource.match(
   /#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|(?:^|[:=,(]\s*|return\s+)["']?(?:white|black|red|blue|green|orange|yellow|purple|gr[ae]y)(?=["';,\s)]|$)/gim
 ) || [];
@@ -149,12 +240,12 @@ for (const expected of [
   "window.addEventListener(\"wheel\", guardScroll",
   "class MaraoSlideToOpen extends HTMLElement",
   "if (!this.shadowRoot) return",
-  "setPointerCapture(point.pointerId)",
+  "track.setPointerCapture?.(point.pointerId)",
   "track.addEventListener(\"touchstart\"",
   "{ passive: false }",
   "static get observedAttributes()",
   "attributeChangedCallback(",
-  "this._progress >= 0.92",
+  "this._progress >= MARAO_SLIDE_COMPLETE_AT",
   "height: 64px",
   "path.some(isSlideToOpen)",
   "class MaraoStateTimelineCard extends HTMLElement",
@@ -179,10 +270,29 @@ const frontendConstants = fs.readFileSync(
   path.join(repoRoot, "custom_components/marao_dashboard/const.py"),
   "utf8"
 );
-for (const expected of ["MARAO_DASHBOARD_FRONTEND_VERSION", "MaraoDashboard.js?v={MARAO_DASHBOARD_FRONTEND_VERSION}"]) {
+for (const expected of [
+  "MARAO_DASHBOARD_FRONTEND_VERSION",
+  "MaraoCards.js?v={MARAO_DASHBOARD_FRONTEND_VERSION}",
+  "MaraoFrigateEventsCard.js?v={MARAO_DASHBOARD_FRONTEND_VERSION}",
+  "MaraoDashboard.js?v={MARAO_DASHBOARD_FRONTEND_VERSION}",
+]) {
   if (!frontendConstants.includes(expected)) {
     hasError = true;
     console.error(`Marao Dashboard frontend resource must be cache-busted: ${expected}`);
+  }
+}
+if (!frontendConstants.match(/MARAO_DASHBOARD_MODULES\s*=\s*\(\s*MARAO_DASHBOARD_FRONTEND_MODULE,\s*\)/s)) {
+  hasError = true;
+  console.error("Only the registry-gated Marao dashboard entry module may be registered with Home Assistant.");
+}
+for (const expected of [
+  'customElements?.get("home-assistant")',
+  "registerMaraoCards();",
+  "registerMaraoCameraEventCards();",
+]) {
+  if (!frontendSource.includes(expected)) {
+    hasError = true;
+    console.error(`Marao dashboard bootstrap must wait for Home Assistant and retry card registration: ${expected}`);
   }
 }
 
@@ -310,9 +420,65 @@ function findCardsByType(value, type) {
   return current.concat(Object.values(value).flatMap((entry) => findCardsByType(entry, type)));
 }
 
-if (findCardType(cardTest.cards[0], "grid")) {
-  hasError = true;
-  console.error("Visible card test dashboard examples must stay in the single-column vertical stack.");
+const editorSource = fs.readFileSync(
+  path.join(repoRoot, "custom_components/marao_dashboard/editor.py"),
+  "utf8"
+);
+const catalogTemplates = [...new Set(
+  [...editorSource.matchAll(/"id":\s*"(hc_[a-z0-9_]+_card)"/g)].map((match) => match[1])
+)];
+const visibleMaraoCards = findCardsByType(cardTest.cards[0], "custom:marao-card");
+const visibleTemplates = visibleMaraoCards.map((card) => card.template).filter(Boolean);
+for (const template of catalogTemplates) {
+  const count = visibleTemplates.filter((candidate) => candidate === template).length;
+  const supportsIntentionalVariants = [
+    "hc_access_card",
+    "hc_climate_card",
+    "hc_fan_card",
+    "hc_light_card",
+    "hc_navigation_card",
+    "hc_wallbox_current_card",
+  ].includes(template);
+  if (count < 1 || (!supportsIntentionalVariants && count !== 1)) {
+    hasError = true;
+    console.error(
+      `Card test dashboard must include ${supportsIntentionalVariants ? "at least" : "exactly"} one visible ${template} example; found ${count}.`
+    );
+  }
+}
+
+const allGalleryTemplates = new Set(
+  findCardsByType(cardTest, "custom:marao-card").map((card) => card.template).filter(Boolean)
+);
+for (const template of [
+  "hc_access_action_card",
+  "hc_access_hold_action_card",
+  "hc_access_slide_action_card",
+  "hc_base_card",
+  "hc_blinds_popup_card",
+  "hc_climate_popup_card",
+  "hc_glance_card",
+  "hc_header_card",
+  "hc_lights_popup_card",
+  "hc_maintenance_popup_card",
+  "hc_media_app_card",
+  "hc_room_card",
+  "hc_scene_card",
+  "hc_security_card",
+  "hc_title_card",
+  "hc_weather_card",
+]) {
+  if (!allGalleryTemplates.has(template)) {
+    hasError = true;
+    console.error(`Card test dashboard is missing the supported ${template} template.`);
+  }
+}
+
+for (const type of ["custom:marao-navbar-card", "custom:marao-popup-card", "custom:marao-camera-events-card"]) {
+  if (!findCardType(cardTest, type)) {
+    hasError = true;
+    console.error(`Card test dashboard is missing the supported ${type} component.`);
+  }
 }
 
 const timelineCards = findCardsByType(cardTest.cards[0], "custom:marao-card")
@@ -424,20 +590,51 @@ if (
   console.error("Card test dashboard must include the functional multi-mode test climate popup.");
 }
 
+const singleModeClimateCard = visibleMaraoCards.find(
+  (card) => card.entity === "climate.marao_dashboard_test_single_mode_climate"
+);
+if (
+  singleModeClimateCard?.template !== "hc_climate_card" ||
+  !singleModeClimateCard.variables?.mode_selector_hash ||
+  cardTest.cards.some((card) => card?.hash === singleModeClimateCard.variables.mode_selector_hash)
+) {
+  hasError = true;
+  console.error("Card test dashboard must include a single-mode climate card whose tap cannot open a popup.");
+}
+
+const cameraCard = visibleMaraoCards.find((card) => card.template === "hc_camera_card");
+const cameraPopup = cardTest.cards.find(
+  (card) => card?.type === "custom:marao-popup-card" && card.hash === cameraCard?.variables?.popup_hash
+);
+if (
+  cameraCard?.entity !== "camera.marao_dashboard_test_camera" ||
+  !cameraPopup ||
+  !findCardsByType(cameraPopup, "custom:marao-camera-events-card").some(
+    (card) => card.entity === cameraCard.entity
+  )
+) {
+  hasError = true;
+  console.error("Card test dashboard must include the safe fake camera and its events popup.");
+}
+
 const appleTvCard = findCardsByType(cardTest.cards[0], "custom:marao-card").find(
   (card) => card.template === "hc_media_card" && card.variables?.apple_tv === true
 );
 const appleTvPopup = cardTest.cards.find(
   (card) => card?.type === "custom:marao-popup-card" && card.hash === "#marao-dashboard-test-apple-tv-popup"
 );
+const appleTvAppGrid = appleTvPopup?.cards?.find(
+  (card) => card?.type === "grid" && card.cards?.some((item) => item.template === "hc_media_app_card")
+);
 if (
   appleTvCard?.variables?.popup_hash !== "#marao-dashboard-test-apple-tv-popup" ||
-  !findCardsByType(appleTvPopup, "custom:marao-card").some((card) => card.template === "hc_media_app_card") ||
+  appleTvAppGrid?.columns !== 2 ||
+  appleTvAppGrid.cards.some((card) => card.show_state !== false) ||
   !String(JSON.stringify(appleTvPopup)).includes('"command":"top_menu"') ||
   !String(JSON.stringify(appleTvPopup)).includes('"command":"select"')
 ) {
   hasError = true;
-  console.error("Card test dashboard must include an Apple TV media card and remote popup.");
+  console.error("Card test dashboard must include two-column Apple TV app shortcuts and a remote popup.");
 }
 
 const historyGraphs = findCardsByType(cardTest.cards[0], "history-graph");
@@ -455,11 +652,11 @@ if (
 const cardTestLastCard = cardTest.cards?.[cardTest.cards.length - 1];
 if (
   cardTestLastCard?.type !== "vertical-stack" ||
-  cardTestLastCard.cards?.[0]?.color_type !== "blank-card" ||
-  !findCardType(cardTestLastCard, "custom:marao-navbar-card")
+  cardTestLastCard.cards?.length !== 1 ||
+  cardTestLastCard.cards[0]?.type !== "custom:marao-navbar-card"
 ) {
   hasError = true;
-  console.error("Card test dashboard must end with the navbar stack and its bottom spacer.");
+  console.error("Card test dashboard must end with the self-spacing navbar stack.");
 }
 
 if (hasError) {
