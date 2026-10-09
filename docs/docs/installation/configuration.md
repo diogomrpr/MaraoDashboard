@@ -17,7 +17,7 @@ The integration then:
 - Serves Marao's dashboard runtime, editor, and camera-events card directly
   from `/marao_dashboard_static` through Home Assistant's frontend and static
   APIs.
-- Copies generated dashboard YAML under `www/community/MaraoDashboard/dashboard`.
+- Generates dashboard YAML under `dashboard/MaraoDashboard`.
 - Copies the theme YAML under `themes/MaraoDashboard` and ensures the standard
   `frontend.themes` include is present.
 - Adds a `marao-dashboard` YAML dashboard entry.
@@ -251,8 +251,8 @@ bottom spacer in views; keep custom room `cards` before the generated navbar.
 ## Frontend runtime
 
 The integration registers its Marao card runtime through Home Assistant's
-frontend API. Generated graphs use native Home Assistant cards, and the
-floating navbar hides the top header while this dashboard is active.
+frontend API. Generated graphs use Marao's project-owned background graph, and
+the floating navbar hides the top header while this dashboard is active.
 
 ## Restart and open
 

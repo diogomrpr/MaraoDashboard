@@ -87,6 +87,10 @@ test("camera event actions keep a visible 48px target and strong feedback", () =
   assert.match(source, /\.icon-button:active \{ transform: scale\(\.94\); \}/);
   assert.match(source, /button:disabled \{ cursor: default; opacity: \.55;/);
   assert.doesNotMatch(source, /:focus-visible/);
+  assert.match(MaraoFrigateEventsCard.styles, /repeat\(auto-fill, minmax\(min\(145px, 100%\), 1fr\)\)/);
+  assert.match(MaraoFrigateEventsCard.styles, /\.meta strong, \.detail-meta strong \{ overflow-wrap: anywhere;/);
+  assert.match(MaraoFrigateEventsCard.styles, /\.meta small, \.detail-meta small \{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap;/);
+  assert.doesNotMatch(MaraoFrigateEventsCard.styles, /@media/);
 });
 
 test("camera event UI routes visible copy through complete English and Portuguese catalogs", () => {
@@ -112,7 +116,7 @@ test("camera event UI routes visible copy through complete English and Portugues
     const card = new MaraoFrigateEventsCard();
     card.shadowRoot = { innerHTML: "" };
     card._config = { entity: "camera.test" };
-    card._hass = { states: {}, connection: { connected: true } };
+    card._hass = { states: { "camera.test": { state: "idle" } }, connection: { connected: true } };
     card._status = "loading";
     card._render();
     assert.match(card.shadowRoot.innerHTML, /Eventos da câmara/);
@@ -145,7 +149,7 @@ test("camera event loading waits for Home Assistant and retries after reconnect"
   const card = new MaraoFrigateEventsCard();
   const loads = [];
   card._connected = true;
-  card._config = { entity: "camera.test", event_provider: "marao_test", limit: 1 };
+  card._config = { entity: "camera.test", event_provider: "frigate", frigate_instance_id: "fixture", limit: 1 };
   card._loadedKey = "unchanged";
   card._load = (...args) => loads.push(args);
 
@@ -153,34 +157,19 @@ test("camera event loading waits for Home Assistant and retries after reconnect"
   assert.equal(card._loadedKey, "unchanged");
   assert.equal(loads.length, 0);
 
-  card.hass = { connected: true, connection: { connected: true }, states: {} };
+  card.hass = { connected: true, connection: { connected: true }, states: { "camera.test": { state: "idle" } } };
   assert.equal(loads.length, 1);
-  assert.equal(loads[0][2], "marao_test");
+  assert.equal(loads[0][2], "frigate");
 });
 
-test("the gallery camera fixture renders an event and detail without calling an event API", async () => {
-  let apiCalls = 0;
+test("shipped camera events contain no fixture imagery or provider branches", async () => {
+  assert.doesNotMatch(source, /marao_test|MARAO_TEST_EVENT_IMAGE|data:image/);
   const card = new MaraoCameraEventsCard();
-  card._config = { entity: "camera.marao_dashboard_test_camera", event_provider: "marao_test", limit: 1 };
-  card._hass = {
-    connected: true,
-    connection: { connected: true },
-    callWS() {
-      apiCalls += 1;
-      throw new Error("The test fixture must not call Home Assistant event APIs");
-    },
-  };
-
-  await card._load({}, "safe-fixture", "marao_test");
-  assert.equal(card._status, "ready");
-  assert.equal(card._events.length, 1);
-  assert.equal(card._events[0].label, "Person detected");
-  assert.match(card._events[0].thumbnailUrl, /^data:image\/svg\+xml/);
-  await card._openEvent(0);
-  assert.equal(card._selected.status, "ready");
-  assert.equal(card._selected.kind, "snapshot");
-  assert.match(card._selected.url, /^data:image\/svg\+xml/);
-  assert.equal(apiCalls, 0);
+  card._config = { entity: "camera.front", limit: 1 };
+  card._hass = { states: { "camera.front": { state: "idle" } }, callWS: async () => { throw new Error("provider failure"); } };
+  await card._load({ instanceId: "configured", camera: "front" }, "failed-request", "frigate");
+  assert.equal(card._status, "error");
+  assert.match(card._error, /Unable to load camera events/);
 });
 
 test("Frigate events are requested and media is signed through Home Assistant", async () => {
@@ -188,6 +177,7 @@ test("Frigate events are requested and media is signed through Home Assistant", 
   const card = new MaraoFrigateEventsCard();
   card._config = { entity: "camera.front_door", limit: 12 };
   card._hass = {
+    states: { "camera.front_door": { state: "idle" } },
     callWS: async (message) => {
       calls.push(message);
       if (message.type === "frigate/events/get") {
@@ -228,7 +218,7 @@ test("camera event provider is explicit first, then inferred from the Home Assis
   };
 
   assert.equal(cameraEventProvider({ entity: "camera.protect", event_provider: "frigate" }, hass), "frigate");
-  assert.equal(cameraEventProvider({ entity: "camera.regular", event_provider: "marao_test" }, hass), "marao_test");
+  assert.equal(cameraEventProvider({ entity: "camera.regular", event_provider: "unsupported" }, hass), "unsupported");
   assert.equal(cameraEventProvider({ entity: "camera.protect", provider: "Protect" }, hass), "unifi_protect");
   assert.equal(cameraEventProvider({ entity: "camera.protect", event_provider: "auto" }, hass), "unifi_protect");
   assert.equal(cameraEventProvider({ entity: "camera.regular", unifi_protect_media_source: "media-source://unifiprotect/nvr:browse:camera" }, hass), "unifi_protect");
@@ -308,6 +298,7 @@ test("UniFi Protect discovers a same-device camera across NVRs and resolves sign
     limit: 1,
   };
   card._hass = {
+    states: { "camera.front_door_low": { state: "idle" } },
     entities: {
       "camera.front_door_low": { platform: "unifiprotect", device_id: "front-device" },
       "camera.front_door_high": { platform: "unifiprotect", device_id: "front-device" },
@@ -409,6 +400,7 @@ test("UniFi Protect media source override skips discovery and uses an event fold
     unifi_protect_media_source: source,
   };
   card._hass = {
+    states: { "camera.front_door": { state: "idle" } },
     callWS: async (message) => {
       calls.push(message);
       return { children: [] };
@@ -423,4 +415,67 @@ test("UniFi Protect media source override skips discovery and uses an event fold
   }]);
   assert.equal(card._status, "ready");
   assert.deepEqual(card._events, []);
+});
+
+test("camera entity availability disables events and invalidates in-flight results", async () => {
+  for (const state of ["unknown", "unavailable", null]) {
+    let calls = 0;
+    const card = new MaraoCameraEventsCard();
+    card.shadowRoot = { innerHTML: "" };
+    card._connected = true;
+    card.setConfig({ entity: "camera.front", frigate_instance_id: "configured" });
+    card.hass = { states: state ? { "camera.front": { state } } : {}, callWS: async () => { calls += 1; } };
+    await card._openEvent(0);
+    await card._load({ instanceId: "configured", camera: "front" }, "blocked");
+    assert.equal(calls, 0);
+    assert.match(card.shadowRoot.innerHTML, new RegExp(`data-status="${state || "unknown"}"`));
+    assert.match(card.shadowRoot.innerHTML, /data-action="refresh"[^>]*disabled/);
+    assert.doesNotMatch(card.shadowRoot.innerHTML, /class="grid"|<video|class="detail-image"/);
+  }
+
+  const card = new MaraoCameraEventsCard();
+  let finish;
+  card._config = { entity: "camera.front" };
+  card._hass = { states: { "camera.front": { state: "idle" } }, callWS: () => new Promise((resolve) => { finish = resolve; }) };
+  const pending = card._load({ instanceId: "configured", camera: "front" }, "pending");
+  card.hass = { connected: false, states: card._hass.states };
+  finish([]);
+  await pending;
+  assert.deepEqual(card._events, []);
+  assert.equal(card._unavailableState(), "unavailable");
+});
+
+test("camera empty and failed results do not request again on unrelated state updates", async () => {
+  for (const fail of [false, true]) {
+    let calls = 0;
+    const card = new MaraoCameraEventsCard();
+    card._connected = true;
+    card._config = { entity: "camera.front", frigate_instance_id: "configured" };
+    const hass = { states: { "camera.front": { state: "idle" } }, callWS: async () => { calls += 1; if (fail) throw new Error("failed"); return []; } };
+    card.hass = hass;
+    await new Promise((resolve) => setImmediate(resolve));
+    for (let i = 0; i < 5; i += 1) card.hass = { ...hass };
+    assert.equal(calls, 1);
+    assert.equal(card._status, fail ? "error" : "ready");
+  }
+});
+
+test("camera events discard in-flight results after the shared connection mutates", async () => {
+  const card = new MaraoCameraEventsCard();
+  card._connected = true;
+  card._config = { entity: "camera.front", event_provider: "frigate", frigate_instance_id: "configured" };
+  let finish;
+  const connection = { connected: true };
+  const hass = { connected: true, connection, states: { "camera.front": { state: "idle" } }, callWS: () => new Promise((resolve) => { finish = resolve; }) };
+  card.hass = hass;
+  connection.connected = false;
+  card.hass = { ...hass, connected: false };
+  finish([]);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(card._events, []);
+  assert.equal(card._loadedKey, "");
+  connection.connected = true;
+  card.hass = { ...hass, callWS: async () => [] };
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(card._status, "ready");
 });

@@ -74,6 +74,7 @@ GENERATOR_TRANSLATIONS = {
         "overview.climate": "Climate",
         "overview.maintenance": "Maintenance",
         "overview.scenes": "Scenes",
+        "access.open": "Open",
         "common.open": "Open",
         "common.close": "Close",
         "common.lock": "Lock",
@@ -93,6 +94,7 @@ GENERATOR_TRANSLATIONS = {
         "overview.climate": "Climatização",
         "overview.maintenance": "Manutenção",
         "overview.scenes": "Cenários",
+        "access.open": "Abrir",
         "common.open": "Abrir",
         "common.close": "Fechar",
         "common.lock": "Trancar",
@@ -460,14 +462,15 @@ def write_dashboard(
     room_views = _room_view_paths(resolved)
     custom_views = _custom_view_paths(resolved)
 
+    dashboard_views = [
+        TaggedScalar("!include", f"{include_root}/{path}")
+        for path in [*main_views, *room_views, *custom_views]
+    ]
+
     plain_files: dict[str, Any] = {
         "dashboard.yaml": {
             "title": resolved["name"],
-            "theme": resolved["theme"],
-            "views": [
-                TaggedScalar("!include", f"{include_root}/{path}")
-                for path in [*main_views, *room_views, *custom_views]
-            ],
+            "views": dashboard_views,
         },
         "components/navigation/navbar.yaml": _navigation_bar(
             resolved, dashboard_key, language
@@ -512,6 +515,10 @@ def write_dashboard(
         card_files[custom_views[index]] = _custom_page_view(
             resolved, page, include_root, dashboard_key, language
         )
+
+    for relative_path, view in card_files.items():
+        if relative_path.startswith("views/"):
+            view["theme"] = resolved["theme"]
 
     old_manifest = _load_generation_manifest(output_dir)
     custom_cards = _preflight_custom_cards(
@@ -1025,7 +1032,7 @@ def _navigation_bar(config: dict[str, Any], dashboard_key: str, language: str = 
         ("rooms", "mdi:sofa-outline", "mdi:sofa", "nav.rooms", "rooms"),
         ("energy", "mdi:lightning-bolt-outline", "mdi:lightning-bolt", "nav.energy", "energy"),
         ("wallbox", "mdi:ev-plug-type2", "mdi:ev-plug-type2", "nav.wallbox", "wallbox"),
-        ("media", "mdi:television-play-outline", "mdi:television-play", "nav.media", "media"),
+        ("media", "mdi:television-play", "mdi:television-play", "nav.media", "media"),
     ):
         if page_name == "rooms" or page_name in config.get("pages", {}):
             available[path] = {
@@ -1141,10 +1148,7 @@ def _overview_nav_card(
         "entity": ids[0],
         "name": name,
         "icon": icon,
-        "label": _count_label_js(ids),
-        "styles": {
-            "icon": [{"color": "var(--color-orange)"}],
-        },
+        "variables": {"summary_entities": ids} if all(entity.split(".")[0] not in {"sensor", "input_number", "number"} for entity in ids) else {},
         "tap_action": {
             "action": "navigate",
             "navigation_path": navigation_path,
@@ -1239,10 +1243,12 @@ def _security_view(config: dict[str, Any], include_root: str, language: str = "e
             }
         )
 
-    cards.extend(_page_action_card(entity) for entity in _entities_from_values(page.get("actions")))
+    action_entities = _entities_from_values(page.get("actions"))
+    cards.extend(_page_action_card(entity) for entity in action_entities)
+    popup_entities = {entity["entity_id"]: entity for entity in [*access_entities, *action_entities]}
     cards.extend(
         _access_popup(entity, language)
-        for entity in access_entities
+        for entity in popup_entities.values()
         if _is_access_entity(entity) and not _is_open_only_access(entity)
     )
     cards.append(TaggedScalar("!include", f"{include_root}/components/navigation/navbar.yaml"))
@@ -1255,6 +1261,8 @@ def _security_view(config: dict[str, Any], include_root: str, language: str = "e
 
 
 def _page_action_card(entity: dict[str, Any]) -> dict[str, Any]:
+    if _is_access_entity(entity):
+        return _room_entity_card(entity)
     domain = entity["entity_id"].split(".", 1)[0]
     if domain == "button":
         action = {
@@ -1337,13 +1345,24 @@ def _energy_view(config: dict[str, Any], include_root: str, language: str = "en"
 def _energy_graph_card(
     entity: dict[str, Any], name: str, icon: str, popup_hash: str | None
 ) -> dict[str, Any]:
+    variables = dict(
+        entity.get("variables") if isinstance(entity.get("variables"), dict) else {}
+    )
+    if entity.get("graph_entity") and not variables.get("graph_entity"):
+        variables["graph_entity"] = entity["graph_entity"]
+    variables = {
+        "show_graph_fill": True,
+        "show_graph_line": True,
+        "show_icon": True,
+        **variables,
+    }
     card = {
         "type": "custom:marao-card",
         "template": entity.get("template") or "hc_graph_card",
         "entity": entity["entity_id"],
         "name": entity.get("name") or name,
         "icon": entity.get("icon") or icon,
-        "variables": {"show_graph_fill": True, "show_graph_line": True, "show_icon": True},
+        "variables": variables,
     }
     if popup_hash:
         card["tap_action"] = {
@@ -1351,13 +1370,7 @@ def _energy_graph_card(
             "navigation_path": popup_hash,
             "haptic": "heavy",
         }
-    return {
-        "type": "vertical-stack",
-        "cards": [
-            card,
-            _history_graph_card(entity["entity_id"]),
-        ],
-    }
+    return card
 
 
 def _energy_period_card(
@@ -1372,15 +1385,6 @@ def _energy_period_card(
         "popup_hash": popup_hash,
         "popup": popup,
         "icon": entity.get("icon") or icon,
-    }
-
-
-def _history_graph_card(entity_id: str) -> dict[str, Any]:
-    return {
-        "type": "history-graph",
-        "entities": [entity_id],
-        "hours_to_show": 24,
-        "show_names": False,
     }
 
 
@@ -1477,9 +1481,8 @@ def _media_players(config: dict[str, Any]) -> list[dict[str, Any]]:
 def _media_view(config: dict[str, Any], include_root: str, language: str = "en") -> dict[str, Any]:
     players = _media_players(config)
     cards: list[Any] = []
-    if players:
-        cards.append(_room_entity_card(players[0]))
     for player in players:
+        cards.append(_room_entity_card(player))
         apple_tv = _apple_tv_options(player)
         apps = apple_tv["apps"] if apple_tv else []
         app_cards = [
@@ -1516,12 +1519,12 @@ def _rooms_view(
             for entity in values
             if entity.get("entity_id")
         ]
-        primary_entity = (lights or all_room_entities or [{"entity_id": "sun.sun"}])[0]["entity_id"]
+        primary_entity = (lights or all_room_entities or [{"entity_id": ""}])[0]["entity_id"]
         room_cards.append(
             {
                 "type": "custom:marao-card",
                 "template": "hc_room_card",
-                "entity": primary_entity,
+                **({"entity": primary_entity} if primary_entity else {}),
                 "name": room["name"],
                 "icon": room["icon"],
                 "variables": {
@@ -1636,7 +1639,7 @@ def _entity_container_cards(
         _access_popup(entity, language)
         for domain in ("lock", "cover")
         for entity in container["entities_by_domain"].get(domain, [])
-        if _is_access_entity(entity)
+        if _is_access_entity(entity) and not _is_open_only_access(entity)
     )
     cards.extend(
         _media_popup(entity)
@@ -1654,7 +1657,7 @@ def _page_shortcut_card(shortcut: dict[str, Any], dashboard_key: str) -> dict[st
     card = {
         "type": "custom:marao-card",
         "template": "hc_navigation_card",
-        "entity": shortcut.get("entity_id") or "sun.sun",
+        **({"entity": shortcut["entity_id"]} if shortcut.get("entity_id") else {}),
         "name": shortcut.get("name") or _friendly_name(shortcut["page"]),
         "icon": shortcut.get("icon") or "mdi:open-in-new",
         "show_label": False,
@@ -1672,29 +1675,31 @@ def _page_shortcut_card(shortcut: dict[str, Any], dashboard_key: str) -> dict[st
 def _title_card(name: str) -> dict[str, Any]:
     return {
         "type": "custom:marao-card",
+        "template": "hc_title_card",
         "name": name,
+        "show_icon": False,
+        "show_state": False,
         "tap_action": {"action": "none"},
         "hold_action": {"action": "none"},
-        "styles": {
-            "card": [
-                {"background": "none"},
-                {"box-shadow": "none"},
-                {"padding": 0},
-                {"margin-bottom": "20px"},
-            ],
-            "grid": [{"grid-template-areas": "'n'"}, {"grid-template-columns": "1fr"}],
-            "name": [
-                {"justify-self": "start"},
-                {"font-weight": 800},
-                {"font-size": "25px"},
-            ],
-        },
     }
 
 
 def _entity_card(entity: dict[str, Any]) -> dict[str, Any]:
     domain = entity["entity_id"].split(".", 1)[0]
     template = entity.get("template") or _domain_template(entity)
+    variables = dict(
+        entity.get("variables") if isinstance(entity.get("variables"), dict) else {}
+    )
+    if entity.get("graph_entity") and not variables.get("graph_entity"):
+        variables["graph_entity"] = entity["graph_entity"]
+    if template == "hc_timeline_card":
+        return {
+            "type": "custom:marao-state-timeline-card",
+            "entity": entity["entity_id"],
+            "name": variables.get("timeline_name")
+            or entity.get("name")
+            or _friendly_name(entity["entity_id"]),
+        }
     card = {
         "type": "custom:marao-card",
         "template": template,
@@ -1703,28 +1708,10 @@ def _entity_card(entity: dict[str, Any]) -> dict[str, Any]:
     }
     if entity.get("icon"):
         card["icon"] = entity["icon"]
-    variables = entity.get("variables")
-    if isinstance(variables, dict):
+    if variables:
         card["variables"] = variables
     elif domain == "climate":
         card["variables"] = {"show_graph": False, "show_mode_buttons": True}
-    variables = card.get("variables") if isinstance(card.get("variables"), dict) else {}
-    graph_entity = (
-        variables.get("graph_entity")
-        or variables.get("power_entity")
-        or entity.get("graph_entity")
-    )
-    if template in {"hc_graph_card", "hc_toggle_graph_card"}:
-        graph_entity = graph_entity or entity["entity_id"]
-        return {
-            "type": "vertical-stack",
-            "cards": [card, _history_graph_card(graph_entity)],
-        }
-    if variables.get("show_graph") and graph_entity:
-        return {
-            "type": "vertical-stack",
-            "cards": [card, _history_graph_card(graph_entity)],
-        }
     return card
 
 
@@ -1742,7 +1729,7 @@ def _room_entity_card(entity: dict[str, Any]) -> dict[str, Any]:
                 name=entity.get("name") or _friendly_name(entity["entity_id"]),
                 icon="mdi:door-open",
                 service="cover.open_cover",
-                label_key="common.open",
+                label_key="access.open",
                 requires_hold=False,
                 color="var(--color-red)",
             )
@@ -1820,6 +1807,7 @@ def _media_button(
     service: str,
     name: str = "",
     data: dict[str, Any] | None = None,
+    seek_offset: int | None = None,
     primary: bool = False,
     dpad: bool = False,
     hold_data: dict[str, Any] | None = None,
@@ -1849,7 +1837,7 @@ def _media_button(
                 {"background": "var(--primary-color)" if primary else "var(--ha-card-background)"},
                 {"box-shadow": "var(--ha-card-box-shadow)"},
             ],
-            "icon": [{"width": "24px" if primary else ("42px" if dpad else "34px")}, {"color": "var(--active-text-color)" if primary else "var(--primary-text-color)"}],
+            "icon": [{"width": "24px" if primary else ("42px" if dpad else "34px")}, {"color": "var(--text-primary-color,var(--active-text-color))" if primary else "var(--primary-text-color)"}],
             "img_cell": [
                 {"width": "100%" if dpad else "52px"},
                 {"height": "100%" if dpad else "52px"},
@@ -1860,8 +1848,17 @@ def _media_button(
             ],
         },
     }
+    media_label = {
+        "media_player.media_previous_track": "media.previous",
+        "media_player.media_play_pause": "media.play_pause",
+        "media_player.media_next_track": "media.next",
+    }.get(service)
+    if media_label:
+        card["variables"] = {"action_label_key": media_label}
     if data:
         card["tap_action"]["data"] = data
+    if seek_offset is not None:
+        card["tap_action"]["seek_offset"] = seek_offset
     if hold_data is not None:
         card["hold_action"] = {
             "action": "perform-action",
@@ -1950,9 +1947,9 @@ def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
                 _remote_button(entity_id, remote_entity, "right", icon="mdi:chevron-right", dpad=True, hold=True),
             ]},
             {"type": "grid", "columns": 3, "square": False, "cards": [
-                _media_button(entity_id, icon="mdi:rewind-10", name="Back 10 seconds", service="media_player.media_seek", data={"seek_position": "[[[ const position = Number(entity?.attributes?.media_position ?? 0); const updatedAt = entity?.attributes?.media_position_updated_at; const elapsed = entity?.state === 'playing' && updatedAt ? Math.max((Date.now() - Date.parse(updatedAt)) / 1000, 0) : 0; return Math.max(Math.round(position + elapsed - 10), 0); ]]]"}),
+                _media_button(entity_id, icon="mdi:rewind-10", name="Back 10 seconds", service="media_player.media_seek", seek_offset=-10),
                 _remote_button(entity_id, remote_entity, "down", icon="mdi:chevron-down", dpad=True, hold=True),
-                _media_button(entity_id, icon="mdi:fast-forward-30", name="Forward 30 seconds", service="media_player.media_seek", data={"seek_position": "[[[ const position = Number(entity?.attributes?.media_position ?? 0); const updatedAt = entity?.attributes?.media_position_updated_at; const elapsed = entity?.state === 'playing' && updatedAt ? Math.max((Date.now() - Date.parse(updatedAt)) / 1000, 0) : 0; const target = Math.round(position + elapsed + 30); const duration = Number(entity?.attributes?.media_duration); return Number.isFinite(duration) ? Math.min(target, duration) : target; ]]]"}),
+                _media_button(entity_id, icon="mdi:fast-forward-30", name="Forward 30 seconds", service="media_player.media_seek", seek_offset=30),
             ]},
         ]
     )
@@ -2039,13 +2036,12 @@ def _access_action_card(
     label_key: str,
     requires_hold: bool,
     color: str,
-    requires_slide: bool = False,
 ) -> dict[str, Any]:
     return {
         "type": "custom:marao-card",
         "template": (
             "hc_access_slide_action_card"
-            if requires_slide
+            if service in {"lock.unlock", "cover.open_cover"}
             else ("hc_access_hold_action_card" if requires_hold else "hc_access_action_card")
         ),
         "entity": entity["entity_id"],
@@ -2072,7 +2068,6 @@ def _access_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any
                 service="lock.unlock",
                 label_key="common.unlock",
                 requires_hold=False,
-                requires_slide=True,
                 color="var(--color-red)",
             ),
             _access_action_card(
@@ -2092,12 +2087,11 @@ def _access_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any
         actions = [
             _access_action_card(
                 entity,
-                name=_t(language, "common.open"),
+                name=_t(language, "access.open"),
                 icon=f"{icon}-open" if icon == "mdi:garage" else "mdi:door-open",
                 service="cover.open_cover",
-                label_key="common.open",
+                label_key="access.open",
                 requires_hold=False,
-                requires_slide=True,
                 color="var(--color-red)",
             ),
             _access_action_card(
@@ -2167,16 +2161,7 @@ def _entity_popup(config: dict[str, Any], domain: str, language: str = "en") -> 
         if domain == "cover":
             popup_entity["template"] = "hc_cover_card"
         card = _entity_card(popup_entity)
-        if domain == "light":
-            entity_cards.append(
-                {
-                    "type": "conditional",
-                    "conditions": [{"entity": entity["entity_id"], "state": "on"}],
-                    "card": card,
-                }
-            )
-        else:
-            entity_cards.append(card)
+        entity_cards.append(card)
     cards = entity_cards if domain == "climate" else [_popup_grid(entity_cards)]
     return {**_popup_header(popup_hash, primary, name, icon, height), "cards": cards}
 
@@ -2246,18 +2231,3 @@ def _popup_header(
         "height": height,
         "max_height": "80dvh",
     }
-
-
-def _count_label_js(entity_ids: list[str]) -> str:
-    ids = ", ".join(repr(entity_id) for entity_id in entity_ids)
-    return (
-        "[[[\n"
-        f"  const ids = [{ids}];\n"
-        "  const active = ids.filter((id) => {\n"
-        "    const state = states[id]?.state;\n"
-        "    return state && !['off', 'closed', 'closing', 'unavailable', 'unknown'].includes(state);\n"
-        "  }).length;\n"
-        "  const t = window.MaraoDashboard?.localize || ((key, _hass, values = {}) => key === 'common.active_count' ? `${values.count} active` : 'All off');\n"
-        "  return active ? t('common.active_count', hass, { count: active }) : t('common.all_off', hass);\n"
-        "]]]\n"
-    )

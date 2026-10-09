@@ -1,13 +1,21 @@
 {
   "domain": "marao_dashboard",
   "name": "Marao Dashboard",
-  "codeowners": ["@diogomrpr"],
+  "codeowners": [
+    "@diogomrpr"
+  ],
   "config_flow": true,
-  "dependencies": ["frontend", "http", "lovelace", "panel_custom", "websocket_api"],
+  "dependencies": [
+    "frontend",
+    "http",
+    "lovelace",
+    "panel_custom",
+    "websocket_api"
+  ],
   "documentation": "https://diogomrpr.github.io/MaraoDashboard/",
   "integration_type": "service",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/diogomrpr/MaraoDashboard/issues",
   "single_config_entry": true,
-  "version": "0.5.0"
+  "version": "0.5.1"
 }

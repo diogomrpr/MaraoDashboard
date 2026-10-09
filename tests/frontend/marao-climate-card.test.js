@@ -45,12 +45,12 @@ test("service actions stop while Home Assistant is disconnected", async () => {
   assert.equal(calls, 0);
 });
 
-test("service rejections become a localized Home Assistant notification", async () => {
+test("service rejections produce one localized notification without HA's duplicate", async () => {
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
   const homeAssistant = new EventTarget();
-  let notification;
-  homeAssistant.addEventListener("hass-notification", (event) => { notification = event.detail; });
+  const notifications = [];
+  homeAssistant.addEventListener("hass-notification", (event) => { notifications.push(event.detail); });
   globalThis.document = { querySelector: () => homeAssistant };
   globalThis.window = {
     dispatchEvent() {},
@@ -62,7 +62,14 @@ test("service rejections become a localized Home Assistant notification", async 
   };
   try {
     await assert.doesNotReject(() => performAction(
-      { language: "pt", callService: () => Promise.reject(new Error("Sem permissão")) },
+      {
+        language: "pt",
+        callService: async (domain, service, data, target, notifyOnError = true) => {
+          assert.deepEqual([domain, service, data, target], ["light", "toggle", { entity_id: "light.test" }, undefined]);
+          if (notifyOnError) homeAssistant.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: "Native error" } }));
+          throw new Error("Sem permissão");
+        },
+      },
       { action: "toggle" },
       "light.test",
     ));
@@ -70,7 +77,7 @@ test("service rejections become a localized Home Assistant notification", async 
     globalThis.document = previousDocument;
     globalThis.window = previousWindow;
   }
-  assert.deepEqual(notification, { message: "A ação falhou: Sem permissão" });
+  assert.deepEqual(notifications, [{ message: "A ação falhou: Sem permissão" }]);
 });
 
 test("every card service path uses the shared rejection boundary", () => {
@@ -139,9 +146,42 @@ test("selected climate mode keeps the same readable control surface", () => {
     source,
     /\.climate-mode\.active \{ background:var\(--ha-card-background,var\(--card-background-color\)\); color:var\(--primary-text-color\); box-shadow:inset 0 0 0 3px var\(--marao-accent-color,var\(--primary-color\)\); \}/,
   );
-  assert.match(source, /\.climate-card \.current-temperature \{[^}]*font-size:max\(2rem,var\(--font-size-primary/);
+  assert.match(source, /\.climate-card \.current-temperature \{[^}]*font-size:calc\(var\(--font-size-primary,1\.125rem\) \* 1\.78\)/);
   assert.match(source, /class="climate current-temperature" aria-label="\$\{esc\(climateReadingLabel\)\}">\$\{esc\(currentTemperature\)\}/);
   assert.match(source, /\.climate-mode \{[^}]*display:flex;[^}]*flex-direction:column;[^}]*align-items:center;[^}]*justify-content:center;[^}]*min-height:72px/);
+});
+
+test("light state palette colors share a dark foreground across card families", () => {
+  for (const [kind, state, color] of [
+    ["hc_cover_card", "open", "blue"],
+    ["hc_light_card", "on", "blue"],
+    ["hc_fan_card", "on", "blue"],
+    ["hc_climate_card", "cool", "blue"],
+    ["hc_battery_card", "50", "yellow"],
+    ["hc_access_card", "opening", "orange"],
+    ["hc_climate_card", "auto", "gold"],
+  ]) {
+    const appearance = stateAppearance(kind, state, {}, {});
+    assert.equal(appearance.background, `var(--color-${color})`, `${kind}: preserve palette hue`);
+    assert.equal(appearance.text, "var(--color-black)", kind);
+    assert.equal(appearance.icon, appearance.text, kind);
+    assert.equal(appearance.iconBackground, "var(--active-overlay-color)", kind);
+  }
+  for (const color of ["blue", "yellow", "orange", "gold", "peach"]) {
+    const active_color = `var(--color-${color}, #abcdef)`;
+    const appearance = stateAppearance("hc_wallbox_current_card", "16", { variables: { active_color } }, {});
+    assert.equal(appearance.background, active_color);
+    assert.equal(appearance.text, "var(--color-black)", "the Wallbox default does not override its light palette");
+  }
+  for (const [kind, state] of [["hc_access_card", "locked"], ["hc_switch_card", "on"], ["hc_climate_card", "fan_only"]]) {
+    assert.equal(stateAppearance(kind, state, {}, {}).text, "var(--active-text-color)", `${kind}: green keeps white text`);
+  }
+  assert.equal(stateAppearance("hc_wallbox_current_card", "16", {}, {}).text, "var(--active-text-color, #fff)");
+  for (const [kind, state] of [["hc_sensor_card", "on"], ["hc_room_card", "on"]]) {
+    const appearance = stateAppearance(kind, state, {}, {});
+    assert.equal(appearance.text, "var(--text-primary-color,var(--active-text-color))");
+    assert.equal(appearance.icon, appearance.text);
+  }
 });
 
 test("number buttons use the entity step and limits", () => {
@@ -174,12 +214,10 @@ test("heat/cool limits preserve the target range", () => {
   });
 });
 
-test("number and slider controls expose at least 48px touch targets", () => {
+test("number controls and slider hit areas expose at least 48px touch targets", () => {
   assert.match(source, /\.number-stepper button \{[^}]*width:48px; height:48px/);
   assert.match(source, /\.climate-stepper button \{ width:52px; height:48px; \}/);
-  assert.match(source, /input\[type=range\]::\-webkit-slider-thumb \{[^}]*width:48px; height:48px/);
-  assert.match(source, /input\[type=range\]::\-moz-range-thumb \{ width:48px; height:48px/);
-  assert.match(source, /const thumb = 48;/);
+  assert.match(source, /input\[type=range\] \{[^}]*min-height:48px; height:48px/);
 });
 
 test("new card control text has English and Portuguese translations", () => {

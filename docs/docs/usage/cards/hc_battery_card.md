@@ -28,3 +28,6 @@ The `hc_battery_card` is used to show battery percentages. It changes color base
 | <span class="entry-type-ha"></span> entity | | **Yes** | sensor.front_door_battery |
 | <span class="entry-type-ha"></span> name | friendly name | No | Front Door Sensor |
 | <span class="entry-type-marao_dashboard"></span> on_icon | mdi:battery | No | mdi:battery-70 |
+
+`hc_card_color` overrides the numeric state background. Unknown and unavailable
+states keep the neutral disabled appearance.

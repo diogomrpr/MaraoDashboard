@@ -1,0 +1,8 @@
+{
+  "domain": "marao_test_media",
+  "name": "Marao Test Media",
+  "codeowners": [],
+  "documentation": "https://github.com/diogomrpr/MaraoDashboard",
+  "iot_class": "local_push",
+  "version": "1.0.0"
+}

@@ -91,14 +91,6 @@ export function frigateEventPath(instanceId, eventId, kind = "thumbnail") {
 
 const PROTECT_ROOT = "media-source://unifiprotect";
 const PROTECT_EVENT_TYPE = /:(?:all|motion|smart|ring|audio)$/;
-const MARAO_TEST_EVENT_IMAGE = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
-    <rect width="640" height="360" fill="#315d78"/>
-    <circle cx="320" cy="145" r="55" fill="#f6f7f2"/>
-    <path d="M205 330c12-82 52-123 115-123s103 41 115 123" fill="#f6f7f2"/>
-  </svg>
-`)}`;
-
 export function cameraEventProvider(config = {}, hass = {}) {
   const explicit = text(config.event_provider) || text(config.provider);
   const provider = explicit.toLowerCase().replace(/[\s-]+/g, "_");
@@ -206,6 +198,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     this._status = "loading";
     this._request = 0;
     this._detailRequest = 0;
+    this._availabilityState = "unavailable";
     this.attachShadow?.({ mode: "open" });
     this.shadowRoot?.addEventListener("click", (event) => this._handleClick(event));
   }
@@ -227,14 +220,24 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     };
     this._selected = undefined;
     this._loadedKey = "";
+    this._events = [];
+    this._request += 1;
+    this._detailRequest += 1;
     this._render();
     this._maybeLoad();
   }
 
   set hass(hass) {
-    const wasConnected = this._connectionAvailable();
+    const previousAvailability = this._availabilityState;
     this._hass = hass;
-    if (!wasConnected && this._connectionAvailable()) this._loadedKey = "";
+    this._availabilityState = this._unavailableState();
+    if (previousAvailability !== this._availabilityState) {
+      this._loadedKey = "";
+      this._events = [];
+      this._selected = undefined;
+      this._request += 1;
+      this._detailRequest += 1;
+    }
     this._render();
     this._maybeLoad();
   }
@@ -251,6 +254,9 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
 
   disconnectedCallback() {
     this._connected = false;
+    this._loadedKey = "";
+    this._request += 1;
+    this._detailRequest += 1;
   }
 
   _connectionAvailable() {
@@ -259,8 +265,15 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       && this._hass.connection?.connected !== false;
   }
 
+  _unavailableState() {
+    if (!this._connectionAvailable()) return "unavailable";
+    const state = this._hass.states?.[this._config?.entity]?.state;
+    if (!state || state === "unknown") return "unknown";
+    return state === "unavailable" ? "unavailable" : "";
+  }
+
   _maybeLoad() {
-    if (!this._connected || !this._config || !this._connectionAvailable()) return;
+    if (!this._connected || !this._config || this._unavailableState()) return;
     const state = this._hass.states?.[this._config.entity];
     const provider = cameraEventProvider(this._config, this._hass);
     const identity = frigateIdentity(this._config, state);
@@ -282,6 +295,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   async _load(identity, key, provider = "frigate") {
+    if (this._unavailableState()) return;
     const request = ++this._request;
     this._identity = identity;
     this._provider = provider;
@@ -298,7 +312,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       this._render();
       return;
     }
-    if (!["frigate", "unifi_protect", "marao_test"].includes(provider)) {
+    if (!["frigate", "unifi_protect"].includes(provider)) {
       this._status = "error";
       this._error = localize(
         "camera_events.error.unsupported_provider",
@@ -309,7 +323,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       this._render();
       return;
     }
-    if (provider !== "marao_test" && typeof this._hass.callWS !== "function") {
+    if (typeof this._hass.callWS !== "function") {
       this._status = "error";
       this._error = localize(
         "camera_events.error.api_unavailable",
@@ -325,11 +339,9 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     this._error = "";
     this._render();
     try {
-      const withThumbnails = provider === "marao_test"
-        ? this._loadTestEvents()
-        : provider === "unifi_protect"
-          ? await this._loadProtectEvents()
-          : await this._loadFrigateEvents(identity);
+      const withThumbnails = provider === "unifi_protect"
+        ? await this._loadProtectEvents()
+        : await this._loadFrigateEvents(identity);
       if (request !== this._request) return;
       this._events = withThumbnails;
       this._status = "ready";
@@ -363,16 +375,6 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
         return { ...event, thumbnailUrl: "" };
       }
     }));
-  }
-
-  _loadTestEvents() {
-    return [{
-      id: "marao-test-person",
-      provider: "marao_test",
-      label: localize("camera_events.test.person_detected", this._hass, {}, "Person detected"),
-      thumbnailUrl: MARAO_TEST_EVENT_IMAGE,
-      detailUrl: MARAO_TEST_EVENT_IMAGE,
-    }];
   }
 
   async _loadProtectEvents() {
@@ -449,6 +451,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   _browseMedia(mediaContentId) {
+    if (this._unavailableState()) throw new Error("Camera unavailable");
     return this._hass.callWS({
       type: "media_source/browse_media",
       media_content_id: mediaContentId,
@@ -456,6 +459,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   async _resolveMedia(mediaContentId) {
+    if (this._unavailableState()) throw new Error("Camera unavailable");
     const resolved = await this._hass.callWS({
       type: "media_source/resolve_media",
       media_content_id: mediaContentId,
@@ -473,6 +477,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   async _signPath(path) {
+    if (this._unavailableState()) throw new Error("Camera unavailable");
     const signed = await this._hass.callWS({
       type: "auth/sign_path",
       path,
@@ -492,7 +497,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
 
   _handleClick(event) {
     const button = event.target?.closest?.("[data-action]");
-    if (!button || button.disabled || !this._connectionAvailable()) return;
+    if (!button || button.disabled || this._unavailableState()) return;
     globalThis.window?.MaraoDashboard?.haptic?.("heavy");
     if (button.dataset.action === "refresh") {
       this._loadedKey = "";
@@ -507,6 +512,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   async _openEvent(index) {
+    if (this._unavailableState()) return;
     const event = this._events[index];
     if (!event) return;
     const detailRequest = ++this._detailRequest;
@@ -514,11 +520,9 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     this._render();
     try {
       const kind = this._provider === "unifi_protect" || event.has_clip ? "clip" : "snapshot";
-      const url = this._provider === "marao_test"
-        ? event.detailUrl
-        : this._provider === "unifi_protect"
-          ? await this._resolveMedia(event.mediaContentId)
-          : await this._signPath(frigateEventPath(this._identity.instanceId, event.id, kind));
+      const url = this._provider === "unifi_protect"
+        ? await this._resolveMedia(event.mediaContentId)
+        : await this._signPath(frigateEventPath(this._identity.instanceId, event.id, kind));
       if (detailRequest !== this._detailRequest) return;
       this._selected = { event, kind, status: "ready", url };
     } catch {
@@ -571,7 +575,8 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     const title = escapeHtml(this._title());
     const back = escapeHtml(localize("camera_events.back", this._hass, {}, "Back to events"));
     const refresh = escapeHtml(localize("camera_events.refresh", this._hass, {}, "Refresh events"));
-    const disabled = this._connectionAvailable() ? "" : ' disabled aria-disabled="true"';
+    const unavailable = this._unavailableState();
+    const disabled = unavailable || (!this._selected && this._status === "loading") ? ' disabled aria-disabled="true"' : "";
     const header = `
       <header>
         <h2>${title}</h2>
@@ -580,13 +585,14 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
           : `<button class="icon-button" data-action="refresh" aria-label="${refresh}" title="${refresh}"${disabled}>&#x21bb;</button>`}
       </header>`;
     let content;
-    if (this._selected) content = this._renderDetail(this._selected);
+    if (unavailable) content = `<p class="message" role="status">${escapeHtml(localize(`common.${unavailable}`, this._hass, {}, unavailable === "unknown" ? "Unknown" : "Unavailable"))}</p>`;
+    else if (this._selected) content = this._renderDetail(this._selected);
     else if (this._status === "loading") content = `<p class="message" role="status">${escapeHtml(localize("camera_events.loading_events", this._hass, {}, "Loading events…"))}</p>`;
     else if (this._status === "error") content = `<p class="message error" role="alert">${escapeHtml(this._error)}</p>`;
     else if (!this._events.length) content = `<p class="message">${escapeHtml(localize("camera_events.no_recent_events", this._hass, {}, "No recent events."))}</p>`;
     else content = `<div class="grid">${this._events.map((event, index) => this._renderEvent(event, index)).join("")}</div>`;
 
-    this.shadowRoot.innerHTML = `<style>${MaraoFrigateEventsCard.styles}</style><ha-card>${header}<main>${content}</main></ha-card>`;
+    this.shadowRoot.innerHTML = `<style>${MaraoFrigateEventsCard.styles}</style><ha-card data-status="${unavailable || this._status}">${header}<main>${content}</main></ha-card>`;
   }
 
   _renderEvent(event, index) {
@@ -604,7 +610,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       "Open {event}{date}",
     ));
     return `
-      <button class="event" data-action="event" data-index="${index}" aria-label="${openLabel}"${this._connectionAvailable() ? "" : ' disabled aria-disabled="true"'}>
+      <button class="event" data-action="event" data-index="${index}" aria-label="${openLabel}"${this._unavailableState() ? ' disabled aria-disabled="true"' : ""}>
         <span class="thumbnail">${image}</span>
         <span class="meta"><strong>${label}</strong><small>${date}</small></span>
       </button>`;
@@ -631,7 +637,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     .icon-button { flex: 0 0 48px; width: 48px; min-width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; cursor: pointer; font-size: max(1.5rem, var(--font-size-primary, 1.125rem)); transition: transform .12s ease, background-color .12s ease; }
     .icon-button:hover { background: var(--secondary-background-color); }
     .icon-button:active { transform: scale(.94); }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(145px, 100%), 1fr)); gap: 10px; }
     .event { min-width: 0; min-height: 48px; padding: 0; overflow: hidden; text-align: left; border: 0; border-radius: var(--ha-card-border-radius, 12px); background: var(--secondary-background-color); cursor: pointer; transition: transform .12s ease; }
     .event:hover { outline: 2px solid var(--primary-color); outline-offset: 1px; }
     button:focus { outline: none; }
@@ -641,12 +647,12 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     .thumbnail img { width: 100%; height: 100%; object-fit: cover; }
     .no-image { font-size: 1.75rem; }
     .meta, .detail-meta { display: flex; flex-direction: column; gap: 3px; padding: 9px 10px 10px; font-size: var(--font-size-secondary, 1rem); font-weight: var(--font-weight-secondary, 500); }
-    .meta strong, .meta small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .meta strong, .detail-meta strong { overflow-wrap: anywhere; }
+    .meta small, .detail-meta small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     small { color: var(--secondary-text-color); font-size: var(--font-size-caption, .875rem); }
     .message { margin: 0; padding: 32px 12px; text-align: center; color: var(--secondary-text-color); font-size: var(--font-size-secondary, 1rem); }
     .error { color: var(--error-color); }
     .detail video, .detail-image { display: block; width: 100%; max-height: 65vh; object-fit: contain; border-radius: var(--ha-card-border-radius, 12px); background: #000; }
-    @media (max-width: 420px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   `;
 }
 

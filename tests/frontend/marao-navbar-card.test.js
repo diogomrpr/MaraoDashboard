@@ -22,6 +22,13 @@ test("navbar keeps 48px touch targets inside the compact 60px bar", () => {
   assert.match(source, /a:active\{transform:scale\(\.92\)/);
 });
 
+test("zoomed navbar wraps full-size controls and reserves space above it", () => {
+  assert.match(source, /display:flex;flex-wrap:wrap;justify-content:center;height:auto;min-height:60px/);
+  assert.match(source, /a\{flex:0 0 48px\}/);
+  assert.match(source, /@media\(max-width:300px\)\{:host\{height:228px\}/);
+  assert.match(source, /padding-bottom:calc\(192px \+ var\(--marao-safe-area-inset-bottom/);
+});
+
 test("fullscreen behavior starts only after the navbar is connected", () => {
   assert.match(source, /connectedCallback\(\) \{ registerFullscreen\(this\);/);
   assert.doesNotMatch(source, /this\._render\(\); registerFullscreen\(this\);/);

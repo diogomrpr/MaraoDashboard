@@ -24,12 +24,12 @@ HVAC modes are available, the mode buttons use representative icons and labels.
 
 | Variable | Default | Required | Description|
 |----------|---------|----------|------------|
-| show_window_state | false | No | If true, the window state will be shown. |
-| window_open_boolean |  | No | The entity that shows if the window is open. |
-| show_mode_state | true | No | If true, the mode state will be shown as a icon next to the current temperature. |
-| show_graph | false | No | If true, a graph will be shown as background. |
-| graph_entity |  | No | The entity that will be shown in the graph. |
-| graph_color | var(--color-red) | No | The color will be used for the graph. |
+| show_mode_buttons | true in generated mode sheets | Show mode buttons on this card. |
+| mode_selector_hash | Empty | Open the configured mode popup from the card. |
+| setpoint_label | Localized target temperature | Accessible name for the target stepper. |
+| show_graph | false | Show a temperature history graph behind the card. |
+| graph_entity | Empty | Sensor entity supplying the graph. |
+| graph_color | Theme text/accent color | Graph line and fill color. |
 
 ## State colors
 

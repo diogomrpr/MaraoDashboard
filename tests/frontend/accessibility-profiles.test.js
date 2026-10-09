@@ -11,13 +11,14 @@ const {
   contextOptionsForScenario,
   effectiveViewport,
   parseArgs,
+  popupFocusFailure,
   safeAreaInsetsForScenario,
   scenarios,
   selectedRuns,
   themeVariables,
   themes,
   visualVariablesForScenario,
-} = require("../../scripts/test-ha-dashboard-accessibility.js");
+} = require("../test-ha-dashboard-accessibility.js");
 
 test("accessibility profiles cover the complete agreed mobile matrix", () => {
   const actual = scenarios.map(({ name, device, viewport, textScale, bold, pageZoom }) => [
@@ -108,20 +109,39 @@ test("preview arguments select one profile and one theme and reject missing valu
   assert.throws(() => selectedRuns({ preview: true, scenario: "iphone-normal", theme: "sepia" }), /Unknown theme/);
 });
 
-test("VS Code preview choices stay aligned with executable profiles and themes", () => {
-  const tasks = JSON.parse(fs.readFileSync(path.join(repoRoot, ".vscode/tasks.json"), "utf8"));
-  const input = (id) => tasks.inputs.find((item) => item.id === id);
-  assert.deepEqual(input("maraoAccessibilityProfile").options, scenarios.map(({ name }) => name));
-  assert.deepEqual(input("maraoAccessibilityTheme").options, themes);
-});
-
 test("browser checks report failed resources and activate cards through their controls", () => {
-  const accessibilitySource = fs.readFileSync(path.join(repoRoot, "scripts/test-ha-dashboard-accessibility.js"), "utf8");
-  const e2eSource = fs.readFileSync(path.join(repoRoot, "scripts/test-ha-dashboard-e2e.js"), "utf8");
+  const accessibilitySource = fs.readFileSync(path.join(repoRoot, "tests/test-ha-dashboard-accessibility.js"), "utf8");
+  const e2eSource = fs.readFileSync(path.join(repoRoot, "tests/test-ha-dashboard-e2e.js"), "utf8");
   for (const source of [accessibilitySource, e2eSource]) {
     assert.match(source, /page\.on\("requestfailed"/);
     assert.match(source, /response\.status\(\) >= 400|response\.status\(\) < 400/);
   }
-  assert.match(accessibilitySource, /locator\("\[data-card-action\]"\)\.click\(\)/);
+  assert.match(accessibilitySource, /await control\.tap\(/);
   assert.match(e2eSource, /function cardAction\(page, title\)/);
+});
+
+test("popup focus checks resolve the live control after a previously located button is replaced", () => {
+  const previous = { document: globalThis.document, location: globalThis.location };
+  try {
+    const root = { isConnected: true };
+    const card = { localName: "marao-card", isConnected: true, shadowRoot: root, getRootNode: () => ({}) };
+    const button = () => ({ localName: "button", isConnected: true, getRootNode: () => root, getAttribute: () => "Lock · unlocking" });
+    let current = button();
+    root.querySelector = () => current;
+    const previouslyLocated = current;
+    previouslyLocated.isConnected = false;
+    current = button();
+    root.activeElement = current;
+    globalThis.document = { activeElement: card, querySelectorAll: () => [] };
+    globalThis.location = { hash: "" };
+    assert.equal(popupFocusFailure(card, "[data-card-action]"), null);
+
+    root.activeElement = null;
+    const failure = popupFocusFailure(card, "[data-card-action]");
+    assert.equal(failure.expected.connected, true);
+    assert.equal(failure.expected.label, "Lock · unlocking");
+    assert.equal(failure.rootActive, null, "a genuine loss of focus still fails");
+  } finally {
+    Object.assign(globalThis, previous);
+  }
 });

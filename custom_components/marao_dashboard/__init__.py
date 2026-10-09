@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 from pathlib import Path
 import re
-import shutil
 from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.components import frontend, lovelace, panel_custom, websocket_api
+from homeassistant.components import frontend, panel_custom, websocket_api
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components.lovelace import LOVELACE_DATA
-from homeassistant.components.lovelace.const import MODE_YAML
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
@@ -22,15 +21,12 @@ from homeassistant.helpers import area_registry as ar, device_registry as dr, en
 from .config_patch import (
     patch_frontend_themes,
     patch_lovelace_dashboard,
+    remove_lovelace_dashboard,
 )
 from .const import (
     BASE_DASHBOARD_CREATED,
     BASE_DASHBOARD_NAME,
     BASE_DASHBOARD_SLUG,
-    CARD_TEST_DASHBOARD_FILE,
-    CARD_TEST_DASHBOARD_ICON,
-    CARD_TEST_DASHBOARD_KEY,
-    CARD_TEST_DASHBOARD_NAME,
     DASHBOARD_BASE_DIR,
     DEFAULT_DASHBOARD_CONFIG,
     DOMAIN,
@@ -39,6 +35,8 @@ from .const import (
     MANAGEMENT_PANEL_PATH,
     MANAGEMENT_PANEL_TITLE,
     LEGACY_FRONTEND_MODULE,
+    LEGACY_CARD_TEST_DASHBOARD_FILE,
+    LEGACY_CARD_TEST_DASHBOARD_KEY,
     MARAO_DASHBOARD_MODULES,
     MARAO_DASHBOARD_PANEL_MODULE,
     MARAO_DASHBOARD_STATIC_URL,
@@ -67,6 +65,7 @@ from .history import (
 SERVICE_REGISTERED = "generate_dashboard_service_registered"
 WEBSOCKET_REGISTERED = "websocket_registered"
 STATIC_PATH_REGISTERED = "static_path_registered"
+FRONTEND_MODULES = "frontend_modules"
 GENERATE_DASHBOARD_SCHEMA = vol.Schema(
     {
         vol.Optional("config_path", default=DEFAULT_DASHBOARD_CONFIG): cv.string,
@@ -76,6 +75,25 @@ GENERATE_DASHBOARD_SCHEMA = vol.Schema(
 )
 
 
+def frontend_fingerprint(frontend_dir: Path) -> str:
+    """Fingerprint served paths and content so an entry reload sees new assets."""
+
+    digest = sha256()
+    for path in sorted(frontend_dir.rglob("*"), key=lambda path: path.relative_to(frontend_dir).as_posix()):
+        relative_path = path.relative_to(frontend_dir)
+        if (
+            not path.is_file()
+            or any(part.startswith(".") or part == "__pycache__" for part in relative_path.parts)
+            or path.suffix in (".pyc", ".pyo")
+        ):
+            continue
+        digest.update(relative_path.as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()[:16]
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Marao Dashboard and create the base dashboard once."""
 
@@ -83,18 +101,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _register_services(hass)
     config_path = hass.config.path("configuration.yaml")
     await _async_register_static_path(hass)
-    for module_url in MARAO_DASHBOARD_MODULES:
+    fingerprint = await hass.async_add_executor_job(
+        frontend_fingerprint, Path(__file__).parent / "frontend"
+    )
+    module_urls = tuple(f"{url}?v={fingerprint}" for url in MARAO_DASHBOARD_MODULES)
+    for module_url in module_urls:
         frontend.add_extra_js_url(hass, module_url)
-    await hass.async_add_executor_job(_install_dashboard_assets, hass)
-    await hass.async_add_executor_job(_ensure_card_test_dashboard_config, hass)
-    _register_card_test_dashboard(hass)
+    hass.data[DOMAIN][FRONTEND_MODULES] = module_urls
+    await _async_remove_legacy_card_test_dashboard(hass)
     await panel_custom.async_register_panel(
         hass,
         frontend_url_path=MANAGEMENT_PANEL_PATH,
         webcomponent_name="marao-dashboard-panel",
         sidebar_title=MANAGEMENT_PANEL_TITLE,
         sidebar_icon=MANAGEMENT_PANEL_ICON,
-        module_url=MARAO_DASHBOARD_PANEL_MODULE,
+        module_url=f"{MARAO_DASHBOARD_PANEL_MODULE}?v={fingerprint}",
         require_admin=True,
         config_panel_domain=DOMAIN,
     )
@@ -107,6 +128,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         None,
         [LEGACY_FRONTEND_MODULE],
     )
+    if hass.services.has_service("frontend", "reload_themes"):
+        await hass.services.async_call("frontend", "reload_themes", blocking=True)
     await async_migrate_legacy_resources(hass)
     registry_entities = _registry_entities(hass)
     should_repair = await hass.async_add_executor_job(
@@ -134,58 +157,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-def _ensure_card_test_dashboard_config(hass: HomeAssistant) -> None:
-    """Persist the fake-entity card gallery dashboard entry."""
+async def _async_remove_legacy_card_test_dashboard(hass: HomeAssistant) -> None:
+    """Remove Marao's retired standalone gallery without touching repurposed keys."""
 
-    patch_lovelace_dashboard(
+    removed = await hass.async_add_executor_job(
+        remove_lovelace_dashboard,
         hass.config.path("configuration.yaml"),
-        CARD_TEST_DASHBOARD_KEY,
-        CARD_TEST_DASHBOARD_NAME,
-        CARD_TEST_DASHBOARD_ICON,
-        CARD_TEST_DASHBOARD_FILE,
+        LEGACY_CARD_TEST_DASHBOARD_KEY,
+        LEGACY_CARD_TEST_DASHBOARD_FILE,
     )
-
-
-def _register_card_test_dashboard(hass: HomeAssistant) -> None:
-    """Register the card gallery immediately, even when config was just patched."""
-
-    dashboard_config = {
-        "mode": MODE_YAML,
-        "title": CARD_TEST_DASHBOARD_NAME,
-        "icon": CARD_TEST_DASHBOARD_ICON,
-        "show_in_sidebar": True,
-        "filename": CARD_TEST_DASHBOARD_FILE,
-    }
-
-    lovelace_data = hass.data.get(LOVELACE_DATA)
-    if not lovelace_data or CARD_TEST_DASHBOARD_KEY in lovelace_data.dashboards:
+    if not removed.changed:
         return
-    lovelace_data.yaml_dashboards[CARD_TEST_DASHBOARD_KEY] = dashboard_config
-    lovelace_data.dashboards[CARD_TEST_DASHBOARD_KEY] = lovelace.dashboard.LovelaceYAML(
-        hass, CARD_TEST_DASHBOARD_KEY, dashboard_config
+
+    frontend.async_remove_panel(
+        hass, LEGACY_CARD_TEST_DASHBOARD_KEY, warn_if_unknown=False
     )
-    frontend.async_register_built_in_panel(
-        hass,
-        "lovelace",
-        sidebar_title=CARD_TEST_DASHBOARD_NAME,
-        sidebar_icon=CARD_TEST_DASHBOARD_ICON,
-        frontend_url_path=CARD_TEST_DASHBOARD_KEY,
-        config={"mode": MODE_YAML},
-        show_in_sidebar=True,
-        update=False,
-    )
+    lovelace_data = hass.data.get(LOVELACE_DATA)
+    if lovelace_data:
+        lovelace_data.dashboards.pop(LEGACY_CARD_TEST_DASHBOARD_KEY, None)
+        lovelace_data.yaml_dashboards.pop(LEGACY_CARD_TEST_DASHBOARD_KEY, None)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload Marao Dashboard."""
 
     frontend.async_remove_panel(hass, MANAGEMENT_PANEL_PATH, warn_if_unknown=False)
-    frontend.async_remove_panel(hass, CARD_TEST_DASHBOARD_KEY, warn_if_unknown=False)
-    lovelace_data = hass.data.get(LOVELACE_DATA)
-    if lovelace_data:
-        lovelace_data.dashboards.pop(CARD_TEST_DASHBOARD_KEY, None)
-        lovelace_data.yaml_dashboards.pop(CARD_TEST_DASHBOARD_KEY, None)
-    for module_url in MARAO_DASHBOARD_MODULES:
+    for module_url in hass.data.get(DOMAIN, {}).pop(FRONTEND_MODULES, ()):
         frontend.remove_extra_js_url(hass, module_url)
     hass.data.get(DOMAIN, {}).pop("base_dashboard", None)
     return True
@@ -579,7 +576,7 @@ def _generate_dashboard(
         config,
         hass.config.path(DASHBOARD_BASE_DIR),
         registry_entities,
-        config_root="/config",
+        config_root=hass.config.config_dir,
         dashboard_key_override=dashboard_key,
         language=language,
     )
@@ -628,31 +625,6 @@ async def _async_register_static_path(hass: HomeAssistant) -> None:
         ]
     )
     hass.data[DOMAIN][STATIC_PATH_REGISTERED] = True
-
-
-def _install_dashboard_assets(hass: HomeAssistant) -> bool:
-    """Install the Marao YAML template library used by generated dashboards."""
-
-    source_dir = Path(__file__).parent / "frontend" / "dashboard"
-    if not source_dir.exists():
-        return False
-
-    target_dir = Path(hass.config.path("www/community/MaraoDashboard/dashboard"))
-    changed = False
-
-    for source_file in source_dir.rglob("*"):
-        if not source_file.is_file():
-            continue
-        relative_path = source_file.relative_to(source_dir)
-        target_file = target_dir / relative_path
-        source = source_file.read_bytes()
-        if target_file.exists() and target_file.read_bytes() == source:
-            continue
-        target_file.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source_file, target_file)
-        changed = True
-
-    return changed
 
 
 def _install_themes(hass: HomeAssistant) -> bool:

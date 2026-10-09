@@ -7,7 +7,15 @@ parent: Cards
 
 # Graph Card
 
-The `hc_graph_card` is used for showing a graph of a sensor. It also shows the current state.
+`hc_graph_card` shows a sensor's live numeric reading over Marao's own
+24-hour background trace. The trace reads Home Assistant recorder history once
+for the card, appends the current state, and needs no native history-graph card
+or other frontend resource. If no numeric history is available, the current
+reading remains visible and the background stays neutral.
+Loading and empty history have readable status text. A failed history request
+shows `History unavailable` while preserving the current reading. Unknown,
+unavailable, and disconnected graph sources stay neutral; history loads again
+after the source recovers.
 
 ![Graph Card Light](../../../assets/images/cards/hc_graph_card/graphcard_light.png)
 
@@ -23,10 +31,10 @@ The `hc_graph_card` is used for showing a graph of a sensor. It also shows the c
 
 ## Variables
 
-| Variable | Default | Required | Description|
+| Variable | Default | Required | Description |
 |----------|---------|----------|------------|
-| graph_color | var(--color-blue) | No | The color used for the graph line. |
-| graph_background | | No | Card background override. |
-| show_graph_line | false | No | Show the graph line. |
-| show_graph_fill | false | No | Show the graph fill. |
+| graph_color | Theme card text/accent color | No | Color for the graph line and fill. |
+| graph_background | Transparent | No | Optional tint behind the graph, without replacing the card's state background. |
+| show_graph_line | true | No | Show the graph line. |
+| show_graph_fill | true | No | Show the graph fill. |
 | show_icon | false | No | Show the card icon. |

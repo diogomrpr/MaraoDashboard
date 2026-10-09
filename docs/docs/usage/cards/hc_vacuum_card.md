@@ -6,7 +6,7 @@ parent: Cards
 
 # Vacuum Card
 
-The `hc_vacuum_card` is used to control a robot vacuum. It includes return-to-base, pause, start, and three segment cleaning buttons.
+The `hc_vacuum_card` is used to control a robot vacuum. It shows the supported return-to-base, pause, and start controls, plus up to three configured segment cleaning buttons. Unknown and unavailable vacuums have disabled controls.
 
 ## Usage
 
@@ -36,14 +36,14 @@ The `hc_vacuum_card` is used to control a robot vacuum. It includes return-to-ba
 | <span class="entry-type-marao_dashboard"></span> icon | mdi:robot-vacuum | No | mdi:robot-vacuum |
 | <span class="entry-type-marao_dashboard"></span> action_1.icon | mdi:door | No | mdi:silverware-fork-knife |
 | <span class="entry-type-marao_dashboard"></span> action_1.on_action | vacuum.send_command | No | vacuum.send_command |
-| <span class="entry-type-marao_dashboard"></span> action_1.segment | 21 | No | 16 |
+| <span class="entry-type-marao_dashboard"></span> action_1.segment | Empty | No | 16 |
 | <span class="entry-type-marao_dashboard"></span> action_2.icon | mdi:sofa | No | mdi:sofa |
 | <span class="entry-type-marao_dashboard"></span> action_2.on_action | vacuum.send_command | No | vacuum.send_command |
-| <span class="entry-type-marao_dashboard"></span> action_2.segment | 22 | No | 17 |
+| <span class="entry-type-marao_dashboard"></span> action_2.segment | Empty | No | 17 |
 | <span class="entry-type-marao_dashboard"></span> action_3.icon | mdi:bed | No | mdi:bed |
 | <span class="entry-type-marao_dashboard"></span> action_3.on_action | vacuum.send_command | No | vacuum.send_command |
-| <span class="entry-type-marao_dashboard"></span> action_3.segment | 23 | No | 18 |
+| <span class="entry-type-marao_dashboard"></span> action_3.segment | Empty | No | 18 |
 
 ## More info
 
-The room buttons send the `app_segment_clean` command. Segment IDs are integration-specific, so update them to match your vacuum map.
+The room buttons send the `app_segment_clean` command. Segment IDs are integration-specific, so update them to match your vacuum map. Segment buttons require native command support. A configured `on_action` overrides the service; services other than `vacuum.send_command` receive the entity target without command parameters. There are no implicit segment IDs: each button appears only when its segment is configured.

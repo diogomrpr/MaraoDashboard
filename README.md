@@ -39,7 +39,7 @@ Install the locked Node and Python test dependencies:
 npm ci
 python3.14 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements-test.txt
+python -m pip install -r tests/requirements.txt
 ```
 
 During development, run only the focused check for the code or card being
@@ -47,13 +47,33 @@ changed. Before a push, tag, or release, `npm run verify:publish` runs the full
 suite and the local Home Assistant browser check. That check requires the
 disposable environment described in the
 [development guide](docs/docs/development/local-development.md) and must never
-target a live Home Assistant instance.
+target a live Home Assistant instance. Configure its URL, administrator long-lived
+token, and SSH access in the ignored `ha-test/local.json`. `npm run ha:sync`
+builds and installs the current working tree, creates safe demonstration entities,
+and generates the complete test dashboard. Browser tests prepare it automatically.
+Frontend changes need an integration reload and browser refresh; backend changes
+need a Home Assistant restart. Preparation handles both.
 
 Marao does not install, update, replace, or remove unrelated HACS cards.
 
+## Repository layout
+
+- `custom_components/marao_dashboard/` — Marao integration and packaged runtime,
+  theme, and generator source.
+- `frontend_src/` — editable dashboard-editor source and build scripts.
+- `tests/` — automated integration, frontend, and browser checks.
+- `ha-test/` — disposable-instance preparation, safe fixtures, and full Cases view.
+- `docs/` — product and development documentation.
+- `.github/` — CI workflows and contribution guidance.
+
+HACS installs only `custom_components/marao_dashboard/`. Tests, synthetic media,
+test dependencies, and local credentials stay outside that directory. Package
+validation checks both the HACS source and staged build. Generated development
+output stays in ignored `ha-test/.cache/` and `tests/.artifacts/` directories.
+
 ## Contributing and license
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Marao
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) before opening a pull request. Marao
 Dashboard is distributed under the repository's license.
 
 Inspired by [HaCasa](https://github.com/damianeickhoff/HaCasa).

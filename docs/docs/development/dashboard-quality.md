@@ -40,8 +40,10 @@ or action logic.
 ## Safe development environment
 
 Agents may deploy and test only against the disposable local Home Assistant at
-`192.168.0.28`. The configured target, credentials, and write opt-ins belong
-in ignored local files.
+`192.168.0.28`. Portable developer tooling accepts other explicitly disposable
+targets, but that does not change the agent restriction. The URL, administrator
+long-lived token, disposable acknowledgement, and SSH configuration belong in
+ignored `ha-test/local.json`; private keys and generated reports stay ignored.
 
 Never:
 
@@ -53,11 +55,16 @@ Never:
 - commit tokens, passwords, alarm codes, camera credentials, private entity
   data, internal secrets, or secret-bearing screenshots, traces, and logs.
 
-Use the **Marao Dashboard Card Test** gallery and its fake/template helpers for
-interaction tests. It must contain every supported Marao card/template and key
-popup variant, including both single-mode and multi-mode climate examples. Add
-a safe helper whenever a supported state, action, or history shape cannot
-currently be exercised there.
+Use the **Cases** view at `/marao-dashboard/card-test` and its fake/template
+helpers for interaction tests. The disposable instance must expose only one
+Marao Lovelace dashboard; its realistic pages and Cases view share that root.
+The gallery must contain every supported Marao card/template and every
+materially distinct state, action, option shape, and popup variant, including
+both single-mode and multi-mode climate examples. Add a safe helper whenever a
+supported state, action, or history shape cannot currently be exercised there,
+and keep a representative card on its realistic generated page. Equivalent
+custom labels, colors, and numeric values do not require a Cartesian set of
+duplicates.
 
 ## Working loop
 
@@ -346,7 +353,8 @@ A risky security action that is not access-point open/unlock—such as disarming
 an alarm or disabling a security/privacy control—requires a 1.2-second
 press-and-hold.
 
-- Draw continuous border progress around the control.
+- Draw continuous border progress around the control while held. Hide the
+  progress stroke at rest and after release or cancellation.
 - Dispatch only after the full duration.
 - Release, cancellation, pointer loss, moving outside the control, route
   change, or disabling the entity before completion must reset without
@@ -369,16 +377,46 @@ confirmation that names what will be removed or replaced.
   must remain readable in light and dark modes.
 - The state and action cannot be ambiguous or encoded only by color.
 
+### Room cards
+
+- A room card with configured `light_entities` exposes one visible **All off**
+  child control for every listed `light.*` entity. It dispatches one
+  `light.turn_off` action for that list and has strong haptic feedback.
+- The child action must stop propagation so the card's separate room-navigation
+  action still works. Disable the child control when Home Assistant is
+  disconnected or any configured light is `unknown` or `unavailable`.
+- The Cases view keeps at least two safe room lights so the combined action and
+  its disabled state can be checked without affecting hardware.
+
 ### Value sliders
 
 - The track is tall enough to keep the thumb visibly centered and contained.
-- Track and card backgrounds must contrast; never choose the same background.
+- Track and card backgrounds must differ. Track, fill, and thumb boundaries
+  retain 3:1 contrast against adjacent surfaces, using persistent outlines when
+  the palette uses pale backgrounds.
+- Card, track, confirmed fill, and thumb use distinct backgrounds.
+- Draw the track, confirmed fill and thumb together as vector shapes with
+  consistent 1px strokes. Keep the semantic native range over the drawing;
+  do not stack native thumb borders over separately clipped CSS curves.
+- Reset the transparent native thumb's shadow and radius explicitly so iOS's
+  default shadow cannot draw a square over the vector thumb.
+- Inspect curve screenshots at device resolution (including 2× and 3× pixel
+  density). A CSS-resolution screenshot discards the phone's extra pixels.
+- Track and thumb are visibly 48px tall. The fill begins flush at the track's
+  left edge and reaches its right edge at the maximum value, with no inset gap.
+- Fill geometry follows the track in CSS so rotation and resizing cannot leave
+  an old measured width behind.
 - The progress fill is rounded to the same geometry as the thumb.
 - Fill represents the current confirmed percentage or value.
 - The thumb independently represents the user's target value.
 - The fill never visually passes the thumb and never escapes the rounded track.
 - Covers update the fill from live position while the target thumb may already
   be at the requested destination.
+- Keep the native input mounted for a complete drag, including across Home
+  Assistant state updates. Refresh its confirmed fill in place; cancellation
+  or an unavailable/disconnected target must not dispatch the partial value.
+- Keep idle value controls mounted across unrelated updates. Refresh when
+  their own state, graph, language/theme metadata or service connection changes.
 
 ### Numeric input
 
@@ -423,18 +461,29 @@ large and readable.
   rather than stretching across the screen.
 - Keep the background inert, trap focus, close through explicit close/back
   behavior, and restore focus.
+- Recognize Marao's native sheet in scroll containment. Preserve native value
+  slider touch defaults inside it; cancelling `touchmove` prevents iOS dragging.
 
 ### Cameras, graphs, and media
 
 - Camera cards use Home Assistant feeds and Marao-owned Frigate/UniFi Protect
   event presentation. Activating a camera card opens its event popup. Do not
   autoplay audio. Show unavailable feeds and provider failures explicitly.
-- Use native Home Assistant graph/history data. Show all available requested
-  history and a clear empty/unavailable state when it cannot be loaded.
+- Graph cards use Marao's shared, project-owned 24-hour background trace. It
+  requests Home Assistant recorder history once for the displayed graph entity,
+  appends the authoritative live numeric state, and does not nest a native
+  history-graph card or load another card resource.
+- Keep the current reading and any entity control usable when history is empty
+  or cannot be loaded; leave the background trace neutral in that case. The
+  optional line, fill, color, and transparent graph-background tint must not
+  make card text or controls less readable.
+- A toggle-graph card derives its control state and availability from
+  `toggle_entity`, never from the numeric metric it displays.
 - Media popup action buttons show their icons rather than leaking service or
   action text into the visual control; each still has an internal semantic
   name.
-- Lazy-load heavy camera, graph, and secondary popup content when possible.
+- Lazy-load camera, graph, and secondary popup content when possible; a graph
+  history request is on demand and deduplicated for its rendered card.
 
 ## Performance and reliability
 

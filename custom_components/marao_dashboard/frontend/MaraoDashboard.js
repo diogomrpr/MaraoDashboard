@@ -12,7 +12,7 @@ const [cardsModule, cameraEventsModule] = await Promise.all([
   import(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`),
   import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`),
 ]);
-const { callServiceWithNotification, haptic, registerMaraoCards } = cardsModule;
+const { callServiceWithNotification, focusRestorer, haptic, registerMaraoCards } = cardsModule;
 registerMaraoCards();
 cameraEventsModule.registerMaraoCameraEventCards();
 
@@ -261,12 +261,27 @@ const TRANSLATIONS = {
     "common.unlock": "Unlock",
     "common.closed": "Closed",
     "common.locked": "Locked",
+    "common.locking": "Locking",
     "common.unlocked": "Unlocked",
     "common.unlocking": "Unlocking...",
     "common.opening": "Opening",
     "common.closing": "Closing",
     "common.running": "Running",
     "common.idle": "Idle",
+    "media.previous": "Previous",
+    "media.play_pause": "Play/pause",
+    "media.next": "Next",
+    "dishwasher.idle": "Idle",
+    "dishwasher.ready": "Ready",
+    "dishwasher.running": "Running",
+    "dishwasher.paused": "Paused",
+    "dishwasher.finished": "Finished",
+    "dishwasher.delayed": "Delayed start",
+    "dishwasher.attention": "Needs attention",
+    "dishwasher.aborting": "Cancelling",
+    "dishwasher.error": "Error",
+    "dishwasher.salt": "Add salt",
+    "dishwasher.rinse_aid": "Add rinse aid",
     "common.loading": "Loading…",
     "common.unknown": "Unknown",
     "common.unavailable": "Unavailable",
@@ -274,11 +289,13 @@ const TRANSLATIONS = {
     "common.all_closed": "All closed",
     "common.all_good": "All good",
     "common.active_count": "{count} active",
+    "common.partial_summary": "{label}, {count} unavailable",
     "common.on_count": "{count} on",
     "common.open_count": "{count} open",
     "common.need_attention_count": "{count} need attention",
     "common.battery": "Battery",
     "common.nothing_playing": "Nothing is playing",
+    "room.turn_off_lights": "Turn off all lights in {name}",
     "camera_events.title": "Camera events",
     "camera_events.event": "Event",
     "camera_events.back": "Back to events",
@@ -305,7 +322,6 @@ const TRANSLATIONS = {
     "camera_events.card.frigate_description": "Recent Frigate events for a camera",
     "camera_events.card.name": "Marão Camera Events Card",
     "camera_events.card.description": "Recent Frigate or UniFi Protect events for a camera",
-    "camera_events.test.person_detected": "Person detected",
     "actions.open": "Open {name}",
     "actions.toggle": "Toggle {name}",
     "actions.failed": "Action failed: {error}",
@@ -339,9 +355,17 @@ const TRANSLATIONS = {
     "overview.maintenance": "Maintenance",
     "access.hold_1_second": "Hold 1 second",
     "access.hold_to_activate": "Hold to {action}",
+    "access.open": "Open",
     "access.slide_to_open": "Slide to open",
     "access.slide_to_unlock": "Slide to unlock",
+    "navigation.label": "Marao navigation",
+    "popup.title": "Marao popup",
     "popup.close": "Close popup",
+    "sensor.updated": "Updated {time}",
+    "vacuum.start": "Start cleaning",
+    "vacuum.pause": "Pause cleaning",
+    "vacuum.return_to_base": "Return to base",
+    "vacuum.clean_segment": "Clean segment {segment}",
     "timeline.title": "State timeline",
     "timeline.loading": "Loading history...",
     "timeline.no_history": "No history in the last 24 hours",
@@ -367,12 +391,27 @@ const TRANSLATIONS = {
     "common.unlock": "Destrancar",
     "common.closed": "Fechado",
     "common.locked": "Trancado",
+    "common.locking": "A trancar",
     "common.unlocked": "Destrancado",
     "common.unlocking": "A destrancar...",
     "common.opening": "A abrir",
     "common.closing": "A fechar",
     "common.running": "Em execução",
     "common.idle": "Inativo",
+    "media.previous": "Anterior",
+    "media.play_pause": "Reproduzir/pausar",
+    "media.next": "Seguinte",
+    "dishwasher.idle": "Inativo",
+    "dishwasher.ready": "Pronto",
+    "dishwasher.running": "Em funcionamento",
+    "dishwasher.paused": "Em pausa",
+    "dishwasher.finished": "Concluído",
+    "dishwasher.delayed": "Início adiado",
+    "dishwasher.attention": "Requer atenção",
+    "dishwasher.aborting": "A cancelar",
+    "dishwasher.error": "Erro",
+    "dishwasher.salt": "Adicionar sal",
+    "dishwasher.rinse_aid": "Adicionar abrilhantador",
     "common.loading": "A carregar…",
     "common.unknown": "Desconhecido",
     "common.unavailable": "Indisponível",
@@ -380,11 +419,13 @@ const TRANSLATIONS = {
     "common.all_closed": "Tudo fechado",
     "common.all_good": "Tudo bem",
     "common.active_count": "{count} ativos",
+    "common.partial_summary": "{label}, {count} indisponíveis",
     "common.on_count": "{count} ligados",
     "common.open_count": "{count} abertos",
     "common.need_attention_count": "{count} precisam de atenção",
     "common.battery": "Bateria",
     "common.nothing_playing": "Nada em reprodução",
+    "room.turn_off_lights": "Desligar todas as luzes em {name}",
     "camera_events.title": "Eventos da câmara",
     "camera_events.event": "Evento",
     "camera_events.back": "Voltar aos eventos",
@@ -411,7 +452,6 @@ const TRANSLATIONS = {
     "camera_events.card.frigate_description": "Eventos recentes do Frigate para uma câmara",
     "camera_events.card.name": "Cartão de eventos de câmara Marão",
     "camera_events.card.description": "Eventos recentes do Frigate ou UniFi Protect para uma câmara",
-    "camera_events.test.person_detected": "Pessoa detetada",
     "actions.open": "Abrir {name}",
     "actions.toggle": "Alternar {name}",
     "actions.failed": "A ação falhou: {error}",
@@ -445,9 +485,17 @@ const TRANSLATIONS = {
     "overview.maintenance": "Manutenção",
     "access.hold_1_second": "Premir 1 segundo",
     "access.hold_to_activate": "Manter premido para {action}",
+    "access.open": "Abrir",
     "access.slide_to_open": "Deslize para abrir",
     "access.slide_to_unlock": "Deslize para desbloquear",
+    "navigation.label": "Navegação Marao",
+    "popup.title": "Janela Marao",
     "popup.close": "Fechar janela",
+    "sensor.updated": "Atualizado {time}",
+    "vacuum.start": "Iniciar limpeza",
+    "vacuum.pause": "Pausar limpeza",
+    "vacuum.return_to_base": "Voltar à base",
+    "vacuum.clean_segment": "Limpar divisão {segment}",
     "timeline.title": "Histórico de estados",
     "timeline.loading": "A carregar histórico...",
     "timeline.no_history": "Sem histórico nas últimas 24 horas",
@@ -484,7 +532,7 @@ function localize(key, hassOrLanguage, placeholders = {}) {
   );
 }
 
-const POPUP_SCROLL_GUARD_VERSION = 2;
+const POPUP_SCROLL_GUARD_VERSION = 3;
 const MARAO_TEXT_SCALE_ATTRIBUTE = "data-marao-dashboard-text-scale";
 const MARAO_TAP_DRAG_THRESHOLD = 10;
 const MARAO_TAP_BLOCK_MS = 500;
@@ -629,13 +677,9 @@ class MaraoSlideToOpen extends HTMLElement {
   }
 
   _disabled() {
-    const entityId = this._entityId() || "";
     const hass = this._hassInstance();
     if (!hass?.callService || hass.connected === false || hass.connection?.connected === false) return true;
-    const inactiveStates = entityId.startsWith("lock.")
-      ? ["unlocking", "unknown", "unavailable"]
-      : ["open", "opening", "unknown", "unavailable"];
-    return inactiveStates.includes(this._state());
+    return ["unknown", "unavailable"].includes(this._state());
   }
 
   _label() {
@@ -649,8 +693,8 @@ class MaraoSlideToOpen extends HTMLElement {
       return window.MaraoDashboard?.localize?.("common.unlocking", this._hassInstance()) || "Unlocking...";
     }
     const isLock = (this._entityId() || "").startsWith("lock.");
-    const key = isLock ? "common.unlock" : "access.slide_to_open";
-    return window.MaraoDashboard?.localize?.(key, this._hassInstance()) || (isLock ? "Unlock" : "Slide to open");
+    const key = isLock ? "common.unlock" : "access.open";
+    return window.MaraoDashboard?.localize?.(key, this._hassInstance()) || (isLock ? "Unlock" : "Open");
   }
 
   _semanticLabel(action) {
@@ -673,16 +717,16 @@ class MaraoSlideToOpen extends HTMLElement {
     const semanticLabel = this._semanticLabel(label);
     this.shadowRoot.innerHTML = `
       <style>
-        :host { position: relative; z-index: 2; display: block; width: 100%; pointer-events: auto; }
+        :host { position: relative; z-index: 2; display: block; width: 100%; pointer-events: auto; --marao-slide-foreground: var(--primary-text-color); --marao-slide-progress: color-mix(in srgb, var(--secondary-background-color) 65%, var(--primary-text-color)); }
         .track {
           position: relative;
           width: 100%;
           min-height: 64px;
           overflow: hidden;
-          border: 1px solid var(--divider-color);
+          border: 1px solid color-mix(in srgb, var(--marao-slide-foreground) 72%, transparent);
           border-radius: 32px;
           box-sizing: border-box;
-          background: var(--marao-card-background);
+          background: var(--secondary-background-color);
           touch-action: pan-y;
           user-select: none;
           -webkit-user-select: none;
@@ -691,14 +735,14 @@ class MaraoSlideToOpen extends HTMLElement {
         .track.dragging { cursor: grabbing; }
         .track.completing { animation: marao-slide-complete 280ms ease-out; }
         @keyframes marao-slide-complete {
-          50% { box-shadow: inset 0 0 0 4px var(--primary-color); }
+          50% { box-shadow: inset 0 0 0 4px var(--marao-slide-foreground); }
         }
         .fill {
           position: absolute;
           inset: 0;
           transform: scaleX(0);
           transform-origin: left center;
-          background: var(--primary-color);
+          background: var(--marao-slide-progress);
           pointer-events: none;
         }
         .label {
@@ -708,8 +752,10 @@ class MaraoSlideToOpen extends HTMLElement {
           min-height: 64px;
           padding: 8px 16px 8px 72px;
           box-sizing: border-box;
-          color: var(--primary-text-color);
-          font: var(--font-weight-primary) var(--font-size-primary) var(--primary-font-family);
+          color: var(--marao-slide-foreground);
+          font-family: var(--primary-font-family);
+          font-size: max(1.125rem, var(--font-size-primary));
+          font-weight: 800;
           line-height: 1.15;
           overflow-wrap: anywhere;
           text-align: center;
@@ -724,19 +770,18 @@ class MaraoSlideToOpen extends HTMLElement {
           height: 54px;
           align-items: center;
           justify-content: center;
-          border: 2px solid var(--primary-color);
+          border: 0;
           border-radius: 50%;
           box-sizing: border-box;
-          color: var(--primary-color);
-          background: var(--active-text-color);
+          color: var(--secondary-background-color);
+          background: var(--marao-slide-foreground);
           box-shadow: var(--ha-card-box-shadow);
-          font-size: 44px;
-          font-family: sans-serif;
-          font-weight: 500;
+          font-size: 0;
           line-height: 1;
-          padding: 0 0 4px 2px;
+          padding: 0;
           pointer-events: none;
         }
+        .thumb ha-icon { --mdc-icon-size: 32px; }
         .track[aria-disabled="true"] { opacity: 0.6; }
         .track[aria-disabled="true"] .thumb {
           border-color: var(--divider-color);
@@ -750,7 +795,7 @@ class MaraoSlideToOpen extends HTMLElement {
       <div class="track" role="slider" tabindex="${disabled ? -1 : 0}" aria-label="${escapeHtml(semanticLabel)}" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0%" aria-disabled="${disabled}">
         <div class="fill"></div>
         <span class="label">${escapeHtml(label)}</span>
-        <span class="thumb">›</span>
+        <span class="thumb"><ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon></span>
       </div>
     `;
     const track = this.shadowRoot.querySelector(".track");
@@ -937,6 +982,13 @@ function escapeHtml(value) {
   })[character]);
 }
 
+function historyEntityState(hass, config) {
+  if (!hass || hass.connected === false || hass.connection?.connected === false) return "unavailable";
+  const state = hass.states?.[config?.entity]?.state;
+  if (!state || state === "unknown") return "unknown";
+  return state === "unavailable" ? "unavailable" : "";
+}
+
 class MaraoStateTimelineCard extends HTMLElement {
   constructor() {
     super();
@@ -950,6 +1002,7 @@ class MaraoStateTimelineCard extends HTMLElement {
     this._resizeObserver.observe(this);
     if (this._config) {
       this._spaceTicks();
+      this._loadHistory();
       return;
     }
     const entity = this.getAttribute("entity");
@@ -961,26 +1014,47 @@ class MaraoStateTimelineCard extends HTMLElement {
 
   disconnectedCallback() {
     this._resizeObserver?.disconnect();
+    this._loadId += 1;
+    this._loading = false;
+    this._loadedKey = "";
+    this._history = null;
+    this._error = false;
   }
 
   setConfig(config) {
     if (!config?.entity) throw new Error("Marao state timeline requires an entity");
     this._config = { ...config };
     this._history = null;
+    this._loadedKey = "";
+    this._loadId += 1;
+    this._loading = false;
+    this._error = false;
     this._render();
     this._loadHistory();
   }
 
   set hass(hass) {
+    const wasUnavailable = this._availabilityState;
     const entity = hass?.states?.[this._config?.entity];
     const marker = entity ? `${entity.state}:${entity.last_updated}` : "missing";
     const changed = marker !== this._stateMarker;
     this._hass = hass;
     this._stateMarker = marker;
-    if (changed) {
-      this._render();
-      this._loadHistory();
+    const unavailable = historyEntityState(hass, this._config);
+    this._availabilityState = unavailable;
+    if (unavailable !== wasUnavailable) {
+      this._loadId += 1;
+      this._loading = false;
+      this._loadedKey = "";
+      this._history = null;
+      this._error = false;
+    } else if (!unavailable && changed && this._history?.length && !this._error) {
+      this._history.push(entity);
+      const end = Date.now();
+      this._range = { start: end - 24 * 60 * 60 * 1000, end };
     }
+    this._render();
+    this._loadHistory();
   }
 
   getCardSize() {
@@ -992,7 +1066,8 @@ class MaraoStateTimelineCard extends HTMLElement {
   }
 
   async _loadHistory() {
-    if (!this._hass || !this._config?.entity || this._loading) return;
+    if (!this._config?.entity || historyEntityState(this._hass, this._config) || this._loadedKey === this._config.entity) return;
+    this._loadedKey = this._config.entity;
     this._loading = true;
     const loadId = ++this._loadId;
     if (!this._history) this._render();
@@ -1017,8 +1092,10 @@ class MaraoStateTimelineCard extends HTMLElement {
     } catch (_error) {
       if (loadId === this._loadId) this._error = true;
     } finally {
-      this._loading = false;
-      if (loadId === this._loadId) this._render();
+      if (loadId === this._loadId) {
+        this._loading = false;
+        this._render();
+      }
     }
   }
 
@@ -1055,10 +1132,10 @@ class MaraoStateTimelineCard extends HTMLElement {
     if (["off", "closed", "locked", "not_home", "idle", "paused", "standby"].includes(normalized)) {
       return "var(--divider-color)";
     }
-    if (["unknown", "opening", "closing", "unlocking", "locking", "pending"].includes(normalized)) {
+    if (["opening", "closing", "unlocking", "locking", "pending"].includes(normalized)) {
       return "var(--color-yellow)";
     }
-    if (normalized === "unavailable") return "var(--disabled-color)";
+    if (["unknown", "unavailable"].includes(normalized)) return "var(--disabled-color)";
     const colors = ["var(--color-blue)", "var(--color-green)", "var(--color-purple)", "var(--color-orange)"];
     const hash = [...normalized].reduce((total, character) => total + character.charCodeAt(0), 0);
     return colors[hash % colors.length];
@@ -1088,14 +1165,18 @@ class MaraoStateTimelineCard extends HTMLElement {
     if (!this.shadowRoot || !this._config) return;
     const entity = this._hass?.states?.[this._config.entity];
     const name = this._config.name || entity?.attributes?.friendly_name || localize("timeline.title", this._hass);
-    const segments = this._segments();
+    const unavailable = historyEntityState(this._hass, this._config);
+    const segments = unavailable || this._error ? [] : this._segments();
     const range = this._range;
     const duration = range ? range.end - range.start : 1;
-    const status = this._error
+    const status = unavailable
+      ? localize(`common.${unavailable}`, this._hass)
+      : this._error
       ? localize("timeline.history_unavailable", this._hass)
       : this._loading && !this._history
         ? localize("timeline.loading", this._hass)
         : localize("timeline.no_history", this._hass);
+    const historyState = unavailable || (this._error ? "error" : this._loading ? "loading" : segments.length ? "ready" : "empty");
     const segmentMarkup = segments.map((segment) => {
       const left = ((segment.from - range.start) / duration) * 100;
       const width = ((segment.to - segment.from) / duration) * 100;
@@ -1113,9 +1194,9 @@ class MaraoStateTimelineCard extends HTMLElement {
       <style>
         :host { display: block; width: 100%; }
         ha-card { box-sizing: border-box; min-height: 168px; padding: 13px 20px; background: var(--ha-card-background); color: var(--primary-text-color); }
-        header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-        h2 { margin: 0; min-width: 0; overflow: hidden; font-size: var(--font-size-primary, 18px); font-weight: var(--font-weight-primary, 700); letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
-        header span { flex: 0 0 auto; color: var(--subtext-color); font-size: var(--font-size-state, 12px); font-weight: var(--font-weight-secondary, 500); }
+        header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+        h2 { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: var(--font-size-primary, 18px); font-weight: var(--font-weight-primary, 700); letter-spacing: 0; }
+        header span { color: var(--subtext-color); overflow-wrap: anywhere; font-size: var(--font-size-state, 12px); font-weight: var(--font-weight-secondary, 500); }
         .plot { position: relative; height: 48px; border: 1px solid var(--divider-color); border-radius: 8px; box-sizing: border-box; overflow: visible; background: var(--marao-card-background); touch-action: none; user-select: none; -webkit-user-select: none; }
         .segments { position: absolute; inset: 0; overflow: hidden; border-radius: 7px; }
         .segment { position: absolute; top: 0; bottom: 0; }
@@ -1130,14 +1211,14 @@ class MaraoStateTimelineCard extends HTMLElement {
         .cursor { position: absolute; z-index: 2; top: -5px; bottom: -5px; width: 2px; display: none; background: var(--primary-text-color); pointer-events: none; }
         .tooltip { position: absolute; z-index: 3; top: -51px; display: none; min-width: 96px; padding: 6px 8px; border: 1px solid var(--divider-color); border-radius: 6px; box-sizing: border-box; transform: translateX(-50%); background: var(--ha-card-background); color: var(--primary-text-color); font-size: var(--font-size-primary, 18px); line-height: 1.25; text-align: center; white-space: nowrap; pointer-events: none; box-shadow: var(--ha-card-box-shadow); }
         .plot.tracking .cursor, .plot.tracking .tooltip { display: block; }
-        .legend { display: flex; gap: 8px; min-height: 16px; margin-top: 30px; overflow: hidden; color: var(--subtext-color); font-size: var(--font-size-secondary, 16px); font-weight: var(--font-weight-secondary, 500); }
-        .legend span { display: flex; min-width: 0; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .legend { display: flex; flex-wrap: wrap; gap: 8px; min-height: 16px; margin-top: 30px; color: var(--subtext-color); font-size: var(--font-size-secondary, 16px); font-weight: var(--font-weight-secondary, 500); }
+        .legend span { display: flex; min-width: 0; max-width: 100%; align-items: center; gap: 5px; overflow-wrap: anywhere; }
         .legend i { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
-        .status { display: grid; min-height: 64px; place-items: center; border: 1px solid var(--divider-color); border-radius: 8px; background: var(--marao-card-background); color: var(--subtext-color); font-size: var(--font-size-primary, 18px); font-weight: var(--font-weight-secondary, 500); }
+        .status { display: grid; min-height: 64px; padding: 12px; place-items: center; border: 1px solid var(--divider-color); border-radius: 8px; background: var(--marao-card-background); color: var(--subtext-color); font-size: var(--font-size-primary, 18px); font-weight: var(--font-weight-secondary, 500); text-align: center; overflow-wrap: anywhere; }
       </style>
-      <ha-card>
-        <header><h2>${escapeHtml(name)}</h2><span>${escapeHtml(entity ? this._stateLabel(entity.state) : "")}</span></header>
-        ${segments.length ? `<div class="plot" role="img" aria-label="${escapeHtml(name)}"><div class="segments">${segmentMarkup}</div><div class="ticks">${ticks}</div><div class="cursor"></div><div class="tooltip"></div></div><div class="legend">${legend}</div>` : `<div class="status">${escapeHtml(status)}</div>`}
+      <ha-card data-history-state="${historyState}">
+        <header><h2>${escapeHtml(name)}</h2><span>${escapeHtml(this._stateLabel(unavailable || entity?.state || "unavailable"))}</span></header>
+        ${segments.length ? `<div class="plot" role="img" aria-label="${escapeHtml(name)}"><div class="segments">${segmentMarkup}</div><div class="ticks">${ticks}</div><div class="cursor"></div><div class="tooltip"></div></div><div class="legend">${legend}</div>` : `<div class="status" role="${this._error && !unavailable ? "alert" : "status"}">${escapeHtml(status)}</div>`}
       </ha-card>`;
     if (segments.length) {
       this._bindTracking();
@@ -1211,6 +1292,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._offset = 0;
     this._history = [];
+    this._loadId = 0;
   }
 
   setConfig(config) {
@@ -1220,13 +1302,36 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const entity = config?.entity || config?.entity_id || null;
     this._config = { period: "day", popup: false, ...config, entity };
     this._offset = 0;
+    this._loadId += 1;
+    this._loading = false;
+    this._loadedKey = "";
+    this._history = [];
+    this._error = false;
+    this._render();
     this._load();
   }
 
   set hass(hass) {
+    const wasUnavailable = this._availabilityState;
     this._hass = hass;
+    this._availabilityState = historyEntityState(hass, this._config);
+    if (this._availabilityState !== wasUnavailable) {
+      this._loadId += 1;
+      this._loading = false;
+      this._loadedKey = "";
+      this._history = [];
+      this._error = false;
+    }
     this._render();
-    if (!this._history?.length) this._load();
+    this._load();
+  }
+
+  connectedCallback() { this._load(); }
+
+  disconnectedCallback() {
+    this._loadId += 1;
+    this._loading = false;
+    this._loadedKey = "";
   }
 
   getCardSize() { return this._config?.popup ? 5 : 2; }
@@ -1255,9 +1360,16 @@ class MaraoEnergyPeriodCard extends HTMLElement {
   }
 
   async _load() {
-    if (!this._hass?.callApi || !this._config?.entity || this._loading) return;
-    this._loading = true;
+    if (!this._config?.popup || historyEntityState(this._hass, this._config)) return;
     const { start, end } = this._range();
+    const key = `${this._config.entity}:${start.toISOString()}`;
+    if (this._loadedKey === key) return;
+    this._loadedKey = key;
+    const loadId = ++this._loadId;
+    this._loading = true;
+    this._error = false;
+    this._history = [];
+    this._render();
     const query = new URLSearchParams({
       filter_entity_id: this._config.entity,
       end_time: end.toISOString(),
@@ -1266,14 +1378,18 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     });
     try {
       const response = await this._hass.callApi("GET", `history/period/${start.toISOString()}?${query}`);
+      if (loadId !== this._loadId) return;
       this._history = Array.isArray(response?.[0]) ? response[0] : [];
       this._error = false;
     } catch (_error) {
+      if (loadId !== this._loadId) return;
       this._history = [];
       this._error = true;
     } finally {
-      this._loading = false;
-      this._render();
+      if (loadId === this._loadId) {
+        this._loading = false;
+        this._render();
+      }
     }
   }
 
@@ -1286,10 +1402,12 @@ class MaraoEnergyPeriodCard extends HTMLElement {
 
   _render() {
     if (!this.shadowRoot || !this._config) return;
+    const restoreFocus = this.shadowRoot.activeElement ? focusRestorer(this.shadowRoot.activeElement) : null;
     const entity = this._hass?.states?.[this._config.entity];
     const title = this._config.name || entity?.attributes?.friendly_name || this._config.entity;
-    const values = this._values();
-    const current = entity?.state && Number.isFinite(Number(entity.state)) ? entity.state : "—";
+    const unavailable = historyEntityState(this._hass, this._config);
+    const values = unavailable ? [] : this._values();
+    const current = unavailable ? localize(`common.${unavailable}`, this._hass) : entity?.state && Number.isFinite(Number(entity.state)) ? entity.state : "—";
     const period = this._periodLabel();
     const range = this._range();
     const min = values.length ? Math.min(...values.map((item) => item.value)) : 0;
@@ -1302,30 +1420,39 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     }).join(" ");
     const previous = localize("energy.previous_period", this._hass);
     const next = localize("energy.next_period", this._hass);
-    const currentLabel = localize("energy.current_period", this._hass);
+    const disabled = unavailable || this._loading;
+    const status = unavailable ? localize(`common.${unavailable}`, this._hass)
+      : this._loading ? localize("timeline.loading", this._hass)
+        : this._error ? localize("timeline.history_unavailable", this._hass) : localize("energy.no_data", this._hass);
+    const historyState = unavailable || (this._loading ? "loading" : this._error ? "error" : values.length || !this._config.popup ? "ready" : "empty");
     const body = this._config.popup
-      ? `<h2>${escapeHtml(title)}</h2><div class="period-nav"><button data-period="previous" aria-label="${escapeHtml(previous)}">‹</button><strong>${escapeHtml(period)}</strong><button data-period="next" aria-label="${escapeHtml(next)}"${this._offset >= 0 ? " disabled" : ""}>›</button></div><div class="chart" role="img" aria-label="${escapeHtml(`${title} ${period}`)}">${points ? `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${points}" /></svg><div class="scale"><span>${escapeHtml(String(max))}</span><span>${escapeHtml(String(min))}</span></div>` : `<span class="empty">${escapeHtml(this._error ? localize("timeline.history_unavailable", this._hass) : localize("energy.no_data", this._hass))}</span>`}</div>`
+      ? `<h2>${escapeHtml(title)}</h2><div class="period-nav"><button data-period="previous" aria-label="${escapeHtml(previous)}"${disabled ? " disabled" : ""}>‹</button><strong>${escapeHtml(period)}</strong><button data-period="next" aria-label="${escapeHtml(next)}"${disabled || this._offset >= 0 ? " disabled" : ""}>›</button></div><div class="chart" role="img" aria-label="${escapeHtml(`${title} ${period}`)}">${points ? `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${points}" /></svg><div class="scale"><span>${escapeHtml(String(max))}</span><span>${escapeHtml(String(min))}</span></div>` : `<span class="empty" role="${this._error && !unavailable ? "alert" : "status"}">${escapeHtml(status)}</span>`}</div>`
       : `<span class="value">${escapeHtml(String(current))}</span><span class="period">${escapeHtml(period)}</span>`;
     const surfaceTag = this._config.popup ? "div" : "button";
-    const surfaceAttributes = this._config.popup ? "" : ` type="button" aria-label="${escapeHtml(title)}"`;
+    const surfaceAttributes = this._config.popup ? "" : ` type="button" aria-label="${escapeHtml(title)}"${unavailable ? ' disabled aria-disabled="true"' : ""}`;
     this.shadowRoot.innerHTML = `<style>
-      :host{display:block;width:100%;} .surface{display:flex;min-height:112px;width:100%;box-sizing:border-box;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:18px 20px;border:0;border-radius:var(--ha-card-border-radius,18px);background:var(--ha-card-background);color:var(--primary-text-color);font:inherit;text-align:left;cursor:pointer;} .surface:focus{outline:none;} h2{margin:0;font-size:var(--font-size-primary,18px);font-weight:var(--font-weight-primary,700);} .value{font-size:2rem;font-weight:800;line-height:1.1;} .period{color:var(--secondary-text-color);font-size:var(--font-size-secondary,14px);} .period-nav{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;width:100%;gap:8px;margin-bottom:12px;text-align:center;} .period-nav strong{font-size:var(--font-size-primary,18px);text-transform:capitalize;} .period-nav button{width:48px;height:48px;border:0;border-radius:50%;background:var(--secondary-background-color);color:var(--primary-text-color);font-size:34px;line-height:1;} .period-nav button:disabled{opacity:.35;} .chart{position:relative;min-height:190px;border-radius:14px;background:var(--secondary-background-color);overflow:hidden;} svg{display:block;width:100%;height:190px;} polyline{fill:none;stroke:var(--primary-color);stroke-width:2.5;vector-effect:non-scaling-stroke;} .scale{position:absolute;inset:8px 8px auto;display:flex;justify-content:space-between;color:var(--secondary-text-color);font-size:12px;} .scale span:last-child{align-self:flex-end;margin-top:158px;} .empty{display:grid;min-height:190px;place-items:center;padding:16px;color:var(--secondary-text-color);text-align:center;}
-    </style><${surfaceTag} class="surface"${surfaceAttributes}>${this._config.popup ? body : `<h2>${escapeHtml(title)}</h2>${body}`}</${surfaceTag}>`;
+      :host{display:block;width:100%;container:marao-energy / inline-size;} .surface{display:flex;min-height:112px;width:100%;box-sizing:border-box;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:18px 20px;border:0;border-radius:var(--ha-card-border-radius,18px);background:var(--ha-card-background);color:var(--primary-text-color);font:inherit;text-align:left;cursor:pointer;} .surface:focus{outline:none;} .surface:disabled{cursor:default;color:var(--secondary-text-color);} .surface>*{max-width:100%;overflow-wrap:anywhere;} h2{margin:0;font-size:var(--font-size-primary,18px);font-weight:var(--font-weight-primary,700);} .value{font-size:calc(var(--font-size-primary,18px) * 1.78);font-weight:800;line-height:1.25;} .period{color:var(--secondary-text-color);font-size:var(--font-size-secondary,14px);} .period-nav{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;width:100%;gap:8px;margin-bottom:12px;text-align:center;} .period-nav strong{font-size:var(--font-size-primary,18px);text-transform:capitalize;} .period-nav button{width:48px;height:48px;border:0;border-radius:50%;background:var(--secondary-background-color);color:var(--primary-text-color);font-size:34px;line-height:1;} .period-nav button:focus{outline:none;} .period-nav button:disabled{opacity:.35;} .chart{position:relative;width:100%;min-height:190px;border-radius:14px;background:var(--secondary-background-color);overflow:hidden;} svg{display:block;width:100%;height:190px;} polyline{fill:none;stroke:var(--primary-color);stroke-width:2.5;vector-effect:non-scaling-stroke;} .scale{position:absolute;inset:8px;display:flex;align-items:flex-start;justify-content:space-between;color:var(--secondary-text-color);font-size:var(--font-size-caption,14px);} .scale span:last-child{align-self:flex-end;} .empty{display:grid;min-height:190px;place-items:center;padding:16px;color:var(--secondary-text-color);font-size:var(--font-size-primary,18px);text-align:center;} @container marao-energy (max-width:240px){.surface{padding:12px 8px}.period-nav{grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center}.period-nav strong{grid-column:1/-1;grid-row:1}}
+    </style><${surfaceTag} class="surface" data-history-state="${historyState}"${surfaceAttributes}>${this._config.popup ? body : `<h2>${escapeHtml(title)}</h2>${body}`}</${surfaceTag}>`;
     if (this._config.popup) {
       this.shadowRoot.querySelectorAll("[data-period]").forEach((button) => button.addEventListener("click", (event) => {
         event.stopPropagation();
+        if (button.disabled || historyEntityState(this._hass, this._config) || this._loading || (button.dataset.period === "next" && this._offset >= 0)) return;
         this._offset += button.dataset.period === "previous" ? -1 : 1;
         window.MaraoDashboard?.haptic?.("heavy");
         this._history = [];
         this._load();
       }));
     } else {
-      this.shadowRoot.querySelector(".surface")?.addEventListener("click", () => {
+      const surface = this.shadowRoot.querySelector(".surface");
+      surface?.addEventListener("click", () => {
+        if (historyEntityState(this._hass, this._config)) return;
+        surface.focus?.({ preventScroll: true });
         window.MaraoDashboard?.haptic?.("heavy");
         const hash = this._config.popup_hash;
         if (hash) window.history.pushState({}, "", `${window.location.pathname}${window.location.search}${hash}`), window.dispatchEvent(new HashChangeEvent("hashchange"));
       });
     }
+    restoreFocus?.();
   }
 }
 
@@ -1342,10 +1469,11 @@ function installPopupScrollGuard() {
   const isElement = (value) => value instanceof Element || value instanceof ShadowRoot;
   const isPopupElement = (value) =>
     value instanceof Element &&
-    (value.classList.contains("bubble-pop-up") ||
+    (value.classList.contains("marao-popup-sheet") ||
+      value.classList.contains("bubble-pop-up") ||
       value.classList.contains("bubble-pop-up-container"));
 
-  const hasOpenPopup = () => Boolean(window.location.hash);
+  const hasOpenPopup = () => isMaraoDashboardPath(window.location.pathname) && Boolean(window.location.hash);
   const isSlideToOpen = (element) => element instanceof HTMLElement && element.tagName === "MARAO-SLIDE-TO-OPEN";
 
   const scrollableFromPath = (path) =>
@@ -1380,6 +1508,8 @@ function installPopupScrollGuard() {
       return;
     }
     const popupPath = path.slice(0, popupIndex + 1);
+    // iOS moves native range thumbs in the touch event's default handler.
+    if (event.type === "touchmove" && popupPath.some((element) => element instanceof Element && element.matches('input[type="range"][data-slider-key]'))) return;
 
     const deltaY =
       event.type === "wheel"
@@ -1409,7 +1539,6 @@ installPopupScrollGuard();
 
 window.MaraoDashboard = {
   ...(window.MaraoDashboard || {}),
-  assetPath: "/marao_dashboard_static/images",
   haptic,
   localize,
   popupScrollGuardInstalled: true,

@@ -5,194 +5,224 @@ parent: Development
 nav_order: 2
 ---
 
-# Local Development
+# Local development
 
-Use only the disposable Home Assistant development instance at
-`192.168.0.28` for visual and interaction checks. Never point the sync,
-browser test, or accessibility test at another or production Home Assistant
-installation.
+Development and browser tests use a disposable Home Assistant instance. The
+preparation command installs the current working tree, creates safe entities,
+and generates one dashboard at `/marao-dashboard`. Agents working on this
+repository may connect only to `192.168.0.28`; the same tools let developers
+configure their own disposable instances. Never use a household or production
+instance, or exercise a real security or safety device.
 
-## Prepare the test instance
+## Install development dependencies
 
-1. Enable SSH on the test instance and use key-based authentication.
-2. Create a dedicated administrator test user and a Home Assistant backup or VM
-   snapshot. The dashboard builder is available only to administrators.
-3. Use a disposable Home Assistant instance for the baseline run. The local
-   sync sends only Marao-owned files.
-4. Copy `.ha-local.example.json` to `.ha-local.json`, then replace every sample
-   credential and keep its Home Assistant target at `192.168.0.28`.
+Use Node.js 22 or newer and Python 3.14:
 
-Keep the safe defaults for the first run:
+On macOS, Node 24 LTS includes npm and npx and can be installed for free with
+Homebrew:
 
-```json
-{
-  "allowDashboardWrites": false,
-  "allowRemoteWrites": false
-}
+```sh
+brew install node@24
 ```
 
-`.ha-local.json` and local SSH keys are ignored by Git. Do not commit them.
-The browser test refuses to run while `allowDashboardWrites` is `false`. A
-non-dry-run sync independently refuses to run while `allowRemoteWrites` is
-`false` or absent.
-
-## Build and inspect the sync
-
-Install the development dependencies and run a dry run:
+Add `export PATH="/opt/homebrew/opt/node@24/bin:$PATH"` to your existing
+`~/.zprofile` on Apple Silicon (`/usr/local/opt/node@24/bin` on Intel), preserving
+its other settings. Open a fresh login shell and check `node --version`,
+`npm --version`, and `npx --version`. Installing a keg-only runtime does not
+require overwriting an unrelated global npm installation.
 
 ```sh
 npm ci
-npm run ha:sync:dry-run
+python3.14 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r tests/requirements.txt
+npx playwright install chromium
 ```
 
-The dry run validates the local configuration and prints the files, SSH target,
-and restart actions without changing Home Assistant. Review every target before
-continuing.
+HACS users do not run these commands. HACS downloads only
+`custom_components/marao_dashboard/`; development tools, tests, test dependencies,
+and fixtures live outside the installed integration. `npm run build:hacs` builds
+the editor and stages the validated integration under
+`ha-test/.cache/dist/custom_components/marao_dashboard/`.
 
-## Sync to Home Assistant
+## Configure a disposable instance
 
-After checking every dry-run target, explicitly allow the remote file changes
-in `.ha-local.json`:
+1. Start a disposable Home Assistant instance with SSH access to its configuration
+   directory and take a baseline backup or VM snapshot.
+2. Create a dedicated administrator user. In that user's profile, create a
+   **Long-Lived Access Token**. Administrator access is required for setup,
+   dashboard generation, integration reloads, and restart actions.
+3. Configure key-based SSH access and accept the instance's verified host key.
+   The SSH account must be able to write its Home Assistant configuration directory.
+4. Copy `ha-test/local.example.json` to `ha-test/local.json`. Set its URL, token,
+   SSH details, and configuration directory. Set `disposable` to `true` only
+   after verifying this is the test instance.
 
-```json
-{
-  "allowRemoteWrites": true,
-  "allowDashboardWrites": false
-}
-```
+| Setting | Meaning |
+| --- | --- |
+| `url` | Home Assistant base URL, including its port if needed |
+| `token` | Administrator long-lived token |
+| `disposable` | Explicit acknowledgement that preparation may replace Marao test fixtures and restart this instance |
+| `sshHost`, `sshUser`, `sshPort` | SSH connection to the same test instance |
+| `sshKeyPath` | Private-key path; relative paths resolve beside `local.json` |
+| `remoteConfigPath` | Absolute Home Assistant configuration directory, usually `/config` |
+
+`ha-test/local.json`, `ha-test/ssh/`, and `ha-test/.ssh/` are ignored. Keep tokens
+and keys out of source, screenshots, and reports. API and browser tests share
+this token; a Home Assistant password is not needed.
+
+## Prepare automatic and manual tests
 
 ```sh
+npm run ha:sync:dry-run
 npm run ha:sync
 ```
 
-The task builds the HACS package, copies the integration and Marao frontend to
-the configured test instance, and installs local-only helper entities used to
-render representative dashboard cards. It requests a Home Assistant restart
-only when integration code requires one.
+The dry run inspects local configuration and reports the deployment plan without
+building, writing files, or contacting Home Assistant. The real command builds
+from the working tree, validates the HACS installation boundary, deploys through
+SSH, installs fixture integrations and helpers, ensures Marao is configured,
+and generates the realistic pages and Cases view. It waits for readiness and
+checks deployed files, frontend resources, routes, and entities before succeeding.
+It records successful deployment state only after these checks pass.
 
-Set `allowRemoteWrites` back to `false` after the sync. Dry runs never require
-this opt-in and remain read-only.
+Every `test:ha:*` command and manual mobile preview runs the same preparation
+first. Tests cannot silently use yesterday's installed code. Repeating preparation
+keeps one Marao integration and one dashboard. Fixtures and generated test
+configuration are owned by this workflow, so use the canonical files in the repo
+for lasting changes.
 
-For frontend-only changes, refresh the browser after syncing. If an older
-resource remains visible, clear that device's Home Assistant frontend cache.
+| Changed files | Preparation action |
+| --- | --- |
+| Frontend modules, styles, fonts, images, or theme | Reload Marao; refresh the browser |
+| Dashboard configuration or Cases cards | Regenerate and refresh the dashboard |
+| Integration/fixture Python, manifests, backend translations, or helper definitions | Restart Home Assistant and wait for readiness |
+| Initial installation or dashboard registration | Restart when required |
+| Only tests or documentation | Verify current deployment; no restart |
 
-## Tests
+Frontend URLs include a fingerprint of the actual frontend files. Reloading the
+integration recalculates it, so the browser requests the new modules and workers.
+Routine sync preserves the installed theme and reloads it when changed. Python
+changes require a restart because reloading an integration does not reliably
+re-import every Python module.
 
-During normal development, run only the smallest check that covers the code or
-card being changed. Select a specific unit or static check where possible;
-these broader commands are examples when their complete layer changed:
+For manual testing, run `npm run ha:sync`, then open
+`http://YOUR-TEST-HOST:8123/marao-dashboard/overview` or
+`/marao-dashboard/card-test` using your configured base URL. Sync again after
+an edit; there is no background watcher.
+
+### Visual browser inspection
+
+Use the available local browser control for navigation, mobile viewport sizing,
+screenshots, semantic controls, and console inspection. Home Assistant cards use
+shadow DOM; when an accessibility-index click cannot reach a control, use its
+semantic browser locator (role and accessible name). Read the updated page after
+navigation or opening a popup before judging its rendering.
+
+Inspect both the realistic page and the corresponding Cases examples. Open
+popups, scroll their contents, close them, and verify restored focus. Exercise
+actions only on safe fixture entities. Browser inspection complements the
+automated checks: an empty popup can be visibly broken without producing a
+console exception. Refresh after sync and confirm the resource fingerprint
+matches the workspace before attributing a problem to the current code.
+
+Capture popups after their slide animation settles. The mobile matrix reapplies
+and checks typography before each scrolling screenshot so cards loaded later
+receive the selected text profile too.
+
+The existing browser control and pinned Playwright checks require no additional
+paid browser service, plugin, third-party card, or disabled sandbox. API and SSH
+commands may need narrowly approved local-network access to the disposable
+instance. Keep authentication in the ignored local configuration or the existing
+authenticated browser session; never put tokens in browser URLs or reports.
+
+## Focused checks and preview
+
+Run the smallest relevant check during normal development. For example:
 
 ```sh
-npm run test:static
-npm run test:python
-```
-
-For icon-only action-card layout changes, run the fast geometry check against
-the disposable gallery:
-
-```sh
+node --test tests/frontend/marao-climate-card.test.js
+pytest tests/components/marao_dashboard/test_generator.py
 npm run test:ha:alignment
+npm run test:ha:sliders
+npm run test:ha:e2e -- --actions-only
+npm run test:ha:e2e -- --ui-only --screenshots
+npm run test:ha:e2e -- --disconnect-only
+npm run ha:preview:accessibility -- --scenario iphone-normal --theme light
 ```
 
-It opens the Apple TV popup in a fresh browser context, reports the horizontal
-and vertical center offset for every remote button, and fails when either axis
-is more than 0.5 CSS pixels off-center. It also prints and verifies the loaded
-Marao Cards resource version so an old browser resource cannot produce a false
-result.
+The alignment check opens the Apple TV and generic media popups and verifies that
+icon-only controls are centered within 0.5 CSS pixels. It also checks the loaded resource
+fingerprint, narrow layouts, action/state-label contrast in both themes, and
+essential readings at 200% text. Use it whenever an icon-only action or its shared layout changes.
+The slider check covers only light, fan, and cover value sliders across the mobile
+profiles and both themes. It checks endpoint alignment, distinct surfaces,
+contrast, confirmed versus target values, and one service call per completed
+interaction. Its screenshots stay in the ignored local artifact directory.
+The preview opens a headed browser and keeps it open until you close it.
 
-### Self-contained baseline
+Preview profiles are `iphone-normal`, `iphone-bold`, `iphone-text-200`,
+`iphone-page-zoom-200`, `iphone-bold-text-200`, their `android-` equivalents,
+`narrow-320`, `iphone-landscape`, and `android-landscape`. Choose `light` or
+`dark` with `--theme`. Chromium emulation covers mobile layout, touch, safe areas,
+text scaling, and zoom reflow. It does not establish that a physical phone was
+tested. VoiceOver, TalkBack, and OS high contrast are outside the current gate.
 
-The browser end-to-end check signs in, checks the generated Marao dashboard,
-and opens the card gallery backed by fake entities. Confirm the URL in
-`.ha-local.json` belongs to the disposable test instance, then explicitly allow
-those writes in that ignored local file:
+All browser checks share current iPhone/Android metadata in
+`tests/mobile-devices.js`, while keeping the agreed 390 × 844 and 360 × 800 CSS
+viewports. Keep that metadata current when upgrading Playwright: older iOS
+user agents can select Home Assistant's legacy frontend and introduce native
+warnings unrelated to the dashboard layout.
 
-```json
-{
-  "allowDashboardWrites": true,
-  "allowRemoteWrites": false
-}
-```
+The broader local layers are `npm run test:static` and `npm run test:python`.
+Static checks verify the committed editor bundle without rewriting it, run
+frontend tests, stage the HACS package, and validate YAML and gallery coverage.
+`npm test` runs these local layers without contacting Home Assistant. Generated
+reports, screenshots, pytest cache, and coverage belong in `tests/.artifacts/`.
 
-The browser end-to-end command is a release check. Run it only when the user
-requests the full gate, during final stabilization, or immediately before
-publishing:
+Run `npm run verify:publish` during final stabilization or before a push, tag,
+GitHub release, or HACS release. It includes all local tests plus end-to-end and
+mobile browser checks, icon alignment, and value-slider geometry and real
+pointer interactions. The mobile matrix prepares once and runs independent
+browser contexts in batches of three. CI runs local checks; it does not have test-instance
+credentials. GitHub Tests, hassfest, and HACS checks must pass for a published
+commit. After the last code edit and automated check, visually inspect every
+affected card on the disposable dashboard as required by the
+[quality contract]({{ '/docs/development/dashboard-quality.html' | relative_url }}).
 
-```sh
-npm run test:ha:e2e
-```
+## Add or change a feature
 
-The check verifies that all generated views and the card gallery render with
-the self-contained Marao card runtime. It checks the gallery's card and popup
-counts, confirms the navbar is present, and reports any Home Assistant warnings
-or errors.
+1. Trace its builder field, Python validation/generation, runtime card, shared
+   control, theme, and translations. Fix reusable behavior in its shared source.
+2. Identify all cards affected by shared code or layout changes.
+3. Edit the source files described in the
+   [architecture guide]({{ '/docs/development/index.html' | relative_url }}).
+   Run `npm run build:editor` after editing the visual editor source.
+4. Add stable state examples, safe helper definitions, popup/action variants,
+   and coverage entries in `ha-test/`. Place a representative example on a
+   realistic generated page as well as Cases. See
+   [gallery coverage]({{ '/docs/development/test-gallery.html' | relative_url }}).
+5. Add the smallest regression check, run it, sync, and inspect the affected
+   cards and interactions. Use only the fake entities for actions.
 
-Save & Generate rewrites Marao's generated dashboard JSON and YAML, may update
-its `configuration.yaml` dashboard entry and Repairs, and may create a history
-snapshot. Browser checks may call services only on the disposable gallery's
-fake/helper entities and may change those temporary test states. Security
-interaction coverage must use those safe helpers and must never operate a real
-physical entity.
+## Troubleshooting
 
-If the run reports an old Marao root JavaScript URL or a URL below
-`/hacsfiles/MaraoDashboard/vendor/`, follow the Marao Repair and remove only the
-exact legacy YAML resource entries it lists.
-Do not remove Google Fonts or unrelated resources, and do not restore or delete
-the stale copied vendor files merely to resolve the Repair. The exact inline
-`/hacsfiles/MaraoDashboard/MaraoDashboard.js` entry in
-`frontend.extra_module_url` is removed automatically when Marao can edit the
-frontend configuration directly; includes and other complex YAML require
-manual removal. After a manual change, reload the Marao integration or restart
-Home Assistant. Reloading Lovelace resources alone does not clear the Repair.
-
-The card gallery is available in the sidebar as **Marao Dashboard Card Test**
-and at `/marao-dashboard-card-test/card-test`. It contains representative fake
-entities for the supported Marao card templates and popup variants, so it is
-the preferred page for visual review.
-
-Run the browser check only after verifying that `.ha-local.json` points to the
-disposable test instance. It is not part of `npm test` or continuous
-integration. `npm run verify:publish` includes it with the complete local test
-suite and is the required gate before publishing.
-
-Set both write opt-ins back to `false` when local testing is complete.
-
-### Mobile accessibility check
-
-Run `npm run test:ha:accessibility` only against `192.168.0.28`. The release
-coverage must include 320 CSS pixels plus representative iPhone and Android
-portrait and landscape viewports. Exercise normal text, bold text, 200% text,
-200% browser zoom, and bold plus 200% text as distinct configurations; verify
-light and dark theme contrast. Full-page dashboard and popup screenshots belong
-under `test-results/accessibility/` and must not contain private home data.
-This check runs as part of `npm run verify:publish`.
-
-The runner refuses to authenticate unless the configured URL host is exactly
-`192.168.0.28`. It uses Chromium's iPhone or Android device settings for the
-user agent, touch input, mobile layout, pixel density, OS text scale, color
-scheme, and safe-area insets. Light and dark Marao variables are applied
-explicitly, so the result does not depend on the test user's last selected
-theme. Because Chromium's OS-scale emulation does not resize every explicit CSS
-length, the runner also scales Marao's shared typography tokens; project-owned
-cards must use those tokens so the 200% visual check remains deterministic.
-
-The 200% page-zoom profile is a deterministic reflow approximation: it halves
-the effective layout viewport and raises the emulated pixel density while
-keeping the named device screen size. This exercises the layout pressure of
-browser zoom, but Chromium device emulation cannot reproduce the surrounding
-iOS or Android browser chrome exactly. Keep real-phone checks for final visual
-polish where a platform-specific difference matters.
-
-VoiceOver, TalkBack, OS high-contrast modes, and physical-phone testing are
-outside the current release gate. Physical-phone inspection remains recommended
-when a device is available and must not be claimed unless it was performed. See
-the [dashboard quality contract]({{ '/docs/development/dashboard-quality.html' | relative_url }})
-for the complete release matrix.
-
-For a quick visual check on a computer, open **Terminal → Run Task** in VS Code
-and choose **HA: Preview Mobile Accessibility**. Pick an iPhone, Android,
-320-pixel, landscape, bold-text, 200% text, or 200% page-zoom profile, then pick
-light or dark mode. The task opens the disposable dashboard in a headed browser
-at that profile and keeps it open until you close the page or browser window.
-It is a focused development aid, not a replacement for the release
-accessibility check.
+- **Authentication fails:** check the base URL and that the token is current and
+  belongs to an administrator. Replace it in the ignored configuration; do not
+  paste it into a command, report, or issue.
+- **SSH fails:** check the key path, verified host key, port, account, and write
+  access to `remoteConfigPath`. The API and SSH targets must be the same instance.
+- **A fixture provider conflicts:** use a clean disposable instance. Preparation
+  must not overwrite a real provider integration with a fake one.
+- **Sync or readiness fails:** read the reported phase and fix it, then rerun.
+  A failed run does not establish a successful deployment. Check the disposable
+  instance's logs locally, keeping credentials and private data out of reports.
+- **Old UI appears:** rerun sync and refresh the browser. The loaded resource
+  fingerprint must match the prepared workspace. Clear the device's Home
+  Assistant frontend cache only if a refresh still leaves an old session.
+- **Legacy resource Repair:** remove only the exact legacy resource entries
+  listed by Marao. Keep unrelated resources and Google Fonts. Reload Marao or
+  restart after a manual YAML edit; a Lovelace resource reload alone does not
+  clear the Repair.
+- **Missing state example or entity:** update its canonical fixture and coverage
+  entry, then prepare again. Do not hand-edit the generated dashboard to mask it.

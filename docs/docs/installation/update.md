@@ -15,11 +15,11 @@ nav_order: 1.4
    release notes request it.
 
 HACS owns `custom_components/marao_dashboard`, including the JavaScript served
-from `/marao_dashboard_static`. The integration refreshes the dashboard YAML
-template library under `www/community/MaraoDashboard/dashboard` and the theme
-YAML under `themes/MaraoDashboard`; local edits to those copied files may be
-replaced. Keep dashboard customizations in `dashboard.json` or inside the
-generated YAML custom markers documented on the configuration page.
+from `/marao_dashboard_static`. The integration maintains the Marao theme YAML
+under `themes/MaraoDashboard`; local edits to that installed theme may be
+replaced. Generated dashboard files under `dashboard/MaraoDashboard` are
+rebuilt from `dashboard.json`. Keep dashboard customizations in that JSON or
+inside the generated YAML custom markers documented on the configuration page.
 
 ## Migrating from older Marao releases
 

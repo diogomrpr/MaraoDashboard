@@ -3,10 +3,18 @@ asyncio_mode = "auto"
 testpaths = ["tests/components/marao_dashboard"]
 pythonpath = ["."]
 addopts = "-ra -p tests.coverage_bootstrap"
+cache_dir = "tests/.artifacts/pytest-cache"
 
 [tool.coverage.run]
 source = ["custom_components/marao_dashboard"]
 omit = ["*/frontend/*"]
+data_file = "tests/.artifacts/.coverage"
+
+[tool.coverage.html]
+directory = "tests/.artifacts/coverage"
+
+[tool.coverage.xml]
+output = "tests/.artifacts/coverage.xml"
 
 [tool.coverage.report]
 show_missing = true

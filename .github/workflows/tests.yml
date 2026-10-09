@@ -6,23 +6,21 @@ on:
       - ".github/workflows/tests.yml"
       - "custom_components/**"
       - "frontend_src/**"
-      - "scripts/**"
+      - "ha-test/**"
       - "tests/**"
       - "package.json"
       - "package-lock.json"
       - "pyproject.toml"
-      - "requirements-test.txt"
   pull_request:
     paths:
       - ".github/workflows/tests.yml"
       - "custom_components/**"
       - "frontend_src/**"
-      - "scripts/**"
+      - "ha-test/**"
       - "tests/**"
       - "package.json"
       - "package-lock.json"
       - "pyproject.toml"
-      - "requirements-test.txt"
   workflow_dispatch:
 
 permissions:
@@ -53,7 +51,7 @@ jobs:
           python-version: "3.14"
 
       - name: Install Python test dependencies
-        run: python -m pip install -r requirements-test.txt
+        run: python -m pip install -r tests/requirements.txt
 
       - name: Run pytest
         run: pytest --cov=custom_components.marao_dashboard --cov-report=term-missing

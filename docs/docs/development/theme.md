@@ -51,7 +51,12 @@ token that expresses the role:
 | Default icon | `--icon-color` |
 | Active text/icon | `--active-text-color` |
 | Primary accent | `--primary-color` |
-| Slider track | `--slider-color` |
+| Foreground on the primary accent | `--text-primary-color` |
+| Marao value slider track | `--marao-slider-track` |
+| Value slider confirmed fill | `--marao-slider-fill` |
+| Disabled value slider fill | `--marao-slider-disabled-fill` |
+| Value slider thumb and boundary | `--marao-slider-thumb`, `--marao-slider-thumb-border` |
+| Home Assistant slider track | `--slider-color` |
 | Divider | `--divider-color` |
 | Warning, error, success | `--warning-color`, `--error-color`, `--success-color` |
 
@@ -59,9 +64,9 @@ The domain palette is:
 
 | Token | Value | Typical state |
 |:--|:--|:--|
-| `--color-green` | `#3F7E4B` | active/safe, fan |
-| `--color-red` | `#D8514B` | heat, open access, alarm |
-| `--color-blue` | `#5FA2D9` | cover, cool |
+| `--color-green` | `#3F7E4B` | safe, switch, climate fan |
+| `--color-red` | `#C54C46` | heat, open access, alarm |
+| `--color-blue` | `#7BADE6` | light, fan, cover, cool |
 | `--color-yellow` | `#F2A84A` | dry, warning |
 | `--color-purple` | `#8A5A7B` | heat/cool |
 | `--color-gold` | `#FFD479` | automatic climate |
@@ -71,12 +76,29 @@ mapping in a generated card. Active cards pair their background with readable
 text and icon treatment; inactive, loading, disabled, unknown, and unavailable
 states remain distinct. Never communicate a state by color alone.
 
+The blue palette follows the supplied dashboard reference: soft blue active
+cards, pale blue icon backgrounds and tracks, and white controls. Labels retain
+a dark foreground for readable contrast on the lighter blue. Light-mode neutral
+surfaces use cool whites and grays; dark mode retains its navy surfaces.
+The primary accent uses deeper blue in light mode and soft blue in dark mode;
+its labels and icons use the paired foreground so both remain readable. Dark
+dividers and timeline segments use lighter slate against the navy surfaces.
+
+Value sliders share a pale blue track (`#AAC9EF`), near-white confirmed fill
+(`#EFF6FF`), and white thumb across both modes. Persistent blue boundaries
+(`#284D7D`) distinguish the track, fill, and independently moving thumb without
+changing their geometry. Track, fill and thumb share a vector drawing with
+consistent 1px strokes; a transparent native range handles input above it.
+The card, track, fill, and thumb each retain a separate background. Disabled
+fills stay neutral.
+
 ## Contrast and shape
 
 - Verify theme changes independently in light and dark mode.
 - Normal text should reach a 4.5:1 contrast ratio.
 - Large text and meaningful control boundaries should reach 3:1.
-- Slider tracks must contrast with their card background.
+- Slider tracks, fills, and thumbs must have contrasting persistent boundaries
+  against adjacent surfaces, including when the surfaces use pale colors.
 - A circular icon background must retain equal dimensions and
   `border-radius: 50%`.
 - Use the shared `--ha-card-border-radius` and elevation variables.

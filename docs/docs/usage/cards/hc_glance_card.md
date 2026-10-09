@@ -10,7 +10,10 @@ parent: Cards
 The `hc_glance_card` is used to display a summary of your entities. It's configured to show the state of the entity and the icon.
 You can add minimun 1 and maximum 3 entities. The card will automatically adjust the placement of the entities.
 
-**Note: The card will show the name you have given the entity. If you want to change the name, you must do this in the entity configuration from HA self.**
+Readings use Home Assistant's localized states and units. Unknown and unavailable
+readings stay neutral without hiding the other readings. Names default to each
+entity's friendly name and can be overridden with `entity1_name`, `entity2_name`,
+or `entity3_name`.
 
 ![Glance Card Light](../../../assets/images/cards/hc_glance_card/glancecard_light.png)
 
@@ -31,6 +34,9 @@ You can add minimun 1 and maximum 3 entities. The card will automatically adjust
 | entity1 | / | **Yes** | add the first entity to the card|
 | entity2 | / | No | add the second entity to the card|
 | entity3 | / | No | add the third entity to the card|
+| entity1_name | Entity friendly name | No | label for the first reading |
+| entity2_name | Entity friendly name | No | label for the second reading |
+| entity3_name | Entity friendly name | No | label for the third reading |
 | entity1_icon | Icon from entity itself | No | replace the icon for the first entity |
 | entity2_icon | Icon from entity itself | No | replace the icon for the second entity |
 | entity3_icon | Icon from entity itself | No | replace the icon for the third entity |

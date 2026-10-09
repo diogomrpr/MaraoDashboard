@@ -28,12 +28,24 @@ templates, documentation, and tests aligned.
   prior project name elsewhere.
 - Preserve current shared component contracts. Do not solve a reusable card,
   input, slider, popup, navbar, or state problem in only one generated card.
+- Keep the disposable test instance on one Marao dashboard at
+  `/marao-dashboard`. Its realistic product pages and exhaustive `card-test`
+  gallery are views of that dashboard; do not create a separate gallery
+  dashboard or route Marao navigation through another dashboard root.
+- Keep shipped code in `custom_components/marao_dashboard/` (with editable
+  editor source in `frontend_src/`), automated checks in `tests/`, and
+  disposable-instance fixtures in `ha-test/`. Do not add fake entities, gallery
+  YAML, or test-only assets to the shipped integration tree.
 
 ## Environment and privacy
 
 - The only Home Assistant instance agents may modify or test is the disposable
   local instance at `192.168.0.28`. Never connect to, deploy to, or operate a
   live or production Home Assistant instance.
+- Development tools accept a developer-configured disposable instance through
+  ignored `ha-test/local.json` (URL, long-lived administrator token, explicit
+  disposable acknowledgement, and SSH connection). This portability does not
+  authorize agents to use any target other than `192.168.0.28`.
 - Exercise physical-action flows only with gallery helpers, templates, or other
   safe fake entities. Never actuate a real lock, door, gate, alarm, camera
   privacy control, or other security/safety device.
@@ -50,6 +62,13 @@ templates, documentation, and tests aligned.
 - During normal iteration, run only the smallest focused check for the changed
   code or card. For UI changes, deploy to the disposable instance and visually
   and interactively inspect the affected card and viewport.
+- Whenever a supported card or behavior is added or changed, update the
+  canonical test gallery and safe fake entities in the same change. Keep every
+  materially distinct state, behavioral option, popup, action, and layout
+  configuration visible, and also place a representative example on the
+  realistic generated page where users would encounter it. Arbitrary custom
+  labels, colors, and equivalent value permutations do not require a Cartesian
+  set of duplicate examples.
 - Use `npm run test:ha:alignment` as the focused geometry check whenever an
   icon-only action card or its shared layout changes.
 - Treat every warning, error card, console exception, failed resource, and

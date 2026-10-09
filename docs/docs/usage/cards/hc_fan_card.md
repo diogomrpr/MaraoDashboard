@@ -7,21 +7,22 @@ parent: Cards
 
 # Fan Card
 
-With the `hc_fan_card` you can control your fan. It has the option to add a oscillation button and a slider to set the speed. The fan icon has a little spinning animation.
+`hc_fan_card` toggles a fan and shows a speed slider when the entity supports
+speed control. Single-speed fans have only the toggle. Unknown and unavailable
+entities keep their controls disabled.
 
-![Climate Card Light](../../../assets/images/cards/hc_fan_card/fancard_light.png)
-
-## Usage
+![Fan Card Light](../../../assets/images/cards/hc_fan_card/fancard_light.png)
 
 ```yaml
-  - type: custom:marao-card
-    template: hc_fan_card
-    entity: <fan entity>
-    variables:
-        enable_osc_btn: true        
+- type: custom:marao-card
+  template: hc_fan_card
+  entity: fan.living_room
+  variables:
+    enable_slider: true
 ```
-## Variables
 
-| Variable | Default | Required | Description|
-|----------|---------|----------|------------|
-| enable_osc_btn | false | No | If true, the oscillation button will be shown. |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| enable_slider | true | Show the slider on fans that support speed control. |
+| card_color | var(--color-blue) | Active card color. |
+| custom_label | Empty | Prefix for the displayed state. |

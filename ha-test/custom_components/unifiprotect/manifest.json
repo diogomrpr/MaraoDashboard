@@ -1,0 +1,9 @@
+{
+  "domain": "unifiprotect",
+  "name": "Marao disposable UniFi media fixture",
+  "codeowners": [],
+  "dependencies": ["media_source", "marao_test_camera"],
+  "documentation": "https://github.com/diogomrpr/MaraoDashboard",
+  "iot_class": "local_push",
+  "version": "1.0.0"
+}

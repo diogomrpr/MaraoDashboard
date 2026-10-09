@@ -7,65 +7,31 @@ parent: Cards
 
 # Navigation Card
 
-**This card has advanced state-based color configuration. Report reproducible
-problems in the project's GitHub issue tracker.**
-
-The `hc_navigation_card` can be used to navigate to certain pages in your dashboard. Although, because Marao Dashboard is so versitile, you can also use this card as a action card without navigation or give it another hold action.
-
-![Navigation Card Light](../../../assets/images/cards/hc_navigation_card/navigationcard_light.png)
-
-This card is also used for the security card. Use the tabs beneath to switch between the 2 different uses.
-
-## Usage Navigation Card
+`hc_navigation_card` opens a dashboard page or popup. Named navigation cards put
+the title across the full width, with the state and icon beneath it. Their
+slightly smaller, scalable title helps compact two-column tiles retain a single
+line. Long titles and enlarged text wrap instead of clipping.
 
 ```yaml
-  - type: custom:marao-card
-    template: hc_navigation_card
-    name: <title of the card>
-    entity: <entity for label>
-    icon: <icon>
-    variables: 
-      hc_label_prefix: 'On - ' # Prefix can by anything but the state of the entity will be added after it.
-      hc_color: var(--color-orange) # color of the card when the state underneath is met (in this case, higher then 0)
-    state:
-      - value: 0 # Can also be 'on'
-        operator: '>' # if value above is 'on', remove this line
-        styles:
-          card:
-            - background: "[[[ return variables.hc_color ]]]" # Let this be
-          name:
-            - color: white
-          label:
-            - color: white
-          icon:
-            - color: white
-      - value: 0 # Can also be 'off'
-        styles:
-            icon:
-              - color: <desired icon color> # color of the icon when the state is met (in this case, just 0)
-    tap_action:
-      action: navigate
-      navigation_path: <navigation path>
-```
-## Usage Security Navigation Card
-
-```yaml
-  - type: custom:marao-card
-    template: hc_navigation_card_security
-    name: <title of the card>
-    entity: <security entity>
-    variables: 
-      hc_color: var(--color-blue) # color of the card when the alarm is not off
-    tap_action:
-      action: navigate
-      navigation_path: <navigation path>
+- type: custom:marao-card
+  template: hc_navigation_card
+  name: Living Room
+  entity: light.living_room
+  icon: mdi:sofa-outline
+  tap_action:
+    action: navigate
+    navigation_path: /marao-dashboard/living-room
+  variables:
+    hc_label_prefix: 'Lights: '
 ```
 
+| Variable | Default | Description |
+|----------|---------|-------------|
+| hc_label_prefix | Empty | Prefix for the entity state. |
+| hc_color | Theme card background | Custom card background. |
+| hc_icon_color | Theme icon color | Custom icon color. |
 
-## Variables
-
-| Variable | Default | Required | Description|
-|----------|---------|----------|------------|
-| hc_label_prefix | 'On - ' | No | Prefix can by anything but the state of the entity will be added after it. |
-| hc_color | var(--color-blue) | No | The color of the card when the state is on |
-| hc_icon_color | | No | Reserved icon color variable. |
+An alarm entity uses Marao's shared alarm state colors unless `hc_color` is
+configured. Unknown and unavailable entities use disabled, neutral cards.
+For security actions, use the generated access or alarm controls, which provide
+the required slide or hold gestures.

@@ -1,49 +1,21 @@
 ---
 hide_table_of_contents: true
-title: Title card / back button
+title: Title Card
 layout: page
 parent: Cards
 ---
 
 # Title Card
 
-The `hc_title_card` is a card that shows a title, subtitle and has the option to add 3 buttons for example scenes. The card used the default name and label parameter and variables for the extra 3 buttons.
-The `hc_title_card_backbtn` is a card that shows a title and a back button. The card used the default name parameter.
-
-## Title Card
-![Title Card Light](../../../assets/images/cards/hc_title_card/titlecard_light.png)
-
-## Back button
-![Backbtn Card Light](../../../assets/images/cards/hc_title_card/titlecard_backbtn_light.png)
-
-
-## Usage Title
+`hc_title_card` displays a scalable section heading without a card background.
+Generated pages use it to separate groups of controls. Its title wraps when
+needed at narrow widths or enlarged text sizes.
 
 ```yaml
-  - type: custom:marao-card
-    template: hc_title_card
-    name: <title>
-    label: <subtitle>
-    variables:
-      entity1: <entity>
-      entity1_name: <entity name>
+- type: custom:marao-card
+  template: hc_title_card
+  name: Living Room
 ```
 
-## Usage Backbutton
-
-```yaml
-  - type: custom:marao-card
-    template: hc_title_card_backbtn
-    name: The Climate
-```
-
-## Variables
-
-| Variable | Default | Required | Description|
-|----------|---------|----------|------------|
-| entity1 | / | No | The entity to call when the first button is pressed |
-| entity2 | / | No | The entity to call when the second button is pressed |
-| entity3 | / | No | The entity to call when the third button is pressed |
-| entity1_name | / | No | The name of the first button |
-| entity2_name | / | No | The name of the second button |
-| entity3_name | / | No | The name of the third button |
+Use a [navigation card](hc_navigation_card.md) with an explicit navigation path
+for a page shortcut. Put scene controls in a [scene card](hc_scene_card.md).

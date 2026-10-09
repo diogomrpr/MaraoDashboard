@@ -7,7 +7,8 @@ parent: Cards
 
 # Weather Card
 
-The weather card is a dynamic card that changes based on conditions. There is a different color, image and icons for the different weather conditions.
+The weather card shows a localized condition, Home Assistant's condition icon,
+current temperature and an optional daily forecast from the configured sensor.
 
 
 ![Weather Card](../../../assets/images/cards/hc_weather_card/weathercard_light.png)

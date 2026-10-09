@@ -7,9 +7,10 @@ parent: Cards
 
 # Camera Card
 
-The `hc_camera_card` shows a live Home Assistant camera feed. Tap it to open a
-generated popup containing the camera's latest Frigate or UniFi Protect events;
-hold it to open Home Assistant's normal more-info dialog.
+The `hc_camera_card` shows Home Assistant's current camera preview while the
+entity is available. Unknown, unavailable and disconnected cameras keep a
+neutral state without displaying an old preview. Tap an available card to open
+its generated popup containing the latest Frigate or UniFi Protect events.
 
 The camera entity should come from either the
 [Frigate Home Assistant integration](https://docs.frigate.video/integrations/home-assistant/)

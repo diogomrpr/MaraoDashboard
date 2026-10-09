@@ -4,6 +4,7 @@ from pathlib import Path
 import json
 import shutil
 import textwrap
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -15,15 +16,18 @@ from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL, DATA_PANELS
 from homeassistant.const import CONF_URL
 from homeassistant.helpers import area_registry as ar, entity_registry as er
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.util.yaml import load_yaml
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.marao_dashboard import (
+    FRONTEND_MODULES,
     _generated_dashboard_needs_self_contained_repair,
     _management_payload,
     _editor_areas,
     _registry_entities,
     _restore_history,
     _save_and_generate_dashboard,
+    frontend_fingerprint,
 )
 from custom_components.marao_dashboard.const import (
     BASE_DASHBOARD_CREATED,
@@ -31,6 +35,7 @@ from custom_components.marao_dashboard.const import (
     DOMAIN,
     GENERATE_DASHBOARD_SERVICE,
     MARAO_DASHBOARD_MODULES,
+    MARAO_DASHBOARD_PANEL_MODULE,
     MARAO_DASHBOARD_STATIC_URL,
 )
 from custom_components.marao_dashboard.legacy_migration import (
@@ -57,6 +62,36 @@ def _reset_dashboard_files(hass) -> None:
     """Keep the shared Home Assistant test config isolated between test runs."""
 
     shutil.rmtree(hass.config.path("dashboard/MaraoDashboard"), ignore_errors=True)
+
+
+def test_frontend_fingerprint_tracks_paths_and_content_but_not_caches(tmp_path: Path) -> None:
+    module = tmp_path / "module.js"
+    module.write_bytes(b"first")
+    asset = tmp_path / "images" / "icon.svg"
+    asset.parent.mkdir()
+    asset.write_bytes(b"icon")
+    initial = frontend_fingerprint(tmp_path)
+    assert len(initial) == 16
+    assert frontend_fingerprint(tmp_path) == initial
+
+    # File creation order and timestamps must not invalidate unchanged assets.
+    module.unlink()
+    module.write_bytes(b"first")
+    assert frontend_fingerprint(tmp_path) == initial
+    for name in (".DS_Store", ".cache/temp", "__pycache__/temp", "temp.pyc", "temp.pyo"):
+        cache = tmp_path / name
+        cache.parent.mkdir(exist_ok=True)
+        cache.write_bytes(b"ignored")
+    assert frontend_fingerprint(tmp_path) == initial
+
+    module.write_bytes(b"second")
+    changed = frontend_fingerprint(tmp_path)
+    assert changed != initial
+    asset.rename(asset.with_name("renamed.svg"))
+    renamed = frontend_fingerprint(tmp_path)
+    assert renamed != changed
+    module.unlink()
+    assert frontend_fingerprint(tmp_path) != renamed
 
 
 def test_generated_dashboard_repairs_legacy_blank_spacer(tmp_path: Path) -> None:
@@ -121,9 +156,9 @@ async def test_setup_entry_installs_base_dashboard_once(hass) -> None:
     assert "light.kitchen_main" in generated_source
     assert Path(hass.config.path("themes/MaraoDashboard/marao-dashboard.yaml")).exists()
     assert "marao-dashboard:" in config_source
-    assert "marao-dashboard-card-test:" in config_source
+    assert "marao-dashboard-card-test:" not in config_source
     assert 'filename: "dashboard/MaraoDashboard/dashboard/dashboard.yaml"' in config_source
-    assert 'filename: "www/community/MaraoDashboard/dashboard/MaraoDashboard/main.yaml"' in config_source
+    assert "MaraoDashboard/dashboard/MaraoDashboard/main.yaml" not in config_source
     assert "themes: !include_dir_merge_named themes" in config_source
     assert "extra_module_url:" not in config_source
     assert "/hacsfiles/MaraoDashboard/MaraoDashboard.js" not in config_source
@@ -134,10 +169,12 @@ async def test_setup_entry_installs_base_dashboard_once(hass) -> None:
     }
     assert not any("/MaraoDashboard/vendor/" in url for url in resource_urls)
     assert not any("marao_dashboard_static" in url for url in resource_urls)
-    assert set(MARAO_DASHBOARD_MODULES) <= set(hass.data[DATA_EXTRA_MODULE_URL].urls)
-    assert all(url.startswith(MARAO_DASHBOARD_STATIC_URL) for url in MARAO_DASHBOARD_MODULES)
-    assert "marao-dashboard-card-test" in hass.data[LOVELACE_DATA].dashboards
-    assert "marao-dashboard-card-test" in hass.data[DATA_PANELS]
+    module_urls = hass.data[DOMAIN][FRONTEND_MODULES]
+    assert set(module_urls) <= set(hass.data[DATA_EXTRA_MODULE_URL].urls)
+    assert tuple(url.split("?", 1)[0] for url in module_urls) == MARAO_DASHBOARD_MODULES
+    assert all(url.startswith(MARAO_DASHBOARD_STATIC_URL) and "?v=" in url for url in module_urls)
+    assert "marao-dashboard-card-test" not in hass.data[LOVELACE_DATA].dashboards
+    assert "marao-dashboard-card-test" not in hass.data[DATA_PANELS]
     assert hass.data[DOMAIN]["websocket_registered"]
     assert "marao-dashboard-editor" in hass.data[DATA_PANELS]
     history = list(
@@ -175,9 +212,40 @@ async def test_setup_entry_marker_prevents_regeneration(hass) -> None:
     assert dashboard.read_text(encoding="utf-8") == "user edited dashboard\n"
     assert dashboard_json.read_text(encoding="utf-8") == '{"name":"User JSON","rooms":[]}\n'
     assert config_source.count("marao-dashboard:") == 1
-    assert "marao-dashboard-card-test:" in config_source
+    assert "marao-dashboard-card-test:" not in config_source
     assert "/hacsfiles/MaraoDashboard/MaraoDashboard.js" not in config_source
-    assert set(MARAO_DASHBOARD_MODULES) <= set(hass.data[DATA_EXTRA_MODULE_URL].urls)
+    assert set(hass.data[DOMAIN][FRONTEND_MODULES]) <= set(hass.data[DATA_EXTRA_MODULE_URL].urls)
+
+
+async def test_reload_updates_frontend_urls_and_unloads_exact_registered_version(hass) -> None:
+    _reset_dashboard_files(hass)
+    Path(hass.config.path("configuration.yaml")).write_text("default_config:\n", encoding="utf-8")
+    entry = MockConfigEntry(domain=DOMAIN, title="Marao Dashboard", data={BASE_DASHBOARD_CREATED: True})
+    entry.add_to_hass(hass)
+    old_version, new_version = "0123456789abcdef", "fedcba9876543210"
+    old_urls = {f"{url}?v={old_version}" for url in MARAO_DASHBOARD_MODULES}
+    new_urls = {f"{url}?v={new_version}" for url in MARAO_DASHBOARD_MODULES}
+
+    with patch(
+        "custom_components.marao_dashboard.frontend_fingerprint",
+        side_effect=[old_version, new_version],
+    ) as fingerprint:
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert old_urls <= set(hass.data[DATA_EXTRA_MODULE_URL].urls)
+        assert await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+        assert fingerprint.call_count == 2
+
+    registered = set(hass.data[DATA_EXTRA_MODULE_URL].urls)
+    assert not old_urls & registered
+    assert new_urls <= registered
+    panel = hass.data[DATA_PANELS]["marao-dashboard-editor"]
+    assert panel.config["_panel_custom"]["module_url"] == f"{MARAO_DASHBOARD_PANEL_MODULE}?v={new_version}"
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert not new_urls & set(hass.data[DATA_EXTRA_MODULE_URL].urls)
+    assert FRONTEND_MODULES not in hass.data[DOMAIN]
 
 
 @pytest.mark.parametrize(
@@ -263,11 +331,12 @@ async def test_setup_preserves_standalone_card_resources(hass) -> None:
     external_module = "/hacsfiles/lovelace-card-mod/card-mod.js"
     frontend.add_extra_js_url(hass, external_module)
 
+    registered_modules = hass.data[DOMAIN][FRONTEND_MODULES]
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     unloaded_modules = set(hass.data[DATA_EXTRA_MODULE_URL].urls)
     assert external_module in unloaded_modules
-    assert not set(MARAO_DASHBOARD_MODULES) & unloaded_modules
+    assert not set(registered_modules) & unloaded_modules
     assert "marao-dashboard-editor" not in hass.data[DATA_PANELS]
     assert {item["id"] for item in resources.async_items()} >= {
         button["id"],
@@ -522,6 +591,12 @@ async def test_generate_dashboard_service_writes_dashboard_and_raw_room_cards(ha
     assert "Raw service card" in room.read_text(encoding="utf-8")
     assert "marao-service-dashboard:" in config_source
     assert config_source.count("marao-service-dashboard:") == 1
+    # The configured HA directory need not be /config. Resolve every generated
+    # include with HA's own loader, including the nested room navbar include.
+    resolved = await hass.async_add_executor_job(load_yaml, str(dashboard))
+    office = next(view for view in resolved["views"] if view["title"] == "Office")
+    assert {"type": "markdown", "content": "Raw service card"} in office["cards"]
+    assert office["cards"][-1]["cards"][0]["type"] == "custom:marao-navbar-card"
 
 
 async def test_management_editor_generates_and_restores_version(hass) -> None:

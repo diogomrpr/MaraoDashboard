@@ -7,8 +7,11 @@ parent: Cards
 
 # Media Card
 
-The `hc_media_card` opens a control popup when tapped. It can show album art as a
-background and includes previous/play/next controls.
+The `hc_media_card` shows the localized player state and opens its control popup
+when tapped. Generic players have previous, play/pause and next icon controls;
+unknown or unavailable players disable their actions.
+Available artwork appears behind a dark overlay so the summary stays readable.
+The card uses a plain background when artwork is absent, disabled or unavailable.
 
 ![Media Card Light](../../../assets/images/cards/hc_media_card/mediacard_light.png)
 
@@ -50,10 +53,16 @@ up, home; left, select, right; rewind, down, fast-forward; then volume,
 play/pause, volume. Without `volume_remote_entity`, the normal media-player
 volume services are used.
 
+Rewind moves back 10 seconds and fast-forward moves ahead 30 seconds, using the
+live playback position and staying within the media duration. Direction and
+select controls support both a short press and a 1.2-second hold. A completed
+hold sends one longer remote command; releasing early uses the short action,
+while cancellation or moving outside the control sends neither.
+
 ## Variables
 
 | Variable | Default | Required | Description|
 |----------|---------|----------|------------|
-| hc_show_background_art | true | No | If true, the background will show the album art. If nothing is playing, an animated GIF will play. |
-| hc_background_color | var(--color-purple) | No | The background color used when `hc_show_background_art` is `false`. |
+| hc_show_background_art | true | No | Show available Home Assistant artwork behind the summary. |
+| hc_background_color | var(--color-purple) | No | Background when artwork is absent or disabled. |
 | popup_hash | `#media` | No | Marao popup hash for manually authored dashboards. Generated dashboards set a unique value. |

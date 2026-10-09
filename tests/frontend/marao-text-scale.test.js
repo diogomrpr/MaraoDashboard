@@ -81,13 +81,14 @@ const callServiceWithNotification = (hass, ...args) => {
   }
 };
 ${sourceWithoutFrontendImports}
-export { MaraoSlideToOpen, installMaraoTapGuard, isMaraoDashboardPath, syncMaraoTextScale };
+export { MaraoSlideToOpen, installMaraoTapGuard, installPopupScrollGuard, isMaraoDashboardPath, syncMaraoTextScale };
 `;
 globalThis.__maraoTestHaptics = [];
 globalThis.__maraoTestActionErrors = [];
 const {
   MaraoSlideToOpen,
   installMaraoTapGuard,
+  installPopupScrollGuard,
   isMaraoDashboardPath,
   syncMaraoTextScale,
 } = await import(
@@ -203,6 +204,43 @@ function fakeClassList() {
     contains: (name) => values.has(name),
   };
 }
+
+test("popup scrolling preserves native range touches while containing background and edge scrolling", () => {
+  const previousWindow = globalThis.window;
+  globalThis.Element = globalThis.HTMLElement;
+  globalThis.ShadowRoot = class {};
+  try {
+    const root = globalThis.window = fakeEventRoot();
+    root.location.hash = "#overview-blinds";
+    root.MaraoDashboard = {};
+    root.getComputedStyle = (element) => ({ overflowY: element.overflowY || "visible" });
+    const sheet = new HTMLElement();
+    sheet.classList = fakeClassList();
+    sheet.classList.add("marao-popup-sheet");
+    Object.assign(sheet, { scrollTop: 50, scrollHeight: 500, clientHeight: 200, overflowY: "auto", matches: () => false });
+    const range = new HTMLElement();
+    range.classList = fakeClassList();
+    range.matches = (selector) => selector === 'input[type="range"][data-slider-key]';
+    installPopupScrollGuard();
+    const move = (path, type = "touchmove", y = 100) => {
+      root.emit("touchstart", { touches: [{ clientY: 100 }] });
+      const event = { touches: [{ clientY: y }], deltaY: 20, composedPath: () => path, prevented: false, stopped: false,
+        preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } };
+      root.emit(type, event);
+      return event;
+    };
+    assert.equal(move([range, sheet]).prevented, false, "native horizontal slider movement reaches its default handler");
+    assert.equal(move([sheet], "touchmove", 80).prevented, false, "Marao popup scrolls internally");
+    assert.equal(move([range, sheet], "wheel").prevented, false, "wheel over a slider still scrolls the popup");
+    sheet.scrollTop = 0;
+    assert.equal(move([sheet], "touchmove", 120).prevented, true, "top edge contains scrolling");
+    sheet.scrollTop = 300;
+    assert.equal(move([sheet], "touchmove", 80).prevented, true, "bottom edge contains scrolling");
+    assert.equal(move([]).prevented, true, "background remains blocked");
+    root.location.pathname = "/config/dashboard";
+    assert.equal(move([]).prevented, false, "other Home Assistant pages retain native scrolling");
+  } finally { globalThis.window = previousWindow; }
+});
 
 function slideFixture() {
   const listeners = new Map();
@@ -360,10 +398,29 @@ test("slide control cannot execute through the keyboard", () => {
   assert.equal(slide._progress, 0);
 });
 
-test("slide control is disabled for unknown and disconnected entities", () => {
+test("slide control remains available in every known access state", () => {
   const { slide } = slideFixture();
   slide.setAttribute("state", "unknown");
   assert.equal(slide._disabled(), true);
+
+  slide.setAttribute("state", "unavailable");
+  assert.equal(slide._disabled(), true);
+
+  slide.setAttribute("state", "unlocked");
+  assert.equal(slide._disabled(), false);
+
+  slide.setAttribute("state", "locking");
+  assert.equal(slide._disabled(), false);
+
+  slide.setAttribute("state", "unlocking");
+  assert.equal(slide._disabled(), false);
+
+  slide.setAttribute("entity", "cover.front_gate");
+  slide.setAttribute("state", "open");
+  assert.equal(slide._disabled(), false);
+
+  slide.setAttribute("state", "opening");
+  assert.equal(slide._disabled(), false);
 
   slide.setAttribute("state", "locked");
   slide._hass.connected = false;
@@ -385,10 +442,32 @@ test("slide control keeps an action-only label, meaningful semantics, and a larg
   assert.match(slide.shadowRoot.innerHTML, /<span class="label">Unlock<\/span>/);
   assert.doesNotMatch(slide.shadowRoot.innerHTML, /slide to unlock/i);
   assert.match(slide.shadowRoot.innerHTML, /width: 54px;\s+height: 54px;/);
+  assert.match(slide.shadowRoot.innerHTML, /--marao-slide-foreground: var\(--primary-text-color\)/);
+  assert.match(slide.shadowRoot.innerHTML, /--marao-slide-progress: color-mix\(in srgb, var\(--secondary-background-color\) 65%, var\(--primary-text-color\)\)/);
+  assert.match(slide.shadowRoot.innerHTML, /font-size: max\(1\.125rem, var\(--font-size-primary\)\)/);
+  assert.match(slide.shadowRoot.innerHTML, /<ha-icon icon="mdi:chevron-right" aria-hidden="true"><\/ha-icon>/);
+  assert.doesNotMatch(slide.shadowRoot.innerHTML, /var\(--color-green\)/);
   assert.match(slide.shadowRoot.innerHTML, /marao-slide-complete 280ms/);
 
   slide._hass.language = "pt";
   slide._render();
   assert.match(slide.shadowRoot.innerHTML, /aria-label="Destrancar Front Door"/);
   assert.match(slide.shadowRoot.innerHTML, /<span class="label">Destrancar<\/span>/);
+});
+
+test("slide control uses the access action wording for covers", () => {
+  const { slide } = slideFixture();
+  slide.setAttribute("entity", "cover.front_door");
+  slide.setAttribute("state", "closed");
+  slide._hass.states = {
+    "cover.front_door": { state: "closed", attributes: { friendly_name: "Front Door" } },
+  };
+  slide._render();
+  assert.match(slide.shadowRoot.innerHTML, /aria-label="Open Front Door"/);
+  assert.match(slide.shadowRoot.innerHTML, /<span class="label">Open<\/span>/);
+
+  slide._hass.language = "pt";
+  slide._render();
+  assert.match(slide.shadowRoot.innerHTML, /aria-label="Abrir Front Door"/);
+  assert.match(slide.shadowRoot.innerHTML, /<span class="label">Abrir<\/span>/);
 });

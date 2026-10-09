@@ -36,15 +36,22 @@ custom_components/
 └── marao_dashboard/
 ```
 
-After the integration is added, Marao copies its generated-dashboard YAML and
-theme assets into these locations:
+The repository's tests, development dependencies, safe demonstration entities,
+and local connection settings are outside this directory and are not installed
+by HACS. The bundled editor assets and their license are runtime files.
+
+After setup, Marao stores its generated dashboard and local history under the
+Home Assistant configuration directory, and installs its theme in Home
+Assistant's standard theme directory:
 
 ```text
-www/community/MaraoDashboard/
-└── dashboard/
-    └── MaraoDashboard/
-        ├── views/
-        └── main.yaml
+dashboard/
+└── MaraoDashboard/
+    ├── dashboard.json
+    ├── dashboard/
+    │   ├── dashboard.yaml
+    │   └── views/
+    └── .history/
 
 themes/
 └── MaraoDashboard/

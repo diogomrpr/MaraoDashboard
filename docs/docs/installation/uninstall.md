@@ -16,14 +16,12 @@ Create a backup first, then remove Marao in this order:
    `configuration.yaml`.
 4. If this installation was upgraded from an older release and Marao still
    reports a legacy resource Repair, remove only the exact entries it names.
-5. If no other dashboard uses it, remove the copied
-   `www/community/MaraoDashboard/dashboard` template directory.
-6. If no other theme uses it, remove `themes/MaraoDashboard`. Keep a
+5. If no other theme uses it, remove `themes/MaraoDashboard`. Keep a
    shared `frontend.themes: !include_dir_merge_named themes` setting when other
    themes still depend on it.
-7. Delete the generated `dashboard/MaraoDashboard` directory only if you no
+6. Delete the generated `dashboard/MaraoDashboard` directory only if you no
    longer need the dashboard JSON, custom YAML, or version history.
-8. Restart Home Assistant.
+7. Restart Home Assistant.
 
 There is no current Marao Lovelace resource to remove. Removing the config
 entry unregisters its frontend modules and editor panel; restarting Home

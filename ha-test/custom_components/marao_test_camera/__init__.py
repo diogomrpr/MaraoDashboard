@@ -1,1 +1,88 @@
-"""Test-only camera platform for Marao dashboard visual checks."""
+"""Authenticated local media and Frigate API fixtures; never a real camera."""
+
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+import time
+
+from aiohttp import web
+import voluptuous as vol
+
+from homeassistant.components import websocket_api
+from homeassistant.components.http import HomeAssistantView
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.service import async_register_admin_service
+
+MARAO_DISPOSABLE_FIXTURE = True
+DOMAIN = "marao_test_camera"
+MEDIA = Path(__file__).parent
+
+
+async def async_setup(hass, config):
+    """Expose the normal Frigate API using synthetic, authenticated local media."""
+    if "frigate/events/get" in hass.data.get("websocket_api", {}):
+        raise RuntimeError("The disposable Frigate fixture cannot replace a real provider")
+    websocket_api.async_register_command(hass, events)
+    hass.http.register_view(FixtureMediaView)
+
+    async def reset(call):
+        for domain in ("climate", "media_player"):
+            for entity in getattr(hass.data.get(domain), "entities", ()):
+                if values := getattr(entity, "_marao_initial_attrs", None):
+                    for key, value in values.items():
+                        setattr(entity, key, value)
+                    entity.async_write_ha_state()
+
+    async def reject_action(call):
+        raise HomeAssistantError("Simulated safe action failure")
+
+    async_register_admin_service(hass, DOMAIN, "reset", reset)
+    async_register_admin_service(hass, DOMAIN, "reject_action", reject_action, vol.Schema({
+        vol.Optional("entity_id"): "sensor.marao_dashboard_test_temperature",
+    }))
+    return True
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): "frigate/events/get",
+    vol.Required("instance_id"): str,
+    vol.Optional("cameras"): [str],
+    vol.Optional("limit", default=12): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
+})
+@websocket_api.async_response
+async def events(hass, connection, msg):
+    """Repeatable normal, empty, loading and reported-error event cases."""
+    if msg["instance_id"] != "marao_test":
+        connection.send_error(msg["id"], "not_found", "Only disposable Marao media exists here")
+        return
+    camera = next(iter(msg.get("cameras", [])), "")
+    if camera == "loading":
+        await asyncio.sleep(5)
+    if camera == "error":
+        connection.send_error(msg["id"], "fixture_error", "Simulated camera provider failure")
+        return
+    now = int(time.time())
+    result = [] if camera == "empty" else [
+        {"id": "marao-test-clip", "label": "person", "start_time": now - 60, "has_clip": True},
+        {"id": "marao-test-snapshot", "label": "car", "start_time": now - 180, "has_clip": False},
+    ]
+    connection.send_result(msg["id"], result[:msg["limit"]])
+
+
+class FixtureMediaView(HomeAssistantView):
+    """Home Assistant authenticates native signed paths before serving media."""
+
+    url = "/api/frigate/marao_test/thumbnail/{event_id}"
+    extra_urls = [
+        "/api/frigate/marao_test/snapshot/{event_id}",
+        "/api/frigate/marao_test/notifications/{event_id}/clip.mp4",
+    ]
+    name = "api:marao_test_camera:media"
+    requires_auth = True
+
+    async def get(self, request, event_id):
+        if event_id not in {"marao-test-clip", "marao-test-snapshot"}:
+            raise web.HTTPNotFound()
+        filename = "event.mp4" if request.path.endswith("/clip.mp4") else "event.svg"
+        return web.FileResponse(MEDIA / filename)

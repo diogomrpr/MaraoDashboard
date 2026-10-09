@@ -1,0 +1,9 @@
+{
+  "domain": "history",
+  "name": "Marao disposable history fixture",
+  "codeowners": [],
+  "dependencies": ["http", "recorder"],
+  "documentation": "https://github.com/diogomrpr/MaraoDashboard",
+  "integration_type": "system",
+  "version": "1.0.0"
+}

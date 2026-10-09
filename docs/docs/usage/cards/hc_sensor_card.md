@@ -7,7 +7,7 @@ parent: Cards
 
 # Sensor Card
 
-The `hc_sensor_card` is used to view the state of a sensor or binary sensor. It's configured to show the state of the sensor and the last updated time.
+The `hc_sensor_card` is used to view the state of a sensor or binary sensor. It's configured to show the state of the sensor and the last updated time when Home Assistant supplies it.
 
 ![Sensor Card Light](../../../assets/images/cards/hc_sensor_card/sensorcard_light.png)
 
@@ -23,4 +23,6 @@ The `hc_sensor_card` is used to view the state of a sensor or binary sensor. It'
 
 | Variable | Default | Required | Description|
 |----------|---------|----------|------------|
-| card_color | var(--color-blue) | No | Color for the card when state is on |
+| hc_card_color | var(--primary-color) | No | Active background color. |
+| on_icon | Entity icon | No | Icon for on or non-binary states. |
+| off_icon | Entity icon | No | Icon for off states. |

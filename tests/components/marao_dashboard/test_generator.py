@@ -83,11 +83,76 @@ def test_write_dashboard_files_without_helper_entities(tmp_path: Path) -> None:
     source = "\n".join(path.read_text() for path in Path(tmp_path, generated.slug).rglob("*.yaml"))
 
     assert dashboard.exists()
-    assert "theme: Marao Dashboard" in dashboard.read_text(encoding="utf-8")
     assert room_view.exists()
+    generated_views = list((tmp_path / generated.slug / "views").rglob("*.yaml"))
+    assert generated_views
+    assert all("theme: Marao Dashboard" in view.read_text(encoding="utf-8") for view in generated_views)
     assert "platform: group" not in source
     assert "light.office_main" in source
     assert "hc_battery_card" in source
+    rooms_view = (tmp_path / generated.slug / "views/main/02-rooms.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "template: hc_room_card" in rooms_view
+    assert "light_entities:" in rooms_view
+    assert "- light.office_main" in rooms_view
+    assert "- light.office_desk" in rooms_view
+
+
+def test_cases_use_normal_custom_page_cards_and_one_navbar(tmp_path: Path) -> None:
+    cards = [
+        {"type": "grid", "columns": 2, "square": False, "cards": [
+            {"type": "custom:marao-card", "template": "hc_switch_card", "entity": "switch.gallery_on"},
+            {"type": "custom:marao-card", "template": "hc_switch_card", "entity": "switch.gallery_unavailable"},
+        ]},
+        {"type": "custom:marao-popup-card", "hash": "#gallery-popup", "cards": [
+            {"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.gallery"},
+        ]},
+    ]
+    config = {
+        "name": "Generated Test", "rooms": [],
+        "pages": {"custom": [{"name": "Cases", "path": "card-test", "cards": cards}]},
+        "navigation": ["overview", "card-test"],
+    }
+    generated = write_dashboard(config, tmp_path)
+    write_dashboard(config, tmp_path)
+    root = tmp_path / generated.slug
+    dashboard = (root / "dashboard.yaml").read_text(encoding="utf-8")
+    source = (root / "views/custom/00-cases.yaml").read_text(encoding="utf-8")
+    view = yaml.load(source, Loader=MaraoDashboardLoader)
+    assert dashboard.count("views/custom/00-cases.yaml") == 1
+    assert view["path"] == "card-test"
+    assert view["cards"][1:-1] == cards
+    assert source.count("components/navigation/navbar.yaml") == 1
+    navbar = yaml.safe_load((root / "components/navigation/navbar.yaml").read_text(encoding="utf-8"))
+    assert navbar["cards"][0]["routes"][-1]["url"] == "/marao-generated-test/card-test"
+
+
+def test_timeline_template_generates_the_native_timeline_card(tmp_path: Path) -> None:
+    generated = write_dashboard(
+        {
+            "name": "Generated Test",
+            "rooms": [
+                {
+                    "name": "Office",
+                    "entities": [
+                        {
+                            "entity_id": "sensor.office_state",
+                            "template": "hc_timeline_card",
+                            "variables": {"timeline_name": "Office history"},
+                        }
+                    ],
+                }
+            ],
+        },
+        tmp_path,
+    )
+
+    room_view = Path(
+        tmp_path, generated.slug, "views", "rooms", "00-office.yaml"
+    ).read_text(encoding="utf-8")
+    assert "type: custom:marao-state-timeline-card" in room_view
+    assert "name: Office history" in room_view
 
 
 def test_dashboard_json_loader_rejects_invalid_json(tmp_path: Path) -> None:
@@ -236,10 +301,6 @@ def test_navbar_sizes_to_routes_and_reserves_its_own_bottom_space(tmp_path: Path
 
 def test_marao_button_actions_declare_heavy_haptics(tmp_path: Path) -> None:
     action_keys = {"tap_action", "hold_action", "double_tap_action", "press_action"}
-    template_root = Path(
-        "custom_components/marao_dashboard/frontend/dashboard/MaraoDashboard/"
-        "templates/internal_templates"
-    )
 
     def assert_actions(value: object, source: Path) -> int:
         action_count = 0
@@ -257,9 +318,6 @@ def test_marao_button_actions_declare_heavy_haptics(tmp_path: Path) -> None:
             for child in value:
                 action_count += assert_actions(child, source)
         return action_count
-
-    for path in template_root.rglob("*.yaml"):
-        assert_actions(yaml.safe_load(path.read_text(encoding="utf-8")), path)
 
     generated = write_dashboard(
         {
@@ -353,6 +411,8 @@ def test_custom_pages_ordered_navigation_and_page_shortcuts(tmp_path: Path) -> N
     assert "navigation_path: /marao-generated-test/studio" in room_view.read_text(
         encoding="utf-8"
     )
+    assert "sun.sun" not in room_view.read_text(encoding="utf-8")
+    assert "sun.sun" not in (root / "views/main/02-rooms.yaml").read_text(encoding="utf-8")
     assert navbar.index("/marao-generated-test/studio") < navbar.index(
         "/marao-generated-test/overview"
     ) < navbar.index("/marao-generated-test/rooms")
@@ -433,7 +493,7 @@ def test_room_climate_card_opens_generated_mode_popup(tmp_path: Path) -> None:
     assert source.index("# marao:custom:start") < source.index("components/navigation/navbar.yaml")
 
 
-def test_room_graph_cards_use_native_recorder_history(tmp_path: Path) -> None:
+def test_room_graph_cards_use_the_shared_marao_background(tmp_path: Path) -> None:
     generated = write_dashboard(
         {
             "name": "Generated Test",
@@ -460,10 +520,12 @@ def test_room_graph_cards_use_native_recorder_history(tmp_path: Path) -> None:
         encoding="utf-8"
     )
 
-    assert source.count("type: history-graph") == 2
+    assert "type: history-graph" not in source
+    assert "template: hc_graph_card" in source
+    assert "template: hc_switch_card" in source
     assert "sensor.power" in source
     assert "sensor.heater_power" in source
-    assert "show_names: false" in source
+    assert "show_graph: true" in source
 
 
 def test_room_access_cards_open_generated_action_popups(tmp_path: Path) -> None:
@@ -506,7 +568,7 @@ def test_room_access_cards_open_generated_action_popups(tmp_path: Path) -> None:
     assert source.index("# marao:custom:start") < source.index("components/navigation/navbar.yaml")
 
 
-def test_open_only_door_generates_direct_open_action_without_popup(tmp_path: Path) -> None:
+def test_open_only_door_generates_strict_slide_without_unused_popup(tmp_path: Path) -> None:
     generated = write_dashboard(
         {
             "name": "Generated Test",
@@ -523,9 +585,11 @@ def test_open_only_door_generates_direct_open_action_without_popup(tmp_path: Pat
     )
 
     source = (tmp_path / generated.slug / "views/rooms/00-entry.yaml").read_text(encoding="utf-8")
-    assert "template: hc_access_action_card" in source
+    assert "template: hc_access_slide_action_card" in source
+    assert "template: hc_access_action_card" not in source
+    assert "action_label_key: access.open" in source
     assert "action_service: cover.open_cover" in source
-    assert "popup_hash: '#access-cover-entry-door'" not in source
+    assert "#access-cover-entry-door" not in source
 
 
 def test_room_media_card_opens_generated_apple_tv_remote_popup(tmp_path: Path) -> None:
@@ -569,8 +633,29 @@ def test_room_media_card_opens_generated_apple_tv_remote_popup(tmp_path: Path) -
     assert "command: top_menu" in source
     assert "command: KEY_VOLDOWN" in source
     assert "perform_action: media_player.media_seek" in source
+    assert "seek_offset: -10" in source and "seek_offset: 30" in source
+    assert "[[[" not in source
     assert app_grid["columns"] == 2
     assert all(card["show_state"] is False for card in app_grid["cards"])
+
+
+def test_media_page_exposes_every_configured_player_and_its_popup(tmp_path: Path) -> None:
+    players = [
+        {"entity_id": "media_player.tv", "name": "Television"},
+        {"entity_id": "media_player.music", "name": "Music"},
+    ]
+    generated = write_dashboard(
+        {"name": "Generated Test", "pages": {"media": {"players": players}}},
+        tmp_path,
+    )
+    view = yaml.load(
+        (tmp_path / generated.slug / "views/main/05-media.yaml").read_text(encoding="utf-8"),
+        Loader=MaraoDashboardLoader,
+    )
+    controls = [card for card in view["cards"] if isinstance(card, dict) and card.get("template") == "hc_media_card"]
+    assert [card["entity"] for card in controls] == [player["entity_id"] for player in players]
+    popups = {card["hash"] for card in view["cards"] if isinstance(card, dict) and card.get("type") == "custom:marao-popup-card"}
+    assert {card["variables"]["popup_hash"] for card in controls} == popups
 
 
 def test_room_camera_card_opens_generated_frigate_events_popup(tmp_path: Path) -> None:
@@ -721,8 +806,10 @@ def test_generates_configured_julian_pages_and_derived_overview_popups(tmp_path:
     assert "navigation_path: '#overview-scenes'" in overview
     assert overview.index("#overview-lights") < overview.index("#overview-blinds")
     assert overview.index("#overview-blinds") < overview.index("#overview-climate")
-    assert "state: 'on'" in lights
-    assert "light.living_room_main" in lights
+    lights_config = yaml.load(lights, Loader=MaraoDashboardLoader)
+    light_cards = lights_config["cards"][0]["cards"]
+    assert [card["entity"] for card in light_cards] == ["light.living_room_main"]
+    assert all(card["type"] == "custom:marao-card" for card in light_cards)
     assert "cover.living_room_blind" in covers
     room_source = (root / "views/rooms/00-living-room.yaml").read_text(encoding="utf-8")
     assert "input_boolean.holiday_mode" in room_source
@@ -1045,3 +1132,33 @@ def test_write_empty_base_dashboard(tmp_path: Path) -> None:
 def test_invalid_config() -> None:
     with pytest.raises(ValueError):
         resolve_dashboard_config({"rooms": []})
+
+
+def test_security_page_access_actions_reuse_safe_controls_and_unique_popups(tmp_path: Path) -> None:
+    """Page actions must not turn lock/door controls into generic toggles."""
+    generated = write_dashboard(
+        {
+            "name": "Generated Test",
+            "pages": {
+                "security": {
+                    "access_entities": ["lock.front_door"],
+                    "actions": [
+                        "lock.front_door",
+                        {"entity_id": "cover.garage_door", "device_class": "garage"},
+                        {"entity_id": "cover.gate", "device_class": "gate", "supported_features": 1},
+                        "switch.porch",
+                    ],
+                }
+            },
+        },
+        tmp_path,
+    )
+    source = (tmp_path / generated.slug / "views/main/01-security.yaml").read_text(encoding="utf-8")
+    assert source.count("hash: '#access-lock-front-door'") == 3  # Two triggers, one popup.
+    assert source.count("hash: '#access-cover-garage-door'") == 2
+    assert "#access-cover-gate" not in source  # Open-only gate uses a direct strict slide.
+    assert source.count("template: hc_access_slide_action_card") == 3
+    assert source.count("template: hc_access_action_card") == 2
+    assert source.count("action: toggle") == 1  # Only the ordinary switch.
+    for service in ["lock.unlock", "lock.lock", "cover.open_cover", "cover.close_cover"]:
+        assert f"action_service: {service}" in source

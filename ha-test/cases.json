@@ -1,0 +1,661 @@
+{
+  "sliderFamilies": ["light", "fan", "cover"],
+  "families": [
+    {
+      "id": "light",
+      "name": "Light",
+      "template": "hc_light_card",
+      "source": "light.marao_dashboard_test_light",
+      "states": [
+        "off",
+        "on",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "switch",
+      "name": "Switch",
+      "template": "hc_switch_card",
+      "source": "switch.marao_dashboard_test_switch",
+      "states": [
+        "off",
+        "on",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "cover",
+      "name": "Cover",
+      "template": "hc_cover_card",
+      "source": "cover.marao_dashboard_test_cover",
+      "states": [
+        "closed",
+        "open",
+        "opening",
+        "closing",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "lock",
+      "name": "Lock",
+      "template": "hc_access_card",
+      "source": "lock.marao_dashboard_test_lock",
+      "states": [
+        "locked",
+        "unlocked",
+        "locking",
+        "unlocking",
+        "open",
+        "opening",
+        "jammed",
+        "unknown",
+        "unavailable",
+        "missing"
+      ],
+      "variables": {
+        "popup_hash": "#marao-dashboard-test-lock-popup"
+      }
+    },
+    {
+      "id": "garage",
+      "name": "Garage",
+      "template": "hc_access_card",
+      "source": "cover.marao_dashboard_test_garage_door",
+      "states": [
+        "closed",
+        "open",
+        "opening",
+        "closing",
+        "unknown",
+        "unavailable",
+        "missing"
+      ],
+      "variables": {
+        "popup_hash": "#marao-dashboard-test-garage-door-popup"
+      }
+    },
+    {
+      "id": "fan",
+      "name": "Fan",
+      "template": "hc_fan_card",
+      "source": "fan.marao_dashboard_test_fan",
+      "states": [
+        "off",
+        "on",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "climate",
+      "name": "Climate",
+      "template": "hc_climate_card",
+      "source": "climate.marao_dashboard_test_multi_mode_climate",
+      "states": [
+        "off",
+        "heat",
+        "cool",
+        "heat_cool",
+        "auto",
+        "dry",
+        "fan_only",
+        "unknown",
+        "unavailable",
+        "missing"
+      ],
+      "variables": {
+        "show_mode_buttons": true
+      }
+    },
+    {
+      "id": "media",
+      "name": "Media",
+      "template": "hc_media_card",
+      "source": "media_player.marao_dashboard_test_apple_tv",
+      "states": [
+        "off",
+        "on",
+        "idle",
+        "playing",
+        "paused",
+        "buffering",
+        "standby",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "alarm",
+      "name": "Alarm",
+      "template": "hc_security_card",
+      "source": "alarm_control_panel.marao_dashboard_test_alarm",
+      "states": [
+        "disarmed",
+        "armed_home",
+        "armed_away",
+        "armed_night",
+        "armed_vacation",
+        "armed_custom_bypass",
+        "pending",
+        "arming",
+        "disarming",
+        "triggered",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "vacuum",
+      "name": "Vacuum",
+      "template": "hc_vacuum_card",
+      "source": "vacuum.marao_dashboard_test_vacuum",
+      "states": [
+        "docked",
+        "cleaning",
+        "paused",
+        "returning",
+        "idle",
+        "error",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "dishwasher",
+      "name": "Dishwasher",
+      "template": "hc_dishwasher_card",
+      "source": "input_select.marao_dashboard_test_dishwasher_state",
+      "states": [
+        "idle",
+        "run",
+        "pause",
+        "finish",
+        "error",
+        "unknown",
+        "unavailable",
+        "missing"
+      ],
+      "variables": {
+        "progress_entity": "sensor.marao_dashboard_test_dishwasher_progress",
+        "remaining_time_entity": "sensor.marao_dashboard_test_dishwasher_remaining",
+        "salt_entity": "input_boolean.marao_dashboard_test_dishwasher_salt",
+        "rinse_aid_entity": "input_boolean.marao_dashboard_test_dishwasher_rinse_aid",
+        "active_program_entity": "input_select.marao_dashboard_test_dishwasher_program"
+      }
+    },
+    {
+      "id": "washer",
+      "name": "Washer",
+      "template": "hc_washing_machine_card",
+      "source": "binary_sensor.marao_dashboard_test_washing_machine",
+      "states": [
+        "off",
+        "on",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "weather",
+      "name": "Weather",
+      "template": "hc_weather_card",
+      "source": "sensor.marao_dashboard_test_weather",
+      "states": [
+        "clear-night",
+        "cloudy",
+        "exceptional",
+        "fog",
+        "hail",
+        "lightning",
+        "lightning-rainy",
+        "partlycloudy",
+        "pouring",
+        "rainy",
+        "snowy",
+        "snowy-rainy",
+        "sunny",
+        "windy",
+        "windy-variant",
+        "unknown",
+        "unavailable",
+        "missing"
+      ],
+      "variables": {
+        "show_forecast": false
+      }
+    },
+    {
+      "id": "battery",
+      "name": "Battery",
+      "template": "hc_battery_card",
+      "source": "sensor.marao_dashboard_test_battery",
+      "states": [
+        "10",
+        "50",
+        "95",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "sensor",
+      "name": "Sensor",
+      "template": "hc_sensor_card",
+      "source": "sensor.marao_dashboard_test_temperature",
+      "states": [
+        "21",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "number",
+      "name": "Number",
+      "template": "hc_number_card",
+      "source": "input_number.marao_dashboard_test_number",
+      "states": [
+        "0",
+        "50",
+        "100",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "wallbox",
+      "name": "Wallbox current",
+      "template": "hc_wallbox_current_card",
+      "source": "input_number.marao_dashboard_test_wallbox_current",
+      "states": [
+        "6",
+        "16",
+        "32",
+        "unknown",
+        "unavailable",
+        "missing"
+      ],
+      "variables": {
+        "shortcuts": [
+          6,
+          12,
+          16
+        ]
+      }
+    },
+    {
+      "id": "camera",
+      "name": "Camera",
+      "template": "hc_camera_card",
+      "source": "camera.marao_dashboard_test_camera",
+      "states": [
+        "idle",
+        "recording",
+        "streaming",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "scene",
+      "name": "Scene",
+      "template": "hc_scene_card",
+      "source": "input_select.marao_dashboard_test_scene",
+      "states": [
+        "Relax",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "room",
+      "name": "Room",
+      "template": "hc_room_card",
+      "source": "light.marao_dashboard_test_room_light",
+      "states": [
+        "off",
+        "on",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "access_slide",
+      "name": "Unlock slide",
+      "template": "hc_access_slide_action_card",
+      "source": "lock.marao_dashboard_test_lock",
+      "states": [
+        "locked",
+        "unlocked",
+        "unknown",
+        "unavailable",
+        "missing"
+      ],
+      "variables": {
+        "action_service": "lock.unlock",
+        "action_label_key": "common.unlock"
+      }
+    },
+    {
+      "id": "access_hold",
+      "name": "Alarm hold",
+      "idleHoldProgressHidden": true,
+      "template": "hc_access_hold_action_card",
+      "source": "alarm_control_panel.marao_dashboard_test_alarm",
+      "states": [
+        "disarmed",
+        "armed_away",
+        "unknown",
+        "unavailable",
+        "missing"
+      ],
+      "variables": {
+        "action_service": "alarm_control_panel.alarm_arm_away",
+        "action_label_key": "security.arm_away"
+      }
+    },
+    {
+      "id": "access_tap",
+      "name": "Lock tap",
+      "template": "hc_access_action_card",
+      "source": "lock.marao_dashboard_test_lock",
+      "states": [
+        "locked",
+        "unlocked",
+        "unknown",
+        "unavailable",
+        "missing"
+      ],
+      "variables": {
+        "action_service": "lock.lock",
+        "action_label_key": "common.lock"
+      }
+    },
+    {
+      "id": "base",
+      "name": "Base card",
+      "template": "hc_base_card",
+      "source": "sensor.marao_dashboard_test_temperature",
+      "states": [
+        "21",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "graph",
+      "name": "Graph",
+      "template": "hc_graph_card",
+      "source": "sensor.marao_dashboard_test_power",
+      "states": [
+        "450",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "toggle_graph",
+      "name": "Toggle graph",
+      "template": "hc_toggle_graph_card",
+      "source": "switch.marao_dashboard_test_switch",
+      "states": [
+        "off",
+        "on",
+        "unknown",
+        "unavailable",
+        "missing"
+      ],
+      "variables": {
+        "graph_entity": "sensor.marao_dashboard_test_graph_history"
+      }
+    },
+    {
+      "id": "header",
+      "name": "Header",
+      "template": "hc_header_card",
+      "source": "sensor.marao_dashboard_test_weather",
+      "states": [
+        "sunny",
+        "unknown",
+        "unavailable",
+        "missing"
+      ],
+      "variables": {
+        "person_entity": "sensor.marao_dashboard_test_person"
+      }
+    },
+    {
+      "id": "energy_period",
+      "name": "Energy period",
+      "type": "custom:marao-energy-period-card",
+      "source": "sensor.marao_dashboard_test_month_energy",
+      "states": [
+        "230",
+        "unknown",
+        "unavailable",
+        "missing"
+      ],
+      "card": {
+        "period": "day"
+      }
+    },
+    {
+      "id": "timeline",
+      "name": "State timeline",
+      "type": "custom:marao-state-timeline-card",
+      "source": "lock.marao_dashboard_test_lock",
+      "states": [
+        "locked",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    }
+  ],
+  "requiredTemplates": [
+    "hc_base_card",
+    "hc_header_card",
+    "hc_title_card",
+    "hc_navigation_card",
+    "hc_weather_card",
+    "hc_camera_card",
+    "hc_glance_card",
+    "hc_light_card",
+    "hc_cover_card",
+    "hc_access_card",
+    "hc_access_action_card",
+    "hc_access_hold_action_card",
+    "hc_access_slide_action_card",
+    "hc_switch_card",
+    "hc_fan_card",
+    "hc_climate_card",
+    "hc_media_card",
+    "hc_media_app_card",
+    "hc_security_card",
+    "hc_sensor_card",
+    "hc_battery_card",
+    "hc_graph_card",
+    "hc_toggle_graph_card",
+    "hc_scene_card",
+    "hc_number_card",
+    "hc_wallbox_current_card",
+    "hc_vacuum_card",
+    "hc_dishwasher_card",
+    "hc_washing_machine_card",
+    "hc_room_card",
+    "hc_blinds_popup_card",
+    "hc_lights_popup_card",
+    "hc_climate_popup_card",
+    "hc_maintenance_popup_card"
+  ],
+  "requiredOptions": [
+    "Light + slider",
+    "Light without slider",
+    "Fan + slider",
+    "Fan without slider",
+    "Single Mode Climate",
+    "Multi Mode Climate",
+    "Apple TV",
+    "Generic media player",
+    "Wallbox charging current",
+    "Wallbox current with one shortcut",
+    "Wallbox current with two shortcuts",
+    "Wallbox current without shortcuts",
+    "Graph line only",
+    "Graph fill only",
+    "Scene with one option",
+    "Scene with two options",
+    "Scene with three options",
+    "Scene with four options",
+    "Scene with five options",
+    "Dual target climate",
+    "Room \u00b7 one light unavailable",
+    "Reported action error"
+  ],
+  "eventCases": [
+    {
+      "id": "frigate",
+      "name": "Frigate clips and snapshots",
+      "provider": "frigate",
+      "camera": "front",
+      "expectedMediaKinds": [
+        "clip",
+        "snapshot"
+      ]
+    },
+    {
+      "id": "unifi",
+      "name": "UniFi Protect clips",
+      "provider": "unifi_protect",
+      "camera": "front",
+      "expectedMediaKinds": [
+        "clip"
+      ]
+    },
+    {
+      "id": "empty",
+      "name": "Camera events \u00b7 empty",
+      "provider": "frigate",
+      "camera": "empty",
+      "expectedEmpty": true
+    },
+    {
+      "id": "loading",
+      "name": "Camera events \u00b7 loading",
+      "provider": "frigate",
+      "camera": "loading",
+      "expectedStatus": "loading"
+    },
+    {
+      "id": "error",
+      "name": "Camera events \u00b7 reported error",
+      "provider": "frigate",
+      "camera": "error",
+      "expectedStatus": "error"
+    },
+    {
+      "id": "unifi-empty",
+      "name": "UniFi Protect \u00b7 empty",
+      "provider": "unifi_protect",
+      "source": "media-source://unifiprotect/fixture:browse:empty:all",
+      "expectedEmpty": true
+    },
+    {
+      "id": "unifi-error",
+      "name": "UniFi Protect \u00b7 reported error",
+      "provider": "unifi_protect",
+      "source": "media-source://unifiprotect/fixture:browse:error:all",
+      "expectedStatus": "error"
+    },
+    {
+      "id": "unifi-detail-error",
+      "name": "UniFi Protect \u00b7 detail error",
+      "provider": "unifi_protect",
+      "source": "media-source://unifiprotect/fixture:browse:detail-error:all",
+      "expectedDetailError": true
+    },
+    {
+      "id": "camera-unknown",
+      "name": "Camera events \u00b7 unknown",
+      "provider": "frigate",
+      "camera": "front",
+      "entity": "camera.marao_dashboard_test_case_camera_unknown",
+      "expectedStatus": "unknown",
+      "expectedDisabled": true
+    },
+    {
+      "id": "camera-unavailable",
+      "name": "Camera events \u00b7 unavailable",
+      "provider": "frigate",
+      "camera": "front",
+      "entity": "camera.marao_dashboard_test_case_camera_unavailable",
+      "expectedStatus": "unavailable",
+      "expectedDisabled": true
+    },
+    {
+      "id": "camera-missing",
+      "name": "Camera events \u00b7 missing",
+      "provider": "frigate",
+      "camera": "front",
+      "entity": "camera.marao_dashboard_test_case_camera_missing",
+      "expectedStatus": "unknown",
+      "expectedDisabled": true
+    }
+  ],
+  "historyCases": [
+    {
+      "id": "empty",
+      "entity": "sensor.marao_dashboard_test_history_empty",
+      "expectedStatus": "empty"
+    },
+    {
+      "id": "loading",
+      "entity": "sensor.marao_dashboard_test_history_loading",
+      "expectedStatus": "loading"
+    },
+    {
+      "id": "error",
+      "entity": "sensor.marao_dashboard_test_history_error",
+      "expectedStatus": "error"
+    }
+  ],
+  "actionErrorCase": {
+    "name": "Reported action error",
+    "entity": "sensor.marao_dashboard_test_temperature",
+    "service": "marao_test_camera.reject_action",
+    "expectedError": "Simulated safe action failure"
+  },
+  "groupCase": {
+    "name": "Room \u00b7 one light unavailable",
+    "entity": "light.marao_dashboard_test_case_light_on",
+    "entities": [
+      "light.marao_dashboard_test_case_light_on",
+      "light.marao_dashboard_test_case_light_unavailable"
+    ]
+  },
+  "dualClimateCase": {
+    "name": "Dual target climate",
+    "entity": "climate.marao_dashboard_test_dual_target_climate",
+    "low": 18,
+    "high": 24
+  }
+}

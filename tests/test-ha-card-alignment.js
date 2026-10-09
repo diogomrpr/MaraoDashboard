@@ -1,0 +1,240 @@
+const { chromium } = require("playwright");
+const { accessToken, setBrowserToken, assertCurrentFrontend, assertDisposableHaTarget, readConfig } = require("../ha-test/client");
+const { prepare } = require("../ha-test/prepare");
+const { measureCenteredIcons } = require("./test-ha-dashboard-e2e");
+const { applyVisualPreferences, layoutIssues, scenarios } = require("./test-ha-dashboard-accessibility");
+
+const tolerance = 0.5;
+
+async function checkControlContrast(page) {
+  const readings = await page.locator('.room-lights-off:not(:disabled),marao-slide-to-open .track[aria-disabled="false"],marao-card ha-card[style*="--marao-card-background"]:not([aria-disabled="true"]) :is(.title,.state,.climate,.current-temperature)').evaluateAll((controls) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    const luminance = (color) => {
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = color;
+      context.fillRect(0, 0, 1, 1);
+      const rgb = [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map((channel) => {
+        const value = channel / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      });
+      return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+    };
+    const ratio = (foreground, background) => {
+      const values = [luminance(foreground), luminance(background)].sort((a, b) => a - b);
+      return (values[1] + 0.05) / (values[0] + 0.05);
+    };
+    return controls.flatMap((control) => {
+      const label = control.querySelector(".label") || control;
+      const foreground = getComputedStyle(label).color;
+      const surfaces = control.matches(".title,.state,.climate,.current-temperature")
+        ? [control.closest("ha-card")]
+        : [control, control.querySelector(".fill")].filter(Boolean);
+      return surfaces.map((surface) => ({
+        label: label.textContent.trim(),
+        surface: surface.className,
+        foreground,
+        background: getComputedStyle(surface).backgroundColor,
+        ratio: ratio(foreground, getComputedStyle(surface).backgroundColor),
+      }));
+    });
+  });
+  if (!readings.length || readings.some((item) => item.ratio < 4.5)) {
+    throw new Error(`Card or action label contrast is below 4.5:1: ${JSON.stringify(readings.filter((item) => item.ratio < 4.5))}`);
+  }
+  console.log(`Card and action labels: minimum contrast ${Math.min(...readings.map((item) => item.ratio)).toFixed(2)}:1.`);
+}
+
+async function checkTextScaling(page) {
+  const normal = scenarios.find((scenario) => scenario.name === "iphone-normal");
+  const enlarged = scenarios.find((scenario) => scenario.name === "iphone-bold-text-200");
+  const measure = () => page.locator(".scene-options button,.wallbox-stepper .number-value,marao-energy-period-card .value,marao-energy-period-card .empty,.body.title-card .title,.current-temperature,.graph-card .state").evaluateAll((elements) =>
+    elements.map((element) => ({ label: element.textContent.trim(), size: parseFloat(getComputedStyle(element).fontSize) })));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await applyVisualPreferences(page, normal, "light");
+  const before = await measure();
+  await applyVisualPreferences(page, enlarged, "light");
+  const after = await measure();
+  if (!before.length || before.length !== after.length || after.some((item, index) => item.size < before[index].size * 1.99)) {
+    throw new Error("Essential card readings and action labels must scale with 200% text.");
+  }
+  const issues = await layoutIssues(page);
+  if (issues.length) throw new Error(`Enlarged card text: ${issues.join(", ")}`);
+}
+
+async function checkMediaShortcutIcons(page) {
+  const icons = await page.locator(".marao-popup-sheet .body.media-app-card").evaluateAll((cards) => cards.map((card) => {
+    const icon = card.querySelector(".icon").getBoundingClientRect();
+    const body = card.getBoundingClientRect();
+    return { name: card.querySelector(".title")?.textContent, width: icon.width, height: icon.height, offset: icon.left + icon.width / 2 - body.left - body.width / 2 };
+  }));
+  if (!icons.length || icons.some((icon) => Math.abs(icon.width - icon.height) > tolerance || Math.abs(icon.offset) > tolerance)) {
+    throw new Error(`Media shortcut icons must be square and centered: ${JSON.stringify(icons)}`);
+  }
+}
+
+async function checkNavbar(page) {
+  await page.locator("marao-navbar-card .nav").first().waitFor({ state: "attached" });
+  const issues = await page.locator("marao-navbar-card .nav").evaluateAll((navbars) => navbars.flatMap((navbar) => {
+    const failures = [];
+    const box = navbar.getBoundingClientRect();
+    const links = [...navbar.querySelectorAll("a")].map((link) => link.getBoundingClientRect());
+    for (const [index, rect] of links.entries()) {
+      if (rect.width < 48 || rect.height < 48) failures.push(`link ${index} below 48px`);
+      if (rect.left < box.left - 1 || rect.right > box.right + 1 || rect.top < box.top - 1 || rect.bottom > box.bottom + 1) failures.push(`link ${index} outside bar`);
+      if (links.slice(index + 1).some((other) => rect.left < other.right - 1 && rect.right > other.left + 1 && rect.top < other.bottom - 1 && rect.bottom > other.top + 1)) failures.push(`link ${index} overlaps`);
+    }
+    return failures;
+  }));
+  if (issues.length) throw new Error(`Navbar: ${issues.join(", ")}`);
+}
+
+async function main() {
+  const config = readConfig();
+  assertDisposableHaTarget(config);
+  await prepare(config);
+  const baseUrl = config.url.replace(/\/$/, "");
+  const tokens = await accessToken(config, baseUrl);
+  const browser = await chromium.launch();
+  const errors = [];
+
+  try {
+    const context = await browser.newContext(require("./mobile-devices").iphone);
+    await context.addInitScript(setBrowserToken, {
+      ...tokens,
+      hassUrl: baseUrl,
+      clientId: `${baseUrl}/`,
+      expires: Date.now() + tokens.expires_in * 1000,
+    });
+    const page = await context.newPage();
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (["error", "warning"].includes(message.type())) errors.push(message.text());
+    });
+    page.on("requestfailed", (request) => {
+      errors.push(`Failed ${request.resourceType()} request: ${new URL(request.url()).pathname}`);
+    });
+    page.on("response", (response) => {
+      if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`);
+    });
+
+    await page.goto(
+      `${baseUrl}/marao-dashboard/card-test?marao_alignment=${Date.now()}`,
+      { waitUntil: "domcontentloaded" },
+    );
+    const appleTvCard = page.locator("marao-card").filter({
+      has: page.locator(".title").filter({ hasText: /^\s*Apple TV\s*$/ }),
+    }).first();
+    await appleTvCard.locator("[data-card-action]").tap();
+    const controls = page.locator(".marao-popup-sheet .body.icon-only");
+    await controls.first().waitFor({ state: "visible" });
+    await page.evaluate(() => document.fonts?.ready);
+    await page.waitForTimeout(350);
+
+    await assertCurrentFrontend(page);
+    await checkNavbar(page);
+    await checkMediaShortcutIcons(page);
+
+    const readings = await measureCenteredIcons(controls);
+    if (readings.length !== 12) throw new Error(`Expected 12 Apple TV controls, found ${readings.length}.`);
+    for (const item of readings) {
+      const failed = item.missingElement
+        || Math.abs(item.horizontalOffset) > tolerance
+        || Math.abs(item.verticalOffset) > tolerance;
+      console.log(
+        `${item.label}: dx=${item.horizontalOffset?.toFixed(2) ?? "?"}px, dy=${item.verticalOffset?.toFixed(2) ?? "?"}px, `
+        + `card=${item.cardWidth ?? "?"}x${item.cardHeight ?? "?"}, icon=${item.iconWidth ?? "?"}x${item.iconHeight ?? "?"} — ${failed ? "FAIL" : "PASS"}`,
+      );
+    }
+
+    const failures = readings.filter((item) => item.missingElement
+      || Math.abs(item.horizontalOffset) > tolerance
+      || Math.abs(item.verticalOffset) > tolerance);
+    if (failures.length) throw new Error(`Misaligned controls: ${JSON.stringify(failures)}`);
+
+    await page.locator(".marao-popup-close").tap();
+    await page.locator(".marao-popup-sheet").waitFor({ state: "detached" });
+    await page.setViewportSize({ width: 195, height: 422 });
+    const narrowNames = ["Battery low", "Battery medium", "Battery full", "Unknown control", "Unavailable control"];
+    for (const name of narrowNames) {
+      const card = page.locator("marao-card").filter({ has: page.locator(".title", { hasText: new RegExp(`^${name}$`) }) }).first();
+      await card.scrollIntoViewIfNeeded();
+      const issues = await card.evaluate((element) => {
+        const root = element.shadowRoot;
+        const failures = [];
+        for (const child of root.querySelectorAll("ha-card,.body,.title,.state")) {
+          if (child.scrollWidth > child.clientWidth + 1 || child.scrollHeight > child.clientHeight + 1) failures.push(`${child.className || child.localName} overflows`);
+        }
+        const icon = root.querySelector(".icon")?.getBoundingClientRect();
+        for (const label of root.querySelectorAll(".title,.state")) {
+          const rect = label.getBoundingClientRect();
+          if (icon && rect.left < icon.right - 1 && rect.right > icon.left + 1 && rect.top < icon.bottom - 1 && rect.bottom > icon.top + 1) failures.push("text overlaps icon");
+        }
+        for (const control of root.querySelectorAll("button,input")) {
+          const rect = control.getBoundingClientRect();
+          if (rect.width < 48 || rect.height < 48) failures.push(`target ${rect.width}x${rect.height} is below 48x48`);
+        }
+        return failures;
+      });
+      if (issues.length) throw new Error(`${name} at 195px: ${issues.join(", ")}`);
+    }
+    for (const width of [195, 180]) {
+      await page.setViewportSize({ width, height: 422 });
+      await checkNavbar(page);
+      const galleryIssues = await layoutIssues(page);
+      if (galleryIssues.length) throw new Error(`Gallery at ${width}px: ${galleryIssues.join(", ")}`);
+      await appleTvCard.locator("[data-card-action]").tap();
+      await controls.first().waitFor({ state: "visible" });
+      await page.waitForTimeout(350);
+      await checkMediaShortcutIcons(page);
+      const zoomReadings = await measureCenteredIcons(controls);
+      const issues = zoomReadings.filter((item) => item.missingElement
+        || item.cardWidth < 48 || item.cardHeight < 48
+        || Math.abs(item.iconWidth - item.iconHeight) > tolerance
+        || Math.abs(item.horizontalOffset) > tolerance || Math.abs(item.verticalOffset) > tolerance);
+      if (zoomReadings.length !== 12 || issues.length) throw new Error(`Apple TV at ${width}px: ${JSON.stringify(issues)}`);
+      const clipped = await controls.evaluateAll((bodies) => bodies.some((body) => {
+        const card = body.closest("ha-card");
+        const action = body.getRootNode().querySelector("[data-card-action]").getBoundingClientRect();
+        const box = card.getBoundingClientRect();
+        return card.scrollWidth > card.clientWidth + 1 || card.scrollHeight > card.clientHeight + 1
+          || action.width < 48 || action.height < 48 || action.left < box.left - 1 || action.right > box.right + 1;
+      }));
+      if (clipped) throw new Error(`Apple TV controls clipped at ${width}px.`);
+      await page.locator(".marao-popup-close").tap();
+      await page.locator(".marao-popup-sheet").waitFor({ state: "detached" });
+      await page.locator("marao-card").filter({ has: page.locator(".title").filter({ hasText: /^Generic media player$/ }) }).first().locator("[data-card-action]").tap();
+      const genericControls = page.locator(".marao-popup-sheet .body.icon-only");
+      await genericControls.first().waitFor({ state: "visible" });
+      const genericReadings = await measureCenteredIcons(genericControls);
+      if (genericReadings.length !== 3 || genericReadings.some((item) => item.missingElement || item.cardWidth < 48 || item.cardHeight < 48 || Math.abs(item.horizontalOffset) > tolerance || Math.abs(item.verticalOffset) > tolerance)) throw new Error(`Generic media controls at ${width}px are too small or misaligned.`);
+      await page.locator(".marao-popup-close").tap();
+      await page.locator(".marao-popup-sheet").waitFor({ state: "detached" });
+      const energy = page.locator("marao-energy-period-card").filter({ has: page.locator('button.surface[aria-label="Month Power"]') }).first();
+      await energy.locator("button.surface").tap({ position: { x: 12, y: 12 } });
+      await page.locator(".marao-popup-sheet marao-energy-period-card .period-nav").waitFor({ state: "visible" });
+      const energyIssues = await layoutIssues(page);
+      if (energyIssues.length) throw new Error(`Energy popup at ${width}px: ${energyIssues.join(", ")}`);
+      await page.locator(".marao-popup-close").tap();
+      await page.locator(".marao-popup-sheet").waitFor({ state: "detached" });
+    }
+    const normal = scenarios.find((scenario) => scenario.name === "iphone-normal");
+    for (const theme of ["light", "dark"]) {
+      await applyVisualPreferences(page, normal, theme);
+      await checkControlContrast(page);
+    }
+    await checkTextScaling(page);
+    if (errors.length) throw new Error(`Browser warnings/errors:\n${errors.map((error) => `- ${error}`).join("\n")}`);
+    console.log(`Marao card alignment OK (${readings.length} controls; tolerance ${tolerance}px; ${narrowNames.length} narrow cards; 195px/180px popups).`);
+  } finally {
+    await browser.close();
+  }
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error.message || error);
+    process.exitCode = 1;
+  });
+}

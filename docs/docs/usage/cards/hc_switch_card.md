@@ -25,8 +25,8 @@ With the `hc_switch_card` you can control your switch. It gives the ability to a
 | Variable | Default | Required | Description|
 |----------|---------|----------|------------|
 | power_entity | / | No | The entity that shows the power consumption. |
-| power_unit | w | No | The unit that will be shown next to the power consumption. |
+| power_unit | Entity unit or W | No | The unit that will be shown next to the power consumption. |
 | show_graph | false | No | If true, a graph will be shown as background. NOTE: It will not show if there is no Power Entity given! |
-| graph_color | white | No | The color will be used for the graph. Line, fill or both. |
+| graph_color | Theme text/accent color | No | The color will be used for the graph. Line, fill or both. |
 | show_graph_line | true | No | If true, a line will be shown in the graph. |
 | show_graph_fill | false | No | If true, the graph will be filled. |

@@ -6,7 +6,10 @@ parent: Cards
 
 # Toggle Graph Card
 
-The `hc_toggle_graph_card` extends `hc_graph_card` by linking a sensor graph to a second entity that can be toggled from the card.
+`hc_toggle_graph_card` extends `hc_graph_card` with a related toggle. It keeps
+the sensor's live numeric reading and project-owned 24-hour background trace,
+while the card action, active treatment, and unavailable state come from
+`toggle_entity` rather than the metric sensor.
 
 ## Usage
 
@@ -40,7 +43,13 @@ The `hc_toggle_graph_card` extends `hc_graph_card` by linking a sensor graph to 
 | <span class="entry-type-marao_dashboard"></span> show_graph_fill | true | No | true |
 | <span class="entry-type-marao_dashboard"></span> show_graph_line | true | No | true |
 | <span class="entry-type-marao_dashboard"></span> show_icon | true | No | true |
+| <span class="entry-type-marao_dashboard"></span> graph_color | Theme card text/accent color | No | var(--color-orange) |
+| <span class="entry-type-marao_dashboard"></span> graph_background | Transparent | No | rgba(255, 255, 255, 0.08) |
 
 ## More info
 
-This card inherits graph behavior from `hc_graph_card` and uses Home Assistant's native history graph rendering.
+This card inherits the shared Marao graph behavior from `hc_graph_card`. It
+requests recorder history once for the displayed sensor, appends its live
+numeric state, and does not add a native history-graph card or another frontend
+resource. If history is unavailable, the current reading and related toggle
+remain usable while the background trace stays neutral.

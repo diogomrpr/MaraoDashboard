@@ -1,0 +1,10 @@
+{
+  "url": "http://homeassistant-test.invalid:8123",
+  "token": "REPLACE_WITH_A_LONG_LIVED_ADMINISTRATOR_TOKEN",
+  "disposable": false,
+  "sshHost": "homeassistant-test.invalid",
+  "sshUser": "root",
+  "sshPort": 22,
+  "sshKeyPath": "ssh/id_ed25519",
+  "remoteConfigPath": "/config"
+}

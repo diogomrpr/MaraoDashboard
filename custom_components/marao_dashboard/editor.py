@@ -121,7 +121,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             "domains": ["fan"],
             "description": "Control a fan and optionally show its percentage slider.",
             "variables": [
-                _field("enable_slider", "Speed slider", "boolean", default=False),
+                _field("enable_slider", "Speed slider", "boolean", default=True),
                 *COMMON_CARD_FIELDS,
             ],
         },
@@ -244,13 +244,13 @@ EDITOR_CATALOG: dict[str, Any] = {
             "label": "Graph",
             "icon": "mdi:chart-line",
             "domains": ["sensor"],
-            "description": "A large metric with a configurable history graph.",
+            "description": "A large live metric with a project-owned 24-hour background graph.",
             "variables": [
                 _field("show_graph_line", "Graph line", "boolean", default=True),
                 _field("show_graph_fill", "Graph fill", "boolean", default=True),
                 _field("show_icon", "Show icon", "boolean", default=False),
                 _field("graph_color", "Graph color", "color", advanced=True),
-                _field("graph_background", "Background", "color", advanced=True),
+                _field("graph_background", "Graph background", "color", advanced=True),
             ],
         },
         {
@@ -258,7 +258,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             "label": "Toggle graph",
             "icon": "mdi:chart-areaspline",
             "domains": ["sensor"],
-            "description": "A metric graph that also controls a related toggle.",
+            "description": "A live metric graph that also controls a related toggle.",
             "variables": [
                 _field("toggle_entity", "Toggle entity", "entity", domains=["switch", "input_boolean"]),
                 _field("show_graph_line", "Graph line", "boolean", default=True),
