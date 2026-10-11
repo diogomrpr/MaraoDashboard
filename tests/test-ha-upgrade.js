@@ -82,6 +82,16 @@ function addResourceSentinel(document) {
   return sentinel;
 }
 
+function unrelatedConfiguration(source, baseline) {
+  const value = YAML.parse(source, haYamlOptions), dashboards = value.lovelace?.dashboards;
+  if (dashboards) for (const [key, dashboard] of Object.entries(dashboards)) if (key === 'unrelated-upgrade-sentinel' || String(dashboard.filename || '').startsWith('dashboard/MaraoDashboard/')) delete dashboards[key];
+  if (Array.isArray(value.lovelace?.resources)) {
+    value.lovelace.resources = value.lovelace.resources.filter(row => row.url !== '/local/marao-upgrade-unrelated.js');
+    if (!value.lovelace.resources.length && !Object.hasOwn(YAML.parse(baseline, haYamlOptions).lovelace || {}, 'resources')) delete value.lovelace.resources;
+  }
+  return value;
+}
+
 function hashes(directory) {
   return Object.fromEntries(sourceFiles(directory).map(file => [file, sha256(fs.readFileSync(path.join(directory, file)))]));
 }
@@ -343,6 +353,7 @@ async function main() {
       baseline = remote({ mode: 'backup', paths });
       preservedDocuments = snapshot().documents;
       fs.writeFileSync(path.join(directory, 'pretest-identities.json'), JSON.stringify(baseline), { mode: 0o600 });
+      fs.writeFileSync(path.join(directory, 'pretest-parent-state.json'), JSON.stringify({ unrelated_existed: sentinelParentExisted }), { mode: 0o600 });
       fs.writeFileSync(path.join(directory, 'pretest-helper-states.json'), JSON.stringify(initialHelperStates), { mode: 0o600 });
       saveReport();
       return baseline;
@@ -366,7 +377,10 @@ async function main() {
       assert.equal(execFileSync('git', ['rev-parse', 'v0.5.1^{commit}'], { cwd: repoRoot, encoding: 'utf8' }).trim(), provenance.find(row => row.tag === 'v0.5.1').commit, 'Released tag changed from frozen provenance');
       assert.equal(JSON.parse(fs.readFileSync(path.join(releasedPackage, 'manifest.json'))).version, '0.5.1');
       assert.ok(!sourceFiles(releasedPackage).some(file => /vendor\/(?:button-card|bubble-card|navbar-card)/.test(file)), 'Forbidden historical runtime bundle');
-      const candidatePackage = path.join(repoRoot, 'ha-test/.cache/dist/custom_components/marao_dashboard');
+      const candidateStage = path.join(directory, 'candidate-package');
+      require('../frontend_src/build-hacs-dist.cjs').build(candidateStage);
+      const candidatePackage = path.join(candidateStage, 'custom_components/marao_dashboard');
+      assert.deepEqual(hashes(candidatePackage), hashes(path.join(repoRoot, 'custom_components/marao_dashboard')), 'Staged candidate differs from the verified source');
       const ownership = JSON.parse(fs.readFileSync(path.join(fixtures, 'unrelated-ownership.json')));
       for (const file of ['www/marao-upgrade-unrelated.js', 'unrelated/marao-upgrade.yaml', 'themes/marao-upgrade-unrelated.yaml']) assert.equal(baseline[file], null, 'Upgrade sentinel would replace existing data');
       ssh(config, 'mkdir -p ' + quote(config.remoteConfigPath + '/unrelated'));
@@ -377,6 +391,7 @@ async function main() {
       configuration.setIn(['lovelace', 'dashboards', 'unrelated-upgrade-sentinel'], configuration.createNode({ mode: 'yaml', title: ownership.dashboard.title,
         icon: 'mdi:file-outline', show_in_sidebar: false, require_admin: true, filename: 'unrelated/marao-upgrade.yaml' }));
       const resourcesBefore = await client.call({ type: 'lovelace/resources' });
+      assert.ok(resourcesBefore.every(row => row.url !== '/local/marao-upgrade-unrelated.js'), 'The resource sentinel already exists');
       originalResources = resourcesBefore;
       const { resource_mode: resourceMode } = await client.call({ type: 'lovelace/info' });
       assert.ok(['yaml', 'storage'].includes(resourceMode), 'Unsupported Lovelace resource mode');
@@ -509,12 +524,7 @@ async function main() {
       assert.deepEqual(collection(current.documents['.storage/lovelace_dashboards']), collection(preservedDocuments['.storage/lovelace_dashboards']), 'Concurrent unrelated dashboard registration change');
       for (const file of storagePaths) if (!['.storage/lovelace_resources', '.storage/lovelace_dashboards'].includes(file)) assert.deepEqual(current.files[file], baseline[file], 'Unrelated native dashboard changed');
       if (originalResources) assert.deepEqual((await client.call({ type: 'lovelace/resources' })).filter(row => row.url !== '/local/marao-upgrade-unrelated.js'), originalResources, 'Unrelated resources changed');
-      const unrelatedConfiguration = source => {
-        const value = YAML.parse(source, haYamlOptions), dashboards = value.lovelace?.dashboards;
-        if (dashboards) for (const [key, dashboard] of Object.entries(dashboards)) if (key === 'unrelated-upgrade-sentinel' || String(dashboard.filename || '').startsWith('dashboard/MaraoDashboard/')) delete dashboards[key];
-        return value;
-      };
-      assert.deepEqual(unrelatedConfiguration(ssh(config, 'cat ' + quote(config.remoteConfigPath + '/configuration.yaml'))), unrelatedConfiguration(baselineConfig), 'Unrelated Home Assistant settings changed');
+      assert.deepEqual(unrelatedConfiguration(ssh(config, 'cat ' + quote(config.remoteConfigPath + '/configuration.yaml')), baselineConfig), unrelatedConfiguration(baselineConfig, baselineConfig), 'Unrelated Home Assistant settings changed');
       remote({ mode: 'restore', expected: current.files, new_paths: newPaths });
       if (!sentinelParentExisted) ssh(config, 'test ! -d ' + quote(config.remoteConfigPath + '/unrelated') + ' || rmdir ' + quote(config.remoteConfigPath + '/unrelated'));
       await reboot();
@@ -537,5 +547,5 @@ function assertUnrelatedEntries(before, after, entryId) {
   assert.deepEqual(unrelated(after), unrelated(before), 'Concurrent unrelated entry change; retained recovery backup');
 }
 
-module.exports = { addResourceSentinel, assertUnrelatedEntries, child, extendedSource, hashes, patchRegistration, plan, validateVisualReviews, withRecovery };
+module.exports = { unrelatedConfiguration, addResourceSentinel, assertUnrelatedEntries, child, extendedSource, hashes, patchRegistration, plan, validateVisualReviews, withRecovery };
 if (require.main === module) main().catch(error => { console.error(error.message.split('\n')[0]); process.exitCode = 1; });

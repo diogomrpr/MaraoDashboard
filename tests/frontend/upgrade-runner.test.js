@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { validatePages } from '../../frontend_src/editor-model.js';
 
 const require = createRequire(import.meta.url);
-const { addResourceSentinel, assertUnrelatedEntries, extendedSource, patchRegistration, plan, validateVisualReviews, withRecovery } = require('../test-ha-upgrade');
+const { addResourceSentinel, unrelatedConfiguration, assertUnrelatedEntries, extendedSource, patchRegistration, plan, validateVisualReviews, withRecovery } = require('../test-ha-upgrade');
 const { undeliveredFix, validateKnownFailure } = require('../native-reconnect-exception');
 const YAML = require('yaml');
 const config = { url: 'http://192.168.0.28:8123', disposable: true, sshHost: '192.168.0.28' };
@@ -81,6 +81,19 @@ test('YAML resource sentinel appends without losing unrelated nodes and rejects 
   const empty=YAML.parseDocument('lovelace: {}');addResourceSentinel(empty);assert.equal(empty.toJSON().lovelace.resources.length,1);
   const external=YAML.parseDocument('lovelace:\n  resources: !include resources.yaml\n',haYamlOptions),original=external.toString();
   assert.throws(()=>addResourceSentinel(external),/explicit resource list/);assert.equal(external.toString(),original);
+});
+
+test('cleanup excludes only owned registrations and the resource sentinel without losing explicit emptiness', () => {
+  for (const resources of ['', '  resources: []\n', '  resources:\n    - url: /local/unrelated.js\n      type: module\n']) {
+    const baseline='http:\n  use_x_forwarded_for: true\nlovelace:\n  resource_mode: yaml\n'+resources;
+    const doc=YAML.parseDocument(baseline);addResourceSentinel(doc);
+    assert.deepEqual(unrelatedConfiguration(doc.toString(),baseline),unrelatedConfiguration(baseline,baseline));
+    doc.setIn(['http','use_x_forwarded_for'],false);
+    assert.notDeepEqual(unrelatedConfiguration(doc.toString(),baseline),unrelatedConfiguration(baseline,baseline));
+    doc.setIn(['http','use_x_forwarded_for'],true);
+    doc.getIn(['lovelace','resources']).add({url:'/local/concurrent.js',type:'module'});
+    assert.notDeepEqual(unrelatedConfiguration(doc.toString(),baseline),unrelatedConfiguration(baseline,baseline));
+  }
 });
 
 test('concurrent unrelated integration edits block cleanup', () => {
