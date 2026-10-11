@@ -1257,8 +1257,9 @@ async function checkEntityGroups(page, serviceCalls, output, scenario, theme, co
   const overlay = page.locator('.marao-popup-overlay');
   await overlay.waitFor({ state: 'visible' });
   const popups = page.locator('marao-popup-card');
-  const index = await popups.evaluateAll(elements => elements.findIndex(element => element._config.hash === '#entity-group-gallery-light-active'));
-  assert.ok(index >= 0);
+  const hash = await namedCard(page, active.name).evaluate(card => card._config.tap_action.navigation_path);
+  const index = await popups.evaluateAll((elements, hash) => elements.findIndex(element => element._config.hash === hash), hash);
+  assert.ok(index >= 0, 'Active light group is missing its configured popup: ' + hash);
   const popup = popups.nth(index);
   await page.waitForFunction(popup => popup._groupChildren?.size > 0, await popup.elementHandle());
   await popup.evaluate(popup => { popup.__groupFirst = popup._groupChildren.get('light.marao_dashboard_test_case_light_on'); });
@@ -1377,13 +1378,13 @@ async function checkEntityGroups(page, serviceCalls, output, scenario, theme, co
     const member = climateMembers.nth(index);
     const initial = await member.locator('.number-value').textContent(), count = climateCalls(entity).length;
     await member.locator('[data-number-step="increase"]').tap();
-    await page.waitForFunction(({ member, initial }) => !member._climatePending && member.shadowRoot.querySelector('.number-value').textContent !== initial, { member: await member.elementHandle(), initial });
+    await page.waitForFunction(({ member, initial }) => !member.shadowRoot.querySelector('.climate-pending') && member.shadowRoot.querySelector('.number-value').textContent !== initial, { member: await member.elementHandle(), initial });
     assert.equal(climateCalls(entity).length, count + 1, 'Grouped climate target must dispatch once');
     const call = climateCalls(entity).at(-1);
     assert.equal(call.service, 'set_temperature');
     assert.ok(entity.includes('dual_target') ? call.data.target_temp_low != null && call.data.target_temp_high != null : call.data.temperature != null);
     await member.locator('[data-number-step="decrease"]').tap();
-    await page.waitForFunction(({ member, initial }) => !member._climatePending && member.shadowRoot.querySelector('.number-value').textContent === initial, { member: await member.elementHandle(), initial });
+    await page.waitForFunction(({ member, initial }) => !member.shadowRoot.querySelector('.climate-pending') && member.shadowRoot.querySelector('.number-value').textContent === initial, { member: await member.elementHandle(), initial });
     assert.equal(climateCalls(entity).length, count + 2);
   }
   const thermostat = 'climate.marao_dashboard_test_case_climate_heat';
