@@ -76,7 +76,7 @@ function readPreparedReceipt(filename, config, candidate) {
 
 const snapshotScript = `import hashlib,json,pathlib,sys
 request=json.load(sys.stdin)
-base=pathlib.Path(request['root'])
+base=pathlib.Path(request['root']).resolve(strict=True)
 if (base/'.marao-upgrade-active.json').is_symlink(): raise ValueError('Symlinked upgrade marker')
 def digest(file):
     if file.is_symlink() or any(p.is_symlink() for p in file.parents): raise ValueError('Symlinked upgrade input')

@@ -6,6 +6,9 @@ const { spawnSync } = require("node:child_process");
 const YAML = require("yaml");
 const { api, connect, fingerprint, readConfig, repoRoot, sourceFiles } = require("./client");
 
+const haYamlOptions = { customTags: ['!include', '!include_dir_list', '!include_dir_named', '!include_dir_merge_list', '!include_dir_merge_named', '!secret', '!env_var']
+  .map(tag => ({ tag, resolve: value => value })) };
+
 const cacheRoot = path.join(__dirname, ".cache");
 const remoteReceipt = ".marao-test-deployment.json";
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -54,7 +57,7 @@ function composeDashboard(config, view) {
 }
 
 function patchPackages(source) {
-  const document = YAML.parseDocument(source);
+  const document = YAML.parseDocument(source, haYamlOptions);
   if (document.errors.length) throw new Error("The remote configuration.yaml could not be parsed.");
   let home = document.get("homeassistant", true);
   if (!home || (YAML.isScalar(home) && home.value == null)) { document.set("homeassistant", document.createNode({})); home = document.get("homeassistant", true); }
@@ -403,4 +406,4 @@ if (require.main === module) {
   const dryRun = process.argv.includes("--dry-run");
   Promise.resolve().then(() => prepare(readConfig(undefined, { dryRun }), { dryRun })).catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = { changePlan, composeDashboard, patchPackages, prepare, referencedEntities, resetBaseline, restart, targetKey };
+module.exports = { haYamlOptions, changePlan, composeDashboard, patchPackages, prepare, referencedEntities, resetBaseline, restart, targetKey };

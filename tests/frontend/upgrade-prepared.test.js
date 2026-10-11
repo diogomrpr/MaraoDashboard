@@ -103,7 +103,7 @@ test('preserved inspection uses only reads and detects source, output, ownership
     for (const [relative, bytes] of Object.entries(contents)) {
       const target=path.join(installed,relative); fs.mkdirSync(path.dirname(target),{recursive:true}); fs.writeFileSync(target,bytes);
     }
-    const input=JSON.stringify({root:installed,slug:'dashboard',domains:['marao_test_camera'],files:Object.keys(saved.fixture_files)});
+    let input=JSON.stringify({root:installed,slug:'dashboard',domains:['marao_test_camera'],files:Object.keys(saved.fixture_files)});
     const read=()=>spawnSync('/bin/sh',['-c',snapshotCommand],{input,encoding:'utf8'});
     const actual=read(); assert.equal(actual.status,0,actual.stderr);
     const document=JSON.parse(actual.stdout);
@@ -112,6 +112,9 @@ test('preserved inspection uses only reads and detects source, output, ownership
     assert.deepEqual(Object.keys(document.output),['.marao-generated.json','dashboard.yaml','manual/unrelated.yaml']);
     assert.deepEqual(Object.keys(document.package),['__init__.py']);
     assert.equal(document.owners.marao_test_camera,'marao-dashboard-tests');
+    const alias=path.join(installed,'config-root-alias'); fs.symlinkSync(installed,alias,'dir');
+    input=JSON.stringify({root:alias,slug:'dashboard',domains:['marao_test_camera'],files:Object.keys(saved.fixture_files)});
+    const aliased=read(); assert.equal(aliased.status,0,aliased.stderr); assert.deepEqual(JSON.parse(aliased.stdout),document);
     fs.symlinkSync(path.join(installed,'packages/marao_dashboard_card_test_helpers.yaml'),path.join(installed,'dashboard/MaraoDashboard/dashboard/outside.yaml'));
     assert.notEqual(read().status,0,'Snapshot followed a symlink');
     for (const [relative, bytes] of Object.entries(contents)) assert.equal(fs.readFileSync(path.join(installed,relative),'utf8'),bytes,'Read-only snapshot changed a file');

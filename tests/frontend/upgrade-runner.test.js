@@ -58,6 +58,17 @@ test('registration staging preserves unrelated HA settings and never creates ano
   assert.deepEqual(Object.keys(YAML.parse(patchRegistration(source, 'saved', true)).lovelace.dashboards), ['unrelated']);
 });
 
+test('release registration retains Home Assistant include tags without parser warnings', () => {
+  const { haYamlOptions } = require('../../ha-test/prepare');
+  const source = 'frontend:\n  themes: !include_dir_merge_named themes\nhomeassistant:\n  packages: !include_dir_named packages\nautomation: !include automations.yaml\nhttp:\n  api_password: !secret api_password\n';
+  const output = patchRegistration(source, 'saved');
+  const doc = YAML.parseDocument(output, haYamlOptions);
+  assert.deepEqual(doc.errors, []); assert.deepEqual(doc.warnings, []);
+  for (const [keys, tag] of [[['frontend','themes'],'!include_dir_merge_named'], [['homeassistant','packages'],'!include_dir_named'], [['automation'],'!include'], [['http','api_password'],'!secret']]) {
+    assert.equal(doc.getIn(keys,true).tag,tag);
+  }
+});
+
 test('concurrent unrelated integration edits block cleanup', () => {
   const before = { data: { entries: [{ entry_id: 'marao', data: { owned: true } }, { entry_id: 'other', data: { keep: true } }] } };
   const after = structuredClone(before); after.data.entries[0].data.owned = false;

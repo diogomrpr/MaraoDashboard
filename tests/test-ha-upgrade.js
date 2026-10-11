@@ -5,7 +5,7 @@ const path = require('node:path');
 const { execFileSync, spawn } = require('node:child_process');
 const YAML = require('yaml');
 const { accessToken, api, assertDisposableHaTarget, connect, readConfig, repoRoot, setBrowserToken, sourceFiles } = require('../ha-test/client');
-const { composeDashboard, resetBaseline, restart } = require('../ha-test/prepare');
+const { composeDashboard, haYamlOptions, resetBaseline, restart } = require('../ha-test/prepare');
 const { candidateIdentity } = require('../ha-test/upgrade/prepared');
 
 const fixtures = path.join(repoRoot, 'ha-test/upgrade/fixtures');
@@ -57,7 +57,7 @@ async function withRecovery(createBackup, work, cleanup) {
 }
 
 function patchRegistration(source, slug, native = false) {
-  const document = YAML.parseDocument(source);
+  const document = YAML.parseDocument(source, haYamlOptions);
   assert.equal(document.errors.length, 0, 'Invalid disposable configuration');
   if (!document.get('lovelace')) document.set('lovelace', document.createNode({}));
   const lovelace = document.get('lovelace', true);
@@ -364,7 +364,7 @@ async function main() {
       ssh(config, 'cat > ' + quote(config.remoteConfigPath + '/www/marao-upgrade-unrelated.js'), '// Safe unrelated upgrade sentinel\n');
       ssh(config, 'cat > ' + quote(config.remoteConfigPath + '/unrelated/marao-upgrade.yaml'), 'title: Unrelated sentinel\nviews: []\n');
       ssh(config, 'cat > ' + quote(config.remoteConfigPath + '/themes/marao-upgrade-unrelated.yaml'), YAML.stringify(ownership.theme));
-      const configuration = YAML.parseDocument(baselineConfig);
+      const configuration = YAML.parseDocument(baselineConfig, haYamlOptions);
       configuration.setIn(['lovelace', 'dashboards', 'unrelated-upgrade-sentinel'], configuration.createNode({ mode: 'yaml', title: ownership.dashboard.title,
         icon: 'mdi:file-outline', show_in_sidebar: false, require_admin: true, filename: 'unrelated/marao-upgrade.yaml' }));
       const sentinelConfig = configuration.toString();
@@ -448,8 +448,8 @@ async function main() {
         assert.equal(active.output[ownership.file.path], sha256(ownership.file.content));
         if (protectedFile) assert.ok(ssh(config, 'cat ' + quote(config.remoteConfigPath + '/dashboard/MaraoDashboard/' + slug + '/' + protectedFile)).includes(custom));
         assertion(row.baseline, 'protected-output', { manual: ownership.file.path, custom: protectedFile || null });
-        const actualConfig = YAML.parse(ssh(config, 'cat ' + quote(config.remoteConfigPath + '/configuration.yaml')));
-        assert.deepEqual(actualConfig.lovelace.dashboards['unrelated-upgrade-sentinel'], YAML.parse(sentinelConfig).lovelace.dashboards['unrelated-upgrade-sentinel']);
+        const actualConfig = YAML.parse(ssh(config, 'cat ' + quote(config.remoteConfigPath + '/configuration.yaml')), haYamlOptions);
+        assert.deepEqual(actualConfig.lovelace.dashboards['unrelated-upgrade-sentinel'], YAML.parse(sentinelConfig, haYamlOptions).lovelace.dashboards['unrelated-upgrade-sentinel']);
         assertion(row.baseline, 'unrelated-registration', 'unrelated-upgrade-sentinel');
         assert.deepEqual(await client.call({ type: 'lovelace/resources' }), resourcesExpected);
         assertion(row.baseline, 'unrelated-resources', sha256(JSON.stringify(resourcesExpected)));
@@ -498,7 +498,7 @@ async function main() {
       for (const file of storagePaths) if (!['.storage/lovelace_resources', '.storage/lovelace_dashboards'].includes(file)) assert.deepEqual(current.files[file], baseline[file], 'Unrelated native dashboard changed');
       if (originalResources) assert.deepEqual((await client.call({ type: 'lovelace/resources' })).filter(row => row.url !== '/local/marao-upgrade-unrelated.js'), originalResources, 'Unrelated resources changed');
       const unrelatedConfiguration = source => {
-        const value = YAML.parse(source), dashboards = value.lovelace?.dashboards;
+        const value = YAML.parse(source, haYamlOptions), dashboards = value.lovelace?.dashboards;
         if (dashboards) for (const [key, dashboard] of Object.entries(dashboards)) if (key === 'unrelated-upgrade-sentinel' || String(dashboard.filename || '').startsWith('dashboard/MaraoDashboard/')) delete dashboards[key];
         return value;
       };
