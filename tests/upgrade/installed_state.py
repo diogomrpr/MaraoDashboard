@@ -185,6 +185,10 @@ def main(request):
     root = Path(request["root"])
     if not root.is_absolute() or str(root) == "/" or ".." in root.parts:
         raise ValueError("Invalid disposable configuration root")
+    # The SSH add-on exposes Core's /config through a /homeassistant alias.
+    root = root.resolve(strict=True)
+    if not root.is_dir() or root == Path("/"):
+        raise ValueError("Invalid disposable configuration root")
     if str(uuid.UUID(request["operation"])) != request["operation"]:
         raise ValueError("Invalid private upgrade operation identity")
     mode = request["mode"]

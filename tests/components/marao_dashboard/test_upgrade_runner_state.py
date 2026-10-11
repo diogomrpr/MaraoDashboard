@@ -108,3 +108,24 @@ def test_invalid_recovery_modes_are_rejected_before_replacing_installed_files(tm
     with pytest.raises(ValueError, match="recovery mode"):
         restore(tmp_path, operation, {"saved.json": tree(source)}, [])
     assert source.read_bytes() == b"candidate"
+
+
+def test_configured_root_alias_preserves_bounded_backup_and_rejects_nested_links(tmp_path):
+    root = tmp_path / "homeassistant"; root.mkdir()
+    alias = tmp_path / "config"; alias.symlink_to(root, target_is_directory=True)
+    source = root / "source.json"; source.write_bytes(b"exact\r\n")
+    operation = str(uuid.uuid4())
+    request = {"root": str(alias), "operation": operation}
+    before = main({**request, "mode": "backup", "paths": ["source.json"]})
+    assert main({**request, "mode": "snapshot", "paths": ["source.json"]})["files"] == before
+    source.write_bytes(b"candidate")
+    main({**request, "mode": "restore", "expected": {"source.json": tree(source)}, "new_paths": []})
+    assert source.read_bytes() == b"exact\r\n"
+    main({**request, "mode": "finish"})
+    assert alias.is_symlink() and not (root / ".marao-upgrade-active.json").exists()
+    (root / "outside.json").symlink_to(tmp_path / "other.json")
+    with pytest.raises(ValueError, match="Symlinked"):
+        main({"root": str(alias), "operation": str(uuid.uuid4()), "mode": "backup", "paths": ["outside.json"]})
+    unsafe = tmp_path / "unsafe"; unsafe.symlink_to("/", target_is_directory=True)
+    with pytest.raises(ValueError, match="configuration root"):
+        main({"root": str(unsafe), "operation": str(uuid.uuid4()), "mode": "backup", "paths": []})

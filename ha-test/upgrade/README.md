@@ -210,6 +210,10 @@ selections/options and protected filenames under explicitly edited page paths.
 Historical bindings may remain absent and neutral only when backed by that
 row's frozen expectation; overlap with non-fixture entities is rejected.
 
+The disposable SSH environment requires Python 3 with its standard library for
+private backup and recovery. The configured root may use the SSH add-on's
+`/config` alias; links inside owned state remain rejected.
+
 The producer reuses the complete browser matrix with guarded receipts. Its
 private operation directory records executed checks, immutable captures and
 candidate identity. After all checks it waits for a private `visual-review.json`
