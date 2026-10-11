@@ -1050,6 +1050,34 @@ async function captureClimateFeedback(page, name, target, output, visualProfile)
   }
 }
 
+function climateFeedbackSnapshot(card, phase) {
+  const read = () => {
+    const state = card.hass.states[card._config.entity];
+    return { mode: card.shadowRoot.querySelector('.state')?.textContent.trim(), target: card.shadowRoot.querySelector('.number-value')?.textContent,
+      pending: Boolean(card.shadowRoot.querySelector('.climate-pending')), selected: card.shadowRoot.querySelector('.climate-mode.active')?.dataset.climateMode,
+      reported: state.state, temperature: state.attributes.temperature, low: state.attributes.target_temp_low, high: state.attributes.target_temp_high,
+      current: state.attributes.current_temperature, activity: state.attributes.hvac_action ?? null };
+  };
+  if (phase === 'observe') {
+    card.__feedbackObserver?.disconnect();
+    card.__feedbackPending = undefined;
+    // A real rejection can arrive before Playwright returns from the tap.
+    card.__feedbackObserver = new MutationObserver(() => {
+      const state = read();
+      if (state.pending && !card.__feedbackPending) card.__feedbackPending = state;
+    });
+    card.__feedbackObserver.observe(card.shadowRoot, { childList: true, subtree: true });
+    return;
+  }
+  if (phase === 'observed') {
+    card.__feedbackObserver.disconnect();
+    const pending = card.__feedbackPending;
+    delete card.__feedbackObserver; delete card.__feedbackPending;
+    return pending;
+  }
+  return read();
+}
+
 async function checkClimateFeedback(page, serviceCalls, output, visualProfile) {
   const assert = require('node:assert/strict');
   if (output) {
@@ -1060,13 +1088,7 @@ async function checkClimateFeedback(page, serviceCalls, output, visualProfile) {
   const delayed = examples.find(example => example.id === 'delayed_confirmation');
   const duplicate = cardByTitle(page, 'Delayed climate duplicate');
   const cardFor = example => cardByTitle(page, example.name).filter({ has: page.locator('.climate-modes') });
-  const snapshot = card => card.evaluate(card => {
-    const state = card.hass.states[card._config.entity];
-    return { mode: card.shadowRoot.querySelector('.state')?.textContent.trim(), target: card.shadowRoot.querySelector('.number-value')?.textContent,
-      pending: Boolean(card.shadowRoot.querySelector('.climate-pending')), selected: card.shadowRoot.querySelector('.climate-mode.active')?.dataset.climateMode,
-      reported: state.state, temperature: state.attributes.temperature, low: state.attributes.target_temp_low, high: state.attributes.target_temp_high,
-      current: state.attributes.current_temperature, activity: state.attributes.hvac_action ?? null };
-  });
+  const snapshot = card => card.evaluate(climateFeedbackSnapshot);
   const callsFor = entity => serviceCalls.filter(call => call.domain === 'climate' && call.entities.includes(entity));
   const capture = (name, target) => captureClimateFeedback(page, name, target, output, visualProfile);
   const waitReported = async (entity, values) => page.waitForFunction(({ entity, values }) => {
@@ -1138,10 +1160,11 @@ async function checkClimateFeedback(page, serviceCalls, output, visualProfile) {
       const card = cardFor(example), before = await snapshot(card);
       const count = callsFor(example.entity).length;
       const notificationCount = await page.evaluate(() => window.__climateFeedbackNotifications.length);
+      await card.evaluate(climateFeedbackSnapshot, 'observe');
       if (example.id === 'delayed_ack') await card.locator('[data-climate-mode="heat"]').tap();
       else await card.locator('[data-number-step="increase"]').tap();
-      const immediate = await snapshot(card);
-      assert.equal(immediate.pending, true, `Immediate feedback for ${example.id}: ${JSON.stringify({ before, immediate, dispatched: callsFor(example.entity).length - count, touch: await page.evaluate(() => navigator.maxTouchPoints) })}`);
+      const immediate = await card.evaluate(climateFeedbackSnapshot, 'observed');
+      assert.equal(immediate?.pending, true, `Immediate feedback for ${example.id}: ${JSON.stringify({ before, immediate, current: await snapshot(card), dispatched: callsFor(example.entity).length - count })}`);
       assert.equal(immediate.reported, before.reported);
       assert.equal(immediate.current, before.current);
       assert.equal(immediate.activity, before.activity);
@@ -1980,4 +2003,4 @@ if (require.main === module) main().catch((error) => {
   console.error(error.message || error); process.exitCode = 1;
 });
 
-module.exports = { captureClimateFeedback, buildViewChecks, checkDisconnected, checkHistoryCases, conditionalCardIsActive, dashboardNavigationViolations, measureCenteredIcons, normalizedPathname, scrollDashboard, titleLayoutIssues };
+module.exports = { captureClimateFeedback, climateFeedbackSnapshot, buildViewChecks, checkDisconnected, checkHistoryCases, conditionalCardIsActive, dashboardNavigationViolations, measureCenteredIcons, normalizedPathname, scrollDashboard, titleLayoutIssues };

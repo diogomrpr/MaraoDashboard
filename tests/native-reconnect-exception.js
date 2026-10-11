@@ -50,6 +50,14 @@ async function undeliveredFix(get = async url => {
   return { checked_at: new Date().toISOString(), core: core.tag_name, latest_stable_frontend: frontend.tag_name, delivered_frontend: delivered, fix, checks };
 }
 
+function readKnownFailure(evidencePath, target) {
+  const exit = JSON.parse(fs.readFileSync(evidencePath + '.exit.json'));
+  assert.equal(exit.stage, 'disconnect-browser-errors', 'E2e failed outside the approved native reconnect scenario: ' + exit.message);
+  const evidence = JSON.parse(fs.readFileSync(evidencePath));
+  validateKnownFailure(evidence, target);
+  assert.equal(exit.message, `Disconnect scenario produced unexpected browser errors:\n${[...evidence.errors, ...evidence.rejections].join('\n')}\nSubscription lifecycle: ${JSON.stringify(evidence.subscriptions)}`);
+}
+
 async function e2eWithApprovedException(config, directory, theme = 'light', env = {}) {
   const evidencePath = path.join(directory, `native-reconnect-${theme}.json`);
   fs.rmSync(evidencePath, { force: true });
@@ -65,11 +73,7 @@ async function e2eWithApprovedException(config, directory, theme = 'light', env 
   } finally { fs.closeSync(fd); }
   if (status === 0) return { passed: true, log };
   assert.equal(status, 1, 'E2e process failed without the approved native failure');
-  const evidence = JSON.parse(fs.readFileSync(evidencePath));
-  validateKnownFailure(evidence, config.url);
-  const exit = JSON.parse(fs.readFileSync(evidencePath + '.exit.json'));
-  assert.equal(exit.stage, 'disconnect-browser-errors', 'E2e failed at another stage or during cleanup');
-  assert.equal(exit.message, `Disconnect scenario produced unexpected browser errors:\n${[...evidence.errors, ...evidence.rejections].join('\n')}\nSubscription lifecycle: ${JSON.stringify(evidence.subscriptions)}`);
+  readKnownFailure(evidencePath, config.url);
   const delivery = await undeliveredFix();
   const result = { passed: true, approved_exception: 'native-ha-stale-unsubscribe', raw_e2e_passed: false, log, evidence: evidencePath, delivery };
   fs.writeFileSync(path.join(directory, 'approved-native-exception-' + theme + '.json'), JSON.stringify(result, null, 2), { mode: 0o600 });
@@ -77,4 +81,4 @@ async function e2eWithApprovedException(config, directory, theme = 'light', env 
   return result;
 }
 
-module.exports = { e2eWithApprovedException, undeliveredFix, validateKnownFailure };
+module.exports = { e2eWithApprovedException, readKnownFailure, undeliveredFix, validateKnownFailure };

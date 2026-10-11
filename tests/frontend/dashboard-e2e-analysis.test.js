@@ -1,16 +1,41 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
 const {
   buildViewChecks,
+  climateFeedbackSnapshot,
   conditionalCardIsActive,
   dashboardNavigationViolations,
   normalizedPathname,
   scrollDashboard,
 } = require("../test-ha-dashboard-e2e.js");
 const { visibleBounds } = require("../test-ha-room-cards.js");
+
+test('climate feedback records a rendered pending transition before a fast rejection, without accepting absent feedback', () => {
+  let mutation, disconnected = 0, pending = false, target = '21';
+  const observe = vm.runInNewContext('(' + climateFeedbackSnapshot.toString() + ')', { MutationObserver: class {
+    constructor(callback) { mutation = callback; }
+    observe() {}
+    disconnect() { disconnected++; }
+  } });
+  const card = { _config: { entity: 'climate.test' }, hass: { states: { 'climate.test': { state: 'heat', attributes: { temperature: 21, current_temperature: 20 } } } },
+    shadowRoot: { querySelector(selector) {
+      return { '.state': { textContent: 'Heat' }, '.number-value': { textContent: target }, '.climate-pending': pending ? {} : null }[selector];
+    } } };
+  observe(card, 'observe');
+  pending = true; target = '21.5'; mutation();
+  pending = false; target = '21'; mutation();
+  const feedback = observe(card, 'observed');
+  assert.equal(feedback.pending, true); assert.equal(feedback.target, '21.5');
+  assert.equal(feedback.temperature, 21); assert.equal(feedback.current, 20);
+  assert.equal(observe(card).pending, false); assert.equal(observe(card).target, '21');
+  observe(card, 'observe'); mutation();
+  assert.equal(observe(card, 'observed'), undefined);
+  assert.equal(disconnected, 2); assert.equal(card.__feedbackObserver, undefined);
+});
 
 const dashboard = {
   views: [

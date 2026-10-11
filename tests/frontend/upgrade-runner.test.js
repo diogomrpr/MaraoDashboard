@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { createRequire } from 'node:module';
 import { validatePages } from '../../frontend_src/editor-model.js';
 
 const require = createRequire(import.meta.url);
 const { addResourceSentinel, unrelatedConfiguration, assertUnrelatedEntries, extendedSource, patchRegistration, plan, validateVisualReviews, withRecovery } = require('../test-ha-upgrade');
-const { undeliveredFix, validateKnownFailure } = require('../native-reconnect-exception');
+const { readKnownFailure, undeliveredFix, validateKnownFailure } = require('../native-reconnect-exception');
 const YAML = require('yaml');
 const config = { url: 'http://192.168.0.28:8123', disposable: true, sshHost: '192.168.0.28' };
 
@@ -129,6 +130,19 @@ test('approved exception accepts only the exact native stale subscription failur
     row => { row.native_failures = []; }, row => { row.native_failures[0].connection = 1; }, row => { row.subscriptions[0].type = 'subscribe_events'; }, row => { row.subscriptions[1].connection = 1; }]) {
     const row = nativeEvidence(); change(row); assert.throws(() => validateKnownFailure(row, config.url));
   }
+});
+
+test('an earlier product failure remains a blocker with its original diagnostic even without native evidence', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-native-failure-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const file = path.join(directory, 'native.json');
+  fs.writeFileSync(file + '.exit.json', JSON.stringify({ stage: null, message: 'Climate feedback failed' }));
+  assert.throws(() => readKnownFailure(file, config.url), /outside the approved native reconnect scenario: Climate feedback failed/);
+  const evidence = nativeEvidence();
+  fs.writeFileSync(file, JSON.stringify(evidence));
+  fs.writeFileSync(file + '.exit.json', JSON.stringify({ stage: 'disconnect-browser-errors',
+    message: `Disconnect scenario produced unexpected browser errors:\n${[...evidence.errors, ...evidence.rejections].join('\n')}\nSubscription lifecycle: ${JSON.stringify(evidence.subscriptions)}` }));
+  readKnownFailure(file, config.url);
 });
 
 test('native exception expires when the fix reaches either supported stable frontend', async () => {
