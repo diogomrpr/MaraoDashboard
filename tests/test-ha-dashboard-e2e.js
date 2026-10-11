@@ -315,7 +315,10 @@ async function checkActionDispatches(page, serviceCalls) {
     await page.waitForTimeout(1250);
     await assertCount(alarm, "alarm_arm_away", holdBefore, 0, "Cancelled security holds");
     await send("touchStart", point);
-    await page.waitForTimeout(1250);
+    // Keep holding until the browser processes its timer, even under test load.
+    await require('playwright/test').expect.poll(() => count(alarm, "alarm_arm_away"), {
+      timeout: 3000, message: "A continuously held security control must dispatch once",
+    }).toBe(holdBefore + 1);
     await send("touchEnd");
     await assertCount(alarm, "alarm_arm_away", holdBefore, 1, "Completed security hold");
   } finally { await touch.detach(); }
