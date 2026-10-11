@@ -31,7 +31,7 @@ function plan(config) {
   rows.push({ baseline: 'predecessor-format-1', format: formats[2], source: read(predecessor.input), expected: JSON.parse(read(predecessor.expected)), replay: 'supported-predecessor-data' });
   const { expandGallery } = require('../ha-test/cases');
   const gallery = expandGallery(YAML.parse(fs.readFileSync(path.join(repoRoot, 'ha-test/dashboard/views/00-card-test.yaml'), 'utf8')));
-  const current = composeDashboard(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ha-test/marao_dashboard_test_dashboard.json'))), gallery);
+  const current = JSON.parse(JSON.stringify(composeDashboard(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ha-test/marao_dashboard_test_dashboard.json'))), gallery)));
   rows.push({ baseline: 'current-format-2', format: formats[3], source: JSON.stringify(current, null, 2) + '\n', expected: current, replay: 'current-format-noop' });
   assert.equal(new Set(rows.map(row => row.baseline)).size, 7);
   for (const row of rows) assert.equal(row.expected.config_version, 2);
@@ -287,49 +287,49 @@ async function main() {
     JSON.stringify({ root: config.remoteConfigPath, operation, ...request })));
   const domains = fs.readdirSync(path.join(repoRoot, 'ha-test/custom_components')).sort();
   let client = await connect(config);
-  const entries = await client.call({ type: 'config_entries/get' });
-  assert.equal(entries.filter(entry => entry.domain === 'marao_dashboard').length, 1);
-  const entryId = entries.find(entry => entry.domain === 'marao_dashboard').entry_id;
-  assert.ok((await client.call({ type: 'auth/current_user' })).is_admin);
-  assert.equal((await api(config, 'GET', '/api/config')).config_dir, config.remoteConfigPath);
-  const baselineConfig = ssh(config, 'cat ' + quote(config.remoteConfigPath + '/configuration.yaml'));
-  const sentinelParentExisted = ssh(config, 'if test -d ' + quote(config.remoteConfigPath + '/unrelated') + '; then echo present; fi').trim() === 'present';
-  ssh(config, 'test ! -e ' + quote(config.remoteConfigPath + '/custom_components/marao_dashboard.upgrade-stage') +
-    ' && test ! -e ' + quote(config.remoteConfigPath + '/custom_components/marao_dashboard.upgrade-previous'));
-  const originalFixture = JSON.parse((await client.call({ type: 'marao_dashboard/config/get' })).config);
-  assert.deepEqual(originalFixture, selected.current, 'Normal safe fixture setup did not match its specified source');
-  const helper = require('../ha-test/cases').expandHelpers(YAML.parse(fs.readFileSync(path.join(repoRoot, 'ha-test/marao_dashboard_card_test_helpers.yaml'), 'utf8')));
-  const helperIds = Object.entries(helper).filter(([domain]) => ['input_boolean', 'input_number', 'input_select', 'input_text'].includes(domain))
-    .flatMap(([domain, values]) => Object.entries(values).filter(([, options]) => options.initial !== undefined || domain === 'input_select').map(([name]) => domain + '.' + name));
-  const helperStates = async () => Object.fromEntries((await client.call({ type: 'get_states' })).filter(row => helperIds.includes(row.entity_id)).map(row => [row.entity_id, row.state]));
-  const initialHelperStates = await helperStates();
-  const helperPaths = JSON.parse(ssh(config, 'python3 -c ' + quote("import json,pathlib;root=pathlib.Path(" + JSON.stringify(config.remoteConfigPath) + ");print(json.dumps([str(p.relative_to(root)) for p in root.rglob('marao_dashboard_card_test_helpers.yaml') if not any(x.startswith('.') for x in p.relative_to(root).parts)]))")));
-  assert.equal(helperPaths.length, 1, 'Expected exactly one safe fixture package');
-  const storagePaths = JSON.parse(ssh(config, 'python3 -c ' + quote("import json,pathlib;root=pathlib.Path(" + JSON.stringify(config.remoteConfigPath) + ");print(json.dumps([str(p.relative_to(root)) for p in (root/'.storage').glob('lovelace*') if p.is_file()]))")));
-  const documents = ['.storage/core.config_entries', ...storagePaths];
-  const paths = ['custom_components/marao_dashboard', 'dashboard/MaraoDashboard', 'configuration.yaml', 'themes/MaraoDashboard',
-    'custom_components/marao_dashboard.upgrade-stage', 'custom_components/marao_dashboard.upgrade-previous',
-    '.storage/core.config_entries', ...storagePaths, ...helperPaths, ...domains.map(domain => 'custom_components/' + domain),
-    'www/marao-upgrade-unrelated.js', 'unrelated/marao-upgrade.yaml', 'themes/marao-upgrade-unrelated.yaml', '.marao-upgrade-package.tar.gz'];
-  const newPaths = [];
-  let baseline, preservedDocuments;
-  const snapshot = slug => remote({ mode: 'snapshot', paths: [...paths, ...newPaths], documents, slug });
-  const disabled = async value => {
-    await client.call({ type: 'config_entries/disable', entry_id: entryId, disabled_by: value ? 'user' : null });
-    const deadline = Date.now() + 20000;
-    while (Date.now() < deadline) {
-      const saved = JSON.parse(ssh(config, 'python3 -c ' + quote("import json,pathlib;d=json.loads(pathlib.Path(" + JSON.stringify(config.remoteConfigPath + '/.storage/core.config_entries') + ").read_bytes());print(json.dumps(next(e.get('disabled_by') for e in d['data']['entries'] if e['entry_id']==" + JSON.stringify(entryId) + ")))")));
-      if (saved === (value ? 'user' : null)) return;
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    throw new Error('The integration enable/disable state was not persisted');
-  };
-  const reboot = async () => { client.close(); await restart(config); client = await connect(config); };
-  const assertCandidate = () => assert.deepEqual(candidateIdentity(), candidate, 'Candidate changed during the release upgrade');
-  const assertion = (baseline, name, evidence) => { report.install_assertions.push({ baseline, assertion: name, passed: true, evidence }); saveReport(); };
-  let nativeId;
-  let originalResources;
   try {
+    const entries = await client.call({ type: 'config_entries/get' });
+    assert.equal(entries.filter(entry => entry.domain === 'marao_dashboard').length, 1);
+    const entryId = entries.find(entry => entry.domain === 'marao_dashboard').entry_id;
+    assert.ok((await client.call({ type: 'auth/current_user' })).is_admin);
+    assert.equal((await api(config, 'GET', '/api/config')).config_dir, config.remoteConfigPath);
+    const baselineConfig = ssh(config, 'cat ' + quote(config.remoteConfigPath + '/configuration.yaml'));
+    const sentinelParentExisted = ssh(config, 'if test -d ' + quote(config.remoteConfigPath + '/unrelated') + '; then echo present; fi').trim() === 'present';
+    ssh(config, 'test ! -e ' + quote(config.remoteConfigPath + '/custom_components/marao_dashboard.upgrade-stage') +
+      ' && test ! -e ' + quote(config.remoteConfigPath + '/custom_components/marao_dashboard.upgrade-previous'));
+    const originalFixture = JSON.parse((await client.call({ type: 'marao_dashboard/config/get' })).config);
+    assert.deepEqual(originalFixture, selected.current, 'Normal safe fixture setup did not match its specified source');
+    const helper = require('../ha-test/cases').expandHelpers(YAML.parse(fs.readFileSync(path.join(repoRoot, 'ha-test/marao_dashboard_card_test_helpers.yaml'), 'utf8')));
+    const helperIds = Object.entries(helper).filter(([domain]) => ['input_boolean', 'input_number', 'input_select', 'input_text'].includes(domain))
+      .flatMap(([domain, values]) => Object.entries(values).filter(([, options]) => options.initial !== undefined || domain === 'input_select').map(([name]) => domain + '.' + name));
+    const helperStates = async () => Object.fromEntries((await client.call({ type: 'get_states' })).filter(row => helperIds.includes(row.entity_id)).map(row => [row.entity_id, row.state]));
+    const initialHelperStates = await helperStates();
+    const helperPaths = JSON.parse(ssh(config, 'python3 -c ' + quote("import json,pathlib;root=pathlib.Path(" + JSON.stringify(config.remoteConfigPath) + ");print(json.dumps([str(p.relative_to(root)) for p in root.rglob('marao_dashboard_card_test_helpers.yaml') if not any(x.startswith('.') for x in p.relative_to(root).parts)]))")));
+    assert.equal(helperPaths.length, 1, 'Expected exactly one safe fixture package');
+    const storagePaths = JSON.parse(ssh(config, 'python3 -c ' + quote("import json,pathlib;root=pathlib.Path(" + JSON.stringify(config.remoteConfigPath) + ");print(json.dumps([str(p.relative_to(root)) for p in (root/'.storage').glob('lovelace*') if p.is_file()]))")));
+    const documents = ['.storage/core.config_entries', ...storagePaths];
+    const paths = ['custom_components/marao_dashboard', 'dashboard/MaraoDashboard', 'configuration.yaml', 'themes/MaraoDashboard',
+      'custom_components/marao_dashboard.upgrade-stage', 'custom_components/marao_dashboard.upgrade-previous',
+      '.storage/core.config_entries', ...storagePaths, ...helperPaths, ...domains.map(domain => 'custom_components/' + domain),
+      'www/marao-upgrade-unrelated.js', 'unrelated/marao-upgrade.yaml', 'themes/marao-upgrade-unrelated.yaml', '.marao-upgrade-package.tar.gz'];
+    const newPaths = [];
+    let baseline, preservedDocuments;
+    const snapshot = slug => remote({ mode: 'snapshot', paths: [...paths, ...newPaths], documents, slug });
+    const disabled = async value => {
+      await client.call({ type: 'config_entries/disable', entry_id: entryId, disabled_by: value ? 'user' : null });
+      const deadline = Date.now() + 20000;
+      while (Date.now() < deadline) {
+        const saved = JSON.parse(ssh(config, 'python3 -c ' + quote("import json,pathlib;d=json.loads(pathlib.Path(" + JSON.stringify(config.remoteConfigPath + '/.storage/core.config_entries') + ").read_bytes());print(json.dumps(next(e.get('disabled_by') for e in d['data']['entries'] if e['entry_id']==" + JSON.stringify(entryId) + ")))")));
+        if (saved === (value ? 'user' : null)) return;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      throw new Error('The integration enable/disable state was not persisted');
+    };
+    const reboot = async () => { client.close(); await restart(config); client = await connect(config); };
+    const assertCandidate = () => assert.deepEqual(candidateIdentity(), candidate, 'Candidate changed during the release upgrade');
+    const assertion = (baseline, name, evidence) => { report.install_assertions.push({ baseline, assertion: name, passed: true, evidence }); saveReport(); };
+    let nativeId;
+    let originalResources;
     await withRecovery(async () => {
       baseline = remote({ mode: 'backup', paths });
       preservedDocuments = snapshot().documents;

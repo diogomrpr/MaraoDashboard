@@ -15,6 +15,9 @@ test('release plan covers every frozen baseline and all four formats without rem
   const value = plan(config);
   assert.equal(value.rows.length, 7); assert.equal(value.rows[0].baseline, 'v0.5.1');
   assert.deepEqual(new Set(value.rows.map(row => row.format)), new Set(value.formats));
+  assert.deepEqual(value.current, JSON.parse(JSON.stringify(value.current)), 'The expected installed fixture must contain only persisted JSON values');
+  for (const row of value.rows) assert.deepEqual(row.expected, JSON.parse(JSON.stringify(row.expected)));
+  assert.deepEqual(JSON.parse(value.rows.at(-1).source), value.current);
   for (const change of [{ disposable: false }, { url: 'http://192.168.0.29:8123', sshHost: '192.168.0.29' }]) assert.throws(() => plan({ ...config, ...change }));
 });
 
