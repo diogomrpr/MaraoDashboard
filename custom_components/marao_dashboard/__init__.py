@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from asyncio import Lock, run_coroutine_threadsafe
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -12,15 +13,17 @@ import voluptuous as vol
 
 from homeassistant.components import frontend, panel_custom, websocket_api
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.components.lovelace import LOVELACE_DATA
+from homeassistant.components.lovelace import LOVELACE_DATA, MODE_YAML
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
 
 from .config_patch import (
     patch_frontend_themes,
     patch_lovelace_dashboard,
+    registered_dashboard_key,
+    validate_dashboard_registration,
     remove_lovelace_dashboard,
 )
 from .const import (
@@ -42,24 +45,38 @@ from .const import (
     MARAO_DASHBOARD_STATIC_URL,
 )
 from .legacy_migration import (
+    LegacyResourcePlan,
     async_clear_legacy_resource_issue,
-    async_migrate_legacy_resources,
+    async_plan_legacy_resources,
+    async_restore_legacy_resource_cache,
 )
-from .editor import EDITOR_CATALOG
+from .editor import EDITOR_CATALOG, page_templates
+from .native_storage import NativeDashboardPlan, async_find_native_dashboard, async_restore_native_cache, staged_native_dashboard
 from .generator import (
+    GENERATION_CONTRACT_VERSION,
+    MANIFEST_NAME,
+    _load_generation_manifest,
     build_base_dashboard_config,
-    ensure_dashboard_config,
+    dashboard_identity,
     load_dashboard_config,
-    make_slug,
+    parse_dashboard_config,
     migrate_legacy_theme,
+    migrate_dashboard_config,
+    materialize_overview_groups,
     plan_dashboard,
     write_dashboard_config,
     write_dashboard,
 )
 from .history import (
+    DASHBOARD_WRITE_LOCK,
+    HISTORY_DIR_NAME,
+    OPERATION_DIR_NAME,
+    RECOVERY_ERROR,
+    dashboard_operation,
     list_dashboard_history,
     restore_dashboard_version,
     snapshot_dashboard,
+    recover_dashboard_operation,
 )
 
 SERVICE_REGISTERED = "generate_dashboard_service_registered"
@@ -97,9 +114,50 @@ def frontend_fingerprint(frontend_dir: Path) -> str:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Marao Dashboard and create the base dashboard once."""
 
+    async with _dashboard_operation_lock(hass):
+        return await _async_setup_dashboard(hass, entry)
+
+
+def _dashboard_operation_lock(hass: HomeAssistant) -> Lock:
+    return hass.data.setdefault(DOMAIN, {}).setdefault("dashboard_operation_lock", Lock())
+
+
+def _recover_dashboard_state(hass: HomeAssistant) -> None:
+    """Recover files and the loaded native resource cache before accepting writes."""
+    checkpoint = Path(hass.config.path(DASHBOARD_BASE_DIR, HISTORY_DIR_NAME, OPERATION_DIR_NAME, "operation.json"))
+    lovelace = hass.data.get(LOVELACE_DATA)
+    def restore_resources():
+        if lovelace is not None and lovelace.resource_mode != MODE_YAML and any(
+            target["path"] == lovelace.resources.store.path for target in json.loads(checkpoint.read_bytes())["targets"]
+        ):
+            run_coroutine_threadsafe(async_restore_legacy_resource_cache(hass), hass.loop).result()
+        if lovelace is not None:
+            targets = {target["path"] for target in json.loads(checkpoint.read_bytes())["targets"]}
+            for dashboard in lovelace.dashboards.values():
+                store = getattr(dashboard, "_store", None)
+                if store is not None and store.path in targets:
+                    run_coroutine_threadsafe(async_restore_native_cache(dashboard), hass.loop).result()
+    recover_dashboard_operation(hass.config.path(DASHBOARD_BASE_DIR), restore_resources)
+
+
+async def _async_setup_dashboard(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    source_path = _dashboard_config_path(hass)
+    await hass.async_add_executor_job(_recover_dashboard_state, hass)
+    source = await hass.async_add_executor_job(load_dashboard_config, source_path) if source_path.exists() else None
+    native = await async_find_native_dashboard(hass, source)
+    if native:
+        hass.data.setdefault(DOMAIN, {})["native_dashboard"] = native[0]
+    elif source is None and entry.data.get(BASE_DASHBOARD_CREATED):
+        raise ValueError("The saved Marao configuration is missing; restore it before generation")
+    registry_entities = _registry_entities(hass)
+    areas = _editor_areas(hass)
+    should_repair = await hass.async_add_executor_job(
+        _should_repair_base_dashboard, hass, registry_entities, areas
+    )
+    legacy_resources = await async_plan_legacy_resources(hass)
+
     hass.data.setdefault(DOMAIN, {})
     _register_services(hass)
-    config_path = hass.config.path("configuration.yaml")
     await _async_register_static_path(hass)
     fingerprint = await hass.async_add_executor_job(
         frontend_fingerprint, Path(__file__).parent / "frontend"
@@ -108,7 +166,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     for module_url in module_urls:
         frontend.add_extra_js_url(hass, module_url)
     hass.data[DOMAIN][FRONTEND_MODULES] = module_urls
-    await _async_remove_legacy_card_test_dashboard(hass)
     await panel_custom.async_register_panel(
         hass,
         frontend_url_path=MANAGEMENT_PANEL_PATH,
@@ -120,25 +177,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         config_panel_domain=DOMAIN,
     )
     _register_websocket_commands(hass)
-    await hass.async_add_executor_job(_install_themes, hass)
-    await hass.async_add_executor_job(
-        patch_frontend_themes,
-        config_path,
-        "themes",
-        None,
-        [LEGACY_FRONTEND_MODULE],
-    )
-    if hass.services.has_service("frontend", "reload_themes"):
-        await hass.services.async_call("frontend", "reload_themes", blocking=True)
-    await async_migrate_legacy_resources(hass)
-    registry_entities = _registry_entities(hass)
-    should_repair = await hass.async_add_executor_job(
-        _should_repair_base_dashboard, hass, registry_entities
-    )
-    if not entry.data.get(BASE_DASHBOARD_CREATED) or should_repair:
-        config = await hass.async_add_executor_job(
-            ensure_dashboard_config, _dashboard_config_path(hass), registry_entities
-        )
+    if not entry.data.get(BASE_DASHBOARD_CREATED) or should_repair or native and source is None:
+        config = (await hass.async_add_executor_job(load_dashboard_config, source_path)
+                  if source_path.exists() else native[1] if native else build_base_dashboard_config(registry_entities))
         generated = await hass.async_add_executor_job(
             _generate_dashboard,
             hass,
@@ -147,28 +188,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             False,
             registry_entities,
             _dashboard_config_path(hass),
+            "generation",
+            None,
+            areas,
+            legacy_resources,
         )
         hass.data[DOMAIN]["base_dashboard"] = generated
         hass.config_entries.async_update_entry(
             entry,
             data={**entry.data, BASE_DASHBOARD_CREATED: True},
         )
+        if generated["legacy_gallery_removed"]:
+            _remove_legacy_card_test_panel(hass)
+    else:
+        await hass.async_add_executor_job(_install_themes, hass, None, legacy_resources)
+    if hass.services.has_service("frontend", "reload_themes"):
+        await hass.services.async_call("frontend", "reload_themes", blocking=True)
+    if legacy_resources:
+        async_clear_legacy_resource_issue(hass)
     await hass.async_add_executor_job(_ensure_current_history, hass)
     return True
 
 
-async def _async_remove_legacy_card_test_dashboard(hass: HomeAssistant) -> None:
-    """Remove Marao's retired standalone gallery without touching repurposed keys."""
-
-    removed = await hass.async_add_executor_job(
-        remove_lovelace_dashboard,
-        hass.config.path("configuration.yaml"),
-        LEGACY_CARD_TEST_DASHBOARD_KEY,
-        LEGACY_CARD_TEST_DASHBOARD_FILE,
-    )
-    if not removed.changed:
-        return
-
+@callback
+def _remove_legacy_card_test_panel(hass: HomeAssistant) -> None:
+    """Remove the retired panel only after its owned YAML patch commits."""
     frontend.async_remove_panel(
         hass, LEGACY_CARD_TEST_DASHBOARD_KEY, warn_if_unknown=False
     )
@@ -181,10 +225,11 @@ async def _async_remove_legacy_card_test_dashboard(hass: HomeAssistant) -> None:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload Marao Dashboard."""
 
-    frontend.async_remove_panel(hass, MANAGEMENT_PANEL_PATH, warn_if_unknown=False)
-    for module_url in hass.data.get(DOMAIN, {}).pop(FRONTEND_MODULES, ()):
-        frontend.remove_extra_js_url(hass, module_url)
-    hass.data.get(DOMAIN, {}).pop("base_dashboard", None)
+    async with _dashboard_operation_lock(hass):
+        frontend.async_remove_panel(hass, MANAGEMENT_PANEL_PATH, warn_if_unknown=False)
+        for module_url in hass.data.get(DOMAIN, {}).pop(FRONTEND_MODULES, ()):
+            frontend.remove_extra_js_url(hass, module_url)
+        hass.data.get(DOMAIN, {}).pop("base_dashboard", None)
     return True
 
 
@@ -199,22 +244,18 @@ def _register_services(hass: HomeAssistant) -> None:
         return
 
     async def generate_dashboard(call: ServiceCall) -> dict[str, Any]:
-        config_path = _dashboard_config_path(hass, call.data["config_path"])
-        config = await hass.async_add_executor_job(load_dashboard_config, config_path)
-        registry_entities = _registry_entities(hass)
-        history_path = (
-            config_path if config_path == _dashboard_config_path(hass) else None
-        )
-        result = await hass.async_add_executor_job(
-            _generate_dashboard,
-            hass,
-            config,
-            call.data.get("dashboard_key"),
-            call.data["dry_run"],
-            registry_entities,
-            history_path,
-        )
-        return result
+        async with _dashboard_operation_lock(hass):
+            config_path = _dashboard_config_path(hass, call.data["config_path"])
+            registry_entities = _registry_entities(hass)
+            return await hass.async_add_executor_job(
+                _generate_dashboard_from_path,
+                hass,
+                config_path,
+                call.data.get("dashboard_key"),
+                call.data["dry_run"],
+                registry_entities,
+                _editor_areas(hass),
+            )
 
     hass.services.async_register(
         DOMAIN,
@@ -233,7 +274,7 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
         return
 
     @websocket_api.require_admin
-    @websocket_api.websocket_command({"type": "marao_dashboard/config/get"})
+    @websocket_api.websocket_command({"type": "marao_dashboard/config/get", vol.Optional("config"): str})
     @websocket_api.async_response
     async def websocket_get_config(
         hass: HomeAssistant,
@@ -242,9 +283,13 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
     ) -> None:
         registry_entities = _registry_entities(hass)
         areas = _editor_areas(hass)
-        payload = await hass.async_add_executor_job(
-            _management_payload, hass, registry_entities, areas
-        )
+        try:
+            payload = await hass.async_add_executor_job(
+                _management_payload, hass, registry_entities, areas, msg.get("config")
+            )
+        except ValueError as err:
+            connection.send_error(msg["id"], "invalid_config", str(err))
+            return
         connection.send_result(msg["id"], payload)
 
     @websocket_api.require_admin
@@ -260,21 +305,23 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
         connection: websocket_api.ActiveConnection,
         msg: dict[str, Any],
     ) -> None:
-        registry_entities = _registry_entities(hass)
-        try:
-            generated = await hass.async_add_executor_job(
-                _save_and_generate_dashboard,
-                hass,
-                msg["config"],
-                registry_entities,
+        async with _dashboard_operation_lock(hass):
+            registry_entities = _registry_entities(hass)
+            try:
+                generated = await hass.async_add_executor_job(
+                    _save_and_generate_dashboard,
+                    hass,
+                    msg["config"],
+                    registry_entities,
+                    _editor_areas(hass),
+                )
+            except ValueError as err:
+                connection.send_error(msg["id"], "invalid_config", str(err))
+                return
+            generated["history"] = await hass.async_add_executor_job(
+                list_dashboard_history, hass.config.path(DASHBOARD_BASE_DIR)
             )
-        except ValueError as err:
-            connection.send_error(msg["id"], "invalid_config", str(err))
-            return
-        generated["history"] = await hass.async_add_executor_job(
-            list_dashboard_history, hass.config.path(DASHBOARD_BASE_DIR)
-        )
-        connection.send_result(msg["id"], generated)
+            connection.send_result(msg["id"], generated)
 
     @websocket_api.require_admin
     @websocket_api.websocket_command(
@@ -289,17 +336,18 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
         connection: websocket_api.ActiveConnection,
         msg: dict[str, Any],
     ) -> None:
-        try:
-            restored = await hass.async_add_executor_job(
-                _restore_history, hass, msg["version"]
+        async with _dashboard_operation_lock(hass):
+            try:
+                restored = await hass.async_add_executor_job(
+                    _restore_history, hass, msg["version"]
+                )
+            except ValueError as err:
+                connection.send_error(msg["id"], "invalid_version", str(err))
+                return
+            restored["history"] = await hass.async_add_executor_job(
+                list_dashboard_history, hass.config.path(DASHBOARD_BASE_DIR)
             )
-        except ValueError as err:
-            connection.send_error(msg["id"], "invalid_version", str(err))
-            return
-        restored["history"] = await hass.async_add_executor_job(
-            list_dashboard_history, hass.config.path(DASHBOARD_BASE_DIR)
-        )
-        connection.send_result(msg["id"], restored)
+            connection.send_result(msg["id"], restored)
 
     websocket_api.async_register_command(hass, websocket_get_config)
     websocket_api.async_register_command(hass, websocket_generate_config)
@@ -311,21 +359,33 @@ def _management_payload(
     hass: HomeAssistant,
     registry_entities: list[dict[str, Any]] | None = None,
     areas: list[dict[str, Any]] | None = None,
+    source: str | None = None,
 ) -> dict[str, Any]:
-    config_path = _dashboard_config_path(hass)
-    config = load_dashboard_config(config_path)
-    planned = plan_dashboard(config, hass.config.path(DASHBOARD_BASE_DIR))
-    return {
-        "config": json.dumps(config, indent=2, ensure_ascii=False) + "\n",
-        "config_path": f"/config/{DEFAULT_DASHBOARD_CONFIG}",
-        "dashboard_url": f"/{planned.dashboard_key}/overview",
-        "history": list_dashboard_history(hass.config.path(DASHBOARD_BASE_DIR)),
-        "editor": {
-            "catalog": EDITOR_CATALOG,
-            "entities": registry_entities or [],
-            "areas": areas or [],
-        },
-    }
+    with DASHBOARD_WRITE_LOCK:
+        if Path(hass.config.path(DASHBOARD_BASE_DIR, HISTORY_DIR_NAME, OPERATION_DIR_NAME, "operation.json")).exists():
+            raise ValueError(RECOVERY_ERROR)
+        config_path = _dashboard_config_path(hass)
+        raw = parse_dashboard_config(source) if source is not None else load_dashboard_config(config_path)
+        config = migrate_dashboard_config(raw, registry_entities, areas)
+        conversion_pending = config != raw
+        config = materialize_overview_groups(config, registry_entities, getattr(hass.config, "language", None) or "en")
+        planned = dashboard_identity(config)
+        key = registered_dashboard_key(hass.config.path("configuration.yaml"), planned.filename)
+        if native := hass.data.get(DOMAIN, {}).get("native_dashboard"):
+            key = native.url_path
+        return {
+            "config": json.dumps(config, indent=2, ensure_ascii=False) + "\n",
+            "conversion_pending": conversion_pending,
+            "config_path": f"/config/{DEFAULT_DASHBOARD_CONFIG}",
+            "dashboard_url": f"/{key or planned.dashboard_key}/{config.get('landing_page', 'overview')}",
+            "page_templates": page_templates(config, registry_entities or []),
+            "history": list_dashboard_history(hass.config.path(DASHBOARD_BASE_DIR)),
+            "editor": {
+                "catalog": EDITOR_CATALOG,
+                "entities": registry_entities or [],
+                "areas": areas or [],
+            },
+        }
 
 
 def _editor_areas(hass: HomeAssistant) -> list[dict[str, Any]]:
@@ -351,14 +411,17 @@ def _ensure_current_history(hass: HomeAssistant) -> None:
     config_path = _dashboard_config_path(hass)
     try:
         config = load_dashboard_config(config_path)
-        planned = plan_dashboard(config, hass.config.path(DASHBOARD_BASE_DIR))
+        planned = dashboard_identity(config)
+        key = registered_dashboard_key(hass.config.path("configuration.yaml"), planned.filename)
+        if native := hass.data.get(DOMAIN, {}).get("native_dashboard"):
+            key = native.url_path
     except (FileNotFoundError, ValueError):
         return
     snapshot_dashboard(
         config_path,
         hass.config.path(DASHBOARD_BASE_DIR),
         config,
-        dashboard_key=planned.dashboard_key,
+        dashboard_key=key or planned.dashboard_key,
         reason="current dashboard",
     )
 
@@ -367,86 +430,34 @@ def _save_and_generate_dashboard(
     hass: HomeAssistant,
     source: str,
     registry_entities: list[dict[str, Any]],
+    areas: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    try:
-        config = json.loads(source)
-    except json.JSONDecodeError as err:
-        raise ValueError(
-            f"Invalid dashboard JSON at line {err.lineno}, column {err.colno}: {err.msg}"
-        ) from err
-    if not isinstance(config, dict):
-        raise ValueError("Dashboard JSON must be an object")
+    config = parse_dashboard_config(source)
 
-    base_dir = hass.config.path(DASHBOARD_BASE_DIR)
-    config_path = _dashboard_config_path(hass)
-    planned = plan_dashboard(config, base_dir, registry_entities)
-    previous_key = None
-    baseline = None
-    try:
-        current = load_dashboard_config(config_path)
-        current_plan = plan_dashboard(current, base_dir, registry_entities)
-        previous_key = current_plan.dashboard_key
-        baseline = snapshot_dashboard(
-            config_path,
-            base_dir,
-            current,
-            dashboard_key=previous_key,
-            reason="before generation",
-        )
-    except (FileNotFoundError, ValueError):
-        pass
-
-    write_dashboard_config(config, config_path)
-    try:
+    with DASHBOARD_WRITE_LOCK:
         return _generate_dashboard(
-            hass,
-            config,
-            planned.dashboard_key,
-            False,
-            registry_entities,
-            config_path,
-            "generated from editor",
-            previous_key,
+            hass, config, None, False, registry_entities,
+            _dashboard_config_path(hass), "generated from editor",
+            areas=areas,
         )
-    except Exception:
-        if baseline:
-            restore_dashboard_version(config_path, base_dir, baseline["version"])
-        raise
 
 
 def _restore_history(hass: HomeAssistant, version: str) -> dict[str, Any]:
-    base_dir = hass.config.path(DASHBOARD_BASE_DIR)
-    config_path = _dashboard_config_path(hass)
-    previous_key = None
-    try:
-        current = load_dashboard_config(config_path)
-        current_plan = plan_dashboard(current, base_dir)
-        previous_key = current_plan.dashboard_key
-        snapshot_dashboard(
-            config_path,
-            base_dir,
-            current,
-            dashboard_key=previous_key,
-            reason="before restore",
-        )
-    except (FileNotFoundError, ValueError):
-        pass
-
-    config, metadata = restore_dashboard_version(config_path, base_dir, version)
-    planned = plan_dashboard(config, base_dir)
-    dashboard_patch = patch_lovelace_dashboard(
-        hass.config.path("configuration.yaml"),
-        metadata.get("dashboard_key") or planned.dashboard_key,
-        planned.title,
-        planned.icon,
-        planned.filename,
-        previous_dashboard_key=previous_key,
+    _recover_dashboard_state(hass)
+    config, metadata = restore_dashboard_version(
+        _dashboard_config_path(hass), hass.config.path(DASHBOARD_BASE_DIR), version,
+        configuration_path=hass.config.path("configuration.yaml"),
     )
+    if native := hass.data.get(DOMAIN, {}).get("native_dashboard"):
+        _generate_dashboard(hass, config, native.url_path, history_reason="restoration")
+        config = load_dashboard_config(_dashboard_config_path(hass))
+    planned = dashboard_identity(config)
+    key = native.url_path if native else metadata.get("dashboard_key") or planned.dashboard_key
     return {
         "restored_version": version,
-        "dashboard_key": metadata.get("dashboard_key") or planned.dashboard_key,
-        "dashboard_url": f"/{metadata.get('dashboard_key') or planned.dashboard_key}/overview",
-        "config_changed": dashboard_patch.changed,
+        "dashboard_key": key,
+        "dashboard_url": f"/{key}/{config.get('landing_page', 'overview')}",
+        "config_changed": metadata.get("config_changed", False),
     }
 
 
@@ -456,58 +467,35 @@ def _dashboard_config_path(hass: HomeAssistant, config_path: str = DEFAULT_DASHB
 
 
 def _should_repair_base_dashboard(
-    hass: HomeAssistant, registry_entities: list[dict[str, Any]]
+    hass: HomeAssistant, registry_entities: list[dict[str, Any]],
+    areas: list[dict[str, Any]] | None = None,
 ) -> bool:
     config_path = _dashboard_config_path(hass)
     if not config_path.exists():
+        identity = dashboard_identity(build_base_dashboard_config(registry_entities))
+        validate_dashboard_registration(hass.config.path("configuration.yaml"), identity.dashboard_key, identity.filename)
         return False
-
-    try:
-        config = load_dashboard_config(config_path)
-    except ValueError:
-        return False
-
-    changed = migrate_legacy_theme(config)
-    slug = make_slug(config.get("slug") or config.get("name"))
-    dashboard_dir = Path(hass.config.path(DASHBOARD_BASE_DIR)) / slug
-    if _generated_dashboard_needs_self_contained_repair(dashboard_dir):
-        try:
-            plan_dashboard(
-                config, hass.config.path(DASHBOARD_BASE_DIR), registry_entities
-            )
-        except ValueError:
-            if changed:
-                write_dashboard_config(config, config_path)
-            return False
-        if changed:
-            write_dashboard_config(config, config_path)
-        return True
-
-    if config.get("name") == BASE_DASHBOARD_NAME and config.get("slug") == BASE_DASHBOARD_SLUG:
-        rooms_path = Path(hass.config.path(DASHBOARD_BASE_DIR, BASE_DASHBOARD_SLUG, "views", "rooms"))
-        if any(
-            "template: hc_access_hold_action_card" in path.read_text(encoding="utf-8")
-            for path in rooms_path.glob("*.yaml")
-        ):
-            return True
-
-    if (
-        config.get("name") != BASE_DASHBOARD_NAME
-        or config.get("slug") != BASE_DASHBOARD_SLUG
-        or config.get("rooms") != []
-    ):
-        if changed:
-            write_dashboard_config(config, config_path)
-        return changed
-
-    refreshed = build_base_dashboard_config(registry_entities)
-    if not refreshed["rooms"]:
-        if changed:
-            write_dashboard_config(config, config_path)
-        return False
-
-    write_dashboard_config(refreshed, config_path)
-    return True
+    with DASHBOARD_WRITE_LOCK:
+        raw = load_dashboard_config(config_path)
+        config = migrate_dashboard_config(raw, registry_entities, areas)
+        migrate_legacy_theme(config)
+        identity = dashboard_identity(config)
+        existing_key = registered_dashboard_key(hass.config.path("configuration.yaml"), identity.filename)
+        if native := hass.data.get(DOMAIN, {}).get("native_dashboard"):
+            existing_key = native.url_path
+        validate_dashboard_registration(hass.config.path("configuration.yaml"), existing_key or identity.dashboard_key, identity.filename)
+        dashboard_dir = Path(hass.config.path(DASHBOARD_BASE_DIR)) / dashboard_identity(config).slug
+        manifest = dashboard_dir / MANIFEST_NAME
+        if manifest.exists():
+            _load_generation_manifest(dashboard_dir)
+        contract = json.loads(manifest.read_text()).get("generated_contract", 0) if manifest.exists() else 0
+        required = (config != raw or not dashboard_dir.exists()
+                    or contract != GENERATION_CONTRACT_VERSION
+                    or registered_dashboard_key(hass.config.path("configuration.yaml"), LEGACY_CARD_TEST_DASHBOARD_FILE) == LEGACY_CARD_TEST_DASHBOARD_KEY
+                    or _generated_dashboard_needs_self_contained_repair(dashboard_dir))
+        if required:
+            plan_dashboard(config, hass.config.path(DASHBOARD_BASE_DIR), registry_entities, dashboard_key_override=existing_key)
+        return required
 
 
 def _generated_dashboard_needs_self_contained_repair(dashboard_dir: Path) -> bool:
@@ -540,6 +528,18 @@ def _generated_dashboard_needs_self_contained_repair(dashboard_dir: Path) -> boo
     return False
 
 
+def _generate_dashboard_from_path(hass, config_path, dashboard_key, dry_run, registry_entities, areas=None):
+    """Read the selected source under the same lock as its writable generation."""
+    with DASHBOARD_WRITE_LOCK:
+        if not dry_run:
+            _recover_dashboard_state(hass)
+        return _generate_dashboard(
+            hass, load_dashboard_config(config_path), dashboard_key, dry_run,
+            registry_entities, config_path,
+            areas=areas,
+        )
+
+
 def _generate_dashboard(
     hass: HomeAssistant,
     config: dict[str, Any],
@@ -549,65 +549,128 @@ def _generate_dashboard(
     source_config_path: Path | None = None,
     history_reason: str = "generation",
     previous_dashboard_key: str | None = None,
+    areas: list[dict[str, Any]] | None = None,
+    legacy_resources: LegacyResourcePlan | None = None,
 ) -> dict[str, Any]:
     """Generate the base dashboard and install required YAML configuration."""
 
-    if registry_entities is None:
-        registry_entities = _registry_entities(hass)
-    language = getattr(hass.config, "language", None) or "en"
-    planned = plan_dashboard(
-        config,
-        hass.config.path(DASHBOARD_BASE_DIR),
-        registry_entities,
-        dashboard_key_override=dashboard_key,
-    )
-    if dry_run:
-        return {
-            "dry_run": True,
-            "dashboard_key": planned.dashboard_key,
-            "dashboard_url": f"/{planned.dashboard_key}/overview",
-            "filename": planned.filename,
-            "files": planned.files,
-            "config_changed": False,
-        }
-
-    config_path = hass.config.path("configuration.yaml")
-    generated = write_dashboard(
-        config,
-        hass.config.path(DASHBOARD_BASE_DIR),
-        registry_entities,
-        config_root=hass.config.config_dir,
-        dashboard_key_override=dashboard_key,
-        language=language,
-    )
-    dashboard_patch = patch_lovelace_dashboard(
-        config_path,
-        generated.dashboard_key,
-        generated.title,
-        generated.icon,
-        generated.filename,
-        previous_dashboard_key=previous_dashboard_key,
-    )
-    result = {
-        "dry_run": False,
-        "dashboard_key": generated.dashboard_key,
-        "dashboard_url": f"/{generated.dashboard_key}/overview",
-        "filename": generated.filename,
-        "files": generated.files,
-        "config_changed": dashboard_patch.changed,
-        "frontend_installed": False,
-        "themes_installed": False,
-    }
-    if source_config_path is not None:
-        history = snapshot_dashboard(
-            source_config_path,
-            hass.config.path(DASHBOARD_BASE_DIR),
+    with DASHBOARD_WRITE_LOCK:
+        if registry_entities is None:
+            registry_entities = _registry_entities(hass)
+        language = getattr(hass.config, "language", None) or "en"
+        base_dir = Path(hass.config.path(DASHBOARD_BASE_DIR))
+        source_config_path = source_config_path or _dashboard_config_path(hass)
+        configuration_path = Path(hass.config.path("configuration.yaml"))
+        if not dry_run:
+            _recover_dashboard_state(hass)
+        elif (base_dir / HISTORY_DIR_NAME / OPERATION_DIR_NAME / "operation.json").exists():
+            raise ValueError(RECOVERY_ERROR)
+        previous_filename = None
+        native = hass.data.get(DOMAIN, {}).get("native_dashboard")
+        if native is not None:
+            if dashboard_key is not None and dashboard_key != native.url_path:
+                raise ValueError("Keep the existing native dashboard route during migration")
+            dashboard_key = native.url_path
+        if source_config_path.exists():
+            current_identity = dashboard_identity(load_dashboard_config(source_config_path))
+            previous_filename = current_identity.filename
+            existing_key = registered_dashboard_key(configuration_path, current_identity.filename)
+            previous_dashboard_key = previous_dashboard_key or existing_key or current_identity.dashboard_key
+            if dashboard_identity(config).slug == current_identity.slug and dashboard_key is None:
+                dashboard_key = existing_key
+        config = migrate_dashboard_config(config, registry_entities, areas)
+        migrate_legacy_theme(config)
+        planned = plan_dashboard(
             config,
-            dashboard_key=generated.dashboard_key,
-            reason=history_reason,
+            hass.config.path(DASHBOARD_BASE_DIR),
+            registry_entities,
+            dashboard_key_override=dashboard_key,
         )
-        result["history_version"] = history["version"]
-    return result
+        validate_dashboard_registration(configuration_path, planned.dashboard_key, planned.filename,
+                                        previous_dashboard_key, previous_filename)
+        if dry_run:
+            return {
+                "dry_run": True,
+                "dashboard_key": planned.dashboard_key,
+                "dashboard_url": f"/{planned.dashboard_key}/{config['landing_page']}",
+                "filename": planned.filename,
+                "files": planned.files,
+                "config_changed": False,
+            }
+
+        native_plan = NativeDashboardPlan.capture(native, base_dir) if native is not None else None
+        output_dir = base_dir / planned.slug
+        theme_dir = Path(hass.config.path("themes", "MaraoDashboard"))
+        baseline = None
+        current = None
+        if source_config_path.exists():
+            current = load_dashboard_config(source_config_path)
+            previous_identity = dashboard_identity(current, previous_dashboard_key)
+            previous_dashboard_key = previous_dashboard_key or previous_identity.dashboard_key
+            baseline = snapshot_dashboard(
+                source_config_path, base_dir, current,
+                dashboard_key=previous_identity.dashboard_key, reason="before generation",
+            )
+        owned_plans = [plan for plan in (legacy_resources, native_plan) if plan is not None]
+        def commit_owned():
+            for plan in owned_plans:
+                plan.commit_from_thread()
+        def restore_owned():
+            for plan in owned_plans:
+                plan.restore_from_thread()
+        with dashboard_operation(
+            base_dir, source_config_path, [output_dir, theme_dir], configuration_path,
+            baseline_version=baseline["version"] if baseline else None,
+            owned_files=tuple(plan.path for plan in owned_plans),
+            before_source_commit=commit_owned if owned_plans else None,
+            restore_callback=restore_owned if owned_plans else None,
+        ) as stage:
+            render_base = stage[output_dir].parent / "render"
+            render_base.mkdir()
+            rendered_dir = render_base / planned.slug
+            if stage[output_dir].exists():
+                stage[output_dir].rename(rendered_dir)
+            generated = write_dashboard(
+                config, render_base, registry_entities,
+                config_root=hass.config.config_dir,
+                dashboard_key_override=dashboard_key, language=language,
+            )
+            if native_plan:
+                native_plan.stage(staged_native_dashboard(rendered_dir, output_dir))
+                stage[native_plan.path].write_bytes(native_plan.content)
+            rendered_dir.rename(stage[output_dir])
+            dashboard_patch = None if native is not None else patch_lovelace_dashboard(
+                stage[configuration_path], generated.dashboard_key, generated.title,
+                generated.icon, generated.filename,
+                previous_dashboard_key=previous_dashboard_key,
+                previous_filename=previous_filename,
+            )
+            themes_installed = _install_themes(hass, stage[theme_dir])
+            frontend_patch = patch_frontend_themes(stage[configuration_path], "themes", None, [LEGACY_FRONTEND_MODULE])
+            legacy_gallery = remove_lovelace_dashboard(
+                stage[configuration_path], LEGACY_CARD_TEST_DASHBOARD_KEY, LEGACY_CARD_TEST_DASHBOARD_FILE,
+            )
+            if legacy_resources:
+                stage[legacy_resources.path].write_bytes(legacy_resources.content)
+            if current != config:
+                write_dashboard_config(config, stage[source_config_path])
+        history = snapshot_dashboard(
+            source_config_path, base_dir, config,
+            dashboard_key=generated.dashboard_key, reason=history_reason,
+        )
+        return {
+            "dry_run": False,
+            "dashboard_key": generated.dashboard_key,
+            "dashboard_url": f"/{generated.dashboard_key}/{config['landing_page']}",
+            "filename": generated.filename,
+            "files": planned.files,
+            "config_changed": bool(dashboard_patch and dashboard_patch.changed) or frontend_patch.changed or legacy_gallery.changed,
+            "legacy_gallery_removed": legacy_gallery.changed,
+            "frontend_installed": False,
+            "themes_installed": themes_installed,
+            "history_version": history["version"],
+            "config": json.dumps(config, indent=2, ensure_ascii=False) + "\n",
+        }
 
 
 async def _async_register_static_path(hass: HomeAssistant) -> None:
@@ -627,14 +690,28 @@ async def _async_register_static_path(hass: HomeAssistant) -> None:
     hass.data[DOMAIN][STATIC_PATH_REGISTERED] = True
 
 
-def _install_themes(hass: HomeAssistant) -> bool:
+def _install_themes(hass: HomeAssistant, target_dir: Path | None = None, legacy_resources: LegacyResourcePlan | None = None) -> bool:
     """Install bundled Marao Dashboard themes into Home Assistant's standard themes folder."""
 
     source_dir = Path(__file__).parent / "frontend" / "themes" / "MaraoDashboard"
     if not source_dir.exists():
         return False
 
-    target_dir = Path(hass.config.path("themes", "MaraoDashboard"))
+    if target_dir is None:
+        _recover_dashboard_state(hass)
+        target_dir = Path(hass.config.path("themes", "MaraoDashboard"))
+        configuration = Path(hass.config.path("configuration.yaml"))
+        with dashboard_operation(
+            hass.config.path(DASHBOARD_BASE_DIR), _dashboard_config_path(hass), [target_dir], configuration,
+            owned_files=(legacy_resources.path,) if legacy_resources else (),
+            before_source_commit=legacy_resources.commit_from_thread if legacy_resources else None,
+            restore_callback=legacy_resources.restore_from_thread if legacy_resources else None,
+        ) as stage:
+            installed = _install_themes(hass, stage[target_dir])
+            patched = patch_frontend_themes(stage[configuration], "themes", None, [LEGACY_FRONTEND_MODULE])
+            if legacy_resources:
+                stage[legacy_resources.path].write_bytes(legacy_resources.content)
+        return installed or patched.changed
     changed = False
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -675,6 +752,7 @@ def _registry_entities(hass: HomeAssistant) -> list[dict[str, Any]]:
                 "name": entry.name or entry.original_name or (state.name if state else None),
                 "icon": entry.icon or (state.attributes.get("icon") if state else None),
                 "device_class": state.attributes.get("device_class") if state else None,
+                "unit_of_measurement": state.attributes.get("unit_of_measurement") if state else None,
                 "supported_features": state.attributes.get("supported_features") if state else None,
                 "device_model": device.model if device else None,
                 "manufacturer": device.manufacturer if device else None,
@@ -699,6 +777,7 @@ def _registry_entities(hass: HomeAssistant) -> list[dict[str, Any]]:
                 "name": state.name,
                 "icon": state.attributes.get("icon"),
                 "device_class": state.attributes.get("device_class"),
+                "unit_of_measurement": state.attributes.get("unit_of_measurement"),
                 "supported_features": state.attributes.get("supported_features"),
                 "device_model": None,
                 "manufacturer": None,

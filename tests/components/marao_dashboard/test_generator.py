@@ -6,17 +6,65 @@ from pathlib import Path
 import pytest
 import yaml
 
+from custom_components.marao_dashboard import generator
 from custom_components.marao_dashboard.generator import (
+    DASHBOARD_CONFIG_VERSION,
     MaraoDashboardLoader,
     build_base_dashboard_config,
     ensure_dashboard_config,
     load_dashboard_config,
     make_slug,
+    migrate_dashboard_config,
     migrate_legacy_theme,
     resolve_dashboard_config,
+    plan_dashboard,
     write_dashboard,
+    write_dashboard_config,
 )
 
+
+
+def _room_pages(config):
+    return [page for page in config["pages"] if page.get("output_path", "").startswith("views/rooms/")]
+
+
+def _room(config, index=0):
+    page = _room_pages(config)[index]
+    content = page.get("_sections", page["sections"])[-1]
+    groups = {}
+    for card in content.get("ordered_cards", []):
+        domain = "entity_group" if card.get("template") == "hc_entity_group_card" else "navigation" if card.get("page") else card["entity_id"].split(".")[0]
+        groups.setdefault(domain, []).append(card)
+    return {**page, **content, "entities_by_domain": groups}
+
+
+def _home_groups(config):
+    return [card for section in config["pages"][0].get("_sections", config["pages"][0]["sections"]) for card in section.get("ordered_cards", section.get("entities", [])) if card.get("template") == "hc_entity_group_card"]
+
+
+def _load_view(path):
+    view = yaml.load(path.read_text(), Loader=MaraoDashboardLoader)
+    root = next(parent for parent in path.parents if (parent / "dashboard.yaml").exists())
+    def expand(value):
+        if isinstance(value, generator.TaggedScalar):
+            relative = value.value.split(str(root.name) + "/", 1)[1]
+            return yaml.load((root / relative).read_text(), Loader=MaraoDashboardLoader)
+        if isinstance(value, dict):
+            return {key: expand(child) for key, child in value.items()}
+        if isinstance(value, list):
+            return [expand(child) for child in value]
+        return value
+    return expand(view)
+
+
+def _view_source(path):
+    source = path.read_text(encoding="utf-8")
+    root = next(parent for parent in path.parents if (parent / "dashboard.yaml").exists())
+    view = yaml.load(source, Loader=MaraoDashboardLoader)
+    for card in view["cards"]:
+        if isinstance(card, generator.TaggedScalar) and "/components/popups/" in card.value:
+            source += (root / "components/popups" / card.value.rsplit("/", 1)[1]).read_text()
+    return source
 
 def test_slug_generation() -> None:
     assert make_slug("Sala e Cozinha") == "sala-e-cozinha"
@@ -24,7 +72,40 @@ def test_slug_generation() -> None:
     assert make_slug("") == "dashboard"
 
 
-def test_hybrid_area_and_explicit_entities() -> None:
+@pytest.mark.parametrize("icon", [None, "", "mdi:palette", "marao_dashboard:back"])
+def test_dashboard_brand_default_preserves_explicit_icons(icon: str | None) -> None:
+    config = {"name": "Brand", "rooms": []}
+    if icon is not None:
+        config["icon"] = icon
+    assert generator.normalize_config(config)["icon"] == (icon or "marao_dashboard:mountain")
+    assert build_base_dashboard_config([])["icon"] == "marao_dashboard:mountain"
+
+
+def test_json_replace_failure_retains_source_and_cleans_temporary_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "dashboard.json"
+    source = b'{"name":"Before", "rooms":[]}\n'
+    path.write_bytes(source)
+    path.chmod(0o600)
+    replace = Path.replace
+
+    def fail_replace(temporary: Path, target: Path) -> Path:
+        if target == path:
+            raise OSError("Injected replace failure")
+        return replace(temporary, target)
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    with pytest.raises(OSError, match="replace failure"):
+        write_dashboard_config({"name": "After", "rooms": []}, path)
+    assert path.read_bytes() == source
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert list(tmp_path.iterdir()) == [path]
+    monkeypatch.setattr(Path, "replace", replace)
+    write_dashboard_config({"name": "After", "rooms": []}, path)
+    assert json.loads(path.read_bytes())["name"] == "After"
+    assert path.stat().st_mode & 0o777 == 0o600
+
+
+def test_legacy_explicit_entities_win_over_area_expansion() -> None:
     config = {
         "name": "BD Mobile",
         "rooms": [
@@ -54,12 +135,115 @@ def test_hybrid_area_and_explicit_entities() -> None:
     ]
 
     resolved = resolve_dashboard_config(config, registry)
-    room = resolved["rooms"][0]
+    room = _room(resolved)
     lights = room["entities_by_domain"]["light"]
 
-    assert [entity["entity_id"] for entity in lights] == ["light.area_lamp", "light.manual_lamp"]
-    assert lights[0]["name"] == "Area Lamp Override"
-    assert room["entities_by_domain"]["cover"][0]["entity_id"] == "cover.window"
+    assert [entity["entity_id"] for entity in lights] == ["light.manual_lamp"]
+    assert lights[0]["name"] == "Manual Lamp"
+    assert "cover" not in room["entities_by_domain"]
+
+
+@pytest.mark.parametrize("selection", [[], {}, None])
+def test_explicit_empty_rooms_do_not_import_area(selection):
+    source = {"name": "Independent", "rooms": [{"name": "Empty", "area": "kitchen", "entities": selection}]}
+    converted = migrate_dashboard_config(source, [{"entity_id": "light.new", "area_id": "kitchen", "has_state": True}])
+    assert converted["config_version"] == 2
+    assert _room(resolve_dashboard_config(converted))["ordered_cards"] == []
+    assert converted == migrate_dashboard_config(converted)
+    assert source["rooms"][0]["entities"] == selection
+
+
+def test_legacy_area_snapshot_uses_effective_area_and_eligible_live_entities():
+    registry = [
+        {"entity_id": "light.selected", "area_id": "kitchen", "area_name": "Kitchen", "has_state": True},
+        {"entity_id": "light.device", "device_area_id": "kitchen", "has_state": True},
+        {"entity_id": "light.elsewhere", "area_id": "office", "device_area_id": "kitchen", "has_state": True},
+        {"entity_id": "light.hidden", "area_id": "kitchen", "hidden_by": "user", "has_state": True},
+        {"entity_id": "light.disabled", "area_id": "kitchen", "disabled_by": "user", "has_state": True},
+        {"entity_id": "light.absent", "area_id": "kitchen", "has_state": False},
+        {"entity_id": "automation.unsupported", "area_id": "kitchen", "has_state": True},
+    ]
+    source = {"name": "Independent", "rooms": [{"name": "Room", "area": "KITCHEN"}]}
+    converted = migrate_dashboard_config(source, registry)
+    assert {key: _room(converted)[key] for key in ("name", "area", "entities")} == {"name": "Room", "area": "kitchen", "entities": ["light.selected", "light.device"]}
+    assert "entities" not in source["rooms"][0]
+    assert migrate_dashboard_config(converted, []) == converted
+    changed_registry = [{"entity_id": "light.new", "area_id": "kitchen", "has_state": True}]
+    assert [entry["entity_id"] for entry in _room(resolve_dashboard_config(converted, changed_registry))["ordered_cards"]] == ["light.selected", "light.device"]
+
+
+@pytest.mark.parametrize("registry,areas", [
+    (None, [{"area_id": "kitchen", "name": "Kitchen"}]),
+    ([], None),
+    ([], [{"area_id": "a", "name": "Kitchen"}, {"area_id": "b", "name": "Kitchen"}]),
+    ([{"entity_id": "light.unknown", "area_id": "kitchen", "area_name": "Kitchen"}], None),
+])
+def test_unresolvable_legacy_area_preserves_source(registry, areas):
+    source = {"name": "Independent", "rooms": [{"name": "Room", "area": "Kitchen"}]}
+    original = json.dumps(source)
+    with pytest.raises(ValueError, match="Cannot import legacy room"):
+        migrate_dashboard_config(source, registry, areas)
+    assert json.dumps(source) == original
+
+
+def test_known_empty_area_is_an_explicit_empty_snapshot():
+    converted = migrate_dashboard_config({"name": "Independent", "rooms": [{"name": "Empty", "area": "Kitchen"}]}, [], [{"area_id": "kitchen", "name": "Kitchen"}])
+    assert {key: _room(converted)[key] for key in ("name", "area", "entities")} == {"name": "Empty", "area": "kitchen", "entities": []}
+
+
+def test_conversion_folds_instructions_preserving_order_options_and_raw_content():
+    raw = {"type": "markdown", "content": "Protected", "extension": {"keep": [2, 1]}}
+    source = {"name": "Independent", "pages": {"media": {}}, "extension": {"keep": True}, "rooms": [{
+        "name": "Room", "area": "obsolete", "columns": 2,
+        "entities": ["light.remove", {"page": "media", "name": "Shortcut"}, {"entity_id": "sensor.keep", "template": "hc_graph_card", "variables": {"display_precision": 2}, "unknown": [2, 1]}],
+        "include": {"light": [{"entity_id": "light.add", "name": "Added"}]},
+        "exclude": ["light.remove"], "overrides": {"sensor.keep": {"icon": "mdi:chart-line"}}, "cards": [raw],
+    }]}
+    converted = migrate_dashboard_config(source)
+    room = _room(converted)
+    assert room["entities"] == [source["rooms"][0]["entities"][1], {**source["rooms"][0]["entities"][2], "icon": "mdi:chart-line"}, {"entity_id": "light.add", "name": "Added"}]
+    assert not any(key in room for key in ("include", "exclude", "overrides"))
+    assert room["cards"] == [raw] and room["columns"] == 2 and room["area"] == "obsolete"
+    assert converted["extension"] == source["extension"]
+    assert migrate_dashboard_config(converted) == converted
+    assert "include" in source["rooms"][0]
+
+
+@pytest.mark.parametrize("instruction", ["include", "exclude", "overrides"])
+def test_current_format_rejects_reintroduced_room_instructions(instruction):
+    with pytest.raises(ValueError, match="explicit entities"):
+        resolve_dashboard_config({"name": "Independent", "config_version": 1, "rooms": [{"name": "Room", instruction: []}]})
+
+
+def test_current_missing_selection_is_empty_and_metadata_cannot_add_members():
+    source = {"name": "Independent", "config_version": 1, "rooms": [{"name": "Room", "area": "kitchen"}]}
+    assert _room(migrate_dashboard_config(source))["entities"] == []
+    assert _room(resolve_dashboard_config(source, [{"entity_id": "light.new", "area_id": "kitchen", "has_state": True}]))["ordered_cards"] == []
+    source["rooms"][0]["entities"] = ["climate.selected"]
+    selected = _room(resolve_dashboard_config(source, [{"entity_id": "climate.selected", "name": "Thermostat", "supported_features": 3}]))["ordered_cards"][0]
+    assert selected["name"] == "Thermostat" and selected["supported_features"] == 3
+
+
+@pytest.mark.parametrize("selection", ["light.selected", {"entity_id": "light.selected", "name": "Chosen"}, {"light": ["light.selected"]}])
+def test_explicit_string_object_and_grouped_shapes_resolve_without_discovery(selection):
+    source = {"name": "Independent", "config_version": 1, "rooms": [{"name": "Room", "area": "office", "entities": selection}]}
+    registry = [{"entity_id": "light.other", "area_id": "office", "has_state": True}]
+    assert [item["entity_id"] for item in _room(resolve_dashboard_config(source, registry))["ordered_cards"]] == ["light.selected"]
+    assert _room(migrate_dashboard_config(source))["entities"] == selection
+
+
+@pytest.mark.parametrize("removed", ["light.selected", "cover.selected", "climate.selected", "camera.selected", "lock.selected", "media_player.selected"])
+def test_deletion_reaches_generated_rooms_overview_and_derived_security_media(tmp_path, removed):
+    members = ["light.selected", "cover.selected", "climate.selected", "camera.selected", "lock.selected", "media_player.selected"]
+    config = {"name": "Independent", "config_version": 1, "rooms": [{"name": "Room", "area": "office", "entities": [identifier for identifier in members if identifier != removed]}]}
+    registry = [{"entity_id": identifier, "area_id": "office", "has_state": True} for identifier in members]
+    generated = write_dashboard(config, tmp_path, registry)
+    source = '\n'.join(path.read_text() for path in (tmp_path / generated.slug).rglob('*.yaml'))
+    assert removed not in source
+    for identifier in members:
+        if identifier != removed:
+            assert identifier in source
+    assert config["rooms"][0]["area"] == "office"
 
 
 def test_write_dashboard_files_without_helper_entities(tmp_path: Path) -> None:
@@ -97,6 +281,11 @@ def test_write_dashboard_files_without_helper_entities(tmp_path: Path) -> None:
     assert "light_entities:" in rooms_view
     assert "- light.office_main" in rooms_view
     assert "- light.office_desk" in rooms_view
+    shortcuts = yaml.load(rooms_view, Loader=MaraoDashboardLoader)["cards"][0]["cards"]
+    assert shortcuts[0]["variables"]["light_entities"] == ["light.office_main", "light.office_desk"]
+    assert shortcuts[0]["tap_action"] == {
+        "action": "navigate", "navigation_path": "/marao-generated-test/room-office", "haptic": "heavy"
+    }
 
 
 def test_cases_use_normal_custom_page_cards_and_one_navbar(tmp_path: Path) -> None:
@@ -171,6 +360,109 @@ def test_dashboard_json_loader_rejects_non_object(tmp_path: Path) -> None:
         load_dashboard_config(config_path)
 
 
+@pytest.mark.parametrize("version", [None, True, False, -1, 0.5, "0", [], {}, 3])
+def test_incompatible_format_leaves_source_and_output_untouched(
+    tmp_path: Path, version: object
+) -> None:
+    config = {"name": "Saved", "config_version": version, "rooms": []}
+    source = tmp_path / "dashboard.json"
+    original = json.dumps(config).encode()
+    source.write_bytes(original)
+    output = tmp_path / "generated"
+    output.mkdir()
+    sentinel = output / "custom.yaml"
+    sentinel.write_text("preserved", encoding="utf-8")
+
+    for operation in (
+        lambda: load_dashboard_config(source),
+        lambda: ensure_dashboard_config(source, []),
+        lambda: migrate_dashboard_config(config),
+        lambda: plan_dashboard(config, output),
+        lambda: write_dashboard(config, output),
+        lambda: write_dashboard_config(config, source),
+        lambda: write_dashboard_config(config, tmp_path / "absent" / "source.json"),
+    ):
+        with pytest.raises(ValueError, match="config_version"):
+            operation()
+        assert source.read_bytes() == original
+        assert sentinel.read_text(encoding="utf-8") == "preserved"
+        assert list(output.iterdir()) == [sentinel]
+        assert not (tmp_path / "absent").exists()
+
+
+@pytest.mark.parametrize("marker", [{"config_version": 2, "landing_page": "empty", "pages": [{"name": "Empty", "path": "empty", "entities": []}]}])
+def test_current_format_is_a_private_idempotent_copy_without_source_writes(
+    tmp_path: Path, marker: dict
+) -> None:
+    config = {
+        "name": "Saved",
+        "extension": {"ordered": ["second", "first"], "raw": {"custom": True}},
+        **marker,
+    }
+    source = tmp_path / "dashboard.json"
+    original = json.dumps(config, separators=(",", ":")).encode() + b"  \n"
+    source.write_bytes(original)
+    converted = migrate_dashboard_config(config)
+    assert converted == config == migrate_dashboard_config(converted)
+    converted["extension"]["ordered"].append("changed")
+    assert config["extension"]["ordered"] == ["second", "first"]
+    assert ensure_dashboard_config(source, []) == config
+    plan_dashboard(config, tmp_path / "generated")
+    assert source.read_bytes() == original
+    assert not (tmp_path / "generated").exists()
+
+
+def test_atomic_write_flushes_new_directory_ancestors(tmp_path, monkeypatch):
+    directories = []
+    sync = generator._fsync_directory
+    def record(path):
+        directories.append(path)
+        sync(path)
+    monkeypatch.setattr(generator, "_fsync_directory", record)
+    target = tmp_path / "new" / "nested" / "source.json"
+    generator._write_bytes(target, b"exact\r\n")
+    assert target.read_bytes() == b"exact\r\n"
+    assert directories == [target.parent, target.parent.parent, tmp_path]
+
+
+def test_ordered_conversion_covers_skipped_steps_and_failure_copy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def first(config: dict, registry, areas) -> None:
+        assert config.get("config_version", 0) == 0
+        config["extension"]["steps"].append("first")
+
+    def second(config: dict, registry, areas) -> None:
+        assert config["config_version"] == 1
+        config["extension"]["steps"].append("second")
+        config.update(landing_page="empty", pages=[{"name": "Empty", "path": "empty"}])
+
+    monkeypatch.setattr(generator, "DASHBOARD_CONFIG_MIGRATIONS", (first, second))
+    monkeypatch.setattr(generator, "DASHBOARD_CONFIG_VERSION", 2)
+    source = {"name": "Saved", "extension": {"steps": []}}
+    expected = {
+        "name": "Saved", "config_version": 2,
+        "extension": {"steps": ["first", "second"]},
+        "landing_page": "empty", "pages": [{"name": "Empty", "path": "empty"}],
+    }
+    assert migrate_dashboard_config(source) == expected
+    assert migrate_dashboard_config(expected) == expected
+    assert migrate_dashboard_config({
+        "name": "Saved", "config_version": 1,
+        "extension": {"steps": ["first"]},
+    }) == expected
+    assert source == {"name": "Saved", "extension": {"steps": []}}
+
+    def failing(config: dict, registry, areas) -> None:
+        config["extension"]["steps"].append("failed")
+        raise ValueError("conversion failed")
+
+    monkeypatch.setattr(generator, "DASHBOARD_CONFIG_MIGRATIONS", (first, failing))
+    with pytest.raises(ValueError, match="conversion failed"):
+        migrate_dashboard_config(source)
+    assert source == {"name": "Saved", "extension": {"steps": []}}
+
+
 def test_missing_dashboard_json_creates_starter_config(tmp_path: Path) -> None:
     config_path = tmp_path / "dashboard.json"
 
@@ -187,8 +479,9 @@ def test_missing_dashboard_json_creates_starter_config(tmp_path: Path) -> None:
     )
 
     assert config_path.exists()
-    assert config["rooms"][0]["name"] == "Kitchen"
-    assert load_dashboard_config(config_path)["rooms"][0]["entities"]["light"][0][
+    assert config["config_version"] == DASHBOARD_CONFIG_VERSION == 2
+    assert _room(config)["name"] == "Kitchen"
+    assert _room(load_dashboard_config(config_path))["entities"]["light"][0][
         "entity_id"
     ] == "light.kitchen_main"
 
@@ -209,7 +502,7 @@ def test_room_cards_are_appended_to_generated_room_view(tmp_path: Path) -> None:
     )
 
     room_view = tmp_path / generated.slug / "views/rooms/00-office.yaml"
-    source = room_view.read_text(encoding="utf-8")
+    source = _view_source(room_view)
 
     assert "type: markdown" in source
     assert "Raw room card" in source
@@ -484,11 +777,11 @@ def test_room_climate_card_opens_generated_mode_popup(tmp_path: Path) -> None:
     )
 
     room_view = tmp_path / generated.slug / "views/rooms/00-office.yaml"
-    source = room_view.read_text(encoding="utf-8")
+    source = _view_source(room_view)
 
-    assert "mode_selector_hash: '#climate-mode-climate-office'" in source
+    assert "mode_selector_hash: '#page-room-office-card-2-modes'" in source
     assert "type: custom:marao-popup-card" in source
-    assert "hash: '#climate-mode-climate-office'" in source
+    assert "hash: '#page-room-office-card-2-modes'" in source
     assert "show_mode_buttons: true" in source
     assert source.index("# marao:custom:start") < source.index("components/navigation/navbar.yaml")
 
@@ -549,14 +842,14 @@ def test_room_access_cards_open_generated_action_popups(tmp_path: Path) -> None:
     )
 
     room_view = tmp_path / generated.slug / "views/rooms/00-office.yaml"
-    source = room_view.read_text(encoding="utf-8")
+    source = _view_source(room_view)
 
     assert source.count("template: hc_access_card") == 2
     assert "template: hc_cover_card" in source
-    assert "popup_hash: '#access-lock-front-door'" in source
-    assert "popup_hash: '#access-cover-garage-door'" in source
-    assert "hash: '#access-lock-front-door'" in source
-    assert "hash: '#access-cover-garage-door'" in source
+    assert "popup_hash: '#page-room-office-card-2-popup'" in source
+    assert "popup_hash: '#page-room-office-card-3-popup'" in source
+    assert "hash: '#page-room-office-card-2-popup'" in source
+    assert "hash: '#page-room-office-card-3-popup'" in source
     assert "action_service: lock.unlock" in source
     assert "action_service: lock.lock" in source
     assert "action_service: cover.open_cover" in source
@@ -619,15 +912,13 @@ def test_room_media_card_opens_generated_apple_tv_remote_popup(tmp_path: Path) -
         tmp_path,
     )
 
-    source = (tmp_path / generated.slug / "views/rooms/00-living-room.yaml").read_text(
-        encoding="utf-8"
-    )
-    view = yaml.load(source, Loader=MaraoDashboardLoader)
-    popup = next(card for card in view["cards"] if card.get("hash") == "#media-media-player-living-room-tv")
+    source = _view_source(tmp_path / generated.slug / "views/rooms/00-living-room.yaml")
+    view = _load_view(tmp_path / generated.slug / "views/rooms/00-living-room.yaml")
+    popup = next(card for card in view["cards"] if card.get("hash") == "#page-room-living-room-card-2-popup")
     app_grid = next(card for card in popup["cards"] if card.get("cards", [{}])[0].get("template") == "hc_media_app_card")
 
-    assert "popup_hash: '#media-media-player-living-room-tv'" in source
-    assert "hash: '#media-media-player-living-room-tv'" in source
+    assert "popup_hash: '#page-room-living-room-card-2-popup'" in source
+    assert "hash: '#page-room-living-room-card-2-popup'" in source
     assert "template: hc_media_app_card" in source
     assert "app_source: YouTube" in source
     assert "command: top_menu" in source
@@ -648,10 +939,7 @@ def test_media_page_exposes_every_configured_player_and_its_popup(tmp_path: Path
         {"name": "Generated Test", "pages": {"media": {"players": players}}},
         tmp_path,
     )
-    view = yaml.load(
-        (tmp_path / generated.slug / "views/main/05-media.yaml").read_text(encoding="utf-8"),
-        Loader=MaraoDashboardLoader,
-    )
+    view = _load_view(tmp_path / generated.slug / "views/main/05-media.yaml")
     controls = [card for card in view["cards"] if isinstance(card, dict) and card.get("template") == "hc_media_card"]
     assert [card["entity"] for card in controls] == [player["entity_id"] for player in players]
     popups = {card["hash"] for card in view["cards"] if isinstance(card, dict) and card.get("type") == "custom:marao-popup-card"}
@@ -685,13 +973,11 @@ def test_room_camera_card_opens_generated_frigate_events_popup(tmp_path: Path) -
         language="pt",
     )
 
-    source = (tmp_path / generated.slug / "views/rooms/00-garden.yaml").read_text(
-        encoding="utf-8"
-    )
+    source = _view_source(tmp_path / generated.slug / "views/rooms/00-garden.yaml")
 
     assert "template: hc_camera_card" in source
-    assert "popup_hash: '#camera-camera-front-door'" in source
-    assert "hash: '#camera-camera-front-door'" in source
+    assert "popup_hash: '#page-room-garden-card-2-popup'" in source
+    assert "hash: '#page-room-garden-card-2-popup'" in source
     assert "type: custom:marao-camera-events-card" in source
     assert "entity: camera.front_door" in source
     assert "title: Eventos" in source
@@ -726,9 +1012,7 @@ def test_room_camera_card_forwards_unifi_protect_event_source(tmp_path: Path) ->
         tmp_path,
     )
 
-    source = (tmp_path / generated.slug / "views/rooms/00-garden.yaml").read_text(
-        encoding="utf-8"
-    )
+    source = _view_source(tmp_path / generated.slug / "views/rooms/00-garden.yaml")
 
     assert "template: hc_camera_card" in source
     assert "type: custom:marao-camera-events-card" in source
@@ -807,7 +1091,7 @@ def test_generates_configured_julian_pages_and_derived_overview_popups(tmp_path:
     assert overview.index("#overview-lights") < overview.index("#overview-blinds")
     assert overview.index("#overview-blinds") < overview.index("#overview-climate")
     lights_config = yaml.load(lights, Loader=MaraoDashboardLoader)
-    light_cards = lights_config["cards"][0]["cards"]
+    light_cards = lights_config["cards"]
     assert [card["entity"] for card in light_cards] == ["light.living_room_main"]
     assert all(card["type"] == "custom:marao-card" for card in light_cards)
     assert "cover.living_room_blind" in covers
@@ -817,6 +1101,8 @@ def test_generates_configured_julian_pages_and_derived_overview_popups(tmp_path:
     assert "alarm_control_panel.home" in (root / "views/main/01-security.yaml").read_text(encoding="utf-8")
     assert "lock.front_door" in (root / "views/main/01-security.yaml").read_text(encoding="utf-8")
     assert "sensor.house_power" in (root / "views/main/03-energy.yaml").read_text(encoding="utf-8")
+    energy = yaml.load((root / "views/main/03-energy.yaml").read_text(encoding="utf-8"), Loader=MaraoDashboardLoader)
+    assert [card["entity"] for card in energy["cards"] if isinstance(card, dict) and card.get("type") == "custom:marao-energy-period-card"] == ["sensor.month_energy", "sensor.month_cost"]
     assert (root / "components/popups/energy_house_power.yaml").exists()
     wallbox = (root / "views/main/04-wallbox.yaml").read_text(encoding="utf-8")
     assert "template: hc_wallbox_current_card" in wallbox
@@ -1037,11 +1323,13 @@ def test_build_base_dashboard_config_groups_enabled_area_entities() -> None:
 
     assert config["name"] == "Marao Dashboard"
     assert config["slug"] == "dashboard"
-    assert config["overview"] == {"weather_entity": "weather.home"}
-    assert [room["name"] for room in config["rooms"]] == ["Kitchen", "Office"]
-    assert config["rooms"][0]["entities"]["light"][0]["entity_id"] == "light.kitchen_main"
-    assert config["rooms"][0]["entities"]["sensor"][0]["device_class"] == "battery"
-    assert config["rooms"][1]["entities"]["switch"][0]["entity_id"] == "switch.office_plug"
+    assert config["pages"][0]["sections"][0]["entities"][0]["entity_id"] == "weather.home"
+    assert [group["entity_type"] for group in _home_groups(config)] == ["light", "battery"]
+    assert _home_groups(config)[0]["popup_filter"] == "active"
+    assert [room["name"] for room in _room_pages(config)] == ["Kitchen", "Office"]
+    assert _room(config, 0)["entities"]["light"][0]["entity_id"] == "light.kitchen_main"
+    assert _room(config, 0)["entities"]["sensor"][0]["device_class"] == "battery"
+    assert _room(config, 1)["entities"]["switch"][0]["entity_id"] == "switch.office_plug"
 
 
 def test_build_base_dashboard_config_skips_unsupported_disabled_hidden() -> None:
@@ -1078,13 +1366,13 @@ def test_build_base_dashboard_config_skips_unsupported_disabled_hidden() -> None
         ]
     )
 
-    assert config["overview"] == {}
-    assert [room["name"] for room in config["rooms"]] == ["Home"]
-    assert config["rooms"][0]["entities"]["sensor"][0]["entity_id"] == "sensor.unassigned"
-    assert len(config["rooms"][0]["entities"]["sensor"]) == 1
+    assert config["pages"][0]["sections"] == []
+    assert [room["name"] for room in _room_pages(config)] == ["Home"]
+    assert _room(config, 0)["entities"]["sensor"][0]["entity_id"] == "sensor.unassigned"
+    assert len(_room(config, 0)["entities"]["sensor"]) == 1
 
 
-def test_existing_empty_base_dashboard_config_refreshes_when_entities_exist(tmp_path: Path) -> None:
+def test_existing_empty_base_dashboard_config_is_not_repopulated(tmp_path: Path) -> None:
     config_path = tmp_path / "dashboard.json"
     config_path.write_text(
         '{"name":"Marao Dashboard","slug":"dashboard","rooms":[]}\n',
@@ -1096,10 +1384,8 @@ def test_existing_empty_base_dashboard_config_refreshes_when_entities_exist(tmp_
         [{"entity_id": "light.unassigned", "name": "Unassigned Lamp"}],
     )
 
-    assert [room["name"] for room in config["rooms"]] == ["Home"]
-    assert json.loads(config_path.read_text(encoding="utf-8"))["rooms"][0]["entities"]["light"][
-        0
-    ]["entity_id"] == "light.unassigned"
+    assert _room_pages(config) == []
+    assert config_path.read_text() == '{"name":"Marao Dashboard","slug":"dashboard","rooms":[]}\n'
 
 
 def test_legacy_theme_names_migrate_to_single_theme() -> None:
@@ -1153,12 +1439,294 @@ def test_security_page_access_actions_reuse_safe_controls_and_unique_popups(tmp_
         },
         tmp_path,
     )
-    source = (tmp_path / generated.slug / "views/main/01-security.yaml").read_text(encoding="utf-8")
-    assert source.count("hash: '#access-lock-front-door'") == 3  # Two triggers, one popup.
-    assert source.count("hash: '#access-cover-garage-door'") == 2
+    source = _view_source(tmp_path / generated.slug / "views/main/01-security.yaml")
+    assert source.count("hash: '#page-security-card-1-popup'") == 2
+    assert source.count("hash: '#page-security-card-2-popup'") == 2  # Duplicate controls own independent sheets.
+    assert source.count("hash: '#page-security-card-3-popup'") == 2
     assert "#access-cover-gate" not in source  # Open-only gate uses a direct strict slide.
-    assert source.count("template: hc_access_slide_action_card") == 3
-    assert source.count("template: hc_access_action_card") == 2
+    assert source.count("template: hc_access_slide_action_card") == 4
+    assert source.count("template: hc_access_action_card") == 3
+    assert "template: hc_access_hold_action_card" in source
     assert source.count("action: toggle") == 1  # Only the ordinary switch.
     for service in ["lock.unlock", "lock.lock", "cover.open_cover", "cover.close_cover"]:
         assert f"action_service: {service}" in source
+
+@pytest.mark.parametrize("precision", [False, True, "0", 1.5, None, -1, 7])
+def test_energy_precision_rejected_before_output(tmp_path: Path, precision: object) -> None:
+    config = {"name": "Energy", "rooms": [], "pages": {"energy": {
+        "today_energy": {"entity_id": "sensor.energy", "variables": {"display_precision": precision}},
+    }}}
+    with pytest.raises(ValueError, match="display_precision"):
+        write_dashboard(config, tmp_path)
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("source,target,accepted", [
+    ("W", "kW", True), ("mW", "MW", True), ("J", "Wh", True),
+    ("kWh", "GJ", True), ("Wh", "kW", False), ("EUR", "Wh", False),
+    (None, "kWh", False), ("W", "kw", False), ("W", None, False),
+])
+def test_energy_conversion_uses_actual_metadata(source: str | None, target: str | None, accepted: bool) -> None:
+    config = {"name": "Energy", "rooms": [{"name": "Room", "entities": [
+        {"entity_id": "sensor.energy", "unit_of_measurement": "kWh", "variables": {"display_unit": target}},
+    ]}]}
+    registry = [{"entity_id": "sensor.energy", "unit_of_measurement": source}]
+    if not accepted:
+        with pytest.raises(ValueError, match="display_unit"):
+            resolve_dashboard_config(config, registry)
+    else:
+        resolved = resolve_dashboard_config(config, registry)
+        assert _room(resolved)["entities_by_domain"]["sensor"][0]["unit_of_measurement"] == source
+        assert config["rooms"][0]["entities"][0]["unit_of_measurement"] == "kWh"
+
+
+def test_energy_formatting_generation_and_independent_graph_sources(tmp_path: Path) -> None:
+    variables = {"display_unit": "kWh", "display_precision": 0, "retained": "option"}
+    config = {"name": "Energy", "rooms": [], "pages": {"energy": {
+        "today_energy": {"entity_id": "sensor.energy", "variables": variables},
+        "loads": [{"name": "Load", "power_entity": {"entity_id": "sensor.power", "variables": {
+            "display_unit": "kW", "display_precision": 6}}, "variables": {"show_icon": False}}],
+    }, "custom": [{"name": "Custom", "cards": [{"type": "custom:marao-card",
+        "template": "hc_graph_card", "entity": "sensor.energy", "variables": {
+            "display_unit": "kWh", "graph_entity": "sensor.history"}}]}]}}
+    registry = [{"entity_id": "sensor.energy", "unit_of_measurement": "Wh"},
+                {"entity_id": "sensor.power", "unit_of_measurement": "W"},
+                {"entity_id": "sensor.history", "unit_of_measurement": "J"}]
+    resolved = resolve_dashboard_config(config, registry)
+    entries = next(page for page in resolved["pages"] if page["path"] == "energy")["_sections"]
+    summary = generator._page_card(entries[0]["ordered_cards"][0], "marao-energy")
+    sheet = generator._page_card_popups(entries[0]["ordered_cards"][0])[0]["cards"][0]
+    for card in (summary, sheet):
+        assert card["display_unit"] == "kWh"
+        assert card["display_precision"] == 0
+        assert "retained" not in card
+    load = generator._page_card(entries[1]["ordered_cards"][0], "marao-energy")
+    assert load["variables"] == {"display_unit": "kW", "display_precision": 6, "show_icon": False}
+    assert config["pages"]["energy"]["today_energy"]["variables"] == variables
+    registry[-1]["unit_of_measurement"] = "W"
+    with pytest.raises(ValueError, match="incompatible with sensor.history"):
+        write_dashboard(config, tmp_path, registry)
+    assert not list(tmp_path.iterdir())
+
+
+def test_switch_formatting_uses_secondary_unit_and_preserves_legacy_label() -> None:
+    config = {"name": "Power", "rooms": [{"name": "Room", "entities": [
+        {"entity_id": "switch.load", "variables": {"power_entity": "sensor.power", "power_unit": "MW",
+                                                   "display_unit": "kW", "display_precision": 0}},
+    ]}]}
+    resolved = resolve_dashboard_config(config, [{"entity_id": "sensor.power", "unit_of_measurement": "W"}])
+    entity = _room(resolved)["entities_by_domain"]["switch"][0]
+    assert generator._entity_card(entity)["variables"] == config["rooms"][0]["entities"][0]["variables"]
+    with pytest.raises(ValueError, match="requires a supported source unit"):
+        resolve_dashboard_config(config, [])
+    del config["rooms"][0]["entities"][0]["variables"]["display_unit"]
+    resolve_dashboard_config(config, [])  # Precision alone needs no guessed dimension.
+
+@pytest.mark.parametrize("columns", [None, 1])
+def test_energy_duplicate_occurrences_remain_independent(columns: int | None) -> None:
+    entities = [
+        {"entity_id": "sensor.energy", "template": "hc_graph_card", "variables": {"display_unit": "kWh", "display_precision": 0}},
+        {"entity_id": "sensor.energy", "variables": {"display_unit": "Wh", "display_precision": 6}},
+        "sensor.energy",
+    ]
+    room = {"name": "Room", "entities": entities}
+    if columns:
+        room["columns"] = columns
+    config = {"name": "Energy", "rooms": [room]}
+    resolved = _room(resolve_dashboard_config(config, [{"entity_id": "sensor.energy", "unit_of_measurement": "Wh"}]))
+    assert len(resolved["ordered_cards"]) == 3
+    cards = [generator._entity_card(item) for item in resolved["entities_by_domain"]["sensor"]]
+    assert cards[0]["variables"] == entities[0]["variables"]
+    assert cards[1]["variables"] == entities[1]["variables"]
+    assert "variables" not in cards[2]
+    assert cards[0]["template"] == "hc_graph_card"
+    assert cards[1]["template"] == cards[2]["template"] == "hc_sensor_card"
+
+
+@pytest.mark.parametrize("key", ["../outside", "unsafe\nfrontend:\n  themes: changed", "Has Spaces", 12])
+def test_invalid_dashboard_route_is_rejected_before_writes(tmp_path, key):
+    from custom_components.marao_dashboard.generator import plan_dashboard
+    config = {"name": "Route", "rooms": []}
+    with pytest.raises(ValueError, match="Dashboard key"):
+        plan_dashboard(config, tmp_path, dashboard_key_override=key)
+    with pytest.raises(ValueError, match="Dashboard key"):
+        write_dashboard(config, tmp_path, dashboard_key_override=key)
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("kind,entity_id,metadata", [
+    ("light", "light.accent", {}), ("cover", "cover.blind", {}),
+    ("climate", "climate.office", {}), ("battery", "sensor.charge", {"device_class": "battery"}),
+])
+def test_entity_group_resolves_independently_and_preserves_member_options(kind, entity_id, metadata):
+    group = {"template": "hc_entity_group_card", "id": "office-group", "name": "Office", "entity_type": kind,
+             "entities": [entity_id, {"entity_id": entity_id, "name": "Custom", "variables": {"future": 42}, "extension": True}],
+             "future": {"keep": True}}
+    config = {"config_version": 1, "name": "Groups", "rooms": [{"name": "Room", "columns": 2,
+        "entities": ["light.independent", group, {"page": "overview"}], "cards": [{"type": "markdown", "content": "Raw"}]}]}
+    original = json.loads(json.dumps(config))
+    result = resolve_dashboard_config(config, [{"entity_id": entity_id, "name": "Live", **metadata}])
+    room = _room(result)
+    resolved = room["ordered_cards"][1]
+    assert resolved["id"] == "office-group" and resolved["future"] == {"keep": True}
+    assert resolved["popup_filter"] == ("active" if kind == "light" else "all")
+    assert resolved["entities"] == [{"entity_id": entity_id, "name": "Custom", **metadata, "variables": {"future": 42}, "extension": True}]
+    assert [item["entity_id"] for item in room["entities_by_domain"]["light"]] == ["light.independent"]
+    assert room["ordered_cards"][2]["page"] == "overview"
+    assert room["cards"] == [{"type": "markdown", "content": "Raw"}]
+    assert config == original
+
+
+@pytest.mark.parametrize("selection", ["direct", "list", "grouped"])
+def test_empty_entity_group_keeps_identity_without_importing_room_entities(selection):
+    group = {"template": "hc_entity_group_card", "id": "empty-group", "name": "Empty", "entity_type": "light", "entities": []}
+    entities = group if selection == "direct" else [group] if selection == "list" else {"entity_group": [group]}
+    result = resolve_dashboard_config({"name": "Groups", "rooms": [{"name": "Room", "entities": entities}]})
+    actual = _room(result)["ordered_cards"][0]
+    assert {key: actual[key] for key in group} == group
+    assert actual["popup_filter"] == "active"
+    assert actual["variables"]["popup_hash"] == "#page-room-room-empty-group-popup"
+    assert not any(card.get("entity_id") for card in _room(result)["ordered_cards"])
+
+
+@pytest.mark.parametrize("change", [
+    {"id": "../unsafe"}, {"entity_type": "sensor"}, {"popup_filter": "off"}, {"popup_filter": None},
+    {"entities": ["cover.blind"]}, {"entities": [{"page": "overview"}]},
+    {"entities": [{"entity_id": "light.main", "entities": []}]},
+    {"entities": [{"entity_id": "light.main", "template": "hc_battery_card"}]},
+    {"entities": [False]}, {"entity_id": "light.main"}, {"name": ""}, {"entities": None}, {"icon": []},
+    {"entities": [{"entity_id": "light.main", "template": {}}]},
+    {"entities": [{"entity_id": "light.main", "variables": []}]},
+])
+def test_invalid_entity_group_preflights_without_writes(tmp_path, change):
+    group = {"template": "hc_entity_group_card", "id": "safe-group", "name": "Group", "entity_type": "light", "entities": [], **change}
+    config = {"name": "Groups", "rooms": [{"name": "Room", "entities": [group]}]}
+    with pytest.raises(ValueError, match="Entity Group"):
+        write_dashboard(config, tmp_path)
+    assert not list(tmp_path.iterdir())
+
+
+def test_entity_group_ids_are_unique_across_overview_and_containers():
+    group = {"template": "hc_entity_group_card", "id": "same", "name": "Group", "entity_type": "light", "entities": []}
+    config = {"name": "Groups", "overview": {"entity_groups": [group]}, "rooms": [{"name": "Room", "entities": [group]}]}
+    with pytest.raises(ValueError, match="Duplicate Entity Group"):
+        resolve_dashboard_config(config)
+    group["id"] = "overview-lights"
+    config["overview"]["entity_groups"] = []
+    with pytest.raises(ValueError, match="reserved"):
+        resolve_dashboard_config(config)
+
+
+def test_battery_group_rejects_known_arbitrary_sensor_and_retains_missing_references():
+    group = {"template": "hc_entity_group_card", "id": "batteries", "name": "Battery", "entity_type": "battery", "entities": ["sensor.charge"]}
+    config = {"name": "Groups", "rooms": [{"name": "Room", "entities": [group]}]}
+    with pytest.raises(ValueError, match="incompatible"):
+        resolve_dashboard_config(config, [{"entity_id": "sensor.charge", "device_class": "temperature"}])
+    resolved = resolve_dashboard_config(config)
+    assert _room(resolved)["entities_by_domain"]["entity_group"][0]["entities"][0]["entity_id"] == "sensor.charge"
+
+
+def test_legacy_group_adapter_preserves_source_options_empty_intent_and_registry_independence():
+    source = {"config_version": 1, "name": "Legacy", "rooms": [{"name": "Office", "entities": [
+        {"entity_id": "light.main", "variables": {"enable_slider": False}, "future": 42},
+        "cover.blind", "climate.office", {"entity_id": "sensor.office_battery", "template": "hc_battery_card"},
+    ]}], "overview": {"weather_entity": "weather.home", "scenes": ["scene.evening"], "extension": True}}
+    original = json.loads(json.dumps(source))
+    preview = generator.materialize_overview_groups(source)
+    groups = preview["overview"]["entity_groups"]
+    assert [group["id"] for group in groups] == ["overview-lights", "overview-blinds", "overview-climate", "overview-maintenance"]
+    assert [group["popup_filter"] for group in groups] == ["active", "all", "all", "all"]
+    assert groups[0]["entities"] == [{"entity_id": "light.main", "variables": {"enable_slider": False}, "future": 42}]
+    assert source == original
+    assert generator.materialize_overview_groups({**source, "overview": {**source["overview"], "entity_groups": []}})["overview"]["entity_groups"] == []
+    assert generator.materialize_overview_groups(preview, [{"entity_id": "light.added", "area_id": "office"}]) == preview
+    assert generator.materialize_overview_groups(source, language="pt")["overview"]["entity_groups"][0]["name"] == "Iluminação"
+
+
+def test_reusable_group_generation_preserves_mixed_order_and_stable_scoped_popups(tmp_path):
+    group = {"template": "hc_entity_group_card", "id": "office-group", "name": "Office group", "entity_type": "climate",
+             "entities": [{"entity_id": "climate.office", "name": "Configured thermostat", "variables": {"setpoint_label": "Target"}}]}
+    other = {**group, "id": "second-group", "name": "Other group"}
+    config = {"name": "Groups", "overview": {"entity_groups": []}, "rooms": [{"name": "Room", "columns": 2,
+              "entities": ["light.independent", group, {"page": "overview"}, other], "cards": [{"type": "markdown", "content": "Raw"}]}],
+              "pages": {"custom": [{"name": "Custom", "path": "custom", "entities": [{**group, "id": "custom-group"}]}]}}
+    generated = write_dashboard(config, tmp_path)
+    path = tmp_path / generated.slug / "views/rooms/00-room.yaml"
+    view = _load_view(path)
+    cards = view["cards"][1]["cards"]
+    assert [card.get("template", card["type"]) for card in cards] == ["hc_light_card", "hc_entity_group_card", "hc_navigation_card", "hc_entity_group_card", "markdown"]
+    popups = [card for card in view["cards"] if isinstance(card, dict) and card.get("type") == "custom:marao-popup-card"]
+    assert len({popup["hash"] for popup in popups}) == 4
+    assert next(popup for popup in popups if popup["hash"] == "#page-room-room-office-group-popup")["cards"][0]["name"] == "Configured thermostat"
+    assert any(popup["hash"] == "#page-room-room-office-group-popup-climate-office-modes" for popup in popups)
+    assert any(popup["hash"] == "#page-room-room-second-group-popup-climate-office-modes" for popup in popups)
+    source = (tmp_path / generated.slug / "views/main/00-overview.yaml").read_text()
+    assert "#overview-climate" not in source and "#overview-lights" not in source
+    hashes = {popup["hash"] for popup in popups}
+    config["rooms"][0]["entities"] = [other, {**group, "name": "Renamed"}]
+    write_dashboard(config, tmp_path)
+    updated = _load_view(path)
+    assert {card["hash"] for card in updated["cards"] if isinstance(card, dict) and card.get("type") == "custom:marao-popup-card"} == hashes
+
+
+def test_cover_groups_keep_access_safety_open_only_and_blind_options(tmp_path):
+    group = {"template": "hc_entity_group_card", "id": "covers", "name": "Access and blinds", "entity_type": "cover", "entities": [
+        {"entity_id": "cover.blind", "variables": {"future": 42}},
+        {"entity_id": "cover.garage", "template": "hc_cover_card"}, "cover.open_only",
+    ]}
+    registry = [{"entity_id": "cover.blind", "device_class": "blind"}, {"entity_id": "cover.garage", "device_class": "garage"},
+                {"entity_id": "cover.open_only", "device_class": "door", "supported_features": 1}]
+    generated = write_dashboard({"name": "Groups", "overview": {"entity_groups": [group]}, "rooms": []}, tmp_path, registry)
+    path = tmp_path / generated.slug / "components/popups/entity_group_covers.yaml"
+    popup = _load_view(path)
+    assert "entity" not in popup
+    assert [card["template"] for card in popup["cards"]] == ["hc_cover_card", "hc_access_card", "hc_access_slide_action_card"]
+    assert popup["cards"][0]["variables"]["future"] == 42
+    assert popup["cards"][1]["variables"]["popup_hash"] == "#entity-group-covers-cover-garage-access"
+    assert popup["cards"][2]["variables"]["action_service"] == "cover.open_cover"
+    secondary = yaml.load((path.parent / "entity_group_covers_0.yaml").read_text(), Loader=MaraoDashboardLoader)
+    assert secondary["hash"] == "#entity-group-covers-cover-garage-access"
+    assert secondary["cards"][0]["cards"][0]["template"] == "hc_access_slide_action_card"
+
+
+def test_overview_group_type_change_retains_reserved_link_identity():
+    group = {"template": "hc_entity_group_card", "id": "overview-lights", "name": "Blinds", "entity_type": "cover", "entities": ["cover.blind"]}
+    resolved = resolve_dashboard_config({"name": "Groups", "rooms": [], "overview": {"entity_groups": [group]}})
+    assert generator._entity_group_card(_home_groups(resolved)[0])["tap_action"]["navigation_path"] == "#overview-lights"
+
+
+@pytest.mark.parametrize("popup_hash", ["#entity-group-controls", "#unsafe/hash", "#entity-group-controls-climate-a_b-modes"])
+def test_group_owned_popup_hashes_preflight_collisions_and_unsafe_links(tmp_path, popup_hash):
+    group = {"template": "hc_entity_group_card", "id": "controls", "name": "Controls", "entity_type": "climate", "entities": [
+        "climate.a_b", {"entity_id": "climate.other", "variables": {"mode_selector_hash": popup_hash}},
+    ]}
+    with pytest.raises(ValueError, match="popup hash"):
+        write_dashboard({"name": "Groups", "rooms": [], "overview": {"entity_groups": [group]}}, tmp_path)
+    assert not list(tmp_path.iterdir())
+
+
+def test_group_secondary_hashes_distinguish_underscores():
+    group = {"template": "hc_entity_group_card", "id": "controls", "name": "Controls", "entity_type": "climate", "entities": ["climate.a_b", "climate.ab"]}
+    resolved = resolve_dashboard_config({"name": "Groups", "rooms": [], "overview": {"entity_groups": [group]}})
+    popups = generator._entity_group_secondary_popups(_home_groups(resolved)[0])
+    assert [popup["hash"] for popup in popups] == ["#entity-group-controls-climate-a_b-modes", "#entity-group-controls-climate-ab-modes"]
+
+
+@pytest.mark.parametrize("other", [
+    {"entities": [{"entity_id": "climate.other", "variables": {"mode_selector_hash": "#entity-group-controls"}}]},
+    {"cards": [{"type": "custom:marao-popup-card", "hash": "#entity-group-controls", "cards": []}]},
+])
+def test_group_rejects_other_generated_and_raw_popup_collisions_before_writes(tmp_path, other):
+    group = {"template": "hc_entity_group_card", "id": "controls", "name": "Controls", "entity_type": "light", "entities": []}
+    with pytest.raises(ValueError, match="conflicts with another popup"):
+        write_dashboard({"name": "Groups", "rooms": [{"name": "Room", **other, "entities": [group, *other.get("entities", [])]}], "overview": {"entity_groups": []}}, tmp_path)
+    assert not list(tmp_path.iterdir())
+
+
+def test_legacy_custom_climate_hash_remains_usable_in_distinct_owning_views(tmp_path):
+    source = {"name": "Legacy", "config_version": 1, "rooms": [{"name": "Room", "entities": [
+        {"entity_id": "climate.office", "variables": {"mode_selector_hash": "#custom-modes", "future": True}},
+    ]}]}
+    preview = generator.materialize_overview_groups(source)
+    assert preview["overview"]["entity_groups"][0]["entities"] == source["rooms"][0]["entities"]
+    write_dashboard(preview, tmp_path)

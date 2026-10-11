@@ -1,0 +1,72 @@
+title: Home
+path: overview
+icon: mdi:home-variant
+cards:
+  # marao:generated:start
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_navigation_card
+      entity: light.living_room_main
+      name: Lights
+      icon: mdi:lightbulb-group-outline
+      label: "[[[\n  const ids = ['light.living_room_main'];\n  const active = ids.filter((id) => {\n    const state = states[id]?.state;\n    return state && !['off', 'closed', 'closing', 'unavailable', 'unknown'].includes(state);\n  }).length;\n  const t = window.MaraoDashboard?.localize || ((key, _hass, values = {}) => key === 'common.active_count' ? `${values.count} active` : 'All off');\n  return active ? t('common.active_count', hass, { count: active }) : t('common.all_off', hass);\n]]]\n"
+      styles:
+        icon:
+        - color: var(--color-orange)
+      tap_action:
+        action: navigate
+        navigation_path: '#overview-lights'
+        haptic: heavy
+    - type: custom:button-card
+      template: hc_navigation_card
+      entity: cover.living_room_blind
+      name: Blinds
+      icon: mdi:window-shutter
+      label: "[[[\n  const ids = ['cover.living_room_blind'];\n  const active = ids.filter((id) => {\n    const state = states[id]?.state;\n    return state && !['off', 'closed', 'closing', 'unavailable', 'unknown'].includes(state);\n  }).length;\n  const t = window.MaraoDashboard?.localize || ((key, _hass, values = {}) => key === 'common.active_count' ? `${values.count} active` : 'All off');\n  return active ? t('common.active_count', hass, { count: active }) : t('common.all_off', hass);\n]]]\n"
+      styles:
+        icon:
+        - color: var(--color-orange)
+      tap_action:
+        action: navigate
+        navigation_path: '#overview-blinds'
+        haptic: heavy
+    - type: custom:button-card
+      template: hc_navigation_card
+      entity: climate.living_room
+      name: Climate
+      icon: mdi:thermostat
+      label: "[[[\n  const ids = ['climate.living_room'];\n  const active = ids.filter((id) => {\n    const state = states[id]?.state;\n    return state && !['off', 'closed', 'closing', 'unavailable', 'unknown'].includes(state);\n  }).length;\n  const t = window.MaraoDashboard?.localize || ((key, _hass, values = {}) => key === 'common.active_count' ? `${values.count} active` : 'All off');\n  return active ? t('common.active_count', hass, { count: active }) : t('common.all_off', hass);\n]]]\n"
+      styles:
+        icon:
+        - color: var(--color-orange)
+      tap_action:
+        action: navigate
+        navigation_path: '#overview-climate'
+        haptic: heavy
+    - type: custom:button-card
+      template: hc_navigation_card
+      entity: input_boolean.holiday_mode
+      name: Scenes
+      icon: mdi:palette-outline
+      label: "[[[\n  const ids = ['input_boolean.holiday_mode'];\n  const active = ids.filter((id) => {\n    const state = states[id]?.state;\n    return state && !['off', 'closed', 'closing', 'unavailable', 'unknown'].includes(state);\n  }).length;\n  const t = window.MaraoDashboard?.localize || ((key, _hass, values = {}) => key === 'common.active_count' ? `${values.count} active` : 'All off');\n  return active ? t('common.active_count', hass, { count: active }) : t('common.all_off', hass);\n]]]\n"
+      styles:
+        icon:
+        - color: var(--color-orange)
+      tap_action:
+        action: navigate
+        navigation_path: '#overview-scenes'
+        haptic: heavy
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/popups/overview_lights.yaml'
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/popups/overview_blinds.yaml'
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/popups/overview_climate.yaml'
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/popups/overview_scenes.yaml'
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

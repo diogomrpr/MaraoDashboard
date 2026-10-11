@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from copy import deepcopy
+from dataclasses import dataclass, replace
 import json
+import math
+import os
 from pathlib import Path
 import re
+import tempfile
 import unicodedata
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 import yaml
 
@@ -53,7 +57,19 @@ DOMAIN_TEMPLATES = {
     "vacuum": "hc_vacuum_card",
 }
 
+ENERGY_UNITS = {
+    "mW": ("power", .001), "W": ("power", 1), "kW": ("power", 1000),
+    "MW": ("power", 1e6), "GW": ("power", 1e9),
+    "Wh": ("energy", 1), "kWh": ("energy", 1000), "MWh": ("energy", 1e6),
+    "GWh": ("energy", 1e9), "J": ("energy", 1 / 3600), "Ws": ("energy", 1 / 3600),
+    "kJ": ("energy", 1000 / 3600), "MJ": ("energy", 1e6 / 3600), "GJ": ("energy", 1e9 / 3600),
+}
+ENERGY_FORMAT_TEMPLATES = {
+    "hc_graph_card", "hc_toggle_graph_card", "hc_sensor_card", "hc_base_card", "hc_switch_card", "hc_energy_period_card",
+}
+
 MANIFEST_NAME = ".marao-generated.json"
+GENERATION_CONTRACT_VERSION = 2
 GENERATED_START = "  # marao:generated:start\n"
 GENERATED_END = "  # marao:generated:end\n"
 CUSTOM_START = "  # marao:custom:start\n"
@@ -74,6 +90,18 @@ GENERATOR_TRANSLATIONS = {
         "overview.climate": "Climate",
         "overview.maintenance": "Maintenance",
         "overview.scenes": "Scenes",
+        "overview.scenes_empty": "No scenes configured.",
+        "energy.house_power": "House Power",
+        "energy.month_power": "Month Power",
+        "energy.today_power": "Today Power",
+        "energy.month_cost": "Month Cost",
+        "energy.today_cost": "Today Cost",
+        "wallbox.status": "Wallbox Status",
+        "wallbox.charging_power": "Charging Power",
+        "wallbox.current": "Charging Current",
+        "wallbox.pause_resume": "Pause / Resume",
+        "security.alarm": "Alarm",
+        "media.player": "Media player",
         "access.open": "Open",
         "common.open": "Open",
         "common.close": "Close",
@@ -94,6 +122,18 @@ GENERATOR_TRANSLATIONS = {
         "overview.climate": "Climatização",
         "overview.maintenance": "Manutenção",
         "overview.scenes": "Cenários",
+        "overview.scenes_empty": "Nenhum cenário configurado.",
+        "energy.house_power": "Potência da casa",
+        "energy.month_power": "Energia do mês",
+        "energy.today_power": "Energia de hoje",
+        "energy.month_cost": "Custo do mês",
+        "energy.today_cost": "Custo de hoje",
+        "wallbox.status": "Estado do carregador",
+        "wallbox.charging_power": "Potência de carregamento",
+        "wallbox.current": "Corrente de carregamento",
+        "wallbox.pause_resume": "Pausar / Retomar",
+        "security.alarm": "Alarme",
+        "media.player": "Leitor multimédia",
         "access.open": "Abrir",
         "common.open": "Abrir",
         "common.close": "Fechar",
@@ -191,27 +231,172 @@ def yaml_dump(data: Any) -> str:
     )
 
 
-def load_dashboard_config(path: str | Path) -> dict[str, Any]:
-    """Load a dashboard JSON config from disk."""
+def dashboard_config_version(config: dict[str, Any]) -> int:
+    """Reject incompatible source before normalization, backup or any write."""
 
+    if not isinstance(config, dict):
+        raise ValueError("Dashboard configuration must be a JSON object")
+    version = config.get("config_version", 0)
+    if type(version) is not int or version < 0:
+        raise ValueError("config_version must be a nonnegative integer")
+    if version > DASHBOARD_CONFIG_VERSION:
+        raise ValueError(
+            f"Dashboard config_version {version} is newer than supported format "
+            f"{DASHBOARD_CONFIG_VERSION}; update Marao before using this configuration"
+        )
+    return version
+
+
+def _explicit_room_membership(config, registry, areas):
+    """Import legacy room instructions once, without saving registry metadata."""
+    known = {area["area_id"]: area.get("name") for area in areas or []}
+    for entity in registry or []:
+        for prefix in ("", "device_"):
+            if entity.get(prefix + "area_id"):
+                known.setdefault(entity[prefix + "area_id"], entity.get(prefix + "area_name"))
+    for room in config.get("rooms", []):
+        if not isinstance(room, dict):
+            raise ValueError("Each room must be an object")
+        hint = room.get("area")
+        matches = ({hint} if isinstance(hint, str) and hint in known else {
+            area_id for area_id, name in known.items()
+            if isinstance(hint, str) and name and make_slug(hint) == make_slug(name)
+        })
+        if len(matches) == 1:
+            room["area"] = next(iter(matches))
+        if "entities" not in room and hint:
+            if registry is None or len(matches) != 1:
+                raise ValueError(f"Cannot import legacy room {room.get('name', '')}: area is missing or ambiguous; provide explicit entities")
+            if any(_matches_area(entity, room["area"]) and "has_state" not in entity for entity in registry):
+                raise ValueError("Cannot import legacy room: entity state metadata is missing; provide explicit entities")
+            room["entities"] = [
+                entity["entity_id"] for entity in registry
+                if _matches_area(entity, room["area"])
+                and _is_enabled_visible(entity) and entity.get("has_state") is True
+                and str(entity.get("entity_id", "")).split(".")[0] in SUPPORTED_DOMAINS
+            ]
+        room.setdefault("entities", [])
+        if not any(key in room for key in ("include", "exclude", "overrides")):
+            continue
+        def entries(spec):
+            if spec is None:
+                return []
+            if isinstance(spec, dict):
+                if "entity_id" in spec or "page" in spec or spec.get("template") == "hc_entity_group_card":
+                    return [spec]
+                return [entry for values in spec.values() for entry in entries(values)]
+            if isinstance(spec, str):
+                return [spec]
+            if isinstance(spec, list):
+                return spec
+            raise ValueError("Legacy room selections must be entity strings, lists or grouped objects")
+        selected = list(entries(room["entities"]))
+        def entity_id(entry):
+            return entry if isinstance(entry, str) else entry.get("entity_id") if isinstance(entry, dict) else None
+        for entry in entries(room.pop("include", None)):
+            indexes = [index for index, value in enumerate(selected) if entity_id(entry) and entity_id(value) == entity_id(entry)]
+            if not indexes:
+                selected.append(entry)
+            elif isinstance(entry, dict):
+                for index in indexes:
+                    previous = selected[index]
+                    selected[index] = {**(previous if isinstance(previous, dict) else {"entity_id": previous}), **entry}
+        excluded = {entity_id(entry) for entry in entries(room.pop("exclude", None))}
+        overrides = room.pop("overrides", {}) or {}
+        if not isinstance(overrides, dict):
+            raise ValueError("Legacy room overrides must be an object")
+        room["entities"] = []
+        for entry in selected:
+            identifier = entity_id(entry)
+            if identifier and identifier in excluded:
+                continue
+            override = overrides.get(identifier)
+            if isinstance(override, dict):
+                entry = {**(entry if isinstance(entry, dict) else {"entity_id": identifier}), **override, "entity_id": identifier}
+            room["entities"].append(entry)
+
+
+def _ordered_pages(config, registry, areas):
+    from .page_migration import convert_legacy_pages
+
+    for room in config.get("rooms", []):
+        if not isinstance(room, dict):
+            raise ValueError("Each room must be an object")
+        if any(key in room for key in ("include", "exclude", "overrides")):
+            raise ValueError("Current room selections use explicit entities; import legacy include/exclude/overrides before editing")
+        if room.get("entities") is None:
+            room["entities"] = []
+    converted = convert_legacy_pages(config, registry)
+    config.clear()
+    config.update(converted)
+
+
+DASHBOARD_CONFIG_MIGRATIONS: tuple[Callable[..., None], ...] = (_explicit_room_membership, _ordered_pages)
+DASHBOARD_CONFIG_VERSION = len(DASHBOARD_CONFIG_MIGRATIONS)
+
+
+def migrate_dashboard_config(
+    config: dict[str, Any], registry_entities: Iterable[dict[str, Any]] | None = None,
+    areas: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Convert a private copy; explicit room contents remain authoritative."""
+
+    version = dashboard_config_version(config)
+    if version == 0 and "views" in config and "title" in config and "name" not in config:
+        from .page_migration import convert_native_storage_dashboard
+        return convert_native_storage_dashboard(config)
+    converted = deepcopy(config)
+    if not isinstance(converted.get("rooms", []), list):
+        raise ValueError("rooms must be a list")
+    registry = list(registry_entities) if registry_entities is not None else None
+    for source_version in range(version, DASHBOARD_CONFIG_VERSION):
+        DASHBOARD_CONFIG_MIGRATIONS[source_version](converted, registry, areas)
+        converted["config_version"] = source_version + 1
+    for room in converted.get("rooms", []):
+        if not isinstance(room, dict):
+            raise ValueError("Each room must be an object")
+        if any(key in room for key in ("include", "exclude", "overrides")):
+            raise ValueError("Current room selections use explicit entities; import legacy include/exclude/overrides before editing")
+        if room.get("entities") is None:
+            room["entities"] = []
+    if converted.get("config_version") == 2:
+        normalize_config(converted)
+    return converted
+
+
+def parse_dashboard_config(source: str) -> dict[str, Any]:
+    """Use one strict JSON boundary for files, preview and editor saves."""
+    def reject_nonfinite(value):
+        raise ValueError("Dashboard JSON numbers must be finite")
+    def parse_float(value):
+        number = float(value)
+        if not math.isfinite(number):
+            reject_nonfinite(value)
+        return number
     try:
-        config = json.loads(Path(path).read_text(encoding="utf-8"))
+        config = json.loads(source, parse_constant=reject_nonfinite, parse_float=parse_float)
     except json.JSONDecodeError as err:
-        raise ValueError(f"Invalid dashboard JSON: {err.msg}") from err
+        raise ValueError(f"Invalid dashboard JSON at line {err.lineno}, column {err.colno}: {err.msg}") from err
 
     if not isinstance(config, dict):
         raise ValueError("Dashboard JSON must be an object")
+    dashboard_config_version(config)
+    if config.get("config_version") == 2:
+        normalize_config(config)
     return config
+
+
+def load_dashboard_config(path: str | Path) -> dict[str, Any]:
+    """Load a dashboard JSON config without changing the file."""
+    return parse_dashboard_config(Path(path).read_text(encoding="utf-8"))
 
 
 def write_dashboard_config(config: dict[str, Any], path: str | Path) -> None:
     """Write a dashboard JSON config without touching generated YAML."""
 
+    dashboard_config_version(config)
     target = Path(path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(
-        json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    _write_text(target, json.dumps(config, indent=2, ensure_ascii=False) + "\n")
 
 
 def ensure_dashboard_config(
@@ -221,28 +406,11 @@ def ensure_dashboard_config(
 
     target = Path(path)
     if target.exists():
-        config = load_dashboard_config(target)
-        if migrate_legacy_theme(config):
-            write_dashboard_config(config, target)
-        registry = list(registry_entities)
-        if _is_empty_base_dashboard_config(config):
-            refreshed = build_base_dashboard_config(registry)
-            if refreshed["rooms"]:
-                write_dashboard_config(refreshed, target)
-                return refreshed
-        return config
+        return migrate_dashboard_config(load_dashboard_config(target), list(registry_entities))
 
     config = build_base_dashboard_config(list(registry_entities))
     write_dashboard_config(config, target)
     return config
-
-
-def _is_empty_base_dashboard_config(config: dict[str, Any]) -> bool:
-    return (
-        config.get("name") == BASE_DASHBOARD_NAME
-        and config.get("slug") == BASE_DASHBOARD_SLUG
-        and config.get("rooms") == []
-    )
 
 
 def migrate_legacy_theme(config: dict[str, Any]) -> bool:
@@ -259,12 +427,27 @@ def migrate_legacy_theme(config: dict[str, Any]) -> bool:
 def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     """Normalize and validate a dashboard configuration."""
 
-    if not isinstance(config, dict):
-        raise ValueError("Dashboard configuration must be a JSON object")
+    dashboard_config_version(config)
+    config = deepcopy(config)
 
     name = str(config.get("name") or "").strip()
     if not name:
         raise ValueError("Dashboard configuration requires a non-empty name")
+
+    if config.get("config_version") == 2:
+        from .editor import EDITOR_CATALOG
+        from .page_model import validate_pages
+
+        validate_pages(config, {card["id"]: card["domains"] for card in EDITOR_CATALOG["cards"]})
+        if config.get("theme") is not None and not isinstance(config["theme"], str):
+            raise ValueError("theme must be a string")
+        if config.get("icon") is not None and not isinstance(config["icon"], str):
+            raise ValueError("icon must be a string")
+        config.update(name=name, slug=make_slug(config.get("slug") or name),
+                      theme=config.get("theme") or BASE_DASHBOARD_THEME,
+                      icon=config.get("icon") or BASE_DASHBOARD_ICON)
+        migrate_legacy_theme(config)
+        return config
 
     rooms = config.get("rooms", [])
     if not isinstance(rooms, list):
@@ -313,7 +496,7 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     normalized["name"] = name
     normalized["slug"] = make_slug(config.get("slug") or name)
     normalized["theme"] = theme
-    normalized["icon"] = config.get("icon") or "mdi:view-dashboard"
+    normalized["icon"] = config.get("icon") or BASE_DASHBOARD_ICON
     normalized["rooms"] = rooms
     normalized["overview"] = overview
     normalized["pages"] = pages
@@ -325,10 +508,16 @@ def resolve_dashboard_config(
 ) -> dict[str, Any]:
     """Resolve rooms against HA registry/entity data and explicit overrides."""
 
-    normalized = normalize_config(config)
-    registry = list(registry_entities or [])
+    registry = list(registry_entities) if registry_entities is not None else None
+    normalized = normalize_config(migrate_dashboard_config(config, registry))
+    return _resolve_pages(normalized, registry)
+
+
+def _resolve_legacy_config(normalized, registry=None, *, validate_source_units=True):
+    """Resolve predecessor defaults only while converting historical pages."""
+    registry = registry or []
     resolved_rooms = [
-        _resolve_entity_container(room, registry, kind="room", allow_area=True)
+        _resolve_entity_container(room, registry, kind="room")
         for room in normalized["rooms"]
     ]
     resolved_custom = [
@@ -346,7 +535,213 @@ def resolve_dashboard_config(
     pages = {**normalized["pages"]}
     if "custom" in pages or resolved_custom:
         pages["custom"] = resolved_custom
-    return {**normalized, "rooms": resolved_rooms, "pages": pages}
+    resolved = {**normalized, "rooms": resolved_rooms, "pages": pages}
+    group_ids: set[str] = set()
+    legacy_groups = "entity_groups" not in resolved["overview"]
+    groups = _legacy_overview_groups(resolved) if legacy_groups else resolved["overview"]["entity_groups"]
+    if not isinstance(groups, list):
+        raise ValueError("Overview Entity Groups must be a list.")
+    member_metadata = [*registry, *_all_entities(resolved)]
+    resolved["overview"]["entity_groups"] = [
+        _resolve_entity_group(group, member_metadata, group_ids, legacy_overview=True)
+        for group in groups
+    ]
+    if legacy_groups:
+        for group in resolved["overview"]["entity_groups"]:
+            group["_legacy_overview"] = True
+    for container in [*resolved_rooms, *resolved_custom]:
+        groups = [
+            _resolve_entity_group(group, registry, group_ids)
+            for group in _entity_groups_from_spec(container.get("entities"))
+        ]
+        if groups:
+            container["entities_by_domain"]["entity_group"] = groups
+            by_id = {group["id"]: group for group in groups}
+            container["ordered_cards"] = [
+                by_id[item["id"]] if item.get("template") == "hc_entity_group_card" else item
+                for item in container["ordered_cards"]
+            ]
+    popup_hashes = set()
+    for group in [*resolved["overview"]["entity_groups"], *[
+        group for container in [*resolved_rooms, *resolved_custom]
+        for group in container["entities_by_domain"].get("entity_group", [])
+    ]]:
+        for popup in [_entity_group_popup(group), *_entity_group_secondary_popups(group)]:
+            popup_hash = popup["hash"]
+            if not isinstance(popup_hash, str) or not re.fullmatch(r"#[a-zA-Z0-9][a-zA-Z0-9_-]*", popup_hash) or popup_hash in popup_hashes:
+                raise ValueError(f"Entity Group has an invalid or conflicting popup hash: {group['id']}")
+            popup_hashes.add(popup_hash)
+    if popup_hashes:
+        def check_owned_hashes(value, owned):
+            if isinstance(value, dict):
+                if value.get("type") == "custom:marao-popup-card" and isinstance(value.get("hash"), str) and value["hash"] in owned:
+                    raise ValueError("Entity Group popup hash conflicts with another popup.")
+                for child in value.values():
+                    check_owned_hashes(child, owned)
+            elif isinstance(value, list):
+                for child in value:
+                    check_owned_hashes(child, owned)
+
+        for container in [resolved["overview"], *resolved_rooms, *resolved_custom]:
+            groups = container.get("entity_groups", container.get("entities_by_domain", {}).get("entity_group", []))
+            if not groups:
+                continue
+            owned = {popup["hash"] for group in groups for popup in [_entity_group_popup(group), *_entity_group_secondary_popups(group)]}
+            if container is resolved["overview"]:
+                ordinary_cards = [_scenes_popup(resolved)] if _overview_scene_entities(resolved) else []
+            else:
+                ordinary = {**container, "entities_by_domain": {key: value for key, value in container["entities_by_domain"].items() if key != "entity_group"}}
+                ordinary_cards = _entity_container_cards(ordinary, "", dashboard_key_for_slug(resolved["slug"]), "en")
+            check_owned_hashes(ordinary_cards, owned)
+    _validate_energy_formatting(resolved, registry, validate_source_units=validate_source_units)
+    return resolved
+
+
+def _legacy_overview_groups(config, language="en"):
+    sources = {}
+    for room in config["rooms"]:
+        spec = room.get("entities")
+        if isinstance(spec, dict) and spec.get("template") == "hc_entity_group_card":
+            continue
+        entries = _flatten_dict_spec(spec) if isinstance(spec, dict) and "entity_id" not in spec else _entities_from_values(spec)
+        for entry in entries:
+            sources.setdefault(entry["entity_id"], entry)
+    groups = []
+    for kind, group_id, key, icon in [
+        ("light", "overview-lights", "overview.lights", "mdi:lightbulb-group-outline"),
+        ("cover", "overview-blinds", "overview.blinds", "mdi:window-shutter"),
+        ("climate", "overview-climate", "overview.climate", "mdi:thermostat"),
+        ("battery", "overview-maintenance", "overview.maintenance", "mdi:wrench"),
+    ]:
+        members = _battery_entities(config) if kind == "battery" else _all_entities(config, kind)
+        if members:
+            selected = [deepcopy(sources.get(member["entity_id"], {"entity_id": member["entity_id"]})) for member in members]
+            groups.append({"template": "hc_entity_group_card", "id": group_id, "name": _t(language, key), "icon": icon,
+                           "entity_type": kind, "popup_filter": "active" if kind == "light" else "all",
+                           "entities": [member["entity_id"] if len(member) == 1 else member for member in selected]})
+    return groups
+
+
+def materialize_overview_groups(config, registry_entities=None, language="en"):
+    """Expose editable legacy defaults on a copy; no source or history writes."""
+    preview = deepcopy(config)
+    if isinstance(preview.get("pages"), list):
+        return preview
+    if "entity_groups" not in (preview.get("overview") or {}):
+        resolved = _resolve_legacy_config(normalize_config(preview), list(registry_entities or []), validate_source_units=False)
+        preview["overview"] = {**(preview.get("overview") or {}), "entity_groups": _legacy_overview_groups(resolved, language)}
+    return preview
+
+
+def _entity_groups_from_spec(spec: Any) -> list[dict[str, Any]]:
+    if isinstance(spec, dict) and spec.get("template") == "hc_entity_group_card":
+        return [spec]
+    values = spec.values() if isinstance(spec, dict) and "entity_id" not in spec and "page" not in spec else [spec]
+    return [item for value in values for item in (value if isinstance(value, list) else [value])
+            if isinstance(item, dict) and item.get("template") == "hc_entity_group_card"]
+
+
+def _resolve_entity_group(group, registry, used_ids, *, legacy_overview=False, canonical_page=False):
+    if not isinstance(group, dict) or group.get("template") != "hc_entity_group_card":
+        raise ValueError("Entity Group must be an hc_entity_group_card object.")
+    group_id = group.get("id")
+    if not isinstance(group_id, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", group_id):
+        raise ValueError("Entity Group requires a stable safe id.")
+    if group_id in used_ids:
+        raise ValueError(f"Duplicate Entity Group id: {group_id}")
+    kind = group.get("entity_type")
+    if kind not in ("light", "cover", "battery", "climate"):
+        raise ValueError(f"Choose a supported Entity Group type: {group_id}")
+    reserved = {"overview-lights": "light", "overview-blinds": "cover", "overview-climate": "climate", "overview-maintenance": "battery"}
+    if group_id in reserved and not (legacy_overview or canonical_page):
+        raise ValueError(f"Entity Group id is reserved: {group_id}")
+    if not isinstance(group.get("name"), str) or not group["name"].strip():
+        raise ValueError(f"Entity Group requires a name: {group_id}")
+    if group.get("icon") is not None and not isinstance(group["icon"], str):
+        raise ValueError(f"Entity Group icon must be a string: {group_id}")
+    if "entity_id" in group or "page" in group:
+        raise ValueError(f"Entity Group cannot have a primary entity or page: {group_id}")
+    popup_filter = group.get("popup_filter", "active" if kind == "light" else "all")
+    if popup_filter not in ("all", "active"):
+        raise ValueError(f"Entity Group requires All entities or Active only: {group_id}")
+    members = group.get("entities")
+    if not isinstance(members, list):
+        raise ValueError(f"Entity Group entities must be a list: {group_id}")
+    metadata = {item["entity_id"]: item for item in registry}
+    selected = {}
+    templates = {"light": {"hc_light_card", "hc_base_card"}, "cover": {"hc_cover_card", "hc_access_card"},
+                 "climate": {"hc_climate_card"}, "battery": {"hc_battery_card", "hc_sensor_card", "hc_base_card"}}
+    for member in members:
+        source = {"entity_id": member} if isinstance(member, str) else member
+        if not isinstance(source, dict) or "page" in source or "entities" in source:
+            raise ValueError(f"Entity Group members must be entity strings or objects, without nesting: {group_id}")
+        entity_id = source.get("entity_id")
+        if not isinstance(entity_id, str) or not re.fullmatch(r"[a-z0-9_]+\.[a-z0-9_]+", entity_id):
+            raise ValueError(f"Entity Group has an invalid member: {group_id}")
+        if source.get("variables") is not None and not isinstance(source["variables"], dict):
+            raise ValueError(f"Entity Group member options must be an object: {group_id}")
+        if any(source.get(key) is not None and not isinstance(source[key], str) for key in ("name", "icon")):
+            raise ValueError(f"Entity Group member name and icon must be strings: {group_id}")
+        domain = entity_id.split(".", 1)[0]
+        live = metadata.get(entity_id)
+        if domain != ("sensor" if kind == "battery" else kind) or (
+            kind == "battery" and live is not None and live.get("device_class") != "battery"
+            and source.get("template") != "hc_battery_card"
+            and not (legacy_overview and group_id == "overview-maintenance" and "battery" in entity_id)
+        ) or (source.get("template") is not None and (not isinstance(source["template"], str) or source["template"] not in templates[kind])):
+            raise ValueError(f"Entity Group has an incompatible member: {group_id}, {entity_id}")
+        selected[entity_id] = {**(live or {}), **selected.get(entity_id, {}), **source}
+        selected[entity_id]["name"] = source.get("name") or selected[entity_id].get("name") or _friendly_name(entity_id)
+    used_ids.add(group_id)
+    return {**group, "popup_filter": popup_filter, "entities": list(selected.values())}
+
+
+def _validate_energy_formatting(value: Any, registry: list[dict[str, Any]], *, validate_source_units=True) -> None:
+    """Validate opt-in reading options against actual live source metadata."""
+    units = {entity["entity_id"]: entity.get("unit_of_measurement") for entity in registry}
+
+    def visit(item: Any) -> None:
+        if isinstance(item, list):
+            for child in item:
+                visit(child)
+            return
+        if not isinstance(item, dict):
+            return
+        direct = item.get("type") == "custom:marao-energy-period-card"
+        entity_id = item.get("entity_id") or item.get("entity")
+        load_source = item.get("power_entity")
+        if isinstance(load_source, dict):
+            load_source = load_source.get("entity_id")
+        template = item.get("template") or DOMAIN_TEMPLATES.get(str(entity_id).split(".")[0])
+        options = item if direct else item.get("variables", {})
+        eligible = direct or (
+            item.get("type") in (None, "custom:marao-card")
+            and (template in ENERGY_FORMAT_TEMPLATES or load_source)
+        )
+        if eligible and isinstance(options, dict) and any(key in options for key in ("display_unit", "display_precision")):
+            precision = options.get("display_precision")
+            if "display_precision" in options and (type(precision) is not int or not 0 <= precision <= 6):
+                raise ValueError("display_precision must be an integer between 0 and 6")
+            if "display_unit" in options:
+                target = options["display_unit"]
+                if not isinstance(target, str) or target not in ENERGY_UNITS:
+                    raise ValueError("display_unit must be a supported power or energy unit")
+                sources = [options.get("power_entity")] if template == "hc_switch_card" else [entity_id or load_source]
+                graph_source = options.get("graph_entity") or item.get("graph_entity")
+                if graph_source and template in ("hc_graph_card", "hc_toggle_graph_card"):
+                    sources.append(graph_source)
+                for source_id in sources:
+                    if not validate_source_units:
+                        continue
+                    source_unit = units.get(source_id) if isinstance(source_id, str) else None
+                    if source_unit not in ENERGY_UNITS:
+                        raise ValueError(f"display_unit requires a supported source unit for {source_id or 'the reading'}")
+                    if ENERGY_UNITS[source_unit][0] != ENERGY_UNITS[target][0]:
+                        raise ValueError(f"display_unit is incompatible with {source_id}")
+        for child in item.values():
+            visit(child)
+
+    visit(value)
 
 
 def _resolve_entity_container(
@@ -354,7 +749,6 @@ def _resolve_entity_container(
     registry: list[dict[str, Any]],
     *,
     kind: str,
-    allow_area: bool = False,
 ) -> dict[str, Any]:
     if not isinstance(container, dict):
         raise ValueError(f"Each {kind} must be an object")
@@ -371,12 +765,6 @@ def _resolve_entity_container(
         raise ValueError(f"{kind} columns must be an integer between 1 and 6")
 
     collected: dict[str, dict[str, Any]] = {}
-    area = container.get("area") if allow_area else None
-    if area:
-        for entity in registry:
-            if _matches_area(entity, str(area)):
-                _add_entity(collected, entity)
-
     _merge_entity_spec(collected, container.get("entities"))
     _merge_entity_spec(collected, container.get("include"))
     for entity_id in _entity_ids_from_spec(container.get("exclude")):
@@ -387,21 +775,37 @@ def _resolve_entity_container(
         if entity_id in collected and isinstance(override, dict):
             collected[entity_id].update(override)
 
+    metadata = {}
+    for entity in registry:
+        _add_entity(metadata, entity)
+    for entity_id, selected in collected.items():
+        live = metadata.get(entity_id, {})
+        collected[entity_id] = {**live, **selected}
+        collected[entity_id]["name"] = selected.get("name") or live.get("name") or _friendly_name(entity_id)
+    units = {entity["entity_id"]: entity.get("unit_of_measurement") for entity in registry}
+    for entity_id, entity in collected.items():
+        # Source units are live metadata, never saved overrides or legacy labels.
+        entity["unit_of_measurement"] = units.get(entity_id)
+
     raw_cards = container.get("cards", [])
     if raw_cards is None:
         raw_cards = []
     if not isinstance(raw_cards, list) or any(not isinstance(card, dict) for card in raw_cards):
         raise ValueError(f"{kind} cards must be a list of Lovelace card objects")
 
+    ordered_cards = _ordered_cards_from_spec(container.get("entities"), collected, overrides)
+    occurrences: dict[str, list[dict[str, Any]]] = {}
+    for entity in ordered_cards:
+        if entity.get("entity_id"):
+            occurrences.setdefault(entity["entity_id"], []).append(entity)
     entities_by_domain: dict[str, list[dict[str, Any]]] = {}
-    for entity in collected.values():
-        domain = entity["entity_id"].split(".", 1)[0]
+    for entity_id in collected:
+        domain = entity_id.split(".", 1)[0]
         if domain in SUPPORTED_DOMAINS:
-            entities_by_domain.setdefault(domain, []).append(entity)
+            entities_by_domain.setdefault(domain, []).extend(occurrences[entity_id])
     shortcuts = _page_shortcuts_from_spec(container.get("entities"))
     if shortcuts:
         entities_by_domain["navigation"] = shortcuts
-    ordered_cards = _ordered_cards_from_spec(container.get("entities"), collected)
 
     path = container.get("path") or (f"room-{make_slug(name)}" if kind == "room" else make_slug(name))
     if kind != "room":
@@ -417,6 +821,29 @@ def _resolve_entity_container(
     }
 
 
+def validate_dashboard_key(key: Any) -> str:
+    """Keep route keys safe for literal YAML entries and navigation paths."""
+    if not isinstance(key, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", key):
+        raise ValueError("Dashboard key must be a lowercase route without spaces or path separators")
+    return key
+
+
+def dashboard_identity(
+    config: dict[str, Any], dashboard_key_override: str | None = None,
+) -> GeneratedDashboard:
+    """Describe saved dashboard ownership without resolving live readings."""
+    normalized = normalize_config(config)
+    slug = normalized["slug"]
+    return GeneratedDashboard(
+        slug=slug,
+        dashboard_key=validate_dashboard_key(dashboard_key_override or dashboard_key_for_slug(slug)),
+        title=normalized["name"],
+        icon=normalized["icon"],
+        filename=f"dashboard/MaraoDashboard/{slug}/dashboard.yaml",
+        files=[],
+    )
+
+
 def plan_dashboard(
     config: dict[str, Any],
     output_base_dir: str | Path,
@@ -429,12 +856,8 @@ def plan_dashboard(
     slug = resolved["slug"]
     output_dir = Path(output_base_dir) / slug
     paths = _generated_relative_paths(resolved)
-    return GeneratedDashboard(
-        slug=slug,
-        dashboard_key=dashboard_key_override or dashboard_key_for_slug(slug),
-        title=resolved["name"],
-        icon=resolved["icon"],
-        filename=f"dashboard/MaraoDashboard/{slug}/dashboard.yaml",
+    return replace(
+        dashboard_identity(resolved, dashboard_key_override),
         files=[str(output_dir / path) for path in paths],
     )
 
@@ -451,21 +874,16 @@ def write_dashboard(
 
     resolved = resolve_dashboard_config(config, registry_entities)
     slug = resolved["slug"]
-    dashboard_key = dashboard_key_override or dashboard_key_for_slug(slug)
+    dashboard_key = validate_dashboard_key(dashboard_key_override or dashboard_key_for_slug(slug))
     output_dir = Path(output_base_dir) / slug
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     files: list[str] = []
 
     include_root = f"{config_root}/dashboard/MaraoDashboard/{slug}"
-    main_views = _main_view_paths(resolved)
-    room_views = _room_view_paths(resolved)
-    custom_views = _custom_view_paths(resolved)
-
-    dashboard_views = [
-        TaggedScalar("!include", f"{include_root}/{path}")
-        for path in [*main_views, *room_views, *custom_views]
-    ]
+    if isinstance(resolved["pages"], list):
+        page_paths, card_files = _page_assets(resolved, include_root, dashboard_key, language)
+    else:
+        page_paths, card_files = _legacy_page_assets(resolved, include_root, dashboard_key, language)
+    dashboard_views = [TaggedScalar("!include", f"{include_root}/{path}") for path in page_paths]
 
     plain_files: dict[str, Any] = {
         "dashboard.yaml": {
@@ -476,6 +894,70 @@ def write_dashboard(
             resolved, dashboard_key, language
         ),
     }
+    for relative_path, view in card_files.items():
+        if relative_path.startswith("views/"):
+            view.setdefault("theme", resolved["theme"])
+
+    old_manifest = _load_generation_manifest(output_dir)
+    custom_cards = _preflight_custom_cards(
+        output_dir,
+        card_files,
+        old_manifest["containers"],
+    )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for relative_path, data in plain_files.items():
+        _write_text(output_dir / relative_path, yaml_dump(_rewrite_external_card_types(data)))
+        files.append(str(output_dir / relative_path))
+
+    for relative_path, data in card_files.items():
+        _write_text(
+            output_dir / relative_path,
+            _render_card_container(data, custom_cards.get(relative_path, "")),
+        )
+        files.append(str(output_dir / relative_path))
+
+    new_plain = set(plain_files)
+    new_containers = set(card_files)
+    for relative_path in old_manifest["plain"]:
+        target = output_dir / relative_path
+        if relative_path not in new_plain and target.is_file():
+            target.unlink()
+    for relative_path in old_manifest["containers"]:
+        target = output_dir / relative_path
+        if relative_path not in new_containers and target.is_file():
+            custom = custom_cards.get(relative_path, "")
+            if _has_custom_cards(custom):
+                _write_text(target, _clear_generated_cards(target.read_text(encoding="utf-8")))
+            else:
+                target.unlink()
+
+    _write_text(
+        output_dir / MANIFEST_NAME,
+        json.dumps(
+            {"version": 1, "generated_contract": GENERATION_CONTRACT_VERSION,
+             "plain": sorted(new_plain), "containers": sorted(new_containers)},
+            indent=2,
+        )
+        + "\n",
+    )
+    files.append(str(output_dir / MANIFEST_NAME))
+
+    return GeneratedDashboard(
+        slug=slug,
+        dashboard_key=dashboard_key,
+        title=resolved["name"],
+        icon=resolved["icon"],
+        filename=f"dashboard/MaraoDashboard/{slug}/dashboard.yaml",
+        files=files,
+    )
+
+
+def _legacy_page_assets(resolved, include_root, dashboard_key, language):
+    main_views = _main_view_paths(resolved)
+    room_views = _room_view_paths(resolved)
+    custom_views = _custom_view_paths(resolved)
+
     card_files: dict[str, dict[str, Any]] = {
         "views/main/00-overview.yaml": _overview_view(
             resolved, include_root, dashboard_key, language
@@ -516,64 +998,13 @@ def write_dashboard(
             resolved, page, include_root, dashboard_key, language
         )
 
-    for relative_path, view in card_files.items():
-        if relative_path.startswith("views/"):
-            view["theme"] = resolved["theme"]
-
-    old_manifest = _load_generation_manifest(output_dir)
-    custom_cards = _preflight_custom_cards(
-        output_dir,
-        card_files,
-        old_manifest["containers"],
-    )
-
-    for relative_path, data in plain_files.items():
-        _write_text(output_dir / relative_path, yaml_dump(_rewrite_external_card_types(data)))
-        files.append(str(output_dir / relative_path))
-
-    for relative_path, data in card_files.items():
-        _write_text(
-            output_dir / relative_path,
-            _render_card_container(data, custom_cards.get(relative_path, "")),
-        )
-        files.append(str(output_dir / relative_path))
-
-    new_plain = set(plain_files)
-    new_containers = set(card_files)
-    for relative_path in old_manifest["plain"]:
-        target = output_dir / relative_path
-        if relative_path not in new_plain and target.is_file():
-            target.unlink()
-    for relative_path in old_manifest["containers"]:
-        target = output_dir / relative_path
-        if relative_path not in new_containers and target.is_file():
-            custom = custom_cards.get(relative_path, "")
-            if _has_custom_cards(custom):
-                _write_text(target, _clear_generated_cards(target.read_text(encoding="utf-8")))
-            else:
-                target.unlink()
-
-    _write_text(
-        output_dir / MANIFEST_NAME,
-        json.dumps(
-            {"version": 1, "plain": sorted(new_plain), "containers": sorted(new_containers)},
-            indent=2,
-        )
-        + "\n",
-    )
-    files.append(str(output_dir / MANIFEST_NAME))
-
-    return GeneratedDashboard(
-        slug=slug,
-        dashboard_key=dashboard_key,
-        title=resolved["name"],
-        icon=resolved["icon"],
-        filename=f"dashboard/MaraoDashboard/{slug}/dashboard.yaml",
-        files=files,
-    )
+    return [*main_views, *room_views, *custom_views], card_files
 
 
 def _generated_relative_paths(config: dict[str, Any]) -> list[str]:
+    if isinstance(config.get("pages"), list):
+        _, assets = _page_assets(config, "", dashboard_key_for_slug(config["slug"]))
+        return ["dashboard.yaml", MANIFEST_NAME, "components/navigation/navbar.yaml", *assets]
     paths = [
         "dashboard.yaml",
         MANIFEST_NAME,
@@ -619,6 +1050,11 @@ def _load_generation_manifest(output_dir: Path) -> dict[str, list[str]]:
         raise ValueError(f"Invalid Marao generation manifest: {err.msg}") from err
     if not isinstance(manifest, dict):
         raise ValueError("Invalid Marao generation manifest")
+    if type(manifest.get("version")) is not int or manifest["version"] != 1:
+        raise ValueError("Unsupported Marao generation manifest version")
+    contract = manifest.get("generated_contract", 0)
+    if type(contract) is not int or not 0 <= contract <= GENERATION_CONTRACT_VERSION:
+        raise ValueError("Unsupported Marao generated contract; use the matching package and data backup")
     paths: dict[str, list[str]] = {}
     for key in ("plain", "containers"):
         values = manifest.get(key, [])
@@ -638,10 +1074,44 @@ def _load_generation_manifest(output_dir: Path) -> dict[str, list[str]]:
 def _write_text(target: Path, text: str) -> None:
     """Atomically write a generated file without touching unrelated paths."""
 
+    _write_bytes(target, text.encode("utf-8"))
+
+
+def _fsync_directory(path: Path) -> None:
+    directory = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
+def _write_bytes(target: Path, content: bytes) -> None:
+    """Replace exact bytes and flush the directory entry for crash recovery."""
+
+    missing_parents = []
+    parent = target.parent
+    while not parent.exists():
+        missing_parents.append(parent)
+        parent = parent.parent
     target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_name(f".{target.name}.tmp")
-    temporary.write_text(text, encoding="utf-8")
-    temporary.replace(target)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", dir=target.parent,
+            prefix=f".{target.name}.", suffix=".tmp", delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            if target.exists():
+                os.fchmod(stream.fileno(), target.stat().st_mode & 0o777)
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(target)
+        for directory in dict.fromkeys([target.parent, *(parent.parent for parent in missing_parents)]):
+            _fsync_directory(directory)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def _preflight_custom_cards(
@@ -853,7 +1323,8 @@ def build_base_dashboard_config(registry_entities: Iterable[dict[str, Any]]) -> 
     )
 
     overview = {"weather_entity": weather_entity} if weather_entity else {}
-    return {
+    starter = {
+        "config_version": 1,
         "name": BASE_DASHBOARD_NAME,
         "slug": BASE_DASHBOARD_SLUG,
         "theme": BASE_DASHBOARD_THEME,
@@ -861,6 +1332,7 @@ def build_base_dashboard_config(registry_entities: Iterable[dict[str, Any]]) -> 
         "overview": overview,
         "rooms": rooms,
     }
+    return migrate_dashboard_config(materialize_overview_groups(starter, entities), entities)
 
 
 def _is_enabled_visible(entity: dict[str, Any]) -> bool:
@@ -868,13 +1340,7 @@ def _is_enabled_visible(entity: dict[str, Any]) -> bool:
 
 
 def _matches_area(entity: dict[str, Any], area: str) -> bool:
-    candidates = {
-        entity.get("area_id"),
-        entity.get("area_name"),
-        entity.get("device_area_id"),
-        entity.get("device_area_name"),
-    }
-    return area in candidates or make_slug(area) in {make_slug(item) for item in candidates if item}
+    return area == (entity.get("area_id") or entity.get("device_area_id"))
 
 
 def _add_entity(target: dict[str, dict[str, Any]], entity: dict[str, Any]) -> None:
@@ -889,6 +1355,7 @@ def _add_entity(target: dict[str, dict[str, Any]], entity: dict[str, Any]) -> No
         "name": entity.get("name") or _friendly_name(entity_id),
         "icon": entity.get("icon"),
         "device_class": entity.get("device_class"),
+        "unit_of_measurement": entity.get("unit_of_measurement"),
         "supported_features": entity.get("supported_features"),
         "device_model": entity.get("device_model"),
         "manufacturer": entity.get("manufacturer"),
@@ -896,7 +1363,9 @@ def _add_entity(target: dict[str, dict[str, Any]], entity: dict[str, Any]) -> No
 
 
 def _merge_entity_spec(target: dict[str, dict[str, Any]], spec: Any) -> None:
-    if isinstance(spec, dict):
+    if isinstance(spec, dict) and spec.get("template") == "hc_entity_group_card":
+        return
+    if isinstance(spec, dict) and "entity_id" not in spec and "page" not in spec:
         for domain, values in spec.items():
             if domain in SUPPORTED_DOMAINS:
                 for entity in _entities_from_values(values):
@@ -921,14 +1390,13 @@ def _entities_from_values(values: Any) -> list[dict[str, Any]]:
     entities = []
     for value in values:
         if isinstance(value, str):
-            entities.append({"entity_id": value, "name": _friendly_name(value)})
+            entities.append({"entity_id": value})
         elif isinstance(value, dict) and isinstance(value.get("entity_id"), str):
             entity_id = value["entity_id"]
             entities.append(
                 {
                     **value,
                     "entity_id": entity_id,
-                    "name": value.get("name") or _friendly_name(entity_id),
                 }
             )
     return entities
@@ -950,7 +1418,7 @@ def _flatten_dict_spec(spec: Any) -> list[dict[str, Any]]:
 
 
 def _page_shortcuts_from_spec(spec: Any) -> list[dict[str, Any]]:
-    values = list(spec.values()) if isinstance(spec, dict) else [spec]
+    values = list(spec.values()) if isinstance(spec, dict) and "entity_id" not in spec and "page" not in spec and spec.get("template") != "hc_entity_group_card" else [spec]
     shortcuts: list[dict[str, Any]] = []
     for value in values:
         entries = value if isinstance(value, list) else [value]
@@ -961,14 +1429,17 @@ def _page_shortcuts_from_spec(spec: Any) -> list[dict[str, Any]]:
 
 
 def _ordered_cards_from_spec(
-    spec: Any, collected: dict[str, dict[str, Any]]
+    spec: Any, collected: dict[str, dict[str, Any]], overrides: dict[str, Any]
 ) -> list[dict[str, Any]]:
-    values = list(spec.values()) if isinstance(spec, dict) else [spec]
+    values = list(spec.values()) if isinstance(spec, dict) and "entity_id" not in spec and "page" not in spec and spec.get("template") != "hc_entity_group_card" else [spec]
     ordered: list[dict[str, Any]] = []
     seen: set[str] = set()
     for value in values:
         entries = value if isinstance(value, list) else [value]
         for entry in entries:
+            if isinstance(entry, dict) and entry.get("template") == "hc_entity_group_card":
+                ordered.append(deepcopy(entry))
+                continue
             if isinstance(entry, dict) and isinstance(entry.get("page"), str):
                 ordered.append({**entry, "template": "hc_navigation_card"})
                 continue
@@ -979,8 +1450,16 @@ def _ordered_cards_from_spec(
                 if isinstance(entry, dict)
                 else None
             )
-            if isinstance(entity_id, str) and entity_id in collected and entity_id not in seen:
-                ordered.append(collected[entity_id])
+            if isinstance(entity_id, str) and entity_id in collected:
+                metadata = {key: collected[entity_id].get(key) for key in (
+                    "entity_id", "name", "icon", "device_class", "unit_of_measurement",
+                    "supported_features", "device_model", "manufacturer",
+                )}
+                occurrence = {**metadata, **_entities_from_values(entry)[0]}
+                if isinstance(overrides.get(entity_id), dict):
+                    occurrence.update(overrides[entity_id])
+                occurrence["unit_of_measurement"] = metadata["unit_of_measurement"]
+                ordered.append(occurrence)
                 seen.add(entity_id)
     ordered.extend(entity for entity_id, entity in collected.items() if entity_id not in seen)
     return ordered
@@ -1018,6 +1497,8 @@ def _first_entity(config: dict[str, Any], domain: str) -> str | None:
 
 
 def _navigation_bar(config: dict[str, Any], dashboard_key: str, language: str = "en") -> dict[str, Any]:
+    if isinstance(config.get("pages"), list):
+        return _page_navigation_bar(config, dashboard_key, language)
     base = f"/{dashboard_key}"
     available = {
         "overview": {
@@ -1096,26 +1577,7 @@ def _overview_view(
             }
         )
 
-    nav_cards = []
-    for domain, title, icon, popup_hash in [
-        ("light", _t(language, "overview.lights"), "mdi:lightbulb-group-outline", "#overview-lights"),
-        ("cover", _t(language, "overview.blinds"), "mdi:window-shutter", "#overview-blinds"),
-        ("climate", _t(language, "overview.climate"), "mdi:thermostat", "#overview-climate"),
-    ]:
-        entities = _all_entities(config, domain)
-        if entities:
-            nav_cards.append(_overview_nav_card(title, icon, entities, popup_hash))
-
-    battery_entities = _battery_entities(config)
-    if battery_entities:
-        nav_cards.append(
-            _overview_nav_card(
-                _t(language, "overview.maintenance"),
-                "mdi:wrench",
-                battery_entities,
-                "#overview-maintenance",
-            )
-        )
+    nav_cards = [_entity_group_card(group, language) for group in overview["entity_groups"]]
 
     scene_entities = _overview_scene_entities(config)
     if scene_entities:
@@ -1164,7 +1626,7 @@ def _overview_scene_entities(config: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _scenes_popup(config: dict[str, Any], language: str = "en") -> dict[str, Any]:
     entities = _overview_scene_entities(config)
-    primary = entities[0]["entity_id"] if entities else "sun.sun"
+    primary = entities[0]["entity_id"] if entities else None
     return {
         **_popup_header(
             "#overview-scenes",
@@ -1275,7 +1737,7 @@ def _page_action_card(entity: dict[str, Any]) -> dict[str, Any]:
         action = {"action": "toggle", "haptic": "heavy"}
     card = {
         "type": "custom:marao-card",
-        "template": entity.get("template") or "hc_switch_card",
+        "template": "hc_access_hold_action_card",
         "entity": entity["entity_id"],
         "name": entity.get("name") or _friendly_name(entity["entity_id"]),
         "show_state": False,
@@ -1307,7 +1769,7 @@ def _energy_view(config: dict[str, Any], include_root: str, language: str = "en"
         if entity := _page_entity(page, field):
             period_cards.append(_energy_period_card(entity, title, period, icon, popup))
     if period_cards:
-        cards.append({"type": "grid", "columns": 2, "square": False, "cards": period_cards})
+        cards.extend(period_cards)
 
     load_cards = []
     for load in page.get("loads", []):
@@ -1317,7 +1779,10 @@ def _energy_view(config: dict[str, Any], include_root: str, language: str = "en"
         if not power:
             continue
         toggle_entity = load.get("toggle_entity")
-        variables = load.get("variables") if isinstance(load.get("variables"), dict) else {}
+        variables = {
+            **(power.get("variables") if isinstance(power.get("variables"), dict) else {}),
+            **(load.get("variables") if isinstance(load.get("variables"), dict) else {}),
+        }
         if toggle_entity:
             variables = {"toggle_entity": toggle_entity, **variables}
         load_cards.append(
@@ -1377,10 +1842,14 @@ def _energy_period_card(
     entity: dict[str, Any], title: str, period: str, icon: str, popup_hash: str | None,
     *, popup: bool = False,
 ) -> dict[str, Any]:
+    variables = entity.get("variables")
+    variables = variables if isinstance(variables, dict) else {}
     return {
         "type": "custom:marao-energy-period-card",
+        **{key: value for key, value in variables.items()
+           if key in ("display_unit", "display_precision")},
         "entity": entity["entity_id"],
-        "name": title,
+        "name": entity.get("name") or title,
         "period": period,
         "popup_hash": popup_hash,
         "popup": popup,
@@ -1402,7 +1871,7 @@ def _energy_popups(config: dict[str, Any], language: str = "en") -> dict[str, di
         entities = [entity for field in fields if (entity := _page_entity(page, field))]
         if entities:
             popups[name] = {
-                **_popup_header(popup_hash, entities[0]["entity_id"], title, icon, "720px"),
+                **_popup_header(popup_hash, entities[0]["entity_id"], entities[0].get("name") or title, entities[0].get("icon") or icon, "720px"),
                 "cards": [
                     _energy_period_card(
                         entity,
@@ -1573,6 +2042,261 @@ def _custom_page_view(
     }
 
 
+def _configured_name(item, language="en"):
+    key = item.get("name_key")
+    if key and item.get("name") == GENERATOR_TRANSLATIONS["en"].get(key):
+        return _t(language, key)
+    return item.get("name") or _friendly_name(item.get("entity_id") or item.get("path") or item.get("id") or "")
+
+
+def _resolve_pages(config, registry=None):
+    """Validate and resolve each occurrence without persisting live metadata."""
+    from .editor import EDITOR_CATALOG
+    from .page_model import page_entries, page_sections, validate_pages
+
+    templates = {card["id"]: card["domains"] for card in EDITOR_CATALOG["cards"]}
+    validate_pages(config, templates)
+    resolved = deepcopy(config)
+    resolved.setdefault("slug", make_slug(resolved["name"]))
+    resolved.setdefault("theme", BASE_DASHBOARD_THEME)
+    resolved.setdefault("icon", BASE_DASHBOARD_ICON)
+    metadata = {entity["entity_id"]: entity for entity in registry or []}
+    defaults = {**DOMAIN_TEMPLATES, "weather": "hc_weather_card", "alarm_control_panel": "hc_security_card",
+                "button": "hc_access_hold_action_card", "scene": "hc_switch_card"}
+    for page in resolved["pages"]:
+        position = 0
+        card_ids = set()
+        group_ids = set()
+        sections = deepcopy(page_sections(page))
+        for section in sections:
+            selected = []
+            for source in page_entries(section.get("entities")):
+                position += 1
+                entity_id = source.get("entity_id")
+                entity = {**metadata.get(entity_id, {}), **deepcopy(source)}
+                entity["id"] = source.get("id") or f"card-{position}"
+                if entity["id"] in card_ids:
+                    raise ValueError(f"Page {page['name']}: conflicting local card identity {entity['id']}")
+                card_ids.add(entity["id"])
+                domain = str(entity_id).split(".", 1)[0]
+                role = source.get("template") or ("hc_navigation_card" if source.get("page") else _domain_template(entity) if domain in DOMAIN_TEMPLATES else defaults.get(domain))
+                if not role:
+                    raise ValueError(f"Page {page['name']}: choose a supported template for {entity_id}")
+                entity["template"] = role
+                entity["_page_instance"] = page["id"] if page.get("id") else page["path"]
+                if entity_id:
+                    entity["name"] = source.get("name") or metadata.get(entity_id, {}).get("name") or _friendly_name(entity_id)
+                    entity["unit_of_measurement"] = metadata.get(entity_id, {}).get("unit_of_measurement")
+                variables = dict(source.get("variables") or {})
+                prefix = f"#page-{page['path']}-{entity['id']}"
+                popup_role = role in ("hc_media_card", "hc_camera_card", "hc_entity_group_card", "hc_scene_collection_card", "hc_energy_period_card")
+                if popup_role or entity_id and _is_access_entity(entity):
+                    variables.setdefault("popup_hash", prefix + "-popup")
+                if role == "hc_graph_card" and variables.get("history_popup"):
+                    variables.setdefault("popup_hash", prefix + "-history")
+                if role == "hc_climate_card":
+                    variables.setdefault("mode_selector_hash", prefix + "-modes")
+                entity["variables"] = variables
+                if role == "hc_entity_group_card":
+                    entity = _resolve_entity_group(entity, list(metadata.values()), group_ids, canonical_page=True)
+                selected.append(entity)
+            section["ordered_cards"] = selected
+        page["_sections"] = sections
+    # Historical options remain opaque and never participate in current validation.
+    _validate_energy_formatting(resolved["pages"], list(metadata.values()))
+    for page in resolved["pages"]:
+        hashes = set()
+        for section in page["_sections"]:
+            for entity in section["ordered_cards"]:
+                for popup in _page_card_popups(entity):
+                    popup_hash = popup["hash"]
+                    if not isinstance(popup_hash, str) or not re.fullmatch(r"#[a-zA-Z0-9][a-zA-Z0-9_-]*", popup_hash) or popup_hash in hashes:
+                        raise ValueError(f"Page {page['name']}: invalid or conflicting popup hash {popup_hash}")
+                    hashes.add(popup_hash)
+            def check_raw(value):
+                if isinstance(value, dict):
+                    if value.get("type") == "custom:marao-popup-card":
+                        popup_hash = value.get("hash")
+                        if not isinstance(popup_hash, str) or not re.fullmatch(r"#[a-zA-Z0-9][a-zA-Z0-9_-]*", popup_hash) or popup_hash in hashes:
+                            raise ValueError(f"Page {page['name']}: invalid or conflicting raw popup hash")
+                        hashes.add(popup_hash)
+                    for child in value.values():
+                        check_raw(child)
+                elif isinstance(value, list):
+                    for child in value:
+                        check_raw(child)
+            check_raw(section.get("cards", []))
+        def check_links(value):
+            if isinstance(value, dict):
+                links = [value.get("navigation_path")]
+                if value.get("template") in ("hc_media_card", "hc_camera_card", "hc_access_card", "hc_entity_group_card", "hc_climate_card"):
+                    links.extend(value.get("variables", {}).get(key) for key in ("popup_hash", "mode_selector_hash"))
+                for link in links:
+                    if isinstance(link, str) and link.startswith(("#page-", "#entity-group-", "#overview-", "#energy-", "#climate-mode-", "#access-", "#media-", "#camera-")) and link not in hashes:
+                        raise ValueError(f"Page {page['name']}: retarget or remove missing popup link {link}")
+                for child in value.values():
+                    check_links(child)
+            elif isinstance(value, list):
+                for child in value:
+                    check_links(child)
+        check_links(_page_view(page, "", dashboard_key_for_slug(resolved["slug"])))
+    return resolved
+
+
+def _page_card(entity, dashboard_key, language="en"):
+    item = {**entity, "name": _configured_name(entity, language)}
+    role = item["template"]
+    variables = item.get("variables", {})
+    if role == "hc_entity_group_card":
+        return _entity_group_card(item, language)
+    if role == "hc_scene_collection_card":
+        return {"type": "custom:marao-card", "template": "hc_navigation_card", "name": item["name"],
+                "icon": item.get("icon") or "mdi:palette-outline", "show_state": False,
+                "tap_action": {"action": "navigate", "navigation_path": variables["popup_hash"], "haptic": "heavy"}}
+    if role == "hc_title_card":
+        card = _title_card(item["name"])
+    elif role == "hc_energy_period_card":
+        card = _energy_period_card(item, item["name"], variables.get("period", "day"), item.get("icon") or "mdi:flash", variables["popup_hash"])
+    elif item.get("page"):
+        card = _page_shortcut_card(item, dashboard_key)
+        card["template"] = role
+    elif role in ("hc_navigation_card", "hc_room_card") and not item.get("entity_id"):
+        card = {"type": "custom:marao-card", "template": role, "variables": deepcopy(variables)}
+    elif role == "hc_access_hold_action_card":
+        card = _page_action_card(item)
+        card["template"] = role
+    elif str(item.get("entity_id") or "").startswith("scene."):
+        card = _scene_card(item)
+    else:
+        card = _room_entity_card(item)
+    for key in ("name", "icon", "show_name", "show_icon", "show_state", "show_label", "tap_action", "hold_action", "double_tap_action"):
+        if key == "name" and role == "hc_timeline_card" and variables.get("timeline_name"):
+            continue
+        if key == "tap_action" and item.get("page"):
+            continue
+        if key in item:
+            card[key] = item[key]
+    if role == "hc_graph_card" and variables.get("history_popup"):
+        card["tap_action"] = {"action": "navigate", "navigation_path": variables["popup_hash"], "haptic": "heavy"}
+    return card
+
+
+def _page_card_popups(entity, language="en"):
+    item = {**entity, "name": _configured_name(entity, language)}
+    role, variables = item["template"], item.get("variables", {})
+    if role == "hc_entity_group_card":
+        return [_entity_group_popup(item, language), *_entity_group_secondary_popups(item, language)]
+    if role == "hc_scene_collection_card":
+        from .page_model import page_entries
+        return [{**_popup_header(variables["popup_hash"], None, item["name"], item.get("icon") or "mdi:palette-outline", "520px"),
+                 "cards": [_scene_card(member) for member in page_entries(item["entities"])] or
+                          [{"type": "markdown", "content": _t(language, "overview.scenes_empty")}]}]
+    if role == "hc_energy_period_card" or role == "hc_graph_card" and variables.get("history_popup"):
+        card = _energy_period_card(item, item["name"], variables.get("period", "day"), item.get("icon") or "mdi:flash", None, popup=True) if role == "hc_energy_period_card" else _energy_graph_card(item, item["name"], item.get("icon") or "mdi:flash", None)
+        return [{**_popup_header(variables["popup_hash"], item["entity_id"], item["name"], item.get("icon") or "mdi:flash", "720px"), "cards": [card]}]
+    if role == "hc_climate_card":
+        return [_climate_mode_popup(item, language)]
+    if role == "hc_media_card":
+        return [_media_popup(item)]
+    if role == "hc_camera_card":
+        return [_camera_popup(item, language)]
+    if item.get("entity_id") and _is_access_entity(item) and not _is_open_only_access(item):
+        return [_access_popup(item, language)]
+    return []
+
+
+def _page_view(page, include_root, dashboard_key, language="en"):
+    cards, popups = [], []
+    for section in page["_sections"]:
+        entries = section["ordered_cards"]
+        rendered = [_page_card(entity, dashboard_key, language) for entity in entries]
+        raw = deepcopy(section.get("cards", []))
+        if section.get("columns"):
+            if rendered or raw:
+                content = [*rendered, *raw]
+                if section["columns"] == 1 and len(content) == 1:
+                    cards.extend(content)
+                else:
+                    cards.append({"type": "grid", "columns": section["columns"], "square": False, "cards": content})
+        else:
+            # Preserve the historical automatic domain layout; fixed grids keep mixed order.
+            domains = ["sensor", "binary_sensor", "camera", "lock", "cover", "climate", "fan", "switch", "input_boolean", "media_player", "vacuum", "number", "input_number", "light", "navigation", "entity_group"]
+            buckets = {}
+            for entity, card in zip(entries, rendered, strict=True):
+                domain = "navigation" if entity.get("page") else "entity_group" if entity["template"] == "hc_entity_group_card" else str(entity.get("entity_id") or "").split(".", 1)[0]
+                buckets.setdefault(domain, []).append(card)
+            for domain in [*domains, *(key for key in buckets if key not in domains)]:
+                if bucket := buckets.get(domain):
+                    cards.append({"type": "grid", "columns": 2 if domain in ("sensor", "binary_sensor", "switch", "input_boolean", "number", "input_number", "light", "navigation", "entity_group") else 1, "square": False, "cards": bucket})
+            cards.extend(raw)
+        popups.extend(popup for entity in entries for popup in _page_card_popups(entity, language))
+    cards.extend(popups)
+    cards.append(TaggedScalar("!include", f"{include_root}/components/navigation/navbar.yaml"))
+    return {"title": _configured_name(page, language), "path": page["path"], "cards": cards,
+            **{key: page[key] for key in ("icon", "theme", "subview") if key in page}}
+
+
+def _page_navigation_bar(config, dashboard_key, language="en"):
+    available = {page["path"]: page for page in config["pages"]}
+    routes = []
+    base = f"/{dashboard_key}"
+    source_base = f"/{dashboard_key_for_slug(config['slug'])}"
+    for entry in config.get("navigation", []):
+        path = entry if isinstance(entry, str) else entry.get("page")
+        if path in available:
+            page = available[path]
+            overrides = entry if isinstance(entry, dict) else {}
+            route = {"icon": page.get("icon") or "mdi:file-outline", "icon_selected": page.get("icon") or "mdi:file-outline",
+                     "label": _configured_name(page, language), **overrides, "url": f"{base}/{path}"}
+            if overrides.get("label_key"):
+                route["label"] = _configured_name({"name": overrides.get("label"), "name_key": overrides["label_key"]}, language)
+            url = overrides.get("url")
+            if url and not overrides.get("label_key") and url not in (f"{base}/{path}", f"{source_base}/{path}"):
+                route["url"] = url
+            routes.append(route)
+        else:
+            routes.append(deepcopy(entry))
+    return {"type": "vertical-stack", "cards": [{"type": "custom:marao-navbar-card", "routes": routes}]}
+
+
+def _page_assets(config, include_root, dashboard_key, language="en"):
+    """Use common protected containers, retaining historical owned filenames."""
+    paths, assets = [], {}
+    pages = config["pages"]
+    ordered = [page for page in pages if page["path"] == config["landing_page"]]
+    ordered.extend(page for page in pages if page["path"] != config["landing_page"])
+    for page in ordered:
+        path = page.get("output_path") or f"views/pages/{page.get('id') or page['path']}.yaml"
+        if path in assets:
+            raise ValueError("Pages resolve to the same generated view file")
+        paths.append(path)
+        view = _page_view(page, include_root, dashboard_key, language)
+        generated_hashes = {popup["hash"] for section in page["_sections"] for entity in section["ordered_cards"]
+                            for popup in _page_card_popups(entity, language)}
+        secondary_paths = {}
+        for section in page["_sections"]:
+            for group in section["ordered_cards"]:
+                if group["template"] == "hc_entity_group_card" and _entity_group_hash(group) in ("#" + group["id"], "#entity-group-" + group["id"]):
+                    for index, popup in enumerate(_entity_group_secondary_popups(group, language)):
+                        secondary_paths[popup["hash"]] = f"components/popups/{_entity_group_hash(group)[1:].replace('-', '_')}_{index}.yaml"
+        for index, card in enumerate(view["cards"]):
+            if isinstance(card, dict) and card.get("type") == "custom:marao-popup-card" and card["hash"] in generated_hashes:
+                popup_hash = card["hash"]
+                filename = popup_hash[1:]
+                if filename.startswith(("overview-", "energy-", "entity-group-")):
+                    filename = filename.replace("-", "_")
+                popup_path = secondary_paths.get(popup_hash, f"components/popups/{filename}.yaml")
+                if popup_path in assets:
+                    popup_path = f"components/popups/{page.get('id') or page['path']}-{filename}.yaml"
+                if popup_path in assets:
+                    raise ValueError("Popups resolve to the same generated file")
+                assets[popup_path] = card
+                view["cards"][index] = TaggedScalar("!include", f"{include_root}/{popup_path}")
+        view["theme"] = config["theme"]
+        assets[path] = view
+    return paths, assets
+
+
 def _entity_container_cards(
     container: dict[str, Any], include_root: str, dashboard_key: str, language: str
 ) -> list[Any]:
@@ -1589,6 +2313,8 @@ def _entity_container_cards(
                 "cards": [
                     _page_shortcut_card(item, dashboard_key)
                     if item.get("page")
+                    else _entity_group_card(item, language)
+                    if item.get("template") == "hc_entity_group_card"
                     else _room_entity_card(item)
                     for item in container["ordered_cards"]
                 ]
@@ -1612,6 +2338,7 @@ def _entity_container_cards(
             ("input_number", 2),
             ("light", 2),
             ("navigation", 2),
+            ("entity_group", 2),
         ]:
             entities = container["entities_by_domain"].get(domain, [])
             if entities:
@@ -1623,6 +2350,8 @@ def _entity_container_cards(
                         "cards": [
                             _page_shortcut_card(entity, dashboard_key)
                             if domain == "navigation"
+                            else _entity_group_card(entity, language)
+                            if domain == "entity_group"
                             else _room_entity_card(entity)
                             for entity in entities
                         ],
@@ -1631,6 +2360,9 @@ def _entity_container_cards(
 
     if not container.get("columns"):
         cards.extend(container["cards"])
+    for group in container["entities_by_domain"].get("entity_group", []):
+        cards.append(_entity_group_popup(group, language))
+        cards.extend(_entity_group_secondary_popups(group, language))
     cards.extend(
         _climate_mode_popup(entity, language)
         for entity in container["entities_by_domain"].get("climate", [])
@@ -1737,7 +2469,7 @@ def _room_entity_card(entity: dict[str, Any]) -> dict[str, Any]:
             "popup_hash": _access_popup_hash(entity["entity_id"]),
             **(entity.get("variables") if isinstance(entity.get("variables"), dict) else {}),
         }
-        return _entity_card({**entity, "variables": variables})
+        return _entity_card({**entity, "template": "hc_access_card", "variables": variables})
 
     if not entity["entity_id"].startswith("climate."):
         if entity["entity_id"].startswith("camera."):
@@ -1746,7 +2478,7 @@ def _room_entity_card(entity: dict[str, Any]) -> dict[str, Any]:
                 **(entity.get("variables") if isinstance(entity.get("variables"), dict) else {}),
             }
             return _entity_card({**entity, "variables": variables})
-        if entity["entity_id"].startswith("media_player."):
+        if entity["entity_id"].startswith("media_player.") and entity.get("template", "hc_media_card") == "hc_media_card":
             variables = {
                 "popup_hash": _media_popup_hash(entity["entity_id"]),
                 **(entity.get("variables") if isinstance(entity.get("variables"), dict) else {}),
@@ -1796,7 +2528,7 @@ def _apple_tv_options(entity: dict[str, Any]) -> dict[str, Any] | None:
     return {
         "remote_entity": options.get("remote_entity") or entity.get("remote_entity") or f"remote.{object_id}",
         "volume_remote_entity": options.get("volume_remote_entity") or entity.get("volume_remote_entity"),
-        "apps": options.get("apps") or entity.get("apple_tv_apps") or [],
+        "apps": options["apps"] if "apps" in options else entity.get("apple_tv_apps", []),
     }
 
 
@@ -1898,6 +2630,7 @@ def _remote_button(
 def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
     entity_id = entity["entity_id"]
     name = entity.get("name") or _friendly_name(entity_id)
+    popup_hash = (entity.get("variables") or {}).get("popup_hash") or _media_popup_hash(entity_id)
     apple_tv = _apple_tv_options(entity)
     if not apple_tv:
         controls = [
@@ -1906,7 +2639,7 @@ def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
             _media_button(entity_id, icon="mdi:skip-next", name="Next", service="media_player.media_next_track"),
         ]
         return {
-            **_popup_header(_media_popup_hash(entity_id), entity_id, name, "mdi:music", "420px"),
+            **_popup_header(popup_hash, entity_id, name, "mdi:music", "420px"),
             "cards": [{"type": "grid", "columns": 3, "square": False, "cards": controls}],
         }
 
@@ -1954,8 +2687,8 @@ def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
         ]
     )
     volume_remote = apple_tv["volume_remote_entity"]
-    volume_down = _remote_button(entity_id, volume_remote, "KEY_VOLDOWN", icon="mdi:volume-minus", name="Volume down") if volume_remote else _media_button(entity_id, icon="mdi:volume-minus", name="Volume down", service="media_player.volume_down")
-    volume_up = _remote_button(entity_id, volume_remote, "KEY_VOLUP", icon="mdi:volume-plus", name="Volume up") if volume_remote else _media_button(entity_id, icon="mdi:volume-plus", name="Volume up", service="media_player.volume_up")
+    volume_down = _remote_button(entity_id, volume_remote, "KEY_VOLDOWN", icon="mdi:volume-minus", name="Volume down") if volume_remote and volume_remote.startswith("remote.") else _media_button(entity_id, icon="mdi:volume-minus", name="Volume down", service="media_player.volume_down", target_entity_id=volume_remote)
+    volume_up = _remote_button(entity_id, volume_remote, "KEY_VOLUP", icon="mdi:volume-plus", name="Volume up") if volume_remote and volume_remote.startswith("remote.") else _media_button(entity_id, icon="mdi:volume-plus", name="Volume up", service="media_player.volume_up", target_entity_id=volume_remote)
     media_controls.append(
         {"type": "grid", "columns": 3, "square": False, "cards": [
             volume_down,
@@ -1964,7 +2697,7 @@ def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
         ]}
     )
     return {
-        **_popup_header(_media_popup_hash(entity_id), entity_id, name, "mdi:remote-tv", "780px"),
+        **_popup_header(popup_hash, entity_id, name, "mdi:remote-tv", "780px"),
         "cards": media_controls,
     }
 
@@ -1992,7 +2725,7 @@ def _camera_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any
 
     return {
         **_popup_header(
-            _camera_popup_hash(entity_id),
+            variables.get("popup_hash") or _camera_popup_hash(entity_id),
             entity_id,
             entity.get("name") or _friendly_name(entity_id),
             entity.get("icon") or "mdi:cctv",
@@ -2009,6 +2742,8 @@ def _is_access_entity(entity: dict[str, Any]) -> bool:
         return True
     if domain != "cover":
         return False
+    if entity.get("template") == "hc_access_card":
+        return True
     device_class = str(entity.get("device_class") or "").lower()
     name = f"{entity_id} {entity.get('name') or ''}".lower()
     return device_class in {"door", "garage", "gate"} or any(
@@ -2107,7 +2842,7 @@ def _access_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any
 
     popup_cards = [{"type": "grid", "columns": 1, "square": False, "cards": actions}]
     return {
-        **_popup_header(_access_popup_hash(entity["entity_id"]), entity["entity_id"], name, icon, "420px"),
+        **_popup_header((entity.get("variables") or {}).get("popup_hash") or _access_popup_hash(entity["entity_id"]), entity["entity_id"], name, icon, "420px"),
         "cards": popup_cards,
     }
 
@@ -2115,7 +2850,7 @@ def _access_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any
 def _climate_mode_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any]:
     return {
         **_popup_header(
-            _climate_mode_hash(entity["entity_id"]),
+            (entity.get("variables") or {}).get("mode_selector_hash") or _climate_mode_hash(entity["entity_id"]),
             entity["entity_id"],
             f"{entity.get('name') or _friendly_name(entity['entity_id'])} {_t(language, 'climate.mode_suffix')}",
             "mdi:thermostat",
@@ -2146,43 +2881,57 @@ def _sensor_template(entity: dict[str, Any]) -> str | None:
     return None
 
 
-def _entity_popup(config: dict[str, Any], domain: str, language: str = "en") -> dict[str, Any]:
-    entities = _all_entities(config, domain)
-    names = {
-        "light": ("#overview-lights", _t(language, "overview.lights"), "mdi:lightbulb-group-outline", "920px"),
-        "climate": ("#overview-climate", _t(language, "overview.climate"), "mdi:thermostat", "760px"),
-        "cover": ("#overview-blinds", _t(language, "overview.blinds"), "mdi:window-shutter", "820px"),
-    }
-    popup_hash, name, icon, height = names[domain]
-    primary = entities[0]["entity_id"] if entities else "sun.sun"
-    entity_cards = []
-    for entity in entities:
-        popup_entity = {**entity, "name": f"{entity['name']} - {entity['room_name']}"}
-        if domain == "cover":
-            popup_entity["template"] = "hc_cover_card"
-        card = _entity_card(popup_entity)
-        entity_cards.append(card)
-    cards = entity_cards if domain == "climate" else [_popup_grid(entity_cards)]
-    return {**_popup_header(popup_hash, primary, name, icon, height), "cards": cards}
+def _entity_group_hash(group):
+    if (group.get("variables") or {}).get("popup_hash"):
+        return group["variables"]["popup_hash"]
+    return "#" + (group["id"] if group["id"] in {"overview-lights", "overview-blinds", "overview-climate", "overview-maintenance"}
+                  else "entity-group-" + group["id"])
 
 
-def _maintenance_popup(config: dict[str, Any], language: str = "en") -> dict[str, Any]:
-    entities = _battery_entities(config)
-    primary = entities[0]["entity_id"] if entities else "sun.sun"
-    return {
-        **_popup_header(
-            "#overview-maintenance",
-            primary,
-            _t(language, "overview.maintenance"),
-            "mdi:wrench",
-            "680px",
-        ),
-        "cards": [
-            {
-                **_popup_grid([_entity_card(entity) for entity in entities]),
-            }
-        ],
-    }
+def _entity_group_name(group, language):
+    keys = {"light": "overview.lights", "cover": "overview.blinds", "climate": "overview.climate", "battery": "overview.maintenance"}
+    return _t(language, keys[group["entity_type"]]) if group.get("_legacy_overview") else _configured_name(group, language)
+
+
+def _entity_group_card(group, language="en"):
+    return {"type": "custom:marao-card", "template": "hc_entity_group_card", "id": group["id"], "name": _entity_group_name(group, language),
+            "icon": group.get("icon") or {"light": "mdi:lightbulb-group-outline", "cover": "mdi:window-shutter",
+                                           "climate": "mdi:thermostat", "battery": "mdi:battery"}[group["entity_type"]],
+            "variables": {"entity_type": group["entity_type"], "summary_entities": [member["entity_id"] for member in group["entities"]]},
+            "tap_action": {"action": "navigate", "navigation_path": _entity_group_hash(group), "haptic": "heavy"}}
+
+
+def _entity_group_members(group):
+    members = []
+    for member in group["entities"]:
+        variables = dict(member.get("variables") or {})
+        popup_hash = _entity_group_hash(group)
+        historical = popup_hash in ("#" + group["id"], "#entity-group-" + group["id"])
+        prefix = (popup_hash if group.get("_page_instance") and not historical else "#entity-group-" + group["id"]) + "-" + member["entity_id"].replace(".", "-")
+        if member["entity_id"].startswith("climate."):
+            variables.setdefault("mode_selector_hash", prefix + "-modes")
+        if _is_access_entity(member):
+            variables.setdefault("popup_hash", prefix + "-access")
+        name = member.get("name") or _friendly_name(member["entity_id"])
+        if group.get("_legacy_overview") and group["entity_type"] != "battery" and member.get("room_name"):
+            name += " - " + member["room_name"]
+        members.append({**member, "name": name, "variables": variables})
+    return members
+
+
+def _entity_group_popup(group, language="en"):
+    name = _entity_group_name(group, language)
+    height = {"light": "920px", "cover": "820px", "climate": "760px", "battery": "680px"}[group["entity_type"]]
+    return {**_popup_header(_entity_group_hash(group), None, name, group.get("icon") or "mdi:view-list", height),
+            "entity_group": {"id": group["id"], "entity_type": group["entity_type"], "popup_filter": group["popup_filter"],
+                             "entities": [member["entity_id"] for member in group["entities"]]},
+            "cards": [_room_entity_card(member) for member in _entity_group_members(group)]}
+
+
+def _entity_group_secondary_popups(group, language="en"):
+    return [_climate_mode_popup(member, language) if member["entity_id"].startswith("climate.") else _access_popup(member, language)
+            for member in _entity_group_members(group)
+            if member["entity_id"].startswith("climate.") or (_is_access_entity(member) and not _is_open_only_access(member))]
 
 
 def _popup_grid(cards: list[dict[str, Any]]) -> dict[str, Any]:
@@ -2200,17 +2949,14 @@ def _battery_entities(config: dict[str, Any]) -> list[dict[str, Any]]:
 def _overview_popups(
     config: dict[str, Any], language: str = "en"
 ) -> dict[str, dict[str, Any]]:
-    popups = {
-        name: _entity_popup(config, domain, language)
-        for name, domain in (
-            ("overview_lights", "light"),
-            ("overview_blinds", "cover"),
-            ("overview_climate", "climate"),
-        )
-        if _all_entities(config, domain)
-    }
-    if _battery_entities(config):
-        popups["overview_maintenance"] = _maintenance_popup(config, language)
+    legacy_names = {"overview-lights": "overview_lights", "overview-blinds": "overview_blinds",
+                    "overview-climate": "overview_climate", "overview-maintenance": "overview_maintenance"}
+    popups = {}
+    for group in config["overview"]["entity_groups"]:
+        name = legacy_names.get(group["id"], "entity_group_" + group["id"])
+        popups[name] = _entity_group_popup(group, language)
+        for index, popup in enumerate(_entity_group_secondary_popups(group, language)):
+            popups[f"{name}_{index}"] = popup
     if _overview_scene_entities(config):
         popups["overview_scenes"] = _scenes_popup(config, language)
     return popups
@@ -2222,7 +2968,7 @@ def _popup_header(
     return {
         "type": "custom:marao-popup-card",
         "hash": popup_hash,
-        "entity": entity_id,
+        **({"entity": entity_id} if entity_id else {}),
         "name": name,
         "icon": icon,
         "show_icon": True,

@@ -1,0 +1,13 @@
+title: Marao Dashboard
+views:
+- !include '/config/dashboard/MaraoDashboard/dashboard/views/main/00-overview.yaml'
+- !include '/config/dashboard/MaraoDashboard/dashboard/views/main/01-security.yaml'
+- !include '/config/dashboard/MaraoDashboard/dashboard/views/main/02-rooms.yaml'
+- !include '/config/dashboard/MaraoDashboard/dashboard/views/main/03-energy.yaml'
+- !include '/config/dashboard/MaraoDashboard/dashboard/views/main/04-wallbox.yaml'
+- !include '/config/dashboard/MaraoDashboard/dashboard/views/main/05-media.yaml'
+- !include '/config/dashboard/MaraoDashboard/dashboard/views/rooms/00-living-room.yaml'
+- !include '/config/dashboard/MaraoDashboard/dashboard/views/rooms/01-entrance.yaml'
+- !include '/config/dashboard/MaraoDashboard/dashboard/views/rooms/02-utility-room.yaml'
+- !include '/config/dashboard/MaraoDashboard/dashboard/views/rooms/03-empty-room.yaml'
+- !include '/config/dashboard/MaraoDashboard/dashboard/views/custom/00-appliances.yaml'

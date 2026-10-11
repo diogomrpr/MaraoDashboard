@@ -1,0 +1,26 @@
+type: custom:marao-popup-card
+hash: '#overview-maintenance'
+entity: sensor.marao_dashboard_test_battery
+name: Maintenance
+icon: mdi:wrench
+show_icon: true
+show_name: true
+show_state: true
+height: 680px
+max_height: 80dvh
+cards:
+  # marao:generated:start
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_battery_card
+      entity: sensor.marao_dashboard_test_battery
+      name: Battery
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end

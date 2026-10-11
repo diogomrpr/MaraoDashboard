@@ -1,0 +1,95 @@
+{
+  "config_version": 1,
+  "name": "Formatting preservation",
+  "overview": {},
+  "extension": {
+    "keep": [
+      "second",
+      "first"
+    ]
+  },
+  "rooms": [
+    {
+      "name": "Room",
+      "columns": 1,
+      "entities": [
+        {
+          "entity_id": "sensor.energy",
+          "template": "hc_graph_card",
+          "variables": {
+            "display_unit": "kWh",
+            "display_precision": 0,
+            "retained": true
+          }
+        },
+        {
+          "entity_id": "sensor.energy",
+          "template": "hc_sensor_card",
+          "variables": {
+            "display_unit": "Wh",
+            "display_precision": 6
+          }
+        },
+        {
+          "entity_id": "switch.load",
+          "variables": {
+            "power_entity": "sensor.power",
+            "power_unit": "MW",
+            "display_unit": "kW",
+            "display_precision": 2
+          }
+        }
+      ],
+      "cards": [
+        {
+          "type": "markdown",
+          "content": "Untouched raw card"
+        }
+      ]
+    }
+  ],
+  "pages": {
+    "energy": {
+      "today_energy": {
+        "entity_id": "sensor.energy",
+        "variables": {
+          "display_unit": "kWh",
+          "display_precision": 0
+        },
+        "future": true
+      },
+      "loads": [
+        {
+          "power_entity": "sensor.power",
+          "variables": {
+            "display_unit": "kW",
+            "display_precision": 6,
+            "future": "retained"
+          }
+        }
+      ]
+    },
+    "custom": [
+      {
+        "name": "Custom",
+        "path": "custom",
+        "columns": 1,
+        "entities": [
+          {
+            "entity_id": "sensor.cost",
+            "variables": {
+              "display_precision": 2
+            }
+          }
+        ],
+        "cards": [
+          {
+            "type": "markdown",
+            "content": "Custom raw card"
+          }
+        ],
+        "extension": 42
+      }
+    ]
+  }
+}

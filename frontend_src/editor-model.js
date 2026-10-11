@@ -2,6 +2,10 @@ export function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+export function newEntityGroupId() {
+  return 'group-' + Array.from(crypto.getRandomValues(new Uint32Array(4)), value => value.toString(16).padStart(8, '0')).join('');
+}
+
 export function slugify(value) {
   return String(value || "room")
     .normalize("NFD")
@@ -15,7 +19,7 @@ export function flattenEntities(spec) {
   const values = [];
   if (Array.isArray(spec)) values.push(...spec);
   else if (typeof spec === "string") values.push(spec);
-  else if (spec && typeof spec === "object" && (typeof spec.entity_id === "string" || typeof spec.page === "string")) values.push(spec);
+  else if (spec && typeof spec === "object" && (typeof spec.entity_id === "string" || typeof spec.page === "string" || typeof spec.template === 'string')) values.push(spec);
   else if (spec && typeof spec === "object") {
     for (const entries of Object.values(spec)) {
       if (Array.isArray(entries)) values.push(...entries);
@@ -23,6 +27,7 @@ export function flattenEntities(spec) {
     }
   }
   return values.flatMap((value) => {
+    if (typeof value?.template === 'string') return [{ ...clone(value), __simple: false }];
     if (typeof value === "string") return [{ entity_id: value, __simple: true }];
     if (value && typeof value === "object" && typeof value.entity_id === "string") {
       return [{ ...clone(value), __simple: false }];
@@ -34,11 +39,10 @@ export function flattenEntities(spec) {
   });
 }
 
-function normalizeEntityContainer(container, areaLinked = false) {
+function normalizeEntityContainer(container) {
   return {
     ...container,
     entities: flattenEntities(container.entities),
-    __areaLinked: areaLinked,
     __hadEntities: Object.hasOwn(container, "entities"),
     __entitySource: clone(container.entities),
   };
@@ -46,32 +50,62 @@ function normalizeEntityContainer(container, areaLinked = false) {
 
 export function normalizeConfig(config) {
   const model = clone(config || {});
+  if (model.config_version === 2 && Array.isArray(model.pages)) {
+    model.pages = model.pages.map(page => Array.isArray(page.sections)
+      ? { ...page, sections: page.sections.map(normalizeEntityContainer) }
+      : normalizeEntityContainer(page));
+    for (const page of model.pages) {
+      page.__pageLayout = Array.isArray(page.sections) ? 'sections' : 'flat';
+      page.__sectionCount = pageContainers(page).length;
+      let position = 0;
+      pageContainers(page).forEach((container, index) => {
+        container.__sectionIndex = index;
+        for (const card of container.entities) {
+          position += 1;
+          card.__localId = card.id || `card-${position}`;
+        }
+      });
+    }
+    return model;
+  }
+  model.__missingSections = ["overview", "pages", "rooms"].filter((key) => !Object.hasOwn(model, key));
   model.overview = model.overview && typeof model.overview === "object" ? model.overview : {};
   model.pages = model.pages && typeof model.pages === "object" ? model.pages : {};
   model.rooms = Array.isArray(model.rooms) ? model.rooms : [];
-  model.rooms = model.rooms.map((room) => normalizeEntityContainer(room, Boolean(room.area)));
+  model.rooms = model.rooms.map((room) => normalizeEntityContainer({ ...room, entities: room.entities ?? [] }));
   if (Array.isArray(model.pages.custom)) {
     model.pages.custom = model.pages.custom.map((page) => normalizeEntityContainer(page));
   }
   return model;
 }
 
-function serializeEntityContainer(container) {
+function serializeEntityContainer(container, options) {
   const output = { ...container };
-  const areaLinked = output.__areaLinked;
   const hadEntities = output.__hadEntities;
   const entitySource = output.__entitySource;
-  delete output.__areaLinked;
   delete output.__hadEntities;
   delete output.__entitySource;
+  delete output.__sectionIndex;
   const grouped = {};
   const ordered = [];
   for (const item of container.entities || []) {
     const entity = { ...item };
     const simple = entity.__simple;
     delete entity.__simple;
+    if (options?.materializeIds && !entity.id) entity.id = entity.__localId;
+    delete entity.__localId;
+    if (entity.template === 'hc_entity_group_card') {
+      (grouped.entity_group ||= []).push(entity);
+      ordered.push(entity);
+      continue;
+    }
     if (typeof entity.page === "string") {
       (grouped.navigation ||= []).push(entity);
+      ordered.push(entity);
+      continue;
+    }
+    if (entity.template && !entity.entity_id) {
+      (grouped.cards ||= []).push(entity);
       ordered.push(entity);
       continue;
     }
@@ -81,11 +115,11 @@ function serializeEntityContainer(container) {
     (grouped[domain] ||= []).push(value);
     ordered.push(value);
   }
-  if (areaLinked) {
+  if (!options?.materializeIds && hadEntities && entitySource !== undefined && JSON.stringify((container.entities || []).map(({ __localId, ...card }) => card)) === JSON.stringify(flattenEntities(entitySource))) {
     if (hadEntities) output.entities = entitySource;
     else delete output.entities;
   } else if (hadEntities || (container.entities || []).length) {
-    output.entities = container.columns ? ordered : grouped;
+    output.entities = options?.ordered || container.columns || Array.isArray(entitySource) ? ordered : grouped;
   } else {
     delete output.entities;
   }
@@ -94,10 +128,29 @@ function serializeEntityContainer(container) {
 
 export function serializeConfig(model) {
   const config = clone(model);
+  if (config.config_version === 2 && Array.isArray(config.pages)) {
+    config.pages = config.pages.map(page => {
+      const containers = pageContainers(page);
+      const materializeIds = page.__pageLayout !== (Array.isArray(page.sections) ? 'sections' : 'flat')
+        || page.__sectionCount !== containers.length || containers.some((container, index) => container.__sectionIndex !== index
+          || JSON.stringify((container.entities || []).map(({ __localId, ...card }) => card)) !== JSON.stringify(flattenEntities(container.__entitySource)));
+      const options = { ordered: true, materializeIds };
+      const output = Array.isArray(page.sections)
+        ? { ...page, sections: page.sections.map(section => serializeEntityContainer(section, options)) }
+        : serializeEntityContainer(page, options);
+      delete output.__pageLayout; delete output.__sectionCount; delete output.__sectionIndex;
+      return output;
+    });
+    return config;
+  }
   config.rooms = (config.rooms || []).map(serializeEntityContainer);
   if (Array.isArray(config.pages?.custom)) {
     config.pages.custom = config.pages.custom.map(serializeEntityContainer);
   }
+  for (const key of config.__missingSections || []) {
+    if (!Object.keys(config[key] || {}).length) delete config[key];
+  }
+  delete config.__missingSections;
   return config;
 }
 
@@ -106,8 +159,9 @@ export function importAreaRoom(area, entities, supportedDomains) {
   const imported = entities
     .filter(
       (entity) =>
-        entity.area_id === area.area_id &&
-        supported.has(entity.domain) &&
+        (entity.area_id || entity.device_area_id) === area.area_id &&
+        supported.has(entity.domain || entity.entity_id?.split(".")[0]) &&
+        entity.has_state === true &&
         !entity.disabled_by &&
         !entity.hidden_by,
     )
@@ -116,39 +170,11 @@ export function importAreaRoom(area, entities, supportedDomains) {
     name: area.name,
     path: `room-${slugify(area.name)}`,
     icon: area.icon || "mdi:sofa-outline",
+    area: area.area_id,
     entities: imported,
-    __areaLinked: false,
     __hadEntities: true,
     __entitySource: undefined,
   };
-}
-
-export function materializeAreaRoom(room, entities, supportedDomains) {
-  if (!room?.area) return room;
-  const areaEntities = importAreaRoom(
-    { area_id: room.area, name: room.name, icon: room.icon },
-    entities,
-    supportedDomains,
-  ).entities;
-  const byId = new Map(areaEntities.map((entity) => [entity.entity_id, entity]));
-  for (const entity of [...flattenEntities(room.entities), ...flattenEntities(room.include)]) {
-    byId.set(entity.entity_id, entity);
-  }
-  const excluded = new Set(flattenEntities(room.exclude).map((entity) => entity.entity_id));
-  for (const entityId of excluded) byId.delete(entityId);
-  for (const [entityId, override] of Object.entries(room.overrides || {})) {
-    if (byId.has(entityId) && override && typeof override === "object") {
-      byId.set(entityId, { ...byId.get(entityId), ...clone(override), entity_id: entityId });
-    }
-  }
-  const output = { ...room, entities: [...byId.values()], __areaLinked: false };
-  output.__hadEntities = true;
-  output.__entitySource = undefined;
-  delete output.area;
-  delete output.include;
-  delete output.exclude;
-  delete output.overrides;
-  return output;
 }
 
 export function moveItem(items, from, to) {
@@ -157,6 +183,158 @@ export function moveItem(items, from, to) {
   const [item] = copy.splice(from, 1);
   copy.splice(to, 0, item);
   return copy;
+}
+
+export function pageContainers(page) {
+  return Array.isArray(page.sections) ? page.sections : [page];
+}
+
+export function roomPageTemplate(model) {
+  return { icon: 'mdi:sofa', columns: 2, entities: model.pages.filter(page => page.area || page.subview).map(page => {
+    const cards = pageContainers(page).flatMap(container => flattenEntities(container.entities));
+    const members = cards.flatMap(card => card.template === 'hc_entity_group_card' ? flattenEntities(card.entities) : [card]);
+    const lights = [...new Set(members.filter(card => card.entity_id?.startsWith('light.')).map(card => card.entity_id))];
+    const primary = lights[0] || members.find(card => card.entity_id)?.entity_id;
+    return { template: 'hc_room_card', name: page.name, icon: page.icon || 'mdi:sofa', page: page.path,
+      ...(primary ? { entity_id: primary } : {}), variables: { light_entities: lights } };
+  }) };
+}
+
+export function createPage(model, details, templates) {
+  const name = String(details.name || '').trim(), path = details.path || slugify(name);
+  if (!name) throw new Error('Each page requires a name.');
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(path) || model.pages.some(page => page.path === path)) throw new Error('Each page requires a unique safe path.');
+  if (!Object.hasOwn(templates, details.template)) throw new Error('Choose a supported page template.');
+  const page = clone(templates[details.template]);
+  page.id = path; page.path = path; page.name = name; page.icon = details.icon || page.icon || 'mdi:file-outline';
+  delete page.name_key; delete page.output_path;
+  if (details.area) page.area = details.area; else delete page.area;
+  const normalized = normalizeConfig({ config_version: 2, pages: [page] }).pages[0];
+  for (const container of pageContainers(normalized)) for (const card of container.entities || []) {
+    if (card.template === 'hc_title_card' && card.id === 'page-title') card.name = name;
+    card.id = newEntityGroupId().replace('group-', 'card-');
+    // Starter links use each new page instance; saved pages are never repopulated.
+    if (card.variables) { delete card.variables.popup_hash; delete card.variables.mode_selector_hash; }
+  }
+  model.pages.push(normalized);
+  if ((model.navigation || []).length < 5) pinPage(model, path, true);
+  return normalized;
+}
+
+export function addPageSection(page) {
+  if (!Array.isArray(page.sections)) {
+    const first = {};
+    for (const key of ['entities', 'cards', 'columns', '__hadEntities', '__entitySource']) {
+      if (Object.hasOwn(page, key)) { first[key] = page[key]; delete page[key]; }
+    }
+    page.sections = Object.keys(first).length ? [first] : [];
+  }
+  page.sections.push(normalizeEntityContainer({ entities: [] }));
+}
+
+function replaceOwnedReferences(value, oldPath, newPath, dashboardRoot) {
+  if (Array.isArray(value)) { value.forEach(item => replaceOwnedReferences(item, oldPath, newPath, dashboardRoot)); return; }
+  if (!value || typeof value !== 'object') return;
+  if (value.page === oldPath) value.page = newPath;
+  for (const key of ['navigation_path', 'url']) {
+    if (value[key] === `${dashboardRoot}/${oldPath}`) value[key] = `${dashboardRoot}/${newPath}`;
+  }
+  for (const key of ['popup_hash', 'mode_selector_hash', 'hash', 'navigation_path']) {
+    if (typeof value[key] === 'string' && value[key].startsWith(`#page-${oldPath}-`)) value[key] = `#page-${newPath}-${value[key].slice(`#page-${oldPath}-`.length)}`;
+  }
+  Object.values(value).forEach(item => replaceOwnedReferences(item, oldPath, newPath, dashboardRoot));
+}
+
+export function renamePage(model, index, path, dashboardRoot) {
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(path) || model.pages.some((page, position) => position !== index && page.path === path)) throw new Error('Each page requires a unique safe path.');
+  const oldPath = model.pages[index].path;
+  model.pages[index].path = path;
+  renamePageReferences(model, oldPath, path, dashboardRoot);
+}
+
+export function duplicatePage(model, index, name, dashboardRoot) {
+  const page = clone(model.pages[index]);
+  const base = slugify(name);
+  let path = base, suffix = 2;
+  while (model.pages.some(item => item.path === path)) path = `${base}-${suffix++}`;
+  const oldPath = page.path;
+  page.name = name; page.path = path; page.id = path;
+  delete page.name_key; delete page.output_path;
+  const hashes = new Map();
+  for (const container of pageContainers(page)) {
+    for (const card of container.entities || []) {
+      card.id = newEntityGroupId().replace('group-', 'card-');
+      const visit = item => {
+        if (Array.isArray(item)) { item.forEach(visit); return; }
+        if (!item || typeof item !== 'object') return;
+        for (const key of ['popup_hash', 'mode_selector_hash']) {
+          if (typeof item[key] === 'string') hashes.set(item[key], `#page-${path}-${card.id}-${key === 'mode_selector_hash' ? 'modes' : 'popup'}${hashes.size ? '-' + hashes.size : ''}`);
+        }
+        Object.values(item).forEach(visit);
+      };
+      visit(card);
+    }
+    const visitRaw = item => {
+      if (Array.isArray(item)) { item.forEach(visitRaw); return; }
+      if (!item || typeof item !== 'object') return;
+      if (item.type === 'custom:marao-popup-card' && typeof item.hash === 'string') hashes.set(item.hash, `#page-${path}-raw-${hashes.size + 1}-popup`);
+      Object.values(item).forEach(visitRaw);
+    };
+    visitRaw(container.cards || []);
+  }
+  const replaceHashes = value => {
+    if (Array.isArray(value)) { value.forEach(replaceHashes); return; }
+    if (!value || typeof value !== 'object') return;
+    for (const key of ['popup_hash', 'mode_selector_hash', 'hash', 'navigation_path']) if (hashes.has(value[key])) value[key] = hashes.get(value[key]);
+    Object.values(value).forEach(replaceHashes);
+  };
+  replaceHashes(page);
+  replaceOwnedReferences(page, oldPath, path, dashboardRoot);
+  model.pages.splice(index + 1, 0, page);
+  return page;
+}
+
+export function pinPage(model, path, pinned) {
+  if (!model.pages.some(page => page.path === path)) throw new Error('Select an existing page.');
+  const navigation = model.navigation || [];
+  const has = entry => entry === path || entry?.page === path;
+  if (!pinned) model.navigation = navigation.filter(entry => !has(entry));
+  else if (!navigation.some(has)) {
+    if (navigation.length >= 5) throw new Error('Unpin another page before adding a sixth navbar entry.');
+    model.navigation = [...navigation, path];
+  }
+}
+
+export function pageReferences(model, path, dashboardRoot) {
+  const references = [];
+  if (model.landing_page === path) references.push({ kind: 'landing', name: path });
+  for (const entry of model.navigation || []) if (entry === path || entry?.page === path || entry?.url === `${dashboardRoot}/${path}`) references.push({ kind: 'navigation', name: entry.label || path });
+  const visit = (value, page) => {
+    if (Array.isArray(value)) { value.forEach(item => visit(item, page)); return; }
+    if (!value || typeof value !== 'object') return;
+    if (value.page === path || value.navigation_path === `${dashboardRoot}/${path}`) references.push({ kind: 'card', name: page.name });
+    if (typeof value.navigation_path === 'string' && value.navigation_path.startsWith(`#page-${path}-`)) references.push({ kind: 'popup', name: page.name });
+    Object.entries(value).filter(([key]) => !key.startsWith('__')).forEach(([, item]) => visit(item, page));
+  };
+  model.pages.filter(page => page.path !== path).forEach(page => visit(page, page));
+  return references;
+}
+
+export function deletePage(model, index, replacement, dashboardRoot) {
+  const removed = model.pages[index];
+  if (model.pages.length === 1) throw new Error('Keep at least one page.');
+  const references = pageReferences(model, removed.path, dashboardRoot);
+  if (references.some(reference => reference.kind === 'popup')) throw new Error('Remove or retarget popup links before deleting this page.');
+  if (references.length && (!replacement || replacement === removed.path || !model.pages.some(page => page.path === replacement))) throw new Error('Choose a replacement page for the landing view and existing links.');
+  if (replacement) renamePageReferences(model, removed.path, replacement, dashboardRoot);
+  model.pages.splice(index, 1);
+}
+
+function renamePageReferences(model, oldPath, newPath, dashboardRoot) {
+  if (model.landing_page === oldPath) model.landing_page = newPath;
+  if (Array.isArray(model.navigation)) model.navigation = model.navigation.map(entry => entry === oldPath ? newPath : entry);
+  replaceOwnedReferences(model.navigation, oldPath, newPath, dashboardRoot);
+  replaceOwnedReferences(model.pages, oldPath, newPath, dashboardRoot);
 }
 
 export function entityMeta(entities, entityId) {
@@ -203,30 +381,235 @@ export function cardForEntity(catalog, entity) {
     sensor: "hc_sensor_card",
     switch: "hc_switch_card",
     vacuum: "hc_vacuum_card",
+    weather: 'hc_weather_card', alarm_control_panel: 'hc_security_card', button: 'hc_access_hold_action_card', scene: 'hc_switch_card',
   };
   return catalog.cards.find((card) => card.id === defaults[domain]) || null;
 }
 
-export function validateConfig(config) {
+export function configuredEntityIds(container) {
+  const ids = new Set(flattenEntities(container.entities).map(item => item.entity_id).filter(Boolean));
+  const visit = (value, key = "") => {
+    if (typeof value === "string" && /^(entity|entity_id|entities)$|_entities$|_entity$/.test(key) && /^[a-z_]+\.[a-z0-9_]+$/i.test(value)) ids.add(value);
+    else if (Array.isArray(value)) value.forEach(item => visit(item, key));
+    else if (value && typeof value === "object") Object.entries(value).forEach(([field, item]) => visit(item, field));
+  };
+  visit(container.cards);
+  return ids;
+}
+
+export function entityCandidates(catalog, entities, container, search = "") {
+  const query = search.trim().toLocaleLowerCase();
+  const added = configuredEntityIds(container);
+  return entities.flatMap(entity => {
+    const card = cardForEntity(catalog, entity);
+    if (!card || entity.disabled_by || entity.hidden_by || entity.has_state !== true) return [];
+    const group = container.template === 'hc_entity_group_card';
+    if (group && !entityGroupMemberCompatible(container.entity_type, { entity_id: entity.entity_id }, entity)) return [];
+    if (query ? !`${entity.name || ""} ${entity.entity_id}`.toLocaleLowerCase().includes(query)
+      : (!group && (!container.area || (entity.area_id || entity.device_area_id) !== container.area)) || added.has(entity.entity_id)) return [];
+    return [{ ...entity, card, added: added.has(entity.entity_id) }];
+  }).sort((a, b) => (a.name || a.entity_id).localeCompare(b.name || b.entity_id) || a.entity_id.localeCompare(b.entity_id));
+}
+
+export function validateConfig(config, configVersion = 1, entities, units = {}, catalog) {
   const errors = [];
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     return ["Dashboard JSON must be an object."];
   }
+  const version = Object.hasOwn(config, "config_version") ? config.config_version : 0;
+  if (!Number.isInteger(version) || version < 0) errors.push("config_version must be a nonnegative integer.");
+  else if (version > configVersion) errors.push("Unsupported dashboard format. Update Marao before editing this configuration.");
+  if (errors.length) return errors;
   if (!String(config.name || "").trim()) errors.push("Dashboard name is required.");
-  if (!Array.isArray(config.rooms)) errors.push("Rooms must be a list.");
-  for (const [index, room] of (config.rooms || []).entries()) {
+  if (version === 2) errors.push(...validatePages(config, catalog));
+  else if (!Array.isArray(config.rooms)) errors.push("Rooms must be a list.");
+  for (const [index, room] of (Array.isArray(config.rooms) ? config.rooms : []).entries()) {
+    if (!room || typeof room !== 'object' || Array.isArray(room)) { errors.push('Each room must be an object.'); continue; }
+    if (version >= 1 && ["include", "exclude", "overrides"].some(key => Object.hasOwn(room, key))) errors.push("Current room selections use explicit entities; import legacy include/exclude/overrides before editing.");
     if (!String(room.name || "").trim()) errors.push(`Room ${index + 1} needs a name.`);
     if (room.columns != null && (!Number.isInteger(room.columns) || room.columns < 1 || room.columns > 6)) errors.push(`Room ${index + 1} columns must be between 1 and 6.`);
   }
   if (config.navigation != null && !Array.isArray(config.navigation)) errors.push("Navigation must be a list.");
   if (Array.isArray(config.navigation) && config.navigation.length > 5) errors.push("Navigation supports at most five entries.");
   if (config.pages?.custom != null && !Array.isArray(config.pages.custom)) errors.push("Custom pages must be a list.");
-  for (const [index, page] of (config.pages?.custom || []).entries()) {
+  for (const [index, page] of (Array.isArray(config.pages?.custom) ? config.pages.custom : []).entries()) {
+    if (!page || typeof page !== 'object' || Array.isArray(page)) { errors.push('Each custom page must be an object.'); continue; }
     if (!String(page.name || "").trim()) errors.push(`Custom page ${index + 1} needs a name.`);
     if (!String(page.path || "").trim()) errors.push(`Custom page ${index + 1} needs a path.`);
     if (page.columns != null && (!Number.isInteger(page.columns) || page.columns < 1 || page.columns > 6)) errors.push(`Custom page ${index + 1} columns must be between 1 and 6.`);
   }
-  return errors;
+  const groupIds = new Set();
+  const checkGroup = (group, overview = false) => {
+    const id = group?.id, kind = group?.entity_type;
+    if (!group || typeof group !== 'object' || group.template !== 'hc_entity_group_card') { errors.push('Entity Group must be an hc_entity_group_card object.'); return; }
+    if (typeof id !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(id)) errors.push('Entity Group requires a stable safe id.');
+    if (groupIds.has(id)) errors.push('Duplicate Entity Group id.');
+    groupIds.add(id);
+    const reserved = { 'overview-lights': 'light', 'overview-blinds': 'cover', 'overview-climate': 'climate', 'overview-maintenance': 'battery' };
+    if (Object.hasOwn(reserved, id) && !overview && version < 2) errors.push('Entity Group id is reserved.');
+    if (!['light', 'cover', 'battery', 'climate'].includes(kind)) errors.push('Choose a supported Entity Group type.');
+    if (typeof group.name !== 'string' || !group.name.trim()) errors.push('Entity Group requires a name.');
+    if (group.icon != null && typeof group.icon !== 'string') errors.push('Entity Group icon must be a string.');
+    if (Object.hasOwn(group, 'entity_id') || Object.hasOwn(group, 'page')) errors.push('Entity Group cannot have a primary entity or page.');
+    if (Object.hasOwn(group, 'popup_filter') && !['all', 'active'].includes(group.popup_filter)) errors.push('Choose All entities or Active only.');
+    if (!Array.isArray(group.entities)) { errors.push('Entity Group entities must be a list.'); return; }
+    for (const member of group.entities) {
+      const value = typeof member === 'string' ? { entity_id: member } : member;
+      if (!value || typeof value !== 'object' || Object.hasOwn(value, 'page') || Object.hasOwn(value, 'entities') || !/^[a-z0-9_]+\.[a-z0-9_]+$/.test(value.entity_id || '')) {
+        errors.push('Entity Group members must be entity strings or objects, without nesting.'); continue;
+      }
+      const metadata = entities?.find(entity => entity.entity_id === value.entity_id);
+      if (value.variables != null && (typeof value.variables !== 'object' || Array.isArray(value.variables))) errors.push('Entity Group member options must be an object.');
+      if (['name', 'icon'].some(key => value[key] != null && typeof value[key] !== 'string')) errors.push('Entity Group member name and icon must be strings.');
+      const legacyBattery = overview && id === 'overview-maintenance' && value.entity_id.includes('battery');
+      if (!entityGroupMemberCompatible(kind, value, metadata, legacyBattery)) errors.push('Entity Group has an incompatible member.');
+    }
+  };
+  if (Object.hasOwn(config.overview || {}, 'entity_groups')) {
+    if (!Array.isArray(config.overview.entity_groups)) errors.push('Overview Entity Groups must be a list.');
+    else config.overview.entity_groups.forEach(group => checkGroup(group, true));
+  }
+  const containers = version === 2 && Array.isArray(config.pages)
+    ? config.pages.filter(page => page && typeof page === 'object').flatMap(page => Array.isArray(page.sections) ? page.sections : [page])
+    : [...(Array.isArray(config.rooms) ? config.rooms : []), ...(Array.isArray(config.pages?.custom) ? config.pages.custom : [])];
+  for (const container of containers.filter(item => item && typeof item === 'object')) {
+    if (version === 2) groupIds.clear();
+    flattenEntities(container.entities).filter(item => item.template === 'hc_entity_group_card').forEach(group => checkGroup(group));
+  }
+  const metadata = new Map((entities || []).map(entity => [entity.entity_id, entity.unit_of_measurement]));
+  const eligible = new Set(["hc_graph_card", "hc_toggle_graph_card", "hc_sensor_card", "hc_base_card", "hc_switch_card", "hc_energy_period_card"]);
+  const visit = item => {
+    if (Array.isArray(item)) { item.forEach(visit); return; }
+    if (!item || typeof item !== "object") return;
+    const direct = item.type === "custom:marao-energy-period-card";
+    const entity = item.entity_id || item.entity;
+    const load = typeof item.power_entity === "object" ? item.power_entity?.entity_id : item.power_entity;
+    const domain = typeof entity === "string" ? entity.split(".")[0] : undefined;
+    const template = item.template || ({sensor: "hc_sensor_card", switch: "hc_switch_card", input_boolean: "hc_switch_card"})[domain];
+    const options = direct ? item : item.variables;
+    if ((direct || ((!item.type || item.type === "custom:marao-card") && (eligible.has(template) || load))) && options) {
+      if (Object.hasOwn(options, "display_precision") && (!Number.isInteger(options.display_precision) || options.display_precision < 0 || options.display_precision > 6)) errors.push("Decimal places must be an integer from 0 to 6.");
+      if (Object.hasOwn(options, "display_unit")) {
+        const target = options.display_unit;
+        if (typeof target !== "string" || !Object.hasOwn(units, target)) errors.push("Choose a supported power or energy display unit.");
+        else if (entities) {
+          const sources = template === "hc_switch_card" ? [options.power_entity] : [entity || load];
+          const graph = options.graph_entity || item.graph_entity;
+          if (graph && ["hc_graph_card", "hc_toggle_graph_card"].includes(template)) sources.push(graph);
+          if (sources.some(source => !Object.hasOwn(units, metadata.get(source)))) errors.push("A supported source unit is required for conversion.");
+          else if (sources.some(source => units[metadata.get(source)][0] !== units[target][0])) errors.push("Display unit is incompatible with the source reading.");
+        }
+      }
+    }
+    Object.values(item).forEach(visit);
+  };
+  visit(version === 2 ? config.pages : config);
+  return [...new Set(errors)];
+}
+
+export function validatePages(config, catalog) {
+  const errors = [], paths = new Set(), pageIds = new Set(), outputPaths = new Set(), references = [];
+  const object = value => value && typeof value === 'object' && !Array.isArray(value);
+  const safePath = value => typeof value === 'string' && /^[a-z0-9][a-z0-9_-]*$/.test(value);
+  const safeId = value => typeof value === 'string' && /^[a-z][a-z0-9_-]{0,63}$/.test(value);
+  const entityId = value => typeof value === 'string' && /^[a-z0-9_]+\.[a-z0-9_]+$/.test(value);
+  const freeRoles = new Set(['hc_title_card', 'hc_navigation_card', 'hc_room_card', 'hc_entity_group_card', 'hc_scene_collection_card']);
+  const templates = new Map((catalog?.cards || []).map(card => [card.id, card.domains]));
+  if (['overview', 'rooms'].some(key => Object.hasOwn(config, key))) errors.push('Mixed legacy and canonical page configuration.');
+  if (!Array.isArray(config.pages) || !config.pages.length) return [...errors, 'Keep at least one page.'];
+  for (const page of config.pages) {
+    if (!object(page)) { errors.push('Each page must be an object.'); continue; }
+    if (typeof page.name !== 'string' || !page.name.trim()) errors.push('Each page requires a name.');
+    if (!safePath(page.path) || paths.has(page.path)) errors.push('Each page requires a unique safe path.');
+    paths.add(page.path);
+    if (page.output_path != null) {
+      if (typeof page.output_path !== 'string' || !/^views\/(?:[a-z0-9_-]+\/)*[a-z0-9_-]+\.yaml$/.test(page.output_path) || outputPaths.has(page.output_path)) errors.push('Page output paths must be safe unique view files.');
+      outputPaths.add(page.output_path);
+    }
+    if (page.id != null) {
+      if (!safeId(page.id) || pageIds.has(page.id)) errors.push('Each page identity must be safe and unique.');
+      pageIds.add(page.id);
+    }
+    if (Object.hasOwn(page, 'subview') && typeof page.subview !== 'boolean') errors.push('Page subview must be a boolean.');
+    if (['icon', 'area'].some(key => page[key] != null && typeof page[key] !== 'string')) errors.push('Page icon and area must be strings.');
+    if (Object.hasOwn(page, 'sections') && ['entities', 'cards', 'columns'].some(key => Object.hasOwn(page, key))) errors.push('A page cannot mix sections with flat entities, cards or columns.');
+    const sections = Object.hasOwn(page, 'sections') ? page.sections : [page];
+    if (!Array.isArray(sections)) { errors.push('Page sections must be a list of objects.'); continue; }
+    const ids = new Set();
+    const entries = spec => {
+      if (spec == null) return [];
+      if (typeof spec === 'string') return [{ entity_id: spec }];
+      if (Array.isArray(spec)) return spec.flatMap(entries);
+      if (object(spec)) return ['entity_id', 'page', 'template'].some(key => Object.hasOwn(spec, key)) ? [spec] : Object.values(spec).flatMap(entries);
+      errors.push('Page entities must be strings, descriptors, lists or grouped objects.'); return [];
+    };
+    for (const section of sections) {
+      if (!object(section)) { errors.push('Page sections must be a list of objects.'); continue; }
+      if (Object.hasOwn(section, 'sections') && section !== page) errors.push('Page sections cannot contain nested sections.');
+      if (section.columns != null && (!Number.isInteger(section.columns) || section.columns < 1 || section.columns > 6)) errors.push('Columns must be an integer between 1 and 6.');
+      if (Object.hasOwn(section, 'cards') && (!Array.isArray(section.cards) || section.cards.some(card => !object(card)))) errors.push('Raw cards must be a list of Lovelace card objects.');
+      for (const card of entries(section.entities)) {
+        if (card.id != null) {
+          if (!safeId(card.id) || ids.has(card.id)) errors.push('Each local card identity must be safe and unique within its page.');
+          ids.add(card.id);
+        }
+        if (card.template != null && (typeof card.template !== 'string' || catalog && !templates.has(card.template))) errors.push('Choose a supported page card template.');
+        if (card.entity_id != null && !entityId(card.entity_id)) errors.push('Page card entity_id must be a valid entity.');
+        if (!freeRoles.has(card.template) && !card.entity_id && !Object.hasOwn(card, 'page')) errors.push('Bind or remove the draft card before generation.');
+        if (entityId(card.entity_id) && !freeRoles.has(card.template) && templates.has(card.template) && !templates.get(card.template).includes(card.entity_id.split('.')[0])) errors.push('Page card binding is incompatible with its template.');
+        if (['name', 'icon'].some(key => card[key] != null && typeof card[key] !== 'string')) errors.push('Card name and icon must be strings.');
+        if (card.variables != null && !object(card.variables)) errors.push('Card options must be an object.');
+        const options = object(card.variables) ? card.variables : {};
+        if (card.template === 'hc_energy_period_card' && !['day', 'month'].includes(options.period ?? 'day')) errors.push('Energy period must be day or month.');
+        if (card.template === 'hc_wallbox_current_card' && Object.hasOwn(options, 'shortcuts') && (!Array.isArray(options.shortcuts) || options.shortcuts.length > 3 || options.shortcuts.some(value => typeof value !== 'number' || !Number.isFinite(value)))) errors.push('Charging shortcuts require at most three finite numbers.');
+        if (card.template === 'hc_room_card' && Object.hasOwn(options, 'light_entities') && (!Array.isArray(options.light_entities) || options.light_entities.some(value => !entityId(value) || !value.startsWith('light.')))) errors.push('Room lights must be an explicit list of light entities.');
+        if (card.template === 'hc_media_app_card' && (typeof options.app_source !== 'string' || !options.app_source.trim())) errors.push('Media app requires an explicit source.');
+        if (card.template === 'hc_access_hold_action_card' && Object.hasOwn(card, 'tap_action')) {
+          const action = card.tap_action, button = card.entity_id?.startsWith('button.');
+          const valid = object(action) && (button
+            ? action.action === 'perform-action' && action.perform_action === 'button.press' && object(action.target) && Object.keys(action.target).length === 1 && action.target.entity_id === card.entity_id
+            : action.action === 'toggle');
+          if (!valid) errors.push('Security action must control its selected entity with the native service.');
+        }
+        if (card.apple_tv != null && card.apple_tv !== false) {
+          if (!object(card.apple_tv)) errors.push('Apple TV options must be an object or false.');
+          else {
+            for (const key of ['remote_entity', 'volume_remote_entity']) {
+              const binding = card.apple_tv[key], domains = key === 'remote_entity' ? ['remote'] : ['remote', 'media_player'];
+              if (binding != null && (!entityId(binding) || !domains.includes(binding.split('.')[0]))) errors.push('Choose a compatible media remote entity.');
+            }
+            const apps = card.apple_tv.apps ?? [];
+            if (!Array.isArray(apps) || apps.some(app => !object(app) || typeof app.source !== 'string' || !app.source.trim())) errors.push('Media apps require an explicit ordered list of sources.');
+          }
+        }
+        if (Object.hasOwn(card, 'page')) references.push(card.page);
+        else if (['hc_navigation_card', 'hc_room_card'].includes(card.template) && (!object(card.tap_action) || !['navigate', 'none'].includes(card.tap_action.action))) errors.push('Choose a destination for the page shortcut.');
+        if (card.template === 'hc_scene_collection_card') {
+          if (!Array.isArray(card.entities)) errors.push('Scene collection entities must be an explicit list.');
+          else if (entries(card.entities).some(member => !entityId(member.entity_id) || !['scene', 'switch', 'input_boolean'].includes(member.entity_id.split('.')[0]))) errors.push('Scene collection members must be native scenes or toggle entities.');
+        }
+      }
+    }
+  }
+  if (!paths.has(config.landing_page)) errors.push('Select an existing landing page.');
+  const navigation = config.navigation ?? [];
+  if (!Array.isArray(navigation) || navigation.length > 5) errors.push('Navigation must be a list of at most five entries.');
+  else for (const route of navigation) {
+    if (typeof route === 'string') references.push(route);
+    else if (object(route) && Object.hasOwn(route, 'page')) references.push(route.page);
+    else if (!object(route) || typeof route.url !== 'string' || typeof route.label !== 'string') errors.push('Navigation entries require a page or a labeled URL.');
+  }
+  if (references.some(reference => typeof reference !== 'string' || !paths.has(reference))) errors.push('Retarget or remove references to missing pages.');
+  return [...new Set(errors)];
+}
+
+export function entityGroupMemberCompatible(kind, member, metadata, legacyBattery = false) {
+  const domain = member.entity_id?.split('.')[0];
+  const templates = { light: ['hc_light_card', 'hc_base_card'], cover: ['hc_cover_card', 'hc_access_card'],
+    climate: ['hc_climate_card'], battery: ['hc_battery_card', 'hc_sensor_card', 'hc_base_card'] };
+  return Boolean(Object.hasOwn(templates, kind) && domain === (kind === 'battery' ? 'sensor' : kind)
+    && (!member.template || templates[kind].includes(member.template))
+    && (kind !== 'battery' || !metadata || metadata.device_class === 'battery' || member.template === 'hc_battery_card' || legacyBattery));
 }
 
 export function buildJsonSchema(catalog, entities) {
@@ -241,6 +624,14 @@ export function buildJsonSchema(catalog, entities) {
       { type: "string", pattern: "^[a-z0-9_]+\\.[a-z0-9_]+$" },
     ],
   };
+  const groupValue = {
+    type: 'object', required: ['template', 'id', 'name', 'entity_type', 'entities'],
+    properties: { template: { const: 'hc_entity_group_card' }, id: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
+      name: { type: 'string', minLength: 1 }, icon: { type: ['string', 'null'] }, entity_type: { enum: ['light', 'cover', 'battery', 'climate'] },
+      popup_filter: { enum: ['all', 'active'] }, entities: { type: 'array', items: { anyOf: [entityIdValue,
+        { type: 'object', required: ['entity_id'], properties: { entity_id: entityIdValue }, additionalProperties: true }] } } },
+    additionalProperties: true,
+  };
   const entityValue = {
     anyOf: [
       entityIdValue,
@@ -252,7 +643,10 @@ export function buildJsonSchema(catalog, entities) {
           name: { type: "string" },
           icon: { type: ["string", "null"] },
           template: { type: "string", enum: catalog.cards.map((card) => card.id) },
-          variables: { type: "object", additionalProperties: true },
+          variables: { type: "object", properties: {
+            display_unit: { type: "string", enum: Object.keys(catalog.energy_units || {}) },
+            display_precision: { type: "integer", minimum: 0, maximum: 6 },
+          }, additionalProperties: true },
         },
         additionalProperties: true,
       },
@@ -269,6 +663,7 @@ export function buildJsonSchema(catalog, entities) {
       },
     ],
   };
+  const cardValue = { anyOf: [...entityValue.anyOf, groupValue] };
   const entityContainer = {
     type: "object",
     required: ["name"],
@@ -279,18 +674,19 @@ export function buildJsonSchema(catalog, entities) {
       columns: { type: "integer", minimum: 1, maximum: 6, description: "Number of cards rendered side by side." },
       entities: {
         anyOf: [
-          { type: "array", items: entityValue },
-          { type: "object", additionalProperties: { type: "array", items: entityValue } },
+          { type: "array", items: cardValue },
+          { type: "object", additionalProperties: { type: "array", items: cardValue } },
         ],
       },
     },
     additionalProperties: true,
   };
-  return {
+  const schema = {
     $id: "https://marao-dashboard.local/dashboard.schema.json",
     type: "object",
     required: ["name", "rooms"],
     properties: {
+      config_version: { type: "integer", minimum: 0, maximum: catalog.config_version ?? 0, description: "Dashboard format version; omitted means legacy format 0." },
       name: { type: "string", minLength: 1, description: "Dashboard title." },
       slug: { type: "string", description: "URL-safe dashboard identifier." },
       theme: { type: "string" },
@@ -309,6 +705,7 @@ export function buildJsonSchema(catalog, entities) {
         properties: {
           weather_entity: { type: "string", enum: entityIds.filter((id) => id.startsWith("weather.")) },
           scenes: { type: "array", items: entityValue },
+          entity_groups: { type: 'array', items: groupValue },
         },
         additionalProperties: true,
       },
@@ -342,4 +739,50 @@ export function buildJsonSchema(catalog, entities) {
     },
     additionalProperties: true,
   };
+  if (catalog.config_version >= 2) {
+    const legacy = clone(schema);
+    const paths = { type: 'string', pattern: '^[a-z0-9][a-z0-9_-]*$' };
+    const freeValue = { type: 'object', required: ['template'], properties: {
+      template: { enum: ['hc_title_card', 'hc_room_card', 'hc_scene_collection_card'] },
+      id: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
+      name: { type: 'string' }, icon: { type: ['string', 'null'] }, page: paths,
+      variables: { type: 'object', additionalProperties: true },
+      entities: { type: 'array', items: entityValue },
+    }, additionalProperties: true };
+    const content = { ...entityContainer.properties,
+      entities: { anyOf: [
+        { type: 'array', items: { anyOf: [...cardValue.anyOf, freeValue] } },
+        { type: 'object', additionalProperties: { type: 'array', items: { anyOf: [...cardValue.anyOf, freeValue] } } },
+        ...cardValue.anyOf, freeValue,
+      ] },
+      cards: { type: 'array', items: { type: 'object', additionalProperties: true } },
+    };
+    schema.required = ['name', 'config_version', 'pages', 'landing_page'];
+    schema.properties.config_version = { const: 2, description: 'Ordered editable pages.' };
+    schema.properties.landing_page = paths;
+    schema.properties.navigation.maxItems = 5;
+    schema.properties.navigation.items.anyOf.push({ type: 'object', required: ['page'], properties: { page: paths }, additionalProperties: true });
+    schema.properties.pages = { type: 'array', minItems: 1, items: {
+      type: 'object', required: ['name', 'path'], properties: {
+        ...content, path: paths, id: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
+        area: { type: 'string' }, subview: { type: 'boolean' },
+        sections: { type: 'array', items: { type: 'object', properties: content, additionalProperties: true } },
+      }, allOf: [{ if: { required: ['sections'] }, then: { not: { anyOf: ['entities', 'cards', 'columns'].map(key => ({ required: [key] })) } } }],
+      additionalProperties: true,
+    } };
+    delete schema.properties.rooms;
+    delete schema.properties.overview;
+    schema.not = { anyOf: [{ required: ['rooms'] }, { required: ['overview'] }] };
+    return {
+      $id: schema.$id, type: 'object',
+      properties: { config_version: legacy.properties.config_version },
+      allOf: [{ if: { required: ['config_version'], properties: { config_version: { const: 2 } } },
+        then: schema, else: { anyOf: [legacy, {
+          type: 'object', required: ['title', 'views'],
+          properties: { title: { type: 'string', minLength: 1 }, views: { type: 'array', minItems: 1, items: { type: 'object', required: ['path'], properties: { path: paths }, additionalProperties: true } } },
+          not: { anyOf: ['config_version', 'name', 'rooms', 'pages'].map(key => ({ required: [key] })) }, additionalProperties: true,
+        }] } }],
+    };
+  }
+  return schema;
 }

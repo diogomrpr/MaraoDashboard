@@ -1,0 +1,65 @@
+{
+  "name": "Generated Test",
+  "overview": {
+    "scenes": [
+      "input_boolean.holiday_mode"
+    ]
+  },
+  "rooms": [
+    {
+      "name": "Living Room",
+      "entities": [
+        "light.living_room_main",
+        "cover.living_room_blind",
+        "climate.living_room",
+        "lock.front_door",
+        "input_boolean.holiday_mode",
+        "input_number.target_temperature",
+        {
+          "entity_id": "media_player.living_room_tv",
+          "apple_tv": {
+            "remote_entity": "remote.living_room_tv",
+            "apps": [
+              {
+                "name": "YouTube",
+                "source": "YouTube"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "pages": {
+    "security": {
+      "alarm_entity": "alarm_control_panel.home",
+      "actions": [
+        "button.open_door"
+      ]
+    },
+    "energy": {
+      "house_power": "sensor.house_power",
+      "month_energy": "sensor.month_energy",
+      "month_cost": "sensor.month_cost",
+      "loads": [
+        {
+          "power_entity": "sensor.heater_power",
+          "toggle_entity": "switch.heater"
+        }
+      ],
+      "appliances": [
+        {
+          "entity_id": "sensor.dishwasher",
+          "template": "hc_dishwasher_card"
+        }
+      ]
+    },
+    "wallbox": {
+      "status_entity": "sensor.wallbox_status",
+      "charging_power_entity": "sensor.wallbox_power",
+      "current_control_entity": "input_number.wallbox_current",
+      "pause_resume_entity": "switch.wallbox_pause"
+    },
+    "media": {}
+  }
+}

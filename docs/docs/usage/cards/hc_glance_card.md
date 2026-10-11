@@ -7,6 +7,8 @@ parent: Cards
 
 # Glance Card
 
+Normal binary states use distinct card backgrounds and a filled or outlined state marker, with a localized accessible state. Redundant state words are omitted, including when `show_state: true`; readings, metadata and useful custom labels remain. `show_state: false` retains its normal-state behavior. Prefix-only labels are omitted when their binary state text is removed.
+
 The `hc_glance_card` is used to display a summary of your entities. It's configured to show the state of the entity and the icon.
 You can add minimun 1 and maximum 3 entities. The card will automatically adjust the placement of the entities.
 
@@ -18,7 +20,6 @@ or `entity3_name`.
 ![Glance Card Light](../../../assets/images/cards/hc_glance_card/glancecard_light.png)
 
 ## Usage
-
 
 ```yaml
   - type: custom:marao-card

@@ -1,0 +1,67 @@
+title: Rooms
+path: rooms
+icon: mdi:sofa
+theme: Marao Dashboard
+cards:
+  # marao:generated:start
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_room_card
+      entity: light.marao_dashboard_test_light
+      name: Living Room
+      icon: mdi:sofa-outline
+      variables:
+        light_entities:
+        - light.marao_dashboard_test_light
+        - light.marao_dashboard_test_room_light
+        - light.marao_dashboard_test_onoff_light
+        lights_target_entity: light.marao_dashboard_test_light
+      tap_action:
+        action: navigate
+        navigation_path: /marao-dashboard/living-room
+        haptic: heavy
+    - type: custom:marao-card
+      template: hc_room_card
+      entity: camera.marao_dashboard_test_camera
+      name: Entrance
+      icon: mdi:door
+      variables:
+        light_entities: []
+        lights_target_entity: camera.marao_dashboard_test_camera
+      tap_action:
+        action: navigate
+        navigation_path: /marao-dashboard/entrance
+        haptic: heavy
+    - type: custom:marao-card
+      template: hc_room_card
+      entity: switch.marao_dashboard_test_switch
+      name: Utility Room
+      icon: mdi:washing-machine
+      variables:
+        light_entities: []
+        lights_target_entity: switch.marao_dashboard_test_switch
+      tap_action:
+        action: navigate
+        navigation_path: /marao-dashboard/utility-room
+        haptic: heavy
+    - type: custom:marao-card
+      template: hc_room_card
+      name: Empty Room
+      icon: mdi:desk
+      variables:
+        light_entities: []
+        lights_target_entity: ''
+      tap_action:
+        action: navigate
+        navigation_path: /marao-dashboard/empty-room
+        haptic: heavy
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/dashboard/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

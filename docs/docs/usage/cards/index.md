@@ -6,6 +6,12 @@ nav_order: 2.1
 ---
 
 # Usage
+The [editable page card guide](editable-page-cards.md) covers weather, room,
+scenes, alarm/service actions, period readings, media apps and shared page
+layouts in the visual builder.
+Use [Entity Group](hc_entity_group_card.md) for explicit task summaries and member
+control sheets on Overview, room or custom pages.
+
 We made Marao Dashboard easy to use but you need to know a few basics. 
 {: .fs-6 .fw-300 }
 
@@ -59,4 +65,57 @@ workflows. These are documented in this cards section:
 - `hc_number_card`
 - `hc_toggle_graph_card`
 - `hc_vacuum_card`
+- [`hc_room_card`](hc_room_card.md)
 - `hc_washing_machine_card`
+
+Normal binary state words are omitted across Marao cards, including raw cards with `show_state: true`. Backgrounds and visible state markers communicate the current state, with localized accessible names. Useful values, labels, action names, transitions and historical interval labels remain.
+
+Unknown, unavailable, missing and disconnected entities use a neutral whole-card surface with a localized reason. Recognized faults and reported action/content errors use an alert surface; partial problems identify affected members while preserving useful content and safe actions. Problem reasons remain visible with `show_state: false` or hidden icons. A later successful explicit action retry clears its reported error without replacing Home Assistant’s authoritative state.
+
+## Energy reading format
+
+Graph and toggle-graph cards, numeric sensor/base readings, switch secondary power
+and Energy period summaries/sheets accept two opt-in display settings:
+
+| Setting | Auto (omitted) | Explicit value |
+| --- | --- | --- |
+| `display_unit` | Actual source unit | Compatible unit from the table below; converts the value. |
+| `display_precision` | Trim trailing zeros, at most six decimal places | Integer 0–6; exactly that many decimal places. |
+
+For shared cards, put these settings under `variables`. Direct
+`custom:marao-energy-period-card` configurations put them at card level.
+Energy card descriptors put them under `variables`; generation carries the
+same settings into the summary and its sheet. Use the shared unit/decimal
+controls in the card editor. Auto removes
+only that setting. Copies of a reading can use different settings.
+
+| Dimension | Supported units |
+| --- | --- |
+| Power | `mW`, `W`, `kW`, `MW`, `GW` |
+| Energy | `Wh`, `kWh`, `MWh`, `GWh`, `J`, `Ws`, `kJ`, `MJ`, `GJ` |
+
+Unit identifiers are case-sensitive: `mW` is a milliwatt and `MW` a megawatt.
+3600 J = 1 Wh. Power and energy cannot be interchanged. Precision alone can
+format a cost while keeping its original currency; there is no currency exchange.
+Numbers use Home Assistant's selected number format, with its language or the
+browser language as fallback. Real zero and signed export values remain valid;
+rounding hides negative-zero text.
+
+With both settings omitted, existing displays remain unchanged. On switches,
+legacy `power_unit` is a label only. Enabling either new setting uses the actual
+secondary sensor's unit; an explicit compatible `display_unit` converts from it.
+It never formats the primary on/off state or changes Home Assistant state,
+service values, climate values, or control inputs.
+
+The editor and generator validate precision and actual live source metadata
+before saving/generating. If source metadata later becomes incompatible, the card
+keeps the original readable live value/unit and reports a localized format error.
+It never applies a converted label to an unconverted value.
+
+Numeric energy history retains each raw record and its original unit in the
+existing bounded request/cache. Compatible records are converted without rounding
+before bounds and geometry are calculated; only visible labels are rounded.
+Missing or incompatible required historical units produce an error instead of a
+misleading continuous trace. A separately selected graph sensor uses its own
+metadata. Changing only format settings reuses raw history and keeps the selected
+period. Source or period changes invalidate obsolete requests.

@@ -1,0 +1,136 @@
+title: Living Room
+path: living-room
+subview: true
+theme: Marao Dashboard
+cards:
+  # marao:generated:start
+  - type: custom:marao-card
+    template: hc_title_card
+    name: Living Room
+    show_icon: false
+    show_state: false
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_sensor_card
+      entity: sensor.marao_dashboard_test_temperature
+      name: Temperature
+    - type: custom:marao-card
+      template: hc_sensor_card
+      entity: sensor.marao_dashboard_test_humidity
+      name: Humidity
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_cover_card
+      entity: cover.marao_dashboard_test_cover
+      name: Blinds
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_climate_card
+      entity: climate.marao_dashboard_test_multi_mode_climate
+      name: Thermostat
+      variables:
+        show_graph: false
+        mode_selector_hash: '#climate-mode-climate-marao-dashboard-test-multi-mode-climate'
+    - type: custom:marao-card
+      template: hc_climate_card
+      entity: climate.marao_dashboard_test_dual_target_climate
+      name: Dual target thermostat
+      variables:
+        show_graph: false
+        mode_selector_hash: '#climate-mode-climate-marao-dashboard-test-dual-target-climate'
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_fan_card
+      entity: fan.marao_dashboard_test_fan
+      name: Ceiling Fan
+    - type: custom:marao-card
+      template: hc_fan_card
+      entity: fan.marao_dashboard_test_onoff_fan
+      name: Single-speed Fan
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_light_card
+      entity: light.marao_dashboard_test_light
+      name: Main Lights
+    - type: custom:marao-card
+      template: hc_light_card
+      entity: light.marao_dashboard_test_room_light
+      name: Accent Lights
+    - type: custom:marao-card
+      template: hc_light_card
+      entity: light.marao_dashboard_test_onoff_light
+      name: On/off Light
+  - type: custom:marao-card
+    template: hc_scene_card
+    entity: input_select.marao_dashboard_test_scene
+    name: Living Room scene
+  - type: custom:marao-card
+    template: hc_glance_card
+    name: Living Room readings
+    variables:
+      entity1: sensor.marao_dashboard_test_temperature
+      entity1_name: Temperature
+      entity2: sensor.marao_dashboard_test_humidity
+      entity2_name: Humidity
+  - type: custom:marao-popup-card
+    hash: '#climate-mode-climate-marao-dashboard-test-multi-mode-climate'
+    entity: climate.marao_dashboard_test_multi_mode_climate
+    name: Thermostat Mode
+    icon: mdi:thermostat
+    show_icon: true
+    show_name: true
+    show_state: true
+    height: 620px
+    max_height: 80dvh
+    cards:
+    - type: custom:marao-card
+      template: hc_climate_card
+      entity: climate.marao_dashboard_test_multi_mode_climate
+      name: Thermostat
+      variables:
+        show_graph: false
+        show_mode_buttons: true
+  - type: custom:marao-popup-card
+    hash: '#climate-mode-climate-marao-dashboard-test-dual-target-climate'
+    entity: climate.marao_dashboard_test_dual_target_climate
+    name: Dual target thermostat Mode
+    icon: mdi:thermostat
+    show_icon: true
+    show_name: true
+    show_state: true
+    height: 620px
+    max_height: 80dvh
+    cards:
+    - type: custom:marao-card
+      template: hc_climate_card
+      entity: climate.marao_dashboard_test_dual_target_climate
+      name: Dual target thermostat
+      variables:
+        show_graph: false
+        show_mode_buttons: true
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/dashboard/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

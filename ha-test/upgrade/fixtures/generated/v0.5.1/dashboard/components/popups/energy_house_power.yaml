@@ -1,0 +1,27 @@
+type: custom:marao-popup-card
+hash: '#energy-house-power'
+entity: sensor.marao_dashboard_test_graph_history
+name: House Power
+icon: mdi:flash
+show_icon: true
+show_name: true
+show_state: true
+height: 720px
+max_height: 80dvh
+cards:
+  # marao:generated:start
+  - type: custom:marao-card
+    template: hc_graph_card
+    entity: sensor.marao_dashboard_test_graph_history
+    name: House Power
+    icon: mdi:flash
+    variables:
+      show_graph_fill: true
+      show_graph_line: true
+      show_icon: true
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end

@@ -1,0 +1,12 @@
+title: Home
+path: overview
+icon: mdi:home-variant
+cards:
+  # marao:generated:start
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

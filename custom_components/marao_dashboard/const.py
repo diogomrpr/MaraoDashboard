@@ -11,11 +11,11 @@ DEFAULT_DASHBOARD_CONFIG = "dashboard/MaraoDashboard/dashboard.json"
 DASHBOARD_KEY_PREFIX = "marao"
 MANAGEMENT_PANEL_PATH = "marao-dashboard-editor"
 MANAGEMENT_PANEL_TITLE = "Marao Dashboard Editor"
-MANAGEMENT_PANEL_ICON = "mdi:view-dashboard-edit"
+MANAGEMENT_PANEL_ICON = "marao_dashboard:mountain"
 
 BASE_DASHBOARD_NAME = "Marao Dashboard"
 BASE_DASHBOARD_SLUG = "dashboard"
-BASE_DASHBOARD_ICON = "mdi:home"
+BASE_DASHBOARD_ICON = "marao_dashboard:mountain"
 BASE_DASHBOARD_THEME = "Marao Dashboard"
 LEGACY_CARD_TEST_DASHBOARD_KEY = "marao-dashboard-card-test"
 LEGACY_CARD_TEST_DASHBOARD_FILE = (

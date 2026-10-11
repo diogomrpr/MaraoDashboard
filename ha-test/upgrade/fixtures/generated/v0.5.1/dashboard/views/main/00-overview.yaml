@@ -1,0 +1,92 @@
+title: Home
+path: overview
+icon: mdi:home-variant
+theme: Marao Dashboard
+cards:
+  # marao:generated:start
+  - type: custom:marao-card
+    template: hc_weather_card
+    entity: sensor.marao_dashboard_test_weather
+    variables:
+      show_forecast: true
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_navigation_card
+      entity: light.marao_dashboard_test_light
+      name: Lights
+      icon: mdi:lightbulb-group-outline
+      variables:
+        summary_entities:
+        - light.marao_dashboard_test_light
+        - light.marao_dashboard_test_room_light
+        - light.marao_dashboard_test_onoff_light
+      tap_action:
+        action: navigate
+        navigation_path: '#overview-lights'
+        haptic: heavy
+    - type: custom:marao-card
+      template: hc_navigation_card
+      entity: cover.marao_dashboard_test_cover
+      name: Blinds
+      icon: mdi:window-shutter
+      variables:
+        summary_entities:
+        - cover.marao_dashboard_test_cover
+        - cover.marao_dashboard_test_garage_door
+        - cover.marao_dashboard_test_open_only_door
+      tap_action:
+        action: navigate
+        navigation_path: '#overview-blinds'
+        haptic: heavy
+    - type: custom:marao-card
+      template: hc_navigation_card
+      entity: climate.marao_dashboard_test_multi_mode_climate
+      name: Climate
+      icon: mdi:thermostat
+      variables:
+        summary_entities:
+        - climate.marao_dashboard_test_multi_mode_climate
+        - climate.marao_dashboard_test_dual_target_climate
+      tap_action:
+        action: navigate
+        navigation_path: '#overview-climate'
+        haptic: heavy
+    - type: custom:marao-card
+      template: hc_navigation_card
+      entity: sensor.marao_dashboard_test_battery
+      name: Maintenance
+      icon: mdi:wrench
+      variables: {}
+      tap_action:
+        action: navigate
+        navigation_path: '#overview-maintenance'
+        haptic: heavy
+    - type: custom:marao-card
+      template: hc_navigation_card
+      entity: input_boolean.marao_dashboard_test_one
+      name: Scenes
+      icon: mdi:palette-outline
+      variables:
+        summary_entities:
+        - input_boolean.marao_dashboard_test_one
+        - input_boolean.marao_dashboard_test_two
+        - input_boolean.marao_dashboard_test_three
+      tap_action:
+        action: navigate
+        navigation_path: '#overview-scenes'
+        haptic: heavy
+  - !include '/config/dashboard/MaraoDashboard/dashboard/components/popups/overview_lights.yaml'
+  - !include '/config/dashboard/MaraoDashboard/dashboard/components/popups/overview_blinds.yaml'
+  - !include '/config/dashboard/MaraoDashboard/dashboard/components/popups/overview_climate.yaml'
+  - !include '/config/dashboard/MaraoDashboard/dashboard/components/popups/overview_maintenance.yaml'
+  - !include '/config/dashboard/MaraoDashboard/dashboard/components/popups/overview_scenes.yaml'
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/dashboard/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

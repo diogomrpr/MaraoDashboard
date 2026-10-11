@@ -8,6 +8,19 @@ const require = createRequire(import.meta.url);
 const { changePlan, composeDashboard, patchPackages, referencedEntities, targetKey } = require("../../ha-test/prepare.js");
 const { fingerprint, readConfig } = require("../../ha-test/client.js");
 
+test('canonical Cases composition retains ordinary pages, is idempotent and adds no legacy storage', () => {
+  const config = { config_version: 2, name: 'Safe', landing_page: 'home', pages: [{ name: 'Home', path: 'home', entities: [] }] };
+  const view = { cards: [{ type: 'markdown', content: 'Safe gallery' }, '/config/dashboard/MaraoDashboard/dashboard/components/navigation/navbar.yaml'] };
+  const source = structuredClone(config);
+  const composed = composeDashboard(config, view);
+  assert.deepEqual(composeDashboard(composed, view), composed);
+  assert.deepEqual(composed.pages[0], config.pages[0]);
+  assert.deepEqual(composed.pages[1].cards, [view.cards[0]]);
+  assert.equal(composed.pages[1].path, 'card-test');
+  assert.ok(!Object.hasOwn(composed, 'rooms') && !Object.hasOwn(composed, 'overview'));
+  assert.deepEqual(config, source);
+});
+
 test("frontend changes reload; backend, fixture, target and missing deployment changes restart", () => {
   const previous = { target: "instance-a", frontend: "1", backend: "1", fixtures: "1", dashboard: "1" };
   assert.equal(changePlan(previous, previous, new Map(), []).restart, false);

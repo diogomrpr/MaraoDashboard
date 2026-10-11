@@ -99,3 +99,5 @@ added to the card configuration.
 | frigate_instance_id | Camera entity metadata | No | Frigate integration instance ID override. |
 | unifi_protect_media_source | Automatic discovery | No | Full camera-level UniFi Protect media-source URI override. |
 | event_limit | `12` | No | Maximum recent events to request. |
+
+Reported media or history failures affect the whole card and keep a readable reason. Use the visible Retry or Refresh control to try again; event details also keep Back. Useful readings and actions with available targets remain usable. A failed actual control target shows a partial warning and disables that action. Problem surfaces take priority over artwork and custom colors.

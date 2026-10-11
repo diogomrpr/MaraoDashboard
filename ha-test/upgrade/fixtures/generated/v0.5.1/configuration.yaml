@@ -1,0 +1,13 @@
+default_config:
+
+lovelace:
+  dashboards:
+    marao-dashboard:
+      mode: yaml
+      title: "Marao Dashboard"
+      icon: "mdi:home"
+      show_in_sidebar: true
+      filename: "dashboard/MaraoDashboard/dashboard/dashboard.yaml"
+
+frontend:
+  themes: !include_dir_merge_named themes

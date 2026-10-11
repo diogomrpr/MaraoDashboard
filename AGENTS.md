@@ -16,6 +16,11 @@ When two project rules conflict, this file wins. Ask the user only when their
 intent cannot be preserved safely. Keep implementation, builder, generator,
 templates, documentation, and tests aligned.
 
+The [OpenSpec guide](openspec/README.md) indexes the documented baseline and
+future changes. Read the affected capability specs and project context before
+planning a task. OpenSpec does not override this contract or establish test
+success; keep future work in changes and archive only completed, verified work.
+
 ## Product and architecture
 
 - Marao is a complete mobile Home Assistant dashboard: integration, visual
@@ -91,8 +96,53 @@ templates, documentation, and tests aligned.
   the published commit.
 - Do not publish while a known, relevant violation of this contract remains,
   even when the automated gate does not detect it.
+- The user explicitly allows the known Home Assistant native stale-unsubscribe
+  reconnect failure until its upstream fix reaches a stable frontend. Preserve
+  raw failing assertions and native subscription evidence; only that diagnosed
+  failure is exempt. All other publication and preserved-install requirements
+  still apply, and the exception expires when the stable fix is available.
 - Keep routine completion reports concise. Use a detailed verification report
   only for a release, final stabilization, or material security/safety work.
+
+## Upgrade compatibility
+
+- Before changing persisted JSON, defaults, generated structures, component keys,
+  or public APIs, inspect supported released configurations and record either
+  preserved compatibility or an explicit versioned migration. Dashboard format,
+  package version, and Home Assistant config-entry version are separate.
+- Preserve selections, deletions, explicit emptiness, order, names, options,
+  unknown fields, raw cards, protected custom YAML, and unrelated HA settings.
+  Never replace an existing dashboard with discovery or starter defaults to
+  avoid a migration. Missing or ambiguous migration inputs are errors.
+- Share ordered conversion and validation across setup, editor, generation,
+  alternate source paths, and history compatibility checks. Previews and dry
+  runs remain read-only; invalid and unsupported newer sources remain untouched.
+- Back up exact source, generated output, and affected owned state before writes;
+  preflight and stage changes, replace files atomically, and retain recovery data
+  through failure or interruption. Report rollback failures and protect unrelated
+  concurrent edits. Archived history stays immutable.
+- Keep provenance-backed historical fixtures, independently specified expected
+  JSON, and upgrade feature coverage current with each relevant change. Run
+  focused migration checks during development.
+- Immediately before versioned publication, require a separate preserved-install
+  upgrade scenario in addition to `npm run verify:publish` and exact-commit CI.
+  It must verify the final candidate, supported released formats, persisted data,
+  complete feature/mobile coverage, failure recovery, and disposable cleanup.
+  Missing, incomplete, failed, or stale evidence blocks publication. This live
+  scenario runs only during explicit release preparation, never as a routine
+  test, push/PR check, ordinary stabilization, or ordinary version hook.
+- Run `npm run verify:release -- /absolute/private/upgrade-report.json` only
+  during release preparation. It requires a clean final commit, private complete
+  preserved-install evidence, the upgraded mobile/theme visual review and verified
+  cleanup, then runs `verify:publish` and rejects candidate or evidence drift.
+  Run `npm run test:ha:upgrade` for the clean final candidate to produce that
+  evidence. The runner requires the safe current fixture installation from final
+  stabilization, backs it up before any remote write, and never invokes fresh
+  preparation while collecting upgrade evidence. Without its real complete
+  evidence, versioned publication remains blocked.
+  Do not claim fresh-fixture checks or mocked gate tests satisfy that requirement.
+  A downgrade requires the matching prior package and saved data/owned-state
+  baseline together, not package assets alone.
 
 ## Binding UI and interaction rules
 
@@ -122,6 +172,10 @@ templates, documentation, and tests aligned.
   Keep rendering Home Assistant's authoritative state, and show a readable
   error when one is reported. A project-wide optimistic pending/timeout state
   machine is not required.
+  Climate controls may preview explicitly requested mode and targets with
+  pending feedback for up to 30 seconds, shared across duplicate controls.
+  Measured temperature, actual activity and availability remain authoritative;
+  matching reports, rejection or target loss reconcile each requested setting.
 - Use strong haptics for button presses and sliders. Access sliders emit haptics
   at each 10% progress boundary and again on completion.
 - Opening or unlocking access points uses the strict slide control only. It must
@@ -142,7 +196,11 @@ templates, documentation, and tests aligned.
   shared up/down control. Climate values intentionally show no unit visually or
   in accessible text.
 - Use the Marao light/dark theme and state colors with sufficient contrast; do
-  not communicate state by color alone. Prioritize alerts only when configured
+  not communicate state by color alone. The user-approved exception is normal
+  room lighting: use the room background without a visible lighting-status row
+  or binary cue, while retaining localized accessible lighting status, deliberate
+  custom labels and visible neutral availability problems. Other families keep
+  their non-color state cues. Prioritize alerts only when configured
   and abnormal, then organize normal controls by task or room.
 - Localize all user-facing text, including action labels such as `Unlock`.
 

@@ -15,6 +15,8 @@ The card uses a plain background when artwork is absent, disabled or unavailable
 
 ![Media Card Light](../../../assets/images/cards/hc_media_card/mediacard_light.png)
 
+Reported media or history failures affect the whole card and keep a readable reason. Use the visible Retry or Refresh control to try again; event details also keep Back. Useful readings and actions with available targets remain usable. A failed actual control target shows a partial warning and disables that action. Problem surfaces take priority over artwork and custom colors.
+
 ## Usage
 
 ```yaml
@@ -26,6 +28,12 @@ The card uses a plain background when artwork is absent, disabled or unavailable
 Generated dashboards create the corresponding popup automatically. For a
 manually authored dashboard, add a Marao popup with the same `popup_hash`
 as the media card.
+
+The visual builder edits this card on any page, including its ordered apps and
+remote targets. A separate `hc_media_app_card` selects its configured
+`variables.app_source` directly. App buttons do not inherit the Media sheet link.
+Each generated card occurrence has an independent popup identity, so duplicate
+pages can reuse one player with different names and options.
 
 ## Apple TV
 

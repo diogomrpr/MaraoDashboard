@@ -1,0 +1,271 @@
+{
+  "config_version": 2,
+  "name": "Released storage example",
+  "landing_page": "home",
+  "navigation": [],
+  "pages": [
+    {
+      "id": "home",
+      "path": "home",
+      "name": "Home",
+      "icon": "mdi:home-variant-outline",
+      "theme": "Marao Dashboard",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "subtitle": "1 area",
+              "icon": "mdi:home-variant-outline",
+              "id": "card-1",
+              "template": "hc_title_card",
+              "name": "Released storage example"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "cards": [
+            {
+              "type": "markdown",
+              "content": "1 area"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "area_id": "outside",
+              "name": "Outside",
+              "icon": "mdi:tree",
+              "navigation_path": "/marao-dashboard/outside",
+              "entity_count": 2,
+              "camera_count": 1,
+              "id": "card-2",
+              "template": "hc_room_card",
+              "page": "outside",
+              "variables": {
+                "light_entities": [
+                  "light.marao_dashboard_test_light"
+                ]
+              },
+              "entity_id": "light.marao_dashboard_test_light"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "outside",
+      "path": "outside",
+      "name": "Outside",
+      "icon": "mdi:tree",
+      "theme": "Marao Dashboard",
+      "area": "outside",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "subtitle": "Released storage example",
+              "icon": "mdi:tree",
+              "back_path": "/marao-dashboard/home",
+              "id": "card-1",
+              "template": "hc_title_card",
+              "name": "Outside"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "cards": [
+            {
+              "type": "markdown",
+              "content": "Released storage example"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "back-1",
+              "template": "hc_navigation_card",
+              "page": "home",
+              "name": "Home",
+              "icon": "mdi:arrow-left"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "area_id": "outside",
+              "name": "Outside",
+              "icon": "mdi:tree",
+              "navigation_path": "/marao-dashboard/outside",
+              "entity_count": 2,
+              "camera_count": 1,
+              "id": "card-2",
+              "template": "hc_room_card",
+              "page": "outside",
+              "variables": {
+                "light_entities": [
+                  "light.marao_dashboard_test_light"
+                ]
+              },
+              "entity_id": "light.marao_dashboard_test_light"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "icon": "mdi:cctv",
+              "id": "card-3",
+              "template": "hc_title_card",
+              "name": "Cameras"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "name": "Safe camera",
+              "id": "card-4",
+              "template": "hc_camera_card",
+              "entity_id": "camera.marao_dashboard_test_camera"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "icon": "mdi:lightbulb-group",
+              "id": "card-5",
+              "template": "hc_title_card",
+              "name": "Lights"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "name": "Safe light",
+              "id": "card-6",
+              "template": "hc_light_card",
+              "entity_id": "light.marao_dashboard_test_light"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "legacy_storage_dashboard": {
+    "title": "Released storage example",
+    "views": [
+      {
+        "title": "Home",
+        "path": "home",
+        "icon": "mdi:home-variant-outline",
+        "theme": "Marao Dashboard",
+        "type": "sections",
+        "max_columns": 4,
+        "sections": [
+          {
+            "type": "grid",
+            "cards": [
+              {
+                "type": "custom:marao-header-card",
+                "title": "Released storage example",
+                "subtitle": "1 area",
+                "icon": "mdi:home-variant-outline"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "cards": [
+              {
+                "type": "custom:marao-room-card",
+                "area_id": "outside",
+                "name": "Outside",
+                "icon": "mdi:tree",
+                "navigation_path": "/marao-dashboard/outside",
+                "entity_count": 2,
+                "camera_count": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Outside",
+        "path": "outside",
+        "icon": "mdi:tree",
+        "theme": "Marao Dashboard",
+        "type": "sections",
+        "max_columns": 4,
+        "sections": [
+          {
+            "type": "grid",
+            "cards": [
+              {
+                "type": "custom:marao-header-card",
+                "title": "Outside",
+                "subtitle": "Released storage example",
+                "icon": "mdi:tree",
+                "back_path": "/marao-dashboard/home"
+              },
+              {
+                "type": "custom:marao-room-card",
+                "area_id": "outside",
+                "name": "Outside",
+                "icon": "mdi:tree",
+                "navigation_path": "/marao-dashboard/outside",
+                "entity_count": 2,
+                "camera_count": 1
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "cards": [
+              {
+                "type": "heading",
+                "heading": "Cameras",
+                "icon": "mdi:cctv"
+              },
+              {
+                "type": "custom:marao-camera-card",
+                "entity": "camera.marao_dashboard_test_camera",
+                "name": "Safe camera"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "cards": [
+              {
+                "type": "heading",
+                "heading": "Lights",
+                "icon": "mdi:lightbulb-group"
+              },
+              {
+                "type": "custom:marao-entity-card",
+                "entity": "light.marao_dashboard_test_light",
+                "name": "Safe light"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

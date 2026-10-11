@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "json_provenance": "provenance.json",
+  "storage_baseline": {
+    "tag": "v0.2.0",
+    "commit": "43761a6fb65142fc11474c322e7434ad85ee627a",
+    "source": "custom_components/marao_dashboard/frontend/MaraoDashboard.js",
+    "source_sha256": "8b47fbbc5f2063dab8acb473f89fe70fae656780fac0f71864fd3ed3e892b624",
+    "input": "v0.2.0-storage-builder-input.json",
+    "fixture": "v0.2.0-storage-dashboard.json",
+    "expected": "v0.2.0-storage-expected.json",
+    "config_version": null,
+    "generated_contract": "native-storage-0",
+    "replay": "historical-storage-data",
+    "provenance": "Output produced by the verified released builder, using independently specified safe registry input; not a released dashboard JSON literal.",
+    "expectation": "Retain the complete original native document and compare the active format-2 pages with the separately authored canonical expectation. Real setup, generation, history and source-failure recovery have focused checks; complete preserved-install execution remains required.",
+    "canonical_expected": "v0.2.0-storage-format-2-expected.json",
+    "canonical_expectation_authoring": "Fixed native card/page/destination literals plus unchanged source scopes; no candidate migration, starter or generated output."
+  },
+  "preservation_cases": [
+    {
+      "id": "customized-format-0",
+      "input": "customized-format-0-input.json",
+      "expected": "customized-format-0-expected.json",
+      "allowed_conversion": [
+        "theme alias to Marao Dashboard"
+      ],
+      "expectation": "Full document equality; retain missing config_version, source ordering, selections/options/raw/unknown content."
+    },
+    {
+      "id": "explicit-empty",
+      "input": "explicit-empty-input.json",
+      "expected": "explicit-empty-expected.json",
+      "allowed_conversion": [],
+      "expectation": "No registry refill; deleted optional pages and empty lists stay absent/empty."
+    }
+  ],
+  "overlay": {
+    "custom_yaml": "preserved-custom-cards.yaml",
+    "ownership": "unrelated-ownership.json",
+    "provenance": "Independently authored safe preservation sentinels; not attributed to a released package."
+  },
+  "sha256": {
+    "v0.2.0-storage-builder-input.json": "521647c31b0c87908818a9c64053e8f0ba73273f893ce940b3194349e541f271",
+    "v0.2.0-storage-dashboard.json": "c606f0105a032fd4fcdb09120163cbf841afb63f5811ddf96354ce59153d3cd0",
+    "v0.2.0-storage-expected.json": "c606f0105a032fd4fcdb09120163cbf841afb63f5811ddf96354ce59153d3cd0",
+    "customized-format-0-input.json": "64ad40a95c94765a49da91e6f82a44cae37fd60e68a906b3289bdbe581e43b83",
+    "customized-format-0-expected.json": "4fafb75b5966e9b1ad0af4ab88a8919f4248243b20784e5da5ae1862baa51b50",
+    "explicit-empty-input.json": "1a73572cd79f890bf0610226d505200a90423572afc37f352a557c613dc41473",
+    "explicit-empty-expected.json": "1a73572cd79f890bf0610226d505200a90423572afc37f352a557c613dc41473",
+    "preserved-custom-cards.yaml": "2ae49ce2a4b78e21c45000933a0d027ac3d9416bf0a466f65aac70fdda7434e1",
+    "unrelated-ownership.json": "9192ff2ce7e48f867370e83b59d08e49917791bdb70be39184fd7522c44bfbc9",
+    "v0.2.0-storage-format-2-expected.json": "32780d06f8d15164097faac1587d3eb5fe8fa4c242e489bcd6ba5f2228097cec"
+  }
+}

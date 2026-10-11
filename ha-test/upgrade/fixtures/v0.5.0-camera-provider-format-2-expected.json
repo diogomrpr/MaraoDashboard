@@ -1,0 +1,109 @@
+{
+  "name": "Generated Test",
+  "config_version": 2,
+  "slug": "generated-test",
+  "theme": "Marao Dashboard",
+  "icon": "marao_dashboard:mountain",
+  "landing_page": "overview",
+  "pages": [
+    {
+      "id": "overview",
+      "name": "Home",
+      "name_key": "nav.home",
+      "path": "overview",
+      "icon": "mdi:home-variant",
+      "output_path": "views/main/00-overview.yaml",
+      "sections": []
+    },
+    {
+      "id": "rooms",
+      "name": "Rooms",
+      "name_key": "nav.rooms",
+      "path": "rooms",
+      "icon": "mdi:sofa",
+      "output_path": "views/main/02-rooms.yaml",
+      "sections": [
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "id": "card-1",
+              "template": "hc_room_card",
+              "entity_id": "camera.driveway_high",
+              "name": "Garden",
+              "icon": "mdi:sofa-outline",
+              "page": "room-garden",
+              "variables": {
+                "light_entities": [],
+                "lights_target_entity": "camera.driveway_high"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Garden",
+      "id": "room-garden",
+      "path": "room-garden",
+      "icon": "mdi:sofa-outline",
+      "subview": true,
+      "output_path": "views/rooms/00-garden.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Garden",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "entities": {
+            "camera": [
+              {
+                "entity_id": "camera.driveway_high",
+                "variables": {
+                  "event_provider": "unifiprotect",
+                  "unifi_protect_media_source": "media-source://unifiprotect/nvr-1:browse:camera-1"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "legacy_page_options": {
+    "overview": {},
+    "pages": {}
+  },
+  "navigation": [
+    {
+      "page": "overview",
+      "label_key": "nav.home",
+      "label": "Home",
+      "icon": "mdi:home-variant-outline",
+      "icon_selected": "mdi:home-variant",
+      "url": "/marao-generated-test/overview"
+    },
+    {
+      "page": "rooms",
+      "label_key": "nav.rooms",
+      "label": "Rooms",
+      "icon": "mdi:sofa-outline",
+      "icon_selected": "mdi:sofa",
+      "url": "/marao-generated-test/rooms"
+    }
+  ]
+}

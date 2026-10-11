@@ -1,0 +1,1368 @@
+{
+  "version": 1,
+  "catalog": {
+    "hc_camera_card": {
+      "options": [
+        "popup_hash",
+        "event_provider",
+        "frigate_camera",
+        "frigate_instance_id",
+        "unifi_protect_media_source",
+        "event_limit"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_light_card": {
+      "options": [
+        "enable_slider",
+        "card_color",
+        "custom_label"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_cover_card": {
+      "options": [
+        "card_color"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_climate_card": {
+      "options": [
+        "show_graph",
+        "graph_entity",
+        "show_mode_buttons",
+        "graph_color",
+        "setpoint_label",
+        "mode_selector_hash"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_fan_card": {
+      "options": [
+        "enable_slider",
+        "card_color",
+        "custom_label"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_media_card": {
+      "options": [
+        "hc_show_background_art",
+        "hc_background_color",
+        "popup_hash"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_access_card": {
+      "options": [
+        "popup_hash"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_sensor_card": {
+      "options": [
+        "hc_card_color",
+        "on_icon",
+        "off_icon",
+        "display_unit",
+        "display_precision"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_switch_card": {
+      "options": [
+        "power_entity",
+        "show_graph",
+        "power_unit",
+        "active_color",
+        "graph_color",
+        "show_graph_line",
+        "show_graph_fill",
+        "display_unit",
+        "display_precision"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_number_card": {
+      "options": [],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_wallbox_current_card": {
+      "options": [
+        "shortcuts"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_vacuum_card": {
+      "options": [
+        "icon",
+        "action_1",
+        "action_2",
+        "action_3"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_battery_card": {
+      "options": [
+        "on_icon",
+        "hc_card_color"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_dishwasher_card": {
+      "options": [
+        "progress_entity",
+        "remaining_time_entity",
+        "salt_entity",
+        "rinse_aid_entity",
+        "active_program_entity"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_washing_machine_card": {
+      "options": [],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_graph_card": {
+      "options": [
+        "show_graph_line",
+        "show_graph_fill",
+        "show_icon",
+        "graph_color",
+        "graph_background",
+        "history_popup",
+        "popup_hash",
+        "display_unit",
+        "display_precision"
+      ],
+      "checks": [
+        "page-generation",
+        "page-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_toggle_graph_card": {
+      "options": [
+        "toggle_entity",
+        "show_graph_line",
+        "show_graph_fill",
+        "show_icon",
+        "graph_color",
+        "active_color",
+        "active_content_color",
+        "active_icon_background",
+        "inactive_background",
+        "inactive_name_color",
+        "inactive_state_color",
+        "inactive_icon_color",
+        "inactive_icon_background",
+        "display_unit",
+        "display_precision"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_timeline_card": {
+      "options": [
+        "timeline_name"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_navigation_card": {
+      "options": [
+        "hc_label_prefix",
+        "hc_icon_color",
+        "hc_color"
+      ],
+      "checks": [
+        "generation",
+        "builder-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_entity_group_card": {
+      "options": [],
+      "checks": [
+        "generation",
+        "builder-model",
+        "groups",
+        "builder-groups"
+      ]
+    },
+    "hc_title_card": {
+      "options": [],
+      "checks": [
+        "page-generation",
+        "page-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_weather_card": {
+      "options": [
+        "show_forecast"
+      ],
+      "checks": [
+        "page-generation",
+        "page-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_room_card": {
+      "options": [
+        "light_entities"
+      ],
+      "checks": [
+        "page-generation",
+        "page-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_scene_collection_card": {
+      "options": [
+        "popup_hash"
+      ],
+      "checks": [
+        "page-generation",
+        "page-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_security_card": {
+      "options": [],
+      "checks": [
+        "page-generation",
+        "page-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_access_hold_action_card": {
+      "options": [],
+      "checks": [
+        "page-generation",
+        "page-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_base_card": {
+      "options": [
+        "card_color",
+        "custom_label",
+        "display_unit",
+        "display_precision"
+      ],
+      "checks": [
+        "page-generation",
+        "page-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_energy_period_card": {
+      "options": [
+        "period",
+        "popup_hash",
+        "display_unit",
+        "display_precision"
+      ],
+      "checks": [
+        "page-generation",
+        "page-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_media_app_card": {
+      "options": [
+        "app_source"
+      ],
+      "checks": [
+        "page-generation",
+        "page-model",
+        "content",
+        "card-runtime"
+      ]
+    }
+  },
+  "guided_pages": {
+    "security": [
+      "generation",
+      "historical-source",
+      "content"
+    ],
+    "energy": [
+      "generation",
+      "historical-source",
+      "content"
+    ],
+    "wallbox": [
+      "generation",
+      "historical-source",
+      "content"
+    ],
+    "media": [
+      "generation",
+      "historical-source",
+      "content"
+    ]
+  },
+  "runtime_components": [
+    "marao-card",
+    "marao-navbar-card",
+    "marao-popup-card",
+    "marao-slide-to-open",
+    "marao-state-timeline-card",
+    "marao-energy-period-card",
+    "marao-frigate-events-card",
+    "marao-camera-events-card"
+  ],
+  "profiles": [
+    "iphone-normal",
+    "iphone-bold",
+    "iphone-text-200",
+    "iphone-page-zoom-200",
+    "iphone-bold-text-200",
+    "android-normal",
+    "android-bold",
+    "android-text-200",
+    "android-page-zoom-200",
+    "android-bold-text-200",
+    "narrow-320",
+    "iphone-landscape",
+    "android-landscape"
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "checks": {
+    "historical-source": {
+      "file": "tests/components/marao_dashboard/test_upgrade_fixtures.py",
+      "assertion": "test_full_expected_documents_and_owned_output_survive_generation",
+      "scope": "candidate"
+    },
+    "history-recovery": {
+      "file": "tests/components/marao_dashboard/test_history.py",
+      "assertion": "def test_interrupted_operation_recovers_before_source_version_advances",
+      "scope": "candidate"
+    },
+    "owned-state-recovery": {
+      "file": "tests/components/marao_dashboard/test_init.py",
+      "assertion": "test_resource_cleanup_shares_exact_file_recovery_and_source_commit",
+      "scope": "candidate"
+    },
+    "generation": {
+      "file": "tests/components/marao_dashboard/test_generator.py",
+      "assertion": "test_regeneration_preserves_manual_cards_and_replaces_generated_cards",
+      "scope": "candidate"
+    },
+    "integration": {
+      "file": "tests/components/marao_dashboard/test_init.py",
+      "assertion": "test_legacy_area_preview_dry_run_and_service_use_one_conversion",
+      "scope": "candidate"
+    },
+    "builder-model": {
+      "file": "tests/frontend/editor-model.test.js",
+      "assertion": "dashboard format survives Visual/JSON round trips with raw and unknown content",
+      "scope": "candidate"
+    },
+    "card-runtime": {
+      "file": "tests/frontend/marao-climate-card.test.js",
+      "assertion": "number controls and slider hit areas expose at least 48px touch targets",
+      "scope": "candidate"
+    },
+    "popup-runtime": {
+      "file": "tests/frontend/marao-card-visibility.test.js",
+      "assertion": "live group filtering retains eligible nodes, cancels removed controls and relocates focus",
+      "scope": "candidate"
+    },
+    "history-runtime": {
+      "file": "tests/frontend/marao-history-cards.test.js",
+      "assertion": "${Card.name} blocks neutral entities and stale in-flight history",
+      "scope": "candidate"
+    },
+    "camera-runtime": {
+      "file": "tests/frontend/marao-frigate-events-card.test.js",
+      "assertion": "camera events discard in-flight results after the shared connection mutates",
+      "scope": "candidate"
+    },
+    "gesture-runtime": {
+      "file": "tests/frontend/marao-text-scale.test.js",
+      "assertion": "slide control captures only horizontal intent and resets partial or cancelled gestures",
+      "scope": "candidate"
+    },
+    "states": {
+      "file": "tests/test-ha-dashboard-e2e.js",
+      "assertion": "checkStateCases",
+      "scope": "format"
+    },
+    "actions": {
+      "file": "tests/test-ha-dashboard-e2e.js",
+      "assertion": "checkActionDispatches",
+      "scope": "format"
+    },
+    "content": {
+      "file": "tests/test-ha-dashboard-e2e.js",
+      "assertion": "checkCardContent",
+      "scope": "format"
+    },
+    "camera": {
+      "file": "tests/test-ha-dashboard-e2e.js",
+      "assertion": "checkCameraCases",
+      "scope": "format"
+    },
+    "media": {
+      "file": "tests/test-ha-dashboard-e2e.js",
+      "assertion": "checkMediaRecovery",
+      "scope": "format"
+    },
+    "history": {
+      "file": "tests/test-ha-dashboard-e2e.js",
+      "assertion": "checkHistoryCases",
+      "scope": "format"
+    },
+    "climate": {
+      "file": "tests/test-ha-dashboard-e2e.js",
+      "assertion": "checkClimateFeedback",
+      "scope": "format"
+    },
+    "groups": {
+      "file": "tests/test-ha-dashboard-e2e.js",
+      "assertion": "checkEntityGroups",
+      "scope": "format"
+    },
+    "room-actions": {
+      "file": "tests/test-ha-room-cards.js",
+      "assertion": "async function actions",
+      "scope": "format"
+    },
+    "builder-preservation": {
+      "file": "tests/test-ha-editor.js",
+      "assertion": "releasedDraftPreservation",
+      "scope": "format"
+    },
+    "builder-rooms": {
+      "file": "tests/test-ha-editor.js",
+      "assertion": "independentRoomChecks",
+      "scope": "profile"
+    },
+    "builder-groups": {
+      "file": "tests/test-ha-editor.js",
+      "assertion": "entityGroupEditorChecks",
+      "scope": "profile"
+    },
+    "builder-save": {
+      "file": "tests/test-ha-editor.js",
+      "assertion": "independentRoomPersistence",
+      "scope": "format"
+    },
+    "builder-energy": {
+      "file": "tests/test-ha-editor.js",
+      "assertion": "energyFormatting",
+      "scope": "format"
+    },
+    "layout": {
+      "file": "tests/test-ha-dashboard-accessibility.js",
+      "assertion": "layoutIssues",
+      "scope": "profile"
+    },
+    "popups": {
+      "file": "tests/test-ha-dashboard-accessibility.js",
+      "assertion": "inspectPopups",
+      "scope": "profile"
+    },
+    "alignment": {
+      "file": "tests/test-ha-card-alignment.js",
+      "assertion": "checkControlContrast",
+      "scope": "format"
+    },
+    "sliders": {
+      "file": "tests/test-ha-value-sliders.js",
+      "assertion": "checkPointerInteraction",
+      "scope": "profile"
+    },
+    "numbers": {
+      "file": "tests/test-ha-climate-layout.js",
+      "assertion": "captureClimateFeedback",
+      "scope": "profile"
+    },
+    "energy": {
+      "file": "tests/test-ha-energy-format.js",
+      "assertion": "inspectGallery",
+      "scope": "format"
+    },
+    "page-generation": {
+      "file": "tests/components/marao_dashboard/test_page_generation.py",
+      "assertion": "test_duplicate_pages_same_entities_have_independent_names_options_and_popups",
+      "scope": "candidate"
+    },
+    "page-migration": {
+      "file": "tests/components/marao_dashboard/test_page_migration.py",
+      "assertion": "test_public_ordered_conversion_matches_independent_document_and_is_idempotent",
+      "scope": "candidate"
+    },
+    "page-model": {
+      "file": "tests/frontend/canonical-page-model.test.js",
+      "assertion": "all pages, sections, entity-free cards, unknown values and explicit emptiness round-trip unchanged",
+      "scope": "candidate"
+    },
+    "page-manager": {
+      "file": "tests/frontend/page-manager-model.test.js",
+      "assertion": "whole page deletion requires explicit link resolution and a new landing page",
+      "scope": "candidate"
+    },
+    "page-templates": {
+      "file": "tests/components/marao_dashboard/test_page_templates.py",
+      "assertion": "test_all_eight_templates_are_plain_containers_with_no_synthetic_bindings",
+      "scope": "candidate"
+    },
+    "native-storage": {
+      "file": "tests/components/marao_dashboard/test_native_storage_migration.py",
+      "assertion": "test_installed_native_dashboard_uses_real_setup_and_recovers_source_failure",
+      "scope": "candidate"
+    },
+    "builder-pages": {
+      "file": "tests/test-ha-editor.js",
+      "assertion": "editablePageChecks",
+      "scope": "profile"
+    }
+  },
+  "cases": {
+    "sliderFamilies": {
+      "identities": [
+        "light",
+        "fan",
+        "cover"
+      ],
+      "checks": [
+        "sliders",
+        "gesture-runtime"
+      ]
+    },
+    "families": {
+      "identities": {
+        "light": [
+          "off",
+          "on",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "switch": [
+          "off",
+          "on",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "cover": [
+          "closed",
+          "open",
+          "opening",
+          "closing",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "lock": [
+          "locked",
+          "unlocked",
+          "locking",
+          "unlocking",
+          "open",
+          "opening",
+          "jammed",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "garage": [
+          "closed",
+          "open",
+          "opening",
+          "closing",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "fan": [
+          "off",
+          "on",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "climate": [
+          "off",
+          "heat",
+          "cool",
+          "heat_cool",
+          "auto",
+          "dry",
+          "fan_only",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "media": [
+          "off",
+          "on",
+          "idle",
+          "playing",
+          "paused",
+          "buffering",
+          "standby",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "alarm": [
+          "disarmed",
+          "armed_home",
+          "armed_away",
+          "armed_night",
+          "armed_vacation",
+          "armed_custom_bypass",
+          "pending",
+          "arming",
+          "disarming",
+          "triggered",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "vacuum": [
+          "docked",
+          "cleaning",
+          "paused",
+          "returning",
+          "idle",
+          "error",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "dishwasher": [
+          "idle",
+          "run",
+          "pause",
+          "finish",
+          "error",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "washer": [
+          "off",
+          "on",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "weather": [
+          "clear-night",
+          "cloudy",
+          "exceptional",
+          "fog",
+          "hail",
+          "lightning",
+          "lightning-rainy",
+          "partlycloudy",
+          "pouring",
+          "rainy",
+          "snowy",
+          "snowy-rainy",
+          "sunny",
+          "windy",
+          "windy-variant",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "battery": [
+          "10",
+          "20",
+          "50",
+          "80",
+          "95",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "sensor": [
+          "21",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "number": [
+          "0",
+          "50",
+          "100",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "wallbox": [
+          "6",
+          "16",
+          "32",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "camera": [
+          "idle",
+          "recording",
+          "streaming",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "scene": [
+          "Relax",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "room": [
+          "off",
+          "on",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "access_slide": [
+          "locked",
+          "unlocked",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "access_hold": [
+          "disarmed",
+          "armed_away",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "access_tap": [
+          "locked",
+          "unlocked",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "base": [
+          "21",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "graph": [
+          "450",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "toggle_graph": [
+          "off",
+          "on",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "header": [
+          "sunny",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "energy_period": [
+          "230.0",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "timeline": [
+          "locked",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "motion": [
+          "off",
+          "on",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "washer_contract": [
+          "idle",
+          "running",
+          "error",
+          "unknown",
+          "unavailable",
+          "missing"
+        ]
+      },
+      "checks": [
+        "states",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "requiredTemplates": {
+      "identities": [
+        "hc_base_card",
+        "hc_header_card",
+        "hc_title_card",
+        "hc_navigation_card",
+        "hc_weather_card",
+        "hc_camera_card",
+        "hc_glance_card",
+        "hc_light_card",
+        "hc_cover_card",
+        "hc_access_card",
+        "hc_access_action_card",
+        "hc_access_hold_action_card",
+        "hc_access_slide_action_card",
+        "hc_switch_card",
+        "hc_fan_card",
+        "hc_climate_card",
+        "hc_media_card",
+        "hc_media_app_card",
+        "hc_security_card",
+        "hc_sensor_card",
+        "hc_battery_card",
+        "hc_graph_card",
+        "hc_toggle_graph_card",
+        "hc_scene_card",
+        "hc_number_card",
+        "hc_wallbox_current_card",
+        "hc_vacuum_card",
+        "hc_dishwasher_card",
+        "hc_washing_machine_card",
+        "hc_room_card",
+        "hc_blinds_popup_card",
+        "hc_lights_popup_card",
+        "hc_climate_popup_card",
+        "hc_maintenance_popup_card",
+        "hc_entity_group_card"
+      ],
+      "checks": [
+        "generation",
+        "content",
+        "layout"
+      ]
+    },
+    "requiredOptions": {
+      "identities": [
+        "Light + slider",
+        "Light without slider",
+        "Fan + slider",
+        "Fan without slider",
+        "Single Mode Climate",
+        "Multi Mode Climate",
+        "Apple TV",
+        "Generic media player",
+        "Wallbox charging current",
+        "Wallbox current with one shortcut",
+        "Wallbox current with two shortcuts",
+        "Wallbox current without shortcuts",
+        "Graph line only",
+        "Graph fill only",
+        "Scene with one option",
+        "Scene with two options",
+        "Scene with three options",
+        "Scene with four options",
+        "Scene with five options",
+        "Dual target climate",
+        "Room \u00b7 one light unavailable",
+        "Reported action error",
+        "Tall controls popup"
+      ],
+      "checks": [
+        "content",
+        "builder-model"
+      ]
+    },
+    "eventCases": {
+      "identities": [
+        "frigate",
+        "unifi",
+        "empty",
+        "loading",
+        "error",
+        "unifi-empty",
+        "unifi-error",
+        "unifi-detail-error",
+        "camera-unknown",
+        "camera-unavailable",
+        "camera-missing",
+        "media_error"
+      ],
+      "checks": [
+        "camera",
+        "camera-runtime"
+      ]
+    },
+    "historyCases": {
+      "identities": [
+        "empty",
+        "loading",
+        "error"
+      ],
+      "checks": [
+        "history",
+        "history-runtime"
+      ]
+    },
+    "actionErrorCase": {
+      "identities": [
+        "entity",
+        "expectedError",
+        "name",
+        "service"
+      ],
+      "checks": [
+        "actions",
+        "card-runtime"
+      ]
+    },
+    "groupCase": {
+      "identities": [
+        "entities",
+        "entity",
+        "name"
+      ],
+      "checks": [
+        "states",
+        "popup-runtime"
+      ]
+    },
+    "dualClimateCase": {
+      "identities": [
+        "entity",
+        "high",
+        "low",
+        "name"
+      ],
+      "checks": [
+        "climate",
+        "numbers"
+      ]
+    },
+    "climateFeedbackCases": {
+      "identities": [
+        "delayed_ack",
+        "delayed_confirmation",
+        "rejected",
+        "unconfirmed",
+        "corrected",
+        "range_delayed",
+        "range_rejected",
+        "range_unconfirmed",
+        "range_corrected"
+      ],
+      "checks": [
+        "climate",
+        "numbers"
+      ]
+    },
+    "titleLayoutCases": {
+      "identities": [
+        "Living room ceiling lighting controls",
+        "Living room temperature and operating modes",
+        "Adjust the appliance operating duration",
+        "Garage charging current and shortcuts",
+        "Open the living room television application",
+        "Local weather conditions and temperature",
+        "Living room temperature and humidity readings",
+        "Front entrance camera and live preview",
+        "Front entrance activity during the last day",
+        "Household energy readings for the current day",
+        null
+      ],
+      "checks": [
+        "layout"
+      ]
+    },
+    "binaryPresentationCases": {
+      "identities": [
+        "Binary static icon \u00b7 off",
+        "Binary hidden icon \u00b7 off",
+        "Binary state prefix \u00b7 off",
+        "Binary static icon \u00b7 on",
+        "Binary hidden icon \u00b7 on",
+        "Binary state prefix \u00b7 on",
+        "Binary configured label and reading",
+        "Summary \u00b7 all off",
+        "Numeric graph with binary toggle",
+        "Binary current state and independent readings",
+        "Binary header motion \u00b7 on",
+        "Binary header motion \u00b7 off"
+      ],
+      "checks": [
+        "states",
+        "layout"
+      ]
+    },
+    "problemPresentationCases": {
+      "identities": [
+        "Hidden normal state \u00b7 unknown",
+        "Hidden normal state \u00b7 unavailable",
+        "Artwork with unavailable remote",
+        "Room \u00b7 usable secondary light",
+        "Ordinary selector \u00b7 error option",
+        "Configured dishwasher warning",
+        "Camera preview \u00b7 failed media",
+        "Media artwork \u00b7 failed media",
+        "Simulate media failure"
+      ],
+      "checks": [
+        "states",
+        "layout"
+      ]
+    },
+    "energyFormattingCases": {
+      "identities": [
+        "Energy format \u00b7 source default",
+        "Energy format \u00b7 converted zero decimals",
+        "Energy format \u00b7 converted two decimals",
+        "Energy format \u00b7 source six decimals",
+        "Energy format \u00b7 automatic decimals",
+        "Energy format \u00b7 signed export",
+        "Energy format \u00b7 real zero",
+        "Energy format \u00b7 cost precision",
+        "Energy format \u00b7 missing source unit",
+        "Energy format \u00b7 missing history unit",
+        "Energy format \u00b7 incompatible history unit",
+        "Energy format \u00b7 unavailable",
+        "Energy format \u00b7 independent graph source",
+        "Energy format \u00b7 toggle power",
+        "Energy format \u00b7 secondary conversion",
+        "Energy format \u00b7 legacy label only",
+        "Energy format \u00b7 converted period",
+        "Energy format \u00b7 source period",
+        "Energy format \u00b7 cost period"
+      ],
+      "checks": [
+        "energy",
+        "builder-energy"
+      ]
+    },
+    "roomCompositionCases": {
+      "identities": [
+        "Room \u00b7 active secondary",
+        "Room \u00b7 all lights off",
+        "Empty room",
+        "Room \u00b7 all lights unavailable",
+        "Bedroom for guests and family with a deliberately long room name",
+        "Room \u00b7 connection loss",
+        "Room \u00b7 custom label"
+      ],
+      "checks": [
+        "room-actions",
+        "layout"
+      ]
+    },
+    "editorRoomCases": {
+      "identities": [
+        "areas",
+        "newEntity",
+        "offRoomEntity",
+        "specializedCard"
+      ],
+      "checks": [
+        "builder-rooms",
+        "builder-save"
+      ]
+    },
+    "entityGroupCases": {
+      "identities": [
+        "gallery-light-all",
+        "gallery-light-active",
+        "gallery-cover-all",
+        "gallery-cover-active",
+        "gallery-climate-all",
+        "gallery-climate-active",
+        "gallery-battery-all",
+        "gallery-battery-active",
+        "gallery-light-inactive",
+        "gallery-light-empty",
+        "gallery-light-unknown",
+        "gallery-light-unavailable",
+        "gallery-battery-unavailable",
+        "gallery-light-one",
+        "gallery-cover-inactive",
+        "gallery-climate-inactive"
+      ],
+      "checks": [
+        "groups",
+        "builder-groups",
+        "popup-runtime"
+      ]
+    },
+    "editablePageCases": {
+      "identities": [
+        "native-scenes",
+        "empty-scenes",
+        "daily-energy",
+        "monthly-energy",
+        "media-app"
+      ],
+      "checks": [
+        "page-generation",
+        "content",
+        "actions",
+        "energy",
+        "media"
+      ]
+    }
+  },
+  "capabilities": {
+    "integration-admin": [
+      "integration",
+      "owned-state-recovery"
+    ],
+    "builder": [
+      "builder-model",
+      "builder-preservation",
+      "builder-rooms",
+      "builder-groups",
+      "builder-save",
+      "builder-energy",
+      "page-model",
+      "page-manager",
+      "page-templates",
+      "builder-pages"
+    ],
+    "generation-customization-history": [
+      "generation",
+      "historical-source",
+      "history-recovery"
+    ],
+    "cards-actions": [
+      "states",
+      "actions",
+      "card-runtime",
+      "climate",
+      "groups",
+      "room-actions",
+      "gesture-runtime",
+      "sliders",
+      "numbers"
+    ],
+    "content": [
+      "camera",
+      "camera-runtime",
+      "media",
+      "history",
+      "history-runtime",
+      "energy"
+    ],
+    "layout-navigation": [
+      "layout",
+      "popups",
+      "alignment"
+    ],
+    "upgrade-resilience": [
+      "historical-source",
+      "history-recovery",
+      "owned-state-recovery",
+      "integration",
+      "native-storage"
+    ],
+    "editable-pages": [
+      "page-model",
+      "page-migration",
+      "page-generation",
+      "page-manager",
+      "page-templates",
+      "builder-pages"
+    ]
+  },
+  "required_install_assertions": [
+    "baseline-package-health",
+    "entry-identity",
+    "source-before-regeneration",
+    "independent-canonical-source",
+    "protected-output",
+    "unrelated-registration",
+    "unrelated-resources",
+    "unrelated-themes",
+    "asset-fingerprint",
+    "second-restart-noop",
+    "history-immutable",
+    "interrupted-operation-recovery",
+    "verified-cleanup"
+  ],
+  "limits": [
+    "Install-level assertions require the unfinished preserved-install orchestrator; ordinary gallery results do not satisfy them.",
+    "Native-storage-0 replay remains unsupported and cannot be silently excluded from release evidence."
+  ],
+  "guided_page_options": {
+    "security": [
+      "alarm_entity",
+      "access_entities",
+      "actions"
+    ],
+    "energy": [
+      "house_power",
+      "month_energy",
+      "month_cost",
+      "today_energy",
+      "today_cost",
+      "appliances"
+    ],
+    "wallbox": [
+      "status_entity",
+      "charging_power_entity",
+      "max_current_entity",
+      "current_control_entity",
+      "current_presets",
+      "pause_resume_entity"
+    ],
+    "media": [
+      "players"
+    ]
+  },
+  "energy_options": [
+    "display_unit",
+    "display_precision"
+  ],
+  "page_templates": {
+    "empty": [
+      "page-templates",
+      "page-generation",
+      "page-manager"
+    ],
+    "home": [
+      "page-templates",
+      "page-generation",
+      "page-manager"
+    ],
+    "rooms": [
+      "page-templates",
+      "page-generation",
+      "page-manager"
+    ],
+    "room": [
+      "page-templates",
+      "page-generation",
+      "page-manager"
+    ],
+    "security": [
+      "page-templates",
+      "page-generation",
+      "page-manager"
+    ],
+    "energy": [
+      "page-templates",
+      "page-generation",
+      "page-manager"
+    ],
+    "wallbox": [
+      "page-templates",
+      "page-generation",
+      "page-manager"
+    ],
+    "media": [
+      "page-templates",
+      "page-generation",
+      "page-manager"
+    ]
+  }
+}

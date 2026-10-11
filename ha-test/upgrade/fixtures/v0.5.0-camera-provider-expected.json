@@ -1,0 +1,19 @@
+{
+  "name": "Generated Test",
+  "rooms": [
+    {
+      "name": "Garden",
+      "entities": {
+        "camera": [
+          {
+            "entity_id": "camera.driveway_high",
+            "variables": {
+              "event_provider": "unifiprotect",
+              "unifi_protect_media_source": "media-source://unifiprotect/nvr-1:browse:camera-1"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

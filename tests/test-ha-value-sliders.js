@@ -63,7 +63,12 @@ async function checkPointerInteraction(page, context, config, example, calls, po
     await original.evaluate((element) => { const host = element.getRootNode().host; host.hass = { ...host.hass, states: { ...host.hass.states } }; });
     if (!await original.evaluate((element) => element.isConnected && Math.abs(Number(element.value) - 60) <= 1)) throw new Error(`${example.name}/${pointer}: unrelated HA update interrupted the drag`);
     // A real external update must refresh confirmed fill without replacing the held input.
-    const activeLabel = await original.evaluate((element) => element.getRootNode().querySelector('.state')?.textContent);
+    const statePresentation = () => original.evaluate((element) => {
+      const root = element.getRootNode(), cue = root.querySelector('.binary-cue');
+      return cue ? { binary: true, active: cue.dataset.active, label: root.querySelector('[role="img"][aria-label]')?.getAttribute('aria-label'), redundant: Boolean(root.querySelector('.state')) }
+        : { binary: false, label: root.querySelector('.state')?.textContent };
+    });
+    const activeState = await statePresentation();
     for (const confirmed of [0, 40]) {
       await api(config, 'POST', `/api/services/${example.source.split('.')[0]}/${expected}`, { entity_id: example.entity, [field]: confirmed });
       try {
@@ -73,8 +78,9 @@ async function checkPointerInteraction(page, context, config, example, calls, po
         const state = await api(config, 'GET', `/api/states/${example.entity}`);
         throw new Error(`confirmed update to ${confirmed} failed: ${JSON.stringify({ observed, serverValue: fixtureValue(state), state: state.state })}`);
       }
-      const label = await original.evaluate((element) => element.getRootNode().querySelector('.state')?.textContent);
-      if (!label || (confirmed === 0 ? label === activeLabel : label !== activeLabel)) throw new Error(`${example.name}/${pointer}: state label stopped following HA`);
+      const currentState = await statePresentation();
+      if (!currentState.label || (confirmed === 0 ? currentState.label === activeState.label : currentState.label !== activeState.label)
+        || currentState.binary && (currentState.redundant || currentState.active !== String(confirmed !== 0))) throw new Error(`${example.name}/${pointer}: state presentation stopped following HA`);
     }
     await move(75);
     if (!await original.evaluate((element) => element.isConnected && Math.abs(Number(element.value) - 75) <= 1)) throw new Error(`${example.name}/${pointer}: target stopped following the pointer`);
@@ -204,7 +210,8 @@ async function main() {
         for (const [index, card] of (await cards.all()).entries()) {
           await card.evaluate((element, block) => element.scrollIntoView({ block }), scenario.pageZoom > 1 ? 'start' : 'center');
           await card.evaluate(async (element) => { await element.shadowRoot.querySelector('ha-card')?.updateComplete; });
-          await card.screenshot({ path: path.join(output, `${run}-${index}.png`), scale: 'device' });
+          // Oversized element screenshots resize Chromium and reset mobile emulation.
+          await page.screenshot({ path: path.join(output, `${run}-${index}.png`), scale: 'css' });
         }
       }
       if (scenario.name === 'iphone-normal') {
@@ -222,7 +229,7 @@ async function main() {
           for (const [index, card] of (await cards.all()).entries()) {
             await card.evaluate((element) => element.scrollIntoView({ block: 'center' }));
             await card.evaluate(async (element) => { await element.shadowRoot.querySelector('ha-card')?.updateComplete; });
-            await card.screenshot({ path: path.join(output, `${run}-${view.replace('#', '-')}-${index}.png`), scale: 'device' });
+            await page.screenshot({ path: path.join(output, `${run}-${view.replace('#', '-')}-${index}.png`), scale: 'css' });
           }
           if (view.endsWith('#overview-blinds')) {
             await page.setViewportSize({ width: 539, height: 816 });
@@ -242,3 +249,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch((error) => { console.error(error.message || error); process.exitCode = 1; });
+module.exports = { checkPointerInteraction, checkNativeThumbReset };

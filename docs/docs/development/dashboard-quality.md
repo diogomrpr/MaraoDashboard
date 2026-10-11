@@ -85,6 +85,37 @@ Do not require a full device matrix or a formal defect ledger for a small
 iteration. Establish only the baseline needed to understand the affected
 behavior.
 
+### Upgrade compatibility
+
+Before changing saved JSON, defaults, generated component contracts or APIs,
+inspect supported released inputs and record a preservation decision or explicit
+versioned conversion. Keep dashboard format separate from package and HA entry
+versions. Preserve deletions, empty selections, order, unknown fields, raw cards,
+protected YAML and unrelated HA configuration; a starter reset is not migration.
+
+All configuration entry points must share conversion/validation. Read-only
+previews and dry runs cannot persist it. Back up exact prior data and affected
+owned state, preflight/stage writes, replace files atomically and retain recovery
+data through failure/interruption. Protect concurrent unrelated edits and report
+rollback failures. Keep archives immutable and preflight restore compatibility.
+Downgrades restore matching package assets and saved data together.
+
+Maintain provenance-backed historical fixtures, independent expected JSON and
+feature-to-assertion coverage. Use focused migration checks during development.
+Immediately before versioned publication, additionally require the final
+candidate's preserved-install upgrade gate: supported released formats, persisted
+expected data, all supported features/mobile profiles, failure recovery and
+verified disposable cleanup. Fresh-fixture provisioning cannot prove upgrades.
+Failed, missing, incomplete or stale evidence blocks publication.
+
+Run that live scenario only during explicit release preparation, outside routine
+tests, push/PR checks, ordinary stabilization and version hooks.
+`npm run verify:release -- /absolute/private/upgrade-report.json` checks complete
+private evidence for a clean final candidate, including preserved-install visual
+reviews and verified cleanup, before running `verify:publish`. The historical runner is implemented in the development candidate; its real
+complete final-candidate evidence is required before publication. Existing `verify:publish`, CI and
+the final affected-card visual inspection still apply.
+
 ### During iteration
 
 1. Make the smallest root-cause change.
@@ -177,16 +208,24 @@ the action it affects.
 - Use content-driven card height and minimum sizes; do not clip essential
   content into a fixed-height composition.
 - Let essential titles, states, errors, and action labels wrap.
+  Balance broken action words above the thumb in narrow access controls.
+- Give every visible Marao card title the full content width in its first row.
+  Put icons, readings and controls below it, including climate steppers, Wallbox
+  shortcuts, media apps and separate history, energy and camera-event headers.
+  Preserve intentionally hidden titles and centered icon-only controls.
 - Secondary, nonessential metadata may use an ellipsis.
 - Reflow multi-column content before controls become cramped.
 - Keep pages vertically scrollable and leave enough content space for the
   floating navbar.
 - Avoid nested scrolling except inside a bounded popup.
 
-Use `env(safe-area-inset-*)` for device-derived insets. Apply notch/top padding
-only for iPhone behavior that needs it. Preserve the accepted compact iPhone
-navbar offset rather than adding a universal bottom gap. Never assume that
-every iPhone has the same cutout or home-indicator size.
+Resolve each safe edge from the Marao development override, locally inherited
+Home Assistant `--safe-area-inset-*`, then browser `env(safe-area-inset-*, 0px)`.
+Home Assistant incorporates app-provided insets; an explicit local zero remains
+authoritative when a host already protects that edge. The active page owns top
+and side clearance once, preserving normal spacing. Restore owned styles and
+priorities on view replacement or route exit. Preserve the accepted compact
+iPhone navbar offset; never assume a fixed cutout or home-indicator size.
 
 ### Montserrat and scaling
 
@@ -212,7 +251,9 @@ The automated runner uses Chromium mobile device emulation, including the
 phone user agent, touch behavior, device pixel ratio, OS text scale, safe-area
 insets, and an explicit Marao light or dark mode. It also scales the shared
 Marao typography tokens because Chromium does not resize every explicit CSS
-length from its OS-scale setting alone. Treat it as a repeatable first-order
+length from its OS-scale setting alone. Repeated scrolling retains one emulation
+session per page, and typography is reapplied after deferred cards mount. Font,
+touch and layout assertions remain mandatory. Treat it as a repeatable first-order
 phone simulation and the automated release gate. Native iOS or Android Home
 Assistant app inspection is recommended when a device is available, but it is
 not required and must never be claimed unless it was actually performed. Its
@@ -282,6 +323,8 @@ to it:
 never substituted with a plausible safe-looking or active state. Disable
 actions in either state.
 
+Every recognized availability or fault/error reason uses the whole card surface and a visible localized cue. Complete availability takes neutral priority over retained action/content errors; otherwise reported errors take priority over partial warnings and loading. Partial cards identify affected members and preserve usable readings and safe actions. Apply shared problem colors after custom colors and artwork, with readable contrast in both themes. Hidden normal state text or icons cannot hide a problem reason. Keep service errors local to the initiating card until a successful explicit retry or configuration replacement, with one native notification and no automatic retry. Card-owned media/history failures have explicit retry or back controls; empty content and ordinary loading remain distinct.
+
 Use Home Assistant's native connection warning when its authenticated
 connection is lost and disable entity actions until it recovers. Do not add a
 competing global offline banner. After reconnecting, reconcile state before
@@ -295,6 +338,14 @@ acknowledgment and dispatch one explicit action. Keep rendering Home
 Assistant's authoritative state and surface a readable error when the service
 call reports one. Do not infer physical success from a successful service
 response.
+
+Climate controls have an explicit exception for requested mode and targets:
+show the latest request immediately, shared across duplicate controls, with
+localized pending feedback. Measurements, actual activity and availability
+remain Home Assistant observations. Match mode and target independently; clear
+the affected preview on rejection, target loss or 30 seconds without confirmation,
+and report unconfirmed changes without retrying. Service acknowledgement alone
+does not confirm a setting. Other card families retain authoritative display.
 
 The current contract deliberately does not require a project-wide optimistic
 pending, confirmation, or timeout state machine. Add one only when a specific
@@ -365,7 +416,11 @@ press-and-hold.
   Assistant's state.
 
 Destructive builder or administrative actions require an explicit
-confirmation that names what will be removed or replaced.
+confirmation that names what will be removed or replaced, except deleting an
+individual card/entity entry from the local editor draft. That removal happens
+immediately and persists only through Save & Generate; Discard changes restores
+the saved entries. Whole-room/page deletion, discarding unsaved work, and history
+restoration retain their confirmations.
 
 ## Shared component contracts
 
@@ -377,14 +432,31 @@ confirmation that names what will be removed or replaced.
   must remain readable in light and dark modes.
 - The state and action cannot be ambiguous or encoded only by color.
 
+Normal binary cards omit redundant on/off, stable lock and running/idle lines, retaining substantive labels, readings, counts, metadata and historical intervals. Distinct backgrounds and filled/outlined state markers remain visible even with static or hidden icons; accessible state uses localized native domain meanings. Explicit `show_state: true` does not restore redundant text, and `show_state: false` keeps its normal-state meaning. Keep icon-only intent based on configured fields, and use the actual toggle for graph state cues.
+
 ### Room cards
 
-- A room card with configured `light_entities` exposes one visible **All off**
-  child control for every listed `light.*` entity. It dispatches one
-  `light.turn_off` action for that list and has strong haptic feedback.
+- A room card with configured `light_entities` exposes one circular lights-off
+  icon button at the lower left, visibly at least 48 × 48 CSS pixels. Its localized
+  accessible name includes the room. It dispatches one `light.turn_off` action
+  for the complete unique `light.*` list and has strong haptic feedback. There
+  is no lights-on action.
 - The child action must stop propagation so the card's separate room-navigation
   action still works. Disable the child control when Home Assistant is
   disconnected or any configured light is `unknown` or `unavailable`.
+- Derive lighting from the complete explicit list, including active secondary
+  lights. Neither an unrelated primary entity nor `lights_target_entity` changes
+  membership. Recheck current target and connection availability on activation;
+  room navigation remains independent of light availability.
+- Normal room lighting uses the active/inactive background without an automatic
+  status/count row or binary cue, as the user-approved room-only exception to
+  non-color normal-state cues. Keep localized accessible lighting status,
+  deliberate custom labels and visible neutral availability problems. Other
+  families retain their additional state cues.
+- Room titles wrap across the full content width. The configured room icon is
+  noninteractive decoration below the title, deliberately cropped at the right
+  and bottom without clipping text, problems or real controls. Other families
+  retain their shared icon and state-cue contracts.
 - The Cases view keeps at least two safe room lights so the combined action and
   its disabled state can be checked without affecting hardware.
 
@@ -428,6 +500,14 @@ large and readable.
 ### Climate
 
 - Separate the operating mode, current temperature, and target control.
+- Requested modes and targets show localized pending feedback for at most 30
+  seconds. Matching reports confirm each setting independently; rejection or
+  expiry restores the latest reported setting. Measurements, equipment activity
+  and availability always remain authoritative; acknowledgement alone is not
+  confirmation.
+- Repeated steps use the latest requested target; mode changes use only targets
+  supported by the reported capabilities. Preserve focus and allow further valid
+  input while pending. No configuration setting or persisted request is needed.
 - Omit degree symbols and units from all visual and accessible climate values.
 - A single supported mode turns on directly to that mode.
 - Multiple supported modes open the Marao popup.
@@ -444,7 +524,7 @@ large and readable.
 - Width and spacing scale automatically with the number of routes.
 - Active icon backgrounds remain circular.
 - Keep button gaps compact without violating the visible 48-by-48 control rule.
-- Derive iPhone positioning from `env(safe-area-inset-bottom)` and preserve
+- Derive iPhone positioning from the shared host-aware bottom inset and preserve
   the accepted lowered offset. Do not add a generic extra bottom margin.
 - The navbar stays below open popups in the stacking order.
 - The fullscreen shell hides Home Assistant's native top bar only while a
@@ -457,6 +537,9 @@ large and readable.
 - Stay above the navbar and all dashboard cards.
 - Keep a visible close button and internal scrolling.
 - Support content-driven height or a configured fixed/max height.
+- Keep the backdrop full-screen and constrain the sheet's usable area to the
+  overlay's own top/side safe bounds. Short sheets retain their bottom placement;
+  tall sheets clamp to available height, including while open during rotation.
 - On wider layouts, stay centered and use the first dashboard column's width
   rather than stretching across the screen.
 - Keep the background inert, trap focus, close through explicit close/back

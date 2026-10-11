@@ -63,6 +63,29 @@ async function checkTextScaling(page) {
   if (issues.length) throw new Error(`Enlarged card text: ${issues.join(", ")}`);
 }
 
+async function checkRoomComposition(page) {
+  const rooms = await page.locator('marao-card').evaluateAll(cards => cards.filter(card => card._config?.template === 'hc_room_card').map(card => {
+    const root = card.shadowRoot, body = root.querySelector('.body'), title = root.querySelector('.title');
+    const action = root.querySelector('[data-room-lights-off]'), decoration = root.querySelector('.room-artwork');
+    const box = root.querySelector('ha-card').getBoundingClientRect(), b = body.getBoundingClientRect(), style = getComputedStyle(body);
+    const target = action?.getBoundingClientRect(), glyph = action?.querySelector('ha-icon').getBoundingClientRect();
+    const art = decoration?.getBoundingClientRect(), t = title?.getBoundingClientRect();
+    const label = String(card._config.variables?.custom_label || '').trim();
+    const lighting = card._config.variables?.light_entities || [];
+    const state = root.querySelector('.state');
+    return { name: card._config.name, titleFits: !t || Math.abs(t.width - (b.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight))) <= .5,
+      normalState: !root.querySelector('.binary-cue') && (!state || Boolean(label) && !/[:：]$/.test(label) && state.textContent === label),
+      semanticLighting: !lighting.length || Boolean((root.querySelector('[data-card-action]') || root.querySelector('ha-card')).getAttribute('aria-description')),
+      actionFits: !target || target.width >= 48 && target.height >= 48 && target.left >= box.left && target.right <= box.right && target.top >= box.top && target.bottom <= box.bottom,
+      glyphCentered: !glyph || Math.abs(glyph.left + glyph.width / 2 - target.left - target.width / 2) <= .5 && Math.abs(glyph.top + glyph.height / 2 - target.top - target.height / 2) <= .5,
+      circle: !action || getComputedStyle(action).borderRadius === '50%',
+      artwork: !art || decoration.getAttribute('aria-hidden') === 'true' && getComputedStyle(decoration).pointerEvents === 'none' && (!t || art.top >= t.bottom) && !root.querySelector('.icon') && decoration.scrollWidth > decoration.clientWidth,
+    };
+  }));
+  const failures = rooms.filter(room => !room.titleFits || !room.normalState || !room.semanticLighting || !room.actionFits || !room.glyphCentered || !room.circle || !room.artwork);
+  if (!rooms.length || failures.length) throw new Error(`Room composition: ${JSON.stringify(failures)}`);
+}
+
 async function checkMediaShortcutIcons(page) {
   const icons = await page.locator(".marao-popup-sheet .body.media-app-card").evaluateAll((cards) => cards.map((card) => {
     const icon = card.querySelector(".icon").getBoundingClientRect();
@@ -214,6 +237,7 @@ async function main() {
       const energy = page.locator("marao-energy-period-card").filter({ has: page.locator('button.surface[aria-label="Month Power"]') }).first();
       await energy.locator("button.surface").tap({ position: { x: 12, y: 12 } });
       await page.locator(".marao-popup-sheet marao-energy-period-card .period-nav").waitFor({ state: "visible" });
+      await page.locator(".marao-popup-sheet").evaluate(async (sheet) => Promise.all(sheet.getAnimations().map((animation) => animation.finished)));
       const energyIssues = await layoutIssues(page);
       if (energyIssues.length) throw new Error(`Energy popup at ${width}px: ${energyIssues.join(", ")}`);
       await page.locator(".marao-popup-close").tap();
@@ -223,6 +247,7 @@ async function main() {
     for (const theme of ["light", "dark"]) {
       await applyVisualPreferences(page, normal, theme);
       await checkControlContrast(page);
+      await checkRoomComposition(page);
     }
     await checkTextScaling(page);
     if (errors.length) throw new Error(`Browser warnings/errors:\n${errors.map((error) => `- ${error}`).join("\n")}`);
@@ -238,3 +263,4 @@ if (require.main === module) {
     process.exitCode = 1;
   });
 }
+module.exports = { checkRoomComposition };

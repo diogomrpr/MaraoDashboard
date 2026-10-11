@@ -1,0 +1,455 @@
+{
+  "name": "Generated Test",
+  "config_version": 2,
+  "slug": "generated-test",
+  "theme": "Marao Dashboard",
+  "icon": "marao_dashboard:mountain",
+  "landing_page": "overview",
+  "pages": [
+    {
+      "id": "overview",
+      "name": "Home",
+      "name_key": "nav.home",
+      "path": "overview",
+      "icon": "mdi:home-variant",
+      "output_path": "views/main/00-overview.yaml",
+      "sections": [
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "template": "hc_entity_group_card",
+              "id": "overview-lights",
+              "name": "Lights",
+              "icon": "mdi:lightbulb-group-outline",
+              "entity_type": "light",
+              "popup_filter": "active",
+              "entities": [
+                "light.living_room_main"
+              ],
+              "variables": {
+                "popup_hash": "#overview-lights"
+              },
+              "name_key": "overview.lights"
+            },
+            {
+              "template": "hc_entity_group_card",
+              "id": "overview-blinds",
+              "name": "Blinds",
+              "icon": "mdi:window-shutter",
+              "entity_type": "cover",
+              "popup_filter": "all",
+              "entities": [
+                "cover.living_room_blind"
+              ],
+              "variables": {
+                "popup_hash": "#overview-blinds"
+              },
+              "name_key": "overview.blinds"
+            },
+            {
+              "template": "hc_entity_group_card",
+              "id": "overview-climate",
+              "name": "Climate",
+              "icon": "mdi:thermostat",
+              "entity_type": "climate",
+              "popup_filter": "all",
+              "entities": [
+                "climate.living_room"
+              ],
+              "variables": {
+                "popup_hash": "#overview-climate"
+              },
+              "name_key": "overview.climate"
+            },
+            {
+              "id": "card-4",
+              "template": "hc_scene_collection_card",
+              "name": "Scenes",
+              "icon": "mdi:palette-outline",
+              "entities": [
+                "input_boolean.holiday_mode"
+              ],
+              "variables": {
+                "popup_hash": "#overview-scenes"
+              },
+              "name_key": "overview.scenes"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rooms",
+      "name": "Rooms",
+      "name_key": "nav.rooms",
+      "path": "rooms",
+      "icon": "mdi:sofa",
+      "output_path": "views/main/02-rooms.yaml",
+      "sections": [
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "id": "card-1",
+              "template": "hc_room_card",
+              "entity_id": "light.living_room_main",
+              "name": "Living Room",
+              "icon": "mdi:sofa-outline",
+              "page": "room-living-room",
+              "variables": {
+                "light_entities": [
+                  "light.living_room_main"
+                ],
+                "lights_target_entity": "light.living_room_main"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "name": "Security",
+      "name_key": "nav.security",
+      "path": "security",
+      "icon": "mdi:shield-home",
+      "output_path": "views/main/01-security.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "card-1",
+              "template": "hc_security_card",
+              "entity_id": "alarm_control_panel.home",
+              "name": "Home"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "card-2",
+              "template": "hc_access_hold_action_card",
+              "entity_id": "button.open_door",
+              "name": "Open Door",
+              "show_state": false,
+              "tap_action": {
+                "action": "perform-action",
+                "perform_action": "button.press",
+                "target": {
+                  "entity_id": "button.open_door"
+                },
+                "haptic": "heavy"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "energy",
+      "name": "Energy",
+      "name_key": "nav.energy",
+      "path": "energy",
+      "icon": "mdi:lightning-bolt",
+      "output_path": "views/main/03-energy.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "card-1",
+              "template": "hc_graph_card",
+              "entity_id": "sensor.house_power",
+              "name": "House Power",
+              "icon": "mdi:flash",
+              "variables": {
+                "show_graph_fill": true,
+                "show_graph_line": true,
+                "show_icon": true,
+                "history_popup": true,
+                "popup_hash": "#energy-house-power"
+              },
+              "name_key": "energy.house_power"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "card-2",
+              "template": "hc_energy_period_card",
+              "entity_id": "sensor.month_energy",
+              "name": "Month Power",
+              "icon": "mdi:flash",
+              "variables": {
+                "period": "month",
+                "popup_hash": "#energy-month-power"
+              },
+              "name_key": "energy.month_power"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "card-3",
+              "template": "hc_energy_period_card",
+              "entity_id": "sensor.month_cost",
+              "name": "Month Cost",
+              "icon": "mdi:currency-eur",
+              "variables": {
+                "period": "month",
+                "popup_hash": "#energy-month-cost"
+              },
+              "name_key": "energy.month_cost"
+            }
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "id": "card-4",
+              "template": "hc_toggle_graph_card",
+              "entity_id": "sensor.heater_power",
+              "name": "Heater Power",
+              "icon": null,
+              "variables": {
+                "toggle_entity": "switch.heater"
+              }
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "card-5",
+              "entity_id": "sensor.dishwasher",
+              "template": "hc_dishwasher_card",
+              "name": "Dishwasher"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wallbox",
+      "name": "Wallbox",
+      "name_key": "nav.wallbox",
+      "path": "wallbox",
+      "icon": "mdi:ev-station",
+      "output_path": "views/main/04-wallbox.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "card-1",
+              "template": "hc_base_card",
+              "entity_id": "sensor.wallbox_status",
+              "name": "Wallbox Status",
+              "icon": "mdi:ev-station",
+              "name_key": "wallbox.status"
+            }
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "id": "card-2",
+              "template": "hc_graph_card",
+              "entity_id": "sensor.wallbox_power",
+              "name": "Charging Power",
+              "icon": "mdi:flash",
+              "variables": {
+                "show_graph_fill": true,
+                "show_graph_line": true,
+                "show_icon": true
+              },
+              "name_key": "wallbox.charging_power"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "card-3",
+              "template": "hc_wallbox_current_card",
+              "entity_id": "input_number.wallbox_current",
+              "name": "Charging Current",
+              "variables": {
+                "shortcuts": []
+              },
+              "name_key": "wallbox.current"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "card-4",
+              "template": "hc_switch_card",
+              "entity_id": "switch.wallbox_pause",
+              "name": "Pause / Resume",
+              "icon": "mdi:pause-circle",
+              "name_key": "wallbox.pause_resume"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "media",
+      "name": "Media",
+      "name_key": "nav.media",
+      "path": "media",
+      "icon": "mdi:television-play",
+      "output_path": "views/main/05-media.yaml",
+      "sections": []
+    },
+    {
+      "name": "Living Room",
+      "id": "room-living-room",
+      "path": "room-living-room",
+      "icon": "mdi:sofa-outline",
+      "subview": true,
+      "output_path": "views/rooms/00-living-room.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Living Room",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "entities": [
+            "light.living_room_main",
+            "cover.living_room_blind",
+            "climate.living_room",
+            "lock.front_door",
+            "input_boolean.holiday_mode",
+            "input_number.target_temperature",
+            {
+              "entity_id": "media_player.living_room_tv",
+              "apple_tv": {
+                "remote_entity": "remote.living_room_tv",
+                "apps": [
+                  {
+                    "name": "YouTube",
+                    "source": "YouTube"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "legacy_page_options": {
+    "overview": {
+      "scenes": [
+        "input_boolean.holiday_mode"
+      ]
+    },
+    "pages": {
+      "security": {
+        "alarm_entity": "alarm_control_panel.home",
+        "actions": [
+          "button.open_door"
+        ],
+        "access_entities": []
+      },
+      "energy": {
+        "house_power": "sensor.house_power",
+        "month_energy": "sensor.month_energy",
+        "month_cost": "sensor.month_cost",
+        "loads": [
+          {
+            "power_entity": "sensor.heater_power",
+            "toggle_entity": "switch.heater"
+          }
+        ],
+        "appliances": [
+          {
+            "entity_id": "sensor.dishwasher",
+            "template": "hc_dishwasher_card"
+          }
+        ]
+      },
+      "wallbox": {
+        "status_entity": "sensor.wallbox_status",
+        "charging_power_entity": "sensor.wallbox_power",
+        "current_control_entity": "input_number.wallbox_current",
+        "pause_resume_entity": "switch.wallbox_pause"
+      },
+      "media": {
+        "players": []
+      }
+    }
+  },
+  "navigation": [
+    {
+      "icon": "mdi:home-variant-outline",
+      "icon_selected": "mdi:home-variant",
+      "label": "Home",
+      "url": "/marao-generated-test/overview",
+      "page": "overview",
+      "label_key": "nav.home"
+    },
+    {
+      "icon": "mdi:shield-home-outline",
+      "icon_selected": "mdi:shield-home",
+      "label": "Security",
+      "url": "/marao-generated-test/security",
+      "page": "security",
+      "label_key": "nav.security"
+    },
+    {
+      "icon": "mdi:sofa-outline",
+      "icon_selected": "mdi:sofa",
+      "label": "Rooms",
+      "url": "/marao-generated-test/rooms",
+      "page": "rooms",
+      "label_key": "nav.rooms"
+    },
+    {
+      "icon": "mdi:lightning-bolt-outline",
+      "icon_selected": "mdi:lightning-bolt",
+      "label": "Energy",
+      "url": "/marao-generated-test/energy",
+      "page": "energy",
+      "label_key": "nav.energy"
+    },
+    {
+      "icon": "mdi:ev-plug-type2",
+      "icon_selected": "mdi:ev-plug-type2",
+      "label": "Wallbox",
+      "url": "/marao-generated-test/wallbox",
+      "page": "wallbox",
+      "label_key": "nav.wallbox"
+    }
+  ]
+}

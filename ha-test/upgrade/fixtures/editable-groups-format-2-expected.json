@@ -1,0 +1,209 @@
+{
+  "config_version": 2,
+  "name": "Editable groups",
+  "slug": "editable-groups",
+  "navigation": [
+    "study",
+    "overview"
+  ],
+  "future_root": [
+    "second",
+    "first"
+  ],
+  "theme": "Marao Dashboard",
+  "icon": "marao_dashboard:mountain",
+  "landing_page": "overview",
+  "legacy_page_options": {
+    "overview": {
+      "entity_groups": [
+        {
+          "template": "hc_entity_group_card",
+          "id": "selected-lights",
+          "name": "Reading lights",
+          "icon": "mdi:book-open",
+          "entity_type": "light",
+          "popup_filter": "all",
+          "entities": [],
+          "variables": {
+            "popup_hash": "#saved-reading-lights",
+            "future_option": true
+          },
+          "future_group": {
+            "retain": true
+          }
+        }
+      ]
+    },
+    "pages": {
+      "custom": [
+        {
+          "name": "Study",
+          "path": "study",
+          "icon": "mdi:book",
+          "columns": 2,
+          "entities": [
+            {
+              "template": "hc_entity_group_card",
+              "id": "study-climate",
+              "name": "Study climate",
+              "entity_type": "climate",
+              "entities": [
+                {
+                  "entity_id": "climate.safe",
+                  "name": "Study thermostat",
+                  "variables": {
+                    "mode_selector_hash": "#saved-study-mode",
+                    "future_option": 42
+                  }
+                }
+              ],
+              "future_group": "retained"
+            },
+            {
+              "page": "overview",
+              "name": "Home"
+            },
+            {
+              "entity_id": "light.safe",
+              "name": "First"
+            },
+            {
+              "entity_id": "light.safe",
+              "name": "Second",
+              "variables": {
+                "enable_slider": false
+              }
+            }
+          ],
+          "cards": [
+            {
+              "type": "markdown",
+              "content": "Saved note",
+              "future_raw": true
+            }
+          ],
+          "future_page": true
+        }
+      ]
+    }
+  },
+  "pages": [
+    {
+      "id": "overview",
+      "name": "Home",
+      "name_key": "nav.home",
+      "path": "overview",
+      "icon": "mdi:home-variant",
+      "output_path": "views/main/00-overview.yaml",
+      "sections": [
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "template": "hc_entity_group_card",
+              "id": "selected-lights",
+              "name": "Reading lights",
+              "icon": "mdi:book-open",
+              "entity_type": "light",
+              "popup_filter": "all",
+              "entities": [],
+              "variables": {
+                "popup_hash": "#saved-reading-lights",
+                "future_option": true
+              },
+              "future_group": {
+                "retain": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rooms",
+      "name": "Rooms",
+      "name_key": "nav.rooms",
+      "path": "rooms",
+      "icon": "mdi:sofa",
+      "output_path": "views/main/02-rooms.yaml",
+      "sections": [
+        {
+          "columns": 2,
+          "entities": []
+        }
+      ]
+    },
+    {
+      "name": "Study",
+      "path": "study",
+      "icon": "mdi:book",
+      "future_page": true,
+      "id": "study",
+      "output_path": "views/custom/00-study.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Study",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "template": "hc_entity_group_card",
+              "id": "study-climate",
+              "name": "Study climate",
+              "entity_type": "climate",
+              "entities": [
+                {
+                  "entity_id": "climate.safe",
+                  "name": "Study thermostat",
+                  "variables": {
+                    "mode_selector_hash": "#saved-study-mode",
+                    "future_option": 42
+                  }
+                }
+              ],
+              "future_group": "retained"
+            },
+            {
+              "page": "overview",
+              "name": "Home"
+            },
+            {
+              "entity_id": "light.safe",
+              "name": "First"
+            },
+            {
+              "entity_id": "light.safe",
+              "name": "Second",
+              "variables": {
+                "enable_slider": false
+              }
+            }
+          ],
+          "cards": [
+            {
+              "type": "markdown",
+              "content": "Saved note",
+              "future_raw": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,290 @@
+{
+  "config_version": 2,
+  "name": "Formatting preservation",
+  "extension": {
+    "keep": [
+      "second",
+      "first"
+    ]
+  },
+  "slug": "formatting-preservation",
+  "theme": "Marao Dashboard",
+  "icon": "marao_dashboard:mountain",
+  "landing_page": "overview",
+  "pages": [
+    {
+      "id": "overview",
+      "name": "Home",
+      "name_key": "nav.home",
+      "path": "overview",
+      "icon": "mdi:home-variant",
+      "output_path": "views/main/00-overview.yaml",
+      "sections": []
+    },
+    {
+      "id": "rooms",
+      "name": "Rooms",
+      "name_key": "nav.rooms",
+      "path": "rooms",
+      "icon": "mdi:sofa",
+      "output_path": "views/main/02-rooms.yaml",
+      "sections": [
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "id": "card-1",
+              "template": "hc_room_card",
+              "entity_id": "sensor.energy",
+              "name": "Room",
+              "icon": "mdi:sofa-outline",
+              "page": "room-room",
+              "variables": {
+                "light_entities": [],
+                "lights_target_entity": "sensor.energy"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "energy",
+      "name": "Energy",
+      "name_key": "nav.energy",
+      "path": "energy",
+      "icon": "mdi:lightning-bolt",
+      "output_path": "views/main/03-energy.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "card-1",
+              "entity_id": "sensor.energy",
+              "template": "hc_energy_period_card",
+              "name": "Today Power",
+              "name_key": "energy.today_power",
+              "icon": "mdi:flash-outline",
+              "future": true,
+              "variables": {
+                "period": "day",
+                "popup_hash": "#energy-today-power",
+                "display_unit": "kWh",
+                "display_precision": 0
+              }
+            }
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "id": "card-2",
+              "entity_id": "sensor.power",
+              "template": "hc_graph_card",
+              "name": "Power",
+              "icon": null,
+              "variables": {
+                "display_unit": "kW",
+                "display_precision": 6,
+                "future": "retained"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Room",
+      "id": "room-room",
+      "path": "room-room",
+      "icon": "mdi:sofa-outline",
+      "output_path": "views/rooms/00-room.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Room",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "entities": [
+            {
+              "entity_id": "sensor.energy",
+              "template": "hc_graph_card",
+              "variables": {
+                "display_unit": "kWh",
+                "display_precision": 0,
+                "retained": true
+              }
+            },
+            {
+              "entity_id": "sensor.energy",
+              "template": "hc_sensor_card",
+              "variables": {
+                "display_unit": "Wh",
+                "display_precision": 6
+              }
+            },
+            {
+              "entity_id": "switch.load",
+              "variables": {
+                "power_entity": "sensor.power",
+                "power_unit": "MW",
+                "display_unit": "kW",
+                "display_precision": 2
+              }
+            }
+          ],
+          "cards": [
+            {
+              "type": "markdown",
+              "content": "Untouched raw card"
+            }
+          ],
+          "columns": 1
+        }
+      ],
+      "subview": true
+    },
+    {
+      "name": "Custom",
+      "path": "custom",
+      "extension": 42,
+      "id": "custom",
+      "icon": "mdi:file-outline",
+      "output_path": "views/custom/00-custom.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Custom",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "entities": [
+            {
+              "entity_id": "sensor.cost",
+              "variables": {
+                "display_precision": 2
+              }
+            }
+          ],
+          "cards": [
+            {
+              "type": "markdown",
+              "content": "Custom raw card"
+            }
+          ],
+          "columns": 1
+        }
+      ]
+    }
+  ],
+  "legacy_page_options": {
+    "overview": {},
+    "pages": {
+      "energy": {
+        "today_energy": {
+          "entity_id": "sensor.energy",
+          "variables": {
+            "display_unit": "kWh",
+            "display_precision": 0
+          },
+          "future": true
+        },
+        "loads": [
+          {
+            "power_entity": "sensor.power",
+            "variables": {
+              "display_unit": "kW",
+              "display_precision": 6,
+              "future": "retained"
+            }
+          }
+        ]
+      },
+      "custom": [
+        {
+          "name": "Custom",
+          "path": "custom",
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "sensor.cost",
+              "variables": {
+                "display_precision": 2
+              }
+            }
+          ],
+          "cards": [
+            {
+              "type": "markdown",
+              "content": "Custom raw card"
+            }
+          ],
+          "extension": 42
+        }
+      ]
+    }
+  },
+  "navigation": [
+    {
+      "icon": "mdi:home-variant-outline",
+      "icon_selected": "mdi:home-variant",
+      "label": "Home",
+      "url": "/marao-formatting-preservation/overview",
+      "page": "overview",
+      "label_key": "nav.home"
+    },
+    {
+      "icon": "mdi:sofa-outline",
+      "icon_selected": "mdi:sofa",
+      "label": "Rooms",
+      "url": "/marao-formatting-preservation/rooms",
+      "page": "rooms",
+      "label_key": "nav.rooms"
+    },
+    {
+      "icon": "mdi:lightning-bolt-outline",
+      "icon_selected": "mdi:lightning-bolt",
+      "label": "Energy",
+      "url": "/marao-formatting-preservation/energy",
+      "page": "energy",
+      "label_key": "nav.energy"
+    },
+    {
+      "icon": "mdi:file-outline",
+      "icon_selected": "mdi:file-outline",
+      "label": "Custom",
+      "url": "/marao-formatting-preservation/custom",
+      "page": "custom",
+      "label_key": "nav.custom"
+    }
+  ]
+}

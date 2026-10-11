@@ -1,0 +1,282 @@
+{
+  "name": "Preserved installation",
+  "slug": "preserved-installation",
+  "theme": "Marao Dashboard",
+  "navigation": [
+    "studio",
+    "rooms",
+    "overview"
+  ],
+  "extension": {
+    "order": [
+      "second",
+      "first"
+    ],
+    "future": true
+  },
+  "config_version": 2,
+  "icon": "marao_dashboard:mountain",
+  "landing_page": "overview",
+  "pages": [
+    {
+      "id": "overview",
+      "name": "Home",
+      "name_key": "nav.home",
+      "path": "overview",
+      "icon": "mdi:home-variant",
+      "output_path": "views/main/00-overview.yaml",
+      "sections": [
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "template": "hc_entity_group_card",
+              "id": "overview-lights",
+              "name": "Lights",
+              "name_key": "overview.lights",
+              "icon": "mdi:lightbulb-group-outline",
+              "entity_type": "light",
+              "popup_filter": "active",
+              "entities": [
+                {
+                  "entity_id": "light.marao_dashboard_test_light",
+                  "name": "First",
+                  "variables": {
+                    "future": 42
+                  }
+                }
+              ],
+              "variables": {
+                "popup_hash": "#overview-lights"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rooms",
+      "name": "Rooms",
+      "name_key": "nav.rooms",
+      "path": "rooms",
+      "icon": "mdi:sofa",
+      "output_path": "views/main/02-rooms.yaml",
+      "sections": [
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "id": "card-1",
+              "template": "hc_room_card",
+              "entity_id": "light.marao_dashboard_test_light",
+              "name": "Office",
+              "icon": "mdi:sofa-outline",
+              "page": "room-office",
+              "variables": {
+                "light_entities": [
+                  "light.marao_dashboard_test_light",
+                  "light.marao_dashboard_test_light"
+                ],
+                "lights_target_entity": "light.marao_dashboard_test_light"
+              }
+            },
+            {
+              "id": "card-2",
+              "template": "hc_room_card",
+              "name": "Empty",
+              "icon": "mdi:sofa-outline",
+              "page": "room-empty",
+              "variables": {
+                "light_entities": [],
+                "lights_target_entity": ""
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Office",
+      "path": "room-office",
+      "area": "fixture-office",
+      "extension": [
+        "keep"
+      ],
+      "id": "room-office",
+      "icon": "mdi:sofa-outline",
+      "output_path": "views/rooms/00-office.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Office",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "entities": [
+            {
+              "entity_id": "light.marao_dashboard_test_light",
+              "name": "First",
+              "variables": {
+                "future": 42
+              }
+            },
+            {
+              "page": "studio",
+              "name": "Studio shortcut",
+              "future": true
+            },
+            {
+              "entity_id": "light.marao_dashboard_test_light",
+              "name": "Duplicate",
+              "variables": {
+                "color": "red"
+              }
+            },
+            {
+              "entity_id": "sensor.marao_dashboard_test_temperature",
+              "name": "Saved temperature"
+            }
+          ],
+          "cards": [
+            {
+              "type": "markdown",
+              "content": "Saved raw note",
+              "future": {
+                "retain": true
+              }
+            }
+          ],
+          "columns": 1
+        }
+      ],
+      "subview": true
+    },
+    {
+      "name": "Empty",
+      "path": "room-empty",
+      "extension": "intentionally empty",
+      "id": "room-empty",
+      "icon": "mdi:sofa-outline",
+      "output_path": "views/rooms/01-empty.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Empty",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "entities": [],
+          "cards": []
+        }
+      ],
+      "subview": true
+    },
+    {
+      "name": "Studio",
+      "path": "studio",
+      "extension": 42,
+      "id": "studio",
+      "icon": "mdi:file-outline",
+      "output_path": "views/custom/00-studio.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Studio",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "entities": {
+            "navigation": [
+              {
+                "page": "overview",
+                "name": "Home"
+              }
+            ],
+            "light": [
+              "light.marao_dashboard_test_room_light"
+            ]
+          },
+          "cards": [
+            {
+              "type": "markdown",
+              "content": "Custom page note"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "legacy_page_options": {
+    "overview": {
+      "scenes": [],
+      "future": {
+        "retain": true
+      }
+    },
+    "pages": {
+      "custom": [
+        {
+          "name": "Studio",
+          "path": "studio",
+          "entities": {
+            "navigation": [
+              {
+                "page": "overview",
+                "name": "Home"
+              }
+            ],
+            "light": [
+              "light.marao_dashboard_test_room_light"
+            ]
+          },
+          "cards": [
+            {
+              "type": "markdown",
+              "content": "Custom page note"
+            }
+          ],
+          "extension": 42
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "dashboard": {"key": "unrelated-dashboard", "mode": "yaml", "filename": "unrelated/dashboard.yaml", "title": "Unrelated sentinel"},
+  "resource": {"id": "unrelated-resource", "url": "/local/unrelated-sentinel.js", "type": "module"},
+  "theme": {"Unrelated sentinel": {"primary-color": "#654321"}},
+  "file": {"path": "manual/unrelated.yaml", "content": "Unrelated file remains byte-for-byte.\r\n"}
+}

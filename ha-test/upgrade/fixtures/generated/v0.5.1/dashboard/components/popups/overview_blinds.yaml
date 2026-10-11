@@ -1,0 +1,34 @@
+type: custom:marao-popup-card
+hash: '#overview-blinds'
+entity: cover.marao_dashboard_test_cover
+name: Blinds
+icon: mdi:window-shutter
+show_icon: true
+show_name: true
+show_state: true
+height: 820px
+max_height: 80dvh
+cards:
+  # marao:generated:start
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_cover_card
+      entity: cover.marao_dashboard_test_cover
+      name: Blinds - Living Room
+    - type: custom:marao-card
+      template: hc_cover_card
+      entity: cover.marao_dashboard_test_garage_door
+      name: Garage Door - Entrance
+    - type: custom:marao-card
+      template: hc_cover_card
+      entity: cover.marao_dashboard_test_open_only_door
+      name: Pedestrian Gate - Entrance
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end

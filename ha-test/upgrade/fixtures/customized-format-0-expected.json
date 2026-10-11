@@ -1,0 +1,30 @@
+{
+  "name": "Preserved installation",
+  "slug": "preserved-installation",
+  "theme": "Marao Dashboard",
+  "navigation": ["studio", "rooms", "overview"],
+  "extension": {"order": ["second", "first"], "future": true},
+  "overview": {"scenes": [], "future": {"retain": true}},
+  "rooms": [
+    {
+      "name": "Office",
+      "path": "room-office",
+      "area": "fixture-office",
+      "columns": 1,
+      "entities": [
+        {"entity_id": "light.marao_dashboard_test_light", "name": "First", "variables": {"future": 42}},
+        {"page": "studio", "name": "Studio shortcut", "future": true},
+        {"entity_id": "light.marao_dashboard_test_light", "name": "Duplicate", "variables": {"color": "red"}}
+      ],
+      "include": ["sensor.marao_dashboard_test_temperature"],
+      "exclude": ["light.marao_dashboard_test_room_light"],
+      "overrides": {"sensor.marao_dashboard_test_temperature": {"name": "Saved temperature"}},
+      "cards": [{"type": "markdown", "content": "Saved raw note", "future": {"retain": true}}],
+      "extension": ["keep"]
+    },
+    {"name": "Empty", "path": "room-empty", "entities": [], "cards": [], "extension": "intentionally empty"}
+  ],
+  "pages": {
+    "custom": [{"name": "Studio", "path": "studio", "entities": {"navigation": [{"page": "overview", "name": "Home"}], "light": ["light.marao_dashboard_test_room_light"]}, "cards": [{"type": "markdown", "content": "Custom page note"}], "extension": 42}]
+  }
+}

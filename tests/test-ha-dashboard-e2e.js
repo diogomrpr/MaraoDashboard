@@ -1,4 +1,5 @@
 const fs = require("fs");
+const assert = require('node:assert/strict');
 const path = require("path");
 const { accessToken, setBrowserToken, api, assertCurrentFrontend, assertDisposableHaTarget, readConfig } = require("../ha-test/client");
 const { prepare } = require("../ha-test/prepare");
@@ -99,6 +100,25 @@ function cardAction(page, title) {
   return cardByTitle(page, title).locator("[data-card-action]");
 }
 
+async function titleLayoutIssues(page) {
+  return page.locator("marao-card,marao-state-timeline-card,marao-energy-period-card,marao-camera-events-card,marao-frigate-events-card").evaluateAll((cards) => cards.flatMap((card) => {
+    const title = card.shadowRoot?.querySelector(".body > .title,header > h2,.surface > h2");
+    if (!title || !title.getBoundingClientRect().width) return [];
+    const parent = title.parentElement;
+    const style = getComputedStyle(parent);
+    const contentWidth = parent.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const rect = title.getBoundingClientRect();
+    const name = card._config?.name || card._config?.title || card._config?.template || card.localName;
+    const issues = [];
+    if (Math.abs(rect.width - contentWidth) > 1) issues.push(`${name}: title uses ${rect.width}px of ${contentWidth}px content width`);
+    for (const child of parent.children) {
+      const other = child.getBoundingClientRect();
+      if (child !== title && other.width && other.height && other.top < rect.bottom - 1) issues.push(`${name}: content appears alongside or above its title`);
+    }
+    return issues;
+  }));
+}
+
 async function measureCenteredIcons(locator) {
   return locator.evaluateAll((bodies) => bodies.map((body, index) => {
     const root = body.getRootNode();
@@ -166,6 +186,8 @@ async function scrollDashboard(page, { screenshotPrefix, onSegment } = {}) {
       previous = current;
     }
     await scroller.evaluate((element) => element.scrollTo({ top: 0, behavior: "instant" }));
+    const titleIssues = await titleLayoutIssues(page);
+    if (titleIssues.length) throw new Error(titleIssues.join("\n"));
   } finally {
     await scroller.dispose();
   }
@@ -213,7 +235,7 @@ async function checkStateCases(page, serviceCalls) {
   if (result.length) throw new Error(`Gallery state coverage failed:\n${result.join("\n")}`);
 }
 
-async function slideGesture(page, track, points, { cancel = false } = {}) {
+async function slideGesture(page, track, points, { cancel = false, afterStart } = {}) {
   await page.locator(".marao-popup-sheet").evaluate((sheet) => Promise.all(sheet.getAnimations().map((animation) => animation.finished)));
   await track.scrollIntoViewIfNeeded();
   const box = await track.boundingBox();
@@ -225,6 +247,7 @@ async function slideGesture(page, track, points, { cancel = false } = {}) {
   });
   try {
     await send("touchStart", previous);
+    if (afterStart) await afterStart();
     for (const [progress, vertical] of points) {
       const next = { x: box.x + 24 + progress * (box.width - 42), y: box.y + box.height / 2 + vertical };
       for (let step = 1; step <= 8; step++) {
@@ -255,8 +278,14 @@ async function checkActionDispatches(page, serviceCalls) {
   await gesture([[1, 0], [1, -80]]);
   await gesture([[1, 0]], { cancel: true });
   await assertCount(lock, "unlock", before, 0, "Cancelled access gestures");
-  await gesture([[1, 0]]);
-  await assertCount(lock, "unlock", before, 1, "Completed access slide");
+  const unrelated = "input_boolean.marao_dashboard_test_light";
+  const original = await page.evaluate(entity => document.querySelector('home-assistant').hass.states[entity].state, unrelated);
+  await gesture([[1, 0]], { afterStart: async () => {
+    await page.evaluate(entity => document.querySelector('home-assistant').hass.callService('input_boolean', 'toggle', {entity_id: entity}), unrelated);
+    await page.waitForFunction(({entity, original}) => document.querySelector('home-assistant').hass.states[entity].state !== original, {entity: unrelated, original});
+  } });
+  await assertCount(lock, "unlock", before, 1, "Completed access slide during unrelated HA update");
+  await page.evaluate(({entity, original}) => document.querySelector('home-assistant').hass.callService('input_boolean', original === 'on' ? 'turn_on' : 'turn_off', {entity_id: entity}), {entity: unrelated, original});
   const lockBefore = count(lock, "lock");
   await page.locator(".marao-popup-sheet marao-card").filter({
     has: page.locator(".title").filter({ hasText: exactText("Lock") }),
@@ -340,10 +369,10 @@ async function checkCameraCases(page) {
       }
       for (const { index, kind } of kinds) {
         await card.locator('[data-action="event"]').nth(index).tap();
-        await page.waitForFunction(() => {
+        await page.waitForFunction((expectedError) => {
           const element = (document.querySelector("home-assistant")?.shadowRoot || document).querySelector(".marao-popup-sheet marao-camera-events-card");
-          return element?._selected && element._selected.status !== "loading";
-        });
+          return element?._selected && (expectedError ? element._selected.status === "error" : element._selected.status !== "loading");
+        }, Boolean(example.expectedDetailError));
         if (example.expectedDetailError) {
           const detail = await card.evaluate((element) => ({
             status: element._selected.status,
@@ -367,7 +396,7 @@ async function checkCameraCases(page) {
   }
 }
 
-async function checkShowcaseActions(page, serviceCalls) {
+async function checkShowcaseActions(page, serviceCalls, output) {
   const vacuumEntity = "vacuum.marao_dashboard_test_vacuum_commands";
   const vacuum = cardByTitle(page, "Vacuum segment commands");
   for (const [index, service, state] of [[0, "start", "cleaning"], [1, "pause", "paused"], [2, "return_to_base", "returning"]]) {
@@ -415,14 +444,113 @@ async function checkShowcaseActions(page, serviceCalls) {
   const mixedRoom = cardByTitle(page, "Room · one light unavailable");
   if (!await mixedRoom.locator("[data-room-lights-off]").isDisabled()) throw new Error("A mixed room group must disable its all-lights-off control.");
   const failure = manifest.actionErrorCase;
+  const failedCard = cardByTitle(page, failure.name);
+  const failedService = failure.service.split('.')[1];
+  const countFailure = () => serviceCalls.filter(call => call.service === failedService).length;
+  const beforeFailure = countFailure();
   await page.evaluate(() => {
     window.__maraoActionErrors = [];
-    window.addEventListener("hass-notification", (event) => window.__maraoActionErrors.push(event.detail.message));
+    if (!window.__maraoActionErrorListener) {
+      window.__maraoActionErrorListener = event => window.__maraoActionErrors.push(event.detail.message);
+      window.addEventListener("hass-notification", window.__maraoActionErrorListener);
+    }
   });
   await cardAction(page, failure.name).tap();
-  await page.getByText(new RegExp(failure.expectedError)).first().waitFor({ state: "visible" });
+  await failedCard.locator('.problem[role="alert"]').filter({ hasText: failure.expectedError }).waitFor({ state: 'visible' });
+  if (output) {
+    fs.mkdirSync(path.dirname(output), { recursive: true });
+    await failedCard.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${output}-failed.png`, scale: 'css' });
+  }
+  if (await failedCard.locator('ha-card').getAttribute('data-problem') !== 'error' || countFailure() !== beforeFailure + 1) throw new Error('Reported failure lost its owning surface or dispatched more than once.');
   const notifications = await page.evaluate((expected) => window.__maraoActionErrors.filter((message) => message.includes(expected)).length, failure.expectedError);
   if (notifications !== 1) throw new Error(`One failed action produced ${notifications} error notifications.`);
+  await failedCard.evaluate(card => { card.hass = { ...card.hass, states: { ...card.hass.states } }; });
+  if (await failedCard.locator('.problem[role="alert"]').count() !== 1) throw new Error('An unrelated state update cleared the reported failure.');
+  const simulateFailure = cardAction(page, 'Simulate safe action failure');
+  await simulateFailure.tap();
+  await page.waitForFunction(() => document.querySelector('home-assistant').hass.states['input_boolean.marao_dashboard_test_action_failure'].state === 'off');
+  try {
+    await cardAction(page, failure.name).tap();
+    await page.waitForFunction(card => !card._actionError && !card.shadowRoot.querySelector('[data-problem="error"]'), await failedCard.elementHandle());
+    if (countFailure() !== beforeFailure + 2) throw new Error('Explicit retry did not dispatch exactly once.');
+    const afterNotifications = await page.evaluate(expected => window.__maraoActionErrors.filter(message => message.includes(expected)).length, failure.expectedError);
+    if (afterNotifications !== 1) throw new Error('Successful retry duplicated a failure notification.');
+    if (output) await page.screenshot({ path: `${output}-recovered.png`, scale: 'css' });
+  } finally {
+    await cardAction(page, 'Simulate safe action failure').tap();
+    await page.waitForFunction(() => document.querySelector('home-assistant').hass.states['input_boolean.marao_dashboard_test_action_failure'].state === 'on');
+  }
+}
+
+async function checkMediaRecovery(page, serviceCalls, output) {
+  const assert = require('node:assert/strict');
+  const helper = 'input_boolean.marao_dashboard_test_media_failure';
+  const cards = ['Camera preview · failed media', 'Media artwork · failed media'].map(name => cardByTitle(page, name));
+  const waitFailure = async card => page.waitForFunction(card => Boolean(card._mediaError), await card.elementHandle());
+  const capture = async name => {
+    if (!output) return;
+    fs.mkdirSync(output, { recursive: true });
+    for (const [index, card] of cards.entries()) {
+      await card.scrollIntoViewIfNeeded();
+      await card.screenshot({ path: path.join(output, `${name}-${index}.png`), scale: 'css', style: 'marao-navbar-card { visibility: hidden !important; }' });
+    }
+  };
+  const setFailure = async enabled => {
+    const before = serviceCalls.filter(call => call.entities.includes(helper)).length;
+    await page.evaluate(({ helper, enabled }) => document.querySelector('home-assistant').hass.callService('input_boolean', enabled ? 'turn_on' : 'turn_off', { entity_id: helper }), { helper, enabled });
+    await page.waitForFunction(({ helper, enabled }) => document.querySelector('home-assistant').hass.states[helper].state === (enabled ? 'on' : 'off'), { helper, enabled });
+    assert.equal(serviceCalls.filter(call => call.entities.includes(helper)).length, before + 1);
+  };
+  try {
+    for (const theme of ['light', 'dark']) {
+      const { applyVisualPreferences, scenarios } = require('./test-ha-dashboard-accessibility');
+      await applyVisualPreferences(page, scenarios.find(scenario => scenario.name === 'iphone-normal'), theme);
+      for (const card of cards) {
+        await waitFailure(card);
+        assert.equal(await card.locator('ha-card').getAttribute('data-problem'), 'error');
+        assert.equal(await card.locator('img.camera,.media-artwork img').count(), 0);
+        await card.evaluate(card => {
+          card.__mediaFailureCount = 0;
+          if (!card.__mediaFailureListener) {
+            card.__mediaFailureListener = event => { if (event.target.localName === 'img' && event.target.isConnected) card.__mediaFailureCount++; };
+            card.shadowRoot.addEventListener('error', card.__mediaFailureListener, true);
+          }
+          card.hass = { ...card.hass, states: { ...card.hass.states } };
+        });
+        assert.equal(await card.evaluate(card => card.__mediaFailureCount), 0, 'Unrelated updates must not retry failed media.');
+        await card.locator('[data-media-retry]').tap();
+        await waitFailure(card);
+        assert.equal(await card.evaluate(card => card.__mediaFailureCount), 1, 'Explicit retry must load one current image.');
+      }
+      await capture(`${theme}-failed-after-explicit-retry`);
+      await setFailure(false);
+      for (const card of cards) {
+        await page.waitForFunction(card => {
+          const image = card.shadowRoot.querySelector('img.camera,.media-artwork img');
+          return !card._mediaError && !card.shadowRoot.querySelector('[data-problem]') && image?.complete && image.naturalWidth > 0;
+        }, await card.elementHandle());
+      }
+      await capture(`${theme}-recovered`);
+      const example = manifest.eventCases.find(example => example.id === 'media_error');
+      assert.ok(example);
+      await cardAction(page, example.name).tap();
+      const events = page.locator('.marao-popup-sheet marao-camera-events-card');
+      await events.locator('[data-action="event"]').first().tap();
+      await page.waitForFunction(card => {
+        const image = card.shadowRoot.querySelector('.detail-image');
+        return card._selected?.status === 'ready' && image?.complete && image.naturalWidth > 0 && !card.shadowRoot.querySelector('[data-problem]');
+      }, await events.elementHandle());
+      await events.locator('[data-action="back"]').tap();
+      await page.locator('.marao-popup-close').tap();
+      await page.waitForFunction(() => !location.hash);
+      await setFailure(true);
+      for (const card of cards) await waitFailure(card);
+    }
+    console.log('Camera preview, artwork and event media: explicit retry, no automatic retry and recovery passed in both themes.');
+  } finally {
+    if (await page.evaluate(helper => document.querySelector('home-assistant').hass.states[helper].state !== 'on', helper)) await setFailure(true);
+  }
 }
 
 async function checkHistoryCases(page) {
@@ -462,7 +590,14 @@ async function checkHistoryCases(page) {
       const state = card?.shadowRoot.querySelector("[data-history-state]")?.dataset.historyState || card?.shadowRoot.querySelector("[data-graph-history-state]")?.dataset.graphHistoryState;
       return state === (example.expectedStatus === "loading" ? "ready" : example.expectedStatus);
     }));
-  }, manifest.historyCases, { timeout: 10000 });
+  }, manifest.historyCases, { timeout: 10000 }).catch(async error => {
+    const states = await cards.evaluateAll(elements => elements.filter(card => /^(Graph|Energy|Timeline) history · /.test(card._config.name)).map(card => ({
+      name: card._config.name, state: card.shadowRoot.querySelector('[data-history-state]')?.dataset.historyState || card.shadowRoot.querySelector('[data-graph-history-state]')?.dataset.graphHistoryState,
+    })));
+    fs.mkdirSync(path.join(__dirname, '.artifacts/dashboard-e2e'), { recursive: true });
+    fs.writeFileSync(path.join(__dirname, '.artifacts/dashboard-e2e/history-failure.json'), JSON.stringify(states, null, 2), { mode: 0o600 });
+    throw error;
+  });
   const repeated = await page.evaluate((examples) => examples.flatMap(({ entity }) => {
     const requests = performance.getEntriesByType("resource").filter((entry) => new URL(entry.name).searchParams.get("filter_entity_id") === entity);
     return requests.length > 3 ? [`${entity}: ${requests.length} history requests for three cards`] : [];
@@ -472,42 +607,57 @@ async function checkHistoryCases(page) {
 
 async function checkOverviewPopups(page, config, screenshotRoot) {
   const lightIds = ["light.marao_dashboard_test_light", "light.marao_dashboard_test_room_light", "light.marao_dashboard_test_onoff_light"];
-  await api(config, "POST", "/api/services/light/turn_off", { entity_id: lightIds });
-  await page.waitForFunction((ids) => ids.every((id) => document.querySelector("home-assistant")?.hass.states[id]?.state === "off"), lightIds);
-  const popups = await page.locator("marao-popup-card").evaluateAll((cards) => cards.map((card) => ({ hash: card._config.hash, name: card._config.name, modeSheet: card._config.cards?.some((child) => child.template === "hc_climate_card" && child.variables?.show_mode_buttons) })));
-  for (const popup of popups) {
-    const index = await page.locator("marao-card").evaluateAll((cards, hash) => cards.findIndex((card) => card._config.tap_action?.navigation_path === hash), popup.hash);
-    if (index < 0) throw new Error(`${popup.name}: generated popup has no overview control.`);
-    await page.locator("marao-card").nth(index).locator("[data-card-action]").tap();
-    const sheet = page.locator(".marao-popup-sheet");
-    await sheet.waitFor({ state: "visible" });
-    await sheet.locator("marao-card").first().waitFor({ state: "visible" });
-    if (!popup.modeSheet && await sheet.locator(".marao-popup-head > h2").textContent() !== popup.name) throw new Error(`${popup.name}: popup heading is missing.`);
-    if (popup.hash === "#overview-blinds") {
-      // Without HA's context providers this becomes a generic fallback symbol.
-      await sheet.locator("ha-state-icon ha-icon ha-svg-icon").first().waitFor({ state: "visible" });
-    }
-    if (popup.hash === "#overview-lights") {
-      const visibleIds = await sheet.locator("marao-card").evaluateAll((cards) => cards.filter((card) => card.getBoundingClientRect().height > 0).map((card) => card._config.entity));
-      if (JSON.stringify(visibleIds) !== JSON.stringify(lightIds)) throw new Error("Inactive lights disappeared from the generated lighting popup.");
-      if (screenshotRoot) {
-        await sheet.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
-        await page.screenshot({ path: path.join(screenshotRoot, "overview-lights-off.png"), scale: "css" });
-      }
-      await page.reload({ waitUntil: "domcontentloaded" });
-      await sheet.waitFor({ state: "visible" });
-      await sheet.locator("marao-card").first().waitFor({ state: "visible" });
-      if (await sheet.locator(".marao-popup-head > h2").textContent() !== popup.name) throw new Error("Reloading the popup URL lost its heading.");
-      await assertCurrentFrontend(page);
-    }
-    await sheet.locator(".marao-popup-close").tap();
+  const baseline = await Promise.all(lightIds.map(id => api(config, 'GET', '/api/states/' + id)));
+  const { inspectPopups, scenarios } = require('./test-ha-dashboard-accessibility');
+  const output = path.join(screenshotRoot || path.join(__dirname, '.artifacts/dashboard-e2e'), 'overview-popups');
+  fs.mkdirSync(output, { recursive: true });
+  const sheet = page.locator('.marao-popup-sheet');
+  const empty = sheet.locator('.marao-popup-content > [role="status"]');
+  const checkEmpty = async () => {
+    await empty.filter({ hasText: /^(No active entities|Sem entidades ativas)$/ }).waitFor({ state: 'visible' });
+    assert.equal(await sheet.locator('marao-card').count(), 0, 'Active-only lighting must omit every inactive member');
+    assert.match(await empty.textContent(), /^(No active entities|Sem entidades ativas)$/);
+    assert.equal(await sheet.locator('.marao-popup-head > h2').textContent(), 'Lights');
+  };
+  try {
+    await api(config, 'POST', '/api/services/light/turn_off', { entity_id: lightIds });
+    await page.waitForFunction(ids => ids.every(id => document.querySelector('home-assistant').hass.states[id]?.state === 'off'), lightIds);
+    assert.deepEqual(await inspectPopups(page, scenarios.find(scenario => scenario.name === 'iphone-normal'), 'light', output, 'overview'), []);
+    const open = async hash => {
+      const index = await page.locator('marao-card').evaluateAll((cards, hash) => cards.findIndex(card => card._config.tap_action?.navigation_path === hash), hash);
+      assert.ok(index >= 0, hash + ': missing Home control');
+      await page.locator('marao-card').nth(index).locator('[data-card-action]').tap();
+      await sheet.waitFor({ state: 'visible' });
+    };
+    await open('#overview-blinds');
+    await sheet.locator('ha-state-icon ha-icon ha-svg-icon').first().waitFor({ state: 'visible' });
+    await sheet.locator('.marao-popup-close').tap();
+    await open('#overview-lights');
+    await checkEmpty();
+    if (screenshotRoot) await page.screenshot({ path: path.join(screenshotRoot, 'overview-lights-off.png'), scale: 'css' });
+    await api(config, 'POST', '/api/services/light/turn_on', { entity_id: lightIds[1] });
+    await page.waitForFunction(id => [...document.querySelector('home-assistant').shadowRoot.querySelectorAll('.marao-popup-content > marao-card')].some(card => card._config.entity === id), lightIds[1]);
+    assert.deepEqual(await sheet.locator('marao-card').evaluateAll(cards => cards.map(card => card._config.entity)), [lightIds[1]], 'Active-only lighting must contain exactly the active member');
+    await api(config, 'POST', '/api/services/light/turn_off', { entity_id: lightIds[1] });
+    await checkEmpty();
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await sheet.waitFor({ state: 'visible' });
+    await checkEmpty();
+    await assertCurrentFrontend(page);
+    await sheet.locator('.marao-popup-close').tap();
     await page.waitForFunction(() => !location.hash);
+    await page.goto(config.url + '/marao-dashboard/card-test', { waitUntil: 'domcontentloaded' });
+    await page.goto(config.url + '/marao-dashboard/overview#overview-lights', { waitUntil: 'domcontentloaded' });
+    await checkEmpty();
+    await sheet.locator('.marao-popup-close').tap();
+    await page.waitForURL(config.url + '/marao-dashboard/overview');
+  } finally {
+    for (const state of baseline) {
+      const data = { entity_id: state.entity_id };
+      if (state.state === 'on' && state.attributes.brightness != null) data.brightness = state.attributes.brightness;
+      await api(config, 'POST', '/api/services/light/' + (state.state === 'on' ? 'turn_on' : 'turn_off'), data);
+    }
   }
-  await page.goto(`${config.url}/marao-dashboard/card-test`, { waitUntil: "domcontentloaded" });
-  await page.goto(`${config.url}/marao-dashboard/overview#overview-lights`, { waitUntil: "domcontentloaded" });
-  await page.locator(".marao-popup-sheet marao-card").first().waitFor({ state: "visible" });
-  await page.locator(".marao-popup-close").tap();
-  await page.waitForURL(`${config.url}/marao-dashboard/overview`);
 }
 
 async function checkGeneratedMedia(page, config, screenshotRoot) {
@@ -552,6 +702,35 @@ async function checkGeneratedMedia(page, config, screenshotRoot) {
 }
 
 async function checkCardContent(page, serviceCalls) {
+  const binaryIssues = await page.locator('marao-card').evaluateAll(cards => {
+    const issues = [], backgrounds = new Map();
+    for (const card of cards) {
+      const name = card._config?.name || '', root = card.shadowRoot;
+      if (!name.startsWith('Binary ') && !/^Motion · (on|off)$/.test(name) && !/^Appliance running contract · (idle|running)$/.test(name) && !/^Lock · (locked|unlocked)$/.test(name)) continue;
+      const entity = card._config.variables?.toggle_entity || card._config.entity, state = card._hass.states[entity];
+      const cue = root.querySelector('.binary-cue'), accessible = root.querySelector('[role="img"][aria-label]');
+      const active = ['on', 'running', 'unlocked'].includes(state.state);
+      if (!cue || cue.dataset.active !== String(active) || !accessible?.getAttribute('aria-label')) issues.push(`${name}: missing state cue or semantic state`);
+      if (root.querySelector('.state') && !['Binary configured label and reading'].includes(name)) issues.push(`${name}: redundant current-state line`);
+      if (['on', 'off'].includes(state.state) && entity.startsWith('binary_sensor.') && !accessible?.getAttribute('aria-label').includes(card._hass.formatEntityState(state))) issues.push(`${name}: lost localized device-class state`);
+      if (name.startsWith('Binary configured')) {
+        if (root.querySelector('.state')?.textContent !== 'Reading corner' || !root.querySelector('.climate')?.textContent.includes('W')) issues.push(`${name}: useful label or reading missing`);
+      }
+      const pair = name.replace(/ · (on|off)$/, '');
+      if (pair !== name) {
+        const entries = backgrounds.get(pair) || {};
+        entries[state.state] = getComputedStyle(root.querySelector('ha-card')).backgroundColor;
+        backgrounds.set(pair, entries);
+      }
+    }
+    for (const [pair, values] of backgrounds) if (!values.on || !values.off || values.on === values.off) issues.push(`${pair}: active/inactive backgrounds agree`);
+    const graph = cards.find(card => card._config.name === 'Numeric graph with binary toggle');
+    if (!graph?.shadowRoot.querySelector('.state')?.textContent.includes('W') || graph.shadowRoot.querySelector('.binary-cue')?.dataset.active !== 'true') issues.push('Numeric toggle graph lost its reading or actual-toggle cue');
+    const summary = cards.find(card => card._config.name === 'Summary · all off');
+    if (summary?.shadowRoot.querySelector('.state')) issues.push('All-off summary retained redundant state');
+    return issues;
+  });
+  if (binaryIssues.length) throw new Error(`Binary presentation failed: ${binaryIssues.join('; ')}`);
   const idleStrokes = await page.locator("marao-card .hold-progress rect").evaluateAll((lines) =>
     lines.filter((line) => Number(getComputedStyle(line).opacity) !== 0).length
   );
@@ -613,8 +792,12 @@ async function checkCardContent(page, serviceCalls) {
   await page.waitForURL("**/marao-dashboard/rooms");
 }
 
-async function checkDisconnected(browser, config) {
-  const context = await browser.newContext(require("./mobile-devices").iphone);
+async function checkDisconnected(browser, config, functionalCompleted = false) {
+  const { scenarios, contextOptionsForScenario, configurePageEmulation } = require('./test-ha-dashboard-accessibility');
+  const scenarioIndex = process.argv.indexOf('--scenario');
+  const scenario = scenarios.find(scenario => scenario.name === (scenarioIndex < 0 ? 'iphone-normal' : process.argv[scenarioIndex + 1]));
+  if (!scenario) throw new Error('Unknown mobile scenario.');
+  const context = await browser.newContext(contextOptionsForScenario(scenario, 'light'));
   const token = accessToken(config);
   await context.addInitScript(setBrowserToken, {
     ...token, hassUrl: config.url, clientId: `${config.url}/`, expires: Date.now() + token.expires_in * 1000,
@@ -626,11 +809,15 @@ async function checkDisconnected(browser, config) {
     });
   });
   const page = await context.newPage();
+  await configurePageEmulation(context, page, scenario);
   const entity = "switch.marao_dashboard_test_switch";
   const errors = [];
   const transportEvents = [];
   const serviceCalls = [];
+  let original;
   const subscriptions = [];
+  const nativeFailures = [];
+  let connection = 0;
   let phase = "connected";
   let transport;
   // Chromium's HTTP offline emulation does not reliably block WebSocket
@@ -642,13 +829,21 @@ async function checkDisconnected(browser, config) {
       return;
     }
     const server = socket.connectToServer();
+    const connectionId = ++connection;
     transport = { socket, server };
     socket.onMessage((payload) => {
       const message = JSON.parse(String(payload));
-      if (/subscribe|stream/.test(message.type)) subscriptions.push({ phase, type: message.type, id: message.id, subscription: message.subscription });
+      if (/subscribe|stream/.test(message.type)) subscriptions.push({ phase, connection: connectionId, type: message.type, id: message.id, subscription: message.subscription });
       const targets = message.target?.entity_id ?? message.service_data?.entity_id;
       if (message.type === "call_service" && (Array.isArray(targets) ? targets.includes(entity) : targets === entity)) serviceCalls.push(message.service);
       server.send(payload);
+    });
+    server.onMessage(payload => {
+      const messages = JSON.parse(String(payload));
+      for (const message of Array.isArray(messages) ? messages : [messages]) {
+        if (message.type === 'result' && message.success === false) nativeFailures.push({ connection: connectionId, id: message.id, code: message.error?.code, message: message.error?.message });
+      }
+      socket.send(payload);
     });
   });
   const expectedOfflineError = (message) => phase === "offline" && (
@@ -678,7 +873,7 @@ async function checkDisconnected(browser, config) {
     await action.waitFor({ state: "visible" });
     await assertCurrentFrontend(page);
     if (await action.isDisabled()) throw new Error("The safe switch action was disabled before disconnection.");
-    const original = await page.evaluate((id) => document.querySelector("home-assistant").hass.states[id].state, entity);
+    original = await page.evaluate((id) => document.querySelector("home-assistant").hass.states[id].state, entity);
     const warning = await page.evaluate(() => document.querySelector("home-assistant").hass.localize("ui.notification_toast.connection_lost"));
     if (!warning) throw new Error("Home Assistant did not provide its localized connection warning.");
     // HA loads its native notification component on first use. Load it while
@@ -722,18 +917,467 @@ async function checkDisconnected(browser, config) {
     const authoritative = await api(config, "GET", `/api/states/${entity}`);
     const rendered = await cardByTitle(page, "Switch + graph").evaluate((card) => ({
       state: card._hass.states[card._config.entity].state,
-      text: card.shadowRoot.querySelector(".state")?.textContent?.trim(),
+      active: card.shadowRoot.querySelector('.binary-cue')?.dataset.active,
+      semanticState: card.shadowRoot.querySelector('.icon[role="img"]')?.getAttribute('aria-label'),
+      problem: card.shadowRoot.querySelector('[data-problem]')?.dataset.problem,
     }));
-    if (rendered.state !== authoritative.state || !rendered.text) throw new Error("Recovered card did not render authoritative state.");
+    if (rendered.state !== authoritative.state || rendered.active !== String(authoritative.state === 'on') || !rendered.semanticState || rendered.problem) throw new Error("Recovered card did not render authoritative state.");
     if (!transportEvents.length) throw new Error("The fault injection did not produce an observed transport disconnection.");
-    await api(config, "POST", `/api/services/switch/turn_${original}`, { entity_id: entity });
     const rejections = await page.evaluate(() => window.__maraoUnhandledRejections);
-    if (errors.length || rejections.length) throw new Error(`Disconnect scenario produced unexpected browser errors:\n${[...errors, ...rejections].join("\n")}\nSubscription lifecycle: ${JSON.stringify(subscriptions)}`);
+    const evidencePath = process.argv.find(arg => arg.startsWith('--reconnect-evidence='))?.slice(21);
+    if (evidencePath) {
+      assert.ok(path.isAbsolute(evidencePath), 'Reconnect evidence must use an absolute private path');
+      fs.writeFileSync(evidencePath, JSON.stringify({ version: 1, target: config.url, checked_at: new Date().toISOString(), functional_completed: functionalCompleted,
+        safe_actions_disabled: true, disconnected_dispatches: 0, authoritative_recovery: true, errors, rejections, subscriptions, native_failures: nativeFailures }), { mode: 0o600 });
+    }
+    if (errors.length || rejections.length) {
+      const error = new Error(`Disconnect scenario produced unexpected browser errors:\n${[...errors, ...rejections].join("\n")}\nSubscription lifecycle: ${JSON.stringify(subscriptions)}`);
+      error.stage = 'disconnect-browser-errors';
+      throw error;
+    }
     console.log("Live disconnect and authoritative recovery OK (disabled actions dispatched zero services).");
   } finally {
     await context.setOffline(false);
+    if (original !== undefined) await api(config, "POST", `/api/services/switch/turn_${original}`, { entity_id: entity });
     await context.close();
   }
+}
+
+async function captureClimateFeedback(page, name, target, output, visualProfile) {
+  const assert = require("node:assert/strict");
+  if (!output) return;
+  fs.mkdirSync(output, { recursive: true });
+  const sheet = page.locator('.marao-popup-sheet');
+  if (await sheet.count()) await sheet.evaluate(async element => Promise.all(element.getAnimations().map(animation => animation.finished)));
+  if (target) await target.evaluate(element => element.scrollIntoView({ block: 'start', behavior: 'instant' }));
+  const verifyProfile = async () => {
+    if (!visualProfile) return;
+    const { applyVisualPreferences, emulationIssues } = require('./test-ha-dashboard-accessibility');
+    await applyVisualPreferences(page, visualProfile.scenario, visualProfile.theme);
+    assert.deepEqual(await emulationIssues(page, visualProfile.scenario, visualProfile.theme), [], 'Climate capture lost its mobile profile');
+  };
+  await verifyProfile();
+  // Text preferences can reflow the gallery after the first scroll.
+  if (target) await target.evaluate(element => element.scrollIntoView({ block: 'start', behavior: 'instant' }));
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  if (target) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const visible = await target.evaluate(element => {
+        const heading = element.shadowRoot.querySelector('.title');
+        if (!heading?.getClientRects().length) return true;
+        const title = heading.getBoundingClientRect();
+        let minimumTop = 0;
+        for (let parent = element; parent; parent = parent.assignedSlot || parent.parentElement || parent.getRootNode()?.host) {
+          if (parent.classList?.contains('marao-popup-sheet')) {
+            minimumTop = parent.querySelector('.marao-popup-head').getBoundingClientRect().bottom;
+            break;
+          }
+        }
+        if (title.top >= minimumTop && title.bottom <= innerHeight) return true;
+        // HA's shifted fullscreen shell can leave scrollIntoView above the viewport.
+        let scrolled = false;
+        for (let parent = element; parent; parent = parent.assignedSlot || parent.parentElement || parent.getRootNode()?.host) {
+          if (parent.scrollHeight > parent.clientHeight && ['auto', 'scroll'].includes(getComputedStyle(parent).overflowY)) {
+            parent.scrollBy({ top: title.top - minimumTop - 14, behavior: 'instant' }); scrolled = true; break;
+          }
+        }
+        if (!scrolled) document.scrollingElement.scrollBy({ top: title.top - minimumTop - 14, behavior: 'instant' });
+        return false;
+      });
+      if (visible) break;
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    }
+    const title = await target.evaluate(element => {
+      const heading = element.shadowRoot.querySelector('.title');
+      const { top, bottom, left, right } = heading?.getBoundingClientRect() ?? { top: 0, bottom: 0, left: 0, right: 0 };
+      let minimumTop = 0;
+      for (let parent = element; parent; parent = parent.assignedSlot || parent.parentElement || parent.getRootNode()?.host) {
+        if (parent.classList?.contains('marao-popup-sheet')) {
+          minimumTop = parent.querySelector('.marao-popup-head').getBoundingClientRect().bottom;
+          break;
+        }
+      }
+      return { top, bottom, left, right, width: innerWidth, height: innerHeight,
+        visible: Boolean(heading?.getClientRects().length),
+        minimumTop };
+    });
+    assert.ok(!title.visible || title.top >= title.minimumTop - .5 && title.bottom <= title.height + .5 && title.left >= -.5 && title.right <= title.width + .5,
+      `${name}: the captured card title is outside the viewport: ${JSON.stringify(title)}`);
+    const valueIssues = await target.evaluate(element => {
+      const issues = [];
+      for (const output of element.shadowRoot.querySelectorAll('.number-value')) {
+        const track = output.closest('.number-stepper').getBoundingClientRect();
+        const range = document.createRange(); range.selectNodeContents(output);
+        for (const rect of range.getClientRects()) if (rect.width && rect.height
+          && (rect.left < track.left - .5 || rect.right > track.right + .5 || rect.top < track.top - .5 || rect.bottom > track.bottom + .5)) {
+          issues.push(output.textContent + ': target value extends outside its rounded control');
+        }
+      }
+      for (const button of element.shadowRoot.querySelectorAll('.number-stepper button')) {
+        const rect = button.getBoundingClientRect();
+        if (rect.width && rect.height && (rect.width < 48 || rect.height < 48)) issues.push('A numeric button is smaller than 48px');
+      }
+      return issues;
+    });
+    assert.deepEqual(valueIssues, [], name);
+  }
+  await page.screenshot({ path: path.join(output, `${name}.png`), scale: 'css' });
+  const navbar = await page.locator('marao-navbar-card nav').boundingBox();
+  const bottom = navbar.y - 8;
+  if (target && await target.evaluate((element, limit) => element.getBoundingClientRect().height > limit - 16, bottom)) {
+    await verifyProfile();
+    for (let attempt = 0; attempt < 3; attempt++) {
+    const limit = (await page.locator('marao-navbar-card nav').boundingBox()).y - 8;
+    await target.evaluate((element, limit) => {
+      const distance = Math.max(0, element.getBoundingClientRect().bottom - limit);
+      let scrolled = false;
+      for (let parent = element; parent; parent = parent.assignedSlot || parent.parentElement || parent.getRootNode()?.host) {
+        if (parent.scrollHeight > parent.clientHeight && ['auto', 'scroll'].includes(getComputedStyle(parent).overflowY)) {
+          parent.scrollBy({ top: distance, behavior: 'instant' });
+          scrolled = true;
+          break;
+        }
+      }
+      if (!scrolled) document.scrollingElement.scrollBy({ top: distance, behavior: 'instant' });
+    }, limit);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    if (await target.evaluate((element, limit) => element.getBoundingClientRect().bottom <= limit + .5, limit)) break;
+    }
+    const limit = (await page.locator('marao-navbar-card nav').boundingBox()).y - 8;
+    assert.ok(await target.evaluate((element, limit) => element.getBoundingClientRect().bottom <= limit + .5, limit),
+      `${name}: the captured card bottom is obscured by the navbar`);
+    await page.screenshot({ path: path.join(output, `${name}-bottom.png`), scale: 'css' });
+  }
+}
+
+async function checkClimateFeedback(page, serviceCalls, output, visualProfile) {
+  const assert = require('node:assert/strict');
+  if (output) {
+    fs.mkdirSync(output, { recursive: true });
+    for (const name of fs.readdirSync(output)) if (name.endsWith('.png')) fs.unlinkSync(path.join(output, name));
+  }
+  const examples = manifest.climateFeedbackCases;
+  const delayed = examples.find(example => example.id === 'delayed_confirmation');
+  const duplicate = cardByTitle(page, 'Delayed climate duplicate');
+  const cardFor = example => cardByTitle(page, example.name).filter({ has: page.locator('.climate-modes') });
+  const snapshot = card => card.evaluate(card => {
+    const state = card.hass.states[card._config.entity];
+    return { mode: card.shadowRoot.querySelector('.state')?.textContent.trim(), target: card.shadowRoot.querySelector('.number-value')?.textContent,
+      pending: Boolean(card.shadowRoot.querySelector('.climate-pending')), selected: card.shadowRoot.querySelector('.climate-mode.active')?.dataset.climateMode,
+      reported: state.state, temperature: state.attributes.temperature, low: state.attributes.target_temp_low, high: state.attributes.target_temp_high,
+      current: state.attributes.current_temperature, activity: state.attributes.hvac_action ?? null };
+  });
+  const callsFor = entity => serviceCalls.filter(call => call.domain === 'climate' && call.entities.includes(entity));
+  const capture = (name, target) => captureClimateFeedback(page, name, target, output, visualProfile);
+  const waitReported = async (entity, values) => page.waitForFunction(({ entity, values }) => {
+    const state = document.querySelector('home-assistant').hass.states[entity];
+    return Object.entries(values).every(([key, value]) => (key === 'state' ? state.state : state.attributes[key]) === value);
+  }, { entity, values });
+  const reset = () => page.evaluate(() => document.querySelector('home-assistant').hass.callService('marao_test_camera', 'reset', {}, undefined, false));
+  await page.evaluate(() => {
+    window.__climateFeedbackNotifications = [];
+    document.addEventListener('hass-notification', event => window.__climateFeedbackNotifications.push(event.detail.message));
+  });
+  try {
+    await reset();
+    const card = cardFor(delayed);
+    for (const mode of ['heat', 'cool', 'off']) {
+      const before = await snapshot(card), count = callsFor(delayed.entity).length;
+      const control = card.locator(`[data-climate-mode="${mode}"]`);
+      if (mode === 'heat') {
+        await control.focus();
+        await control.press('Enter');
+        assert.equal(await card.evaluate(card => card.shadowRoot.activeElement?.dataset.climateMode), mode);
+      } else await control.tap();
+      const immediate = await snapshot(card);
+      assert.equal(immediate.selected, mode);
+      assert.equal(immediate.pending, true, `Immediate feedback for mode ${mode}`);
+      assert.equal(immediate.reported, before.reported);
+      assert.equal(immediate.current, before.current);
+      assert.equal(immediate.activity, before.activity);
+      assert.equal(callsFor(delayed.entity).length, count + 1);
+      assert.equal((await snapshot(duplicate)).mode, immediate.mode);
+      await capture(`mode-${mode}-pending`, card);
+      await waitReported(delayed.entity, { state: mode });
+      await card.locator('.climate-pending').waitFor({ state: 'detached' });
+      if (mode === 'heat') {
+        // Focus restoration waits for the replacement ha-card's Lit render.
+        await page.waitForFunction(card => card.shadowRoot.activeElement?.dataset.climateMode === 'heat', await card.elementHandle());
+        assert.equal(await card.evaluate(card => card.shadowRoot.activeElement?.dataset.climateMode), mode);
+      }
+    }
+    const start = callsFor(delayed.entity).length;
+    const increase = card.locator('[data-number-step="increase"]');
+    await increase.focus();
+    await increase.press('Enter');
+    assert.equal(await card.evaluate(card => card.shadowRoot.activeElement?.dataset.numberStep), 'increase');
+    for (let index = 1; index < 3; index += 1) await increase.tap();
+    assert.equal((await snapshot(card)).target, '22.5');
+    assert.equal((await snapshot(card)).temperature, 21);
+    assert.deepEqual(callsFor(delayed.entity).slice(start).map(call => call.data.temperature), [21.5, 22, 22.5]);
+    assert.equal((await snapshot(duplicate)).target, '22.5');
+    // Open from the header; the centered stepper is an independent control.
+    await duplicate.locator('[data-card-action]').tap({ position: { x: 24, y: 24 } });
+    const sheet = page.locator('.marao-popup-sheet');
+    await sheet.waitFor({ state: 'visible' });
+    assert.equal(await sheet.locator('.number-value').innerText(), '22.5');
+    assert.equal(await sheet.locator('marao-card').evaluate((copy, original) =>
+      Boolean(copy.shadowRoot.querySelector('.climate-pending')) === Boolean(original.shadowRoot.querySelector('.climate-pending')),
+    await card.elementHandle()), true, 'The sheet must share the original pending state');
+    await capture('duplicate-sheet-pending', sheet.locator('marao-card'));
+    await sheet.locator('.marao-popup-close').tap();
+    const afterSheet = await snapshot(card);
+    // Large viewport captures can finish after HA confirms the requested target.
+    assert.equal(afterSheet.pending, afterSheet.temperature !== 22.5);
+    await waitReported(delayed.entity, { temperature: 22.5 });
+    await card.locator('.climate-pending').waitFor({ state: 'detached' });
+
+    const expiry = [];
+    for (const example of examples.filter(example => example.id !== delayed.id)) {
+      assert.ok(example.entity.startsWith('climate.marao_dashboard_test_feedback_'));
+      const card = cardFor(example), before = await snapshot(card);
+      const count = callsFor(example.entity).length;
+      const notificationCount = await page.evaluate(() => window.__climateFeedbackNotifications.length);
+      if (example.id === 'delayed_ack') await card.locator('[data-climate-mode="heat"]').tap();
+      else await card.locator('[data-number-step="increase"]').tap();
+      const immediate = await snapshot(card);
+      assert.equal(immediate.pending, true, `Immediate feedback for ${example.id}: ${JSON.stringify({ before, immediate, dispatched: callsFor(example.entity).length - count, touch: await page.evaluate(() => navigator.maxTouchPoints) })}`);
+      assert.equal(immediate.reported, before.reported);
+      assert.equal(immediate.current, before.current);
+      assert.equal(immediate.activity, before.activity);
+      assert.equal(callsFor(example.entity).length, count + 1);
+      const request = callsFor(example.entity).at(-1).data;
+      const requestedTarget = Object.fromEntries(['temperature', 'target_temp_low', 'target_temp_high']
+        .filter(key => Object.hasOwn(request, key)).map(key => [key, request[key]]));
+      await capture(`${example.id}-pending`, card);
+      if (example.behavior === 'reject') {
+        await card.locator('.climate-pending').waitFor({ state: 'detached' });
+        assert.equal((await snapshot(card)).target, before.target);
+        const messages = await page.evaluate(() => window.__climateFeedbackNotifications);
+        assert.equal(messages.length, notificationCount + 1);
+        assert.match(messages.at(-1), /Climate fixture rejected the change/);
+        await capture(`${example.id}-rejected`, card);
+      } else if (example.behavior === 'unconfirmed' || example.behavior === 'corrected') {
+        if (example.behavior === 'corrected') {
+          await waitReported(example.entity, Object.fromEntries(Object.entries(requestedTarget).map(([key, value]) => [key, value + .5])));
+          assert.equal((await snapshot(card)).target, immediate.target);
+          assert.equal((await snapshot(card)).pending, true);
+        }
+        expiry.push({ example, card });
+      } else {
+        await waitReported(example.entity, example.id === 'delayed_ack' ? { state: 'heat' } : requestedTarget);
+        await card.locator('.climate-pending').waitFor({ state: 'detached' });
+      }
+    }
+    for (const { example, card } of expiry) {
+      await card.locator('.climate-pending').waitFor({ state: 'detached', timeout: 35000 });
+      const state = await snapshot(card);
+      assert.equal(state.target, example.dual_target ? `${state.low}–${state.high}` : String(state.temperature));
+      await capture(`${example.id}-expired`, card);
+    }
+    const messages = await page.evaluate(() => window.__climateFeedbackNotifications);
+    assert.equal(messages.filter(message => /not confirmed|não confirmada/.test(message)).length, expiry.length, `Expiry notifications for safe fixtures: ${JSON.stringify(messages)}`);
+    console.log('Climate feedback: immediate modes, rapid steps, shared sheet, confirmation, rejection and expiry passed.');
+  } finally {
+    await reset();
+    await page.reload();
+    await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+  }
+}
+
+async function checkEntityGroups(page, serviceCalls, output, scenario, theme, config) {
+  const { namedCard } = require('./test-ha-room-cards');
+  const { applyVisualPreferences, layoutIssues } = require('./test-ha-dashboard-accessibility');
+  fs.mkdirSync(output, { recursive: true });
+  const before = serviceCalls.length;
+  for (const group of manifest.entityGroupCases) {
+    const card = namedCard(page, group.name);
+    await card.waitFor({ state: 'visible' });
+    assert.equal(await card.evaluate(card => card._config.id), group.id);
+    assert.equal(await card.evaluate(card => card._config.entity), undefined);
+    await card.scrollIntoViewIfNeeded();
+    const disabled = await card.locator('[data-card-action]').isDisabled();
+    if (disabled) {
+      assert.match(await card.locator('.problem').textContent(), /Unknown|Unavailable|Entity missing|Desconhecido|Indisponível|Entidade em falta/);
+      continue;
+    }
+    await card.locator('[data-card-action]').tap();
+    const overlay = page.locator('.marao-popup-overlay');
+    await overlay.waitFor({ state: 'visible' });
+    assert.equal(await overlay.locator('h2').textContent(), group.name);
+    await applyVisualPreferences(page, scenario, theme);
+    await page.waitForFunction(() => {
+      const root = document.querySelector('home-assistant').shadowRoot;
+      return root.querySelector('.marao-popup-content')?.children.length > 0;
+    });
+    const rows = overlay.locator('.marao-popup-content > marao-card');
+    const ids = await rows.evaluateAll(cards => cards.map(card => card._config.entity));
+    const members = group.entities.map(member => typeof member === 'string' ? member : member.entity_id);
+    if (group.popup_filter === 'all') assert.deepEqual(ids, members);
+    else {
+      const expected = await page.evaluate(({ type, members }) => members.filter(id => {
+        const state = document.querySelector('home-assistant').hass.states[id]?.state;
+        return type === 'light' ? state === 'on' : type === 'cover' ? ['open','opening'].includes(state)
+          : type === 'climate' ? state != null && !['off','unknown','unavailable'].includes(state)
+          : /^\d+(\.\d+)?$/.test(state || '') && Number(state) < 20;
+      }), { type: group.entity_type, members });
+      assert.deepEqual(ids, expected);
+    }
+    assert.deepEqual(await layoutIssues(page), [], group.id + ': popup geometry');
+    await page.screenshot({ path: path.join(output, `${group.id}.png`), scale: 'css' });
+    await overlay.locator('.marao-popup-close').tap();
+    await overlay.waitFor({ state: 'detached' });
+  }
+  assert.equal(serviceCalls.length, before, 'Opening/filtering groups actuated a member');
+  const active = manifest.entityGroupCases.find(group => group.id === 'gallery-light-active');
+  await namedCard(page, active.name).locator('[data-card-action]').tap();
+  const overlay = page.locator('.marao-popup-overlay');
+  await overlay.waitFor({ state: 'visible' });
+  const popups = page.locator('marao-popup-card');
+  const index = await popups.evaluateAll(elements => elements.findIndex(element => element._config.hash === '#entity-group-gallery-light-active'));
+  assert.ok(index >= 0);
+  const popup = popups.nth(index);
+  await page.waitForFunction(popup => popup._groupChildren?.size > 0, await popup.elementHandle());
+  await popup.evaluate(popup => { popup.__groupFirst = popup._groupChildren.get('light.marao_dashboard_test_case_light_on'); });
+  const changeLights = async (service, entities) => {
+    assert.ok(entities.every(entity => /^light\.marao_dashboard_test_/.test(entity)));
+    await api(config, 'POST', '/api/services/light/' + service, { entity_id: entities });
+    await page.waitForFunction(({ popup, entities, state }) => entities.every(entity => popup._hass.states[entity].state === state), {
+      popup: await popup.elementHandle(), entities, state: service === 'turn_on' ? 'on' : 'off',
+    });
+  };
+  await changeLights('turn_on', ['light.marao_dashboard_test_case_light_off']);
+  assert.equal(await popup.evaluate(popup => popup.__groupFirst === popup._groupChildren.get('light.marao_dashboard_test_case_light_on')), true, 'Retained eligible slider was remounted');
+  const heldSlider = overlay.locator('input[data-slider-key="hc_light_card:light.marao_dashboard_test_case_light_on"]');
+  await heldSlider.scrollIntoViewIfNeeded();
+  const sliderBox = await heldSlider.boundingBox(), sliderValue = Number(await heldSlider.inputValue());
+  const touch = await page.context().newCDPSession(page);
+  const touchPoint = { x: sliderBox.x + 24 + (sliderBox.width - 48) * sliderValue / 100, y: sliderBox.y + 24, id: 1 };
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [touchPoint] });
+  assert.equal(await heldSlider.evaluate(input => input.getRootNode().host._sliderGesture?.input === input), true, 'Grouped slider gesture did not start');
+  await changeLights('turn_off', ['light.marao_dashboard_test_onoff_light']);
+  assert.equal(await heldSlider.evaluate(input => input.getRootNode().host._sliderGesture?.input === input), true, 'Eligible HA update cancelled a held group slider');
+  await popup.evaluate(popup => {
+    const removed = popup._groupChildren.get('light.marao_dashboard_test_case_light_off');
+    removed.shadowRoot.querySelector('button')?.focus();
+    popup.__groupRemoved = removed;
+  });
+  await changeLights('turn_off', ['light.marao_dashboard_test_case_light_on', 'light.marao_dashboard_test_case_light_off', 'light.marao_dashboard_test_onoff_light']);
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await touch.detach();
+  assert.equal(await popup.evaluate(popup => popup.__groupFirst._sliderGesture), null, 'Removed group slider retained its gesture');
+  assert.equal(await popup.evaluate(popup => popup.__groupRemoved.isConnected), false);
+  assert.equal(await overlay.locator('.marao-popup-content [role="status"]').textContent(), 'No active entities');
+  assert.equal(await popup.evaluate(popup => popup._overlay.querySelector('.marao-popup-close') === popup._overlay.getRootNode().activeElement), true);
+  await page.keyboard.press('Tab');
+  assert.equal(await overlay.evaluate(overlay => {
+    let active = document.activeElement;
+    while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+    while (active && !overlay.contains(active)) active = active.getRootNode()?.host;
+    return Boolean(active);
+  }), true, 'Group popup must trap keyboard focus');
+  assert.equal(serviceCalls.length, before, 'Live filtering dispatched a service');
+  await changeLights('turn_on', ['light.marao_dashboard_test_case_light_on']);
+  await changeLights('turn_off', ['light.marao_dashboard_test_case_light_off', 'light.marao_dashboard_test_onoff_light']);
+  await popup.evaluate(popup => { delete popup.__groupRemoved; delete popup.__groupFirst; });
+  await overlay.locator('.marao-popup-close').tap();
+  await overlay.waitFor({ state: 'detached' });
+  const openGroup = async id => {
+    await namedCard(page, manifest.entityGroupCases.find(group => group.id === id).name).locator('[data-card-action]').tap();
+    await page.locator('.marao-popup-sheet').waitFor({ state: 'visible' });
+    await page.locator('.marao-popup-sheet').evaluate(sheet => Promise.all(sheet.getAnimations().map(animation => animation.finished)));
+    await page.locator('.marao-popup-sheet marao-card').first().waitFor({ state: 'visible' });
+    await applyVisualPreferences(page, scenario, theme);
+  };
+  const { checkPointerInteraction } = require('./test-ha-value-sliders');
+  for (const [id, entity] of [['gallery-light-all','light.marao_dashboard_test_case_light_on'], ['gallery-cover-all','cover.marao_dashboard_test_case_cover_open']]) {
+    await openGroup(id);
+    const example = concreteCases().find(card => card.entity === entity);
+    await checkPointerInteraction(page, page.context(), config, example, serviceCalls, 'touch', '.marao-popup-sheet');
+    await page.locator('.marao-popup-close').tap();
+    await page.locator('.marao-popup-overlay').waitFor({ state: 'detached' });
+  }
+  await openGroup('gallery-cover-all');
+  const accessCards = page.locator('.marao-popup-sheet marao-card');
+  const openOnly = 'cover.marao_dashboard_test_open_only_door';
+  assert.equal(await page.evaluate(entity => document.querySelector('home-assistant').hass.states[entity].attributes.supported_features, openOnly), 1, 'Open-only fixture must advertise only OPEN');
+  const openOnlyIndex = await accessCards.evaluateAll((cards, entity) => cards.findIndex(card => card._config.entity === entity), openOnly);
+  assert.ok(openOnlyIndex >= 0, 'Open-only member is missing');
+  const openOnlyCard = accessCards.nth(openOnlyIndex);
+  assert.equal(await openOnlyCard.evaluate(card => card._config.template), 'hc_access_slide_action_card');
+  assert.equal(await openOnlyCard.locator('marao-slide-to-open').count(), 1, 'Open-only access must expose the strict slide control');
+  assert.equal(await openOnlyCard.locator('input[type="range"], [data-card-action]').count(), 0, 'Open-only access must not expose ordinary position or tap actions');
+  const openOnlyHelper = 'input_boolean.marao_dashboard_test_open_only_door';
+  const openOnlyBaseline = await api(config, 'GET', '/api/states/' + openOnlyHelper);
+  const openOnlyCount = () => serviceCalls.filter(call => call.entities.includes(openOnly) && call.service === 'open_cover').length;
+  try {
+    await api(config, 'POST', '/api/services/input_boolean/turn_off', { entity_id: openOnlyHelper });
+    await page.waitForFunction(entity => document.querySelector('home-assistant').hass.states[entity].state === 'closed', openOnly);
+    const openOnlyTrack = openOnlyCard.locator('marao-slide-to-open .track'), before = openOnlyCount();
+    for (const [points, options] of [[[[.3,0]],{}], [[[.01,30]],{}], [[[1,0]],{cancel:true}]]) await slideGesture(page, openOnlyTrack, points, options);
+    assert.equal(openOnlyCount(), before, 'Cancelled open-only access must not dispatch');
+    await slideGesture(page, openOnlyTrack, [[1,0]]);
+    await page.waitForFunction(entity => document.querySelector('home-assistant').hass.states[entity].state === 'open', openOnly);
+    assert.equal(openOnlyCount(), before + 1, 'Completed open-only access must dispatch once');
+  } finally {
+    await api(config, 'POST', '/api/services/input_boolean/' + (openOnlyBaseline.state === 'on' ? 'turn_on' : 'turn_off'), { entity_id: openOnlyHelper });
+    await page.waitForFunction(({entity, state}) => document.querySelector('home-assistant').hass.states[entity].state === state,
+      {entity: openOnly, state: openOnlyBaseline.state === 'on' ? 'open' : 'closed'});
+  }
+  const accessIndex = await accessCards.evaluateAll(cards => cards.findIndex(card => card._config.entity === 'cover.marao_dashboard_test_garage_door'));
+  assert.ok(accessIndex >= 0, 'Safe garage member is missing');
+  const access = accessCards.nth(accessIndex);
+  assert.equal(await access.locator('input[type="range"]').count(), 0, 'Access cover must not expose a blind slider');
+  await access.locator('[data-card-action]').tap();
+  const track = page.locator('.marao-popup-sheet marao-slide-to-open .track');
+  const garage = 'cover.marao_dashboard_test_garage_door';
+  const count = () => serviceCalls.filter(call => call.entities.includes(garage) && call.service === 'open_cover').length;
+  const accessBefore = count();
+  for (const [points, options] of [[[[.3,0]],{}], [[[.01,30]],{}], [[[1,0]],{cancel:true}]]) await slideGesture(page, track, points, options);
+  assert.equal(count(), accessBefore, 'Incomplete/vertical/cancelled grouped access gesture dispatched');
+  await slideGesture(page, track, [[1,0]]);
+  await page.waitForTimeout(150);
+  assert.equal(count(), accessBefore + 1, 'Completed grouped access slide must dispatch once');
+  await api(config, 'POST', '/api/services/cover/close_cover', { entity_id: garage });
+  await page.locator('.marao-popup-close').tap();
+  await page.locator('.marao-popup-overlay').waitFor({ state: 'detached' });
+  await openGroup('gallery-battery-all');
+  assert.equal(await page.locator('.marao-popup-sheet [data-card-action], .marao-popup-sheet input, .marao-popup-sheet [data-number-step]').count(), 0, 'Battery members must remain read-only');
+  await page.locator('.marao-popup-close').tap();
+  await page.locator('.marao-popup-overlay').waitFor({ state: 'detached' });
+  await openGroup('gallery-climate-all');
+  const climateCalls = entity => serviceCalls.filter(call => call.domain === 'climate' && call.entities.includes(entity));
+  const climateMembers = page.locator('.marao-popup-sheet marao-card');
+  for (const entity of ['climate.marao_dashboard_test_case_climate_heat', 'climate.marao_dashboard_test_dual_target_climate']) {
+    const index = await climateMembers.evaluateAll((cards, entity) => cards.findIndex(card => card._config.entity === entity), entity);
+    assert.ok(index >= 0);
+    const member = climateMembers.nth(index);
+    const initial = await member.locator('.number-value').textContent(), count = climateCalls(entity).length;
+    await member.locator('[data-number-step="increase"]').tap();
+    await page.waitForFunction(({ member, initial }) => !member._climatePending && member.shadowRoot.querySelector('.number-value').textContent !== initial, { member: await member.elementHandle(), initial });
+    assert.equal(climateCalls(entity).length, count + 1, 'Grouped climate target must dispatch once');
+    const call = climateCalls(entity).at(-1);
+    assert.equal(call.service, 'set_temperature');
+    assert.ok(entity.includes('dual_target') ? call.data.target_temp_low != null && call.data.target_temp_high != null : call.data.temperature != null);
+    await member.locator('[data-number-step="decrease"]').tap();
+    await page.waitForFunction(({ member, initial }) => !member._climatePending && member.shadowRoot.querySelector('.number-value').textContent === initial, { member: await member.elementHandle(), initial });
+    assert.equal(climateCalls(entity).length, count + 2);
+  }
+  const thermostat = 'climate.marao_dashboard_test_case_climate_heat';
+  const modeIndex = await climateMembers.evaluateAll((cards, entity) => cards.findIndex(card => card._config.entity === entity), thermostat);
+  await climateMembers.nth(modeIndex).locator('[data-card-action]').tap();
+  const modes = page.locator('.marao-popup-sheet [data-climate-mode="cool"]');
+  await modes.waitFor({ state: 'visible' });
+  assert.equal(await page.locator('.marao-popup-sheet h2').isVisible(), false, 'Actual mode-sheet title behavior must remain intact');
+  const modeBefore = climateCalls(thermostat).length;
+  await modes.tap();
+  await page.waitForFunction(entity => document.querySelector('home-assistant').hass.states[entity].state === 'cool', thermostat);
+  assert.equal(climateCalls(thermostat).length, modeBefore + 1);
+  assert.equal(climateCalls(thermostat).at(-1).service, 'set_hvac_mode');
+  await api(config, 'POST', '/api/services/climate/set_hvac_mode', { entity_id: thermostat, hvac_mode: 'heat' });
+  await page.locator('.marao-popup-close').tap();
+  await page.locator('.marao-popup-overlay').waitFor({ state: 'detached' });
+  console.log(`Entity Groups ${scenario.name}/${theme}: typed filters, empty states, visible titles, retained nodes and focus passed.`);
 }
 
 async function main() {
@@ -747,42 +1391,102 @@ async function main() {
   await prepare(config);
   const baseUrl = config.url.replace(/\/$/, "");
   const tokens = await accessToken(config, baseUrl);
-  const browser = await chromium.launch();
+  let browser = await chromium.launch();
   if (process.argv.includes("--disconnect-only")) {
     try { await checkDisconnected(browser, config); } finally { await browser.close(); }
     return;
   }
-  const context = await browser.newContext(require("./mobile-devices").iphone);
-  await context.addInitScript(setBrowserToken, {
-    ...tokens, hassUrl: baseUrl, clientId: `${baseUrl}/`, expires: Date.now() + tokens.expires_in * 1000,
-  });
-  await context.addInitScript(() => {
-    window.__maraoHaptics = [];
-    window.addEventListener("haptic", (event) => window.__maraoHaptics.push(event.detail));
-  });
-  const page = await context.newPage();
-  const serviceCalls = [];
-  page.on("websocket", (socket) => socket.on("framesent", ({ payload }) => {
-    let message;
-    try { message = JSON.parse(String(payload)); } catch { return; }
-    if (message.type !== "call_service") return;
-    const entities = message.target?.entity_id ?? message.service_data?.entity_id ?? [];
-    serviceCalls.push({ domain: message.domain, service: message.service, entities: Array.isArray(entities) ? entities : [entities] });
-  }));
-  const errors = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => { if (["error", "warning"].includes(message.type())) errors.push(message.text()); });
-  page.on("requestfailed", (request) => errors.push(`Failed ${request.resourceType()} request: ${new URL(request.url()).pathname} (${request.failure()?.errorText || "unknown error"})`));
-  page.on("response", (response) => {
-    if (response.status() >= 400 && ["document", "script", "stylesheet", "image", "font"].includes(response.request().resourceType())) {
-      errors.push(`${response.status()} ${response.request().resourceType()} response: ${new URL(response.url()).pathname}`);
-    }
-  });
+  const { applyVisualPreferences, scenarios, contextOptionsForScenario, configurePageEmulation } = require('./test-ha-dashboard-accessibility');
+  const scenarioIndex = process.argv.indexOf('--scenario');
+  const scenario = scenarios.find(scenario => scenario.name === (scenarioIndex < 0 ? 'iphone-normal' : process.argv[scenarioIndex + 1]));
+  if (!scenario) throw new Error('Unknown mobile scenario.');
+  const serviceCalls = [], errors = [];
+  const createSession = async theme => {
+    const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
+    await context.addInitScript(setBrowserToken, {
+      ...tokens, hassUrl: baseUrl, clientId: `${baseUrl}/`, expires: Date.now() + tokens.expires_in * 1000,
+    });
+    await context.addInitScript(() => {
+      window.__maraoHaptics = [];
+      window.addEventListener("haptic", (event) => window.__maraoHaptics.push(event.detail));
+    });
+    const page = await context.newPage();
+    await configurePageEmulation(context, page, scenario);
+    page.on("websocket", (socket) => socket.on("framesent", ({ payload }) => {
+      let message;
+      try { message = JSON.parse(String(payload)); } catch { return; }
+      if (message.type !== "call_service") return;
+      const entities = message.target?.entity_id ?? message.service_data?.entity_id ?? [];
+      serviceCalls.push({ domain: message.domain, service: message.service, entities: Array.isArray(entities) ? entities : [entities], data: message.service_data });
+    }));
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => { if (["error", "warning"].includes(message.type())) errors.push(message.text()); });
+    page.on("requestfailed", (request) => errors.push(`Failed ${request.resourceType()} request: ${new URL(request.url()).pathname} (${request.failure()?.errorText || "unknown error"})`));
+    page.on("response", (response) => {
+      if (response.status() >= 400) {
+        errors.push(`${response.status()} ${response.request().resourceType()} response: ${new URL(response.url()).pathname}`);
+      }
+    });
+    return { context, page };
+  };
+  const requestedTheme = process.argv.find(arg => arg.startsWith('--theme='))?.slice(8) || 'light';
+  assert.ok(['light', 'dark'].includes(requestedTheme), 'Unknown e2e theme');
+  let { context, page } = await createSession(requestedTheme);
   const assertNoBrowserErrors = (label) => {
     if (!errors.length) return;
     const observed = errors.splice(0);
     throw new Error(`${label} produced browser warnings/errors:\n${observed.map((item) => `- ${item}`).join("\n")}`);
   };
+  if (process.argv.includes('--media-only')) {
+    try {
+      await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
+      await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+      await assertCurrentFrontend(page);
+      await checkMediaRecovery(page, serviceCalls, path.join(screenshotRoot, 'media-recovery'));
+      await page.waitForLoadState('networkidle');
+      assertNoBrowserErrors('Media recovery');
+    } finally { await browser.close(); }
+    return;
+  }
+  if (process.argv.includes('--groups-only')) {
+    try {
+      for (const theme of ['light','dark']) {
+        if (theme === 'dark') { await browser.close(); browser = await chromium.launch(); ({ context, page } = await createSession(theme)); }
+        await page.goto(`${baseUrl}/marao-dashboard/card-test`);
+        await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+        await assertCurrentFrontend(page);
+        await applyVisualPreferences(page, scenario, theme);
+        await checkEntityGroups(page, serviceCalls, path.join(__dirname, '.artifacts', `entity-groups-${scenario.name}-${theme}`), scenario, theme, config);
+        await page.waitForLoadState('networkidle');
+        assertNoBrowserErrors(`Entity Groups (${theme})`);
+      }
+    } finally {
+      await browser.close();
+      await api(config, 'POST', '/api/services/marao_test_camera/reset', {});
+    }
+    return;
+  }
+  if (process.argv.includes('--climate-only')) {
+    try {
+      for (const theme of ['light', 'dark']) {
+        if (theme === 'dark') {
+          // Chromium can lose touch emulation when a mobile session changes theme.
+          await browser.close();
+          browser = await chromium.launch();
+          ({ context, page } = await createSession(theme));
+        }
+        await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
+        await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+        await assertCurrentFrontend(page);
+        await applyVisualPreferences(page, scenario, theme);
+        await checkClimateFeedback(page, serviceCalls, path.join(__dirname, '.artifacts', `climate-feedback-${scenario.name}-${theme}`), { scenario, theme });
+        await page.waitForLoadState('networkidle');
+        assertNoBrowserErrors(`Climate feedback (${theme})`);
+        console.log(`Climate feedback, single dispatch and keyboard focus OK (${theme}).`);
+      }
+    } finally { await browser.close(); }
+    return;
+  }
   const deepSnapshot = () => page.evaluate(() => {
     const elements = [];
     const visit = (root) => {
@@ -816,9 +1520,13 @@ async function main() {
       await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: "domcontentloaded" });
       await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
       await assertCurrentFrontend(page);
-      await checkActionDispatches(page, serviceCalls);
-      await checkShowcaseActions(page, serviceCalls);
+      for (const theme of ['light', 'dark']) {
+        await applyVisualPreferences(page, scenario, theme);
+        await checkActionDispatches(page, serviceCalls);
+        await checkShowcaseActions(page, serviceCalls, captureScreenshots ? path.join(screenshotRoot, 'action-recovery', `${scenario.name}-${theme}`) : undefined);
+      }
       await checkCameraCases(page);
+      await checkMediaRecovery(page, serviceCalls, captureScreenshots ? path.join(screenshotRoot, 'media-recovery') : undefined);
       assertNoBrowserErrors("Card interactions");
       console.log("Gallery action checks passed.");
       return;
@@ -869,6 +1577,7 @@ async function main() {
       await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
       await assertCurrentFrontend(page);
       await scrollDashboard(page);
+      await page.waitForLoadState('networkidle');
       assertNoBrowserErrors(view.name);
       const result = await deepSnapshot();
       if (result.errors.length || result.warnings.length) throw new Error(`${view.name} rendered warnings/errors: ${JSON.stringify(result)}`);
@@ -878,6 +1587,7 @@ async function main() {
     await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
     await assertCurrentFrontend(page);
     await scrollDashboard(page);
+    await page.waitForLoadState('networkidle');
     assertNoBrowserErrors("Energy");
     const housePowerGraph = cardByTitle(page, "House Power").locator("svg.graph-background");
     if (await housePowerGraph.count() !== 1 || !await housePowerGraph.isVisible() || await housePowerGraph.locator("polyline.line").count() !== 1) {
@@ -898,6 +1608,18 @@ async function main() {
     if (cardTest.errors.length || cardTest.warnings.length) throw new Error(`Card test dashboard rendered warnings/errors: ${JSON.stringify(cardTest)}`);
     if (!cardTest.nav || cardTest.maraoCards < 10 || cardTest.popups < 1) throw new Error(`Card test dashboard rendered too few Marao cards: ${JSON.stringify(cardTest)}`);
     await checkStateCases(page, serviceCalls);
+    await checkClimateFeedback(page, serviceCalls, captureScreenshots ? path.join(screenshotRoot, 'climate-feedback') : undefined);
+    await page.waitForFunction(() => {
+      const graphs = new Set();
+      const visit = root => {
+        root.querySelectorAll('marao-card').forEach(card => {
+          if (card.shadowRoot?.querySelector('svg.graph-background polyline.line')?.getAttribute('points')?.trim()) graphs.add(card._config.name);
+        });
+        root.querySelectorAll('*').forEach(element => { if (element.shadowRoot) visit(element.shadowRoot); });
+      };
+      visit(document);
+      return ['Switch + graph', 'Graph', 'Toggle graph'].every(name => graphs.has(name));
+    }, undefined, { timeout: 10000 });
     const graphCards = await page.locator("marao-card").evaluateAll((cards) => cards.map((card) => {
       const root = card.shadowRoot;
       const graph = root?.querySelector("svg.graph-background");
@@ -1032,6 +1754,19 @@ async function main() {
     }
     await page.locator(".marao-popup-close").tap();
     await cardAction(page, "Lock access").tap();
+    const lockEntity = await page.locator('.marao-popup-sheet marao-card').first().evaluate(card => card._config.entity);
+    if (lockEntity !== 'lock.marao_dashboard_test_lock') throw new Error('Lock presentation check must use the safe gallery lock.');
+    const lockState = await page.evaluate(entity => document.querySelector('home-assistant').hass.states[entity].state, lockEntity);
+    const lockCues = await page.locator('.marao-popup-sheet marao-card').evaluateAll(cards => cards.map(card => card.shadowRoot.querySelector('.binary-cue')?.dataset.active));
+    if (lockCues.some(active => active !== String(lockState === 'unlocked'))) throw new Error('Access action cues do not match the authoritative lock state.');
+    if (lockState === 'locked') {
+      const inactive = await page.locator('.marao-popup-sheet marao-card').evaluateAll(cards => cards.map(card => card.shadowRoot.querySelector('ha-card').style.getPropertyValue('--marao-card-background')));
+      if (inactive.some(background => background)) throw new Error('Inactive binary lock actions did not use their normal neutral surface.');
+      const count = serviceCalls.filter(call => call.entities.includes(lockEntity) && call.service === 'unlock').length;
+      await slideGesture(page, page.locator('.marao-popup-sheet marao-slide-to-open .track'), [[1, 0]]);
+      await page.waitForFunction(entity => document.querySelector('home-assistant').hass.states[entity].state === 'unlocked', lockEntity);
+      if (serviceCalls.filter(call => call.entities.includes(lockEntity) && call.service === 'unlock').length !== count + 1) throw new Error('Valid lock slide must dispatch once.');
+    }
     const lockActionBackgrounds = await page.locator(".marao-popup-sheet marao-card").evaluateAll((cards) =>
       cards.map((card) => card.shadowRoot?.querySelector("ha-card")?.style.getPropertyValue("--marao-card-background"))
     );
@@ -1041,6 +1776,12 @@ async function main() {
     const lockSliderLabel = (await page.locator(".marao-popup-sheet marao-slide-to-open .label").innerText()).trim();
     if (!["Unlock", "Destrancar"].includes(lockSliderLabel)) {
       throw new Error(`Lock slider label must be the localized single-word Unlock label, got: ${lockSliderLabel}`);
+    }
+    if (lockState === 'locked') {
+      const lockIndex = await page.locator('.marao-popup-sheet marao-card').evaluateAll(cards => cards.findIndex(card => card._config.variables?.action_service === 'lock.lock'));
+      if (lockIndex < 0) throw new Error('Missing explicit safe Lock action.');
+      await page.locator('.marao-popup-sheet marao-card').nth(lockIndex).locator('[data-card-action]').tap();
+      await page.waitForFunction(entity => document.querySelector('home-assistant').hass.states[entity].state === 'locked', lockEntity);
     }
     await page.locator(".marao-popup-close").tap();
     await cardAction(page, "Climate").tap();
@@ -1189,6 +1930,7 @@ async function main() {
     await checkActionDispatches(page, serviceCalls);
     await checkShowcaseActions(page, serviceCalls);
     await checkCameraCases(page);
+    await checkMediaRecovery(page, serviceCalls, captureScreenshots ? path.join(screenshotRoot, 'media-recovery') : undefined);
     assertNoBrowserErrors("Card interactions");
     await checkCardContent(page, serviceCalls);
     if (captureScreenshots) {
@@ -1212,6 +1954,7 @@ async function main() {
         await assertCurrentFrontend(screenshotPage);
         const filename = view.url.split("/").filter(Boolean).at(-1).replace(/[^a-z0-9-]/gi, "-");
         await scrollDashboard(screenshotPage, { screenshotPrefix: path.join(screenshotRoot, filename) });
+        await screenshotPage.waitForLoadState('networkidle');
         await screenshotContext.close();
         if (screenshotErrors.length) {
           throw new Error(`${view.name} screenshot produced browser warnings/errors:\n${screenshotErrors.map((item) => `- ${item}`).join("\n")}`);
@@ -1219,7 +1962,7 @@ async function main() {
       }
     }
     console.log(`Gallery interactions and page screenshots OK (${checks.length} generated views; ${cardTest.maraoCards} gallery cards).`);
-    await checkDisconnected(browser, config);
+    await checkDisconnected(browser, config, true);
     const popupCount = (serialized.match(/custom:marao-popup-card/g) || []).length;
     console.log(`Marao Dashboard e2e OK (${checks.length} generated view(s); ${cardTest.maraoCards} card-test cards; ${coloredCards} state-colored cards; ${popupCount} generated popup configuration(s))`);
     if (captureScreenshots) console.log(`Dashboard screenshots: ${screenshotRoot}`);
@@ -1228,6 +1971,13 @@ async function main() {
   }
 }
 
-if (require.main === module) main().catch((error) => { console.error(error.message || error); process.exitCode = 1; });
+if (require.main === module) main().catch((error) => {
+  const output = path.join(__dirname, '.artifacts/dashboard-e2e');
+  fs.mkdirSync(output, { recursive: true });
+  fs.writeFileSync(path.join(output, 'failure.txt'), error.stack || error.message, { mode: 0o600 });
+  const evidencePath = process.argv.find(arg => arg.startsWith('--reconnect-evidence='))?.slice(21);
+  if (evidencePath && path.isAbsolute(evidencePath)) fs.writeFileSync(evidencePath + '.exit.json', JSON.stringify({ stage: error.stage || null, message: error.message }), { mode: 0o600 });
+  console.error(error.message || error); process.exitCode = 1;
+});
 
-module.exports = { buildViewChecks, checkDisconnected, conditionalCardIsActive, dashboardNavigationViolations, measureCenteredIcons, normalizedPathname, scrollDashboard };
+module.exports = { captureClimateFeedback, buildViewChecks, checkDisconnected, checkHistoryCases, conditionalCardIsActive, dashboardNavigationViolations, measureCenteredIcons, normalizedPathname, scrollDashboard, titleLayoutIssues };

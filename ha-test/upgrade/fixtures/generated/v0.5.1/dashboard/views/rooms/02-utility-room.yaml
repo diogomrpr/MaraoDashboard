@@ -1,0 +1,86 @@
+title: Utility Room
+path: utility-room
+subview: true
+theme: Marao Dashboard
+cards:
+  # marao:generated:start
+  - type: custom:marao-card
+    template: hc_title_card
+    name: Utility Room
+    show_icon: false
+    show_state: false
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_battery_card
+      entity: sensor.marao_dashboard_test_battery
+      name: Battery
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_sensor_card
+      entity: binary_sensor.marao_dashboard_test_washing_machine
+      name: Washer
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_switch_card
+      entity: switch.marao_dashboard_test_switch
+      name: Utility Switch
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_vacuum_card
+      entity: vacuum.marao_dashboard_test_vacuum
+      name: Robot Vacuum
+    - type: custom:marao-card
+      template: hc_vacuum_card
+      entity: vacuum.marao_dashboard_test_vacuum_commands
+      name: Room cleaning
+      variables:
+        action_1:
+          icon: mdi:sofa
+          segment: 21
+        action_2:
+          icon: mdi:bed
+          segment: 22
+        action_3:
+          icon: mdi:door
+          segment: 23
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_number_card
+      entity: input_number.marao_dashboard_test_number
+      name: Level
+  - type: custom:marao-card
+    template: hc_dishwasher_card
+    entity: input_select.marao_dashboard_test_dishwasher_state
+    name: Dishwasher
+    variables:
+      progress_entity: sensor.marao_dashboard_test_dishwasher_progress
+      remaining_time_entity: sensor.marao_dashboard_test_dishwasher_remaining
+      salt_entity: input_boolean.marao_dashboard_test_dishwasher_salt
+      rinse_aid_entity: input_boolean.marao_dashboard_test_dishwasher_rinse_aid
+      active_program_entity: input_select.marao_dashboard_test_dishwasher_program
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/dashboard/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

@@ -1,13 +1,22 @@
 # Marao Dashboard
 
+<picture>
+  <source media="(max-width: 300px) and (prefers-color-scheme: dark)" srcset="custom_components/marao_dashboard/frontend/brand/mark-dark.svg">
+  <source media="(max-width: 300px)" srcset="custom_components/marao_dashboard/frontend/brand/mark.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="custom_components/marao_dashboard/frontend/brand/logo-dark.svg">
+  <img src="custom_components/marao_dashboard/frontend/brand/logo.svg" alt="Marao Dashboard mountain logo" width="312" height="168" loading="lazy">
+</picture>
+
 Marao Dashboard builds a complete, phone-friendly Home Assistant dashboard from
-a visual JSON editor. It combines generated overview and room views, reusable
-cards and pop-up controls, a coordinated theme, and local version history.
+a visual/JSON editor. It combines editable pages and sections, reusable cards
+and pop-up controls, a coordinated theme, and local version history.
 
 ## Highlights
 
-- Edit rooms, entities, cards, and optional pages from an admin-only Home
-  Assistant panel.
+- Add, duplicate and edit every page, section and card from an admin-only Home
+  Assistant panel. Start with Home, Rooms, Security, Energy, Wallbox or Media.
+- Keep explicit room membership, configure Entity Groups and energy units, and
+  choose a landing page independently of the five navbar pins.
 - Generate a complete YAML dashboard while preserving marked custom-card
   sections between rebuilds.
 - Use a responsive Marao theme and consistent controls for common Home
@@ -33,6 +42,10 @@ configuration, camera-provider requirements, updates, and troubleshooting.
 
 ## Development
 
+The [OpenSpec guide](openspec/README.md) records the existing product contracts,
+development context, and workflow for proposing and implementing future tasks.
+Read it alongside `AGENTS.md` before changing behavior.
+
 Install the locked Node and Python test dependencies:
 
 ```sh
@@ -51,6 +64,11 @@ target a live Home Assistant instance. Configure its URL, administrator long-liv
 token, and SSH access in the ignored `ha-test/local.json`. `npm run ha:sync`
 builds and installs the current working tree, creates safe demonstration entities,
 and generates the complete test dashboard. Browser tests prepare it automatically.
+Versioned publication also requires the clean final candidate’s preserved-install
+upgrade scenario and `verify:release`, including historical data, mobile/theme
+visual inspection and verified disposable cleanup. Fresh fixture checks alone
+do not establish upgrade compatibility.
+
 Frontend changes need an integration reload and browser refresh; backend changes
 need a Home Assistant restart. Preparation handles both.
 
@@ -63,6 +81,7 @@ Marao does not install, update, replace, or remove unrelated HACS cards.
 - `frontend_src/` — editable dashboard-editor source and build scripts.
 - `tests/` — automated integration, frontend, and browser checks.
 - `ha-test/` — disposable-instance preparation, safe fixtures, and full Cases view.
+- `openspec/` — baseline specifications, project context, and future change plans.
 - `docs/` — product and development documentation.
 - `.github/` — CI workflows and contribution guidance.
 

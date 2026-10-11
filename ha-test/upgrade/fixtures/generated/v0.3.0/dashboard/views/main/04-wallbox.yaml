@@ -1,0 +1,82 @@
+title: Wallbox
+path: wallbox
+icon: mdi:ev-station
+cards:
+  # marao:generated:start
+  - type: custom:button-card
+    template: hc_base_card
+    entity: sensor.wallbox_status
+    name: Wallbox Status
+    icon: mdi:ev-station
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_graph_card
+      entity: sensor.wallbox_power
+      name: Wallbox Power
+      icon: mdi:flash
+      variables:
+        show_graph_fill: true
+        show_graph_line: true
+        show_icon: true
+  - type: custom:button-card
+    template: hc_number_card
+    entity: input_number.wallbox_current
+    name: Wallbox Current
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+    - type: custom:button-card
+      entity: input_number.wallbox_current
+      name: 6 A
+      show_state: false
+      show_icon: false
+      tap_action:
+        action: perform-action
+        perform_action: input_number.set_value
+        target:
+          entity_id: input_number.wallbox_current
+        data:
+          value: 6
+        haptic: heavy
+    - type: custom:button-card
+      entity: input_number.wallbox_current
+      name: 12 A
+      show_state: false
+      show_icon: false
+      tap_action:
+        action: perform-action
+        perform_action: input_number.set_value
+        target:
+          entity_id: input_number.wallbox_current
+        data:
+          value: 12
+        haptic: heavy
+    - type: custom:button-card
+      entity: input_number.wallbox_current
+      name: 16 A
+      show_state: false
+      show_icon: false
+      tap_action:
+        action: perform-action
+        perform_action: input_number.set_value
+        target:
+          entity_id: input_number.wallbox_current
+        data:
+          value: 16
+        haptic: heavy
+  - type: custom:button-card
+    template: hc_switch_card
+    entity: switch.wallbox_pause
+    name: Wallbox Pause
+    icon: mdi:pause-circle
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

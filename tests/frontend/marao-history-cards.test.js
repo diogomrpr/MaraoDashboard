@@ -16,15 +16,17 @@ class Shadow {
       focus() { if (!this.disabled) root.activeElement = this; },
       disabled: /\bdisabled\b/.test(attrs),
       dataset: { period: attrs.match(/data-period="([^"]+)"/)?.[1] },
+      retry: /data-history-retry/.test(attrs),
       surface: /class="surface"/.test(attrs),
       addEventListener(_type, handler) { this.click = () => handler({ stopPropagation() {} }); },
     }));
   }
   get innerHTML() { return this.html; }
-  querySelector(selector) { return selector === ".surface" ? this.buttons.find((button) => button.surface) : null; }
+  querySelector(selector) { return selector === ".surface" ? this.buttons.find((button) => button.surface) : selector === '[data-history-retry]' ? this.buttons.find(button => button.retry) : null; }
   querySelectorAll(selector) { return selector === "button" ? this.buttons : selector === "[data-period]" ? this.buttons.filter((button) => button.dataset.period) : []; }
 }
 globalThis.HTMLElement = class { attachShadow() { this.shadowRoot = new Shadow(); } };
+globalThis.ResizeObserver = class { observe() {} disconnect() {} };
 globalThis.customElements = { get: () => true };
 let navigations = 0;
 globalThis.window = {
@@ -38,7 +40,7 @@ const source = await fs.readFile(new URL("../../custom_components/marao_dashboar
 const cardsSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8");
 const cardsModule = `data:text/javascript;base64,${Buffer.from(cardsSource).toString("base64")}`;
 const classes = source.slice(source.indexOf("function escapeHtml("), source.indexOf('if (!customElements.get("marao-energy-period-card"))'));
-const { MaraoStateTimelineCard, MaraoEnergyPeriodCard } = await import(`data:text/javascript;base64,${Buffer.from(`import { focusRestorer } from "${cardsModule}";\nconst localize = (key) => key;\n${classes}\nexport { MaraoStateTimelineCard, MaraoEnergyPeriodCard };`).toString("base64")}`);
+const { MaraoStateTimelineCard, MaraoEnergyPeriodCard } = await import(`data:text/javascript;base64,${Buffer.from(`import { energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, focusRestorer } from "${cardsModule}";\nconst localize = (key) => key;\n${classes}\nexport { MaraoStateTimelineCard, MaraoEnergyPeriodCard };`).toString("base64")}`);
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 const state = (value = "21") => ({ state: value, attributes: { friendly_name: "History" }, last_changed: new Date().toISOString() });
 function create(Card, popup = true) {
@@ -48,6 +50,15 @@ function create(Card, popup = true) {
   card.setConfig({ entity: "sensor.history", popup, popup_hash: "#history" });
   return card;
 }
+
+test('energy periods retain legacy entity aliases and day-summary defaults', () => {
+  const card = new MaraoEnergyPeriodCard();
+  card.setConfig({ entity_id: 'sensor.history' });
+  assert.equal(card._config.entity, 'sensor.history');
+  assert.equal(card._config.period, 'day');
+  assert.equal(card._config.popup, false);
+  assert.equal(card._offset, 0);
+});
 
 for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) {
   test(`${Card.name} invalidates in-flight history when the shared connection mutates`, async () => {
@@ -169,3 +180,87 @@ test("timeline appends authoritative live changes without fetching the same hist
   assert.match(card.shadowRoot.innerHTML, /data-history-state="ready"/);
   assert.equal(card._stateColor("unknown"), "var(--disabled-color)");
 });
+
+test('timeline omits only redundant binary current text and retains historical state labels', async () => {
+  for (const [entity, current, previous] of [['binary_sensor.test', 'on', 'off'], ['lock.test', 'locked', 'unlocked']]) {
+    const card = create(MaraoStateTimelineCard, false);
+    card.setConfig({ entity, name: 'Timeline' });
+    const now = Date.now();
+    card.hass = { language: 'en', states: { [entity]: state(current) }, callApi: async () => [[
+      { ...state(previous), last_changed: new Date(now - 3600000).toISOString() },
+      { ...state(current), last_changed: new Date(now - 600000).toISOString() },
+    ]] };
+    await tick();
+    const html = card.shadowRoot.innerHTML;
+    assert.match(html, /class="binary-cue"/);
+    assert.match(html, /role="img" aria-label="Timeline:/);
+    assert.doesNotMatch(html.match(/<header>[\s\S]*?<\/header>/)[0], /<span>[^<]+<\/span>/);
+    assert.match(html, new RegExp(`data-state="${previous}"`));
+    assert.match(html, new RegExp(`data-state="${current}"`));
+    assert.match(html, /class="legend"/);
+  }
+  const card = create(MaraoStateTimelineCard, false);
+  card.hass = { states: { 'sensor.history': state('21') }, callApi: async () => [] };
+  await tick();
+  assert.match(card.shadowRoot.innerHTML, /<header>[\s\S]*?<span>21<\/span>/);
+});
+
+for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) test(`${Card.name} gives history failure a whole surface and retries only explicitly`, async () => {
+  const card = create(Card);
+  let calls = 0, fail = true;
+  const hass = { states: { 'sensor.history': state() }, callApi: async () => { calls++; if (fail) throw new Error('Rejected history'); return []; } };
+  card.hass = hass;
+  await tick();
+  assert.match(card.shadowRoot.innerHTML, /data-problem="error" style="background:var\(--marao-problem-error-background/);
+  assert.match(card.shadowRoot.innerHTML, /role="alert"/);
+  assert.ok(card.shadowRoot.querySelector('[data-history-retry]'));
+  for (let index = 0; index < 3; index++) card.hass = { ...hass };
+  assert.equal(calls, 1);
+  fail = false;
+  card.shadowRoot.querySelector('[data-history-retry]').click();
+  await tick();
+  assert.equal(calls, 2);
+  assert.match(card.shadowRoot.innerHTML, /data-history-state="empty"/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-problem="error"/);
+});
+
+for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) test(`${Card.name} initializes without inventing entity unavailability`, () => {
+  const card = create(Card);
+  assert.match(card.shadowRoot.innerHTML, /data-history-state="loading"/);
+  assert.match(card.shadowRoot.innerHTML, /data-problem="loading"/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-problem="neutral"/);
+});
+
+for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) {
+  for (const fail of [false, true]) test(`${Card.name} retains in-flight and settled history through HA shell moves (${fail ? 'error' : 'empty'})`, async () => {
+    const card = create(Card);
+    card.isConnected = true;
+    let calls = 0, finish, reject;
+    card.hass = {states: {'sensor.history': state()}, callApi: () => {calls++; return new Promise((resolve, fail) => {finish = resolve; reject = fail;});}};
+    card.isConnected = false;
+    card.disconnectedCallback?.();
+    card.isConnected = true;
+    card.connectedCallback();
+    assert.equal(calls, 1);
+    if (fail) reject(new Error('history failed')); else finish([]);
+    await tick();
+    card.isConnected = false;
+    card.disconnectedCallback?.();
+    card.isConnected = true;
+    card.connectedCallback();
+    assert.equal(calls, 1);
+    assert.match(card.shadowRoot.innerHTML, new RegExp(`data-history-state="${fail ? 'error' : 'empty'}"`));
+  });
+  test(`${Card.name} discards history completed while removed`, async () => {
+    const card = create(Card);
+    card.isConnected = true;
+    let finish;
+    card.hass = {states: {'sensor.history': state()}, callApi: () => new Promise(resolve => {finish = resolve;})};
+    card.isConnected = false;
+    card.disconnectedCallback?.();
+    finish([[state()]]);
+    await tick();
+    assert.equal(card._history?.length || 0, 0);
+    assert.equal(card._loadedKey, '');
+  });
+}

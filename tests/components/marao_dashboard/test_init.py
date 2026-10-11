@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import asyncio
 import json
 import shutil
 import textwrap
@@ -21,12 +22,14 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.marao_dashboard import (
     FRONTEND_MODULES,
+    async_setup_entry,
     _generated_dashboard_needs_self_contained_repair,
     _management_payload,
     _editor_areas,
     _registry_entities,
     _restore_history,
     _save_and_generate_dashboard,
+    _generate_dashboard,
     frontend_fingerprint,
 )
 from custom_components.marao_dashboard.const import (
@@ -40,10 +43,23 @@ from custom_components.marao_dashboard.const import (
 )
 from custom_components.marao_dashboard.legacy_migration import (
     LEGACY_RESOURCES_ISSUE_ID,
-    async_migrate_legacy_resources,
+    async_plan_legacy_resources,
 )
 from custom_components.marao_dashboard.editor import EDITOR_CATALOG
+from custom_components.marao_dashboard.generator import migrate_dashboard_config
 
+
+
+def _room_page(config, index=0):
+    return [page for page in config["pages"] if page.get("output_path", "").startswith("views/rooms/")][index]
+
+
+def _room_entities(config):
+    return _room_page(config)["sections"][-1].get("entities", [])
+
+
+def _home_groups(config):
+    return [card for section in config["pages"][0]["sections"] for card in section.get("entities", []) if card.get("template") == "hc_entity_group_card"]
 
 def _create_area_entity(hass, area_name: str, entity_id: str) -> None:
     area = ar.async_get(hass).async_create(area_name)
@@ -62,6 +78,104 @@ def _reset_dashboard_files(hass) -> None:
     """Keep the shared Home Assistant test config isolated between test runs."""
 
     shutil.rmtree(hass.config.path("dashboard/MaraoDashboard"), ignore_errors=True)
+
+
+async def _persist_resource_fixture(hass, resources, hass_storage, monkeypatch):
+    """Give the normally mocked resource store real files for recovery assertions."""
+    store = resources.store
+    original_load = store._async_load
+    async def load():
+        path = Path(store.path)
+        if path.exists():
+            hass_storage[store.key] = json.loads(await hass.async_add_executor_job(path.read_bytes))
+        return await original_load()
+    async def write(data):
+        await hass.async_add_executor_job(store._write_data, data)
+    monkeypatch.setattr(store, "_async_load", load)
+    monkeypatch.setattr(store, "_async_write_data", write)
+    await store.async_save({"items": resources.async_items()})
+
+
+@pytest.mark.parametrize("existing_source", [False, True])
+async def test_setup_route_collision_stops_before_owned_changes(hass, existing_source):
+    _reset_dashboard_files(hass)
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    if existing_source:
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text('{"name":"Dashboard","slug":"dashboard","rooms":[]}')
+    configuration = Path(hass.config.path("configuration.yaml"))
+    configuration.write_text("lovelace:\n  dashboards:\n    marao-dashboard:\n      mode: yaml\n      filename: manual.yaml\n")
+    before = configuration.read_bytes()
+    entry = MockConfigEntry(domain=DOMAIN, data={BASE_DASHBOARD_CREATED: existing_source})
+    with patch("custom_components.marao_dashboard._register_services") as register:
+        with pytest.raises(ValueError, match="unrelated configuration"):
+            await async_setup_entry(hass, entry)
+        register.assert_not_called()
+    assert configuration.read_bytes() == before
+    assert source.exists() == existing_source
+    if existing_source:
+        assert list(source.parent.iterdir()) == [source]
+
+
+@pytest.mark.parametrize("operation", ["save", "generate", "dry-run"])
+def test_generation_route_collision_preserves_source_output_and_history(hass, operation):
+    _reset_dashboard_files(hass)
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True, exist_ok=True)
+    saved = {"name": "Dashboard", "slug": "dashboard", "rooms": []}
+    source.write_text(json.dumps(saved))
+    output = source.parent / "dashboard"
+    output.mkdir()
+    (output / "manual.yaml").write_bytes(b"# exact user content\r\n")
+    configuration = Path(hass.config.path("configuration.yaml"))
+    configuration.write_text("lovelace:\n  dashboards:\n    marao-dashboard:\n      mode: yaml\n      filename: manual.yaml\n")
+    before = {p: p.read_bytes() for p in [source, configuration, output / "manual.yaml"]}
+    with pytest.raises(ValueError, match="unrelated configuration"):
+        if operation == "save":
+            _save_and_generate_dashboard(hass, json.dumps(saved), [])
+        else:
+            _generate_dashboard(hass, saved, dry_run=operation == "dry-run", registry_entities=[])
+    assert all(p.read_bytes() == content for p, content in before.items())
+    assert not (source.parent / ".history").exists()
+
+
+@pytest.mark.parametrize("source", [
+    '{"name":"Future","config_version":2,"rooms":[]}',
+    '{"name":"Malformed","config_version":true,"rooms":[]}',
+    '{not json',
+])
+async def test_setup_rejects_incompatible_source_before_owned_changes(hass, source) -> None:
+    _reset_dashboard_files(hass)
+    path = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(source, encoding="utf-8")
+    configuration = Path(hass.config.path("configuration.yaml"))
+    configuration.write_text("# unrelated configuration\n", encoding="utf-8")
+    entry = MockConfigEntry(domain=DOMAIN, data={BASE_DASHBOARD_CREATED: True})
+    with patch("custom_components.marao_dashboard._register_services") as register:
+        with pytest.raises(ValueError):
+            await async_setup_entry(hass, entry)
+        register.assert_not_called()
+    assert path.read_text(encoding="utf-8") == source
+    assert configuration.read_text(encoding="utf-8") == "# unrelated configuration\n"
+    assert entry.data == {BASE_DASHBOARD_CREATED: True}
+    assert list(path.parent.iterdir()) == [path]
+
+
+@pytest.mark.parametrize("saved,submitted", [(1, 3), (3, 1), (True, 1)])
+def test_editor_save_rejects_incompatible_format_without_replacing_baseline(
+    hass, saved, submitted
+) -> None:
+    _reset_dashboard_files(hass)
+    path = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    original = json.dumps({"name": "Saved", "config_version": saved, "rooms": []})
+    path.write_text(original, encoding="utf-8")
+    source = json.dumps({"name": "Replacement", "config_version": submitted, "rooms": []})
+    with pytest.raises(ValueError, match="config_version"):
+        _save_and_generate_dashboard(hass, source, [])
+    assert path.read_text(encoding="utf-8") == original
+    assert list(path.parent.iterdir()) == [path]
 
 
 def test_frontend_fingerprint_tracks_paths_and_content_but_not_caches(tmp_path: Path) -> None:
@@ -150,7 +264,7 @@ async def test_setup_entry_installs_base_dashboard_once(hass) -> None:
     assert stored_entry.data[BASE_DASHBOARD_CREATED]
     assert dashboard.exists()
     assert dashboard_json.exists()
-    assert json.loads(dashboard_json.read_text(encoding="utf-8"))["rooms"][0]["name"] == "Kitchen"
+    assert _room_page(json.loads(dashboard_json.read_text(encoding="utf-8")))["name"] == "Kitchen"
     assert "title: Marao Dashboard" in generated_source
     assert "weather.home" in generated_source
     assert "light.kitchen_main" in generated_source
@@ -201,7 +315,7 @@ async def test_setup_entry_marker_prevents_regeneration(hass) -> None:
     dashboard = Path(hass.config.path("dashboard/MaraoDashboard/dashboard/dashboard.yaml"))
     dashboard_json = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
     dashboard.write_text("user edited dashboard\n", encoding="utf-8")
-    dashboard_json.write_text('{"name":"User JSON","rooms":[]}\n', encoding="utf-8")
+    dashboard_json.write_text('{"name":"User JSON","slug":"dashboard","config_version":2,"landing_page":"home","pages":[{"name":"Home","path":"home","entities":[]}]}\n', encoding="utf-8")
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
@@ -210,7 +324,7 @@ async def test_setup_entry_marker_prevents_regeneration(hass) -> None:
 
     config_source = Path(hass.config.path("configuration.yaml")).read_text(encoding="utf-8")
     assert dashboard.read_text(encoding="utf-8") == "user edited dashboard\n"
-    assert dashboard_json.read_text(encoding="utf-8") == '{"name":"User JSON","rooms":[]}\n'
+    assert dashboard_json.read_text(encoding="utf-8") == '{"name":"User JSON","slug":"dashboard","config_version":2,"landing_page":"home","pages":[{"name":"Home","path":"home","entities":[]}]}\n'
     assert config_source.count("marao-dashboard:") == 1
     assert "marao-dashboard-card-test:" not in config_source
     assert "/hacsfiles/MaraoDashboard/MaraoDashboard.js" not in config_source
@@ -220,6 +334,9 @@ async def test_setup_entry_marker_prevents_regeneration(hass) -> None:
 async def test_reload_updates_frontend_urls_and_unloads_exact_registered_version(hass) -> None:
     _reset_dashboard_files(hass)
     Path(hass.config.path("configuration.yaml")).write_text("default_config:\n", encoding="utf-8")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text(json.dumps({"config_version": 2, "name": "Marao Dashboard", "landing_page": "home", "navigation": [], "pages": [{"name": "Home", "path": "home", "entities": []}]}))
     entry = MockConfigEntry(domain=DOMAIN, title="Marao Dashboard", data={BASE_DASHBOARD_CREATED: True})
     entry.add_to_hass(hass)
     old_version, new_version = "0123456789abcdef", "fedcba9876543210"
@@ -241,6 +358,7 @@ async def test_reload_updates_frontend_urls_and_unloads_exact_registered_version
     assert not old_urls & registered
     assert new_urls <= registered
     panel = hass.data[DATA_PANELS]["marao-dashboard-editor"]
+    assert panel.sidebar_icon == "marao_dashboard:mountain"
     assert panel.config["_panel_custom"]["module_url"] == f"{MARAO_DASHBOARD_PANEL_MODULE}?v={new_version}"
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
@@ -299,8 +417,9 @@ cards:
     )
     entry.add_to_hass(hass)
 
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
+    with pytest.raises(ValueError):
+        await async_setup_entry(hass, entry)
+    assert Path(hass.config.path("configuration.yaml")).read_text() == "default_config:\n"
 
     assert dashboard_json.read_text(encoding="utf-8") == source
     assert popup.read_text(encoding="utf-8") == popup_source
@@ -309,6 +428,9 @@ cards:
 async def test_setup_preserves_standalone_card_resources(hass) -> None:
     _reset_dashboard_files(hass)
     Path(hass.config.path("configuration.yaml")).write_text("default_config:\n", encoding="utf-8")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text(json.dumps({"config_version": 2, "name": "Marao Dashboard", "landing_page": "home", "navigation": [], "pages": [{"name": "Home", "path": "home", "entities": []}]}))
     entry = MockConfigEntry(domain=DOMAIN, title="Marao Dashboard", data={BASE_DASHBOARD_CREATED: True})
     entry.add_to_hass(hass)
 
@@ -380,7 +502,7 @@ async def test_remove_entry_clears_repairs_but_unload_preserves_them(hass) -> No
     )
     hass.data[LOVELACE_DATA].resource_mode = MODE_YAML
     source = config_path.read_text(encoding="utf-8")
-    assert await async_migrate_legacy_resources(hass) == 0
+    assert await async_plan_legacy_resources(hass) is None
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     issue_registry = ir.async_get(hass)
@@ -390,9 +512,12 @@ async def test_remove_entry_clears_repairs_but_unload_preserves_them(hass) -> No
     assert issue_registry.async_get_issue(DOMAIN, LEGACY_RESOURCES_ISSUE_ID) is None
 
 
-async def test_storage_mode_migrates_only_legacy_marao_resources(hass) -> None:
+async def test_storage_mode_migrates_only_legacy_marao_resources(hass, hass_storage, monkeypatch) -> None:
     _reset_dashboard_files(hass)
     Path(hass.config.path("configuration.yaml")).write_text("default_config:\n", encoding="utf-8")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text(json.dumps({"config_version": 2, "name": "Marao Dashboard", "landing_page": "home", "navigation": [], "pages": [{"name": "Home", "path": "home", "entities": []}]}))
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Marao Dashboard",
@@ -403,6 +528,10 @@ async def test_storage_mode_migrates_only_legacy_marao_resources(hass) -> None:
     await hass.async_block_till_done()
 
     resources = hass.data[LOVELACE_DATA].resources
+    await _persist_resource_fixture(hass, resources, hass_storage, monkeypatch)
+    redundant = []
+    for url in ["/hacsfiles/MaraoDashboard/MaraoCards.js?v=old", *MARAO_DASHBOARD_MODULES]:
+        redundant.append(await resources.async_create_item({CONF_URL: url, CONF_RESOURCE_TYPE_WS: "module"}))
     await resources.async_create_item(
         {
             CONF_URL: "/hacsfiles/MaraoDashboard/vendor/button-card/button-card.js?v=7",
@@ -446,6 +575,8 @@ async def test_storage_mode_migrates_only_legacy_marao_resources(hass) -> None:
     await hass.async_block_till_done()
 
     items = {item["id"]: item for item in resources.async_items()}
+    assert not {item["id"] for item in redundant} & items.keys()
+    assert json.loads(Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG)).read_text())["pages"] == [{"name": "Home", "path": "home", "entities": []}]
     assert standalone["id"] in items
     assert external_lookalike["id"] in items
     assert local_near_miss["id"] in items
@@ -459,10 +590,127 @@ async def test_storage_mode_migrates_only_legacy_marao_resources(hass) -> None:
     assert ir.async_get(hass).async_get_issue(DOMAIN, LEGACY_RESOURCES_ISSUE_ID) is None
 
 
+@pytest.mark.parametrize("boundary", ["delete", "flush", "silent-flush", "source", "interrupted", "concurrent", "cache-rollback"])
+async def test_resource_cleanup_shares_exact_file_recovery_and_source_commit(hass, hass_storage, monkeypatch, boundary):
+    from custom_components.marao_dashboard import history
+
+    class Interrupted(BaseException):
+        pass
+
+    _reset_dashboard_files(hass)
+    configuration = Path(hass.config.path("configuration.yaml"))
+    configuration.write_text("default_config:\n# unrelated\n")
+    entry = MockConfigEntry(domain=DOMAIN, data={})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    resources = hass.data[LOVELACE_DATA].resources
+    await _persist_resource_fixture(hass, resources, hass_storage, monkeypatch)
+    for url in ["/hacsfiles/MaraoDashboard/MaraoDashboard.js?v=old", "/hacsfiles/MaraoDashboard/vendor/button-card/button-card.js", "/local/unrelated-sentinel.js"]:
+        await resources.async_create_item({CONF_URL: url, CONF_RESOURCE_TYPE_WS: "module"})
+    await resources.store.async_save({"items": resources.async_items()})
+    resource_file = Path(resources.store.path)
+    resource_file.write_bytes((json.dumps(json.loads(resource_file.read_bytes()), indent=1).replace("\n", "\r\n") + "\r\n").encode())
+    plan = await async_plan_legacy_resources(hass)
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    slug = json.loads(source.read_bytes())["slug"]
+    exact = (json.dumps({"name": "Selected", "slug": slug, "rooms": []}) + "\r\n").encode()
+    source.write_bytes(exact)
+    output = source.parent / slug
+    (output / "manual.txt").write_bytes(b"protected content\r\n")
+    theme = Path(hass.config.path("themes/MaraoDashboard/marao-dashboard.yaml"))
+    theme.write_bytes(b"Old theme:\r\n  primary-color: blue\r\n")
+    before = {file: file.read_bytes() for file in [source, configuration, resource_file, theme, *output.rglob("*")] if file.is_file()}
+    failed = False
+    if boundary in ("delete", "concurrent"):
+        original = resources.async_delete_item
+        async def delete(item_id):
+            nonlocal failed
+            await original(item_id)
+            if not failed:
+                failed = True
+                if boundary == "concurrent":
+                    await resources.async_create_item({CONF_URL: "/local/concurrent-sentinel.js", CONF_RESOURCE_TYPE_WS: "module"})
+                else:
+                    raise OSError("injected deletion failure")
+        monkeypatch.setattr(resources, "async_delete_item", delete)
+    elif boundary == "flush":
+        original = resources.store.async_save
+        async def save(data):
+            nonlocal failed
+            if data["items"] == plan.after and not failed:
+                failed = True
+                raise OSError("injected persistence failure")
+            await original(data)
+        monkeypatch.setattr(resources.store, "async_save", save)
+    elif boundary == "silent-flush":
+        from homeassistant.util.file import WriteError
+        original = resources.store._async_write_data
+        async def silent_write(data):
+            nonlocal failed
+            if not failed:
+                failed = True
+                raise WriteError("injected native storage failure")
+            await original(data)
+        monkeypatch.setattr(resources.store, "_async_write_data", silent_write)
+    else:
+        original = history._write_bytes
+        def write(file, content):
+            nonlocal failed
+            original(file, content)
+            if file == source and not failed:
+                failed = True
+                if boundary == "interrupted":
+                    raise Interrupted("injected interruption")
+                raise OSError("injected source failure")
+        monkeypatch.setattr(history, "_write_bytes", write)
+    original_restore = plan.restore
+    if boundary == "cache-rollback":
+        async def broken_restore():
+            raise ValueError("injected cache recovery failure")
+        monkeypatch.setattr(plan, "restore", broken_restore)
+    error = Interrupted if boundary == "interrupted" else ValueError if boundary in ("concurrent", "cache-rollback", "silent-flush") else OSError
+    reason = "persistence failed" if boundary == "silent-flush" else "recovery failed" if error is ValueError else "injected"
+    with pytest.raises(error, match=reason):
+        await hass.async_add_executor_job(lambda: _generate_dashboard(hass, json.loads(exact), registry_entities=[], legacy_resources=plan))
+    checkpoint = source.parent / ".history/.operation"
+    if boundary == "concurrent":
+        assert checkpoint.exists() and source.read_bytes() == exact
+        assert {item[CONF_URL] for item in resources.async_items()} == {item[CONF_URL] for item in plan.before} | {"/local/concurrent-sentinel.js"}
+        assert any(item[CONF_URL] == "/local/concurrent-sentinel.js" for item in json.loads(resource_file.read_bytes())["data"]["items"])
+        assert (checkpoint / "operation.json").exists()
+        return
+    if boundary == "cache-rollback":
+        assert checkpoint.exists()
+        pending = {file: file.read_bytes() for file in before}
+        with pytest.raises(ValueError, match="recovery failed"):
+            _management_payload(hass, [])
+        with pytest.raises(ValueError, match="recovery failed"):
+            _generate_dashboard(hass, json.loads(exact), dry_run=True, registry_entities=[])
+        assert all(file.read_bytes() == content for file, content in pending.items())
+        monkeypatch.setattr(plan, "restore", original_restore)
+        from custom_components.marao_dashboard import _recover_dashboard_state
+        await hass.async_add_executor_job(_recover_dashboard_state, hass)
+    if boundary == "interrupted":
+        assert checkpoint.exists() and json.loads(source.read_bytes())["config_version"] == 2
+        assert resources.async_items() == plan.after
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        with patch("custom_components.marao_dashboard._generate_dashboard", side_effect=OSError("stop after recovery")):
+            with pytest.raises(OSError, match="stop after recovery"):
+                await async_setup_entry(hass, entry)
+    assert all(file.read_bytes() == content for file, content in before.items())
+    assert {file for file in output.rglob("*") if file.is_file()} == {file for file in before if file.is_relative_to(output)}
+    assert resources.async_items() == plan.before
+    assert not checkpoint.exists()
+
+
 async def test_yaml_resource_mode_reports_legacy_resources_without_mutation(hass) -> None:
     _reset_dashboard_files(hass)
     config_path = Path(hass.config.path("configuration.yaml"))
     config_path.write_text("default_config:\n", encoding="utf-8")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text(json.dumps({"config_version": 2, "name": "Marao Dashboard", "landing_page": "home", "navigation": [], "pages": [{"name": "Home", "path": "home", "entities": []}]}))
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Marao Dashboard",
@@ -500,7 +748,7 @@ async def test_yaml_resource_mode_reports_legacy_resources_without_mutation(hass
     )
     hass.data[LOVELACE_DATA].resource_mode = MODE_YAML
     source = config_path.read_text(encoding="utf-8")
-    assert await async_migrate_legacy_resources(hass) == 0
+    assert await async_plan_legacy_resources(hass) is None
 
     items = {item["id"]: item for item in resources.async_items()}
     assert legacy["id"] in items
@@ -548,6 +796,9 @@ async def test_generate_dashboard_service_dry_run_does_not_write(hass) -> None:
 async def test_generate_dashboard_service_writes_dashboard_and_raw_room_cards(hass) -> None:
     _reset_dashboard_files(hass)
     Path(hass.config.path("configuration.yaml")).write_text("default_config:\n", encoding="utf-8")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text(json.dumps({"config_version": 2, "name": "Marao Dashboard", "landing_page": "home", "navigation": [], "pages": [{"name": "Home", "path": "home", "entities": []}]}))
     entry = MockConfigEntry(domain=DOMAIN, title="Marao Dashboard", data={BASE_DASHBOARD_CREATED: True})
     entry.add_to_hass(hass)
 
@@ -636,6 +887,21 @@ async def test_management_editor_generates_and_restores_version(hass) -> None:
     assert manual_file.read_text(encoding="utf-8") == "manual card before generation\n"
 
 
+async def test_registry_unit_metadata_uses_live_registered_and_unregistered_states(hass) -> None:
+    entry = er.async_get(hass).async_get_or_create(
+        "sensor", "test", "energy_meter", suggested_object_id="energy_meter"
+    )
+    hass.states.async_set(entry.entity_id, "2500", {"unit_of_measurement": "Wh"})
+    hass.states.async_set("sensor.unregistered_cost", "12.345", {"unit_of_measurement": "EUR"})
+    entities = {entity["entity_id"]: entity for entity in _registry_entities(hass)}
+    assert entities[entry.entity_id]["unit_of_measurement"] == "Wh"
+    assert entities["sensor.unregistered_cost"]["unit_of_measurement"] == "EUR"
+    hass.states.async_set(entry.entity_id, "2.5", {"unit_of_measurement": "kWh"})
+    assert next(entity for entity in _registry_entities(hass) if entity["entity_id"] == entry.entity_id)["unit_of_measurement"] == "kWh"
+    hass.states.async_remove(entry.entity_id)
+    assert next(entity for entity in _registry_entities(hass) if entity["entity_id"] == entry.entity_id)["unit_of_measurement"] is None
+
+
 async def test_management_payload_includes_editor_context(hass) -> None:
     _reset_dashboard_files(hass)
     Path(hass.config.path("configuration.yaml")).write_text("default_config:\n", encoding="utf-8")
@@ -650,6 +916,7 @@ async def test_management_payload_includes_editor_context(hass) -> None:
     payload = _management_payload(hass, _registry_entities(hass), _editor_areas(hass))
 
     assert payload["editor"]["catalog"]["version"] == 1
+    assert payload["editor"]["catalog"]["config_version"] == 2
     assert payload["editor"]["areas"] == [
         {"area_id": payload["editor"]["areas"][0]["area_id"], "name": "Kitchen", "icon": None}
     ]
@@ -674,6 +941,9 @@ def test_editor_catalog_maps_to_installed_templates() -> None:
 
     assert len(card_ids) == len(EDITOR_CATALOG["cards"])
     assert card_ids == {
+        "hc_title_card", "hc_weather_card", "hc_room_card", "hc_scene_collection_card",
+        "hc_security_card", "hc_access_hold_action_card", "hc_base_card", "hc_energy_period_card", "hc_media_app_card",
+        "hc_entity_group_card",
         "hc_access_card",
         "hc_battery_card",
         "hc_camera_card",
@@ -690,9 +960,9 @@ def test_editor_catalog_maps_to_installed_templates() -> None:
         "hc_switch_card",
         "hc_timeline_card",
         "hc_toggle_graph_card",
-            "hc_vacuum_card",
-            "hc_wallbox_current_card",
-            "hc_washing_machine_card",
+        "hc_vacuum_card",
+        "hc_wallbox_current_card",
+        "hc_washing_machine_card",
     }
     assert Path("custom_components/marao_dashboard/frontend/MaraoCards.js").exists()
     for card in EDITOR_CATALOG["cards"]:
@@ -708,3 +978,415 @@ def test_editor_catalog_maps_to_installed_templates() -> None:
             <= field.keys()
             for field in page["fields"]
         )
+
+
+@pytest.mark.parametrize("current", [False, True])
+async def test_formatted_source_stays_editable_when_live_unit_disappears(hass, current) -> None:
+    _reset_dashboard_files(hass)
+    Path(hass.config.path("configuration.yaml")).write_text("default_config:\n", encoding="utf-8")
+    entry = MockConfigEntry(domain=DOMAIN, title="Marao Dashboard", data={})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    config = {"config_version": 1, "name": "Dashboard", "slug": "dashboard", "rooms": [], "pages": {"energy": {"today_energy": {
+        "entity_id": "sensor.marao_dashboard_test_energy", "variables": {"display_unit": "kWh", "display_precision": 0},
+    }}}}
+    if current:
+        config = migrate_dashboard_config(config)
+    path = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source = json.dumps(config, indent=2) + "\n"
+    path.write_text(source, encoding="utf-8")
+    payload = _management_payload(hass, [])
+    assert payload["conversion_pending"] is not current
+    assert json.loads(payload["config"]) == migrate_dashboard_config(config)
+    assert payload["dashboard_url"] == "/marao-dashboard/overview"
+    assert path.read_text() == source
+    with pytest.raises(ValueError, match="supported source unit"):
+        _save_and_generate_dashboard(hass, source, [])
+    assert path.read_text() == source
+    if current:
+        config["pages"][2]["sections"][0]["entities"][0]["variables"].pop("display_unit")
+    else:
+        config["pages"]["energy"]["today_energy"]["variables"].pop("display_unit")
+    _save_and_generate_dashboard(hass, json.dumps(config), [])
+    assert json.loads(path.read_text()) == migrate_dashboard_config(config)
+
+
+async def test_setup_regenerates_contract_preserving_exact_empty_source_and_entry(hass):
+    from custom_components.marao_dashboard.generator import write_dashboard
+    from custom_components.marao_dashboard.history import list_dashboard_history
+    _reset_dashboard_files(hass)
+    Path(hass.config.path("configuration.yaml")).write_text("default_config:\n# unrelated\n")
+    _create_area_entity(hass, "Kitchen", "light.upgrade_kitchen")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG)); source.parent.mkdir(parents=True)
+    exact = b'{\r\n "name":"Marao Dashboard", "config_version":2, "slug":"dashboard", "landing_page":"overview", "pages":[{"name":"Home","path":"overview","entities":[]}], "extension":{"keep":[2,1]}\r\n}\r\n'
+    source.write_bytes(exact)
+    output = source.parent / "dashboard"
+    write_dashboard(json.loads(exact), source.parent, config_root=hass.config.config_dir)
+    (output / "custom.txt").write_bytes(b"private customization\r\n")
+    manifest = output / ".marao-generated.json"
+    old = json.loads(manifest.read_text()); old.pop("generated_contract"); manifest.write_text(json.dumps(old))
+    entry = MockConfigEntry(domain=DOMAIN, data={BASE_DASHBOARD_CREATED: True, "extension": "retained"})
+    entry.add_to_hass(hass); identifier = entry.entry_id
+    assert await hass.config_entries.async_setup(identifier)
+    await hass.async_block_till_done()
+    assert entry.entry_id == identifier and entry.data["extension"] == "retained"
+    assert source.read_bytes() == exact
+    assert json.loads(manifest.read_text())["generated_contract"] == 2
+    assert (output / "custom.txt").read_bytes() == b"private customization\r\n"
+    assert not any(page.get("subview") for page in json.loads(source.read_bytes())["pages"])
+    before = {str(p.relative_to(output)): p.read_bytes() for p in output.rglob("*") if p.is_file()}
+    versions = list_dashboard_history(source.parent)
+    assert await hass.config_entries.async_reload(identifier)
+    await hass.async_block_till_done()
+    assert source.read_bytes() == exact
+    assert {str(p.relative_to(output)): p.read_bytes() for p in output.rglob("*") if p.is_file()} == before
+    assert list_dashboard_history(source.parent) == versions
+
+
+async def test_generation_waits_for_setup_before_reading_the_saved_source(hass, monkeypatch):
+    from custom_components.marao_dashboard import panel_custom
+    _reset_dashboard_files(hass)
+    Path(hass.config.path("configuration.yaml")).write_text("default_config:\n")
+    started, release = asyncio.Event(), asyncio.Event()
+    original = panel_custom.async_register_panel
+    async def pause_setup(*args, **kwargs):
+        started.set()
+        await release.wait()
+        return await original(*args, **kwargs)
+    monkeypatch.setattr(panel_custom, "async_register_panel", pause_setup)
+    entry = MockConfigEntry(domain=DOMAIN, data={})
+    entry.add_to_hass(hass)
+    setup = asyncio.create_task(hass.config_entries.async_setup(entry.entry_id))
+    await started.wait()
+    generated = asyncio.create_task(hass.services.async_call(
+        DOMAIN, GENERATE_DASHBOARD_SERVICE, {"dry_run": True}, blocking=True, return_response=True,
+    ))
+    await asyncio.sleep(0)
+    assert not generated.done()
+    assert not Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG)).exists()
+    release.set()
+    assert await setup
+    assert (await generated)["dry_run"]
+    await hass.async_block_till_done()
+
+
+async def test_setup_and_generation_preserve_registered_custom_route_and_history(hass):
+    from custom_components.marao_dashboard.generator import write_dashboard
+    from custom_components.marao_dashboard.config_patch import patch_lovelace_dashboard
+    from custom_components.marao_dashboard.history import list_dashboard_history
+    from custom_components.marao_dashboard import _generate_dashboard_from_path
+    _reset_dashboard_files(hass)
+    configuration = Path(hass.config.path("configuration.yaml"))
+    configuration.write_text("default_config:\n# unrelated\n")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG)); source.parent.mkdir(parents=True)
+    exact = b'{"name":"My dashboard","config_version":2,"slug":"dashboard","landing_page":"overview","pages":[{"name":"Home","path":"overview","entities":[]}],"keep":[2,1]}\r\n'
+    source.write_bytes(exact)
+    result = write_dashboard(json.loads(exact), source.parent, dashboard_key_override="chosen-route")
+    patch_lovelace_dashboard(configuration, result.dashboard_key, result.title, result.icon, result.filename)
+    manifest = source.parent / "dashboard/.marao-generated.json"
+    legacy = json.loads(manifest.read_bytes()); legacy.pop("generated_contract"); manifest.write_text(json.dumps(legacy))
+    entry = MockConfigEntry(domain=DOMAIN, data={BASE_DASHBOARD_CREATED: True})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert source.read_bytes() == exact
+    assert _management_payload(hass)["dashboard_url"] == "/chosen-route/overview"
+    assert "marao-dashboard:" not in configuration.read_text()
+    before = configuration.read_bytes()
+    assert _generate_dashboard_from_path(hass, source, None, True, [])["dashboard_key"] == "chosen-route"
+    assert configuration.read_bytes() == before and source.read_bytes() == exact
+    assert _save_and_generate_dashboard(hass, exact.decode(), [])["dashboard_key"] == "chosen-route"
+    versions = list_dashboard_history(source.parent)
+    assert all(version["dashboard_key"] == "chosen-route" for version in versions)
+    from custom_components.marao_dashboard import _restore_history
+    assert _restore_history(hass, versions[-1]["version"])["dashboard_key"] == "chosen-route"
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert source.read_bytes() == exact
+    assert _management_payload(hass)["dashboard_url"] == "/chosen-route/overview"
+
+
+async def test_generation_alternate_source_shares_canonical_conversion_and_dry_run_is_read_only(hass):
+    from custom_components.marao_dashboard import _generate_dashboard_from_path
+    _reset_dashboard_files(hass)
+    configuration = Path(hass.config.path("configuration.yaml")); configuration.write_text("default_config:\n")
+    base = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG)); base.parent.mkdir(parents=True)
+    config = {"name": "Compatibility", "slug": "dashboard", "theme": "Marao Dashboard Gold", "rooms": [], "extension": {"raw": [2, 1]}}
+    source = json.dumps(config, indent=3) + "\r\n"
+    alternate = Path(hass.config.path("alternate-dashboard.json")); alternate.write_bytes(source.encode())
+    before_configuration = configuration.read_bytes()
+    result = _generate_dashboard_from_path(hass, alternate, None, True, [])
+    assert result["dry_run"]
+    assert alternate.read_bytes() == source.encode() and configuration.read_bytes() == before_configuration
+    assert not (base.parent / ".history").exists() and not (base.parent / "dashboard").exists()
+    _generate_dashboard_from_path(hass, alternate, None, False, [])
+    converted = alternate.read_bytes()
+    expected = migrate_dashboard_config(config)
+    expected["theme"] = "Marao Dashboard"
+    assert json.loads(converted) == expected
+    assert not base.exists(), "Alternate generation must not create the default source"
+    _save_and_generate_dashboard(hass, source, [])
+    assert base.read_bytes() == converted
+    output = base.parent / "dashboard"
+    before_output = {str(p.relative_to(output)): p.read_bytes() for p in output.rglob("*") if p.is_file()}
+    _generate_dashboard_from_path(hass, alternate, None, False, [])
+    assert alternate.read_bytes() == converted
+    assert {str(p.relative_to(output)): p.read_bytes() for p in output.rglob("*") if p.is_file()} == before_output
+
+
+async def test_legacy_restore_preview_then_generation_keeps_archive_immutable(hass):
+    from custom_components.marao_dashboard.generator import write_dashboard
+    from custom_components.marao_dashboard.history import snapshot_dashboard
+    _reset_dashboard_files(hass)
+    Path(hass.config.path("configuration.yaml")).write_text("default_config:\n")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG)); source.parent.mkdir(parents=True)
+    legacy = {"name": "Legacy", "slug": "dashboard", "theme": "Marao Dashboard Gold", "rooms": [], "unknown": {"raw": [2, 1]}}
+    exact = (json.dumps(legacy, indent=3) + "\r\n").encode()
+    source.write_bytes(exact)
+    write_dashboard(legacy, source.parent, config_root=hass.config.config_dir)
+    archived = snapshot_dashboard(source, source.parent, legacy)
+    archive = source.parent / ".history" / archived["version"]
+    expected_archive = {str(p.relative_to(archive)): p.read_bytes() for p in archive.rglob("*") if p.is_file()}
+    _save_and_generate_dashboard(hass, json.dumps({**legacy, "name": "Current", "theme": "Marao Dashboard"}), [])
+    _restore_history(hass, archived["version"])
+    assert source.read_bytes() == exact
+    preview = _management_payload(hass)
+    assert preview["conversion_pending"]
+    assert json.loads(preview["config"]) == migrate_dashboard_config(legacy)
+    assert source.read_bytes() == exact, "Preview must not persist conversion"
+    _save_and_generate_dashboard(hass, exact.decode(), [])
+    assert json.loads(source.read_bytes()) == {**migrate_dashboard_config(legacy), "theme": "Marao Dashboard"}
+    assert {str(p.relative_to(archive)): p.read_bytes() for p in archive.rglob("*") if p.is_file()} == expected_archive
+
+
+async def test_setup_imports_legacy_area_once_and_retains_exact_baseline(hass):
+    from custom_components.marao_dashboard.history import list_dashboard_history
+    _reset_dashboard_files(hass)
+    Path(hass.config.path("configuration.yaml")).write_text("default_config:\n")
+    _create_area_entity(hass, "Kitchen", "light.snapshot_selected")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG)); source.parent.mkdir(parents=True)
+    exact = b'{"name":"Saved","rooms":[{"name":"Kitchen","area":"Kitchen"}],"unknown":[2,1]}\r\n'
+    source.write_bytes(exact)
+    entry = MockConfigEntry(domain=DOMAIN, data={BASE_DASHBOARD_CREATED: True})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    saved = json.loads(source.read_bytes())
+    assert saved["config_version"] == 2 and saved["unknown"] == [2, 1]
+    assert _room_entities(saved) == ["light.snapshot_selected"]
+    versions = list_dashboard_history(source.parent)
+    assert any((source.parent / ".history" / version["version"] / "dashboard.json").read_bytes() == exact for version in versions)
+    registry = er.async_get(hass)
+    registry.async_remove("light.snapshot_selected")
+    hass.states.async_remove("light.snapshot_selected")
+    area = ar.async_get(hass).areas[_room_page(saved)["area"]]
+    added = registry.async_get_or_create("light", "test", "snapshot_new", suggested_object_id="snapshot_new")
+    registry.async_update_entity(added.entity_id, area_id=area.id)
+    hass.states.async_set(added.entity_id, "off")
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert json.loads(source.read_bytes()) == saved
+    _save_and_generate_dashboard(hass, source.read_text(), _registry_entities(hass), _editor_areas(hass))
+    view = next((source.parent / "saved/views/rooms").glob("*.yaml")).read_text()
+    assert "light.snapshot_selected" in view and added.entity_id not in view
+
+
+async def test_unresolved_legacy_area_stops_setup_before_owned_changes(hass):
+    _reset_dashboard_files(hass)
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG)); source.parent.mkdir(parents=True)
+    exact = b'{"name":"Saved","rooms":[{"name":"Lost","area":"missing"}]}\r\n'
+    source.write_bytes(exact)
+    configuration = Path(hass.config.path("configuration.yaml")); configuration.write_text("# unrelated\n")
+    with patch("custom_components.marao_dashboard._register_services") as register:
+        with pytest.raises(ValueError, match="Cannot import legacy room"):
+            await async_setup_entry(hass, MockConfigEntry(domain=DOMAIN, data={BASE_DASHBOARD_CREATED: True}))
+        register.assert_not_called()
+    assert source.read_bytes() == exact and configuration.read_text() == "# unrelated\n"
+    assert list(source.parent.iterdir()) == [source]
+
+
+def test_legacy_area_preview_dry_run_and_service_use_one_conversion(hass):
+    from custom_components.marao_dashboard import _generate_dashboard_from_path
+    _reset_dashboard_files(hass)
+    source = Path(hass.config.path("alternate.json"))
+    exact = b'{"name":"Selected","rooms":[{"name":"Kitchen","area":"Kitchen"}]}\r\n'
+    source.write_bytes(exact)
+    configuration = Path(hass.config.path("configuration.yaml")); configuration.write_text("# unrelated\n")
+    metadata = [{"entity_id": "light.snapshot", "area_id": "kitchen", "area_name": "Kitchen", "has_state": True}]
+    areas = [{"area_id": "kitchen", "name": "Kitchen"}]
+    assert _generate_dashboard_from_path(hass, source, None, True, metadata, areas)["dry_run"]
+    assert source.read_bytes() == exact and configuration.read_text() == "# unrelated\n"
+    _generate_dashboard_from_path(hass, source, None, False, metadata, areas)
+    saved = json.loads(source.read_bytes())
+    assert saved["config_version"] == 2 and _room_entities(saved) == ["light.snapshot"]
+    before = source.read_bytes()
+    _generate_dashboard_from_path(hass, source, None, False, [], [])
+    assert source.read_bytes() == before
+
+
+def test_failed_converted_render_keeps_active_source_and_baseline_exact(hass):
+    _reset_dashboard_files(hass)
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG)); source.parent.mkdir(parents=True)
+    exact = b'{"name":"Selected","rooms":[{"name":"Empty","entities":[]}]}\r\n'
+    source.write_bytes(exact)
+    configuration = Path(hass.config.path("configuration.yaml")); configuration.write_text("# unrelated\n")
+    with patch("custom_components.marao_dashboard.write_dashboard", side_effect=ValueError("render failed")):
+        with pytest.raises(ValueError, match="render failed"):
+            _save_and_generate_dashboard(hass, exact.decode(), [])
+    assert source.read_bytes() == exact and configuration.read_text() == "# unrelated\n"
+    archives = list((source.parent / ".history").glob("*/dashboard.json"))
+    assert archives and all(path.read_bytes() == exact for path in archives)
+    assert not (source.parent / "selected").exists()
+
+
+@pytest.mark.parametrize("boundary", ["theme", "configuration", "source", "frontend-preflight", "gallery-preflight", "interrupted"])
+def test_generation_theme_boundary_recovers_exact_source_output_and_owned_patches(hass, monkeypatch, boundary):
+    from custom_components.marao_dashboard import history
+    import custom_components.marao_dashboard as integration
+
+    _reset_dashboard_files(hass)
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b'{"name":"Selected","rooms":[]}\r\n')
+    output = source.parent / "selected"
+    output.mkdir()
+    (output / "manual.txt").write_bytes(b"exact custom content\r\n")
+    configuration = Path(hass.config.path("configuration.yaml"))
+    configuration.write_bytes(("# unrelated configuration\r\n"
+        "lovelace:\r\n  dashboards:\r\n"
+        f"    {integration.LEGACY_CARD_TEST_DASHBOARD_KEY}:\r\n"
+        f"      mode: yaml\r\n      filename: {integration.LEGACY_CARD_TEST_DASHBOARD_FILE}\r\n").encode())
+    theme = Path(hass.config.path("themes/MaraoDashboard/marao-dashboard.yaml"))
+    theme.parent.mkdir(parents=True, exist_ok=True)
+    theme.write_bytes(b"Old theme:\r\n  primary-color: blue\r\n")
+    (theme.parent / "manual.yaml").write_bytes(b"Manual theme:\r\n  primary-color: red\r\n")
+    files = [source, configuration, *output.rglob("*"), *theme.parent.rglob("*")]
+    before = {file: file.read_bytes() for file in files if file.is_file()}
+    if boundary in ("frontend-preflight", "gallery-preflight"):
+        name = "patch_frontend_themes" if boundary == "frontend-preflight" else "remove_lovelace_dashboard"
+        original = getattr(integration, name)
+        def fail(*args, **kwargs):
+            original(*args, **kwargs)
+            raise OSError("injected patch preflight failure")
+        monkeypatch.setattr(integration, name, fail)
+    else:
+        original = history._write_bytes
+        target = {"theme": theme, "configuration": configuration, "source": source, "interrupted": source}[boundary]
+        failed = False
+        def fail(path, data):
+            nonlocal failed
+            original(path, data)
+            if path == target and not failed:
+                failed = True
+                if boundary == "interrupted":
+                    raise KeyboardInterrupt("injected interruption")
+                raise OSError("injected commit failure")
+        monkeypatch.setattr(history, "_write_bytes", fail)
+    with pytest.raises(KeyboardInterrupt if boundary == "interrupted" else OSError, match="injected"):
+        _generate_dashboard(hass, json.loads(source.read_bytes()), registry_entities=[])
+    if boundary == "interrupted":
+        assert (source.parent / ".history/.operation/operation.json").exists()
+        assert json.loads(source.read_bytes())["config_version"] == 2
+        assert theme.read_bytes() != before[theme]
+        history.recover_dashboard_operation(source.parent)
+    assert all(file.read_bytes() == content for file, content in before.items())
+    assert {file for file in output.rglob("*") if file.is_file()} == {output / "manual.txt"}
+    assert {file for file in theme.parent.rglob("*") if file.is_file()} == {file for file in before if file.is_relative_to(theme.parent)}
+    assert not (source.parent / ".history/.operation").exists()
+
+
+def test_theme_only_sync_and_dry_run_preserve_saved_source_and_unrelated_themes(hass):
+    from custom_components.marao_dashboard import _install_themes
+
+    _reset_dashboard_files(hass)
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True)
+    exact = b'{"config_version":1,"name":"Selected","rooms":[]}\r\n'
+    source.write_bytes(exact)
+    configuration = Path(hass.config.path("configuration.yaml"))
+    configuration.write_bytes(b"# unrelated\r\n")
+    manual = Path(hass.config.path("themes/OtherTheme/manual.yaml"))
+    manual.parent.mkdir(parents=True, exist_ok=True)
+    manual.write_bytes(b"Other theme:\r\n  primary-color: red\r\n")
+    theme = Path(hass.config.path("themes/MaraoDashboard/marao-dashboard.yaml"))
+    theme_before = theme.read_bytes() if theme.exists() else None
+    _generate_dashboard(hass, json.loads(exact), dry_run=True, registry_entities=[])
+    assert source.read_bytes() == exact and configuration.read_bytes() == b"# unrelated\r\n"
+    assert (theme.read_bytes() if theme.exists() else None) == theme_before
+    assert not (source.parent / ".history").exists()
+    _install_themes(hass)
+    installed = theme.read_bytes()
+    patched = configuration.read_bytes()
+    assert source.read_bytes() == exact
+    assert manual.read_bytes() == b"Other theme:\r\n  primary-color: red\r\n"
+    assert not _install_themes(hass)
+    assert source.read_bytes() == exact and configuration.read_bytes() == patched and theme.read_bytes() == installed
+    assert not (source.parent / ".history/.operation").exists()
+
+
+@pytest.mark.parametrize("owned", [True, False])
+async def test_setup_stages_retired_gallery_cleanup_and_preserves_repurposed_route(hass, owned):
+    import custom_components.marao_dashboard as integration
+
+    _reset_dashboard_files(hass)
+    configuration = Path(hass.config.path("configuration.yaml"))
+    configuration.write_text("# unrelated configuration\n")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True)
+    config = {"name": "Selected", "config_version": 1, "rooms": []}
+    source.write_bytes((json.dumps(config) + "\r\n").encode())
+    _generate_dashboard(hass, config, registry_entities=[])
+    integration.patch_lovelace_dashboard(
+        configuration, integration.LEGACY_CARD_TEST_DASHBOARD_KEY, "Retired", "mdi:test-tube",
+        integration.LEGACY_CARD_TEST_DASHBOARD_FILE if owned else "manual/repurposed.yaml",
+    )
+    before = source.read_bytes()
+    entry = MockConfigEntry(domain=DOMAIN, data={BASE_DASHBOARD_CREATED: True})
+    entry.add_to_hass(hass)
+    with patch("custom_components.marao_dashboard._remove_legacy_card_test_panel") as remove:
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        assert remove.call_count == int(owned)
+    assert source.read_bytes() == before
+    assert (integration.LEGACY_CARD_TEST_DASHBOARD_KEY in configuration.read_text()) is not owned
+    assert "# unrelated configuration" in configuration.read_text()
+    assert not integration._should_repair_base_dashboard(hass, [], [])
+    assert not (source.parent / ".history/.operation").exists()
+
+
+def test_legacy_area_management_preview_is_canonical_and_read_only(hass):
+    _reset_dashboard_files(hass)
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG)); source.parent.mkdir(parents=True)
+    exact = b'{"name":"Selected","rooms":[{"name":"Kitchen","area":"Kitchen"}]}\r\n'
+    source.write_bytes(exact)
+    metadata = [{"entity_id": "light.snapshot", "area_id": "kitchen", "area_name": "Kitchen", "has_state": True}]
+    areas = [{"area_id": "kitchen", "name": "Kitchen"}]
+    preview = _management_payload(hass, metadata, areas)
+    assert preview["conversion_pending"]
+    shown_room = _room_page(json.loads(preview["config"]))
+    assert shown_room["name"] == "Kitchen" and shown_room["area"] == "kitchen"
+    assert shown_room["sections"][-1]["entities"] == ["light.snapshot"]
+    assert source.read_bytes() == exact and list(source.parent.iterdir()) == [source]
+    Path(hass.config.path("configuration.yaml")).write_text("# unrelated\n")
+    result = _save_and_generate_dashboard(hass, exact.decode(), metadata, areas)
+    assert result["config"].encode() == source.read_bytes()
+    assert json.loads(result["config"])["config_version"] == 2
+
+
+def test_group_page_conversion_preview_is_read_only_and_saved_groups_stay_independent(hass):
+    _reset_dashboard_files(hass)
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG)); source.parent.mkdir(parents=True)
+    config = {"config_version": 1, "name": "Selected", "rooms": [{"name": "Kitchen", "entities": [
+        {"entity_id": "light.snapshot", "variables": {"enable_slider": False}, "future": True},
+    ]}], "overview": {"future": 42}}
+    exact = (json.dumps(config, indent=3) + "\r\n").encode(); source.write_bytes(exact)
+    preview = _management_payload(hass, [])
+    assert preview["conversion_pending"]
+    shown = json.loads(preview["config"])
+    assert _home_groups(shown)[0]["entities"] == config["rooms"][0]["entities"]
+    assert shown["legacy_page_options"]["overview"]["future"] == 42
+    assert source.read_bytes() == exact and list(source.parent.iterdir()) == [source]
+    Path(hass.config.path("configuration.yaml")).write_text("# unrelated\n")
+    _save_and_generate_dashboard(hass, preview["config"], [])
+    assert json.loads(source.read_bytes()) == shown
+    assert json.loads(_management_payload(hass, [{"entity_id": "light.new", "area_id": "kitchen", "has_state": True}])["config"]) == shown

@@ -69,15 +69,23 @@ const source = await fs.readFile(
   "utf8",
 );
 const sourceWithoutFrontendImports = source.slice(source.indexOf("const MARAO_FONT_URL"));
+const cardsSource = await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8');
 const instrumentedSource = `
+import { cardProblem, problemStyle, serviceOutcome } from "data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}";
 const haptic = (value) => globalThis.__maraoTestHaptics.push(value);
-const callServiceWithNotification = (hass, ...args) => {
+const callServiceWithNotification = (hass, domain, service, data, onOutcome) => {
   try {
-    return Promise.resolve(hass.callService(...args)).catch((error) => {
+    onOutcome?.("sent");
+    return Promise.resolve(hass.callService(domain, service, data)).then(result => {
+      onOutcome?.("success");
+      return result;
+    }).catch((error) => {
       globalThis.__maraoTestActionErrors.push(error.message);
+      onOutcome?.("error", error);
     });
   } catch (error) {
     globalThis.__maraoTestActionErrors.push(error.message);
+    onOutcome?.("error", error);
   }
 };
 ${sourceWithoutFrontendImports}
@@ -296,6 +304,23 @@ function pointerEvent(track, clientX, clientY, pointerId = 1) {
     stopPropagation() { this.stopped = true; },
   };
 }
+
+test('access tracks survive unrelated HA updates and refresh when the connection changes', () => {
+  const { slide, listeners } = slideFixture();
+  let writes = 0, html = '';
+  Object.defineProperty(slide.shadowRoot, 'innerHTML', { get: () => html, set: value => { writes++; html = value; } });
+  slide._render();
+  const boundListeners = listeners.size;
+  slide.hass = { ...slide._hass, states: { ...slide._hass.states, 'sensor.other': { state: '10' } } };
+  assert.equal(writes, 1);
+  assert.equal(listeners.size, boundListeners);
+  slide.hass = { ...slide._hass, connected: false };
+  assert.equal(writes, 2);
+  assert.match(html, /aria-disabled="true"/);
+  slide.hass = { ...slide._hass, connected: true };
+  assert.equal(writes, 3);
+  assert.match(html, /aria-disabled="false"/);
+});
 
 test("slide control keeps vertical gestures available for page scrolling", () => {
   const { captured, slide, track } = slideFixture();

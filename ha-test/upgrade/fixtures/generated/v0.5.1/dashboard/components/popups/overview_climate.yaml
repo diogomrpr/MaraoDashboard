@@ -1,0 +1,32 @@
+type: custom:marao-popup-card
+hash: '#overview-climate'
+entity: climate.marao_dashboard_test_multi_mode_climate
+name: Climate
+icon: mdi:thermostat
+show_icon: true
+show_name: true
+show_state: true
+height: 760px
+max_height: 80dvh
+cards:
+  # marao:generated:start
+  - type: custom:marao-card
+    template: hc_climate_card
+    entity: climate.marao_dashboard_test_multi_mode_climate
+    name: Thermostat - Living Room
+    variables:
+      show_graph: false
+      show_mode_buttons: true
+  - type: custom:marao-card
+    template: hc_climate_card
+    entity: climate.marao_dashboard_test_dual_target_climate
+    name: Dual target thermostat - Living Room
+    variables:
+      show_graph: false
+      show_mode_buttons: true
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end

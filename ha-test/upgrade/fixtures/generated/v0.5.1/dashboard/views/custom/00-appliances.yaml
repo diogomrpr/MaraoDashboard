@@ -1,0 +1,64 @@
+title: Appliances
+path: appliances
+icon: mdi:dishwasher
+theme: Marao Dashboard
+cards:
+  # marao:generated:start
+  - type: custom:marao-card
+    template: hc_title_card
+    name: Appliances
+    show_icon: false
+    show_state: false
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_vacuum_card
+      entity: vacuum.marao_dashboard_test_vacuum
+      name: Robot Vacuum
+    - type: custom:marao-card
+      template: hc_sensor_card
+      entity: binary_sensor.marao_dashboard_test_washing_machine
+      name: Washer
+    - type: custom:marao-card
+      template: hc_dishwasher_card
+      entity: input_select.marao_dashboard_test_dishwasher_state
+      name: Dishwasher
+      variables:
+        progress_entity: sensor.marao_dashboard_test_dishwasher_progress
+        remaining_time_entity: sensor.marao_dashboard_test_dishwasher_remaining
+        salt_entity: input_boolean.marao_dashboard_test_dishwasher_salt
+        rinse_aid_entity: input_boolean.marao_dashboard_test_dishwasher_rinse_aid
+        active_program_entity: input_select.marao_dashboard_test_dishwasher_program
+    - type: custom:marao-card
+      template: hc_navigation_card
+      entity: sensor.marao_dashboard_test_wallbox_status
+      name: Wallbox
+      icon: mdi:ev-station
+      show_state: false
+      tap_action:
+        action: navigate
+        navigation_path: /marao-dashboard/wallbox
+        haptic: heavy
+    - type: custom:marao-card
+      template: hc_navigation_card
+      entity: media_player.marao_dashboard_test_apple_tv
+      name: Media
+      icon: mdi:television-play
+      show_state: false
+      tap_action:
+        action: navigate
+        navigation_path: /marao-dashboard/media
+        haptic: heavy
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/dashboard/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

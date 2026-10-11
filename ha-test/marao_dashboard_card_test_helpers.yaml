@@ -2,7 +2,21 @@ history: {}
 
 unifiprotect:
 
+scene:
+  - name: Marao Dashboard Test Native Scene
+    entities:
+      input_boolean.marao_dashboard_test_one: "on"
+
 input_boolean:
+  marao_dashboard_test_action_failure:
+    name: Simulate safe action failure
+    initial: true
+  marao_dashboard_test_media_failure:
+    name: Simulate media failure
+    initial: true
+  marao_dashboard_test_appliance_warning:
+    name: Simulate appliance warning
+    initial: true
   marao_dashboard_test_one:
     name: Marao Dashboard Test One
   marao_dashboard_test_two:
@@ -192,6 +206,10 @@ input_select:
 vacuum:
   - platform: marao_test_vacuum
 
+cover:
+  - platform: marao_test_cover
+    name: Marao Dashboard Test Open Only Door
+
 climate:
   - platform: marao_test_climate
     name: Marao Dashboard Test Dual Target Climate
@@ -224,9 +242,16 @@ climate:
 
 camera:
   - platform: marao_test_camera
+    name: Marao Dashboard Test Media Error
+    picture_error: true
+  - platform: marao_test_camera
     name: Marao Dashboard Test Camera
 
 media_player:
+  - platform: marao_test_media
+    name: Marao Dashboard Test Media Error
+    initial_state: playing
+    picture_error: true
   - platform: marao_test_media
     name: Marao Dashboard Test Apple TV
   - platform: marao_test_media
@@ -249,6 +274,18 @@ homeassistant:
         - "heat"
 
 template:
+  - weather:
+      - name: Marao Dashboard Test Weather
+        default_entity_id: weather.marao_dashboard_test_weather
+        unique_id: marao_dashboard_test_weather
+        condition: "{{ states('input_select.marao_dashboard_test_weather_condition') }}"
+        temperature: "21"
+        temperature_unit: "°C"
+        humidity: "50"
+        attributes:
+          forecast: >-
+            {{ [dict(datetime=(now() + timedelta(days=1)).isoformat(), condition='cloudy', temperature=22, templow=14),
+                dict(datetime=(now() + timedelta(days=2)).isoformat(), condition='rainy', temperature=19, templow=12)] }}
   - light:
       - name: Marao Dashboard Test Light
         default_entity_id: light.marao_dashboard_test_light
@@ -371,33 +408,6 @@ template:
               entity_id: input_number.marao_dashboard_test_garage_door_position
             data:
               value: "{{ position }}"
-      - name: Marao Dashboard Test Open Only Door
-        default_entity_id: cover.marao_dashboard_test_open_only_door
-        unique_id: marao_dashboard_test_open_only_door
-        device_class: door
-        state: "{{ 'open' if is_state('input_boolean.marao_dashboard_test_open_only_door', 'on') else 'closed' }}"
-        position: "{{ 100 if is_state('input_boolean.marao_dashboard_test_open_only_door', 'on') else 0 }}"
-        open_cover:
-          - action: input_boolean.turn_on
-            target:
-              entity_id: input_boolean.marao_dashboard_test_open_only_door
-        close_cover:
-          - action: input_boolean.turn_off
-            target:
-              entity_id: input_boolean.marao_dashboard_test_open_only_door
-        set_cover_position:
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ position | int > 0 }}"
-                sequence:
-                  - action: input_boolean.turn_on
-                    target:
-                      entity_id: input_boolean.marao_dashboard_test_open_only_door
-            default:
-              - action: input_boolean.turn_off
-                target:
-                  entity_id: input_boolean.marao_dashboard_test_open_only_door
   - lock:
       - name: Marao Dashboard Test Lock
         default_entity_id: lock.marao_dashboard_test_lock
@@ -512,15 +522,6 @@ template:
       - name: Marao Dashboard Test Person
         unique_id: marao_dashboard_test_person
         state: home
-      - name: Marao Dashboard Test Weather
-        unique_id: marao_dashboard_test_weather_sensor
-        state: "{{ states('input_select.marao_dashboard_test_weather_condition') }}"
-        attributes:
-          temperature: "21"
-          temperature_unit: "°C"
-          forecast: >-
-            {{ [dict(datetime=(now() + timedelta(days=1)).isoformat(), condition='cloudy', temperature=22, templow=14),
-                dict(datetime=(now() + timedelta(days=2)).isoformat(), condition='rainy', temperature=19, templow=12)] }}
       - name: Marao Dashboard Test Temperature
         unique_id: marao_dashboard_test_temperature_sensor
         state: "{{ states('input_number.marao_dashboard_test_temperature') }}"
@@ -539,6 +540,43 @@ template:
         unit_of_measurement: W
         device_class: power
         state_class: measurement
+      - name: Marao Dashboard Test Energy Format Mixed
+        unique_id: marao_dashboard_test_energy_format_mixed
+        state: "1234.5"
+        unit_of_measurement: Wh
+      - name: Marao Dashboard Test Energy Format Power
+        unique_id: marao_dashboard_test_energy_format_power
+        state: "1500"
+        unit_of_measurement: W
+      - name: Marao Dashboard Test Energy Format Export
+        unique_id: marao_dashboard_test_energy_format_export
+        state: "-1234.5"
+        unit_of_measurement: Wh
+      - name: Marao Dashboard Test Energy Format Zero
+        unique_id: marao_dashboard_test_energy_format_zero
+        state: "0"
+        unit_of_measurement: W
+      - name: Marao Dashboard Test Energy Format Cost
+        unique_id: marao_dashboard_test_energy_format_cost
+        state: "1.2345"
+        unit_of_measurement: EUR
+      - name: Marao Dashboard Test Energy Format Missing Live
+        unique_id: marao_dashboard_test_energy_format_missing_live
+        state: "42"
+        unit_of_measurement: Wh
+      - name: Marao Dashboard Test Energy Format Missing History
+        unique_id: marao_dashboard_test_energy_format_missing_history
+        state: "2345"
+        unit_of_measurement: Wh
+      - name: Marao Dashboard Test Energy Format Incompatible History
+        unique_id: marao_dashboard_test_energy_format_incompatible_history
+        state: "3456"
+        unit_of_measurement: Wh
+      - name: Marao Dashboard Test Energy Format Unavailable
+        unique_id: marao_dashboard_test_energy_format_unavailable
+        state: "0"
+        availability: "{{ false }}"
+        unit_of_measurement: Wh
       - name: Marao Dashboard Test Month Energy
         unique_id: marao_dashboard_test_month_energy_sensor
         state: "{{ states('input_number.marao_dashboard_test_month_energy') }}"
@@ -588,6 +626,10 @@ template:
         unit_of_measurement: "%"
         device_class: battery
         state_class: measurement
+      - name: Marao Dashboard Test Group Invalid Battery
+        default_entity_id: sensor.marao_dashboard_test_group_invalid_battery
+        unique_id: marao_dashboard_test_group_invalid_battery
+        state: "not a number"
       - name: Marao Dashboard Test Battery Medium
         unique_id: marao_dashboard_test_battery_medium
         state: "50"

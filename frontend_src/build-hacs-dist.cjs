@@ -4,7 +4,6 @@ const path = require("path");
 const repoRoot = path.resolve(__dirname, "..");
 const integrationRoot = path.join(repoRoot, "custom_components", "marao_dashboard");
 const stagingRoot = path.join(repoRoot, "ha-test", ".cache", "dist");
-const distRoot = path.join(stagingRoot, "custom_components", "marao_dashboard");
 
 function isLocalCache(name) {
   return name === ".DS_Store" || name === "__pycache__" || /\.py[co]$/.test(name);
@@ -46,9 +45,10 @@ function assertPackageBoundary(root, { allowLocalCache = false } = {}) {
   visit(root);
 }
 
-function build() {
+function build(outputRoot = stagingRoot) {
+  const distRoot = path.join(outputRoot, "custom_components", "marao_dashboard");
   assertPackageBoundary(integrationRoot, { allowLocalCache: true });
-  fs.rmSync(stagingRoot, { recursive: true, force: true });
+  fs.rmSync(outputRoot, { recursive: true, force: true });
   fs.cpSync(integrationRoot, distRoot, {
     recursive: true,
     filter: (source) => !isLocalCache(path.basename(source)),

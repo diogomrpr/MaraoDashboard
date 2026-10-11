@@ -94,6 +94,13 @@ Marao Dashboard:
 ####################### MODES ####################
   modes:
     light:
+      marao-problem-neutral-background: '#E2E8F0'
+      marao-problem-neutral-text: '#243348'
+      marao-problem-warning-background: '#FFF0C2'
+      marao-problem-warning-text: '#573E10'
+      marao-problem-error-background: '#FFE0E4'
+      marao-problem-error-text: '#65162C'
+
 
       # Marao Dashboard Variables
       color-black: '#17263F'
@@ -139,6 +146,13 @@ Marao Dashboard:
       
 
     dark:
+      marao-problem-neutral-background: '#29313B'
+      marao-problem-neutral-text: '#E2E8F0'
+      marao-problem-warning-background: '#443518'
+      marao-problem-warning-text: '#FFE6A5'
+      marao-problem-error-background: '#47212E'
+      marao-problem-error-text: '#FFE0E4'
+
   
       # Marao Dashboard Variables
       primary-color: '#7BADE6'

@@ -1,6 +1,6 @@
 {
   "name": "marao-dashboard",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": true,
   "description": "Marao Dashboard Home Assistant dashboard development tools",
   "scripts": {
@@ -14,13 +14,17 @@
     "test": "npm run test:static && npm run test:python",
     "test:ha:e2e": "node tests/test-ha-dashboard-e2e.js",
     "test:ha:alignment": "node tests/test-ha-card-alignment.js",
+    "test:ha:rooms": "node tests/test-ha-room-cards.js",
+    "test:ha:climate-layout": "node tests/test-ha-climate-layout.js",
     "test:ha:sliders": "node tests/test-ha-value-sliders.js",
     "test:ha:accessibility": "node tests/test-ha-dashboard-accessibility.js",
     "ha:preview:accessibility": "node tests/test-ha-dashboard-accessibility.js --preview",
-    "verify:publish": "npm test && npm run test:ha:e2e && npm run test:ha:accessibility && npm run test:ha:alignment && npm run test:ha:sliders",
+    "verify:publish": "node tests/verify-publish.js",
+    "verify:release": "node tests/verify-release.js",
     "preversion": "npm run verify:publish",
     "ha:sync": "node ha-test/prepare.js",
-    "ha:sync:dry-run": "node ha-test/prepare.js --dry-run"
+    "ha:sync:dry-run": "node ha-test/prepare.js --dry-run",
+    "test:ha:upgrade": "node tests/test-ha-upgrade.js"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

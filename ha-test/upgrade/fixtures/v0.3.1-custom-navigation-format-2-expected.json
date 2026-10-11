@@ -1,0 +1,152 @@
+{
+  "name": "Generated Test",
+  "navigation": [
+    "studio",
+    "overview",
+    "rooms"
+  ],
+  "config_version": 2,
+  "slug": "generated-test",
+  "theme": "Marao Dashboard",
+  "icon": "marao_dashboard:mountain",
+  "landing_page": "overview",
+  "pages": [
+    {
+      "id": "overview",
+      "name": "Home",
+      "name_key": "nav.home",
+      "path": "overview",
+      "icon": "mdi:home-variant",
+      "output_path": "views/main/00-overview.yaml",
+      "sections": []
+    },
+    {
+      "id": "rooms",
+      "name": "Rooms",
+      "name_key": "nav.rooms",
+      "path": "rooms",
+      "icon": "mdi:sofa",
+      "output_path": "views/main/02-rooms.yaml",
+      "sections": [
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "id": "card-1",
+              "template": "hc_room_card",
+              "name": "Office",
+              "icon": "mdi:sofa-outline",
+              "page": "room-office",
+              "variables": {
+                "light_entities": [],
+                "lights_target_entity": ""
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Office",
+      "id": "room-office",
+      "path": "room-office",
+      "icon": "mdi:sofa-outline",
+      "subview": true,
+      "output_path": "views/rooms/00-office.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Office",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "entities": {
+            "navigation": [
+              {
+                "page": "studio",
+                "name": "Open studio",
+                "icon": "mdi:palette"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Studio",
+      "path": "studio",
+      "icon": "mdi:palette",
+      "id": "studio",
+      "output_path": "views/custom/00-studio.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Studio",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "entities": {
+            "light": [
+              "light.studio"
+            ],
+            "navigation": [
+              {
+                "page": "overview",
+                "name": "Back home"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "legacy_page_options": {
+    "overview": {},
+    "pages": {
+      "custom": [
+        {
+          "name": "Studio",
+          "path": "studio",
+          "icon": "mdi:palette",
+          "entities": {
+            "light": [
+              "light.studio"
+            ],
+            "navigation": [
+              {
+                "page": "overview",
+                "name": "Back home"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

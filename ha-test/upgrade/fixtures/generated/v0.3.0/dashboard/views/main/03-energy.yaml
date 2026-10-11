@@ -1,0 +1,72 @@
+title: Energy
+path: energy
+icon: mdi:lightning-bolt
+cards:
+  # marao:generated:start
+  - type: custom:button-card
+    template: hc_graph_card
+    entity: sensor.house_power
+    name: House Power
+    icon: mdi:flash
+    variables:
+      show_graph_fill: true
+      show_graph_line: true
+      show_icon: true
+    tap_action:
+      action: navigate
+      navigation_path: '#energy-house-power'
+      haptic: heavy
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_graph_card
+      entity: sensor.month_energy
+      name: Month Energy
+      icon: mdi:calendar-month-outline
+      variables:
+        show_graph_fill: true
+        show_graph_line: true
+        show_icon: true
+      tap_action:
+        action: navigate
+        navigation_path: '#energy-month'
+        haptic: heavy
+    - type: custom:button-card
+      template: hc_graph_card
+      entity: sensor.month_cost
+      name: Month Cost
+      icon: mdi:calendar-month-outline
+      variables:
+        show_graph_fill: true
+        show_graph_line: true
+        show_icon: true
+      tap_action:
+        action: navigate
+        navigation_path: '#energy-month'
+        haptic: heavy
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_toggle_graph_card
+      entity: sensor.heater_power
+      name: Heater Power
+      icon: null
+      variables:
+        toggle_entity: switch.heater
+  - type: custom:button-card
+    template: hc_dishwasher_card
+    entity: sensor.dishwasher
+    name: Dishwasher
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/popups/energy_house_power.yaml'
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/popups/energy_month.yaml'
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

@@ -1,0 +1,63 @@
+schema: spec-driven
+
+context: |
+  Marao is a complete mobile Home Assistant dashboard, including its integration,
+  administrator builder, generator, cards, popups, navbar, theme, and Cases gallery.
+  Read AGENTS.md and docs/docs/development/dashboard-quality.md first. They take
+  precedence over OpenSpec; OpenSpec records the baseline and proposed changes.
+  Read openspec/README.md, openspec/project-context.md, openspec/feature-coverage.md,
+  and the affected capability specs. The baseline describes published v0.5.1,
+  not a new feature backlog. Use the source/check map to trace the complete path.
+  Agents may access, test, or modify only disposable Home Assistant 192.168.0.28.
+  All physical-action tests use safe fixtures. Never expose credentials or private
+  entity/media data; local configuration and diagnostic artifacts remain ignored.
+  Keep the runtime self-contained without third-party Lovelace cards. Preserve
+  Marao identity and the README's single approved attribution.
+  Mobile is the acceptance target: 320px, iPhone/Android portrait and landscape,
+  light/dark, normal/bold/200% text/200% zoom/bold plus 200% text. Automated mobile
+  profiles are the gate; never claim physical-phone or Safari inspection without it.
+  The user allows the diagnosed native Home Assistant stale-unsubscribe reconnect
+  failure until its upstream fix reaches a stable frontend. Keep raw assertions and
+  exact native evidence; all other publication and upgrade gates remain required.
+  OpenSpec is development tooling only. Preserve unrelated work and use the smallest
+  coherent shared-root change; do not add a framework or abstraction for speculation.
+  Assess saved-release compatibility before changing JSON, defaults, generated
+  contracts or APIs. Preserve explicit intent, unknown/raw/custom content and
+  unrelated ownership. Reuse ordered conversions with preflight, private backups
+  and recovery; previews/dry runs stay read-only and archives stay immutable.
+  Keep historical fixtures, independent expected JSON and feature coverage current.
+  Versioned publication additionally requires a final-candidate preserved-install
+  upgrade gate during explicit release preparation only. The candidate implements
+  test:ha:upgrade and verify:release; complete real preserved-install evidence and
+  verified cleanup are still required before publication.
+
+rules:
+  proposal:
+    - State the concrete problem, scope, affected-card set (or empty), and non-goals.
+    - Distinguish observed behavior, assumptions, and intended changes; name existing capability paths.
+    - Assess saved-release and generated-contract compatibility; record preservation or the required versioned migration.
+  specs:
+    - Use testable SHALL requirements and WHEN/THEN scenarios; preserve existing requirement names in deltas.
+    - Keep existing behavior in baseline specs and unfinished work in changes; never describe an unconfirmed fix as shipped.
+  design:
+    - Trace relevant builder, validation, generator, shared runtime, theme, translations, documentation, tests, and fixtures.
+    - Reuse existing components and state any migration, data-preservation, privacy, and action-safety implications.
+    - Describe historical inputs and independent expected transformations, backup/preflight/recovery, read-only paths and complete package-plus-data rollback.
+  tasks:
+    - Make tasks concrete and checkable; keep future or unverified work unchecked.
+    - Include the smallest relevant automated check and final affected-card visual inspection for UI work.
+    - Include gallery and realistic-page examples when supported behavior changes, and alignment checks for icon-only layouts.
+    - Require verify:publish before any push, tag, or release; do not require the full suite for ordinary small changes.
+    - Keep focused migration checks in development; require the separate final-candidate upgrade gate only during explicit versioned-release preparation, with verified cleanup and historical feature coverage.
+
+operations:
+  apply:
+    guidance:
+      - Follow AGENTS.md; inspect the end-to-end path and record every affected card before editing.
+      - Record upgrade impact and preserve supported saved configurations; maintain historical expected fixtures when formats or generated contracts change.
+      - Run focused checks during iteration; deploy UI changes only to 192.168.0.28 and use safe fixture actions.
+      - After the last edit and focused check, visually inspect every affected card as the final validation step.
+  archive:
+    guidance:
+      - Archive only completed and verified work; never archive unresolved upstream follow-ups as complete.
+      - Keep baseline specs synchronized with the accepted change and report remaining limitations honestly.

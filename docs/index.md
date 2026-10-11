@@ -6,6 +6,11 @@ nav_order: 0
 
 # Marao Dashboard
 
+<picture>
+  <source media="(max-width: 300px)" srcset="{{ '/assets/images/favicon.svg' | relative_url }}">
+  <img src="{{ '/assets/images/logo.svg' | relative_url }}" alt="Marao Dashboard mountain logo" width="312" height="168" style="max-width:100%;height:auto">
+</picture>
+
 Marao Dashboard turns a visual, editable JSON model into a coordinated Home
 Assistant YAML dashboard. It provides overview and room views, responsive card
 templates, pop-up controls, a theme, and local version history.

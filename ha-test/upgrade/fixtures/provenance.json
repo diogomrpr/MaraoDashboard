@@ -1,0 +1,175 @@
+[
+  {
+    "fixture": "v0.3.0-guided-pages.json",
+    "tag": "v0.3.0",
+    "commit": "0982c2125412b4bb0aa188afbd6f17f0d484be30",
+    "source": "tests/components/marao_dashboard/test_generator.py",
+    "source_line": 617,
+    "source_sha256": "05e5ffb8a1b27d6a709b023f52900c8767a3c6d8ff25a357474ccb0c936cd922",
+    "fixture_sha256": "d36b57a6581e20563d6d00625b07cee5849f2540de42a421e2f0de7c0b892307",
+    "provenance": "Released Python test configuration literal, serialized for read-only compatibility checks.",
+    "config_version": 0,
+    "generated_contract": 0,
+    "replay": "historical-data",
+    "expected": "v0.3.0-guided-pages-expected.json",
+    "expected_sha256": "d36b57a6581e20563d6d00625b07cee5849f2540de42a421e2f0de7c0b892307",
+    "generated": {
+      "directory": "generated/v0.3.0",
+      "slug": "generated-test",
+      "dashboard_key": "marao-generated-test",
+      "filename": "dashboard/MaraoDashboard/generated-test/dashboard.yaml",
+      "source_sha256": {
+        "custom_components/marao_dashboard/const.py": "891cf10ec221538d0cd48ee658ec6b7194a6f5d3a95d5b78cab004f89094098a",
+        "custom_components/marao_dashboard/generator.py": "c6c22ca8ab26e3149ff04adf8898cfa2734cd8d23077958a409c8d7936744efd",
+        "custom_components/marao_dashboard/config_patch.py": "ee21e2d556b125009a6fffe99de9f3c604d67b96e9554d3944c285a44da3556e"
+      },
+      "files": {
+        "configuration.yaml": "8deed026772f385e293aaeee905a3e99be6608e3650656e94d59298800091c40",
+        "dashboard/.marao-generated.json": "c3cc9336e02abbf9fb43d518a292dc6f6003c5bed6ad3c1e197c68c75e1973e0",
+        "dashboard/components/navigation/navbar.yaml": "37b789c0a1afc8324df3fb7898a07c0fdfe339829a93bfde311e7ee810edb797",
+        "dashboard/components/popups/energy_house_power.yaml": "b3a5a7b7315cd0ff1dd988b890a869a22ea1bb72ed72d4bdb15ca2be0bb84e51",
+        "dashboard/components/popups/energy_month.yaml": "8d3fa07ddc1e1d4f3f6d7a501770e66a353df81d71274e349bc7847755a12bf9",
+        "dashboard/components/popups/overview_blinds.yaml": "3710036dda4700a1e831f595eb3ef091b0b2c4a7338f051340a4c86f57d4920b",
+        "dashboard/components/popups/overview_climate.yaml": "9aa1b3480b176c6e3db1e8cdacd1f766414051326c1370f964ceb100e9ff1145",
+        "dashboard/components/popups/overview_lights.yaml": "ea66f9ca78da91fc22aece44e7aa3efa375793cef9013007bd70515f4a8f5555",
+        "dashboard/components/popups/overview_scenes.yaml": "d6997d78c71a2e91af1af52f3247e08dff9fb0ac45d46d7075eb8a65f15a4546",
+        "dashboard/dashboard.yaml": "eb6949d763e7486d9e016bdad4d8bc76c33c31790119114e74e375fb5179cefe",
+        "dashboard/views/main/00-overview.yaml": "d29d4810ef7b76b5a9158d0813e5f6ee333c1fac59ab2668213061f8fb7b6ed4",
+        "dashboard/views/main/01-security.yaml": "6fd311481b1747b294edc356fc00fd707e9aef1e57af4c0d00c55b73621b33a9",
+        "dashboard/views/main/02-rooms.yaml": "89ff0bfe892ec2916b3a21452ae3060644099adf68efdd048f9bcbade19d7c20",
+        "dashboard/views/main/03-energy.yaml": "5a1184f841476847c9188e33d416ad39ba38674624ba4031750c3701331c3405",
+        "dashboard/views/main/04-wallbox.yaml": "6f7cdc2497219abfec7b6da70e245d9c35dcc3d8839a1b93822f2f43701a7686",
+        "dashboard/views/main/05-media.yaml": "86fa0b963ca523caec9cb240bd3d965f2ac88d70a9d241f1fed1b384f0690ad1",
+        "dashboard/views/rooms/00-living-room.yaml": "a58cfc4e7caf7ed59742a17638cd94a079ae4a276a468e7ff95c6bc6d82e6394"
+      },
+      "provenance": "Produced offline by the exact released generator and configuration patch, from the frozen released JSON with an empty registry and /config include root. No historical runtime package was installed."
+    }
+  },
+  {
+    "fixture": "v0.3.1-custom-navigation.json",
+    "tag": "v0.3.1",
+    "commit": "a8a750d232d3d136eb04b9b74adc456c68e383d7",
+    "source": "tests/components/marao_dashboard/test_generator.py",
+    "source_line": 477,
+    "source_sha256": "2d52646ca59aba9b3a5515cc1b0e62589cbbb0bdd92fc49c9490f2e37f4b73eb",
+    "fixture_sha256": "f0b7f6fd44321fd51a41d1343fbb94690c590363491616f0f1db8e0bc2f925ac",
+    "provenance": "Released Python test configuration literal, serialized unchanged for historical-data replay.",
+    "config_version": 0,
+    "generated_contract": 0,
+    "replay": "historical-data",
+    "expected": "v0.3.1-custom-navigation-expected.json",
+    "expected_sha256": "f0b7f6fd44321fd51a41d1343fbb94690c590363491616f0f1db8e0bc2f925ac",
+    "generated": {
+      "directory": "generated/v0.3.1",
+      "slug": "generated-test",
+      "dashboard_key": "marao-generated-test",
+      "filename": "dashboard/MaraoDashboard/generated-test/dashboard.yaml",
+      "source_sha256": {
+        "custom_components/marao_dashboard/const.py": "d6c4e1368b62085dc410656762131a237abbcbd037c97045ff497f5bdfefeca9",
+        "custom_components/marao_dashboard/generator.py": "c1cc99f713d9e42a3c932222acd39bd2b613d72e3823b3e74b32224a006565cf",
+        "custom_components/marao_dashboard/config_patch.py": "ee21e2d556b125009a6fffe99de9f3c604d67b96e9554d3944c285a44da3556e"
+      },
+      "files": {
+        "configuration.yaml": "8deed026772f385e293aaeee905a3e99be6608e3650656e94d59298800091c40",
+        "dashboard/.marao-generated.json": "e133a5cdce5990eb7e51ef5af103f1fc4d450e31fd5b12e412f97fa22224083c",
+        "dashboard/components/navigation/navbar.yaml": "676e871c195c91492b261046e1f93b497acd62c8aaf4ba3f16686c429d5a2a18",
+        "dashboard/dashboard.yaml": "d3f88af2a21e42ec9ffca7aaf599a9bc007116ca7027e35a6333148792a486ca",
+        "dashboard/views/custom/00-studio.yaml": "de192cf78c40056141dc928381d674f15ff81a9f7ffef671dc4170ce06edecd5",
+        "dashboard/views/main/00-overview.yaml": "cbfd089e9f1e057cb1047544cfc0e046a16416e0c95f09b0f590670eb82a6d03",
+        "dashboard/views/main/02-rooms.yaml": "3e4efbef2f6d427db99d78b62dcdd4e1eb8ee8bd7b2d6c98d866029e037eaf32",
+        "dashboard/views/rooms/00-office.yaml": "0a5f389f6991f4b299b18c6fd9ad395c9ebc3d0d7741d5b331501bba19e0e2f7"
+      },
+      "provenance": "Produced offline by the exact released generator and configuration patch, from the frozen released JSON with an empty registry and /config include root. No historical runtime package was installed."
+    }
+  },
+  {
+    "fixture": "v0.5.0-camera-provider.json",
+    "tag": "v0.5.0",
+    "commit": "eb378c5afdb7ec9f8a98928c5ddc5e30b27cdb11",
+    "source": "tests/components/marao_dashboard/test_generator.py",
+    "source_line": 620,
+    "source_sha256": "e94932ec4bdc584b811e746db684f41d1382e5f160db0862d44441f044431979",
+    "fixture_sha256": "e88c17fcfb4033334061847eff2fde2be80c53795cc9be60036e0862994b7881",
+    "provenance": "Released Python test configuration literal, serialized unchanged for historical-data replay.",
+    "config_version": 0,
+    "generated_contract": 0,
+    "replay": "historical-data",
+    "expected": "v0.5.0-camera-provider-expected.json",
+    "expected_sha256": "e88c17fcfb4033334061847eff2fde2be80c53795cc9be60036e0862994b7881",
+    "generated": {
+      "directory": "generated/v0.5.0",
+      "slug": "generated-test",
+      "dashboard_key": "marao-generated-test",
+      "filename": "dashboard/MaraoDashboard/generated-test/dashboard.yaml",
+      "source_sha256": {
+        "custom_components/marao_dashboard/const.py": "60c74488d49e8a89b228d4f700763c84b95fee92ad933c9ae717e105fab91644",
+        "custom_components/marao_dashboard/generator.py": "6cbe252500e3b528b87e1948e01ec55041849e6492da7ce86526f7e19b929e7c",
+        "custom_components/marao_dashboard/config_patch.py": "ee21e2d556b125009a6fffe99de9f3c604d67b96e9554d3944c285a44da3556e"
+      },
+      "files": {
+        "configuration.yaml": "8deed026772f385e293aaeee905a3e99be6608e3650656e94d59298800091c40",
+        "dashboard/.marao-generated.json": "a3017ad3ee76bd51d9f1b2f52379cdd7a196df9c887654c217c9982d5b9652f5",
+        "dashboard/components/navigation/navbar.yaml": "120b0773ec768c286a0b15f8d5be75ea9025a07bcfb5bfa68a0b46fcdd4fa3ed",
+        "dashboard/dashboard.yaml": "068be3c498169ffeef3e692a40135bc63c58dfb891384ac936d0acc743f43a69",
+        "dashboard/views/main/00-overview.yaml": "cbfd089e9f1e057cb1047544cfc0e046a16416e0c95f09b0f590670eb82a6d03",
+        "dashboard/views/main/02-rooms.yaml": "73b6c941f2a989b00e5010cf9ca19086820a9caedfc62667bc3e23fe9b7c23a5",
+        "dashboard/views/rooms/00-garden.yaml": "a1feb95366d5c6c200ce8102b777f6affe2e03bcd3c7f2b7c55467ef29c87725"
+      },
+      "provenance": "Produced offline by the exact released generator and configuration patch, from the frozen released JSON with an empty registry and /config include root. No historical runtime package was installed."
+    }
+  },
+  {
+    "fixture": "v0.5.1-dashboard.json",
+    "tag": "v0.5.1",
+    "commit": "370c2c57088b0982a5059acbeab998624e0bf427",
+    "source": "ha-test/marao_dashboard_test_dashboard.json",
+    "source_line": null,
+    "source_sha256": "3535cda7ee348a4eb3220a66e7dcaa25bfbf4c2f40c15a520058191fe0879618",
+    "fixture_sha256": "3535cda7ee348a4eb3220a66e7dcaa25bfbf4c2f40c15a520058191fe0879618",
+    "provenance": "Exact bytes of the released disposable dashboard configuration.",
+    "config_version": 0,
+    "generated_contract": 0,
+    "replay": "previous-package",
+    "expected": "v0.5.1-dashboard-expected.json",
+    "expected_sha256": "3535cda7ee348a4eb3220a66e7dcaa25bfbf4c2f40c15a520058191fe0879618",
+    "generated": {
+      "directory": "generated/v0.5.1",
+      "slug": "dashboard",
+      "dashboard_key": "marao-dashboard",
+      "filename": "dashboard/MaraoDashboard/dashboard/dashboard.yaml",
+      "source_sha256": {
+        "custom_components/marao_dashboard/const.py": "32f1e907b20499b43792d2d915e28f665f0677996108e5a7c0c89b3c54024f86",
+        "custom_components/marao_dashboard/generator.py": "b3983f3eb1703328dd9f11f4c4bf47f46657e44bffcd98ea5e3962cc6601c4ac",
+        "custom_components/marao_dashboard/config_patch.py": "ee21e2d556b125009a6fffe99de9f3c604d67b96e9554d3944c285a44da3556e"
+      },
+      "files": {
+        "configuration.yaml": "74df66df9f97d0c35902ee2154c492c3235caca50c907fef24356730c78be33f",
+        "dashboard/.marao-generated.json": "84f658f2a03ac7c2d278cf791f5fde9cbe346531219ce8059d89737407da080b",
+        "dashboard/components/navigation/navbar.yaml": "31c0a0cd61d031ae230301075b88475b1ea6563dc00f56438d82b3773d7f50a8",
+        "dashboard/components/popups/energy_house_power.yaml": "81539ca00641f65982b4303a4ad6d118e23018d80ffb37542acec9fdeb6f8c93",
+        "dashboard/components/popups/energy_month_cost.yaml": "d7fcdd1bd64de0478ec30c484208bec0ac57a484abd0f355d561f6680635dd3c",
+        "dashboard/components/popups/energy_month_power.yaml": "4d066823c37ed5eae68244ae872430f10a28ca0d462b3e416606937671042c33",
+        "dashboard/components/popups/energy_today_cost.yaml": "d791cf6020e798d91aa6bbb73257b7acb1747ee7ef2a9e51626e1b8b551cbade",
+        "dashboard/components/popups/energy_today_power.yaml": "9e1deb24144654ec8c4f5f71efc72ce4aff1205e0ef25265b51f904de36db151",
+        "dashboard/components/popups/overview_blinds.yaml": "88157651883f2b91bd0fa375295b52ba5a349a142ab940b19ee979354fed6495",
+        "dashboard/components/popups/overview_climate.yaml": "3f192e395ab300e8b2303f6f483cc2f276b08a8f54f66291ee6bff01de600f8b",
+        "dashboard/components/popups/overview_lights.yaml": "9f3abb9c9c10f6bf7a3d371c0fd74c3b792f44c62c5347fffd02d097d886527c",
+        "dashboard/components/popups/overview_maintenance.yaml": "8cae52510c8b91844ba0cb2e1f79b1e790198e8844e3d430a9e3c909c21f10b5",
+        "dashboard/components/popups/overview_scenes.yaml": "c31ac03f3f5aa7b7bd53ea7f944473df4f0b657f68a1d7e0f8e7d97684397584",
+        "dashboard/dashboard.yaml": "c2fc25655975499e37b13598d418f0805f7a17d16fd5af6dbea65d6e6c397d19",
+        "dashboard/views/custom/00-appliances.yaml": "e57b397225fc9f98842573d5091fe2fa30a7e64a228a5c2a825b75cbc3feaa65",
+        "dashboard/views/main/00-overview.yaml": "3c5268c4fd3a0973f7b3042cdb2bc607a83b62266d74e2786b29d3da1cf15c6c",
+        "dashboard/views/main/01-security.yaml": "5e31fbf64045b6e9ff4a9d8a5f7a164c370456a764c3d2a045c0c804aadc63f5",
+        "dashboard/views/main/02-rooms.yaml": "9b005a6f29937805b8f28a2fc9c36c82fe7849e86f1212867ae848505a8d5a8c",
+        "dashboard/views/main/03-energy.yaml": "4ebef276f45e4d0d6ccb8978eb9c256c1205d8ec625cc815f2f18a2f7909eba8",
+        "dashboard/views/main/04-wallbox.yaml": "88c70dcd5169adf45ae679477bb5a7b925f934aeba57d183aafd3c0b52911526",
+        "dashboard/views/main/05-media.yaml": "1cdc95471a6b827909d7a70c8e4f16d1902e7eec1bd8735c5a23bfeb7f3b94ae",
+        "dashboard/views/rooms/00-living-room.yaml": "6602df0417d069d9f56c0207831430ee7c5f612264728ed9db20e78bb3d9f258",
+        "dashboard/views/rooms/01-entrance.yaml": "5985be7f16b33d942185044cb30b9bb3223f8e6ede8ded77cda95d8c5615b6cb",
+        "dashboard/views/rooms/02-utility-room.yaml": "66d03f1fc9059869f849229cb4c5e512e5b6e8aa842c7a17b135c61a5219663f",
+        "dashboard/views/rooms/03-empty-room.yaml": "e30c457d0c7ad677c27967f7e55638d75f01adec5f5ee91056745e438088c82e"
+      },
+      "provenance": "Produced offline by the exact released generator and configuration patch, from the frozen released JSON with an empty registry and /config include root. No historical runtime package was installed."
+    }
+  }
+]

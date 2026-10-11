@@ -1,0 +1,35 @@
+type: vertical-stack
+cards:
+- type: custom:button-card
+  color_type: blank-card
+  styles:
+    card:
+    - height: 128px
+- type: custom:navbar-card
+  haptic:
+    double_tap_action: true
+    hold_action: true
+    tap_action: true
+    url: true
+  mobile:
+    mode: floating
+    show_labels: false
+  desktop:
+    min_width: 1024
+    mode: floating
+    position: bottom
+    show_labels: false
+  routes:
+  - icon: mdi:palette
+    icon_selected: mdi:palette
+    label: Studio
+    url: /marao-generated-test/studio
+  - icon: mdi:home-variant-outline
+    icon_selected: mdi:home-variant
+    label: Home
+    url: /marao-generated-test/overview
+  - icon: mdi:sofa-outline
+    icon_selected: mdi:sofa
+    label: Rooms
+    url: /marao-generated-test/rooms
+  styles: ":host {\n  --navbar-border-radius: 999px;\n  --marao-navbar-route-size: 58px;\n}\n.navbar {\n  align-items: center;\n}\n.navbar-card {\n  box-sizing: border-box !important;\n  justify-content: center !important;\n  width: fit-content !important;\n  max-width: calc(100vw - 24px) !important;\n  padding-left: 16px !important;\n  padding-right: 16px !important;\n  gap: 0 !important;\n}\n.navbar-card.mobile.floating {\n  margin-bottom: 18px;\n  padding-top: 8px !important;\n  padding-bottom: 8px !important;\n  touch-action: none;\n}\n.route {\n  flex: 0 0 var(--marao-navbar-route-size);\n  width: var(--marao-navbar-route-size);\n  min-width: var(--marao-navbar-route-size);\n}\n.button {\n  width: 40px;\n  max-width: 40px;\n  height: 40px;\n  border-radius: 50%;\n}"

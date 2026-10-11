@@ -1,0 +1,9 @@
+{
+  "config_version": 0,
+  "name": "Intentionally empty installation",
+  "rooms": [],
+  "overview": {"scenes": []},
+  "pages": {},
+  "navigation": [],
+  "extension": {"deleted": ["room-office", "security", "energy"]}
+}

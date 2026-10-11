@@ -1,0 +1,42 @@
+type: custom:marao-popup-card
+hash: '#overview-scenes'
+entity: input_boolean.marao_dashboard_test_one
+name: Scenes
+icon: mdi:palette-outline
+show_icon: true
+show_name: true
+show_state: true
+height: 520px
+max_height: 80dvh
+cards:
+  # marao:generated:start
+  - type: custom:marao-card
+    template: hc_switch_card
+    entity: input_boolean.marao_dashboard_test_one
+    name: Relax
+    icon: mdi:sofa
+    tap_action:
+      action: toggle
+      haptic: heavy
+  - type: custom:marao-card
+    template: hc_switch_card
+    entity: input_boolean.marao_dashboard_test_two
+    name: Movie
+    icon: mdi:movie-open
+    tap_action:
+      action: toggle
+      haptic: heavy
+  - type: custom:marao-card
+    template: hc_switch_card
+    entity: input_boolean.marao_dashboard_test_three
+    name: Night
+    icon: mdi:weather-night
+    tap_action:
+      action: toggle
+      haptic: heavy
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end

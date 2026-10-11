@@ -36,27 +36,128 @@ The editable source of truth is:
 dashboard/MaraoDashboard/dashboard.json
 ```
 
-The integration adds an admin-only **Marao Dashboard Editor** page to the Home
-Assistant sidebar at `/marao-dashboard-editor`. Its **Visual** tab guides you
-through general settings, overview entities, rooms, cards, and optional pages
-using Home Assistant entity, area, theme, and icon selectors. **Add card** first
-shows the supported Marao card types, then filters the entity selector and
-offers common and advanced options for that card.
+## Ordered page format
 
-Use **Add room** to start an empty room or import a snapshot of a Home Assistant
-area. A snapshot copies the area's current entities into the JSON and remains
-fully editable; later area changes are not synchronized. Older area-linked
-rooms keep their existing behavior until their first card edit, when the editor
-explains and performs the conversion to a snapshot.
+Dashboard format **2**, being prepared for the next release, stores every page in
+one ordered `pages` array. `landing_page` names an existing page path. The
+landing view is generated first; the remaining views retain their saved order.
+Navbar entries are a separate ordered list of at most five page references or
+labeled URLs. An empty navbar list stays empty.
 
-The **JSON** tab edits the same document in the built-in code editor,
-with validation, formatting, schema help, and entity-ID suggestions. Unknown
-fields and raw Lovelace cards are preserved when switching views. Invalid JSON
-must be corrected before returning to **Visual**.
+```json
+{
+  "config_version": 2,
+  "name": "My home",
+  "landing_page": "home",
+  "navigation": ["home"],
+  "pages": [
+    {
+      "id": "home",
+      "name": "Home",
+      "path": "home",
+      "icon": "mdi:home",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {"id": "heading", "template": "hc_title_card", "name": "Living room"}
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {"id": "lamp", "entity_id": "light.living_room", "template": "hc_light_card"},
+            {"id": "office-link", "template": "hc_navigation_card", "name": "Office", "page": "office"}
+          ],
+          "cards": [{"type": "markdown", "content": "A saved note"}]
+        }
+      ]
+    },
+    {"id": "office", "name": "Office", "path": "office", "area": "office", "entities": []}
+  ]
+}
+```
 
-Changes remain local to the editor until you select **Save & Generate**. Use
-**Discard changes** to reload the saved source or **Open dashboard** to inspect
-the last generated result.
+A page uses either flat `entities`/`cards`/`columns` or ordered `sections`, never
+both. Each section uses the same container fields. Fixed grids accept one to
+six columns and retain mixed card order; omitting columns uses the existing
+automatic domain layout. Empty and absent selections remain empty or absent.
+Titles, shortcuts, room shortcuts, Entity Groups and scene collections may be
+entity-free. Other descriptors require a compatible entity before generation;
+unfinished template cards must be bound or removed.
+
+Page paths are unique lowercase letters, numbers, underscores or hyphens.
+Optional page and local card IDs start with a letter and use the same characters;
+card IDs are unique within a page. Names and icons belong to that occurrence,
+so editing a title does not rename a Home Assistant entity. Unknown fields,
+raw cards, ordering and explicit options remain in the saved document. An
+optional `area` only supplies suggestions; it does not synchronize membership.
+
+The ordered upgrade first imports legacy room membership from format 0 to 1,
+then converts format 1 to 2. Existing Home, Rooms, room, custom and optional
+guided pages become ordinary descriptors. Only absent legacy selections receive
+their historical defaults; explicit empty access, player and group lists win.
+Old options without a current composition role remain in `legacy_page_options`
+as non-operative data. Migrated `output_path` metadata retains existing owned
+view filenames and their protected YAML regions; new pages use stable files
+under `views/pages/`. Backups and read-only preview rules still apply.
+
+Generated popup identities use the page path, local card ID and popup role.
+Compatible explicit hashes are retained and checked for collisions, including
+nested group popups. Migration retains historical owned filenames where
+possible. Custom external URLs remain opaque; unresolved known page references
+must be retargeted or removed explicitly before saving.
+
+The integration adds an admin-only **Marao Dashboard Editor** at
+`/marao-dashboard-editor`. Its **Visual** tab starts with the page manager. Every
+page uses the same card and section controls, including Home, Rooms, Security,
+Energy, Wallbox and Media. Expand a page to add, edit, remove or reorder its cards,
+change section columns, and move or remove sections. Empty pages stay empty.
+
+**Add page** offers Empty, Home, Rooms, Room, Security, Energy, Wallbox and Media.
+Templates populate the new local draft once, using real available entities and
+saved media preferences. Optional roles without a binding are omitted. Bind or
+remove an unbound required Alarm, House Power, Charging Current or Media card
+before saving. Later registry changes or repeated generation never refill a saved
+page. Choose Room with a suggestion area to import its current selection once;
+choosing Rooms creates independent shortcuts to the current room-page drafts.
+
+Page order, **Landing page** and navbar order are independent. **Pin to navbar**
+and **Unpin** change only the menu; unpinning retains the page and all its cards.
+The navbar supports five entries. A sixth page can be created unpinned and reached
+with a Room or Navigation shortcut. Unpin another entry before pinning a sixth.
+Renaming a path updates owned page and popup links. Duplicating regenerates local
+card/popup identities and creates an unpinned copy with independent options.
+
+**Add card** offers **By card type** and **By entity**. Search by name or entity ID
+across all areas. Associated pages offer suggestions from their optional area;
+changing that area leaves saved cards untouched. Opening Add refreshes metadata
+once without replacing the local draft. Card options include names/icons,
+entities, selected Room lights, explicit native scenes, energy periods/history,
+charging presets, media apps and secondary remote bindings. Confirming an edit
+changes the draft; it does not save or actuate an entity.
+
+The **JSON** tab edits the same document, with folding, formatting, validation,
+schema help and entity suggestions. Switching tabs preserves unknown fields,
+raw Lovelace cards, selections, order and explicit empty or absent content.
+Supported older JSON uses the backend's read-only migration preview when switching
+to Visual. Invalid or newer JSON remains untouched for correction. Card identities
+are retained when content is edited or reordered, so existing popup links keep
+pointing to the same card; an unchanged round trip retains the original shorthand.
+
+Changes remain local until **Save & Generate**. The title, save action and tabs
+stay visible while scrolling. **More actions** contains History, Discard changes
+and Open dashboard; the latter opens the saved dashboard in another tab.
+Individual-card deletion is immediate and local, without confirmation. Whole-page
+deletion requires confirmation naming that page. The final page cannot be deleted;
+landing/menu/shortcut references need an explicit replacement or removal first.
+Unresolved popup links must be repaired before deleting their owning page.
+
+The development candidate uses dashboard format **2**. Format 0 imports legacy
+room membership first; format 1 then becomes the ordered page model. Dashboard
+format, package version and Home Assistant config-entry version are separate.
+Only a successful writable generation persists conversion. The update guide
+explains exact backups, compatible history restoration and complete rollback.
 
 Each successful generation is saved under
 `dashboard/MaraoDashboard/.history`. Select **History** to access the latest 20 versions,
@@ -77,10 +178,11 @@ data:
 Use `dry_run: true` to validate the JSON and see the planned dashboard key/files
 without writing generated YAML or patching `configuration.yaml`.
 
-## Minimal JSON
+## Legacy format 0/1 input examples
 
 ```json
 {
+  "config_version": 1,
   "name": "Marao Dashboard",
   "slug": "dashboard",
   "theme": "Marao Dashboard",
@@ -92,29 +194,30 @@ without writing generated YAML or patching `configuration.yaml`.
     {
       "name": "Living Room",
       "area": "living_room",
+      "entities": ["light.living_room"],
       "icon": "mdi:sofa-outline"
     }
   ]
 }
 ```
 
-## Room overrides
+## Legacy room overrides
 
-Use `entities` or `include` to add entities, `exclude` to remove entities, and
-`overrides` to customize card labels, icons, templates, or variables. Use
+Edit `entities` to add or remove cards. Entity objects customize labels, icons,
+templates and variables. `area` never adds entities during generation. Use
 `cards` only for raw Lovelace cards that should be appended to that room view.
 
 ```json
 {
+  "config_version": 1,
   "name": "Marao Dashboard",
   "rooms": [
     {
       "name": "Office",
       "area": "office",
-      "entities": ["light.office_desk"],
-      "exclude": ["sensor.office_unused"],
-      "overrides": {
-        "light.office_desk": {
+      "entities": [
+        {
+          "entity_id": "light.office_desk",
           "name": "Desk",
           "icon": "mdi:desk-lamp",
           "template": "hc_light_card",
@@ -122,7 +225,7 @@ Use `entities` or `include` to add entities, `exclude` to remove entities, and
             "show_slider": true
           }
         }
-      },
+      ],
       "cards": [
         {
           "type": "markdown",
@@ -137,12 +240,13 @@ Use `entities` or `include` to add entities, `exclude` to remove entities, and
 The dashboard is not regenerated automatically on every restart. After adding
 entities or changing layout, update `dashboard.json` and call the service again.
 
-## Julian-style pages
+## Legacy guided-page input
 
-Rooms are the canonical list of normal entities. The overview popups and the
-Security and Media pages reuse those entities automatically, so IDs do not need
-to be duplicated. Add a `pages` section only for the optional Julian main pages
-and their page-specific roles.
+These objects are accepted as older input and converted once. Security and Media
+receive their historical selections only when the relevant older field is absent;
+explicit empty lists stay empty. Legacy Home groups become ordinary editable Home
+cards. Format-2 pages use the ordered example above and never rediscover composition
+from `legacy_page_options` or refill an absent card list.
 
 ```json
 {
@@ -211,7 +315,12 @@ fields as rooms plus `remote_entity`, `volume_remote_entity`, and `apps`.
 The generator always produces the Overview and Rooms views. It produces
 Security, Energy, Wallbox, and Media only when that object exists in `pages`.
 Overview tiles open generated Marao popups: Lights includes only `on`
-lights, while Covers includes every room cover.
+lights by default; each Entity Group can instead choose All entities. Covers,
+battery sensors and thermostats default to All entities. Add groups through the
+same card catalog on room/custom pages; see the [Entity Group guide](../usage/cards/hc_entity_group_card.md)
+for the descriptor, activity definitions, member options and popup ownership.
+Energy period readings occupy full-width cards so enlarged numbers remain intact.
+Saved selections, values, ordering and popup actions are preserved.
 
 ## Keep hand-written cards across regeneration
 
@@ -274,3 +383,35 @@ lovelace:
       show_in_sidebar: true
       filename: dashboard/MaraoDashboard/dashboard/dashboard.yaml
 ```
+
+In JSON, place the caret on or inside a list/object, then use **Collapse region**
+or **Expand region** beside Format JSON. These controls restore editor focus and
+use its normal keyboard commands. A collapsed indicator marks hidden content;
+folding changes only the view. Save & Generate still validates and saves the full
+document, including hidden fields. Unchanged Visual/JSON switches retain folds.
+
+### Energy display choices
+
+A guided Energy slot can retain its entity options while selecting a display unit
+and precision. Summary and sheet share the selection:
+
+```json
+{"today_energy": {"entity_id": "sensor.example_energy", "variables": {"display_unit": "kWh", "display_precision": 2}}}
+```
+
+Direct Lovelace period cards use card-level settings:
+
+```yaml
+type: custom:marao-energy-period-card
+entity: sensor.example_energy
+period: day
+popup: true
+display_unit: kWh
+display_precision: 2
+```
+
+The source must expose a compatible actual unit. Auto removes only the selected
+override; `0` means zero decimals. Load, room and custom cards use the same
+`variables` keys. See [unit choices and history behavior](../usage/cards/index.md#energy-reading-format).
+This additive feature does not bump the configuration format or reinterpret old
+`power_unit` labels.

@@ -1,0 +1,123 @@
+{
+  "provenance": "Frozen released input records in provenance.json; independently authored expected descriptors and popup membership, without candidate migration/generation.",
+  "groups": {
+    "v0.3.0": [
+      {
+        "template": "hc_entity_group_card",
+        "id": "overview-lights",
+        "name": "Lights",
+        "icon": "mdi:lightbulb-group-outline",
+        "entity_type": "light",
+        "popup_filter": "active",
+        "entities": [
+          "light.living_room_main"
+        ]
+      },
+      {
+        "template": "hc_entity_group_card",
+        "id": "overview-blinds",
+        "name": "Blinds",
+        "icon": "mdi:window-shutter",
+        "entity_type": "cover",
+        "popup_filter": "all",
+        "entities": [
+          "cover.living_room_blind"
+        ]
+      },
+      {
+        "template": "hc_entity_group_card",
+        "id": "overview-climate",
+        "name": "Climate",
+        "icon": "mdi:thermostat",
+        "entity_type": "climate",
+        "popup_filter": "all",
+        "entities": [
+          "climate.living_room"
+        ]
+      }
+    ],
+    "v0.3.1": [],
+    "v0.5.0": [],
+    "v0.5.1": [
+      {
+        "template": "hc_entity_group_card",
+        "id": "overview-lights",
+        "name": "Lights",
+        "icon": "mdi:lightbulb-group-outline",
+        "entity_type": "light",
+        "popup_filter": "active",
+        "entities": [
+          {
+            "entity_id": "light.marao_dashboard_test_light",
+            "name": "Main Lights"
+          },
+          {
+            "entity_id": "light.marao_dashboard_test_room_light",
+            "name": "Accent Lights"
+          },
+          {
+            "entity_id": "light.marao_dashboard_test_onoff_light",
+            "name": "On/off Light"
+          }
+        ]
+      },
+      {
+        "template": "hc_entity_group_card",
+        "id": "overview-blinds",
+        "name": "Blinds",
+        "icon": "mdi:window-shutter",
+        "entity_type": "cover",
+        "popup_filter": "all",
+        "entities": [
+          {
+            "entity_id": "cover.marao_dashboard_test_cover",
+            "name": "Blinds"
+          },
+          {
+            "entity_id": "cover.marao_dashboard_test_garage_door",
+            "name": "Garage Door"
+          },
+          {
+            "entity_id": "cover.marao_dashboard_test_open_only_door",
+            "name": "Pedestrian Gate",
+            "device_class": "door",
+            "supported_features": 1
+          }
+        ]
+      },
+      {
+        "template": "hc_entity_group_card",
+        "id": "overview-climate",
+        "name": "Climate",
+        "icon": "mdi:thermostat",
+        "entity_type": "climate",
+        "popup_filter": "all",
+        "entities": [
+          {
+            "entity_id": "climate.marao_dashboard_test_multi_mode_climate",
+            "name": "Thermostat"
+          },
+          {
+            "entity_id": "climate.marao_dashboard_test_dual_target_climate",
+            "name": "Dual target thermostat"
+          }
+        ]
+      },
+      {
+        "template": "hc_entity_group_card",
+        "id": "overview-maintenance",
+        "name": "Maintenance",
+        "icon": "mdi:wrench",
+        "entity_type": "battery",
+        "popup_filter": "all",
+        "entities": [
+          {
+            "entity_id": "sensor.marao_dashboard_test_battery",
+            "name": "Battery",
+            "device_class": "battery"
+          }
+        ]
+      }
+    ]
+  }
+}

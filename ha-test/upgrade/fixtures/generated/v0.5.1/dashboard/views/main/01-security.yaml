@@ -1,0 +1,143 @@
+title: Security
+path: security
+icon: mdi:shield-home
+theme: Marao Dashboard
+cards:
+  # marao:generated:start
+  - type: custom:marao-card
+    template: hc_security_card
+    entity: alarm_control_panel.marao_dashboard_test_alarm
+    name: Marao Dashboard Test Alarm
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_access_card
+      entity: cover.marao_dashboard_test_garage_door
+      name: Garage Door
+      variables:
+        popup_hash: '#access-cover-marao-dashboard-test-garage-door'
+    - type: custom:marao-card
+      template: hc_access_slide_action_card
+      entity: cover.marao_dashboard_test_open_only_door
+      name: Pedestrian Gate
+      icon: mdi:door-open
+      variables:
+        action_service: cover.open_cover
+        action_requires_hold: false
+        action_label_key: access.open
+        action_color: var(--color-red)
+    - type: custom:marao-card
+      template: hc_access_card
+      entity: lock.marao_dashboard_test_lock
+      name: Front Lock
+      variables:
+        popup_hash: '#access-lock-marao-dashboard-test-lock'
+  - type: custom:marao-card
+    template: hc_switch_card
+    entity: switch.marao_dashboard_test_switch
+    name: Porch Lights
+    show_state: false
+    tap_action:
+      action: toggle
+      haptic: heavy
+  - type: custom:marao-card
+    template: hc_access_card
+    entity: lock.marao_dashboard_test_lock
+    name: Lock action
+    variables:
+      popup_hash: '#access-lock-marao-dashboard-test-lock'
+  - type: custom:marao-card
+    template: hc_access_card
+    entity: cover.marao_dashboard_test_garage_door
+    name: Garage action
+    variables:
+      popup_hash: '#access-cover-marao-dashboard-test-garage-door'
+  - type: custom:marao-card
+    template: hc_access_slide_action_card
+    entity: cover.marao_dashboard_test_open_only_door
+    name: Pedestrian gate action
+    icon: mdi:door-open
+    variables:
+      action_service: cover.open_cover
+      action_requires_hold: false
+      action_label_key: access.open
+      action_color: var(--color-red)
+  - type: custom:marao-popup-card
+    hash: '#access-cover-marao-dashboard-test-garage-door'
+    entity: cover.marao_dashboard_test_garage_door
+    name: Garage action
+    icon: mdi:garage
+    show_icon: true
+    show_name: true
+    show_state: true
+    height: 420px
+    max_height: 80dvh
+    cards:
+    - type: grid
+      columns: 1
+      square: false
+      cards:
+      - type: custom:marao-card
+        template: hc_access_slide_action_card
+        entity: cover.marao_dashboard_test_garage_door
+        name: Open
+        icon: mdi:garage-open
+        variables:
+          action_service: cover.open_cover
+          action_requires_hold: false
+          action_label_key: access.open
+          action_color: var(--color-red)
+      - type: custom:marao-card
+        template: hc_access_action_card
+        entity: cover.marao_dashboard_test_garage_door
+        name: Close
+        icon: mdi:garage
+        variables:
+          action_service: cover.close_cover
+          action_requires_hold: false
+          action_label_key: common.close
+          action_color: var(--color-green)
+  - type: custom:marao-popup-card
+    hash: '#access-lock-marao-dashboard-test-lock'
+    entity: lock.marao_dashboard_test_lock
+    name: Lock action
+    icon: mdi:lock
+    show_icon: true
+    show_name: true
+    show_state: true
+    height: 420px
+    max_height: 80dvh
+    cards:
+    - type: grid
+      columns: 1
+      square: false
+      cards:
+      - type: custom:marao-card
+        template: hc_access_slide_action_card
+        entity: lock.marao_dashboard_test_lock
+        name: Unlock
+        icon: mdi:lock-open-variant
+        variables:
+          action_service: lock.unlock
+          action_requires_hold: false
+          action_label_key: common.unlock
+          action_color: var(--color-red)
+      - type: custom:marao-card
+        template: hc_access_action_card
+        entity: lock.marao_dashboard_test_lock
+        name: Lock
+        icon: mdi:lock
+        variables:
+          action_service: lock.lock
+          action_requires_hold: false
+          action_label_key: common.lock
+          action_color: var(--color-green)
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/dashboard/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

@@ -10,6 +10,8 @@ from typing import Iterable
 
 import yaml
 
+from .generator import _write_text, validate_dashboard_key
+
 
 @dataclass(frozen=True)
 class ConfigPatchResult:
@@ -72,6 +74,64 @@ def _entry_lines(
     ]
 
 
+class _RegistrationLoader(yaml.BaseLoader):
+    def construct_mapping(self, node, deep=False):
+        keys = [self.construct_object(key, deep=deep) for key, _ in node.value]
+        if any(not isinstance(key, str) for key in keys) or len(keys) != len(set(keys)):
+            raise ValueError("Duplicate configuration keys prevent safe dashboard registration")
+        return super().construct_mapping(node, deep=deep)
+
+
+def _dashboard_registrations(config_path: str | Path) -> dict:
+    path = Path(config_path)
+    if not path.exists():
+        return {}
+    try:
+        config = yaml.load(path.read_bytes().decode("utf-8"), Loader=_RegistrationLoader) or {}
+    except (yaml.YAMLError, UnicodeError) as err:
+        raise ValueError("Cannot read the dashboard registration in configuration.yaml") from err
+    if not isinstance(config, dict):
+        raise ValueError("configuration.yaml must contain a mapping")
+    lovelace = config.get("lovelace") or {}
+    if not isinstance(lovelace, dict):
+        raise ValueError("Dashboard registration requires an inline Lovelace mapping")
+    dashboards = lovelace.get("dashboards") or {}
+    if not isinstance(dashboards, dict):
+        raise ValueError("Dashboard registration requires an inline dashboards mapping")
+    return dashboards
+
+
+def registered_dashboard_key(config_path: str | Path, filename: str) -> str | None:
+    """Find the existing route by its exact owned filename without loading includes."""
+    dashboards = _dashboard_registrations(config_path)
+    keys = [key for key, entry in dashboards.items()
+            if isinstance(entry, dict) and entry.get("mode") == "yaml" and entry.get("filename") == filename]
+    if len(keys) > 1:
+        raise ValueError("Multiple dashboard routes point to the same Marao file")
+    return validate_dashboard_key(keys[0]) if keys else None
+
+
+def validate_dashboard_registration(
+    config_path: str | Path, dashboard_key: str, filename: str,
+    previous_dashboard_key: str | None = None, previous_filename: str | None = None,
+) -> None:
+    """Reject routes that do not identify this source's exact current or planned file."""
+    validate_dashboard_key(dashboard_key)
+    dashboards = _dashboard_registrations(config_path)
+    for key in dict.fromkeys([dashboard_key, previous_dashboard_key]):
+        if key is None:
+            continue
+        validate_dashboard_key(key)
+        if key not in dashboards:
+            continue
+        entry = dashboards[key]
+        allowed = {filename} if key == dashboard_key else set()
+        if key == previous_dashboard_key and previous_filename is not None:
+            allowed.add(previous_filename)
+        if not isinstance(entry, dict) or entry.get("mode") != "yaml" or entry.get("filename") not in allowed:
+            raise ValueError("Dashboard route is already registered to unrelated configuration")
+
+
 def patch_lovelace_dashboard(
     config_path: str | Path,
     dashboard_key: str,
@@ -80,6 +140,7 @@ def patch_lovelace_dashboard(
     filename: str,
     show_in_sidebar: bool = True,
     previous_dashboard_key: str | None = None,
+    previous_filename: str | None = None,
 ) -> ConfigPatchResult:
     """Add or update a YAML Lovelace dashboard entry in configuration.yaml.
 
@@ -87,8 +148,9 @@ def patch_lovelace_dashboard(
     intact. A timestamped backup is created only when a write is needed.
     """
 
+    validate_dashboard_registration(config_path, dashboard_key, filename, previous_dashboard_key, previous_filename)
     path = Path(config_path)
-    source = path.read_text(encoding="utf-8") if path.exists() else ""
+    source = path.read_bytes().decode("utf-8") if path.exists() else ""
     lines = source.splitlines(keepends=True)
     entry = _entry_lines(dashboard_key, title, icon, filename, show_in_sidebar)
 
@@ -124,25 +186,16 @@ def patch_lovelace_dashboard(
     key_lines = [f"{dashboard_key}:"]
     if previous_dashboard_key and previous_dashboard_key != dashboard_key:
         key_lines.append(f"{previous_dashboard_key}:")
-    existing_start = None
-    for key_line in key_lines:
-        for index in range(dashboards_start + 1, dashboards_end):
-            if _line_indent(lines[index]) == 4 and lines[index].strip() == key_line:
-                existing_start = index
-                break
-        if existing_start is not None:
-            break
-
-    if existing_start is None:
+    starts = [index for index in range(dashboards_start + 1, dashboards_end)
+              if _line_indent(lines[index]) == 4 and lines[index].strip() in key_lines]
+    if not starts:
         lines[dashboards_end:dashboards_end] = entry
     else:
-        existing_end = dashboards_end
-        for index in range(existing_start + 1, dashboards_end):
-            stripped = lines[index].strip()
-            if stripped and not stripped.startswith("#") and _line_indent(lines[index]) <= 4:
-                existing_end = index
-                break
-        lines[existing_start:existing_end] = entry
+        ranges = [(start, next((index for index in range(start + 1, dashboards_end)
+                               if lines[index].strip() and not lines[index].lstrip().startswith("#")
+                               and _line_indent(lines[index]) <= 4), dashboards_end)) for start in starts]
+        for start, end in reversed(ranges):
+            lines[start:end] = entry if start == starts[0] else []
 
     return _write_if_changed(path, source, lines, dashboard_key, filename)
 
@@ -155,7 +208,7 @@ def remove_lovelace_dashboard(
     """Remove a legacy dashboard only when it still points at our file."""
 
     path = Path(config_path)
-    source = path.read_text(encoding="utf-8") if path.exists() else ""
+    source = path.read_bytes().decode("utf-8") if path.exists() else ""
     lines = source.splitlines(keepends=True)
     lovelace_start, lovelace_end = _section_bounds(lines, "lovelace")
     if lovelace_start is None:
@@ -223,7 +276,7 @@ def patch_frontend_themes(
     """Ensure Home Assistant loads themes and frontend modules."""
 
     path = Path(config_path)
-    source = path.read_text(encoding="utf-8") if path.exists() else ""
+    source = path.read_bytes().decode("utf-8") if path.exists() else ""
     lines = source.splitlines(keepends=True)
     entry = f"  themes: !include_dir_merge_named {themes_path}\n"
     modules = tuple(extra_module_urls or ())
@@ -403,7 +456,9 @@ def _write_if_changed(
         shutil.copy2(path, backup)
         backup_path = str(backup)
 
-    path.write_text(updated, encoding="utf-8")
+    if (path.read_bytes().decode("utf-8") if path.exists() else "") != original:
+        raise ValueError("Home Assistant configuration changed during Marao preflight")
+    _write_text(path, updated)
     return ConfigPatchResult(True, backup_path, dashboard_key, filename)
 
 
@@ -422,5 +477,7 @@ def _write_frontend_if_changed(
         shutil.copy2(path, backup)
         backup_path = str(backup)
 
-    path.write_text(updated, encoding="utf-8")
+    if (path.read_bytes().decode("utf-8") if path.exists() else "") != original:
+        raise ValueError("Home Assistant configuration changed during Marao preflight")
+    _write_text(path, updated)
     return FrontendPatchResult(True, backup_path, themes_path)

@@ -2,12 +2,63 @@ from __future__ import annotations
 
 from pathlib import Path
 import textwrap
+import pytest
 
 from custom_components.marao_dashboard.config_patch import (
     patch_frontend_themes,
     patch_lovelace_dashboard,
     remove_lovelace_dashboard,
+    registered_dashboard_key,
+    validate_dashboard_registration,
 )
+
+
+@pytest.mark.parametrize("entry", [
+    "      mode: yaml\n      filename: manual.yaml\n",
+    "      mode: storage\n      filename: owned.yaml\n",
+    "      mode: yaml\n      filename: owned.yaml\n    chosen-route:\n      mode: yaml\n      filename: manual.yaml\n",
+])
+def test_registration_collision_rejects_before_backup_or_patch(tmp_path, entry):
+    file = tmp_path / "configuration.yaml"
+    file.write_bytes(("# preserved\nlovelace:\n  dashboards:\n    chosen-route:\n" + entry).replace("\n", "\r\n").encode())
+    original = file.read_bytes()
+    with pytest.raises(ValueError, match="unrelated configuration|Duplicate configuration keys"):
+        patch_lovelace_dashboard(file, "chosen-route", "Marao", "mdi:home", "owned.yaml")
+    assert file.read_bytes() == original
+    assert list(tmp_path.iterdir()) == [file]
+
+
+def test_registration_rename_removes_only_exact_owned_old_route(tmp_path):
+    file = tmp_path / "configuration.yaml"
+    file.write_text("lovelace:\n  dashboards:\n    old-route:\n      mode: yaml\n      filename: old.yaml\n    keep-route:\n      mode: yaml\n      filename: manual.yaml\n    new-route:\n      mode: yaml\n      filename: new.yaml\n")
+    original = file.read_bytes()
+    with pytest.raises(ValueError, match="unrelated configuration"):
+        validate_dashboard_registration(file, "new-route", "new.yaml", "keep-route", "old.yaml")
+    assert file.read_bytes() == original
+    result = patch_lovelace_dashboard(file, "new-route", "Marao", "mdi:home", "new.yaml",
+                                      previous_dashboard_key="old-route", previous_filename="old.yaml")
+    assert result.changed
+    assert registered_dashboard_key(file, "old.yaml") is None
+    assert registered_dashboard_key(file, "new.yaml") == "new-route"
+    assert "    keep-route:\n      mode: yaml\n      filename: manual.yaml\n" in file.read_text()
+
+
+def test_existing_dashboard_route_uses_exact_filename_and_preserves_source(tmp_path):
+    import pytest
+    file = tmp_path / "configuration.yaml"
+    filename = "dashboard/MaraoDashboard/dashboard/dashboard.yaml"
+    source = "homeassistant:\n  packages: !include_dir_named packages\nlovelace:\n  dashboards:\n    chosen-route:\n      mode: yaml\n      filename: " + filename + "\n    unrelated:\n      mode: yaml\n      filename: manual.yaml\n"
+    file.write_bytes(source.replace("\n", "\r\n").encode())
+    before = file.read_bytes()
+    assert registered_dashboard_key(file, filename) == "chosen-route"
+    assert registered_dashboard_key(file, "other/dashboard.yaml") is None
+    assert file.read_bytes() == before
+    file.write_text(source + "    ambiguous:\n      mode: yaml\n      filename: " + filename + "\n")
+    with pytest.raises(ValueError, match="Multiple dashboard routes"):
+        registered_dashboard_key(file, filename)
+    file.write_text("lovelace:\n  dashboards: !include dashboards.yaml\n")
+    with pytest.raises(ValueError, match="inline dashboards mapping"):
+        registered_dashboard_key(file, filename)
 
 
 def test_add_dashboard_preserves_includes(tmp_path: Path) -> None:
@@ -74,6 +125,8 @@ def test_update_existing_dashboard_is_idempotent(tmp_path: Path) -> None:
         "New",
         "mdi:view-dashboard",
         "dashboard/MaraoDashboard/new/dashboard.yaml",
+        previous_dashboard_key="marao-dashboard-old",
+        previous_filename="dashboard/old.yaml",
     )
     second = patch_lovelace_dashboard(
         config_path,
@@ -275,3 +328,11 @@ def test_patch_frontend_themes_removes_empty_legacy_module_list(tmp_path: Path) 
     updated = config_path.read_text(encoding="utf-8")
     assert "extra_module_url:" not in updated
     assert "themes: !include_dir_merge_named themes" in updated
+
+
+def test_dashboard_patch_preserves_unrelated_crlf_bytes(tmp_path):
+    config = tmp_path / "configuration.yaml"
+    untouched = b"default_config:\r\n# unrelated comment\r\n"
+    config.write_bytes(untouched)
+    patch_lovelace_dashboard(config, "marao-dashboard", "Marao", "mdi:home", "dashboard/MaraoDashboard/dashboard/dashboard.yaml")
+    assert config.read_bytes().startswith(untouched)

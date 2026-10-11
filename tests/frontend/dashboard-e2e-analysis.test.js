@@ -10,6 +10,7 @@ const {
   normalizedPathname,
   scrollDashboard,
 } = require("../test-ha-dashboard-e2e.js");
+const { visibleBounds } = require("../test-ha-room-cards.js");
 
 const dashboard = {
   views: [
@@ -122,7 +123,10 @@ function scrollPage({ settle = () => {}, blocked = false } = {}) {
   };
   const handle = { evaluate: (run, value) => run(element, value), dispose: () => { disposed = true; } };
   const page = {
-    locator: () => ({ first: () => ({ evaluateHandle: () => handle }) }),
+    locator: () => ({
+      first: () => ({ evaluateHandle: () => handle }),
+      evaluateAll: (run) => run([]),
+    }),
     evaluate: () => {},
     waitForTimeout: () => { settle(element, ++frames); visits.push(element.scrollTop); },
     screenshot: () => {},
@@ -166,4 +170,35 @@ test("each scroll segment settles and verifies lazy content before capturing it"
     onSegment: () => { ready = true; },
   });
   assert.ok(captures > 1);
+});
+
+test("dashboard scrolling reports title defects and disposes its scroll handle", async () => {
+  const fixture = scrollPage();
+  const locator = fixture.page.locator();
+  fixture.page.locator = () => ({
+    ...locator,
+    evaluateAll: () => ["Example: title uses 120px of 240px content width"],
+  });
+  await assert.rejects(() => scrollDashboard(fixture.page), /Example: title uses 120px of 240px content width/);
+  assert.equal(fixture.element.scrollTop, 0);
+  assert.equal(fixture.disposed(), true);
+});
+
+test("room geometry is read atomically and rejects an invisible element", async () => {
+  const rect = { x: 8, y: 40, width: 120, height: 96 };
+  const locator = {
+    boundingBox: () => { throw new Error('Separate visibility and geometry reads can race'); },
+    evaluate: run => run({ localName: 'marao-card', getBoundingClientRect: () => ({ ...rect, toJSON: () => ({ ...rect }) }) }),
+  };
+  assert.deepEqual(await visibleBounds(locator), rect);
+  rect.height = 0;
+  await assert.rejects(() => visibleBounds(locator), /no visible geometry: marao-card/);
+  const host = {
+    evaluate: (run, selector) => run({ shadowRoot: { querySelector: value => {
+      assert.equal(value, '[data-room-lights-off]');
+      return { localName: 'button', getBoundingClientRect: () => ({ width: 48, height: 48, toJSON: () => ({ width: 48, height: 48 }) }) };
+    } } }, selector),
+  };
+  assert.deepEqual(await visibleBounds(host, '[data-room-lights-off]'), { width: 48, height: 48 });
+  await assert.rejects(() => visibleBounds({ evaluate: (run, selector) => run({ shadowRoot: { querySelector: () => null }, querySelector: () => null }, selector) }, 'nav'), /element is missing: nav/);
 });

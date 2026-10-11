@@ -2,27 +2,7 @@
   "name": "Marao Dashboard",
   "slug": "dashboard",
   "theme": "Marao Dashboard",
-  "icon": "mdi:home",
-  "overview": {
-    "weather_entity": "sensor.marao_dashboard_test_weather",
-    "scenes": [
-      {
-        "entity_id": "input_boolean.marao_dashboard_test_one",
-        "name": "Relax",
-        "icon": "mdi:sofa"
-      },
-      {
-        "entity_id": "input_boolean.marao_dashboard_test_two",
-        "name": "Movie",
-        "icon": "mdi:movie-open"
-      },
-      {
-        "entity_id": "input_boolean.marao_dashboard_test_three",
-        "name": "Night",
-        "icon": "mdi:weather-night"
-      }
-    ]
-  },
+  "icon": "marao_dashboard:mountain",
   "navigation": [
     "overview",
     "rooms",
@@ -35,80 +15,779 @@
       "icon_selected": "mdi:test-tube"
     }
   ],
-  "rooms": [
+  "config_version": 2,
+  "landing_page": "overview",
+  "pages": [
+    {
+      "id": "overview",
+      "name": "Home",
+      "name_key": "nav.home",
+      "path": "overview",
+      "icon": "mdi:home-variant",
+      "output_path": "views/main/00-overview.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "weather.marao_dashboard_test_weather",
+              "template": "hc_weather_card",
+              "variables": {
+                "show_forecast": true
+              },
+              "id": "card-1"
+            }
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "template": "hc_entity_group_card",
+              "id": "overview-lights",
+              "name": "Lights",
+              "icon": "mdi:lightbulb-group-outline",
+              "entity_type": "light",
+              "popup_filter": "active",
+              "entities": [
+                {
+                  "entity_id": "light.marao_dashboard_test_light",
+                  "name": "Living room ceiling lighting",
+                  "variables": {
+                    "custom_label": "Reading corner"
+                  }
+                },
+                {
+                  "entity_id": "light.marao_dashboard_test_room_light",
+                  "name": "Accent Lights"
+                },
+                {
+                  "entity_id": "light.marao_dashboard_test_onoff_light",
+                  "name": "On/off Light"
+                }
+              ],
+              "variables": {
+                "popup_hash": "#overview-lights"
+              }
+            },
+            {
+              "template": "hc_entity_group_card",
+              "id": "overview-blinds",
+              "name": "Blinds",
+              "icon": "mdi:window-shutter",
+              "entity_type": "cover",
+              "popup_filter": "all",
+              "entities": [
+                {
+                  "entity_id": "cover.marao_dashboard_test_cover",
+                  "name": "Blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_garage_door",
+                  "name": "Garage Door"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_open_only_door",
+                  "name": "Pedestrian Gate",
+                  "device_class": "door",
+                  "supported_features": 1
+                }
+              ],
+              "variables": {
+                "popup_hash": "#overview-blinds"
+              }
+            },
+            {
+              "template": "hc_entity_group_card",
+              "id": "overview-climate",
+              "name": "Climate",
+              "icon": "mdi:thermostat",
+              "entity_type": "climate",
+              "popup_filter": "all",
+              "entities": [
+                {
+                  "entity_id": "climate.marao_dashboard_test_multi_mode_climate",
+                  "name": "Thermostat"
+                },
+                {
+                  "entity_id": "climate.marao_dashboard_test_dual_target_climate",
+                  "name": "Dual target thermostat"
+                },
+                {
+                  "entity_id": "climate.marao_dashboard_test_feedback_delayed_confirmation",
+                  "name": "Delayed thermostat"
+                }
+              ],
+              "variables": {
+                "popup_hash": "#overview-climate"
+              }
+            },
+            {
+              "template": "hc_entity_group_card",
+              "id": "overview-maintenance",
+              "name": "Maintenance",
+              "icon": "mdi:wrench",
+              "entity_type": "battery",
+              "popup_filter": "all",
+              "entities": [
+                {
+                  "entity_id": "sensor.marao_dashboard_test_battery",
+                  "name": "Battery",
+                  "template": "hc_battery_card"
+                }
+              ],
+              "variables": {
+                "popup_hash": "#overview-maintenance"
+              }
+            },
+            {
+              "id": "card-6",
+              "template": "hc_scene_collection_card",
+              "name": "Scenes",
+              "name_key": "overview.scenes",
+              "icon": "mdi:palette-outline",
+              "entities": [
+                "scene.marao_dashboard_test_native_scene",
+                {
+                  "entity_id": "input_boolean.marao_dashboard_test_one",
+                  "name": "Relax",
+                  "icon": "mdi:sofa"
+                },
+                {
+                  "entity_id": "input_boolean.marao_dashboard_test_two",
+                  "name": "Movie",
+                  "icon": "mdi:movie-open"
+                },
+                {
+                  "entity_id": "input_boolean.marao_dashboard_test_three",
+                  "name": "Night",
+                  "icon": "mdi:weather-night"
+                }
+              ],
+              "variables": {
+                "popup_hash": "#overview-scenes"
+              }
+            },
+            {
+              "id": "studio-shortcut",
+              "template": "hc_navigation_card",
+              "name": "Studio",
+              "icon": "mdi:desk",
+              "show_state": false,
+              "tap_action": {
+                "action": "navigate",
+                "navigation_path": "/marao-dashboard/studio"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rooms",
+      "name": "Rooms",
+      "name_key": "nav.rooms",
+      "path": "rooms",
+      "icon": "mdi:sofa",
+      "output_path": "views/main/02-rooms.yaml",
+      "sections": [
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "id": "card-1",
+              "template": "hc_room_card",
+              "entity_id": "light.marao_dashboard_test_light",
+              "name": "Living Room",
+              "icon": "mdi:sofa-outline",
+              "page": "living-room",
+              "variables": {
+                "light_entities": [
+                  "light.marao_dashboard_test_light",
+                  "light.marao_dashboard_test_room_light",
+                  "light.marao_dashboard_test_onoff_light"
+                ],
+                "lights_target_entity": "light.marao_dashboard_test_light"
+              }
+            },
+            {
+              "id": "card-2",
+              "template": "hc_room_card",
+              "entity_id": "camera.marao_dashboard_test_camera",
+              "name": "Entrance",
+              "icon": "mdi:door",
+              "page": "entrance",
+              "variables": {
+                "light_entities": [],
+                "lights_target_entity": "camera.marao_dashboard_test_camera"
+              }
+            },
+            {
+              "id": "card-3",
+              "template": "hc_room_card",
+              "entity_id": "switch.marao_dashboard_test_switch",
+              "name": "Utility Room",
+              "icon": "mdi:garage",
+              "page": "utility-room",
+              "variables": {
+                "light_entities": [],
+                "lights_target_entity": "switch.marao_dashboard_test_switch"
+              }
+            },
+            {
+              "id": "card-4",
+              "template": "hc_room_card",
+              "name": "Empty Room",
+              "icon": "mdi:bed",
+              "page": "empty-room",
+              "variables": {
+                "light_entities": [],
+                "lights_target_entity": ""
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "name": "Security",
+      "name_key": "nav.security",
+      "path": "security",
+      "icon": "mdi:shield-home",
+      "output_path": "views/main/01-security.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "alarm_control_panel.marao_dashboard_test_alarm",
+              "template": "hc_security_card",
+              "name": "Marao Dashboard Test Alarm",
+              "id": "card-1"
+            }
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "entity_id": "cover.marao_dashboard_test_garage_door",
+              "name": "Garage Door",
+              "template": "hc_access_card",
+              "id": "card-2"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_open_only_door",
+              "name": "Pedestrian Gate",
+              "device_class": "door",
+              "supported_features": 1,
+              "template": "hc_access_card",
+              "id": "card-3"
+            },
+            {
+              "entity_id": "lock.marao_dashboard_test_lock",
+              "name": "Front Lock",
+              "template": "hc_access_card",
+              "id": "card-4"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "switch.marao_dashboard_test_switch",
+              "name": "Porch Lights",
+              "template": "hc_access_hold_action_card",
+              "id": "card-5",
+              "show_state": false,
+              "tap_action": {
+                "action": "toggle",
+                "haptic": "heavy"
+              }
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "lock.marao_dashboard_test_lock",
+              "name": "Lock action",
+              "template": "hc_access_card",
+              "id": "card-6"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "cover.marao_dashboard_test_garage_door",
+              "name": "Garage action",
+              "device_class": "garage",
+              "template": "hc_access_card",
+              "id": "card-7"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "cover.marao_dashboard_test_open_only_door",
+              "name": "Pedestrian gate action",
+              "device_class": "door",
+              "supported_features": 1,
+              "template": "hc_access_card",
+              "id": "card-8"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "energy",
+      "name": "Energy",
+      "name_key": "nav.energy",
+      "path": "energy",
+      "icon": "mdi:lightning-bolt",
+      "output_path": "views/main/03-energy.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "sensor.marao_dashboard_test_graph_history",
+              "name": "House Power",
+              "variables": {
+                "show_graph_fill": true,
+                "show_graph_line": true,
+                "show_icon": true,
+                "display_unit": "kW",
+                "display_precision": 2,
+                "history_popup": true,
+                "popup_hash": "#energy-house-power"
+              },
+              "template": "hc_graph_card",
+              "icon": "mdi:flash",
+              "id": "card-1"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "sensor.marao_dashboard_test_month_energy",
+              "template": "hc_energy_period_card",
+              "name": "Month Power",
+              "icon": "mdi:flash",
+              "variables": {
+                "period": "month",
+                "popup_hash": "#energy-month-power"
+              },
+              "name_key": "energy.month_power",
+              "id": "card-2"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "sensor.marao_dashboard_test_energy_format_mixed",
+              "name": "Today Energy",
+              "variables": {
+                "period": "day",
+                "popup_hash": "#energy-today-power",
+                "display_unit": "kWh",
+                "display_precision": 2
+              },
+              "template": "hc_energy_period_card",
+              "icon": "mdi:flash-outline",
+              "id": "card-3"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "sensor.marao_dashboard_test_month_cost",
+              "template": "hc_energy_period_card",
+              "name": "Month Cost",
+              "icon": "mdi:currency-eur",
+              "variables": {
+                "period": "month",
+                "popup_hash": "#energy-month-cost"
+              },
+              "name_key": "energy.month_cost",
+              "id": "card-4"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "sensor.marao_dashboard_test_energy_format_cost",
+              "name": "Today Cost",
+              "variables": {
+                "period": "day",
+                "popup_hash": "#energy-today-cost",
+                "display_precision": 2
+              },
+              "template": "hc_energy_period_card",
+              "icon": "mdi:cash-clock",
+              "id": "card-5"
+            }
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "entity_id": "sensor.marao_dashboard_test_graph_history",
+              "name": "House load",
+              "variables": {
+                "display_unit": "kW",
+                "display_precision": 6,
+                "toggle_entity": "switch.marao_dashboard_test_switch"
+              },
+              "template": "hc_toggle_graph_card",
+              "id": "card-6",
+              "icon": null
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "sensor.marao_dashboard_test_power",
+              "name": "Solar Power",
+              "template": "hc_sensor_card",
+              "id": "card-7"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "binary_sensor.marao_dashboard_test_washing_machine",
+              "name": "Washer",
+              "template": "hc_sensor_card",
+              "id": "card-8"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wallbox",
+      "name": "Wallbox",
+      "name_key": "nav.wallbox",
+      "path": "wallbox",
+      "icon": "mdi:ev-station",
+      "output_path": "views/main/04-wallbox.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "sensor.marao_dashboard_test_wallbox_status",
+              "name": "Wallbox",
+              "template": "hc_base_card",
+              "icon": "mdi:ev-station",
+              "id": "card-1"
+            }
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "entity_id": "sensor.marao_dashboard_test_wallbox_power",
+              "name": "Charging Power",
+              "variables": {
+                "show_graph_fill": true,
+                "show_graph_line": true,
+                "show_icon": true,
+                "display_unit": "kW",
+                "display_precision": 2
+              },
+              "template": "hc_graph_card",
+              "icon": "mdi:flash",
+              "id": "card-2"
+            },
+            {
+              "entity_id": "sensor.marao_dashboard_test_wallbox_maximum_current",
+              "name": "Maximum Current",
+              "template": "hc_graph_card",
+              "icon": "mdi:current-ac",
+              "variables": {
+                "show_graph_fill": true,
+                "show_graph_line": true,
+                "show_icon": true
+              },
+              "id": "card-3"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "input_number.marao_dashboard_test_wallbox_current",
+              "name": "Charging Current",
+              "template": "hc_wallbox_current_card",
+              "variables": {
+                "shortcuts": [
+                  6,
+                  12,
+                  16
+                ]
+              },
+              "id": "card-4"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "input_boolean.marao_dashboard_test_wallbox_pause",
+              "name": "Pause Charging",
+              "template": "hc_switch_card",
+              "icon": "mdi:pause-circle",
+              "id": "card-5"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "media",
+      "name": "Media",
+      "name_key": "nav.media",
+      "path": "media",
+      "icon": "mdi:television-play",
+      "output_path": "views/main/05-media.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "media_player.marao_dashboard_test_apple_tv",
+              "name": "Living Room Apple TV",
+              "apple_tv": {
+                "remote_entity": "remote.marao_dashboard_test_apple_tv",
+                "volume_remote_entity": "media_player.marao_dashboard_test_apple_tv",
+                "apps": [
+                  {
+                    "name": "YouTube",
+                    "source": "YouTube",
+                    "icon": "mdi:youtube"
+                  },
+                  {
+                    "name": "Plex",
+                    "source": "Plex",
+                    "icon": "mdi:plex"
+                  }
+                ]
+              },
+              "template": "hc_media_card",
+              "id": "card-1"
+            }
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "name": "YouTube",
+              "icon": "mdi:youtube",
+              "id": "card-2",
+              "template": "hc_media_app_card",
+              "entity_id": "media_player.marao_dashboard_test_apple_tv",
+              "show_state": false,
+              "variables": {
+                "app_source": "YouTube"
+              }
+            },
+            {
+              "name": "Plex",
+              "icon": "mdi:plex",
+              "id": "card-3",
+              "template": "hc_media_app_card",
+              "entity_id": "media_player.marao_dashboard_test_apple_tv",
+              "show_state": false,
+              "variables": {
+                "app_source": "Plex"
+              }
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "media_player.marao_dashboard_test_audio",
+              "name": "Living Room Music",
+              "apple_tv": false,
+              "template": "hc_media_card",
+              "id": "card-4"
+            }
+          ]
+        }
+      ]
+    },
     {
       "name": "Living Room",
       "path": "living-room",
       "icon": "mdi:sofa-outline",
-      "entities": {
-        "light": [
-          {
-            "entity_id": "light.marao_dashboard_test_light",
-            "name": "Main Lights"
-          },
-          {
-            "entity_id": "light.marao_dashboard_test_room_light",
-            "name": "Accent Lights"
-          },
-          {
-            "entity_id": "light.marao_dashboard_test_onoff_light",
-            "name": "On/off Light"
-          }
-        ],
-        "cover": [
-          {
-            "entity_id": "cover.marao_dashboard_test_cover",
-            "name": "Blinds"
-          }
-        ],
-        "climate": [
-          {
-            "entity_id": "climate.marao_dashboard_test_multi_mode_climate",
-            "name": "Thermostat"
-          },
-          {
-            "entity_id": "climate.marao_dashboard_test_dual_target_climate",
-            "name": "Dual target thermostat"
-          }
-        ],
-        "fan": [
-          {
-            "entity_id": "fan.marao_dashboard_test_fan",
-            "name": "Ceiling Fan"
-          },
-          {
-            "entity_id": "fan.marao_dashboard_test_onoff_fan",
-            "name": "Single-speed Fan"
-          }
-        ],
-        "sensor": [
-          {
-            "entity_id": "sensor.marao_dashboard_test_temperature",
-            "name": "Temperature"
-          },
-          {
-            "entity_id": "sensor.marao_dashboard_test_humidity",
-            "name": "Humidity"
-          }
-        ]
-      },
-      "cards": [
+      "area": "marao_fixture_living_room",
+      "id": "living-room",
+      "output_path": "views/rooms/00-living-room.yaml",
+      "subview": true,
+      "sections": [
         {
-          "type": "custom:marao-card",
-          "template": "hc_scene_card",
-          "entity": "input_select.marao_dashboard_test_scene",
-          "name": "Living Room scene"
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Living Room",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
         },
         {
-          "type": "custom:marao-card",
-          "template": "hc_glance_card",
-          "name": "Living Room readings",
-          "variables": {
-            "entity1": "sensor.marao_dashboard_test_temperature",
-            "entity1_name": "Temperature",
-            "entity2": "sensor.marao_dashboard_test_humidity",
-            "entity2_name": "Humidity"
-          }
+          "entities": {
+            "light": [
+              {
+                "entity_id": "light.marao_dashboard_test_light",
+                "name": "Living room ceiling lighting",
+                "variables": {
+                  "custom_label": "Reading corner"
+                }
+              },
+              {
+                "entity_id": "light.marao_dashboard_test_room_light",
+                "name": "Accent Lights"
+              },
+              {
+                "entity_id": "light.marao_dashboard_test_onoff_light",
+                "name": "On/off Light"
+              }
+            ],
+            "cover": [
+              {
+                "entity_id": "cover.marao_dashboard_test_cover",
+                "name": "Blinds"
+              }
+            ],
+            "climate": [
+              {
+                "entity_id": "climate.marao_dashboard_test_multi_mode_climate",
+                "name": "Thermostat"
+              },
+              {
+                "entity_id": "climate.marao_dashboard_test_dual_target_climate",
+                "name": "Dual target thermostat"
+              },
+              {
+                "entity_id": "climate.marao_dashboard_test_feedback_delayed_confirmation",
+                "name": "Delayed thermostat"
+              }
+            ],
+            "fan": [
+              {
+                "entity_id": "fan.marao_dashboard_test_fan",
+                "name": "Ceiling Fan"
+              },
+              {
+                "entity_id": "fan.marao_dashboard_test_onoff_fan",
+                "name": "Single-speed Fan"
+              }
+            ],
+            "sensor": [
+              {
+                "entity_id": "sensor.marao_dashboard_test_temperature",
+                "name": "Temperature"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_humidity",
+                "name": "Humidity"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_energy_format_mixed",
+                "name": "Room energy in kWh",
+                "template": "hc_graph_card",
+                "variables": {
+                  "display_unit": "kWh",
+                  "display_precision": 2
+                }
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_energy_format_mixed",
+                "name": "Room energy in Wh",
+                "template": "hc_sensor_card",
+                "variables": {
+                  "display_unit": "Wh",
+                  "display_precision": 6
+                }
+              }
+            ],
+            "entity_group": [
+              {
+                "template": "hc_entity_group_card",
+                "id": "living-task-lights",
+                "name": "Living room task lighting",
+                "entity_type": "light",
+                "popup_filter": "active",
+                "entities": [
+                  {
+                    "entity_id": "light.marao_dashboard_test_light",
+                    "name": "Task lighting",
+                    "variables": {
+                      "enable_slider": true
+                    }
+                  },
+                  "light.marao_dashboard_test_onoff_light"
+                ]
+              }
+            ]
+          },
+          "cards": [
+            {
+              "type": "custom:marao-card",
+              "template": "hc_scene_card",
+              "entity": "input_select.marao_dashboard_test_scene",
+              "name": "Living Room scene"
+            },
+            {
+              "type": "custom:marao-card",
+              "template": "hc_glance_card",
+              "name": "Living room temperature and humidity readings",
+              "variables": {
+                "entity1": "sensor.marao_dashboard_test_temperature",
+                "entity1_name": "Temperature",
+                "entity2": "sensor.marao_dashboard_test_humidity",
+                "entity2_name": "Humidity"
+              }
+            }
+          ]
         }
       ]
     },
@@ -116,24 +795,525 @@
       "name": "Entrance",
       "path": "entrance",
       "icon": "mdi:door",
-      "entities": {
-        "camera": [
-          {
-            "entity_id": "camera.marao_dashboard_test_camera",
-            "name": "Front Door Camera",
-            "variables": {
-              "event_provider": "frigate",
-              "frigate_instance_id": "marao_test"
+      "id": "entrance",
+      "output_path": "views/rooms/01-entrance.yaml",
+      "subview": true,
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Entrance",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
             }
-          }
-        ],
-        "lock": [
-          {
-            "entity_id": "lock.marao_dashboard_test_lock",
-            "name": "Front Lock"
-          }
-        ],
-        "cover": [
+          ]
+        },
+        {
+          "entities": {
+            "camera": [
+              {
+                "entity_id": "camera.marao_dashboard_test_camera",
+                "name": "Front Door Camera",
+                "variables": {
+                  "event_provider": "frigate",
+                  "frigate_instance_id": "marao_test"
+                }
+              }
+            ],
+            "lock": [
+              {
+                "entity_id": "lock.marao_dashboard_test_lock",
+                "name": "Front Lock"
+              }
+            ],
+            "cover": [
+              {
+                "entity_id": "cover.marao_dashboard_test_garage_door",
+                "name": "Garage Door"
+              },
+              {
+                "entity_id": "cover.marao_dashboard_test_open_only_door",
+                "name": "Pedestrian Gate",
+                "device_class": "door",
+                "supported_features": 1
+              }
+            ]
+          },
+          "cards": [
+            {
+              "type": "custom:marao-card",
+              "template": "hc_camera_card",
+              "entity": "camera.marao_dashboard_test_media_error",
+              "name": "Camera preview feedback"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Utility Room",
+      "path": "utility-room",
+      "icon": "mdi:garage",
+      "area": "marao_fixture_utility_room",
+      "id": "utility-room",
+      "output_path": "views/rooms/02-utility-room.yaml",
+      "subview": true,
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Utility Room",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "entities": {
+            "switch": [
+              {
+                "entity_id": "switch.marao_dashboard_test_switch",
+                "name": "Utility Switch"
+              }
+            ],
+            "vacuum": [
+              {
+                "entity_id": "vacuum.marao_dashboard_test_vacuum",
+                "name": "Robot Vacuum"
+              },
+              {
+                "entity_id": "vacuum.marao_dashboard_test_vacuum_commands",
+                "name": "Room cleaning",
+                "variables": {
+                  "action_1": {
+                    "icon": "mdi:sofa",
+                    "segment": 21
+                  },
+                  "action_2": {
+                    "icon": "mdi:bed",
+                    "segment": 22
+                  },
+                  "action_3": {
+                    "icon": "mdi:door",
+                    "segment": 23
+                  }
+                }
+              }
+            ],
+            "binary_sensor": [
+              {
+                "entity_id": "binary_sensor.marao_dashboard_test_washing_machine",
+                "name": "Washer"
+              }
+            ],
+            "sensor": [
+              {
+                "entity_id": "sensor.marao_dashboard_test_battery",
+                "name": "Battery",
+                "device_class": "battery"
+              }
+            ],
+            "input_number": [
+              {
+                "entity_id": "input_number.marao_dashboard_test_number",
+                "name": "Level"
+              }
+            ]
+          },
+          "cards": [
+            {
+              "type": "custom:marao-card",
+              "template": "hc_dishwasher_card",
+              "entity": "input_select.marao_dashboard_test_dishwasher_state",
+              "name": "Dishwasher",
+              "variables": {
+                "progress_entity": "sensor.marao_dashboard_test_dishwasher_progress",
+                "remaining_time_entity": "sensor.marao_dashboard_test_dishwasher_remaining",
+                "salt_entity": "input_boolean.marao_dashboard_test_dishwasher_salt",
+                "rinse_aid_entity": "input_boolean.marao_dashboard_test_dishwasher_rinse_aid",
+                "active_program_entity": "input_select.marao_dashboard_test_dishwasher_program"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Empty Room",
+      "path": "empty-room",
+      "icon": "mdi:bed",
+      "area": "marao_fixture_empty_room",
+      "id": "empty-room",
+      "output_path": "views/rooms/03-empty-room.yaml",
+      "subview": true,
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Empty Room",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "entities": {}
+        }
+      ]
+    },
+    {
+      "name": "Appliances",
+      "path": "appliances",
+      "icon": "mdi:dishwasher",
+      "id": "appliances",
+      "output_path": "views/custom/00-appliances.yaml",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "page-title",
+              "template": "hc_title_card",
+              "name": "Appliances",
+              "show_icon": false,
+              "show_state": false,
+              "tap_action": {
+                "action": "none"
+              },
+              "hold_action": {
+                "action": "none"
+              }
+            }
+          ]
+        },
+        {
+          "entities": [
+            {
+              "entity_id": "vacuum.marao_dashboard_test_vacuum",
+              "name": "Robot Vacuum"
+            },
+            {
+              "entity_id": "binary_sensor.marao_dashboard_test_washing_machine",
+              "name": "Washer"
+            }
+          ],
+          "cards": [
+            {
+              "type": "custom:marao-card",
+              "template": "hc_dishwasher_card",
+              "entity": "input_select.marao_dashboard_test_dishwasher_state",
+              "name": "Dishwasher",
+              "variables": {
+                "progress_entity": "sensor.marao_dashboard_test_dishwasher_progress",
+                "remaining_time_entity": "sensor.marao_dashboard_test_dishwasher_remaining",
+                "salt_entity": "input_boolean.marao_dashboard_test_dishwasher_salt",
+                "rinse_aid_entity": "input_boolean.marao_dashboard_test_dishwasher_rinse_aid",
+                "active_program_entity": "input_select.marao_dashboard_test_dishwasher_program"
+              }
+            },
+            {
+              "type": "custom:marao-card",
+              "template": "hc_navigation_card",
+              "entity": "sensor.marao_dashboard_test_wallbox_status",
+              "name": "Wallbox",
+              "icon": "mdi:ev-station",
+              "show_state": false,
+              "tap_action": {
+                "action": "navigate",
+                "navigation_path": "/marao-dashboard/wallbox",
+                "haptic": "heavy"
+              }
+            },
+            {
+              "type": "custom:marao-card",
+              "template": "hc_navigation_card",
+              "entity": "media_player.marao_dashboard_test_apple_tv",
+              "name": "Media",
+              "icon": "mdi:television-play",
+              "show_state": false,
+              "tap_action": {
+                "action": "navigate",
+                "navigation_path": "/marao-dashboard/media",
+                "haptic": "heavy"
+              }
+            },
+            {
+              "type": "custom:marao-card",
+              "template": "hc_bubble_popup_card",
+              "entity": "input_number.marao_dashboard_test_battery",
+              "name": "Appliance controls",
+              "variables": {
+                "popup_hash": "#marao-dashboard-test-appliance-controls"
+              }
+            },
+            {
+              "type": "custom:marao-popup-card",
+              "hash": "#marao-dashboard-test-appliance-controls",
+              "entity": "input_number.marao_dashboard_test_battery",
+              "name": "Appliance controls",
+              "height": "100dvh",
+              "max_height": "100dvh",
+              "cards": [
+                {
+                  "type": "custom:marao-card",
+                  "template": "hc_dishwasher_card",
+                  "entity": "input_select.marao_dashboard_test_dishwasher_state",
+                  "name": "Dishwasher",
+                  "variables": {
+                    "progress_entity": "sensor.marao_dashboard_test_dishwasher_progress",
+                    "remaining_time_entity": "sensor.marao_dashboard_test_dishwasher_remaining",
+                    "salt_entity": "input_boolean.marao_dashboard_test_dishwasher_salt",
+                    "rinse_aid_entity": "input_boolean.marao_dashboard_test_dishwasher_rinse_aid",
+                    "active_program_entity": "input_select.marao_dashboard_test_dishwasher_program"
+                  }
+                },
+                {
+                  "type": "custom:marao-card",
+                  "template": "hc_slider_card",
+                  "entity": "input_number.marao_dashboard_test_battery",
+                  "name": "Battery level"
+                },
+                {
+                  "type": "custom:marao-card",
+                  "template": "hc_light_card",
+                  "entity": "light.marao_dashboard_test_light",
+                  "name": "Utility light"
+                }
+              ]
+            },
+            {
+              "type": "custom:marao-card",
+              "template": "hc_base_card",
+              "entity": "sensor.marao_dashboard_test_temperature",
+              "name": "Appliance action feedback",
+              "tap_action": {
+                "action": "call-service",
+                "service": "marao_test_camera.reject_action"
+              }
+            },
+            {
+              "type": "custom:marao-card",
+              "template": "hc_switch_card",
+              "entity": "input_boolean.marao_dashboard_test_action_failure",
+              "name": "Simulate safe action failure"
+            }
+          ],
+          "columns": 1
+        }
+      ]
+    },
+    {
+      "id": "studio",
+      "name": "Studio",
+      "path": "studio",
+      "icon": "mdi:desk",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "studio-title",
+              "template": "hc_title_card",
+              "name": "Studio controls",
+              "show_icon": false,
+              "show_state": false
+            }
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "entity_id": "sensor.marao_dashboard_test_energy_format_mixed",
+              "name": "Studio energy today",
+              "variables": {
+                "period": "day",
+                "display_unit": "kWh",
+                "display_precision": 2
+              },
+              "template": "hc_energy_period_card",
+              "icon": "mdi:flash-outline",
+              "id": "studio-energy"
+            },
+            {
+              "id": "studio-light",
+              "template": "hc_light_card",
+              "entity_id": "light.marao_dashboard_test_light",
+              "name": "Studio reading light"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "media_player.marao_dashboard_test_apple_tv",
+              "name": "Studio television",
+              "apple_tv": {
+                "remote_entity": "remote.marao_dashboard_test_apple_tv",
+                "volume_remote_entity": "media_player.marao_dashboard_test_apple_tv",
+                "apps": [
+                  {
+                    "name": "YouTube",
+                    "source": "YouTube",
+                    "icon": "mdi:youtube"
+                  }
+                ]
+              },
+              "template": "hc_media_card",
+              "id": "studio-media"
+            }
+          ],
+          "cards": [
+            {
+              "type": "markdown",
+              "content": "Saved layout: energy, lighting and television together."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "legacy_page_options": {
+    "overview": {
+      "weather_entity": "weather.marao_dashboard_test_weather",
+      "scenes": [
+        {
+          "entity_id": "input_boolean.marao_dashboard_test_one",
+          "name": "Relax",
+          "icon": "mdi:sofa"
+        },
+        {
+          "entity_id": "input_boolean.marao_dashboard_test_two",
+          "name": "Movie",
+          "icon": "mdi:movie-open"
+        },
+        {
+          "entity_id": "input_boolean.marao_dashboard_test_three",
+          "name": "Night",
+          "icon": "mdi:weather-night"
+        }
+      ],
+      "entity_groups": [
+        {
+          "template": "hc_entity_group_card",
+          "id": "overview-lights",
+          "name": "Lights",
+          "icon": "mdi:lightbulb-group-outline",
+          "entity_type": "light",
+          "popup_filter": "active",
+          "entities": [
+            {
+              "entity_id": "light.marao_dashboard_test_light",
+              "name": "Living room ceiling lighting",
+              "variables": {
+                "custom_label": "Reading corner"
+              }
+            },
+            {
+              "entity_id": "light.marao_dashboard_test_room_light",
+              "name": "Accent Lights"
+            },
+            {
+              "entity_id": "light.marao_dashboard_test_onoff_light",
+              "name": "On/off Light"
+            }
+          ]
+        },
+        {
+          "template": "hc_entity_group_card",
+          "id": "overview-blinds",
+          "name": "Blinds",
+          "icon": "mdi:window-shutter",
+          "entity_type": "cover",
+          "popup_filter": "all",
+          "entities": [
+            {
+              "entity_id": "cover.marao_dashboard_test_cover",
+              "name": "Blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_garage_door",
+              "name": "Garage Door"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_open_only_door",
+              "name": "Pedestrian Gate",
+              "device_class": "door",
+              "supported_features": 1
+            }
+          ]
+        },
+        {
+          "template": "hc_entity_group_card",
+          "id": "overview-climate",
+          "name": "Climate",
+          "icon": "mdi:thermostat",
+          "entity_type": "climate",
+          "popup_filter": "all",
+          "entities": [
+            {
+              "entity_id": "climate.marao_dashboard_test_multi_mode_climate",
+              "name": "Thermostat"
+            },
+            {
+              "entity_id": "climate.marao_dashboard_test_dual_target_climate",
+              "name": "Dual target thermostat"
+            },
+            {
+              "entity_id": "climate.marao_dashboard_test_feedback_delayed_confirmation",
+              "name": "Delayed thermostat"
+            }
+          ]
+        },
+        {
+          "template": "hc_entity_group_card",
+          "id": "overview-maintenance",
+          "name": "Maintenance",
+          "icon": "mdi:wrench",
+          "entity_type": "battery",
+          "popup_filter": "all",
+          "entities": [
+            {
+              "entity_id": "sensor.marao_dashboard_test_battery",
+              "name": "Battery",
+              "template": "hc_battery_card"
+            }
+          ]
+        }
+      ]
+    },
+    "pages": {
+      "security": {
+        "alarm_entity": "alarm_control_panel.marao_dashboard_test_alarm",
+        "access_entities": [
           {
             "entity_id": "cover.marao_dashboard_test_garage_door",
             "name": "Garage Door"
@@ -143,270 +1323,261 @@
             "name": "Pedestrian Gate",
             "device_class": "door",
             "supported_features": 1
+          },
+          {
+            "entity_id": "lock.marao_dashboard_test_lock",
+            "name": "Front Lock"
           }
-        ]
-      }
-    },
-    {
-      "name": "Utility Room",
-      "path": "utility-room",
-      "icon": "mdi:washing-machine",
-      "entities": {
-        "switch": [
+        ],
+        "actions": [
           {
             "entity_id": "switch.marao_dashboard_test_switch",
-            "name": "Utility Switch"
-          }
-        ],
-        "vacuum": [
-          {
-            "entity_id": "vacuum.marao_dashboard_test_vacuum",
-            "name": "Robot Vacuum"
+            "name": "Porch Lights"
           },
           {
-            "entity_id": "vacuum.marao_dashboard_test_vacuum_commands",
-            "name": "Room cleaning",
-            "variables": {
-              "action_1": {
-                "icon": "mdi:sofa",
-                "segment": 21
-              },
-              "action_2": {
-                "icon": "mdi:bed",
-                "segment": 22
-              },
-              "action_3": {
-                "icon": "mdi:door",
-                "segment": 23
-              }
-            }
-          }
-        ],
-        "binary_sensor": [
+            "entity_id": "lock.marao_dashboard_test_lock",
+            "name": "Lock action"
+          },
           {
-            "entity_id": "binary_sensor.marao_dashboard_test_washing_machine",
-            "name": "Washer"
-          }
-        ],
-        "sensor": [
+            "entity_id": "cover.marao_dashboard_test_garage_door",
+            "name": "Garage action",
+            "device_class": "garage"
+          },
           {
-            "entity_id": "sensor.marao_dashboard_test_battery",
-            "name": "Battery",
-            "device_class": "battery"
-          }
-        ],
-        "input_number": [
-          {
-            "entity_id": "input_number.marao_dashboard_test_number",
-            "name": "Level"
+            "entity_id": "cover.marao_dashboard_test_open_only_door",
+            "name": "Pedestrian gate action",
+            "device_class": "door",
+            "supported_features": 1
           }
         ]
       },
-      "cards": [
-        {
-          "type": "custom:marao-card",
-          "template": "hc_dishwasher_card",
-          "entity": "input_select.marao_dashboard_test_dishwasher_state",
-          "name": "Dishwasher",
+      "energy": {
+        "house_power": {
+          "entity_id": "sensor.marao_dashboard_test_graph_history",
+          "name": "House Power",
           "variables": {
-            "progress_entity": "sensor.marao_dashboard_test_dishwasher_progress",
-            "remaining_time_entity": "sensor.marao_dashboard_test_dishwasher_remaining",
-            "salt_entity": "input_boolean.marao_dashboard_test_dishwasher_salt",
-            "rinse_aid_entity": "input_boolean.marao_dashboard_test_dishwasher_rinse_aid",
-            "active_program_entity": "input_select.marao_dashboard_test_dishwasher_program"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Empty Room",
-      "path": "empty-room",
-      "icon": "mdi:desk",
-      "entities": {}
-    }
-  ],
-  "pages": {
-    "security": {
-      "alarm_entity": "alarm_control_panel.marao_dashboard_test_alarm",
-      "access_entities": [
-        {
-          "entity_id": "cover.marao_dashboard_test_garage_door",
-          "name": "Garage Door"
-        },
-        {
-          "entity_id": "cover.marao_dashboard_test_open_only_door",
-          "name": "Pedestrian Gate",
-          "device_class": "door",
-          "supported_features": 1
-        },
-        {
-          "entity_id": "lock.marao_dashboard_test_lock",
-          "name": "Front Lock"
-        }
-      ],
-      "actions": [
-        {
-          "entity_id": "switch.marao_dashboard_test_switch",
-          "name": "Porch Lights"
-        },
-        {
-          "entity_id": "lock.marao_dashboard_test_lock",
-          "name": "Lock action"
-        },
-        {
-          "entity_id": "cover.marao_dashboard_test_garage_door",
-          "name": "Garage action",
-          "device_class": "garage"
-        },
-        {
-          "entity_id": "cover.marao_dashboard_test_open_only_door",
-          "name": "Pedestrian gate action",
-          "device_class": "door",
-          "supported_features": 1
-        }
-      ]
-    },
-    "energy": {
-      "house_power": {
-        "entity_id": "sensor.marao_dashboard_test_graph_history",
-        "name": "House Power"
-      },
-      "month_energy": "sensor.marao_dashboard_test_month_energy",
-      "month_cost": "sensor.marao_dashboard_test_month_cost",
-      "today_energy": "sensor.marao_dashboard_test_today_energy",
-      "today_cost": "sensor.marao_dashboard_test_today_cost",
-      "loads": [
-        {
-          "name": "House load",
-          "power_entity": "sensor.marao_dashboard_test_graph_history",
-          "toggle_entity": "switch.marao_dashboard_test_switch"
-        }
-      ],
-      "appliances": [
-        {
-          "entity_id": "sensor.marao_dashboard_test_power",
-          "name": "Solar Power"
-        },
-        {
-          "entity_id": "binary_sensor.marao_dashboard_test_washing_machine",
-          "name": "Washer"
-        }
-      ]
-    },
-    "wallbox": {
-      "status_entity": {
-        "entity_id": "sensor.marao_dashboard_test_wallbox_status",
-        "name": "Wallbox"
-      },
-      "charging_power_entity": {
-        "entity_id": "sensor.marao_dashboard_test_wallbox_power",
-        "name": "Charging Power"
-      },
-      "max_current_entity": {
-        "entity_id": "sensor.marao_dashboard_test_wallbox_maximum_current",
-        "name": "Maximum Current"
-      },
-      "current_control_entity": {
-        "entity_id": "input_number.marao_dashboard_test_wallbox_current",
-        "name": "Charging Current"
-      },
-      "current_presets": [
-        6,
-        12,
-        16
-      ],
-      "pause_resume_entity": {
-        "entity_id": "input_boolean.marao_dashboard_test_wallbox_pause",
-        "name": "Pause Charging"
-      }
-    },
-    "media": {
-      "players": [
-        {
-          "entity_id": "media_player.marao_dashboard_test_apple_tv",
-          "name": "Living Room Apple TV",
-          "apple_tv": {
-            "remote_entity": "remote.marao_dashboard_test_apple_tv",
-            "volume_remote_entity": "media_player.marao_dashboard_test_apple_tv",
-            "apps": [
-              {
-                "name": "YouTube",
-                "source": "YouTube",
-                "icon": "mdi:youtube"
-              },
-              {
-                "name": "Plex",
-                "source": "Plex",
-                "icon": "mdi:plex"
-              }
-            ]
+            "display_unit": "kW",
+            "display_precision": 2
           }
         },
-        {
-          "entity_id": "media_player.marao_dashboard_test_audio",
-          "name": "Living Room Music",
-          "apple_tv": false
-        }
-      ]
-    },
-    "custom": [
-      {
-        "name": "Appliances",
-        "path": "appliances",
-        "icon": "mdi:dishwasher",
-        "columns": 1,
-        "entities": [
+        "month_energy": "sensor.marao_dashboard_test_month_energy",
+        "month_cost": "sensor.marao_dashboard_test_month_cost",
+        "today_energy": {
+          "entity_id": "sensor.marao_dashboard_test_energy_format_mixed",
+          "name": "Today Energy",
+          "variables": {
+            "display_unit": "kWh",
+            "display_precision": 2
+          }
+        },
+        "today_cost": {
+          "entity_id": "sensor.marao_dashboard_test_energy_format_cost",
+          "name": "Today Cost",
+          "variables": {
+            "display_precision": 2
+          }
+        },
+        "loads": [
           {
-            "entity_id": "vacuum.marao_dashboard_test_vacuum",
-            "name": "Robot Vacuum"
+            "name": "House load",
+            "power_entity": "sensor.marao_dashboard_test_graph_history",
+            "toggle_entity": "switch.marao_dashboard_test_switch",
+            "variables": {
+              "display_unit": "kW",
+              "display_precision": 6
+            }
+          }
+        ],
+        "appliances": [
+          {
+            "entity_id": "sensor.marao_dashboard_test_power",
+            "name": "Solar Power"
           },
           {
             "entity_id": "binary_sensor.marao_dashboard_test_washing_machine",
             "name": "Washer"
           }
+        ]
+      },
+      "wallbox": {
+        "status_entity": {
+          "entity_id": "sensor.marao_dashboard_test_wallbox_status",
+          "name": "Wallbox"
+        },
+        "charging_power_entity": {
+          "entity_id": "sensor.marao_dashboard_test_wallbox_power",
+          "name": "Charging Power",
+          "variables": {
+            "display_unit": "kW",
+            "display_precision": 2
+          }
+        },
+        "max_current_entity": {
+          "entity_id": "sensor.marao_dashboard_test_wallbox_maximum_current",
+          "name": "Maximum Current"
+        },
+        "current_control_entity": {
+          "entity_id": "input_number.marao_dashboard_test_wallbox_current",
+          "name": "Charging Current"
+        },
+        "current_presets": [
+          6,
+          12,
+          16
         ],
-        "cards": [
+        "pause_resume_entity": {
+          "entity_id": "input_boolean.marao_dashboard_test_wallbox_pause",
+          "name": "Pause Charging"
+        }
+      },
+      "media": {
+        "players": [
           {
-            "type": "custom:marao-card",
-            "template": "hc_dishwasher_card",
-            "entity": "input_select.marao_dashboard_test_dishwasher_state",
-            "name": "Dishwasher",
-            "variables": {
-              "progress_entity": "sensor.marao_dashboard_test_dishwasher_progress",
-              "remaining_time_entity": "sensor.marao_dashboard_test_dishwasher_remaining",
-              "salt_entity": "input_boolean.marao_dashboard_test_dishwasher_salt",
-              "rinse_aid_entity": "input_boolean.marao_dashboard_test_dishwasher_rinse_aid",
-              "active_program_entity": "input_select.marao_dashboard_test_dishwasher_program"
+            "entity_id": "media_player.marao_dashboard_test_apple_tv",
+            "name": "Living Room Apple TV",
+            "apple_tv": {
+              "remote_entity": "remote.marao_dashboard_test_apple_tv",
+              "volume_remote_entity": "media_player.marao_dashboard_test_apple_tv",
+              "apps": [
+                {
+                  "name": "YouTube",
+                  "source": "YouTube",
+                  "icon": "mdi:youtube"
+                },
+                {
+                  "name": "Plex",
+                  "source": "Plex",
+                  "icon": "mdi:plex"
+                }
+              ]
             }
           },
           {
-            "type": "custom:marao-card",
-            "template": "hc_navigation_card",
-            "entity": "sensor.marao_dashboard_test_wallbox_status",
-            "name": "Wallbox",
-            "icon": "mdi:ev-station",
-            "show_state": false,
-            "tap_action": {
-              "action": "navigate",
-              "navigation_path": "/marao-dashboard/wallbox",
-              "haptic": "heavy"
-            }
-          },
-          {
-            "type": "custom:marao-card",
-            "template": "hc_navigation_card",
-            "entity": "media_player.marao_dashboard_test_apple_tv",
-            "name": "Media",
-            "icon": "mdi:television-play",
-            "show_state": false,
-            "tap_action": {
-              "action": "navigate",
-              "navigation_path": "/marao-dashboard/media",
-              "haptic": "heavy"
-            }
+            "entity_id": "media_player.marao_dashboard_test_audio",
+            "name": "Living Room Music",
+            "apple_tv": false
           }
         ]
-      }
-    ]
+      },
+      "custom": [
+        {
+          "name": "Appliances",
+          "path": "appliances",
+          "icon": "mdi:dishwasher",
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "vacuum.marao_dashboard_test_vacuum",
+              "name": "Robot Vacuum"
+            },
+            {
+              "entity_id": "binary_sensor.marao_dashboard_test_washing_machine",
+              "name": "Washer"
+            }
+          ],
+          "cards": [
+            {
+              "type": "custom:marao-card",
+              "template": "hc_dishwasher_card",
+              "entity": "input_select.marao_dashboard_test_dishwasher_state",
+              "name": "Dishwasher",
+              "variables": {
+                "progress_entity": "sensor.marao_dashboard_test_dishwasher_progress",
+                "remaining_time_entity": "sensor.marao_dashboard_test_dishwasher_remaining",
+                "salt_entity": "input_boolean.marao_dashboard_test_dishwasher_salt",
+                "rinse_aid_entity": "input_boolean.marao_dashboard_test_dishwasher_rinse_aid",
+                "active_program_entity": "input_select.marao_dashboard_test_dishwasher_program"
+              }
+            },
+            {
+              "type": "custom:marao-card",
+              "template": "hc_navigation_card",
+              "entity": "sensor.marao_dashboard_test_wallbox_status",
+              "name": "Wallbox",
+              "icon": "mdi:ev-station",
+              "show_state": false,
+              "tap_action": {
+                "action": "navigate",
+                "navigation_path": "/marao-dashboard/wallbox",
+                "haptic": "heavy"
+              }
+            },
+            {
+              "type": "custom:marao-card",
+              "template": "hc_navigation_card",
+              "entity": "media_player.marao_dashboard_test_apple_tv",
+              "name": "Media",
+              "icon": "mdi:television-play",
+              "show_state": false,
+              "tap_action": {
+                "action": "navigate",
+                "navigation_path": "/marao-dashboard/media",
+                "haptic": "heavy"
+              }
+            },
+            {
+              "type": "custom:marao-card",
+              "template": "hc_bubble_popup_card",
+              "entity": "input_number.marao_dashboard_test_battery",
+              "name": "Appliance controls",
+              "variables": {
+                "popup_hash": "#marao-dashboard-test-appliance-controls"
+              }
+            },
+            {
+              "type": "custom:marao-popup-card",
+              "hash": "#marao-dashboard-test-appliance-controls",
+              "entity": "input_number.marao_dashboard_test_battery",
+              "name": "Appliance controls",
+              "height": "100dvh",
+              "max_height": "100dvh",
+              "cards": [
+                {
+                  "type": "custom:marao-card",
+                  "template": "hc_dishwasher_card",
+                  "entity": "input_select.marao_dashboard_test_dishwasher_state",
+                  "name": "Dishwasher",
+                  "variables": {
+                    "progress_entity": "sensor.marao_dashboard_test_dishwasher_progress",
+                    "remaining_time_entity": "sensor.marao_dashboard_test_dishwasher_remaining",
+                    "salt_entity": "input_boolean.marao_dashboard_test_dishwasher_salt",
+                    "rinse_aid_entity": "input_boolean.marao_dashboard_test_dishwasher_rinse_aid",
+                    "active_program_entity": "input_select.marao_dashboard_test_dishwasher_program"
+                  }
+                },
+                {
+                  "type": "custom:marao-card",
+                  "template": "hc_slider_card",
+                  "entity": "input_number.marao_dashboard_test_battery",
+                  "name": "Battery level"
+                },
+                {
+                  "type": "custom:marao-card",
+                  "template": "hc_light_card",
+                  "entity": "light.marao_dashboard_test_light",
+                  "name": "Utility light"
+                }
+              ]
+            },
+            {
+              "type": "custom:marao-card",
+              "template": "hc_base_card",
+              "entity": "sensor.marao_dashboard_test_temperature",
+              "name": "Appliance action feedback",
+              "tap_action": {
+                "action": "call-service",
+                "service": "marao_test_camera.reject_action"
+              }
+            },
+            {
+              "type": "custom:marao-card",
+              "template": "hc_switch_card",
+              "entity": "input_boolean.marao_dashboard_test_action_failure",
+              "name": "Simulate safe action failure"
+            }
+          ]
+        }
+      ]
+    }
   }
 }

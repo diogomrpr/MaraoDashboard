@@ -1,0 +1,28 @@
+type: custom:bubble-card
+card_type: pop-up
+hash: '#overview-climate'
+button_type: state
+entity: climate.living_room
+name: Climate
+icon: mdi:thermostat
+show_icon: true
+show_name: true
+show_state: true
+scrolling_effect: false
+close_by_clicking_outside: true
+styles: ".bubble-pop-up,\n.bubble-pop-up-container {\n  overscroll-behavior: contain !important;\n  touch-action: pan-y !important;\n}\n.bubble-pop-up-container {\n  height: 100% !important;\n  align-items: stretch !important;\n  align-content: start !important;\n  justify-content: flex-start !important;\n}\n.bubble-pop-up {\n  position: fixed !important;\n  inset: auto 0 0 0 !important;\n  height: min(760px, 80vh) !important;\n  max-height: 80vh !important;\n  margin: 0 !important;\n  overflow-y: auto !important;\n}\n.bubble-pop-up-container > .bubble-cards-container,\n.bubble-pop-up-container > ha-sortable {\n  align-self: stretch !important;\n  margin-top: 16px !important;\n}\n"
+cards:
+  # marao:generated:start
+  - type: custom:button-card
+    template: hc_climate_card
+    entity: climate.living_room
+    name: Living Room - Living Room
+    variables:
+      show_graph: false
+      show_mode_buttons: true
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end

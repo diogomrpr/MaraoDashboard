@@ -12,7 +12,7 @@ const [cardsModule, cameraEventsModule] = await Promise.all([
   import(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`),
   import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`),
 ]);
-const { callServiceWithNotification, focusRestorer, haptic, registerMaraoCards } = cardsModule;
+const { energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, focusRestorer, haptic, registerMaraoCards } = cardsModule;
 registerMaraoCards();
 cameraEventsModule.registerMaraoCameraEventCards();
 
@@ -30,6 +30,10 @@ if (
 }
 
 const ICONS = {
+  "mountain": {
+    "path": "M1 21 6.5 9 9.5 14 14 3 19 15 21 10 23 21Z",
+    "viewBox": "0 0 24 24"
+  },
   "back": {
     "path": "M10.957,12.354a.5.5,0,0,1,0-.708l4.586-4.585a1.5,1.5,0,0,0-2.121-2.122L8.836,9.525a3.505,3.505,0,0,0,0,4.95l4.586,4.586a1.5,1.5,0,0,0,2.121-2.122Z",
     "viewBox": "0 0 24 24"
@@ -290,12 +294,18 @@ const TRANSLATIONS = {
     "common.all_good": "All good",
     "common.active_count": "{count} active",
     "common.partial_summary": "{label}, {count} unavailable",
+    "group.empty": "No entities configured",
+    "group.no_active": "No active entities",
+    "group.all_closed": "All closed",
+    "group.low_count": "{count} low",
+    "popup.controls_unavailable": "Controls unavailable",
     "common.on_count": "{count} on",
     "common.open_count": "{count} open",
     "common.need_attention_count": "{count} need attention",
     "common.battery": "Battery",
     "common.nothing_playing": "Nothing is playing",
     "room.turn_off_lights": "Turn off all lights in {name}",
+    "room.lighting_summary": "Lighting: {label}",
     "camera_events.title": "Camera events",
     "camera_events.event": "Event",
     "camera_events.back": "Back to events",
@@ -325,6 +335,10 @@ const TRANSLATIONS = {
     "actions.open": "Open {name}",
     "actions.toggle": "Toggle {name}",
     "actions.failed": "Action failed: {error}",
+    "common.missing": "Entity missing",
+    "common.disconnected": "Disconnected",
+    "common.retry": "Retry",
+    "common.media_unavailable": "Media unavailable",
     "actions.for_target": "{action} {name}",
     "controls.increase": "Increase {name}",
     "controls.decrease": "Decrease {name}",
@@ -340,6 +354,8 @@ const TRANSLATIONS = {
     "climate.current_temperature": "Current {value}",
     "climate.modes": "Climate modes",
     "climate.set_mode": "Set climate mode to {mode}",
+    "climate.updating": "Updating…",
+    "climate.not_confirmed": "Change not confirmed: {name}",
     "climate.mode.off": "Off",
     "climate.mode.heat": "Heat",
     "climate.mode.cool": "Cool",
@@ -374,6 +390,7 @@ const TRANSLATIONS = {
     "energy.next_period": "Next period",
     "energy.current_period": "Current period",
     "energy.no_data": "No recorded values for this period",
+    "energy.format_error": "Reading format is incompatible with its source unit",
     "wallbox.shortcuts": "Charging current shortcuts",
     "security.arming": "Arming...",
     "security.arm_away": "Arm away",
@@ -420,12 +437,18 @@ const TRANSLATIONS = {
     "common.all_good": "Tudo bem",
     "common.active_count": "{count} ativos",
     "common.partial_summary": "{label}, {count} indisponíveis",
+    "group.empty": "Sem entidades configuradas",
+    "group.no_active": "Sem entidades ativas",
+    "group.all_closed": "Tudo fechado",
+    "group.low_count": "{count} com bateria fraca",
+    "popup.controls_unavailable": "Controlos indisponíveis",
     "common.on_count": "{count} ligados",
     "common.open_count": "{count} abertos",
     "common.need_attention_count": "{count} precisam de atenção",
     "common.battery": "Bateria",
     "common.nothing_playing": "Nada em reprodução",
     "room.turn_off_lights": "Desligar todas as luzes em {name}",
+    "room.lighting_summary": "Iluminação: {label}",
     "camera_events.title": "Eventos da câmara",
     "camera_events.event": "Evento",
     "camera_events.back": "Voltar aos eventos",
@@ -455,6 +478,10 @@ const TRANSLATIONS = {
     "actions.open": "Abrir {name}",
     "actions.toggle": "Alternar {name}",
     "actions.failed": "A ação falhou: {error}",
+    "common.missing": "Entidade em falta",
+    "common.disconnected": "Sem ligação",
+    "common.retry": "Tentar novamente",
+    "common.media_unavailable": "Multimédia indisponível",
     "actions.for_target": "{action} {name}",
     "controls.increase": "Aumentar {name}",
     "controls.decrease": "Diminuir {name}",
@@ -470,6 +497,8 @@ const TRANSLATIONS = {
     "climate.current_temperature": "Atual {value}",
     "climate.modes": "Modos de climatização",
     "climate.set_mode": "Definir modo para {mode}",
+    "climate.updating": "A atualizar…",
+    "climate.not_confirmed": "Alteração não confirmada: {name}",
     "climate.mode.off": "Desligado",
     "climate.mode.heat": "Aquecer",
     "climate.mode.cool": "Arrefecer",
@@ -504,6 +533,7 @@ const TRANSLATIONS = {
     "energy.next_period": "Período seguinte",
     "energy.current_period": "Período atual",
     "energy.no_data": "Não existem valores registados neste período",
+    "energy.format_error": "O formato da leitura é incompatível com a unidade de origem",
     "wallbox.shortcuts": "Atalhos de corrente de carregamento",
     "security.arming": "A armar...",
     "security.arm_away": "Armar fora",
@@ -643,6 +673,8 @@ class MaraoSlideToOpen extends HTMLElement {
 
   setConfig(config) {
     this._config = config || {};
+    this._actionError = "";
+    this._actionRequest = (this._actionRequest || 0) + 1;
     this._render();
   }
 
@@ -652,16 +684,24 @@ class MaraoSlideToOpen extends HTMLElement {
   }
 
   connectedCallback() {
+    this._actionLive = true;
     this._render();
   }
 
   disconnectedCallback() {
+    this._actionLive = false;
+    this._actionError = "";
+    this._actionRequest = (this._actionRequest || 0) + 1;
     clearTimeout(this._completionTimer);
     this._resetGesture(this.shadowRoot?.querySelector(".track"));
   }
 
   attributeChangedCallback(_name, oldValue, newValue) {
-    if (oldValue !== newValue && this._pointerId === null) this._render();
+    if (oldValue !== newValue) {
+      this._actionError = "";
+      this._actionRequest = (this._actionRequest || 0) + 1;
+      if (this._pointerId === null) this._render();
+    }
   }
 
   _entityId() {
@@ -715,9 +755,11 @@ class MaraoSlideToOpen extends HTMLElement {
     const disabled = this._disabled();
     const label = this._label();
     const semanticLabel = this._semanticLabel(label);
-    this.shadowRoot.innerHTML = `
+    const owner = this.getRootNode()?.host;
+    const problem = owner?._callService ? null : cardProblem({ entity: this._entityId() }, this._hassInstance(), { error: this._actionError });
+    const markup = `
       <style>
-        :host { position: relative; z-index: 2; display: block; width: 100%; pointer-events: auto; --marao-slide-foreground: var(--primary-text-color); --marao-slide-progress: color-mix(in srgb, var(--secondary-background-color) 65%, var(--primary-text-color)); }
+        :host { position: relative; z-index: 2; display: block; width: 100%; container: marao-access / inline-size; pointer-events: auto; --marao-slide-foreground: var(--primary-text-color); --marao-slide-progress: color-mix(in srgb, var(--secondary-background-color) 65%, var(--primary-text-color)); }
         .track {
           position: relative;
           width: 100%;
@@ -725,6 +767,7 @@ class MaraoSlideToOpen extends HTMLElement {
           overflow: hidden;
           border: 1px solid color-mix(in srgb, var(--marao-slide-foreground) 72%, transparent);
           border-radius: 32px;
+          outline: none;
           box-sizing: border-box;
           background: var(--secondary-background-color);
           touch-action: pan-y;
@@ -782,7 +825,12 @@ class MaraoSlideToOpen extends HTMLElement {
           pointer-events: none;
         }
         .thumb ha-icon { --mdc-icon-size: 32px; }
-        .track[aria-disabled="true"] { opacity: 0.6; }
+        @container marao-access (max-width: 240px) {
+          .label { padding: 8px 8px 72px; word-break: break-all; text-wrap: balance; }
+          .thumb { top: auto; bottom: 4px; }
+        }
+        .problem { display:flex; gap:8px; padding:12px; margin:0; font-size:var(--font-size-secondary,1rem); line-height:1.25; overflow-wrap:anywhere; }
+        .problem ha-icon { flex:0 0 24px; }
         .track[aria-disabled="true"] .thumb {
           border-color: var(--divider-color);
           color: var(--icon-color);
@@ -792,12 +840,18 @@ class MaraoSlideToOpen extends HTMLElement {
           .track.completing { animation: none; }
         }
       </style>
+      <div${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}>
       <div class="track" role="slider" tabindex="${disabled ? -1 : 0}" aria-label="${escapeHtml(semanticLabel)}" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0%" aria-disabled="${disabled}">
         <div class="fill"></div>
         <span class="label">${escapeHtml(label)}</span>
         <span class="thumb"><ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon></span>
       </div>
+      ${problem ? `<p class="problem" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="mdi:alert-circle-outline" aria-hidden="true"></ha-icon><span>${escapeHtml(problem.reason)}</span></p>` : ""}
+      </div>
     `;
+    if (markup === this._renderedMarkup && this.shadowRoot.querySelector('.track')) return;
+    this._renderedMarkup = markup;
+    this.shadowRoot.innerHTML = markup;
     const track = this.shadowRoot.querySelector(".track");
     if (disabled) return;
     if (navigator.maxTouchPoints > 0) {
@@ -959,7 +1013,9 @@ class MaraoSlideToOpen extends HTMLElement {
     const [domain] = entityId.split(".", 1);
     const service = domain === "lock" ? "unlock" : "open_cover";
     this._animateCompletion();
-    callServiceWithNotification(hass, domain, service, { entity_id: entityId });
+    const owner = this.getRootNode()?.host;
+    if (owner?._callService) owner._callService(domain, service, { entity_id: entityId });
+    else callServiceWithNotification(hass, domain, service, { entity_id: entityId }, serviceOutcome(this));
     haptic("success");
   }
 
@@ -1014,11 +1070,7 @@ class MaraoStateTimelineCard extends HTMLElement {
 
   disconnectedCallback() {
     this._resizeObserver?.disconnect();
-    this._loadId += 1;
-    this._loading = false;
-    this._loadedKey = "";
-    this._history = null;
-    this._error = false;
+    // HA can temporarily detach this same card while moving the dashboard shell.
   }
 
   setConfig(config) {
@@ -1066,7 +1118,7 @@ class MaraoStateTimelineCard extends HTMLElement {
   }
 
   async _loadHistory() {
-    if (!this._config?.entity || historyEntityState(this._hass, this._config) || this._loadedKey === this._config.entity) return;
+    if (this.isConnected === false || !this._config?.entity || historyEntityState(this._hass, this._config) || this._loadedKey === this._config.entity) return;
     this._loadedKey = this._config.entity;
     this._loading = true;
     const loadId = ++this._loadId;
@@ -1084,16 +1136,17 @@ class MaraoStateTimelineCard extends HTMLElement {
         "GET",
         `history/period/${start.toISOString()}?${query}`
       );
-      if (loadId === this._loadId) {
+      if (loadId === this._loadId && this.isConnected !== false) {
         this._history = Array.isArray(response?.[0]) ? response[0] : [];
         this._range = { start: start.getTime(), end: end.getTime() };
         this._error = false;
       }
     } catch (_error) {
-      if (loadId === this._loadId) this._error = true;
+      if (loadId === this._loadId && this.isConnected !== false) this._error = true;
     } finally {
       if (loadId === this._loadId) {
         this._loading = false;
+        if (this.isConnected === false) this._loadedKey = "";
         this._render();
       }
     }
@@ -1166,17 +1219,20 @@ class MaraoStateTimelineCard extends HTMLElement {
     const entity = this._hass?.states?.[this._config.entity];
     const name = this._config.name || entity?.attributes?.friendly_name || localize("timeline.title", this._hass);
     const unavailable = historyEntityState(this._hass, this._config);
+    const problem = cardProblem(this._config, this._hass, { contentError: this._error ? localize("timeline.history_unavailable", this._hass) : "", loading: this._loading });
+    const binary = unavailable ? null : binaryState(this._config.entity, entity);
+    const currentState = !this._hass?.states ? localize("common.loading", this._hass) : this._stateLabel(unavailable || entity?.state || "unavailable");
     const segments = unavailable || this._error ? [] : this._segments();
     const range = this._range;
     const duration = range ? range.end - range.start : 1;
-    const status = unavailable
+    const status = !this._hass?.states ? localize("common.loading", this._hass) : unavailable
       ? localize(`common.${unavailable}`, this._hass)
       : this._error
       ? localize("timeline.history_unavailable", this._hass)
       : this._loading && !this._history
         ? localize("timeline.loading", this._hass)
         : localize("timeline.no_history", this._hass);
-    const historyState = unavailable || (this._error ? "error" : this._loading ? "loading" : segments.length ? "ready" : "empty");
+    const historyState = !this._hass?.states ? "loading" : unavailable || (this._error ? "error" : this._loading ? "loading" : segments.length ? "ready" : "empty");
     const segmentMarkup = segments.map((segment) => {
       const left = ((segment.from - range.start) / duration) * 100;
       const width = ((segment.to - segment.from) / duration) * 100;
@@ -1194,7 +1250,12 @@ class MaraoStateTimelineCard extends HTMLElement {
       <style>
         :host { display: block; width: 100%; }
         ha-card { box-sizing: border-box; min-height: 168px; padding: 13px 20px; background: var(--ha-card-background); color: var(--primary-text-color); }
-        header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+        header { display: grid; gap: 12px; margin-bottom: 8px; }
+        ha-card[data-binary=true] { background: var(--color-blue); color: var(--color-black); --subtext-color: var(--color-black); }
+        .binary-cue { justify-self: end; box-sizing: border-box; width: 20px; height: 20px; border: 2px solid currentColor; border-radius: 50%; }
+        .binary-cue[data-active=true] { background: currentColor; }
+        button { min-width:48px; min-height:48px; padding:10px 12px; border:0; border-radius:12px; font:inherit; font-family:var(--primary-font-family); font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-secondary,500); overflow-wrap:anywhere; color:var(--primary-text-color); background:var(--secondary-background-color); cursor:pointer; }
+        button:focus { outline:none; }
         h2 { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: var(--font-size-primary, 18px); font-weight: var(--font-weight-primary, 700); letter-spacing: 0; }
         header span { color: var(--subtext-color); overflow-wrap: anywhere; font-size: var(--font-size-state, 12px); font-weight: var(--font-weight-secondary, 500); }
         .plot { position: relative; height: 48px; border: 1px solid var(--divider-color); border-radius: 8px; box-sizing: border-box; overflow: visible; background: var(--marao-card-background); touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -1205,21 +1266,31 @@ class MaraoStateTimelineCard extends HTMLElement {
         .tick.first { transform: none; }
         .tick.last { transform: translateX(-100%); }
         .tick i { display: block; height: 100%; border-left: 1px solid var(--divider-color); opacity: .7; }
-        .tick b { display: block; margin-top: 4px; color: var(--subtext-color); font-size: var(--font-size-secondary, 18px); font-weight: var(--font-weight-secondary, 500); letter-spacing: 0; white-space: nowrap; }
-        .plot.staggered .tick:nth-child(even) b { transform: translateY(22px); }
-        .plot.staggered + .legend { margin-top: 50px; }
+        .tick b { display: block; margin-top: 4px; color: var(--subtext-color); font-size: var(--font-size-secondary, 18px); font-weight: var(--font-weight-secondary, 500); line-height: 1.25; letter-spacing: 0; white-space: nowrap; }
+        .plot.staggered .tick:nth-child(even) b { transform: translateY(1.3em); }
+        .plot.staggered + .legend { margin-top: calc(var(--font-size-secondary,18px) * 2.6 + 8px); }
         .cursor { position: absolute; z-index: 2; top: -5px; bottom: -5px; width: 2px; display: none; background: var(--primary-text-color); pointer-events: none; }
         .tooltip { position: absolute; z-index: 3; top: -51px; display: none; min-width: 96px; padding: 6px 8px; border: 1px solid var(--divider-color); border-radius: 6px; box-sizing: border-box; transform: translateX(-50%); background: var(--ha-card-background); color: var(--primary-text-color); font-size: var(--font-size-primary, 18px); line-height: 1.25; text-align: center; white-space: nowrap; pointer-events: none; box-shadow: var(--ha-card-box-shadow); }
         .plot.tracking .cursor, .plot.tracking .tooltip { display: block; }
-        .legend { display: flex; flex-wrap: wrap; gap: 8px; min-height: 16px; margin-top: 30px; color: var(--subtext-color); font-size: var(--font-size-secondary, 16px); font-weight: var(--font-weight-secondary, 500); }
+        .legend { display: flex; flex-wrap: wrap; gap: 8px; min-height: 16px; margin-top: calc(var(--font-size-secondary,18px) * 1.25 + 8px); color: var(--subtext-color); font-size: var(--font-size-secondary, 16px); font-weight: var(--font-weight-secondary, 500); }
         .legend span { display: flex; min-width: 0; max-width: 100%; align-items: center; gap: 5px; overflow-wrap: anywhere; }
         .legend i { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
         .status { display: grid; min-height: 64px; padding: 12px; place-items: center; border: 1px solid var(--divider-color); border-radius: 8px; background: var(--marao-card-background); color: var(--subtext-color); font-size: var(--font-size-primary, 18px); font-weight: var(--font-weight-secondary, 500); text-align: center; overflow-wrap: anywhere; }
       </style>
-      <ha-card data-history-state="${historyState}">
-        <header><h2>${escapeHtml(name)}</h2><span>${escapeHtml(this._stateLabel(unavailable || entity?.state || "unavailable"))}</span></header>
-        ${segments.length ? `<div class="plot" role="img" aria-label="${escapeHtml(name)}"><div class="segments">${segmentMarkup}</div><div class="ticks">${ticks}</div><div class="cursor"></div><div class="tooltip"></div></div><div class="legend">${legend}</div>` : `<div class="status" role="${this._error && !unavailable ? "alert" : "status"}">${escapeHtml(status)}</div>`}
+      <ha-card${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""} data-history-state="${historyState}"${binary === null ? "" : ` data-binary="${binary}"`}>
+        <header><h2>${escapeHtml(name)}</h2>${problem?.complete ? "" : binary === null ? `<span>${escapeHtml(currentState)}</span>` : `<span class="binary-cue" data-active="${binary}" role="img" aria-label="${escapeHtml(`${name}: ${currentState}`)}"></span>`}</header>
+        ${problem && problem.kind !== "loading" ? `<p class="status" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="mdi:alert-circle-outline" aria-hidden="true"></ha-icon> ${escapeHtml(problem.reason)}</p>` : ""}
+        ${this._error && !unavailable ? `<button type="button" data-history-retry>${escapeHtml(localize("common.retry", this._hass))}</button>` : ""}
+        ${segments.length ? `<div class="plot" role="img" aria-label="${escapeHtml(name)}"><div class="segments">${segmentMarkup}</div><div class="ticks">${ticks}</div><div class="cursor"></div><div class="tooltip"></div></div><div class="legend">${legend}</div>` : problem && problem.kind !== "loading" ? "" : `<div class="status" role="status">${escapeHtml(status)}</div>`}
       </ha-card>`;
+    this.shadowRoot.querySelector('[data-history-retry]')?.addEventListener('click', () => {
+      if (!this._error || historyEntityState(this._hass, this._config) || this._loading) return;
+      this._loadedKey = "";
+      this._error = false;
+      this._history = null;
+      window.MaraoDashboard?.haptic?.("heavy");
+      this._loadHistory();
+    });
     if (segments.length) {
       this._bindTracking();
       this._spaceTicks();
@@ -1300,13 +1371,17 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     // lets dashboards generated before the period-card migration render while
     // they are regenerated, instead of producing an error card.
     const entity = config?.entity || config?.entity_id || null;
-    this._config = { period: "day", popup: false, ...config, entity };
-    this._offset = 0;
-    this._loadId += 1;
-    this._loading = false;
-    this._loadedKey = "";
-    this._history = [];
-    this._error = false;
+    const next = { period: "day", popup: false, ...config, entity };
+    const changed = !this._config || ["entity", "period", "popup"].some(key => this._config[key] !== next[key]);
+    this._config = next;
+    if (changed) {
+      this._offset = 0;
+      this._loadId += 1;
+      this._loading = false;
+      this._loadedKey = "";
+      this._history = [];
+      this._error = false;
+    }
     this._render();
     this._load();
   }
@@ -1327,12 +1402,6 @@ class MaraoEnergyPeriodCard extends HTMLElement {
   }
 
   connectedCallback() { this._load(); }
-
-  disconnectedCallback() {
-    this._loadId += 1;
-    this._loading = false;
-    this._loadedKey = "";
-  }
 
   getCardSize() { return this._config?.popup ? 5 : 2; }
 
@@ -1360,7 +1429,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
   }
 
   async _load() {
-    if (!this._config?.popup || historyEntityState(this._hass, this._config)) return;
+    if (this.isConnected === false || !this._config?.popup || historyEntityState(this._hass, this._config)) return;
     const { start, end } = this._range();
     const key = `${this._config.entity}:${start.toISOString()}`;
     if (this._loadedKey === key) return;
@@ -1373,31 +1442,35 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const query = new URLSearchParams({
       filter_entity_id: this._config.entity,
       end_time: end.toISOString(),
-      minimal_response: "",
-      no_attributes: "",
     });
     try {
       const response = await this._hass.callApi("GET", `history/period/${start.toISOString()}?${query}`);
-      if (loadId !== this._loadId) return;
+      if (loadId !== this._loadId || this.isConnected === false) return;
       this._history = Array.isArray(response?.[0]) ? response[0] : [];
       this._error = false;
     } catch (_error) {
-      if (loadId !== this._loadId) return;
+      if (loadId !== this._loadId || this.isConnected === false) return;
       this._history = [];
       this._error = true;
     } finally {
       if (loadId === this._loadId) {
         this._loading = false;
+        if (this.isConnected === false) this._loadedKey = "";
         this._render();
       }
     }
   }
 
   _values() {
-    return this._history.map((record) => ({
-      value: Number(record.state),
-      time: new Date(record.last_changed || record.last_updated).getTime(),
-    })).filter((item) => Number.isFinite(item.value) && Number.isFinite(item.time));
+    const formatting = energyFormatting(this._config);
+    const unit = this._hass?.states?.[this._config.entity]?.attributes?.unit_of_measurement;
+    let error = false;
+    const values = this._history.map(record => {
+      const reading = formatting ? energyHistoryValue(record, unit, this._config) : {value: Number(record.state)};
+      if (formatting && (!reading || reading.error)) error = true;
+      return {value: reading?.value, time: new Date(record.last_changed || record.last_updated).getTime()};
+    }).filter(item => Number.isFinite(item.value) && Number.isFinite(item.time));
+    return {values: error ? [] : values, error};
   }
 
   _render() {
@@ -1406,12 +1479,19 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const entity = this._hass?.states?.[this._config.entity];
     const title = this._config.name || entity?.attributes?.friendly_name || this._config.entity;
     const unavailable = historyEntityState(this._hass, this._config);
-    const values = unavailable ? [] : this._values();
-    const current = unavailable ? localize(`common.${unavailable}`, this._hass) : entity?.state && Number.isFinite(Number(entity.state)) ? entity.state : "—";
+    const formatting = energyFormatting(this._config);
+    const reading = formatting ? energyValue(entity?.state, entity?.attributes?.unit_of_measurement, this._config) : null;
+    const history = unavailable ? {values: [], error: false} : this._values();
+    const formatError = reading?.error || history.error ? localize("energy.format_error", this._hass) : "";
+    const problem = cardProblem(this._config, this._hass, { contentError: formatError || (this._error ? localize("timeline.history_unavailable", this._hass) : ""), loading: this._loading });
+    const values = history.values;
+    const current = !this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass) : reading ? energyLabel(reading, this._config, this._hass) : entity?.state && Number.isFinite(Number(entity.state)) ? entity.state : "—";
     const period = this._periodLabel();
     const range = this._range();
     const min = values.length ? Math.min(...values.map((item) => item.value)) : 0;
     const max = values.length ? Math.max(...values.map((item) => item.value)) : 1;
+    const unit = reading?.unit || entity?.attributes?.unit_of_measurement || "";
+    const bound = value => formatting ? `${formatEnergyNumber(value, this._config.display_precision, this._hass)} ${unit}`.trim() : String(value);
     const spread = max - min || 1;
     const points = values.map((item) => {
       const x = ((item.time - range.start.getTime()) / Math.max(1, range.end - range.start)) * 100;
@@ -1421,18 +1501,25 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const previous = localize("energy.previous_period", this._hass);
     const next = localize("energy.next_period", this._hass);
     const disabled = unavailable || this._loading;
-    const status = unavailable ? localize(`common.${unavailable}`, this._hass)
+    const status = !this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass)
       : this._loading ? localize("timeline.loading", this._hass)
         : this._error ? localize("timeline.history_unavailable", this._hass) : localize("energy.no_data", this._hass);
-    const historyState = unavailable || (this._loading ? "loading" : this._error ? "error" : values.length || !this._config.popup ? "ready" : "empty");
+    const historyState = !this._hass?.states ? "loading" : unavailable || (this._loading ? "loading" : this._error || formatError ? "error" : values.length || !this._config.popup ? "ready" : "empty");
     const body = this._config.popup
-      ? `<h2>${escapeHtml(title)}</h2><div class="period-nav"><button data-period="previous" aria-label="${escapeHtml(previous)}"${disabled ? " disabled" : ""}>‹</button><strong>${escapeHtml(period)}</strong><button data-period="next" aria-label="${escapeHtml(next)}"${disabled || this._offset >= 0 ? " disabled" : ""}>›</button></div><div class="chart" role="img" aria-label="${escapeHtml(`${title} ${period}`)}">${points ? `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${points}" /></svg><div class="scale"><span>${escapeHtml(String(max))}</span><span>${escapeHtml(String(min))}</span></div>` : `<span class="empty" role="${this._error && !unavailable ? "alert" : "status"}">${escapeHtml(status)}</span>`}</div>`
+      ? `<h2>${escapeHtml(title)}</h2><div class="period-nav"><button data-period="previous" aria-label="${escapeHtml(previous)}"${disabled ? " disabled" : ""}>‹</button><strong>${escapeHtml(period)}</strong><button data-period="next" aria-label="${escapeHtml(next)}"${disabled || this._offset >= 0 ? " disabled" : ""}>›</button></div><div class="chart" role="img" aria-label="${escapeHtml(`${title} ${period}${formatting && values.length ? ` ${bound(min)} – ${bound(max)}` : ""}`)}">${points ? `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${points}" /></svg><div class="scale"><span>${escapeHtml(bound(max))}</span><span>${escapeHtml(bound(min))}</span></div>` : `<span class="empty" role="${this._error && !unavailable ? "alert" : "status"}">${problem && problem.kind !== "loading" ? `<ha-icon icon="mdi:alert-circle-outline" aria-hidden="true"></ha-icon> ${escapeHtml(problem.reason)}` : escapeHtml(status)}</span>`}</div>`
       : `<span class="value">${escapeHtml(String(current))}</span><span class="period">${escapeHtml(period)}</span>`;
     const surfaceTag = this._config.popup ? "div" : "button";
-    const surfaceAttributes = this._config.popup ? "" : ` type="button" aria-label="${escapeHtml(title)}"${unavailable ? ' disabled aria-disabled="true"' : ""}`;
+    const surfaceAttributes = this._config.popup ? "" : ` type="button" aria-label="${escapeHtml(`${title}${formatting ? ` ${current}` : ""}`)}"${unavailable ? ' disabled aria-disabled="true"' : ""}`;
     this.shadowRoot.innerHTML = `<style>
-      :host{display:block;width:100%;container:marao-energy / inline-size;} .surface{display:flex;min-height:112px;width:100%;box-sizing:border-box;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:18px 20px;border:0;border-radius:var(--ha-card-border-radius,18px);background:var(--ha-card-background);color:var(--primary-text-color);font:inherit;text-align:left;cursor:pointer;} .surface:focus{outline:none;} .surface:disabled{cursor:default;color:var(--secondary-text-color);} .surface>*{max-width:100%;overflow-wrap:anywhere;} h2{margin:0;font-size:var(--font-size-primary,18px);font-weight:var(--font-weight-primary,700);} .value{font-size:calc(var(--font-size-primary,18px) * 1.78);font-weight:800;line-height:1.25;} .period{color:var(--secondary-text-color);font-size:var(--font-size-secondary,14px);} .period-nav{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;width:100%;gap:8px;margin-bottom:12px;text-align:center;} .period-nav strong{font-size:var(--font-size-primary,18px);text-transform:capitalize;} .period-nav button{width:48px;height:48px;border:0;border-radius:50%;background:var(--secondary-background-color);color:var(--primary-text-color);font-size:34px;line-height:1;} .period-nav button:focus{outline:none;} .period-nav button:disabled{opacity:.35;} .chart{position:relative;width:100%;min-height:190px;border-radius:14px;background:var(--secondary-background-color);overflow:hidden;} svg{display:block;width:100%;height:190px;} polyline{fill:none;stroke:var(--primary-color);stroke-width:2.5;vector-effect:non-scaling-stroke;} .scale{position:absolute;inset:8px;display:flex;align-items:flex-start;justify-content:space-between;color:var(--secondary-text-color);font-size:var(--font-size-caption,14px);} .scale span:last-child{align-self:flex-end;} .empty{display:grid;min-height:190px;place-items:center;padding:16px;color:var(--secondary-text-color);font-size:var(--font-size-primary,18px);text-align:center;} @container marao-energy (max-width:240px){.surface{padding:12px 8px}.period-nav{grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center}.period-nav strong{grid-column:1/-1;grid-row:1}}
-    </style><${surfaceTag} class="surface" data-history-state="${historyState}"${surfaceAttributes}>${this._config.popup ? body : `<h2>${escapeHtml(title)}</h2>${body}`}</${surfaceTag}>`;
+      :host{display:block;width:100%;container:marao-energy / inline-size;} .surface{display:flex;min-height:112px;width:100%;box-sizing:border-box;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:18px 20px;border:0;border-radius:var(--ha-card-border-radius,18px);background:var(--ha-card-background);color:var(--primary-text-color);font:inherit;text-align:left;cursor:pointer;} .surface:focus{outline:none;} .surface:disabled{cursor:default;color:var(--secondary-text-color);} .surface>*{max-width:100%;overflow-wrap:anywhere;} h2{width:100%;margin:0;font-size:var(--font-size-primary,18px);font-weight:var(--font-weight-primary,700);} .value{font-size:calc(var(--font-size-primary,18px) * 1.78);font-weight:800;line-height:1.25;} .period{color:var(--secondary-text-color);font-size:var(--font-size-secondary,14px);} .period-nav{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;width:100%;gap:8px;margin-bottom:12px;text-align:center;} .period-nav strong{font-size:var(--font-size-primary,18px);text-transform:capitalize;} .surface>[data-history-retry]{min-width:48px;min-height:48px;padding:10px 12px;border:0;border-radius:12px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);overflow-wrap:anywhere;} .surface>[data-history-retry]:focus{outline:none;} .period-nav button{width:48px;height:48px;border:0;border-radius:50%;background:var(--secondary-background-color);color:var(--primary-text-color);font-size:34px;line-height:1;} .period-nav button:focus{outline:none;} .period-nav button:disabled{opacity:.35;} .chart{display:grid;position:relative;width:100%;min-height:190px;border-radius:14px;background:var(--secondary-background-color);overflow:hidden;} svg{grid-area:1/1;display:block;width:100%;height:100%;min-height:190px;} polyline{fill:none;stroke:var(--primary-color);stroke-width:2.5;vector-effect:non-scaling-stroke;} .scale{grid-area:1/1;position:relative;margin:8px;min-height:174px;display:flex;flex-direction:column;gap:8px;align-items:flex-start;justify-content:space-between;color:var(--secondary-text-color);font-size:var(--font-size-caption,14px);} .scale span{max-width:100%;overflow-wrap:anywhere;}.scale span:last-child{align-self:flex-end;} .empty{display:grid;min-height:190px;place-items:center;padding:16px;color:var(--secondary-text-color);font-size:var(--font-size-primary,18px);text-align:center;} @container marao-energy (max-width:240px){.surface{padding:12px 8px}.period-nav{grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center}.period-nav strong{grid-column:1/-1;grid-row:1}}
+      .problem{font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.25;}
+    </style><${surfaceTag} class="surface"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""} data-history-state="${historyState}"${surfaceAttributes}>${this._config.popup ? body : `<h2>${escapeHtml(title)}</h2>${body}`}${this._error && !unavailable && this._config.popup ? `<button type="button" data-history-retry>${escapeHtml(localize("common.retry", this._hass))}</button>` : ""}${problem && problem.kind !== "loading" && !this._config.popup ? `<span class="problem" role="status"><ha-icon icon="mdi:help-circle-outline" aria-hidden="true"></ha-icon> <span>${escapeHtml(problem.reason)}</span></span>` : ""}</${surfaceTag}>`;
+    this.shadowRoot.querySelector('[data-history-retry]')?.addEventListener('click', () => {
+      if (!this._error || historyEntityState(this._hass, this._config) || this._loading) return;
+      this._loadedKey = "";
+      window.MaraoDashboard?.haptic?.("heavy");
+      this._load();
+    });
     if (this._config.popup) {
       this.shadowRoot.querySelectorAll("[data-period]").forEach((button) => button.addEventListener("click", (event) => {
         event.stopPropagation();

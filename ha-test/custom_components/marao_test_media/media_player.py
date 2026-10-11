@@ -14,6 +14,8 @@ from homeassistant.components.media_player.const import (
 )
 
 from homeassistant.util import slugify
+from homeassistant.core import callback
+from homeassistant.helpers.event import async_track_state_change_event
 
 SOURCES = ["YouTube", "Plex"]
 ARTWORK = "data:image/svg+xml;base64," + base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270"><rect width="480" height="270" fill="#805a81"/><circle cx="360" cy="80" r="150" fill="#fff"/><circle cx="90" cy="230" r="170" fill="#e7c278"/></svg>').decode()
@@ -22,7 +24,7 @@ ARTWORK = "data:image/svg+xml;base64," + base64.b64encode(b'<svg xmlns="http://w
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the local visual-test media player."""
     async_add_entities(
-        [MaraoTestAppleTV(config.get("name", "Marao Dashboard Test Apple TV"), config.get("initial_state", "idle"))]
+        [MaraoTestAppleTV(config.get("name", "Marao Dashboard Test Apple TV"), config.get("initial_state", "idle"), config.get("picture_error", False))]
     )
 
 
@@ -50,7 +52,8 @@ class MaraoTestAppleTV(MediaPlayerEntity):
         | MediaPlayerEntityFeature.TURN_OFF
     )
 
-    def __init__(self, name: str, initial_state: str = "idle") -> None:
+    def __init__(self, name: str, initial_state: str = "idle", picture_error: bool = False) -> None:
+        self._picture_error = picture_error
         self._attr_name = name
         self._attr_unique_id = slugify(name)
         self._attr_state = None if initial_state in {"unknown", "unavailable"} else MediaPlayerState(initial_state)
@@ -66,7 +69,18 @@ class MaraoTestAppleTV(MediaPlayerEntity):
     @property
     def entity_picture(self) -> str:
         """Expose static synthetic artwork without an external resource."""
+        if self._picture_error and not self.hass.states.is_state("input_boolean.marao_dashboard_test_media_failure", "off"):
+            return "data:image/svg+xml;base64,PHN2Zw=="
         return ARTWORK
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        if self._picture_error:
+            self.async_on_remove(async_track_state_change_event(self.hass, ["input_boolean.marao_dashboard_test_media_failure"], self._fixture_media_changed))
+
+    @callback
+    def _fixture_media_changed(self, event):
+        self.async_write_ha_state()
 
     async def async_turn_off(self) -> None:
         """Turn the simulated player off."""

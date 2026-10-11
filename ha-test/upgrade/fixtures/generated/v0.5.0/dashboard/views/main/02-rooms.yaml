@@ -1,0 +1,28 @@
+title: Rooms
+path: rooms
+icon: mdi:sofa
+cards:
+  # marao:generated:start
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_room_card
+      entity: camera.driveway_high
+      name: Garden
+      icon: mdi:sofa-outline
+      variables:
+        light_entities: []
+        lights_target_entity: camera.driveway_high
+      tap_action:
+        action: navigate
+        navigation_path: /marao-generated-test/room-garden
+        haptic: heavy
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

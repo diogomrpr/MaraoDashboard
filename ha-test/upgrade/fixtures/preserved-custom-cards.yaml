@@ -1,0 +1,10 @@
+  - type: markdown
+    content: "Preserved custom YAML note"
+    extension:
+      order: [second, first]
+  - type: custom:marao-card
+    template: hc_sensor_card
+    entity: sensor.marao_dashboard_test_temperature
+    name: "Protected temperature"
+    variables:
+      future: true

@@ -1,0 +1,45 @@
+title: Office
+path: room-office
+subview: true
+cards:
+  # marao:generated:start
+  - type: custom:button-card
+    name: Office
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+    styles:
+      card:
+      - background: none
+      - box-shadow: none
+      - padding: 0
+      - margin-bottom: 20px
+      grid:
+      - grid-template-areas: '''n'''
+      - grid-template-columns: 1fr
+      name:
+      - justify-self: start
+      - font-weight: 800
+      - font-size: 25px
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_navigation_card
+      entity: sun.sun
+      name: Open studio
+      icon: mdi:palette
+      show_label: false
+      tap_action:
+        action: navigate
+        navigation_path: /marao-generated-test/studio
+        haptic: heavy
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

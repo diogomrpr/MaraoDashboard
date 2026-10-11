@@ -1,0 +1,34 @@
+type: custom:marao-popup-card
+hash: '#overview-lights'
+entity: light.marao_dashboard_test_light
+name: Lights
+icon: mdi:lightbulb-group-outline
+show_icon: true
+show_name: true
+show_state: true
+height: 920px
+max_height: 80dvh
+cards:
+  # marao:generated:start
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_light_card
+      entity: light.marao_dashboard_test_light
+      name: Main Lights - Living Room
+    - type: custom:marao-card
+      template: hc_light_card
+      entity: light.marao_dashboard_test_room_light
+      name: Accent Lights - Living Room
+    - type: custom:marao-card
+      template: hc_light_card
+      entity: light.marao_dashboard_test_onoff_light
+      name: On/off Light - Living Room
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end

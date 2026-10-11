@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 
 globalThis.HTMLElement = class {
+  getRootNode() { return {}; }
   attachShadow() {
     this.shadowRoot = {
       innerHTML: "",
@@ -14,7 +15,61 @@ globalThis.HTMLElement = class {
 
 const source = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8");
 const dashboardSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url), "utf8");
-const { ACCESS_HOLD_MS, MaraoCard, MaraoPopupCard, callServiceWithNotification, focusRestorer, performAction, registerMaraoCards, stateAppearance, summaryState, vacuumActions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#visibility`);
+const { ACCESS_HOLD_MS, MaraoCard, MaraoPopupCard, callServiceWithNotification, focusRestorer, performAction, registerMaraoCards, binaryState, cardProblem, problemStyle, serviceOutcome, stateAppearance, summaryState, entityGroupState, vacuumActions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#visibility`);
+
+test('typed groups count complete membership independently of filtering and duplicate references', () => {
+  for (const [type, values, active, label] of [
+    ['light', ['off', 'on', 'unknown'], ['member.1'], '1 active, 1 unavailable'],
+    ['cover', ['closed', 'opening', 'closing', 'open'], ['member.1', 'member.3'], '2 active'],
+    ['climate', ['off', 'heat', 'auto', 'unavailable'], ['member.1', 'member.2'], '2 active, 1 unavailable'],
+  ]) {
+    const states = Object.fromEntries(values.map((state, index) => [`member.${index}`, { state, attributes: { hvac_action: 'idle' } }]));
+    const ids = [...Object.keys(states), 'member.1'];
+    const summary = entityGroupState(type, ids, { states });
+    assert.deepEqual(summary.activeEntities, active); assert.equal(summary.label, label);
+    assert.equal(summary.available, values.filter(state => !['unknown', 'unavailable'].includes(state)).length);
+    assert.equal(summary.state, 'on');
+  }
+  assert.equal(entityGroupState('cover', ['cover.closed', 'cover.closing'], { states: { 'cover.closed': { state: 'closed' }, 'cover.closing': { state: 'closing' } } }).label, 'All closed');
+  assert.equal(entityGroupState('climate', ['climate.off'], { states: { 'climate.off': { state: 'off' } } }).label, 'All off');
+  assert.equal(entityGroupState('light', ['light.unknown'], { states: { 'light.unknown': { state: 'unknown' } } }).state, 'unknown');
+  assert.equal(entityGroupState('light', ['light.unavailable'], { states: { 'light.unavailable': { state: 'unavailable' } } }).state, 'unavailable');
+  assert.equal(entityGroupState('light', [], { states: {} }).label, 'No entities configured');
+  assert.equal(entityGroupState('light', ['light.on'], {}).state, 'loading');
+  assert.deepEqual(summaryState(['climate.idle'], { states: { 'climate.idle': { state: 'idle' } } }), { state: 'off', label: 'All off' });
+});
+
+test('battery groups retain first usable reading and count secondary lows and invalid readings', () => {
+  const readings = ['unavailable', '75', '10', '20', '80', '0', '100', '-1', '101', '', 'bad', 'unknown'];
+  const states = Object.fromEntries(readings.map((state, index) => [`sensor.${index}`, { state }]));
+  const summary = entityGroupState('battery', [...Object.keys(states), 'sensor.2'], { states });
+  assert.equal(summary.reading, 75); assert.equal(summary.available, 6);
+  assert.deepEqual(summary.activeEntities, ['sensor.2', 'sensor.5']);
+  assert.equal(summary.label, '75% · 2 low, 6 unavailable');
+  const invalid = { states: { 'sensor.invalid': { state: 'not a number' } } };
+  assert.equal(entityGroupState('battery', ['sensor.invalid'], invalid).state, 'unavailable');
+  const card = new MaraoCard();
+  card.setConfig({ template: 'hc_entity_group_card', name: 'Maintenance', variables: { entity_type: 'battery', summary_entities: ['sensor.invalid'] }, tap_action: { action: 'navigate', navigation_path: '#group' } });
+  card.hass = invalid;
+  assert.match(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
+  assert.match(card.shadowRoot.innerHTML, /Unavailable/);
+});
+
+test('entity-free group cards preserve counts, readable inactive/empty states and connection guards', () => {
+  const card = new MaraoCard();
+  card.setConfig({ template: 'hc_entity_group_card', name: 'Lights', variables: { entity_type: 'light', summary_entities: ['light.on', 'light.off'] }, tap_action: { action: 'navigate', navigation_path: '#group' } });
+  card.hass = { states: { 'light.on': { state: 'on' }, 'light.off': { state: 'off' } } };
+  assert.match(card.shadowRoot.innerHTML, /1 active/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
+  card.hass = { ...card._hass, connected: false };
+  assert.match(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
+  assert.match(card.shadowRoot.innerHTML, /Disconnected/);
+  card.hass = { states: { 'light.on': { state: 'off' }, 'light.off': { state: 'off' } } };
+  assert.match(card.shadowRoot.innerHTML, /All off/);
+  card.setConfig({ ...card._config, variables: { entity_type: 'light', summary_entities: [] } });
+  assert.match(card.shadowRoot.innerHTML, /No entities configured/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
+});
 
 test("actions disable and decline unavailable service targets independent of their displayed entity", async () => {
   const calls = [];
@@ -63,7 +118,7 @@ test("shared builder settings change the rendered labels, icons and power readin
   const card = new MaraoCard();
   card.setConfig({ template: "hc_switch_card", entity: "switch.test", variables: { custom_label: "Status: ", power_entity: "sensor.power", power_unit: "kW" } });
   card.hass = { callService() {}, states: { "switch.test": { state: "on", attributes: {} }, "sensor.power": { state: "2", attributes: {} } } };
-  assert.match(card.shadowRoot.innerHTML, /Status: on/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="state">/);
   assert.match(card.shadowRoot.innerHTML, /2 kW/);
   card.setConfig({ template: "hc_sensor_card", entity: "binary_sensor.test", variables: { on_icon: "mdi:check", off_icon: "mdi:close" } });
   card.hass = { callService() {}, states: { "binary_sensor.test": { state: "off", attributes: {}, last_updated: "2026-10-09T12:00:00Z" } } };
@@ -163,8 +218,6 @@ test("dashboard waits for Home Assistant's settled registry before loading and r
 
 test("energy period cards provide calendar history navigation", () => {
   assert.match(dashboardSource, /customElements\.define\("marao-energy-period-card"/);
-  assert.match(dashboardSource, /const entity = config\?\.entity \|\| config\?\.entity_id \|\| null/);
-  assert.match(dashboardSource, /this\._config = \{ period: "day", popup: false, \.\.\.config, entity \}/);
   assert.match(dashboardSource, /history\/period\/\$\{start\.toISOString\(\)\}/);
   assert.match(dashboardSource, /data-period="previous"/);
   assert.match(dashboardSource, /data-period="next"/);
@@ -231,7 +284,8 @@ test("graph history failures remain readable without repeated requests and recov
   assert.match(card.shadowRoot.innerHTML, /data-graph-history-state="loading"/);
   await new Promise((resolve) => setImmediate(resolve));
   assert.match(card.shadowRoot.innerHTML, /data-graph-history-state="error"/);
-  assert.match(card.shadowRoot.innerHTML, /role="alert">History unavailable/);
+  assert.match(card.shadowRoot.innerHTML, /class="problem" role="alert">[\s\S]*History unavailable/);
+  assert.match(card.shadowRoot.innerHTML, /data-graph-retry/);
   assert.match(card.shadowRoot.innerHTML, /125 W/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /class="graph-background"/);
   for (let i = 0; i < 5; i += 1) card.hass = { ...hass };
@@ -258,7 +312,7 @@ test("graph history ignores responses after its source becomes neutral or its ca
       callApi: () => { requests += 1; return new Promise((resolve) => { finish = resolve; }); },
     };
     card.hass = hass;
-    if (transition === "detach") card.disconnectedCallback();
+    if (transition === "detach") { card.isConnected = false; card.disconnectedCallback(); }
     else card.hass = transition === "disconnect" ? { ...hass, connected: false }
       : { ...hass, states: { "sensor.power": { state: transition, attributes: {} } } };
     finish([[{ state: "125", last_updated: new Date().toISOString() }]]);
@@ -270,6 +324,7 @@ test("graph history ignores responses after its source becomes neutral or its ca
       card.hass = { ...card.hass };
       assert.equal(requests, 1, transition);
     }
+    card.isConnected = true;
     card.hass = { ...hass, callApi: async () => [] };
     await new Promise((resolve) => setImmediate(resolve));
     assert.match(card.shadowRoot.innerHTML, /data-graph-history-state="empty"/, transition);
@@ -289,7 +344,7 @@ test("idle ranges and graph requests detect mutation of Home Assistant's shared 
   };
   card.hass = hass;
   // The idle-input branch is normally reached through the real shadow DOM.
-  card.shadowRoot.querySelector = (selector) => selector === 'input[data-slider-key]' ? {} : null;
+  card.shadowRoot.querySelector = (selector) => selector === 'input[data-slider-key],img.camera,.media-artwork img' ? {} : null;
   connection.connected = false;
   card.hass = { ...hass, connected: false };
   assert.match(card.shadowRoot.innerHTML, /type="range"[^>]* disabled/);
@@ -323,7 +378,10 @@ test("room cards preserve navigation and expose an all-lights-off control", () =
   };
   assert.match(card.shadowRoot.innerHTML, /data-room-lights-off/);
   assert.match(card.shadowRoot.innerHTML, /aria-label="Turn off all lights in Living Room"/);
-  assert.match(card.shadowRoot.innerHTML, /<span>All off<\/span>/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-room-lights-off[^>]*>[\s\S]*?<span>/);
+  assert.match(card.shadowRoot.innerHTML, /class="room-artwork" aria-hidden="true"><ha-icon icon="mdi:sofa"/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="icon"/);
+  assert.match(source, /\.room-lights-off \{[^}]*width:48px; height:48px;[^}]*border-radius:50%;/);
   assert.match(card.shadowRoot.innerHTML, /icon="mdi:sofa"/);
   assert.match(source, /\.room-lights-off \{[^}]*background:var\(--ha-card-background,var\(--card-background-color\)\); color:var\(--primary-text-color\);/);
   assert.match(source, /\.room-lights-off:disabled \{ opacity:\.6; cursor:default;/);
@@ -351,6 +409,84 @@ test("room all-lights-off actions target every configured light", async () => {
     lights[0],
   );
   assert.deepEqual(calls, [["light", "turn_off", { entity_id: lights }, undefined, false]]);
+});
+
+test('room lighting uses every unique selected light and ignores an unrelated primary', () => {
+  const card = new MaraoCard();
+  const colors = {};
+  card.shadowRoot.querySelector = selector => selector === 'ha-card' ? { classList: { remove() {} }, style: { setProperty(key, value) { colors[key] = value; } } } : null;
+  card.setConfig({ template: 'hc_room_card', entity: 'sensor.unrelated', name: 'Bedroom',
+    variables: { light_entities: ['light.first', 'light.second', 'light.second', 'sensor.unrelated'] },
+    tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/bedroom' } });
+  const states = { 'sensor.unrelated': { state: 'unavailable', attributes: {} },
+    'light.first': { state: 'off', attributes: {} }, 'light.second': { state: 'on', attributes: {} } };
+  card.hass = { callService() {}, states };
+  assert.equal(colors['--marao-card-background'], 'var(--room-card-active-background,var(--primary-color))');
+  assert.match(card.shadowRoot.innerHTML, /1 active/);
+  assert.match(card.shadowRoot.innerHTML, /aria-description="Lighting: 1 active"/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="state">|class="binary-cue"/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-problem|data-room-lights-off[^>]* disabled/);
+  states['light.second'] = { state: 'off', attributes: {} };
+  for (const key of Object.keys(colors)) delete colors[key];
+  card.hass = { ...card.hass, states: { ...states } };
+  assert.equal(colors['--marao-card-background'], undefined);
+  assert.match(card.shadowRoot.innerHTML, /aria-description="Lighting: All off"/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="state">|class="binary-cue"/);
+  for (const value of ['unknown', 'unavailable', null]) {
+    const second = value === null ? undefined : { state: value, attributes: {} };
+    card.hass = { ...card.hass, states: { ...states, 'light.second': second } };
+    assert.match(card.shadowRoot.innerHTML, /data-problem="neutral"/);
+    assert.match(card.shadowRoot.innerHTML, /data-room-lights-off[^>]* disabled/);
+    assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
+  }
+  card.setConfig({ ...card._config, variables: { light_entities: [] } });
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-room-lights-off|binary-cue\"|<div class="state">|data-problem/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
+  card.setConfig({ ...card._config, show_icon: false, variables: { light_entities: [], custom_label: 'Reading corner' } });
+  assert.match(card.shadowRoot.innerHTML, /<div class="state">Reading corner<\/div>/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /class="room-artwork"|data-room-lights-off|aria-description="Lighting:/);
+  card.setConfig({ ...card._config, tap_action: { action: 'none' }, variables: { light_entities: ['light.first'], custom_label: 'Reading corner' } });
+  assert.match(card.shadowRoot.innerHTML, /<ha-card role="group" aria-label="Bedroom" aria-description="Lighting: All off"/);
+  assert.match(card.shadowRoot.innerHTML, /<div class="state">Reading corner<\/div>/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action|class="binary-cue"/);
+});
+
+test('room child activation dispatches once and rechecks targets without navigating', async () => {
+  const previousWindow = globalThis.window;
+  const calls = [], haptics = [], routes = [];
+  globalThis.window = { dispatchEvent(event) { if (event.type === 'haptic') haptics.push(event.detail); },
+    location: { pathname: '/marao-dashboard/rooms' }, history: { pushState(_state, _title, route) { routes.push(route); } } };
+  try {
+    const card = new MaraoCard();
+    let activate;
+    const button = { disabled: false, addEventListener(_type, handler) { activate = handler; } };
+    card.shadowRoot.querySelector = selector => selector === '[data-room-lights-off]' ? button : null;
+    card.setConfig({ template: 'hc_room_card', entity: 'sensor.unrelated', name: 'Bedroom',
+      variables: { light_entities: ['light.first', 'light.second', 'light.first'] },
+      tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/bedroom' } });
+    card.hass = { connected: true, callService: async (...args) => calls.push(args),
+      states: { 'light.first': { state: 'off', attributes: {} }, 'light.second': { state: 'on', attributes: {} } } };
+    let prevented = 0, stopped = 0;
+    const event = { currentTarget: button, preventDefault() { prevented++; }, stopPropagation() { stopped++; } };
+    activate(event);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(calls, [['light', 'turn_off', { entity_id: ['light.first', 'light.second'] }, undefined, false]]);
+    assert.deepEqual(haptics, ['heavy']);
+    assert.deepEqual(routes, []);
+    assert.equal(prevented, 1); assert.equal(stopped, 1);
+    card._hass.states['light.second'] = { state: 'unavailable', attributes: {} };
+    activate(event);
+    card._hass = { ...card._hass, connected: false };
+    activate(event);
+    button.disabled = true;
+    card._hass = { ...card._hass, connected: true, states: { 'light.first': { state: 'on' }, 'light.second': { state: 'off' } } };
+    activate(event);
+    assert.equal(calls.length, 1); assert.equal(haptics.length, 1); assert.deepEqual(routes, []);
+    card._hass.connected = false;
+    await card._performAction(card._config.tap_action, card._config.entity);
+    assert.deepEqual(routes, ['/marao-dashboard/bedroom']);
+    assert.equal(calls.length, 1);
+  } finally { globalThis.window = previousWindow; }
 });
 
 test("toggle graph cards use their toggle availability for control state", () => {
@@ -419,7 +555,7 @@ test("title cards render as text-only section headings", () => {
   assert.match(source, /\.body\.title-card \{[^}]*padding:0 0 20px;/);
 });
 
-test("media app shortcuts stack a centered icon over a two-line title", () => {
+test("media app shortcuts retain a full-width title above the centered icon", () => {
   const card = new MaraoCard();
   card.setConfig({
     entity: "media_player.apple_tv",
@@ -434,6 +570,7 @@ test("media app shortcuts stack a centered icon over a two-line title", () => {
   assert.doesNotMatch(card.shadowRoot.innerHTML, /class="state"/);
   assert.match(source, /\.body\.media-app-card \{[^}]*flex-direction:column;[^}]*align-items:center;[^}]*text-align:center;/);
   assert.match(source, /\.body\.media-app-card \.title \{[^}]*min-height:2\.5em;/);
+  assert.doesNotMatch(source, /\.body\.media-app-card \.icon \{[^}]*order:-1/);
 });
 
 test("wallbox current card uses a large stepper and optional shortcuts", () => {
@@ -572,11 +709,11 @@ test("loading, unknown, and unavailable states stay distinct and disabled", () =
   assert.match(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
 
   card.hass = { callService() {}, states: {} };
-  assert.match(card.shadowRoot.innerHTML, /<div class="state">unknown<\/div>/);
+  assert.match(card.shadowRoot.innerHTML, /data-problem="neutral"[^>]*>[\s\S]*Entity missing/);
   assert.match(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
 
   card.hass = { callService() {}, states: { "light.test": { state: "unavailable", attributes: {} } } };
-  assert.match(card.shadowRoot.innerHTML, /<div class="state">unavailable<\/div>/);
+  assert.match(card.shadowRoot.innerHTML, /data-problem="neutral"[^>]*>[\s\S]*Unavailable/);
   assert.match(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
 });
 
@@ -775,6 +912,48 @@ test("popups inherit native Home Assistant context while blocking and restoring 
   } finally { Object.assign(globalThis, previous); }
 });
 
+test("popup replacement preserves the original opener and installs inert state after closing the old sheet", () => {
+  const previous = { document: globalThis.document, window: globalThis.window, ResizeObserver: globalThis.ResizeObserver };
+  const close = new EventTarget(); close.focus = () => {};
+  const background = { inert: false };
+  const root = { children: [background], append(element) { this.children.push(element); } };
+  const popups = [new MaraoPopupCard(), new MaraoPopupCard()];
+  const view = { shadowRoot: { querySelector: () => null, querySelectorAll: selector => selector === 'marao-popup-card' ? popups : [] } };
+  let restored = 0;
+  globalThis.document = { querySelectorAll: () => [], createElement: () => {
+    const overlay = new EventTarget();
+    overlay.querySelector = selector => selector === '.marao-popup-close' ? close : null;
+    overlay.remove = () => root.children.splice(root.children.indexOf(overlay), 1);
+    return overlay;
+  }, body: root };
+  globalThis.window = { location: { pathname: '/marao-dashboard/card-test', hash: '#child' } };
+  try {
+    for (const firstListener of [0, 1]) {
+      const [parent, child] = popups;
+      for (const [index, popup] of popups.entries()) {
+        popup._config = { hash: index ? '#child' : '#group' };
+        popup._viewOwner = { view }; popup._viewPath = window.location.pathname;
+        popup.isConnected = true;
+        popup._renderChildren = () => {}; popup._columnObserver = null;
+      }
+      // Geometry observation is independent of the focus handoff under test.
+      globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+      parent._open = true; parent._focus = () => { restored += 1; };
+      parent._overlay = document.createElement('div'); root.append(parent._overlay);
+      parent._setBackgroundInert(parent._overlay, root);
+      popups[firstListener]._sync(); popups[1 - firstListener]._sync();
+      assert.equal(parent._open, false);
+      assert.equal(child._open, true);
+      assert.equal(root.children.length, 2, 'only the new overlay remains');
+      assert.equal(background.inert, true, 'the new popup keeps the background inert');
+      assert.equal(restored, firstListener, 'replacement must not restore focus behind the new popup');
+      child._close(false);
+      assert.equal(restored, firstListener + 1);
+      assert.equal(background.inert, false);
+    }
+  } finally { Object.assign(globalThis, previous); }
+});
+
 test("popup URLs open after attachment and reopen after a native remount", () => {
   const previousWindow = globalThis.window;
   globalThis.window = { location: { hash: "#lights" }, addEventListener() {}, removeEventListener() {} };
@@ -963,6 +1142,66 @@ test("popup preserves child cards while forwarding Home Assistant state updates"
   assert.doesNotMatch(source, /set hass\(value\) \{ this\._hass = value; this\._renderChildren\(\); \}/);
 });
 
+test('live group filtering retains eligible nodes, cancels removed controls and relocates focus', async () => {
+  const previousDocument = globalThis.document;
+  const host = { children: [], insertions: 0,
+    append(card) { this.insertBefore(card, null); },
+    insertBefore(card, before) { this.insertions++; this.children = this.children.filter(item => item !== card); const index = before ? this.children.indexOf(before) : this.children.length; this.children.splice(index, 0, card); card.isConnected = true; },
+  };
+  const node = () => ({ isConnected: false, setAttribute() {}, contains(active) { return active === this.control; },
+    remove() { this.cancelled = true; this.isConnected = false; host.children = host.children.filter(item => item !== this); } });
+  const close = { getRootNode: () => ({}), focus() { globalThis.document.activeElement = this; } };
+  globalThis.document = { activeElement: null, createElement: node };
+  try {
+    const popup = new MaraoPopupCard();
+    popup._config = { entity_group: { entity_type: 'light', popup_filter: 'active', entities: ['light.first', 'light.second'] },
+      cards: [{ entity: 'light.first' }, { entity: 'light.second' }] };
+    popup._overlay = { querySelector: selector => selector === '.marao-popup-content' ? host : close };
+    popup._groupChildren = new Map(); popup._groupHelpers = { createCardElement: node };
+    popup.hass = { states: { 'light.first': { state: 'on' }, 'light.second': { state: 'on' } } };
+    const [first, second] = host.children; const insertions = host.insertions;
+    second.control = { getRootNode: () => ({ host: second }) };
+    globalThis.document.activeElement = second.control;
+    popup.hass = { states: { 'light.first': { state: 'on' }, 'light.second': { state: 'off' } } };
+    assert.deepEqual(host.children, [first]); assert.equal(first.cancelled, undefined);
+    assert.equal(host.insertions, insertions); assert.equal(second.cancelled, true);
+    assert.equal(globalThis.document.activeElement, close);
+    popup.hass = { states: { 'light.first': { state: 'off' }, 'light.second': { state: 'off' } } };
+    assert.equal(host.children.length, 1); assert.equal(host.children[0].textContent, 'No active entities');
+    popup.hass = { states: { 'light.first': { state: 'on' }, 'light.second': { state: 'off' } } };
+    assert.equal(host.children.length, 1); assert.notEqual(host.children[0], first);
+    popup._config.entity_group.popup_filter = 'all';
+    popup.hass = { states: { 'light.first': { state: 'on' }, 'light.second': { state: 'unavailable' } } };
+    assert.equal(host.children.length, 2); assert.equal(host.children[1].hass.states['light.second'].state, 'unavailable');
+    popup._config.entity_group.entities = []; popup._config.cards = [];
+    popup.hass = { states: {} };
+    assert.equal(host.children[0].textContent, 'No entities configured');
+  } finally { globalThis.document = previousDocument; }
+});
+
+test('popup ignores stale helpers after teardown and shows a readable helper failure', async () => {
+  const previousDocument = globalThis.document, previousHelpers = globalThis.loadCardHelpers;
+  const host = { children: [], replaceChildren() { this.children = []; }, append(card) { this.children.push(card); } };
+  globalThis.document = { createElement: () => ({ setAttribute() {} }) };
+  try {
+    const popup = new MaraoPopupCard();
+    popup._config = { cards: [] };
+    popup._overlay = { querySelector: () => host };
+    let resolve;
+    globalThis.loadCardHelpers = () => new Promise(done => { resolve = done; });
+    const rendering = popup._renderChildren();
+    assert.equal(host.children[0].textContent, 'Loading…');
+    popup._childrenRenderId++; popup._overlay = null;
+    resolve({ createCardElement() { assert.fail('A closed popup must not mount children'); } });
+    await rendering;
+    assert.equal(host.children[0].textContent, 'Loading…', 'Stale completion must not mutate the detached host');
+    popup._overlay = { querySelector: () => host };
+    globalThis.loadCardHelpers = async () => { throw new Error('Controls unavailable'); };
+    await popup._renderChildren();
+    assert.equal(host.children[0].textContent, 'Controls unavailable');
+  } finally { globalThis.document = previousDocument; globalThis.loadCardHelpers = previousHelpers; }
+});
+
 test("focus waits for Home Assistant's native slot render and skips a detached control", async () => {
   for (const detached of [false, true]) {
     let completeRender;
@@ -1089,7 +1328,7 @@ test("idle value sliders skip unrelated updates but refresh their state, graph, 
     const card = new MaraoCard();
     card.setConfig({ entity, template: "hc_light_card", variables: { graph_entity: graph, show_graph: true } });
     card.hass = { callService() {}, states: { [entity]: { state: "on", attributes: { brightness: 128 } }, [graph]: { state: "20" } } };
-    card.shadowRoot.querySelector = (selector) => selector === 'input[data-slider-key]' ? {} : null;
+    card.shadowRoot.querySelector = (selector) => selector === 'input[data-slider-key],img.camera,.media-artwork img' ? {} : null;
     let renders = 0;
     card._render = () => { renders += 1; };
     const next = { ...card.hass, states: { ...card.hass.states } };
@@ -1132,5 +1371,226 @@ test("legacy access opening actions always render the strict slider without a ta
       assert.match(markup, /<marao-slide-to-open/);
       assert.doesNotMatch(markup, /data-card-action|data-hold-action/);
     }
+  }
+});
+
+function renderBinary(config, states, language='en') {
+ const card=new MaraoCard(); card.setConfig(config); card.hass={language,callService(){},states}; return card.shadowRoot.innerHTML;
+}
+test('binary meaning follows native domains and explicit appliance contracts',()=>{
+ for(const domain of ['light','fan','switch','input_boolean','binary_sensor']) for(const value of ['on','off']) assert.equal(binaryState(`${domain}.test`,{state:value}),value==='on');
+ for(const domain of ['sensor','number','select','input_select','climate','media_player','cover','vacuum','alarm_control_panel']) for(const value of ['on','off']) assert.equal(binaryState(`${domain}.test`,{state:value}),null);
+ for(const value of ['unknown','unavailable','locking','unlocking','open','opening','jammed']) assert.equal(binaryState('lock.test',{state:value}),null);
+ for(const value of ['locked','unlocked']) assert.equal(binaryState('lock.test',{state:value}),value==='unlocked');
+ for(const [value,expected] of [['running',true],['idle',false],['paused',null],['error',null]]) assert.equal(binaryState('sensor.test',{state:value},'hc_washing_machine_card'),expected);
+ for(const kind of ['hc_cover_card','hc_climate_card','hc_media_card','hc_media_app_card','hc_camera_card','hc_security_card','hc_weather_card','hc_vacuum_card','hc_dishwasher_card','hc_scene_card','hc_number_card','hc_wallbox_current_card','hc_battery_card']) assert.equal(binaryState('switch.test',{state:'on'},kind),null);
+});
+test('binary cards hide only redundant state and keep visible cues for native, static and hidden icons',()=>{
+ for(const domain of ['light','fan','switch','input_boolean','binary_sensor','lock']) for(const value of domain==='lock'?['locked','unlocked']:['on','off']) for(const variant of [{},{icon:'mdi:test'},{show_icon:false}]) {
+  const entity=`${domain}.test`,html=renderBinary({entity,name:'Target',show_state:true,...variant},{[entity]:{state:value,attributes:{device_class:'motion'}}});
+  assert.doesNotMatch(html,/<div class="state">/); assert.match(html,/class="binary-cue"/); assert.match(html,/role="img" aria-label="Target:/);
+  assert.match(html,new RegExp(`data-active="${value==='on'||value==='unlocked'}"`));
+ }
+});
+test('binary state hiding retains configured labels, numeric readings and metadata without dangling prefixes',()=>{
+ const entity='switch.test', states={[entity]:{state:'on',attributes:{}},'sensor.power':{state:'120',attributes:{unit_of_measurement:'W'}}};
+ for(const variables of [{custom_label:'Status: ',hc_label_prefix:'Power: '},{hc_label_prefix:'Status '}]) assert.doesNotMatch(renderBinary({entity,variables},states),/<div class="state">/);
+ assert.match(renderBinary({entity,variables:{custom_label:'Night lighting',power_entity:'sensor.power'}},states),/<div class="state">Night lighting<\/div>/);
+ assert.match(renderBinary({template:'hc_switch_card',entity,variables:{power_entity:'sensor.power'}},states),/120 W/);
+ const sensor=renderBinary({template:'hc_sensor_card',entity:'binary_sensor.test',variables:{on_icon:'mdi:check',off_icon:'mdi:close'}},{'binary_sensor.test':{state:'off',last_updated:'2026-10-10T12:00:00Z',attributes:{}}});
+ assert.match(sensor,/icon="mdi:close"/);assert.match(sensor,/Updated /);
+});
+test('binary hiding preserves explicit title-hidden and icon-only roles',()=>{
+ const entity='switch.test',states={[entity]:{state:'on',attributes:{}}};
+ assert.doesNotMatch(renderBinary({entity,show_name:false,show_state:true,show_label:false},states),/body icon-only/);
+ assert.match(renderBinary({entity,show_name:false,show_state:false,show_label:false},states),/body icon-only/);
+});
+test('summaries retain active counts and unavailable members, but omit known All off',()=>{
+ const entity='switch.test',config={template:'hc_navigation_card',entity,variables:{summary_entities:[entity,'switch.other']}};
+ for(const [first,second,expected] of [['on','off','1 active'],['on','unavailable','1 active, 1 unavailable'],['off','unavailable','All off, 1 unavailable']]) assert.match(renderBinary(config,{[entity]:{state:first},'switch.other':{state:second}}),new RegExp(`<div class="state">${expected}<`));
+ assert.doesNotMatch(renderBinary(config,{[entity]:{state:'off'},'switch.other':{state:'off'}}),/<div class="state">/);
+});
+test('toggle graphs use their actual toggle while preserving numeric state and header details',()=>{
+ const entity='sensor.power',toggle='switch.test',states={[entity]:{state:'42',attributes:{unit_of_measurement:'W'}},[toggle]:{state:'on'}};
+ const html=renderBinary({template:'hc_toggle_graph_card',entity,variables:{toggle_entity:toggle}},states);
+ assert.match(html,/<div class="state">42 W<\/div>/);assert.match(html,/binary-cue" data-active="true"/);
+ const binary=renderBinary({template:'hc_toggle_graph_card',entity:toggle,variables:{toggle_entity:toggle,graph_entity:entity}},states);
+ assert.doesNotMatch(binary,/<div class="state">/);
+ const header=renderBinary({template:'hc_header_card',entity:toggle},states);
+ assert.doesNotMatch(header,/<div class="state">/);assert.match(header,/<div class="climate">/);
+});
+test('nonbinary and transitional content stays visible, including configured prefixes',()=>{
+ for(const [entity,value,template] of [['cover.test','opening','hc_cover_card'],['climate.test','heat','hc_climate_card'],['media_player.test','paused','hc_media_card'],['lock.test','locking','hc_access_card'],['vacuum.test','returning','hc_vacuum_card'],['sensor.test','on','hc_base_card'],['input_select.test','on','hc_scene_card']]) assert.match(renderBinary({entity,template,variables:{custom_label:'State: '}},{[entity]:{state:value,attributes:{}}}),/<div class="state">State: /);
+});
+test('binary backgrounds distinguish normal active and inactive states through shared and navigation paths',()=>{
+ for(const kind of ['hc_base_card','hc_navigation_card','hc_washing_machine_card','hc_room_card']) {
+  const config={entity:'binary_sensor.test',variables:{hc_color:'var(--color-orange)'}};
+  assert.notEqual(stateAppearance(kind,'on',config).background,stateAppearance(kind,'off',config).background);
+ }
+});
+test('binary accessible state uses Home Assistant localized device-class meanings',()=>{
+ for(const [deviceClass,on,off] of [['motion','Detected','Clear'],['moisture','Molhado','Seco'],['opening','Aberto','Fechado']]) for(const value of ['on','off']) for(const template of ['hc_sensor_card','hc_header_card']) {
+  const card=new MaraoCard();card.setConfig({template,entity:'binary_sensor.test',name:'Target'});
+  card.hass={language:deviceClass==='motion'?'en':'pt',states:{'binary_sensor.test':{state:value,attributes:{device_class:deviceClass}}},formatEntityState:state=>{assert.equal(state.entity_id,'binary_sensor.test');return state.state==='on'?on:off}};
+  assert.match(card.shadowRoot.innerHTML,new RegExp(`aria-label="Target: ${value==='on'?on:off}"`));assert.doesNotMatch(card.shadowRoot.innerHTML,/<div class="state">/);
+ }
+});
+
+const owner=()=>({_config:{},_actionError:'',_hass:{},renders:0,_render(){this.renders++}});
+test('local outcomes persist until an explicit successful retry and remain isolated',()=>{
+ const first=owner(),second=owner();const old=serviceOutcome(first);old('error',new Error('Rejected'));assert.equal(first._actionError,'Rejected');assert.equal(second._actionError,'');
+ const newer=serviceOutcome(first);newer('skipped');assert.equal(first._actionError,'Rejected');old('success');assert.equal(first._actionError,'Rejected');newer('success');assert.equal(first._actionError,'');old('error',new Error('Late'));assert.equal(first._actionError,'');assert.equal(first.renders,2);
+});
+test('configuration replacement and removal reject obsolete action callbacks',()=>{
+ const card=owner();const old=serviceOutcome(card);card._config={entity:'switch.other'};old('error',new Error('Wrong card'));assert.equal(card._actionError,'');const removed=serviceOutcome(card);card._actionLive=false;removed('error',new Error('Removed'));assert.equal(card._actionError,'');
+});
+test('card service and action paths reuse the centralized single-dispatch error notification',async()=>{
+ const card=new MaraoCard();card.setConfig({entity:'switch.test'});let calls=0,notifications=0;
+ globalThis.document={querySelector:()=>({dispatchEvent(){notifications++}})};globalThis.window={MaraoDashboard:{}};
+ card.hass={states:{'switch.test':{state:'off'}},callService:async()=>{calls++;throw new Error('Fixture rejection')}};
+ await card._performAction({action:'toggle'},'switch.test');assert.equal(calls,1);assert.equal(notifications,1);assert.equal(card._actionError,'Fixture rejection');
+ card.hass={...card._hass,callService:async()=>{calls++}};await card._performAction({action:'toggle'},'switch.test');assert.equal(calls,2);assert.equal(notifications,1);assert.equal(card._actionError,'');
+});
+test('native area and device targets retain outcome reporting and skipped connection guards',async()=>{
+ const outcomes=[],calls=[];await performAction({connected:false,callService(){}},{action:'toggle'},'switch.test',status=>outcomes.push(status));assert.deepEqual(outcomes,['skipped']);
+ await performAction({callService:async(...args)=>calls.push(args)},{action:'perform-action',perform_action:'light.turn_off',target:{area_id:'gallery'}},'',status=>outcomes.push(status));assert.deepEqual(outcomes,['skipped','sent','success']);assert.deepEqual(calls[0].slice(0,4),['light','turn_off',{}, {area_id:'gallery'}]);
+});
+
+test('outcome rendering failures cannot invent or hide native service errors',async()=>{
+ let notifications=0,calls=0;globalThis.document={querySelector:()=>({dispatchEvent(){notifications++}})};
+ const callback=()=>{throw new Error('Rendering failed')};
+ await assert.rejects(callServiceWithNotification({callService:async()=>{calls++}},'switch','toggle',{},status=>{if(status==='success')callback()}),/Rendering failed/);
+ assert.equal(calls,1);assert.equal(notifications,0);
+ await assert.rejects(callServiceWithNotification({callService:async()=>{calls++;throw new Error('Reported failure')}},'switch','toggle',{},status=>{if(status==='error')callback()}),/Rendering failed/);
+ assert.equal(calls,2);assert.equal(notifications,1);
+});
+
+const entity='light.test';const state=value=>({state:value,attributes:{}});const normal={states:{[entity]:state('on'),'sensor.reading':state('21')}};
+test('complete availability has priority over retained action and content errors',()=>{
+ for(const [states,reason] of [[{},'Entity missing'],[{[entity]:state('unknown')},'Unknown'],[{[entity]:state('unavailable')},'Unavailable']]) {
+  const problem=cardProblem({entity},{states},{error:'Rejected',contentError:'History unavailable'});assert.equal(problem.kind,'neutral');assert.equal(problem.complete,true);assert.equal(problem.reason,`${reason} · Action failed: Rejected · History unavailable`);
+ }
+ const disconnected=cardProblem({entity},{...normal,connected:false});assert.equal(disconnected.kind,'neutral');assert.equal(disconnected.reason,'Disconnected');
+ assert.equal(cardProblem({entity},{},{error:'Rejected'}).kind,'loading');assert.equal(cardProblem({template:'hc_title_card'},{connected:false}),null);
+});
+test('usable summary and glance data remain partial with failed actual members',()=>{
+ const summary={template:'hc_navigation_card',entity,variables:{summary_entities:[entity,'light.missing']}};
+ assert.equal(cardProblem(summary,normal).kind,'warning');assert.equal(cardProblem(summary,normal).complete,false);
+ assert.equal(cardProblem(summary,{states:{}}).kind,'neutral');
+ const glance={template:'hc_glance_card',entity:'sensor.missing',variables:{entity1:'sensor.reading'}};assert.equal(cardProblem(glance,normal).kind,'warning');
+ assert.equal(cardProblem({template:'hc_room_card',entity,variables:{light_entities:[entity,'light.missing']}},normal).kind,'neutral');
+});
+test('actual toggle, remote and graph failures remain distinct from readable primary content',()=>{
+ for(const config of [
+  {template:'hc_toggle_graph_card',entity:'sensor.reading',variables:{toggle_entity:'switch.missing'}},
+  {template:'hc_climate_card',entity,variables:{show_graph:true,graph_entity:'sensor.missing'}},
+  {entity,tap_action:{action:'perform-action',perform_action:'remote.send_command',target:{entity_id:'remote.missing'}}},
+ ])assert.equal(cardProblem(config,normal).kind,'warning');
+ assert.equal(cardProblem({entity,variables:{graph_entity:'sensor.missing',show_graph:false}},normal),null);
+ assert.equal(cardProblem({entity,tap_action:{action:'navigate',navigation_path:'#missing'}},normal),null);
+});
+test('only recognized operational faults take error priority over partial content',()=>{
+ for(const [template,id,value] of [['hc_vacuum_card','vacuum.test','error'],['hc_dishwasher_card','sensor.test','actionrequired'],['hc_washing_machine_card','sensor.test','error'],['hc_access_card','lock.test','jammed'],['hc_security_card','alarm_control_panel.test','triggered']]) assert.equal(cardProblem({template,entity:id},{states:{[id]:state(value)}}).kind,'error');
+ assert.equal(cardProblem({entity:'sensor.test'},{states:{'sensor.test':state('error')}}),null);
+ assert.equal(cardProblem({entity},normal,{contentError:'History unavailable',loading:true}).kind,'error');
+ assert.equal(cardProblem({entity},normal,{loading:true}).kind,'loading');assert.equal(cardProblem({entity},normal),null);
+});
+
+test('problem surfaces override custom colors and hidden normal fields without hiding usable readings', () => {
+  const card = new MaraoCard();
+  card.setConfig({ entity: 'light.test', template: 'hc_light_card', show_state: false, show_icon: false, variables: { active_color: '#123456' } });
+  card.hass = { callService() {}, states: { 'light.test': { state: 'unknown', attributes: {} } } };
+  assert.match(card.shadowRoot.innerHTML, /data-problem="neutral" style="background:var\(--marao-problem-neutral-background/);
+  assert.match(card.shadowRoot.innerHTML, /class="problem" role="status">[\s\S]*Unknown/);
+  assert.match(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /style="[^"]*#123456/);
+  card.setConfig({ entity: 'media_player.test', template: 'hc_media_card', variables: { hc_background_color: '#123456' } });
+  card._actionError = 'Reported rejection';
+  card.hass = { callService() {}, states: { 'media_player.test': { state: 'playing', attributes: { entity_picture: '/synthetic-artwork', media_title: 'Safe programme' } } } };
+  assert.match(card.shadowRoot.innerHTML, /data-problem="error" style="background:var\(--marao-problem-error-background/);
+  assert.match(card.shadowRoot.innerHTML, /Reported rejection/);
+  assert.match(card.shadowRoot.innerHTML, /Safe programme/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /class="media-artwork"/);
+  card.setConfig({ entity: 'sensor.value', template: 'hc_glance_card', variables: { entity1: 'sensor.value', entity2: 'sensor.missing' } });
+  card.hass = { states: { 'sensor.value': { state: '21', attributes: { unit_of_measurement: 'W' } } } };
+  assert.match(card.shadowRoot.innerHTML, /data-problem="warning"/);
+  assert.match(card.shadowRoot.innerHTML, /21 W/);
+  assert.match(card.shadowRoot.innerHTML, /sensor.missing: Entity missing/);
+});
+
+test('failed media stays local, waits for explicit retry, and ignores old resource callbacks', () => {
+  const card = new MaraoCard();
+  card.setConfig({ entity: 'camera.test', template: 'hc_camera_card' });
+  const images = [], retries = [];
+  card.shadowRoot.querySelectorAll = selector => {
+    if (selector !== 'img.camera,.media-artwork img' || !card.shadowRoot.innerHTML.includes('<img class="camera"')) return [];
+    const image = { isConnected: true, addEventListener(_event, callback) { this.error = callback; } };
+    images.push(image); return [image];
+  };
+  card.shadowRoot.querySelector = selector => {
+    if (selector !== '[data-media-retry]' || !card.shadowRoot.innerHTML.includes('data-media-retry')) return null;
+    const button = { addEventListener(_event, callback) { this.click = () => callback({ stopPropagation() {} }); } };
+    retries.push(button); return button;
+  };
+  const hass = { callService() {}, states: { 'camera.test': { state: 'idle', attributes: { entity_picture: '/safe-image' } } } };
+  card.hass = hass;
+  assert.equal(images.length, 1);
+  const firstError = images[0].error;
+  firstError();
+  assert.match(card.shadowRoot.innerHTML, /data-problem="error"/);
+  assert.match(card.shadowRoot.innerHTML, /Media unavailable/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /<img class="camera"/);
+  card.hass = { ...hass, states: { ...hass.states } };
+  assert.equal(images.length, 1);
+  retries.at(-1).click();
+  assert.equal(images.length, 2);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-problem="error"/);
+  images[0].isConnected = false;
+  firstError();
+  assert.equal(card._mediaError, '');
+  card.setConfig({ entity: 'camera.other', template: 'hc_camera_card' });
+  images[1].error();
+  assert.equal(card._mediaError, '');
+});
+
+for (const fail of [false, true]) test(`graph history survives a temporary HA shell move (${fail ? 'error' : 'ready'})`, async () => {
+  const card = new MaraoCard();
+  card.isConnected = true;
+  card.setConfig({entity: 'sensor.power', template: 'hc_graph_card'});
+  let calls = 0, finish, reject;
+  card.hass = {states: {'sensor.power': {state: '125', attributes: {}}}, callApi: () => {calls++; return new Promise((resolve, fail) => {finish = resolve; reject = fail;});}};
+  card.isConnected = false;
+  card.disconnectedCallback();
+  card.isConnected = true;
+  card.connectedCallback();
+  assert.equal(calls, 1);
+  if (fail) reject(new Error('history failed')); else finish([]);
+  await new Promise(resolve => setImmediate(resolve));
+  card.isConnected = false;
+  card.disconnectedCallback();
+  card.isConnected = true;
+  card.connectedCallback();
+  assert.equal(calls, 1);
+  assert.match(card.shadowRoot.innerHTML, new RegExp(`data-graph-history-state="${fail ? 'error' : 'empty'}"`));
+});
+
+test('unrelated HA updates retain an active strict access slide with the current service context', () => {
+  for (const change of ['unrelated', 'target', 'unknown', 'disconnect', 'locale']) {
+    const card = new MaraoCard();
+    card.setConfig({entity: 'lock.test', template: 'hc_access_slide_action_card', variables: {action_service: 'lock.unlock'}});
+    const state = {state: 'locked', attributes: {}};
+    const hass = {states: {'lock.test': state}, callService() {}, language: 'en'};
+    card.hass = hass;
+    const slide = {_pointerId: 1};
+    card.shadowRoot.querySelector = selector => selector === 'marao-slide-to-open' ? slide : null;
+    let renders = 0; card._render = () => renders++;
+    const next = {...hass, states: {...hass.states, 'sensor.other': {state: '20'}}};
+    if (change === 'target') next.states['lock.test'] = {...state, state: 'unlocked'};
+    if (change === 'unknown') next.states['lock.test'] = {...state, state: 'unknown'};
+    if (change === 'disconnect') next.connected = false;
+    if (change === 'locale') next.language = 'pt';
+    card.hass = next;
+    assert.equal(renders, change === 'unrelated' ? 0 : 1, change);
+    if (change === 'unrelated') assert.equal(slide.hass, next);
   }
 });

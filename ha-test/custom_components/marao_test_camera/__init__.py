@@ -11,6 +11,7 @@ import voluptuous as vol
 
 from homeassistant.components import websocket_api
 from homeassistant.components.http import HomeAssistantView
+from homeassistant.components.http.const import KEY_HASS
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.service import async_register_admin_service
 
@@ -26,17 +27,44 @@ async def async_setup(hass, config):
     websocket_api.async_register_command(hass, events)
     hass.http.register_view(FixtureMediaView)
 
+    unit_entity = "sensor.marao_dashboard_test_energy_format_missing_live"
+
+    def set_energy_unit(failed):
+        state = hass.states.get(unit_entity)
+        if state is None:
+            raise HomeAssistantError("Safe energy fixture is not ready")
+        attributes = dict(state.attributes)
+        if failed:
+            attributes.pop("unit_of_measurement", None)
+        else:
+            attributes["unit_of_measurement"] = "Wh"
+        hass.states.async_set(unit_entity, state.state, attributes)
+
+    async def toggle_energy_unit(call):
+        state = hass.states.get(unit_entity)
+        set_energy_unit(state is not None and "unit_of_measurement" in state.attributes)
+
     async def reset(call):
+        if hass.states.get(unit_entity) is not None:
+            set_energy_unit(False)
         for domain in ("climate", "media_player"):
             for entity in getattr(hass.data.get(domain), "entities", ()):
+                if reset_entity := getattr(entity, "async_marao_reset", None):
+                    await reset_entity()
+                    continue
                 if values := getattr(entity, "_marao_initial_attrs", None):
                     for key, value in values.items():
                         setattr(entity, key, value)
                     entity.async_write_ha_state()
 
     async def reject_action(call):
+        if hass.states.is_state("input_boolean.marao_dashboard_test_action_failure", "off"):
+            return
         raise HomeAssistantError("Simulated safe action failure")
 
+    async_register_admin_service(hass, DOMAIN, "toggle_energy_unit", toggle_energy_unit, vol.Schema({
+        vol.Optional("entity_id"): unit_entity,
+    }))
     async_register_admin_service(hass, DOMAIN, "reset", reset)
     async_register_admin_service(hass, DOMAIN, "reject_action", reject_action, vol.Schema({
         vol.Optional("entity_id"): "sensor.marao_dashboard_test_temperature",
@@ -67,6 +95,8 @@ async def events(hass, connection, msg):
         {"id": "marao-test-clip", "label": "person", "start_time": now - 60, "has_clip": True},
         {"id": "marao-test-snapshot", "label": "car", "start_time": now - 180, "has_clip": False},
     ]
+    if camera == "media_error":
+        result = [{"id": "marao-test-media-error", "label": "person", "start_time": now - 60, "has_clip": False}]
     connection.send_result(msg["id"], result[:msg["limit"]])
 
 
@@ -82,6 +112,10 @@ class FixtureMediaView(HomeAssistantView):
     requires_auth = True
 
     async def get(self, request, event_id):
+        if event_id == "marao-test-media-error":
+            if not request.app[KEY_HASS].states.is_state("input_boolean.marao_dashboard_test_media_failure", "off"):
+                return web.Response(body=b"<svg", content_type="image/svg+xml")
+            return web.FileResponse(MEDIA / "event.svg")
         if event_id not in {"marao-test-clip", "marao-test-snapshot"}:
             raise web.HTTPNotFound()
         filename = "event.mp4" if request.path.endswith("/clip.mp4") else "event.svg"

@@ -57,8 +57,29 @@ the repository; it does not install the root Node/Python test dependencies.
 Bundled Monaco assets are required editor runtime assets. Third-party Lovelace
 cards are not dependencies and must not be bundled or modified.
 
+## Dashboard JSON format
+
+`generator.py` owns `dashboard_config_version`, `migrate_dashboard_config`, and
+the ordered `DASHBOARD_CONFIG_MIGRATIONS` sequence. Conversion works on a deep
+copy before normalization; each step advances the private copy's marker only
+after it succeeds. Load/write/setup preflight reject malformed or newer markers.
+
+| Format | Meaning and expected conversion |
+| --- | --- |
+| Absent marker or integer `0` | Released area-linked input; conversion honors explicit selections, imports area-only rooms once and folds legacy membership instructions into explicit entries |
+| `1` | Explicit room membership; `area` supplies suggestions, empty selections stay empty and generation never expands an area |
+
+The format number is independent of package, editor-catalog and HA config-entry
+versions. Each later format adds the next ordered conversion with focused checks
+for direct skipped-version upgrades, failure preservation and idempotence.
+Unknown fields and raw content remain present. Existing theme aliases still
+follow the legacy repair path; durable migration commit/recovery and release-only
+upgrade orchestration remain pending in `ensure-safe-dashboard-upgrades`.
+
 ## Continue development
 
+- [Brand assets]({{ '/docs/development/brand-assets.html' | relative_url }})
+  documents the canonical mountain artwork, theme variants, and local export.
 - [Local development]({{ '/docs/development/local-development.html' | relative_url }})
   covers dependencies, token/SSH configuration, current-code deployment, reloads,
   tests, manual preview, and troubleshooting.

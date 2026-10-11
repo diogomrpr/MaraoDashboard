@@ -1,0 +1,24 @@
+type: vertical-stack
+cards:
+- type: custom:marao-navbar-card
+  routes:
+  - icon: mdi:home-variant-outline
+    icon_selected: mdi:home-variant
+    label: Home
+    url: /marao-dashboard/overview
+  - icon: mdi:sofa-outline
+    icon_selected: mdi:sofa
+    label: Rooms
+    url: /marao-dashboard/rooms
+  - icon: mdi:shield-home-outline
+    icon_selected: mdi:shield-home
+    label: Security
+    url: /marao-dashboard/security
+  - icon: mdi:lightning-bolt-outline
+    icon_selected: mdi:lightning-bolt
+    label: Energy
+    url: /marao-dashboard/energy
+  - url: /marao-dashboard/card-test
+    label: Cases
+    icon: mdi:test-tube
+    icon_selected: mdi:test-tube

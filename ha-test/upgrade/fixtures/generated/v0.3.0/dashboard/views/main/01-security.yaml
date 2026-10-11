@@ -1,0 +1,75 @@
+title: Security
+path: security
+icon: mdi:shield-home
+cards:
+  # marao:generated:start
+  - type: custom:button-card
+    template: hc_security_card
+    entity: alarm_control_panel.home
+    name: Home
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_access_card
+      entity: lock.front_door
+      name: Front Door
+      variables:
+        popup_hash: '#access-lock-front-door'
+  - type: custom:button-card
+    template: hc_switch_card
+    entity: button.open_door
+    name: Open Door
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.open_door
+      haptic: heavy
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#access-lock-front-door'
+    button_type: state
+    entity: lock.front_door
+    name: Front Door
+    icon: mdi:lock
+    show_icon: true
+    show_name: true
+    show_state: true
+    scrolling_effect: false
+    close_by_clicking_outside: true
+    styles: ".bubble-pop-up,\n.bubble-pop-up-container {\n  overscroll-behavior: contain !important;\n  touch-action: pan-y !important;\n}\n.bubble-pop-up-container {\n  height: 100% !important;\n  align-items: stretch !important;\n  align-content: start !important;\n  justify-content: flex-start !important;\n}\n.bubble-pop-up {\n  position: fixed !important;\n  inset: auto 0 0 0 !important;\n  height: min(420px, 80vh) !important;\n  max-height: 80vh !important;\n  margin: 0 !important;\n  overflow-y: auto !important;\n}\n.bubble-pop-up-container > .bubble-cards-container,\n.bubble-pop-up-container > ha-sortable {\n  align-self: stretch !important;\n  margin-top: 16px !important;\n}\n"
+    cards:
+    - type: grid
+      columns: 1
+      square: false
+      cards:
+      - type: custom:button-card
+        template: hc_access_slide_action_card
+        entity: lock.front_door
+        name: Unlock
+        icon: mdi:lock-open-variant
+        variables:
+          action_service: lock.unlock
+          action_requires_hold: false
+          action_label_key: common.unlock
+          action_color: var(--color-red)
+      - type: custom:button-card
+        template: hc_access_action_card
+        entity: lock.front_door
+        name: Lock
+        icon: mdi:lock
+        variables:
+          action_service: lock.lock
+          action_requires_hold: false
+          action_label_key: common.lock
+          action_color: var(--color-green)
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

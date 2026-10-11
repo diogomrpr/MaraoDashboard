@@ -1,0 +1,15 @@
+{
+  "config_version": 2,
+  "name": "Intentionally empty installation",
+  "navigation": [],
+  "extension": {"deleted": ["room-office", "security", "energy"]},
+  "slug": "intentionally-empty-installation",
+  "theme": "Marao Dashboard",
+  "icon": "marao_dashboard:mountain",
+  "landing_page": "overview",
+  "pages": [
+    {"id": "overview", "name": "Home", "name_key": "nav.home", "path": "overview", "icon": "mdi:home-variant", "output_path": "views/main/00-overview.yaml", "sections": []},
+    {"id": "rooms", "name": "Rooms", "name_key": "nav.rooms", "path": "rooms", "icon": "mdi:sofa", "output_path": "views/main/02-rooms.yaml", "sections": [{"columns": 2, "entities": []}]}
+  ],
+  "legacy_page_options": {"overview": {"scenes": []}, "pages": {}}
+}

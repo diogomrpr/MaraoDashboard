@@ -1,0 +1,142 @@
+{
+  "name": "Generated Test",
+  "overview": {
+    "scenes": [
+      "input_boolean.holiday_mode"
+    ],
+    "weather_entity": "weather.fixture",
+    "future": {
+      "preserve": true
+    }
+  },
+  "rooms": [
+    {
+      "name": "Living Room",
+      "entities": [
+        "light.living_room_main",
+        "cover.living_room_blind",
+        "climate.living_room",
+        "lock.front_door",
+        "input_boolean.holiday_mode",
+        "input_number.target_temperature",
+        {
+          "entity_id": "media_player.living_room_tv",
+          "apple_tv": {
+            "remote_entity": "remote.living_room_tv",
+            "apps": [
+              {
+                "name": "YouTube",
+                "source": "YouTube",
+                "icon": "mdi:youtube",
+                "future_app_option": true
+              }
+            ],
+            "volume_remote_entity": "remote.volume_fixture",
+            "future_remote_option": true
+          }
+        },
+        {
+          "entity_id": "sensor.fixture_battery",
+          "template": "hc_battery_card"
+        }
+      ],
+      "cards": [
+        {
+          "type": "markdown",
+          "content": "Preserved raw note",
+          "future": {
+            "preserve": true
+          }
+        }
+      ],
+      "future_page": {
+        "preserve": true
+      }
+    }
+  ],
+  "pages": {
+    "security": {
+      "alarm_entity": "alarm_control_panel.home",
+      "actions": [
+        "button.open_door"
+      ]
+    },
+    "energy": {
+      "house_power": {
+        "entity_id": "sensor.house_power",
+        "name": "Whole-home demand",
+        "icon": "mdi:home-lightning-bolt",
+        "future_card": 42,
+        "variables": {
+          "show_graph_line": false,
+          "future_option": {
+            "preserve": true
+          }
+        }
+      },
+      "month_energy": "sensor.month_energy",
+      "month_cost": "sensor.month_cost",
+      "loads": [
+        {
+          "power_entity": "sensor.heater_power",
+          "toggle_entity": "switch.heater"
+        }
+      ],
+      "appliances": [
+        {
+          "entity_id": "sensor.dishwasher",
+          "template": "hc_dishwasher_card"
+        }
+      ],
+      "today_energy": {
+        "entity_id": "sensor.today_energy",
+        "name": "Daily meter",
+        "icon": "mdi:counter",
+        "future_card": true
+      },
+      "today_cost": {
+        "entity_id": "sensor.today_cost",
+        "name": "Daily spend",
+        "icon": "mdi:cash",
+        "future_card": true
+      },
+      "future_page": {
+        "preserve": true
+      }
+    },
+    "wallbox": {
+      "status_entity": "sensor.wallbox_status",
+      "charging_power_entity": "sensor.wallbox_power",
+      "current_control_entity": {
+        "entity_id": "input_number.wallbox_current",
+        "name": "Requested current",
+        "icon": "mdi:ev-plug-type2",
+        "variables": {
+          "future_option": true
+        }
+      },
+      "pause_resume_entity": "switch.wallbox_pause",
+      "max_current_entity": {
+        "entity_id": "sensor.max_current",
+        "name": "Current limit",
+        "icon": "mdi:current-ac",
+        "variables": {
+          "future_option": true
+        }
+      },
+      "current_presets": [
+        6,
+        12,
+        16
+      ]
+    },
+    "media": {}
+  },
+  "config_version": 1,
+  "extension": {
+    "preserve": [
+      "second",
+      "first"
+    ]
+  }
+}

@@ -1,0 +1,54 @@
+title: Wallbox
+path: wallbox
+icon: mdi:ev-station
+theme: Marao Dashboard
+cards:
+  # marao:generated:start
+  - type: custom:marao-card
+    template: hc_base_card
+    entity: sensor.marao_dashboard_test_wallbox_status
+    name: Wallbox
+    icon: mdi:ev-station
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:marao-card
+      template: hc_graph_card
+      entity: sensor.marao_dashboard_test_wallbox_power
+      name: Charging Power
+      icon: mdi:flash
+      variables:
+        show_graph_fill: true
+        show_graph_line: true
+        show_icon: true
+    - type: custom:marao-card
+      template: hc_graph_card
+      entity: sensor.marao_dashboard_test_wallbox_maximum_current
+      name: Maximum Current
+      icon: mdi:current-ac
+      variables:
+        show_graph_fill: true
+        show_graph_line: true
+        show_icon: true
+  - type: custom:marao-card
+    template: hc_wallbox_current_card
+    entity: input_number.marao_dashboard_test_wallbox_current
+    name: Charging Current
+    variables:
+      shortcuts:
+      - 6
+      - 12
+      - 16
+  - type: custom:marao-card
+    template: hc_switch_card
+    entity: input_boolean.marao_dashboard_test_wallbox_pause
+    name: Pause Charging
+    icon: mdi:pause-circle
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/dashboard/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

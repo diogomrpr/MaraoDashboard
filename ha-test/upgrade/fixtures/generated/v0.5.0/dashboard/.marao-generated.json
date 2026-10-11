@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "plain": [
+    "components/navigation/navbar.yaml",
+    "dashboard.yaml"
+  ],
+  "containers": [
+    "views/main/00-overview.yaml",
+    "views/main/02-rooms.yaml",
+    "views/rooms/00-garden.yaml"
+  ]
+}

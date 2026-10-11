@@ -1,0 +1,29 @@
+title: Rooms
+path: rooms
+icon: mdi:sofa
+cards:
+  # marao:generated:start
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_room_card
+      entity: light.living_room_main
+      name: Living Room
+      icon: mdi:sofa-outline
+      variables:
+        light_entities:
+        - light.living_room_main
+        lights_target_entity: light.living_room_main
+      tap_action:
+        action: navigate
+        navigation_path: /marao-generated-test/room-living-room
+        haptic: heavy
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

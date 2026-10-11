@@ -5,7 +5,7 @@ const { chromium } = require("playwright");
 const deviceDescriptors = require("./mobile-devices");
 const { accessToken, setBrowserToken, assertCurrentFrontend, assertDisposableHaTarget, readConfig } = require("../ha-test/client");
 const { prepare } = require("../ha-test/prepare");
-const { scrollDashboard } = require("./test-ha-dashboard-e2e");
+const { scrollDashboard, titleLayoutIssues } = require("./test-ha-dashboard-e2e");
 
 const repoRoot = path.resolve(__dirname, "..");
 const themePath = path.join(
@@ -42,12 +42,174 @@ function parseArgs(argv = process.argv.slice(2)) {
     preview: argv.includes("--preview"),
     scenario: argumentValue(argv, "--scenario"),
     theme: argumentValue(argv, "--theme"),
+    ...(argv.includes('--safe-area') ? { safeArea: true } : {}),
+    ...(argv.includes('--pages') ? { pages: true } : {}),
   };
+}
+
+const insetSides = ['top', 'right', 'bottom', 'left'];
+const safeAreaCases = [
+  { name: 'app-only', app: { top: 47, bottom: 34 }, browser: {} },
+  { name: 'different-app-browser', app: { top: 59, bottom: 34 }, browser: { top: 47, bottom: 21 } },
+  { name: 'browser-only', browser: { top: 47, bottom: 34 } },
+  { name: 'explicit-zero', app: {}, browser: { top: 47, bottom: 34 } },
+  { name: 'host-padded', app: { top: 47, bottom: 34 }, browser: {}, hostTop: 47 },
+  { name: 'rotation', app: { left: 47, right: 47, bottom: 21 }, browser: { top: 59 }, viewport: { width: 844, height: 390 } },
+  { name: 'portrait-again', app: { top: 59, bottom: 34 }, browser: {}, viewport: { width: 390, height: 844 } },
+];
+
+async function applySafeAreaSource(context, page, source) {
+  if(source.viewport)await page.setViewportSize(source.viewport);
+  const session = await context.newCDPSession(page);
+  const insets = Object.fromEntries(insetSides.flatMap(side => [[side, source.browser[side] || 0], [side + 'Max', source.browser[side] || 0]]));
+  await session.send('Emulation.setSafeAreaInsetsOverride', { insets });
+  await session.detach();
+  await page.evaluate(({ sides, app, hostTop }) => {
+    const visit = root => { for(const element of root?.children || []) {
+      for(const side of sides) element.style.removeProperty('--marao-safe-area-inset-' + side);
+      visit(element.shadowRoot); visit(element);
+    }}; visit(document);
+    for(const side of sides) {
+      const property = '--app-safe-area-inset-' + side;
+      if(app === undefined) document.documentElement.style.removeProperty(property);
+      else document.documentElement.style.setProperty(property, (app[side] || 0) + 'px');
+    }
+    const navbar = document.querySelector('home-assistant');
+    const findView = root => {
+      if(!root) return null;
+      const view = root.querySelector?.('hui-view-container#view');
+      if(view) return view;
+      for(const e of root.querySelectorAll?.('*') || []) { const found = findView(e.shadowRoot); if(found)return found; }
+      return null;
+    };
+    const view = findView(navbar.shadowRoot);
+    if(!view) throw new Error('Missing active dashboard container');
+    view.style.marginTop = hostTop ? hostTop + 'px' : '';
+    if(hostTop) view.style.setProperty('--safe-area-inset-top', '0px');
+    else view.style.removeProperty('--safe-area-inset-top');
+  }, { sides: insetSides, app: source.app, hostTop: source.hostTop });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function safeAreaGeometry(page, source) {
+  const expected = source.app || source.browser;
+  return page.evaluate(({ expected, hostTop }) => {
+    const issues = [];
+    const card = (()=>{ const find=root=>{if(!root)return;const c=root.querySelector?.('marao-card');if(c)return c;for(const e of root.querySelectorAll?.('*')||[]){const c=find(e.shadowRoot);if(c)return c;}};return find(document);})();
+    if(!card) return { issues: ['Missing first card'] };
+    const ancestors=[];for(let e=card;e;e=e.parentElement||e.getRootNode()?.host)ancestors.push(e);
+    const view=ancestors.find(e=>e.id==='view');const bounds=card.getBoundingClientRect();
+    const padding=parseFloat(getComputedStyle(view).paddingTop);
+    const top=expected.top||0;
+    if(bounds.top<top-1)issues.push('First content overlaps the safe top edge');
+    if(Math.abs(padding-(hostTop?0:top))>1)issues.push('Active container does not match selected clearance');
+    if(hostTop && padding>1)issues.push('Already-safe host has duplicate top clearance');
+    if(bounds.left<(expected.left||0)-1||bounds.right>innerWidth-(expected.right||0)+1)issues.push('First content overlaps a safe side edge');
+    const navbar=ancestors.find(e=>e.localName==='hui-view')?.querySelector('marao-navbar-card');
+    const findNav=root=>{if(!root)return;const n=root.querySelector?.('marao-navbar-card');if(n)return n;for(const e of root.querySelectorAll?.('*')||[]){const n=findNav(e.shadowRoot);if(n)return n;}};
+    const nav=(navbar||findNav(document))?.shadowRoot.querySelector('nav')?.getBoundingClientRect();
+    if(nav && (nav.left<(expected.left||0)-1||nav.right>innerWidth-(expected.right||0)+1))issues.push('Navbar overlaps a safe side edge');
+    const navBottom=/iPhone|iPod/.test(navigator.userAgent)?Math.max(4,(expected.bottom||0)-20):12;
+    if(nav && Math.abs(innerHeight-nav.bottom-navBottom)>1)issues.push('Navbar ignores the selected bottom inset');
+    if(nav && [...(navbar||findNav(document)).shadowRoot.querySelectorAll('a')].some(a=>{const r=a.getBoundingClientRect();return r.width<48||r.height<48||r.left<nav.left||r.right>nav.right||r.top<nav.top||r.bottom>nav.bottom;}))issues.push('Navbar touch target is too small or outside its bar');
+    return {issues, first:bounds.toJSON(), padding, nav:nav?.toJSON(), top: view.getBoundingClientRect().top,
+      ownerStyles: [...(ancestors.find(e=>e.localName==='hui-root')?.shadowRoot?.adoptedStyleSheets||[])].flatMap(s=>[...s.cssRules].map(r=>r.cssText)).filter(s=>/padding|header-height|#view/.test(s)),
+      ancestors:ancestors.map(e=>e.localName), resolved:getComputedStyle(view).getPropertyValue('--safe-area-inset-top')};
+  }, { expected, hostTop: source.hostTop });
+}
+
+async function inspectSafeAreaSheets(context, page, output, runName) {
+  const sources = [safeAreaCases[0], safeAreaCases.find(c => c.name === 'rotation'), safeAreaCases.at(-1)];
+  for (const [hash, kind] of [['#marao-dashboard-card-test-popup', 'auto'], ['#marao-dashboard-test-value-sliders-popup', 'fixed'], ['#marao-dashboard-test-tall-controls-popup', 'tall']]) {
+    await applySafeAreaSource(context, page, sources[0]);
+    const trigger = page.locator('marao-card').filter({ has: page.locator('[data-card-action]') });
+    const target = await trigger.evaluateAll((cards, hash) => cards.findIndex(c => c._config.variables?.popup_hash === hash || c._config.tap_action?.navigation_path === hash), hash);
+    if (target < 0) throw new Error(`Missing safe sheet trigger: ${kind}`);
+    const host = trigger.nth(target), control = host.locator('[data-card-action]');
+    await control.scrollIntoViewIfNeeded(); await control.focus(); await control.tap({ position: { x: 12, y: 12 } });
+    const sheet = page.locator('.marao-popup-sheet');
+    await sheet.waitFor({ state: 'visible' });
+    await sheet.evaluate(async e => { await Promise.all(e.getAnimations().map(a => a.finished)); });
+    const original = await sheet.elementHandle();
+    await page.locator('marao-popup-card').evaluateAll(cards => { window.__safeSheetOwner=cards.find(c=>c._open); });
+    for (const source of sources) {
+      await applySafeAreaSource(context, page, source);
+      await sheet.evaluate(e => e.scrollTo({ top: 0, behavior: 'instant' }));
+      const issues = await sheet.evaluate((e, { app, kind, original }) => {
+        const issues = [], bounds = e.getBoundingClientRect(), close = e.querySelector('.marao-popup-close').getBoundingClientRect();
+        if(e !== original) issues.push(`Rotation replaced the open sheet (original connected: ${original.isConnected}; original owner connected: ${window.__safeSheetOwner.isConnected}; owner open: ${window.__safeSheetOwner._open})`);
+        if(bounds.top < (app.top || 0)-1 || bounds.left < (app.left || 0)-1 || bounds.right > innerWidth-(app.right || 0)+1)issues.push('Sheet overlaps a safe edge');
+        if(close.width < 48 || close.height < 48 || close.top < bounds.top || close.right > bounds.right)issues.push('Close control is not contained');
+        if(kind === 'tall' && Math.abs(bounds.top-(app.top || 0))>1)issues.push('Tall sheet does not use available height');
+        if(kind === 'fixed' && Math.abs(bounds.height-innerHeight/2)>1)issues.push('Fixed sheet lost its configured height');
+        if(kind === 'auto' && getComputedStyle(e).paddingTop !== '0px')issues.push('Short sheet acquired duplicate top padding');
+        const column=window.__safeSheetOwner._viewOwner?.view.shadowRoot.querySelector('#columns > div:first-child');
+        const width=column?.getBoundingClientRect().width;
+        if(width>0 && Math.abs(bounds.width-Math.min(Math.round(width),innerWidth-(app.left||0)-(app.right||0)))>1)issues.push('Sheet did not retain the current column width');
+        if(![...e.getRootNode().children].filter(c=>c!==e.parentElement).every(c=>c.inert))issues.push('Background is not inert');
+        return issues;
+      }, { app: source.app, kind, original });
+      await page.screenshot({path:path.join(output,`${runName}-safe-sheet-${kind}-${source.name}.png`),scale:'css'});
+      if(issues.length)throw new Error(`${kind} ${source.name}: ${issues.join('; ')}`);
+      const background = await page.evaluate(() => scrollY);
+      await sheet.evaluate(e => e.scrollTo({ top: e.scrollHeight, behavior: 'instant' }));
+      if(await page.evaluate(() => scrollY) !== background)throw new Error('Sheet scrolling moved the background');
+      await page.locator('.marao-popup-close').click({ trial: true });
+    }
+    await page.locator('.marao-popup-close').click(); await sheet.waitFor({state:'detached'});
+    await page.waitForFunction(({host})=>host.shadowRoot.activeElement===host.shadowRoot.querySelector('[data-card-action]'),{host:await host.elementHandle()});
+  }
+}
+
+async function inspectFullscreenLifecycle(page) {
+  for (const route of ['/config/dashboard', '/marao-dashboard-editor']) {
+    await page.locator('marao-navbar-card').evaluate(navbar => {
+      let root=navbar;while(root&&root.localName!=='hui-root')root=root.parentElement||root.getRootNode()?.host;
+      window.__safeOwned={view:root.shadowRoot.querySelector('#view'),header:root.shadowRoot.querySelector('.header')};
+    });
+    await page.evaluate(route => {history.pushState(null,'',route);window.dispatchEvent(new CustomEvent('location-changed'));},route);
+    const native = page.locator(route === '/marao-dashboard-editor' ? 'marao-dashboard-panel' : 'ha-config-dashboard');
+    await native.waitFor({state:'visible'});
+    if(route === '/marao-dashboard-editor') await page.waitForFunction(panel=>panel._loaded,await native.elementHandle());
+    else {
+      const count = await native.evaluate(async panel=>(await panel.hass.callWS({type:'repairs/list_issues'})).issues.filter(issue=>!issue.ignored).length);
+      await page.waitForFunction(({panel,count})=>panel._repairsIssues.total===count,{panel:await native.elementHandle(),count});
+    }
+    await native.evaluate(async root => {
+      const visit = async element => {
+        await element.updateComplete;
+        if(element.localName === 'img' && element.src) {
+          if(!element.complete) await new Promise((resolve,reject)=>{
+            element.addEventListener('load',resolve,{once:true});
+            element.addEventListener('error',()=>reject(new Error('Native route image failed')),{once:true});
+          });
+          if(!element.naturalWidth)throw new Error('Native route image is empty');
+        }
+        await Promise.all([...element.children,...(element.shadowRoot?.children||[])].map(visit));
+      };
+      await visit(root);
+    });
+    // Native settings resolve integration icons after their first Lit render.
+    await page.waitForLoadState('networkidle');
+    await page.waitForFunction(() => {
+      const {view,header}=window.__safeOwned;
+      return !view.style.getPropertyValue('padding-top') && !header.style.getPropertyValue('display');
+    });
+    await page.evaluate(() => {history.pushState(null,'','/marao-dashboard/card-test');window.dispatchEvent(new CustomEvent('location-changed'));});
+    await page.locator('marao-navbar-card').waitFor({state:'visible'});
+    await page.waitForFunction(() => {
+      const find=root=>{if(!root)return;const nav=root.querySelector?.('marao-navbar-card');if(nav)return nav;for(const e of root.querySelectorAll?.('*')||[]){const nav=find(e.shadowRoot);if(nav)return nav;}};
+      let root=find(document);while(root&&root.localName!=='hui-root')root=root.parentElement||root.getRootNode()?.host;
+      return root?.shadowRoot.querySelector('.header')?.style.display==='none';
+    });
+  }
 }
 
 function selectedRuns(options) {
   const selectedScenarios = options.scenario
     ? scenarios.filter(({ name }) => name === options.scenario)
+    : options.safeArea
+      ? scenarios.filter(({ name }) => name === "iphone-normal")
     : options.preview
       ? scenarios.filter(({ name }) => name === "iphone-bold-text-200")
       : scenarios;
@@ -100,10 +262,17 @@ function safeAreaInsetsForScenario(scenario) {
   };
 }
 
-async function configurePageEmulation(context, page, scenario) {
-  const session = await context.newCDPSession(page);
+const pageEmulationSessions = new WeakMap();
+
+async function configurePageEmulation(context, page, scenario, insets = safeAreaInsetsForScenario(scenario)) {
+  let session = pageEmulationSessions.get(page);
+  if (!session) {
+    session = await context.newCDPSession(page);
+    pageEmulationSessions.set(page, session);
+  }
+  await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
   await session.send("Emulation.setSafeAreaInsetsOverride", {
-    insets: safeAreaInsetsForScenario(scenario),
+    insets,
   });
   await session.send("Emulation.setEmulatedOSTextScale", { scale: scenario.textScale });
 }
@@ -142,7 +311,7 @@ function visualVariablesForScenario(scenario, theme) {
 
 async function applyVisualPreferences(page, scenario, theme) {
   const variables = visualVariablesForScenario(scenario, theme);
-  await page.evaluate(({ cssVariables, profile, mode }) => {
+  const apply = () => page.evaluate(({ cssVariables, profile, mode }) => {
     const apply = (element) => {
       for (const [name, value] of Object.entries(cssVariables)) {
         element.style.setProperty(name, value, "important");
@@ -164,8 +333,11 @@ async function applyVisualPreferences(page, scenario, theme) {
     };
     visit(document.documentElement);
   }, { cssVariables: variables, profile: scenario.name, mode: theme });
+  await apply();
   await page.evaluate(async () => { await document.fonts?.ready; });
   await page.waitForTimeout(300);
+  // HA may mount themed cards while fonts and scroll rendering settle.
+  await apply();
 }
 
 async function emulationIssues(page, scenario, theme) {
@@ -243,7 +415,7 @@ async function emulationIssues(page, scenario, theme) {
 }
 
 async function layoutIssues(page) {
-  return page.evaluate(() => {
+  const issues = await page.evaluate(() => {
     const issues = [];
     const intersects = (a, b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
     const context = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
@@ -265,15 +437,19 @@ async function layoutIssues(page) {
         if (element.localName === "hui-error-card" || element.localName === "hui-warning") {
           issues.push(`${element.localName}: ${element.textContent?.trim() || "rendered without details"}`);
         }
-        if (owned && element.matches?.(".message.error")) {
+        if (owned && element.matches?.('.message.error,.problem span,.reading.neutral dt,.reading.neutral dd,[data-problem]:not([data-problem="loading"]) .message,[data-problem]:not([data-problem="loading"]) .status,[data-problem]:not([data-problem="loading"]) .empty')) {
           let background;
+          let opacity = 1;
           for (let ancestor = element; ancestor; ancestor = ancestor.parentElement || ancestor.getRootNode()?.host) {
+            opacity *= Number(getComputedStyle(ancestor).opacity);
             const color = rgba(getComputedStyle(ancestor).backgroundColor);
             if (color[3] === 255) { background = color; break; }
           }
           if (!background) issues.push(`${element.textContent.trim()}: error background is not measurable`);
           else {
-            const values = [luminance(rgba(getComputedStyle(element).color)), luminance(background)].sort((a, b) => a - b);
+            const foreground = rgba(getComputedStyle(element).color), alpha = opacity * foreground[3] / 255;
+            const visible = foreground.slice(0, 3).map((channel, index) => channel * alpha + background[index] * (1 - alpha));
+            const values = [luminance(visible), luminance(background)].sort((a, b) => a - b);
             const ratio = (values[1] + 0.05) / (values[0] + 0.05);
             if (ratio < 4.5) issues.push(`${element.textContent.trim()}: error text contrast is ${ratio.toFixed(2)}:1; expected 4.5:1`);
           }
@@ -298,6 +474,40 @@ async function layoutIssues(page) {
             if (links.slice(index + 1).some((other) => intersects(link, other))) issues.push("navbar touch targets overlap");
           }
         }
+        if (owned && element.matches?.('[data-history-retry],[data-graph-retry],[data-media-retry],.surface > .problem[role="status"]')) {
+          const probe = document.createElement('span');
+          probe.style.cssText = 'font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500)';
+          element.parentElement.append(probe);
+          const expected = getComputedStyle(probe), actual = getComputedStyle(element);
+          if (actual.fontSize !== expected.fontSize || actual.fontWeight !== expected.fontWeight || actual.fontFamily !== expected.fontFamily) {
+            issues.push(`${element.textContent.trim()}: status or Retry text does not follow shared scalable typography`);
+          }
+          probe.remove();
+        }
+        if (element.localName === "marao-slide-to-open") {
+          const track = element.shadowRoot?.querySelector('.track');
+          const label = element.shadowRoot?.querySelector('.label');
+          const thumb = element.shadowRoot?.querySelector('.thumb');
+          if (track && getComputedStyle(track).outlineStyle !== 'none') issues.push('access slide has a focus-only outline');
+          if (label && thumb) {
+            const range = document.createRange(); range.selectNodeContents(label);
+            if ([...range.getClientRects()].some(rect => rect.width && rect.height && intersects(rect, thumb.getBoundingClientRect()))) {
+              issues.push(`${label.textContent.trim()}: access slide label overlaps its thumb`);
+            }
+          }
+        }
+        if (element.localName === "marao-state-timeline-card") {
+          const labels = [...(element.shadowRoot?.querySelectorAll(".tick b,.legend span") || [])];
+          const bounds = labels.map(label => {
+            const range = document.createRange(); range.selectNodeContents(label);
+            return [...range.getClientRects()].filter(rect => rect.width > 0 && rect.height > 0);
+          });
+          for (let index = 0; index < labels.length; index++) {
+            if (bounds[index].some(rect => bounds.slice(index + 1).some(other => other.some(candidate => intersects(rect, candidate))))) {
+              issues.push(`${labels[index].textContent}: timeline time or legend labels overlap`);
+            }
+          }
+        }
         if (element.localName === "marao-energy-period-card") {
           const chart = element.shadowRoot?.querySelector(".chart")?.getBoundingClientRect();
           for (const label of element.shadowRoot?.querySelectorAll(".scale span") || []) {
@@ -313,6 +523,14 @@ async function layoutIssues(page) {
         if (owned && element.matches?.(".title,.state,.climate,.current-temperature,.number-value,.value,.empty,h1,h2,.message,.climate-mode,.legend span,.meta strong,.detail-meta strong,.reading dt,.reading dd,.header-date,.media-summary")) {
           if (element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1) {
             issues.push(`${element.textContent?.trim() || element.localName}: essential text is clipped`);
+          }
+          if (element.matches('.number-value')) {
+            const track = element.closest('.number-stepper')?.getBoundingClientRect();
+            const range = document.createRange(); range.selectNodeContents(element);
+            for (const rect of range.getClientRects()) if (track && rect.width && rect.height
+              && (rect.left < track.left - .5 || rect.right > track.right + .5 || rect.top < track.top - .5 || rect.bottom > track.bottom + .5)) {
+              issues.push(`${element.textContent.trim()}: numeric value extends outside its rounded control`);
+            }
           }
           if (/^[+-]?\d+(?:[.,]\d+)?$/.test(element.textContent?.trim() || "")) {
             const range = document.createRange();
@@ -337,7 +555,7 @@ async function layoutIssues(page) {
           const style = getComputedStyle(element);
           if (style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0 && (rect.width < 48 || rect.height < 48)) {
             const name = element.getAttribute("aria-label") || element.getAttribute("title") || element.textContent?.trim() || element.localName;
-            issues.push(`${name}: interactive target is ${Math.round(rect.width)}x${Math.round(rect.height)}; expected at least 48x48`);
+            issues.push(`${name}: interactive target is ${rect.width}x${rect.height}; expected at least 48x48`);
           }
         }
         visit(element.shadowRoot, owned);
@@ -350,6 +568,7 @@ async function layoutIssues(page) {
     if (sheet && sheet.scrollWidth > sheet.clientWidth + 1) issues.push("popup has horizontal overflow");
     return [...new Set(issues)];
   });
+  return [...issues, ...await titleLayoutIssues(page)];
 }
 
 async function frontendRegistrationIssues(page) {
@@ -397,28 +616,115 @@ function popupFocusFailure(card, selector) {
   return { expected: describe(element), rootConnected: root?.isConnected, host: describe(card), rootActive: describe(root?.activeElement), active, ancestors, hash: location.hash, overlays: (document.querySelector?.("home-assistant")?.shadowRoot || document).querySelectorAll(".marao-popup-overlay").length, trace: globalThis.__maraoFocusDiagnostics || [] };
 }
 
+function popupHasVisibleContent(host) {
+  return [...host.children].some(child => {
+    const rect = child.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0 && getComputedStyle(child).display !== 'none'
+      && (child.textContent?.trim() || child.matches('img,svg'))) return true;
+    return Boolean(child.shadowRoot && popupHasVisibleContent(child.shadowRoot) || popupHasVisibleContent(child));
+  });
+}
+
 async function inspectPopups(page, scenario, theme, output, runName) {
   const popups = await page.locator("marao-popup-card").evaluateAll((cards) => cards.map((card) => ({
     hash: card._config.hash, name: card._config.name || card._config.title || card._config.hash,
-    heading: card._config.cards?.some((child) => child?.template === "hc_climate_card" && child.variables?.show_mode_buttons)
+    heading: !card._config.entity_group && card._config.cards?.some((child) => child?.template === "hc_climate_card" && child.variables?.show_mode_buttons)
       ? "" : String(card._config.title ?? card._config.name ?? ""),
+    directModeOnly: !card._config.entity_group && card._config.cards?.some(child => child.template === 'hc_climate_card' && child.variables?.show_mode_buttons)
+      && card._config.cards.every(child => child.template === 'hc_climate_card' && (card._hass?.states?.[child.entity]?.attributes?.hvac_modes?.filter(Boolean).length || 0) <= 1),
+    parentHash: cards.find(parent => parent._config.entity_group && parent._config.cards?.some(member =>
+      [member.tap_action?.navigation_path, member.variables?.popup_hash, member.variables?.mode_selector_hash].includes(card._config.hash)
+    ))?._config.hash,
   })));
   const triggers = page.locator("marao-card,marao-energy-period-card");
-  const targets = await triggers.evaluateAll((cards) => cards.map((card, index) => ({
-    index, tag: card.localName,
-    hash: card._config?.tap_action?.navigation_path || card._config?.variables?.popup_hash
-      || card._config?.variables?.mode_selector_hash || card._config?.popup_hash,
-  })));
+  const targets = await triggers.evaluateAll((cards) => cards.map((card, index) => {
+    const config = card._config || {};
+    const modes = card._hass?.states?.[config.entity]?.attributes?.hvac_modes?.filter(Boolean) || [];
+    const hash = config.tap_action ? config.tap_action.navigation_path
+      : config.template === 'hc_climate_card' ? modes.length > 1 && config.variables?.mode_selector_hash
+      : config.variables?.popup_hash || config.popup_hash;
+    return { index, tag: card.localName, hash };
+  }));
   const issues = [];
   for (const [index, popup] of popups.entries()) {
-    const target = targets.find(({ hash }) => hash === popup.hash);
+    let target = targets.find(({ hash }) => hash === popup.hash);
+    if (popup.directModeOnly) {
+      if (target) throw new Error(`${popup.name}: single-mode climate control must not open a popup.`);
+      continue;
+    }
+    let card = target && triggers.nth(target.index);
+    let returnCard = card;
+    let viaParent = false;
+    if (!target && popup.parentHash) {
+      viaParent = true;
+      const parent = targets.find(({ hash }) => hash === popup.parentHash);
+      if (!parent) throw new Error(`Popup ${popup.name} has no parent group control.`);
+      returnCard = triggers.nth(parent.index);
+      const parentControl = returnCard.locator('[data-card-action]');
+      if (await parentControl.isDisabled()) continue;
+      await parentControl.focus();
+      await parentControl.tap({ position: { x: 12, y: 12 } });
+      await page.locator('.marao-popup-sheet').waitFor({ state: 'visible' });
+      await page.waitForFunction(hash => {
+        const visit = root => {
+          for (const node of root?.querySelectorAll?.('*') || []) {
+            if (node.localName === 'marao-popup-card' && node._config.hash === hash) return Boolean(node._groupHelpers);
+            const found = node.shadowRoot && visit(node.shadowRoot); if (found) return true;
+          }
+          return false;
+        };
+        return visit(document);
+      }, popup.parentHash);
+      const members = page.locator('.marao-popup-sheet marao-card');
+      const selected = await members.evaluateAll((cards, hash) => cards.findIndex(card =>
+        [card._config.tap_action?.navigation_path, card._config.variables?.popup_hash, card._config.variables?.mode_selector_hash].includes(hash)
+      ), popup.hash);
+      if (selected < 0) {
+        const inactive = await page.locator('marao-popup-card').evaluateAll((cards, hashes) => {
+          const parent = cards.find(card => card._config.hash === hashes.parent);
+          const member = parent._config.cards.find(card => [card.variables?.popup_hash, card.variables?.mode_selector_hash].includes(hashes.child));
+          const state = parent._hass.states[member.entity]?.state || 'unknown';
+          return parent._config.entity_group.popup_filter === 'active'
+            && (member.entity.startsWith('climate.') ? ['off', 'unknown', 'unavailable'].includes(state) : !['open', 'opening'].includes(state));
+        }, { parent: popup.parentHash, child: popup.hash });
+        if (!inactive) throw new Error(`Popup ${popup.name}: eligible group member did not render.`);
+        await page.locator('.marao-popup-close').tap();
+        await page.locator('.marao-popup-sheet').waitFor({ state: 'detached' });
+        continue;
+      }
+      target = { tag: 'marao-card' };
+      card = members.nth(selected);
+    }
     if (!target) throw new Error(`Popup ${popup.name} has no gallery control.`);
-    const card = triggers.nth(target.index);
     const control = card.locator(target.tag === "marao-card" ? "[data-card-action]" : "button.surface");
-    if (await control.isDisabled()) continue; // Disabled entity examples must not open their popup.
+    if (await control.isDisabled()) {
+      if (viaParent) { await page.locator('.marao-popup-close').tap(); await page.locator('.marao-popup-sheet').waitFor({ state: 'detached' }); }
+      continue;
+    } // Disabled entity examples must not open their popup.
     await control.focus();
     try {
-      if (target.tag === "marao-card") await control.tap({ position: { x: 12, y: 12 } });
+      if (target.tag === "marao-card") {
+        let position = { x: 12, y: 12 };
+        if (viaParent) {
+          await card.scrollIntoViewIfNeeded();
+          await control.focus();
+          await card.evaluate(card => {
+            const sheet = card.closest('.marao-popup-sheet');
+            const header = sheet.querySelector('.marao-popup-head').getBoundingClientRect();
+            sheet.scrollBy({ top: card.getBoundingClientRect().top - header.bottom - 12, behavior: 'instant' });
+          });
+          position = await control.evaluate(button => {
+            const card = button.getRootNode().host, sheet = card.closest('.marao-popup-sheet');
+            const box = button.getBoundingClientRect(), header = sheet.querySelector('.marao-popup-head').getBoundingClientRect();
+            const top = Math.max(box.top, header.bottom, 0), bottom = Math.min(box.bottom, sheet.getBoundingClientRect().bottom, innerHeight);
+            if (box.width < 48 || bottom - top < 48) throw new Error('Popup member has less than 48px of clear touch area.');
+            const x = box.left + 24, y = top + 24;
+            if (sheet.getRootNode().elementFromPoint(x, y) !== card || button.getRootNode().elementFromPoint(x, y) !== button) throw new Error('Popup member touch area is obstructed.');
+            return { x: 24, y: y - box.top };
+          });
+        }
+        await control.tap({ position });
+      }
       else await control.tap();
     } catch (error) {
       const diagnostics = await control.evaluate((element) => {
@@ -448,19 +754,37 @@ async function inspectPopups(page, scenario, theme, output, runName) {
       if (!unobstructed) issues.push(`${popup.name}: popup content overlaps the close button`);
     };
     await sheet.waitFor({ state: "visible" });
+    const actualHash = await page.evaluate(() => location.hash);
+    if (actualHash !== popup.hash) {
+      fs.writeFileSync(path.join(output, `${runName}-popup-${index + 1}-wrong-popup.json`), JSON.stringify({ popup, actualHash, trigger: await card.evaluate(card => card._config) }, null, 2));
+      throw new Error(`${popup.name}: trigger opened a different popup.`);
+    }
     await page.waitForFunction(() => (document.querySelector("home-assistant")?.shadowRoot || document).querySelector(".marao-popup-content")?.children.length > 0);
     if (await sheet.locator('.body.icon-only').count()) await sheet.locator('.body.icon-only svg').first().waitFor({ state: 'visible' });
     if ((await sheet.locator(".marao-popup-head > h2").textContent()).trim() !== popup.heading) issues.push(`${popup.name}: configured popup heading is missing`);
-    const visibleContents = await sheet.locator(".marao-popup-content").evaluate((host) => {
-      const visible = (root) => [...root.children].some((child) => {
-        const rect = child.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0 && getComputedStyle(child).display !== "none" && (child.textContent?.trim() || child.matches("img,svg"))) return true;
-        return child.shadowRoot && visible(child.shadowRoot) || visible(child);
-      });
-      return visible(host);
-    });
-    if (!visibleContents) issues.push(`${popup.name}: popup has no visible content`);
+    // Native cards mount before their asynchronous content renders.
+    try {
+      await page.waitForFunction(popupHasVisibleContent, await sheet.locator('.marao-popup-content').elementHandle(), { timeout: 10000 });
+    } catch (error) {
+      if (error.name !== 'TimeoutError') throw error;
+      issues.push(`${popup.name}: popup has no visible content`);
+    }
     await applyVisualPreferences(page, scenario, theme);
+    const statusTypography = await sheet.locator('.marao-popup-content').evaluate((host) => {
+      const messages = [...host.querySelectorAll(':scope > p')];
+      if (!messages.length) return [];
+      const probe = document.createElement('span');
+      probe.style.cssText = 'font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500)';
+      host.append(probe);
+      const expected = getComputedStyle(probe), size = expected.fontSize, weight = expected.fontWeight;
+      probe.remove();
+      return messages.flatMap(message => {
+        const style = getComputedStyle(message);
+        return style.fontSize !== size || style.fontWeight !== weight || message.scrollWidth > message.clientWidth + 1
+          ? ['popup status does not follow the shared scalable typography or overflows'] : [];
+      });
+    });
+    issues.push(...statusTypography.map(issue => `${popup.name}: ${issue}`));
     await page.waitForFunction(() => [...(document.querySelector('home-assistant')?.shadowRoot || document).querySelectorAll('.marao-popup-content marao-card')].every((card) => {
       if (card._config.template !== 'hc_access_slide_action_card') return true;
       const track = card.shadowRoot.querySelector('marao-slide-to-open')?.shadowRoot?.querySelector('.track');
@@ -526,10 +850,10 @@ async function inspectPopups(page, scenario, theme, output, runName) {
     await page.waitForFunction(({ host, selector }) => {
       const control = host.shadowRoot?.querySelector(selector);
       return host.isConnected && control?.isConnected && host.shadowRoot.activeElement === control;
-    }, { host: await card.elementHandle(), selector: target.tag === "marao-card" ? "[data-card-action]" : "button.surface" }, { timeout: 1000 }).catch((error) => {
+    }, { host: await returnCard.elementHandle(), selector: target.tag === "marao-card" ? "[data-card-action]" : "button.surface" }, { timeout: 1000 }).catch((error) => {
       if (error.name !== "TimeoutError") throw error;
     });
-    const focusFailure = await card.evaluate(popupFocusFailure, target.tag === "marao-card" ? "[data-card-action]" : "button.surface");
+    const focusFailure = await returnCard.evaluate(popupFocusFailure, target.tag === "marao-card" ? "[data-card-action]" : "button.surface");
     if (focusFailure) {
       focusFailure.popups = await page.locator("marao-popup-card").evaluateAll((cards) => cards.filter((item) => item._open || item._backgroundState.length).map((item) => ({ hash: item._config.hash, open: item._open, background: item._backgroundState.map(({ element, inert }) => ({ tag: element.localName, previousInert: inert, currentInert: element.inert })) })));
       fs.writeFileSync(`${prefix}-focus-failure.json`, JSON.stringify({ popup, diagnostics: focusFailure }, null, 2));
@@ -545,10 +869,10 @@ async function main() {
   const runs = selectedRuns(options);
   const config = readConfig();
   assertDisposableHaTarget(config);
-  await prepare(config);
+  const { dashboard } = await prepare(config);
   const baseUrl = config.url.replace(/\/$/, "");
   const token = await accessToken(config, baseUrl);
-  const output = path.join(__dirname, ".artifacts", "accessibility");
+  const output = path.join(__dirname, ".artifacts", "accessibility", ...(options.safeArea ? ['safe-area'] : []));
   if (!options.preview) fs.mkdirSync(output, { recursive: true });
   const checkProfile = async ({ scenario, theme }) => {
     // Keep each profile's touch emulation independent of other target
@@ -559,8 +883,12 @@ async function main() {
       await context.addInitScript(setBrowserToken, {
         ...token, hassUrl: baseUrl, clientId: `${baseUrl}/`, expires: Date.now() + token.expires_in * 1000,
       });
+      if(options.safeArea) await context.addInitScript(() => {
+        const apply=()=>{document.documentElement.style.setProperty('--app-safe-area-inset-top','47px');document.documentElement.style.setProperty('--app-safe-area-inset-bottom','34px');};
+        if(document.documentElement)apply();else document.addEventListener('DOMContentLoaded',apply,{once:true});
+      });
       const page = await context.newPage();
-      await configurePageEmulation(context, page, scenario);
+      await configurePageEmulation(context, page, scenario, options.safeArea ? Object.fromEntries(insetSides.flatMap(side=>[[side,0],[side+'Max',0]])) : undefined);
       const errors = [];
       page.on("pageerror", (error) => {
         errors.push(error.message);
@@ -577,7 +905,7 @@ async function main() {
         if (options.preview) console.error(`[browser request] ${message}`);
       });
       page.on("response", (response) => {
-        if (response.status() < 400 || !["document", "script", "stylesheet", "image", "font"].includes(response.request().resourceType())) return;
+        if (response.status() < 400) return;
         const message = `${response.status()} ${response.request().resourceType()} response: ${new URL(response.url()).pathname}`;
         errors.push(message);
         if (options.preview) console.error(`[browser response] ${message}`);
@@ -633,7 +961,50 @@ async function main() {
         throw new Error(`${runName} did not render a Marao card:\n${details}\n${error.message}`);
       }
       await assertCurrentFrontend(page);
+      if(options.safeArea) {
+        await page.locator('marao-navbar-card nav').waitFor({state:'visible'});
+        await page.evaluate(()=>document.fonts.ready);
+        const cold=await safeAreaGeometry(page,safeAreaCases[0]);
+        fs.writeFileSync(path.join(output,`${runName}-cold.json`),JSON.stringify(cold,null,2));
+        await page.screenshot({path:path.join(output,`${runName}-cold.png`),scale:'css'});
+        if(cold.issues.length)throw new Error(`Cold app inset: ${cold.issues.join('; ')}`);
+      }
       await applyVisualPreferences(page, scenario, theme);
+      if(options.safeArea) {
+        const samples=[];
+        for(const source of safeAreaCases) {
+          await page.locator('marao-card').first().scrollIntoViewIfNeeded();
+          await page.evaluate(()=>window.scrollTo(0,0));
+          await applySafeAreaSource(context,page,source);
+          const geometry=await safeAreaGeometry(page,source);
+          if(source.name==='app-only') {
+            await page.evaluate(()=>{location.hash='#marao-dashboard-test-value-sliders-popup';});
+            const sheet=page.locator('.marao-popup-sheet');await sheet.waitFor({state:'visible'});
+            await sheet.evaluate(async e=>{await Promise.all(e.getAnimations().map(a=>a.finished));});
+            geometry.sheet=await sheet.evaluate(e=>({bounds:e.getBoundingClientRect().toJSON(),close:e.querySelector('.marao-popup-close').getBoundingClientRect().toJSON()}));
+            await page.screenshot({path:path.join(output,`${runName}-safe-area-baseline-sheet.png`),scale:'css'});
+            await page.locator('.marao-popup-close').click();await sheet.waitFor({state:'detached'});
+          }
+          samples.push({name:source.name,...geometry});
+          fs.writeFileSync(path.join(output,`${runName}-safe-area.json`),JSON.stringify(samples,null,2));
+          await page.screenshot({path:path.join(output,`${runName}-safe-area-${source.name}.png`),scale:'css'});
+          if(geometry.issues.length)throw new Error(`${runName} ${source.name}: ${geometry.issues.join('; ')}`);
+          await page.locator('marao-card').last().evaluate(card=>{
+            for(let e=card;e;e=e.assignedSlot||e.parentElement||e.getRootNode()?.host) {
+              if(e.clientHeight>0&&e.scrollHeight>e.clientHeight+1&&['auto','scroll'].includes(getComputedStyle(e).overflowY)){e.scrollTo({top:e.scrollHeight,behavior:'instant'});return;}
+            }document.scrollingElement.scrollTo({top:document.scrollingElement.scrollHeight,behavior:'instant'});
+          });
+          const last=await page.locator('marao-card').last().boundingBox();
+          const bar=await page.locator('marao-navbar-card nav').boundingBox();
+          if(last.y+last.height>bar.y-8)throw new Error(`${source.name}: Last card is covered by the navbar`);
+          await page.screenshot({path:path.join(output,`${runName}-safe-last-${source.name}.png`),scale:'css'});
+        }
+        await inspectSafeAreaSheets(context,page,output,runName);
+        await inspectFullscreenLifecycle(page);
+        if(errors.length)throw new Error(errors.join('\n'));
+        console.log(`${runName}: production safe-area source checks passed.`);
+        return;
+      }
       if (options.preview) {
         await scrollDashboard(page);
         const previewIssues = [...await frontendRegistrationIssues(page), ...await emulationIssues(page, scenario, theme), ...await layoutIssues(page)];
@@ -666,6 +1037,22 @@ async function main() {
       if (errors.length || issues.length) throw new Error(`${runName} failed:\n${[...errors, ...issues].map((item) => `- ${item}`).join("\n")}`);
       issues = issues.concat(await inspectPopups(page, scenario, theme, output, runName));
       if (errors.length || issues.length) throw new Error(`${runName} failed:\n${[...errors, ...issues].map((item) => `- ${item}`).join("\n")}`);
+      if (options.pages) for (const view of dashboard.views.filter(view => view.path !== 'card-test')) {
+        await page.waitForLoadState('networkidle');
+        await page.evaluate(route => { history.pushState(null, '', route); window.dispatchEvent(new CustomEvent('location-changed')); }, '/marao-dashboard/' + view.path);
+        await page.waitForLoadState('networkidle');
+        await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+        await applyVisualPreferences(page, scenario, theme);
+        const prefix = path.join(output, runName + '-page-' + view.path);
+        if (await page.locator('marao-card').count()) await scrollDashboard(page, { screenshotPrefix: prefix, onSegment: async () => {
+          await applyVisualPreferences(page, scenario, theme);
+          const found = await layoutIssues(page);
+          if (found.length) throw new Error(`${runName}/${view.path}: ${found.join('\n')}`);
+        } });
+        else await page.screenshot({ path: prefix + '-empty.png', scale: 'css' });
+        const found = [...await emulationIssues(page, scenario, theme), ...await layoutIssues(page), ...await inspectPopups(page, scenario, theme, output, runName + '-page-' + view.path)];
+        if (errors.length || found.length) throw new Error(`${runName}/${view.path}: ${[...errors, ...found].join('\n')}`);
+      }
       console.log(`${runName}: gallery and popup checks passed.`);
       await context.close();
     } finally {
@@ -681,6 +1068,9 @@ async function main() {
 if (require.main === module) main().catch((error) => { console.error(error.message || error); process.exitCode = 1; });
 
 module.exports = {
+  applySafeAreaSource,
+  safeAreaCases,
+  safeAreaGeometry,
   applyVisualPreferences,
   configurePageEmulation,
   contextOptionsForScenario,
@@ -691,6 +1081,7 @@ module.exports = {
   layoutIssues,
   parseArgs,
   popupFocusFailure,
+  popupHasVisibleContent,
   safeAreaInsetsForScenario,
   scenarios,
   selectedRuns,

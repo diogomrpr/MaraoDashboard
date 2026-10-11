@@ -7,7 +7,7 @@ cards:
     cards:
       - type: custom:marao-card
         template: hc_header_card
-        entity: sensor.marao_dashboard_test_weather
+        entity: weather.marao_dashboard_test_weather
         variables:
           person_entity: sensor.marao_dashboard_test_person
 
@@ -77,13 +77,13 @@ cards:
 
       - type: custom:marao-card
         template: hc_weather_card
-        entity: sensor.marao_dashboard_test_weather
+        entity: weather.marao_dashboard_test_weather
         variables:
           show_forecast: false
 
       - type: custom:marao-card
         template: hc_weather_card
-        entity: sensor.marao_dashboard_test_weather
+        entity: weather.marao_dashboard_test_weather
         name: Weather with forecast
         variables:
           show_forecast: true

@@ -1,0 +1,42 @@
+{
+  "name": "Generated Test",
+  "navigation": [
+    "studio",
+    "overview",
+    "rooms"
+  ],
+  "rooms": [
+    {
+      "name": "Office",
+      "entities": {
+        "navigation": [
+          {
+            "page": "studio",
+            "name": "Open studio",
+            "icon": "mdi:palette"
+          }
+        ]
+      }
+    }
+  ],
+  "pages": {
+    "custom": [
+      {
+        "name": "Studio",
+        "path": "studio",
+        "icon": "mdi:palette",
+        "entities": {
+          "light": [
+            "light.studio"
+          ],
+          "navigation": [
+            {
+              "page": "overview",
+              "name": "Back home"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

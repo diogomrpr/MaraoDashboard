@@ -1,0 +1,25 @@
+type: custom:marao-popup-card
+hash: '#energy-month-power'
+entity: sensor.marao_dashboard_test_month_energy
+name: Month Power
+icon: mdi:flash
+show_icon: true
+show_name: true
+show_state: true
+height: 720px
+max_height: 80dvh
+cards:
+  # marao:generated:start
+  - type: custom:marao-energy-period-card
+    entity: sensor.marao_dashboard_test_month_energy
+    name: Month Power
+    period: month
+    popup_hash: null
+    popup: true
+    icon: mdi:flash
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end

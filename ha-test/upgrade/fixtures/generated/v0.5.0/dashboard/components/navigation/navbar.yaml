@@ -1,0 +1,12 @@
+type: vertical-stack
+cards:
+- type: custom:marao-navbar-card
+  routes:
+  - icon: mdi:home-variant-outline
+    icon_selected: mdi:home-variant
+    label: Home
+    url: /marao-generated-test/overview
+  - icon: mdi:sofa-outline
+    icon_selected: mdi:sofa
+    label: Rooms
+    url: /marao-generated-test/rooms

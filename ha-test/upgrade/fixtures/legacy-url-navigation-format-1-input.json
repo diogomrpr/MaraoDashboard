@@ -1,0 +1,15 @@
+{
+  "config_version": 1,
+  "name": "Saved URL menu",
+  "rooms": [],
+  "navigation": [
+    {
+      "label": "Cards",
+      "url": "/cards",
+      "icon": "mdi:test-tube",
+      "future": {
+        "keep": true
+      }
+    }
+  ]
+}

@@ -4,10 +4,11 @@ import fs from "node:fs/promises";
 
 const source = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8");
 
-test("navbar uses the iPhone safe area without extra bottom spacing", () => {
-  assert.match(source, /iPhone\|iPod[\s\S]+\? "max\(4px, calc\(var\(--marao-safe-area-inset-bottom, env\(safe-area-inset-bottom\)\) - 20px\)\)" : "12px"/);
-  assert.match(source, /var\(--marao-safe-area-inset-top, env\(safe-area-inset-top\)\) 0 0/);
-  assert.match(source, /calc\(92px \+ var\(--marao-safe-area-inset-bottom, env\(safe-area-inset-bottom\)\)\)/);
+test("navbar and sheets share the host-aware inset fallback", () => {
+  assert.match(source, /var\(--marao-safe-area-inset-\$\{side\}, var\(--safe-area-inset-\$\{side\}, env\(safe-area-inset-\$\{side\}, 0px\)\)\)/);
+  assert.match(source, /max\(4px, calc\(\$\{safeArea\("bottom"\)\} - 20px\)\)/);
+  assert.match(source, /padding:\$\{safeArea\("top"\)\} \$\{safeArea\("right"\)\} 0 \$\{safeArea\("left"\)\}/);
+  assert.match(source, /max-height:min\(\$\{esc\(this\._config\.max_height\)\}, 100%\)/);
 });
 
 test("navbar width scales compactly with its route count", () => {
@@ -17,7 +18,7 @@ test("navbar width scales compactly with its route count", () => {
 
 test("navbar keeps 48px touch targets inside the compact 60px bar", () => {
   assert.match(source, /:host\{display:block;height:128px;/);
-  assert.match(source, /height:60px;box-sizing:border-box;padding:6px 10px/);
+  assert.match(source, /height:auto;min-height:60px;box-sizing:border-box;padding:6px 10px/);
   assert.match(source, /min-width:48px;width:48px;height:48px;aspect-ratio:1 \/ 1/);
   assert.match(source, /a:active\{transform:scale\(\.92\)/);
 });
@@ -26,10 +27,93 @@ test("zoomed navbar wraps full-size controls and reserves space above it", () =>
   assert.match(source, /display:flex;flex-wrap:wrap;justify-content:center;height:auto;min-height:60px/);
   assert.match(source, /a\{flex:0 0 48px\}/);
   assert.match(source, /@media\(max-width:300px\)\{:host\{height:228px\}/);
-  assert.match(source, /padding-bottom:calc\(192px \+ var\(--marao-safe-area-inset-bottom/);
+  assert.match(source, /padding-bottom:calc\(192px \+ \$\{safeArea\("bottom"\)\}/);
 });
 
 test("fullscreen behavior starts only after the navbar is connected", () => {
   assert.match(source, /connectedCallback\(\) \{ registerFullscreen\(this\);/);
   assert.doesNotMatch(source, /this\._render\(\); registerFullscreen\(this\);/);
+});
+
+test("fullscreen owns only active Marao roots and restores styles on replacement, exit and disconnect", () => {
+  const style = (initial = {}) => {
+    const values = new Map(Object.entries(initial));
+    return {
+      values, getPropertyValue: key => values.get(key)?.[0] || "",
+      getPropertyPriority: key => values.get(key)?.[1] || "",
+      setProperty: (key, value, priority = "") => values.set(key, [value, priority]),
+      removeProperty: key => values.delete(key),
+    };
+  };
+  const view = { style: style({ "padding-top": ["8px", "important"], "padding-bottom": ["13px", ""] }) };
+  const header = { style: style({ display: ["flex", "important"] }) };
+  const unrelated = { style: style({ display: ["grid", ""] }) };
+  let currentView = view;
+  const root = { localName: "hui-root", shadowRoot: {
+    querySelectorAll: () => [header], querySelector: () => currentView,
+  } };
+  const navbar = () => ({ isConnected: true, getClientRects: () => [{}], parentElement: root,
+    _config: { routes: [{ url: "/marao-dashboard/overview" }] },
+  });
+  const first = navbar(), second = navbar();
+  const events = new Map();
+  const window = { location: { href: "http://192.168.0.28/marao-dashboard/overview", pathname: "/marao-dashboard/overview" },
+    addEventListener: (key, callback) => events.set(key, callback), removeEventListener: key => events.delete(key),
+  };
+  let timers = 0;
+  const functions = new Function("window", "getComputedStyle", "setInterval", "clearInterval", "safeArea",
+    source.slice(source.indexOf("const fullscreenUsers"), source.indexOf("export class MaraoPopupCard")).replace("export function focusRestorer", "function focusRestorer")
+    + ";return {registerFullscreen,unregisterFullscreen,applyFullscreen};")(window,
+      node => ({ getPropertyValue: property => node.style.getPropertyValue(property) || "0px" }),
+      () => { timers++; return 1; }, () => { timers--; }, side => `var(--safe-${side})`);
+  functions.registerFullscreen(first);
+  assert.equal(header.style.getPropertyValue("display"), "none");
+  assert.equal(view.style.getPropertyValue("padding-top"), "max(8px, var(--safe-top))");
+  assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(60px + var(--safe-bottom) + 12px))");
+  assert.equal(unrelated.style.getPropertyValue("display"), "grid");
+  functions.registerFullscreen(second);
+  assert.equal(timers, 1);
+  currentView = { style: style() };
+  functions.applyFullscreen();
+  assert.deepEqual(view.style.values.get("padding-top"), ["8px", "important"]);
+  assert.deepEqual(view.style.values.get("padding-bottom"), ["13px", ""]);
+  assert.ok(!view.style.values.has("padding-right"));
+  assert.ok(currentView.style.getPropertyValue("padding-top").includes("var(--safe-top)"));
+  for (const path of ["/config/dashboard", "/marao-dashboard-editor", "/marao-dashboard/overview"]) {
+    window.location.pathname = path;
+    events.get("location-changed")();
+    assert.equal(header.style.getPropertyValue("display"), path.endsWith("overview") ? "none" : "flex");
+    if (!path.endsWith("overview")) assert.equal(currentView.style.values.size, 0);
+  }
+  first.isConnected = false;
+  functions.unregisterFullscreen(first);
+  assert.equal(header.style.getPropertyValue("display"), "none");
+  functions.unregisterFullscreen(second);
+  assert.deepEqual(header.style.values.get("display"), ["flex", "important"]);
+  assert.equal(currentView.style.values.size, 0);
+  assert.equal(timers, 0);
+  assert.equal(events.size, 0);
+});
+
+test("popup cleanup distinguishes retained masonry cards from removed cards and views", () => {
+  const removed = [];
+  const Popup = new Function("BaseElement", "window", source.slice(source.indexOf("export class MaraoPopupCard"), source.indexOf("export function registerMaraoCards")).replace("export class", "class") + ";return MaraoPopupCard;")(
+    class {}, { removeEventListener: event => removed.push(event) });
+  const popup = new Popup(), card = {};
+  const view = { isConnected: true, cards: [card] };
+  let closes = 0;
+  popup._close = () => closes++;
+  popup._viewOwner = { view, card };
+  popup.isConnected = false;
+  popup.disconnectedCallback();
+  assert.equal(closes, 0);
+  assert.equal(removed.length, 0);
+  view.cards = [];
+  popup.disconnectedCallback();
+  assert.equal(closes, 1);
+  popup._viewOwner = { view, card };
+  view.cards = [card]; view.isConnected = false;
+  popup.disconnectedCallback();
+  assert.equal(closes, 2);
+  assert.deepEqual(removed, ['hashchange','location-changed','popstate','hashchange','location-changed','popstate']);
 });

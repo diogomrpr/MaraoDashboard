@@ -6,7 +6,9 @@ parent: Cards
 
 # Washing Machine Card
 
-The `hc_washing_machine_card` is used to show a washing machine binary sensor state and the elapsed runtime while the entity is `on`.
+Normal binary states use distinct card backgrounds and a filled or outlined state marker, with a localized accessible state. Redundant state words are omitted, including when `show_state: true`; readings, metadata and useful custom labels remain. `show_state: false` retains its normal-state behavior. Prefix-only labels are omitted when their binary state text is removed.
+
+The `hc_washing_machine_card` is used to show a washing machine binary sensor state using its native on/off or explicit running/idle contract.
 
 ## Usage
 
@@ -28,4 +30,4 @@ The `hc_washing_machine_card` is used to show a washing machine binary sensor st
 
 ## More info
 
-The timer uses the entity `last_changed` value, so it resets when the binary sensor changes state.
+The state marker follows the reported running/idle state; unavailable and unknown states retain their visible reason.

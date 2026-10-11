@@ -6,10 +6,13 @@ parent: Cards
 
 # Light Card
 
+Normal binary states use distinct card backgrounds and a filled or outlined state marker, with a localized accessible state. Redundant state words are omitted, including when `show_state: true`; readings, metadata and useful custom labels remain. `show_state: false` retains its normal-state behavior. Prefix-only labels are omitted when their binary state text is removed.
+
 Generated overview lighting popups list every configured light, including lights
 that are off. Unknown and unavailable lights remain visible with disabled controls.
 The `hc_light_card` is used to turn on and off a light. You have the option to show or hide the brightness slider.
-
+The title uses the full content width above the state, icon and brightness control;
+long names wrap at the chosen text size.
 
 ![light Card Light](../../../assets/images/cards/hc_light_card/lightcard_light.png)
 
@@ -37,4 +40,4 @@ The `hc_light_card` is used to turn on and off a light. You have the option to s
 
 The slider uses the entity's supported color modes to detect dimming support.
 On/off-only lights have a toggle without a slider. Set `enable_slider: false` to
-hide it on dimmable lights. `custom_label` adds a prefix to the displayed state.
+hide it on dimmable lights. `custom_label` adds a prefix to useful nonbinary state content or retains a substantive label on a binary card.

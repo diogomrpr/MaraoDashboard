@@ -1,0 +1,32 @@
+{
+  "title": "Released storage example",
+  "urlPath": "marao-dashboard",
+  "areas": [
+    {
+      "area_id": "outside",
+      "name": "Outside",
+      "icon": "mdi:tree"
+    }
+  ],
+  "devices": [
+    {
+      "id": "outside-device",
+      "area_id": "outside"
+    }
+  ],
+  "entities": [
+    {
+      "entity_id": "camera.marao_dashboard_test_camera",
+      "device_id": "outside-device",
+      "original_name": "Safe camera"
+    },
+    {
+      "entity_id": "light.marao_dashboard_test_light",
+      "area_id": "outside",
+      "original_name": "Safe light"
+    }
+  ],
+  "selectedAreaIds": [
+    "outside"
+  ]
+}

@@ -2,10 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 
-const source = await fs.readFile(
+let source = await fs.readFile(
   new URL("../../custom_components/marao_dashboard/frontend/MaraoFrigateEventsCard.js", import.meta.url),
   "utf8",
 );
+const cardsSource = await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8');
+source = source.replace('await import(`./MaraoCards.js${new URL(import.meta.url).search}`)', `await import("data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}")`);
 const dashboardSource = await fs.readFile(
   new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url),
   "utf8",
@@ -82,7 +84,7 @@ test("Frigate event helpers normalize API data and build safe integration URLs",
 });
 
 test("camera event actions keep a visible 48px target and strong feedback", () => {
-  assert.match(source, /\.icon-button \{ flex: 0 0 48px; width: 48px; min-width: 48px; height: 48px;/);
+  assert.match(source, /\.icon-button \{ justify-self: end; width: 48px; min-width: 48px; height: 48px;/);
   assert.match(source, /MaraoDashboard\?\.haptic\?\.\("heavy"\)/);
   assert.match(source, /\.icon-button:active \{ transform: scale\(\.94\); \}/);
   assert.match(source, /button:disabled \{ cursor: default; opacity: \.55;/);
@@ -478,4 +480,30 @@ test("camera events discard in-flight results after the shared connection mutate
   card.hass = { ...hass, callWS: async () => [] };
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(card._status, "ready");
+});
+
+test('native media failures preserve other events, mark the whole surface and ignore obsolete elements', () => {
+  const card = new MaraoCameraEventsCard();
+  card.shadowRoot = { innerHTML: '' };
+  card._config = { entity: 'camera.safe', title: 'Safe events' };
+  card._hass = { states: { 'camera.safe': { state: 'idle', attributes: {} } } };
+  card._status = 'ready';
+  card._events = [{ id: 'one', label: 'First', thumbnailUrl: '/safe-one' }, { id: 'two', label: 'Second', thumbnailUrl: '/safe-two' }];
+  const media = { isConnected: true, localName: 'img', getRootNode: () => card.shadowRoot, getAttribute: () => '/safe-one' };
+  card._handleMediaError({ target: media });
+  assert.equal(card._events.length, 2);
+  assert.match(card.shadowRoot.innerHTML, /data-problem="error"/);
+  assert.match(card.shadowRoot.innerHTML, /Media unavailable/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /<img src="\/safe-one"/);
+  assert.match(card.shadowRoot.innerHTML, /<img src="\/safe-two"/);
+  card._selected = { event: card._events[0], url: '/safe-detail', kind: 'snapshot', status: 'ready' };
+  media.getAttribute = () => '/safe-detail';
+  card._handleMediaError({ target: media });
+  assert.equal(card._selected.status, 'error');
+  assert.match(card.shadowRoot.innerHTML, /data-action="back"/);
+  card._selected = undefined;
+  card._thumbnailErrors.clear();
+  media.isConnected = false;
+  card._handleMediaError({ target: media });
+  assert.equal(card._thumbnailErrors.size, 0);
 });

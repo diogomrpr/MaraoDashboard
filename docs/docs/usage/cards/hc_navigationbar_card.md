@@ -49,13 +49,21 @@ must never depend on a tooltip.
 - Every control is visibly at least 48 by 48 CSS pixels.
 - Active icon backgrounds are perfect circles and use the Marao theme.
 - Gaps remain compact while route width auto-scales.
-- iPhone positioning derives from `env(safe-area-inset-bottom)` and keeps the
+- iPhone positioning uses Home Assistant's app-aware safe-area value, falling
+  back to browser insets, and keeps the
   accepted lowered offset without an extra generic bottom margin.
 - Other mobile devices use the normal compact bottom offset.
 - Button presses use Marao's strong haptic feedback.
 - Open Marao popups remain above the navbar.
 - The navbar activates Marao's route-scoped fullscreen shell, which hides Home
   Assistant's native top bar only while the dashboard is active.
+
+Page and navbar side clearance follow the current insets during rotation.
+Marao sheets keep their full-screen backdrop, but their content stays inside
+the overlay's own top and side safe bounds. `height: auto` keeps short sheets
+compact; fixed `height` and `max_height` are limited to available safe height.
+The default maximum remains `80dvh`; even an explicit `100dvh` sheet keeps its
+title and close control accessible. Sheets scroll internally above the navbar.
 
 Do not add a second navbar dependency or manually register a Lovelace resource.
 The Marao integration owns and registers this component.

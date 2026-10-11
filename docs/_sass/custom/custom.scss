@@ -59,3 +59,19 @@
   height: 10px;
   margin-right: 2px;
 }
+
+.site-title {
+  gap: 10px;
+  white-space: normal;
+}
+
+.site-title span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.marao-doc-mark {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+}

@@ -1,0 +1,6 @@
+title: Generated Test
+theme: Marao Dashboard
+views:
+- !include '/config/dashboard/MaraoDashboard/generated-test/views/main/00-overview.yaml'
+- !include '/config/dashboard/MaraoDashboard/generated-test/views/main/02-rooms.yaml'
+- !include '/config/dashboard/MaraoDashboard/generated-test/views/rooms/00-garden.yaml'

@@ -10,6 +10,16 @@ The `hc_climate_card` shows a large, unitless current temperature and a target
 temperature stepper. Its background identifies the active HVAC mode; `off`,
 `unknown`, and `unavailable` retain the neutral card background. When multiple
 HVAC modes are available, the mode buttons use representative icons and labels.
+Dual targets retain both values inside the rounded control and can wrap at the
+range separator when enlarged text needs more space. Scalar targets keep their
+existing numeric layout.
+
+Mode and target changes appear immediately with “Updating…” while Home Assistant
+confirms them. Repeated temperature steps build on the requested target, and
+duplicate cards and mode popups show the same request. Current temperature and
+equipment activity keep their reported values. A rejected request restores the
+reported setting and shows its error; after 30 seconds without confirmation, the
+card restores the reported setting and shows “Change not confirmed”.
 
 ![Climate Card Light](../../../assets/images/cards/hc_climate_card/climatecard_light.png)
 

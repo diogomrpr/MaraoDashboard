@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "plain": [
+    "components/navigation/navbar.yaml",
+    "dashboard.yaml"
+  ],
+  "containers": [
+    "components/popups/energy_house_power.yaml",
+    "components/popups/energy_month_cost.yaml",
+    "components/popups/energy_month_power.yaml",
+    "components/popups/energy_today_cost.yaml",
+    "components/popups/energy_today_power.yaml",
+    "components/popups/overview_blinds.yaml",
+    "components/popups/overview_climate.yaml",
+    "components/popups/overview_lights.yaml",
+    "components/popups/overview_maintenance.yaml",
+    "components/popups/overview_scenes.yaml",
+    "views/custom/00-appliances.yaml",
+    "views/main/00-overview.yaml",
+    "views/main/01-security.yaml",
+    "views/main/02-rooms.yaml",
+    "views/main/03-energy.yaml",
+    "views/main/04-wallbox.yaml",
+    "views/main/05-media.yaml",
+    "views/rooms/00-living-room.yaml",
+    "views/rooms/01-entrance.yaml",
+    "views/rooms/02-utility-room.yaml",
+    "views/rooms/03-empty-room.yaml"
+  ]
+}

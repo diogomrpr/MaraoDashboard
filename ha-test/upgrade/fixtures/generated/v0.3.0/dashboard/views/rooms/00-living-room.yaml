@@ -1,0 +1,641 @@
+title: Living Room
+path: room-living-room
+subview: true
+cards:
+  # marao:generated:start
+  - type: custom:button-card
+    name: Living Room
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+    styles:
+      card:
+      - background: none
+      - box-shadow: none
+      - padding: 0
+      - margin-bottom: 20px
+      grid:
+      - grid-template-areas: '''n'''
+      - grid-template-columns: 1fr
+      name:
+      - justify-self: start
+      - font-weight: 800
+      - font-size: 25px
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_access_card
+      entity: lock.front_door
+      name: Front Door
+      variables:
+        popup_hash: '#access-lock-front-door'
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_cover_card
+      entity: cover.living_room_blind
+      name: Living Room Blind
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_climate_card
+      entity: climate.living_room
+      name: Living Room
+      variables:
+        show_graph: false
+        mode_selector_hash: '#climate-mode-climate-living-room'
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_switch_card
+      entity: input_boolean.holiday_mode
+      name: Holiday Mode
+  - type: grid
+    columns: 1
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_media_card
+      entity: media_player.living_room_tv
+      name: Living Room Tv
+      variables:
+        popup_hash: '#media-media-player-living-room-tv'
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_number_card
+      entity: input_number.target_temperature
+      name: Target Temperature
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+    - type: custom:button-card
+      template: hc_light_card
+      entity: light.living_room_main
+      name: Living Room Main
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#climate-mode-climate-living-room'
+    button_type: state
+    entity: climate.living_room
+    name: Living Room Mode
+    icon: mdi:thermostat
+    show_icon: true
+    show_name: true
+    show_state: true
+    scrolling_effect: false
+    close_by_clicking_outside: true
+    styles: ".bubble-pop-up,\n.bubble-pop-up-container {\n  overscroll-behavior: contain !important;\n  touch-action: pan-y !important;\n}\n.bubble-pop-up-container {\n  height: 100% !important;\n  align-items: stretch !important;\n  align-content: start !important;\n  justify-content: flex-start !important;\n}\n.bubble-pop-up {\n  position: fixed !important;\n  inset: auto 0 0 0 !important;\n  height: min(620px, 80vh) !important;\n  max-height: 80vh !important;\n  margin: 0 !important;\n  overflow-y: auto !important;\n}\n.bubble-pop-up-container > .bubble-cards-container,\n.bubble-pop-up-container > ha-sortable {\n  align-self: stretch !important;\n  margin-top: 16px !important;\n}\n"
+    cards:
+    - type: custom:button-card
+      template: hc_climate_card
+      entity: climate.living_room
+      name: Living Room
+      variables:
+        show_graph: false
+        show_mode_buttons: true
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#access-lock-front-door'
+    button_type: state
+    entity: lock.front_door
+    name: Front Door
+    icon: mdi:lock
+    show_icon: true
+    show_name: true
+    show_state: true
+    scrolling_effect: false
+    close_by_clicking_outside: true
+    styles: ".bubble-pop-up,\n.bubble-pop-up-container {\n  overscroll-behavior: contain !important;\n  touch-action: pan-y !important;\n}\n.bubble-pop-up-container {\n  height: 100% !important;\n  align-items: stretch !important;\n  align-content: start !important;\n  justify-content: flex-start !important;\n}\n.bubble-pop-up {\n  position: fixed !important;\n  inset: auto 0 0 0 !important;\n  height: min(420px, 80vh) !important;\n  max-height: 80vh !important;\n  margin: 0 !important;\n  overflow-y: auto !important;\n}\n.bubble-pop-up-container > .bubble-cards-container,\n.bubble-pop-up-container > ha-sortable {\n  align-self: stretch !important;\n  margin-top: 16px !important;\n}\n"
+    cards:
+    - type: grid
+      columns: 1
+      square: false
+      cards:
+      - type: custom:button-card
+        template: hc_access_slide_action_card
+        entity: lock.front_door
+        name: Unlock
+        icon: mdi:lock-open-variant
+        variables:
+          action_service: lock.unlock
+          action_requires_hold: false
+          action_label_key: common.unlock
+          action_color: var(--color-red)
+      - type: custom:button-card
+        template: hc_access_action_card
+        entity: lock.front_door
+        name: Lock
+        icon: mdi:lock
+        variables:
+          action_service: lock.lock
+          action_requires_hold: false
+          action_label_key: common.lock
+          action_color: var(--color-green)
+  - type: custom:bubble-card
+    card_type: pop-up
+    hash: '#media-media-player-living-room-tv'
+    button_type: state
+    entity: media_player.living_room_tv
+    name: Living Room Tv
+    icon: mdi:remote-tv
+    show_icon: true
+    show_name: true
+    show_state: true
+    scrolling_effect: false
+    close_by_clicking_outside: true
+    styles: ".bubble-pop-up,\n.bubble-pop-up-container {\n  overscroll-behavior: contain !important;\n  touch-action: pan-y !important;\n}\n.bubble-pop-up-container {\n  height: 100% !important;\n  align-items: stretch !important;\n  align-content: start !important;\n  justify-content: flex-start !important;\n}\n.bubble-pop-up {\n  position: fixed !important;\n  inset: auto 0 0 0 !important;\n  height: min(780px, 80vh) !important;\n  max-height: 80vh !important;\n  margin: 0 !important;\n  overflow-y: auto !important;\n}\n.bubble-pop-up-container > .bubble-cards-container,\n.bubble-pop-up-container > ha-sortable {\n  align-self: stretch !important;\n  margin-top: 16px !important;\n}\n"
+    cards:
+    - type: grid
+      columns: 2
+      square: false
+      cards:
+      - type: custom:button-card
+        template: hc_media_app_card
+        entity: media_player.living_room_tv
+        name: YouTube
+        icon: mdi:play-box-outline
+        variables:
+          app_source: YouTube
+    - type: grid
+      columns: 3
+      square: false
+      cards:
+      - type: custom:button-card
+        entity: media_player.living_room_tv
+        name: Back
+        icon: mdi:arrow-u-left-top
+        show_name: false
+        show_state: false
+        show_label: false
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.living_room_tv
+          haptic: heavy
+          data:
+            command: menu
+        styles:
+          grid:
+          - grid-template-areas: '''i'''
+          card:
+          - height: 90px
+          - padding: 14px 10px
+          - border-radius: 28px
+          - background: var(--ha-card-background)
+          - box-shadow: var(--ha-card-box-shadow)
+          icon:
+          - width: 34px
+          - color: var(--primary-text-color)
+          img_cell:
+          - width: 52px
+          - height: 52px
+          - border-radius: 50%
+          - background: var(--opacity-contrast-100)
+          - justify-self: center
+          - align-self: center
+      - type: custom:button-card
+        entity: media_player.living_room_tv
+        name: ''
+        icon: mdi:chevron-up
+        show_name: false
+        show_state: false
+        show_label: false
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.living_room_tv
+          haptic: heavy
+          data:
+            command: up
+        styles:
+          grid:
+          - grid-template-areas: '''i'''
+          card:
+          - height: 88px
+          - padding: 0
+          - border-radius: 30px
+          - background: var(--ha-card-background)
+          - box-shadow: var(--ha-card-box-shadow)
+          icon:
+          - width: 42px
+          - color: var(--primary-text-color)
+          img_cell:
+          - width: 100%
+          - height: 100%
+          - border-radius: '0'
+          - background: none
+          - justify-self: center
+          - align-self: center
+        hold_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.living_room_tv
+          data:
+            command: up
+            hold_secs: 1
+          haptic: heavy
+      - type: custom:button-card
+        entity: media_player.living_room_tv
+        name: Home
+        icon: mdi:home-outline
+        show_name: false
+        show_state: false
+        show_label: false
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.living_room_tv
+          haptic: heavy
+          data:
+            command: top_menu
+        styles:
+          grid:
+          - grid-template-areas: '''i'''
+          card:
+          - height: 90px
+          - padding: 14px 10px
+          - border-radius: 28px
+          - background: var(--ha-card-background)
+          - box-shadow: var(--ha-card-box-shadow)
+          icon:
+          - width: 34px
+          - color: var(--primary-text-color)
+          img_cell:
+          - width: 52px
+          - height: 52px
+          - border-radius: 50%
+          - background: var(--opacity-contrast-100)
+          - justify-self: center
+          - align-self: center
+    - type: grid
+      columns: 3
+      square: false
+      cards:
+      - type: custom:button-card
+        entity: media_player.living_room_tv
+        name: ''
+        icon: mdi:chevron-left
+        show_name: false
+        show_state: false
+        show_label: false
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.living_room_tv
+          haptic: heavy
+          data:
+            command: left
+        styles:
+          grid:
+          - grid-template-areas: '''i'''
+          card:
+          - height: 88px
+          - padding: 0
+          - border-radius: 30px
+          - background: var(--ha-card-background)
+          - box-shadow: var(--ha-card-box-shadow)
+          icon:
+          - width: 42px
+          - color: var(--primary-text-color)
+          img_cell:
+          - width: 100%
+          - height: 100%
+          - border-radius: '0'
+          - background: none
+          - justify-self: center
+          - align-self: center
+        hold_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.living_room_tv
+          data:
+            command: left
+            hold_secs: 1
+          haptic: heavy
+      - type: custom:button-card
+        entity: media_player.living_room_tv
+        name: ''
+        icon: mdi:checkbox-blank-circle
+        show_name: false
+        show_state: false
+        show_label: false
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.living_room_tv
+          haptic: heavy
+          data:
+            command: select
+        styles:
+          grid:
+          - grid-template-areas: '''i'''
+          card:
+          - height: 88px
+          - padding: 0
+          - border-radius: 30px
+          - background: var(--primary-color)
+          - box-shadow: var(--ha-card-box-shadow)
+          icon:
+          - width: 24px
+          - color: var(--active-text-color)
+          img_cell:
+          - width: 100%
+          - height: 100%
+          - border-radius: '0'
+          - background: none
+          - justify-self: center
+          - align-self: center
+        hold_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.living_room_tv
+          data:
+            command: select
+            hold_secs: 1
+          haptic: heavy
+      - type: custom:button-card
+        entity: media_player.living_room_tv
+        name: ''
+        icon: mdi:chevron-right
+        show_name: false
+        show_state: false
+        show_label: false
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.living_room_tv
+          haptic: heavy
+          data:
+            command: right
+        styles:
+          grid:
+          - grid-template-areas: '''i'''
+          card:
+          - height: 88px
+          - padding: 0
+          - border-radius: 30px
+          - background: var(--ha-card-background)
+          - box-shadow: var(--ha-card-box-shadow)
+          icon:
+          - width: 42px
+          - color: var(--primary-text-color)
+          img_cell:
+          - width: 100%
+          - height: 100%
+          - border-radius: '0'
+          - background: none
+          - justify-self: center
+          - align-self: center
+        hold_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.living_room_tv
+          data:
+            command: right
+            hold_secs: 1
+          haptic: heavy
+    - type: grid
+      columns: 3
+      square: false
+      cards:
+      - type: custom:button-card
+        entity: media_player.living_room_tv
+        name: Back 10 seconds
+        icon: mdi:rewind-10
+        show_name: false
+        show_state: false
+        show_label: false
+        tap_action:
+          action: perform-action
+          perform_action: media_player.media_seek
+          target:
+            entity_id: media_player.living_room_tv
+          haptic: heavy
+          data:
+            seek_position: '[[[ const position = Number(entity?.attributes?.media_position ?? 0); const updatedAt = entity?.attributes?.media_position_updated_at; const elapsed = entity?.state === ''playing'' && updatedAt ? Math.max((Date.now() - Date.parse(updatedAt)) / 1000, 0) : 0; return Math.max(Math.round(position + elapsed - 10), 0); ]]]'
+        styles:
+          grid:
+          - grid-template-areas: '''i'''
+          card:
+          - height: 90px
+          - padding: 14px 10px
+          - border-radius: 28px
+          - background: var(--ha-card-background)
+          - box-shadow: var(--ha-card-box-shadow)
+          icon:
+          - width: 34px
+          - color: var(--primary-text-color)
+          img_cell:
+          - width: 52px
+          - height: 52px
+          - border-radius: 50%
+          - background: var(--opacity-contrast-100)
+          - justify-self: center
+          - align-self: center
+      - type: custom:button-card
+        entity: media_player.living_room_tv
+        name: ''
+        icon: mdi:chevron-down
+        show_name: false
+        show_state: false
+        show_label: false
+        tap_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.living_room_tv
+          haptic: heavy
+          data:
+            command: down
+        styles:
+          grid:
+          - grid-template-areas: '''i'''
+          card:
+          - height: 88px
+          - padding: 0
+          - border-radius: 30px
+          - background: var(--ha-card-background)
+          - box-shadow: var(--ha-card-box-shadow)
+          icon:
+          - width: 42px
+          - color: var(--primary-text-color)
+          img_cell:
+          - width: 100%
+          - height: 100%
+          - border-radius: '0'
+          - background: none
+          - justify-self: center
+          - align-self: center
+        hold_action:
+          action: perform-action
+          perform_action: remote.send_command
+          target:
+            entity_id: remote.living_room_tv
+          data:
+            command: down
+            hold_secs: 1
+          haptic: heavy
+      - type: custom:button-card
+        entity: media_player.living_room_tv
+        name: Forward 30 seconds
+        icon: mdi:fast-forward-30
+        show_name: false
+        show_state: false
+        show_label: false
+        tap_action:
+          action: perform-action
+          perform_action: media_player.media_seek
+          target:
+            entity_id: media_player.living_room_tv
+          haptic: heavy
+          data:
+            seek_position: '[[[ const position = Number(entity?.attributes?.media_position ?? 0); const updatedAt = entity?.attributes?.media_position_updated_at; const elapsed = entity?.state === ''playing'' && updatedAt ? Math.max((Date.now() - Date.parse(updatedAt)) / 1000, 0) : 0; const target = Math.round(position + elapsed + 30); const duration = Number(entity?.attributes?.media_duration); return Number.isFinite(duration) ? Math.min(target, duration) : target; ]]]'
+        styles:
+          grid:
+          - grid-template-areas: '''i'''
+          card:
+          - height: 90px
+          - padding: 14px 10px
+          - border-radius: 28px
+          - background: var(--ha-card-background)
+          - box-shadow: var(--ha-card-box-shadow)
+          icon:
+          - width: 34px
+          - color: var(--primary-text-color)
+          img_cell:
+          - width: 52px
+          - height: 52px
+          - border-radius: 50%
+          - background: var(--opacity-contrast-100)
+          - justify-self: center
+          - align-self: center
+    - type: grid
+      columns: 3
+      square: false
+      cards:
+      - type: custom:button-card
+        entity: media_player.living_room_tv
+        name: Volume down
+        icon: mdi:volume-minus
+        show_name: false
+        show_state: false
+        show_label: false
+        tap_action:
+          action: perform-action
+          perform_action: media_player.volume_down
+          target:
+            entity_id: media_player.living_room_tv
+          haptic: heavy
+        styles:
+          grid:
+          - grid-template-areas: '''i'''
+          card:
+          - height: 90px
+          - padding: 14px 10px
+          - border-radius: 28px
+          - background: var(--ha-card-background)
+          - box-shadow: var(--ha-card-box-shadow)
+          icon:
+          - width: 34px
+          - color: var(--primary-text-color)
+          img_cell:
+          - width: 52px
+          - height: 52px
+          - border-radius: 50%
+          - background: var(--opacity-contrast-100)
+          - justify-self: center
+          - align-self: center
+      - type: custom:button-card
+        entity: media_player.living_room_tv
+        name: Play
+        icon: mdi:play
+        show_name: false
+        show_state: false
+        show_label: false
+        tap_action:
+          action: perform-action
+          perform_action: media_player.media_play_pause
+          target:
+            entity_id: media_player.living_room_tv
+          haptic: heavy
+        styles:
+          grid:
+          - grid-template-areas: '''i'''
+          card:
+          - height: 90px
+          - padding: 14px 10px
+          - border-radius: 28px
+          - background: var(--primary-color)
+          - box-shadow: var(--ha-card-box-shadow)
+          icon:
+          - width: 24px
+          - color: var(--active-text-color)
+          img_cell:
+          - width: 52px
+          - height: 52px
+          - border-radius: 50%
+          - background: var(--opacity-contrast-100)
+          - justify-self: center
+          - align-self: center
+      - type: custom:button-card
+        entity: media_player.living_room_tv
+        name: Volume up
+        icon: mdi:volume-plus
+        show_name: false
+        show_state: false
+        show_label: false
+        tap_action:
+          action: perform-action
+          perform_action: media_player.volume_up
+          target:
+            entity_id: media_player.living_room_tv
+          haptic: heavy
+        styles:
+          grid:
+          - grid-template-areas: '''i'''
+          card:
+          - height: 90px
+          - padding: 14px 10px
+          - border-radius: 28px
+          - background: var(--ha-card-background)
+          - box-shadow: var(--ha-card-box-shadow)
+          icon:
+          - width: 34px
+          - color: var(--primary-text-color)
+          img_cell:
+          - width: 52px
+          - height: 52px
+          - border-radius: 50%
+          - background: var(--opacity-contrast-100)
+          - justify-self: center
+          - align-self: center
+  # marao:generated:end
+  # marao:custom:start
+  # Add custom Lovelace cards here.
+  # marao:custom:end
+  # marao:generated-footer:start
+  - !include '/config/dashboard/MaraoDashboard/generated-test/components/navigation/navbar.yaml'
+  # marao:generated-footer:end

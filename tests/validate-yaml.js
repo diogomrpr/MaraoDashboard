@@ -96,6 +96,12 @@ for (const [platform, count] of Object.entries({
   }
 }
 const templateVacuums = helperPackage.template?.flatMap((block) => block.vacuum || []) || [];
+if (!helperPackage.cover?.some(cover => cover.platform === 'marao_test_cover') ||
+    !fs.existsSync(path.join(repoRoot, 'ha-test/custom_components/marao_test_cover/cover.py')) ||
+    !fs.existsSync(path.join(repoRoot, 'ha-test/custom_components/marao_test_cover/manifest.json'))) {
+  hasError = true;
+  console.error('The gallery must define its native safe open-only cover fixture.');
+}
 if (templateVacuums.some((vacuum) => "battery_level" in vacuum || "battery_level_template" in vacuum)) {
   hasError = true;
   console.error(`${helperPackagePath} must not use deprecated template vacuum battery options.`);
@@ -138,7 +144,7 @@ for (const expected of [
   "name: Marao Dashboard Test Today Energy",
   "name: Marao Dashboard Test Month Cost",
   "name: Marao Dashboard Test Today Cost",
-  "cover.marao_dashboard_test_open_only_door",
+  "name: Marao Dashboard Test Open Only Door",
   "name: Marao Dashboard Test Unknown",
   "name: Marao Dashboard Test Unavailable",
   "name: Marao Dashboard Test Battery Low",
@@ -431,9 +437,9 @@ const expectedGuidedPages = ["security", "energy", "wallbox", "media"];
 if (
   testDashboard.name !== "Marao Dashboard" ||
   testDashboard.slug !== "dashboard" ||
-  testDashboard.rooms?.length < 3 ||
-  !expectedGuidedPages.every((page) => testDashboard.pages?.[page] && typeof testDashboard.pages[page] === "object") ||
-  !testDashboard.pages?.custom?.length
+  testDashboard.config_version !== 2 || testDashboard.pages?.filter(page => page.subview).length < 3 ||
+  !expectedGuidedPages.every((path) => testDashboard.pages?.some(page => page.path === path)) ||
+  !testDashboard.pages?.some(page => page.path === "appliances")
 ) {
   hasError = true;
   console.error("The canonical test dashboard must contain realistic rooms, every guided page, and a custom page.");
@@ -447,10 +453,19 @@ const testViewPaths = new Set([
   "wallbox",
   "media",
   "card-test",
-  ...(testDashboard.rooms || []).map((room) => room.path),
-  ...(testDashboard.pages?.custom || []).map((page) => page.path),
+  ...(testDashboard.pages || []).map((page) => page.path),
 ]);
-const popupHashes = new Set(findCardsByType(cardTest, "custom:marao-popup-card").map((card) => card.hash));
+const popupHashes = new Set([cardTest, testDashboard].flatMap((source) => findCardsByType(source, "custom:marao-popup-card").map((card) => card.hash)));
+const popupRoles = new Set(['hc_entity_group_card', 'hc_scene_collection_card', 'hc_energy_period_card', 'hc_graph_card', 'hc_climate_card', 'hc_media_card', 'hc_camera_card', 'hc_access_card']);
+const collectGeneratedPopups = value => {
+  if (Array.isArray(value)) return value.forEach(collectGeneratedPopups);
+  if (!value || typeof value !== 'object') return;
+  if (popupRoles.has(value.template) && (value.template !== 'hc_graph_card' || value.variables?.history_popup)) {
+    for (const key of ['popup_hash', 'mode_selector_hash']) if (value.variables?.[key]) popupHashes.add(value.variables[key]);
+  }
+  Object.values(value).forEach(collectGeneratedPopups);
+};
+collectGeneratedPopups(testDashboard.pages);
 const navigationTargets = [];
 const collectNavigation = (value) => {
   if (Array.isArray(value)) return value.forEach(collectNavigation);
@@ -464,7 +479,7 @@ const collectNavigation = (value) => {
   Object.values(value).forEach(collectNavigation);
 };
 collectNavigation(cardTest);
-collectNavigation(testDashboard);
+collectNavigation(testDashboard.pages);
 for (const route of testDashboard.navigation || []) {
   if (route && typeof route === "object" && typeof route.url === "string") {
     navigationTargets.push(route.url);
@@ -504,6 +519,8 @@ const visibleTemplates = visibleMaraoCards.map((card) => card.template).filter(B
 for (const template of catalogTemplates) {
   const count = template === "hc_timeline_card"
     ? findCardsByType(cardTest.cards[0], "custom:marao-state-timeline-card").length
+    : ['hc_entity_group_card', 'hc_scene_collection_card', 'hc_energy_period_card', 'hc_media_app_card'].includes(template)
+      ? (cardTest.entities || []).filter((entity) => entity.template === template).length
     : visibleTemplates.filter((candidate) => candidate === template).length;
   if (count < 1) {
     hasError = true;

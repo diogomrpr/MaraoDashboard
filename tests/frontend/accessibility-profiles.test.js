@@ -8,10 +8,15 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const {
+  applyVisualPreferences,
+  applySafeAreaSource,
+  safeAreaCases,
   contextOptionsForScenario,
+  configurePageEmulation,
   effectiveViewport,
   parseArgs,
   popupFocusFailure,
+  popupHasVisibleContent,
   safeAreaInsetsForScenario,
   scenarios,
   selectedRuns,
@@ -19,6 +24,91 @@ const {
   themes,
   visualVariablesForScenario,
 } = require("../test-ha-dashboard-accessibility.js");
+
+test('visual preferences reach cards mounted while fonts and scrolling settle', async () => {
+  const node = localName => ({ localName, children: [], dataset: {}, style: { values: new Map(), setProperty(name, value) { this.values.set(name, value); } } });
+  const html = node('html'), ha = node('home-assistant'), shadow = node('shadow-root');
+  html.children = [ha]; ha.shadowRoot = shadow;
+  const lateCard = node('marao-card');
+  const previous = globalThis.document;
+  globalThis.document = { documentElement: html, fonts: { ready: Promise.resolve() } };
+  const page = { evaluate: async (callback, data) => callback(data), waitForTimeout: async () => { shadow.children.push(lateCard); } };
+  try {
+    await applyVisualPreferences(page, scenarios.find(s => s.name === 'iphone-bold-text-200'), 'dark');
+    for (const element of [html, ha, lateCard]) {
+      assert.equal(element.style.values.get('--font-size-primary'), '36px');
+      assert.equal(element.style.values.get('--font-size-secondary'), '32px');
+      assert.equal(element.style.values.get('--font-weight-primary'), '800');
+    }
+    assert.equal(html.dataset.maraoThemeMode, 'dark');
+    await applyVisualPreferences(page, scenarios.find(s => s.name === 'iphone-normal'), 'light');
+    assert.equal(lateCard.style.values.get('--font-size-primary'), '18px');
+    assert.equal(html.dataset.maraoThemeMode, 'light');
+  } finally { globalThis.document = previous; }
+});
+
+test('mobile emulation explicitly restores touch together with text and safe-area settings', async () => {
+  const calls=[];
+  let sessions = 0;
+  const context={newCDPSession:async()=>{ sessions += 1; return {send:async(method,params)=>calls.push({method,params})}; }};
+  const scenario=scenarios.find(s=>s.name==='iphone-bold');
+  const page = {};
+  await configurePageEmulation(context,page,scenario);
+  assert.deepEqual(calls,[
+    {method:'Emulation.setTouchEmulationEnabled',params:{enabled:true,maxTouchPoints:1}},
+    {method:'Emulation.setSafeAreaInsetsOverride',params:{insets:safeAreaInsetsForScenario(scenario)}},
+    {method:'Emulation.setEmulatedOSTextScale',params:{scale:scenario.textScale}},
+  ]);
+  await configurePageEmulation(context,page,scenario);
+  assert.equal(sessions, 1, 'Repeated scrolling must retain the same page emulation session');
+  assert.deepEqual(calls.slice(3), calls.slice(0,3));
+  await configurePageEmulation(context,{},scenario);
+  assert.equal(sessions, 2, 'A different page needs its own emulation session');
+});
+
+test('production safe-area cases keep browser and app sources independent and remove all emulation overrides', async () => {
+  const style = () => ({ values: new Map(), setProperty(k,v){this.values.set(k,v)}, removeProperty(k){this.values.delete(k)} });
+  const node = () => ({ children: [], style: style(), querySelector(){return null}, querySelectorAll(){return []} });
+  const html=node(), ha=node(), view=node(), shadow=node();
+  html.children=[ha];ha.shadowRoot=shadow;shadow.children=[view];shadow.querySelector=()=>view;
+  for(const e of [html,ha,view])for(const side of ['top','right','bottom','left'])e.style.setProperty('--marao-safe-area-inset-'+side,'99px');
+  view.style.setProperty('unrelated','keep');
+  const previousDocument=globalThis.document, previousFrame=globalThis.requestAnimationFrame;
+  globalThis.document={documentElement:html,children:[html],querySelector:()=>ha};
+  globalThis.requestAnimationFrame=callback=>callback();
+  const calls=[];
+  const context={newCDPSession:async()=>({send:async(method,params)=>calls.push({method,params}),detach:async()=>{}})};
+  const sizes=[];
+  const page={evaluate:async(callback,data)=>callback(data),setViewportSize:async size=>sizes.push(size)};
+  try {
+    await applySafeAreaSource(context,page,safeAreaCases[0]);
+    assert.equal(calls[0].params.insets.top,0);
+    assert.equal(html.style.values.get('--app-safe-area-inset-top'),'47px');
+    for(const e of [html,ha,view])assert.ok(![...e.style.values.keys()].some(k=>k.startsWith('--marao-safe-area-inset-')));
+    await applySafeAreaSource(context,page,safeAreaCases.find(c=>c.name==='host-padded'));
+    assert.equal(view.style.values.get('--safe-area-inset-top'),'0px');
+    assert.equal(view.style.marginTop,'47px');
+    await applySafeAreaSource(context,page,safeAreaCases.find(c=>c.name==='browser-only'));
+    assert.equal(calls.at(-1).params.insets.top,47);
+    assert.ok(!html.style.values.has('--app-safe-area-inset-top'));
+    assert.ok(!view.style.values.has('--safe-area-inset-top'));
+    assert.equal(view.style.marginTop,'');
+    await applySafeAreaSource(context,page,safeAreaCases.find(c=>c.name==='explicit-zero'));
+    assert.equal(html.style.values.get('--app-safe-area-inset-top'),'0px');
+    assert.equal(calls.at(-1).params.insets.top,47);
+    assert.equal(view.style.values.get('unrelated'),'keep');
+    await applySafeAreaSource(context,page,safeAreaCases.find(c=>c.name==='rotation'));
+    assert.deepEqual(sizes.at(-1),{width:844,height:390});
+    assert.equal(html.style.values.get('--app-safe-area-inset-top'),'0px');
+    assert.equal(html.style.values.get('--app-safe-area-inset-left'),'47px');
+    assert.equal(calls.at(-1).params.insets.top,59);
+    await applySafeAreaSource(context,page,safeAreaCases.find(c=>c.name==='portrait-again'));
+    assert.equal(html.style.values.get('--app-safe-area-inset-top'),'59px');
+    assert.equal(html.style.values.get('--app-safe-area-inset-left'),'0px');
+  } finally {globalThis.document=previousDocument;globalThis.requestAnimationFrame=previousFrame;}
+  assert.equal(parseArgs(['--safe-area']).safeArea,true);
+  assert.deepEqual(selectedRuns(parseArgs(['--safe-area'])).map(r=>[r.scenario.name,r.theme]),[['iphone-normal','light'],['iphone-normal','dark']]);
+});
 
 test("accessibility profiles cover the complete agreed mobile matrix", () => {
   const actual = scenarios.map(({ name, device, viewport, textScale, bold, pageZoom }) => [
@@ -144,4 +234,41 @@ test("popup focus checks resolve the live control after a previously located but
   } finally {
     Object.assign(globalThis, previous);
   }
+});
+
+test('whole-card problem colors have readable contrast and distinct availability/fault surfaces in both themes', () => {
+  const luminance = color => {
+    assert.match(color, /^#[0-9a-f]{6}$/i);
+    return color.slice(1).match(/../g).map(part => parseInt(part, 16) / 255)
+      .map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
+      .reduce((total, value, index) => total + value * [.2126, .7152, .0722][index], 0);
+  };
+  for (const theme of themes) {
+    const variables = themeVariables(theme), backgrounds = [];
+    for (const kind of ['neutral', 'warning', 'error']) {
+      const background = variables[`--marao-problem-${kind}-background`], text = variables[`--marao-problem-${kind}-text`];
+      const levels = [luminance(background), luminance(text)].sort((a, b) => a - b);
+      assert.ok((levels[1] + .05) / (levels[0] + .05) >= 4.5, `${theme}/${kind}`);
+      backgrounds.push(background);
+    }
+    assert.equal(new Set(backgrounds).size, 3);
+  }
+});
+
+
+test('popup content waits for nested native rendering and rejects an empty mount', () => {
+  const previous = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = node => ({ display: node.hidden ? 'none' : 'block' });
+  const node = text => ({ children: [], textContent: text, getBoundingClientRect: () => ({ width: 350, height: 50 }), matches: () => false });
+  try {
+    const native = node(''), host = { children: [native] };
+    native.shadowRoot = { children: [node('')] };
+    assert.equal(popupHasVisibleContent(host), false);
+    native.shadowRoot.children[0].textContent = 'No scenes configured';
+    assert.equal(popupHasVisibleContent(host), true);
+    native.shadowRoot.children[0].hidden = true;
+    assert.equal(popupHasVisibleContent(host), false);
+    native.shadowRoot.children = [];
+    assert.equal(popupHasVisibleContent(host), false);
+  } finally { globalThis.getComputedStyle = previous; }
 });
