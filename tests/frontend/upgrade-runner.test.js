@@ -12,6 +12,26 @@ const { readKnownFailure, undeliveredFix, validateKnownFailure } = require('../n
 const YAML = require('yaml');
 const config = { url: 'http://192.168.0.28:8123', disposable: true, sshHost: '192.168.0.28' };
 
+test('upgrade cleanup restores recorded helper values and preflights all states before sending actions', async () => {
+  const { helperStateActions, restoreHelperStates } = require('../../ha-test/prepare');
+  assert.deepEqual(helperStateActions({
+    'input_boolean.marao_dashboard_test_on': 'on', 'input_boolean.marao_dashboard_test_off': 'off',
+    'input_number.marao_dashboard_test_number': '20.5', 'input_select.marao_dashboard_test_scene': 'Movie',
+    'input_text.marao_dashboard_test_text': '',
+  }), [
+    ['input_boolean', 'turn_on', { entity_id: 'input_boolean.marao_dashboard_test_on' }],
+    ['input_boolean', 'turn_off', { entity_id: 'input_boolean.marao_dashboard_test_off' }],
+    ['input_number', 'set_value', { entity_id: 'input_number.marao_dashboard_test_number', value: 20.5 }],
+    ['input_select', 'select_option', { entity_id: 'input_select.marao_dashboard_test_scene', option: 'Movie' }],
+    ['input_text', 'set_value', { entity_id: 'input_text.marao_dashboard_test_text', value: '' }],
+  ]);
+  for (const [entity, value] of [['input_select.actual_device', 'Movie'], ['lock.marao_dashboard_test_lock', 'locked'],
+    ['input_boolean.marao_dashboard_test_on', 'unknown'], ['input_number.marao_dashboard_test_number', ''],
+    ['input_number.marao_dashboard_test_number', 'NaN'], ['input_text.marao_dashboard_test_text', null]]) {
+    await assert.rejects(restoreHelperStates({}, { 'input_select.marao_dashboard_test_scene': 'Movie', [entity]: value }), /fixture helper/);
+  }
+});
+
 test('release plan covers every frozen baseline and all four formats without remote operations', () => {
   const value = plan(config);
   assert.equal(value.rows.length, 7); assert.equal(value.rows[0].baseline, 'v0.5.1');

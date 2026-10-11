@@ -5,7 +5,7 @@ const path = require('node:path');
 const { execFileSync, spawn } = require('node:child_process');
 const YAML = require('yaml');
 const { accessToken, api, assertDisposableHaTarget, connect, readConfig, repoRoot, setBrowserToken, sourceFiles } = require('../ha-test/client');
-const { composeDashboard, haYamlOptions, resetBaseline, restart } = require('../ha-test/prepare');
+const { composeDashboard, haYamlOptions, resetBaseline, restoreHelperStates, restart } = require('../ha-test/prepare');
 const { candidateIdentity } = require('../ha-test/upgrade/prepared');
 
 const fixtures = path.join(repoRoot, 'ha-test/upgrade/fixtures');
@@ -531,6 +531,7 @@ async function main() {
       assert.ok((await client.call({ type: 'config_entries/get' })).some(entry => entry.entry_id === entryId && entry.state === 'loaded'));
       assert.deepEqual(JSON.parse((await client.call({ type: 'marao_dashboard/config/get' })).config), selected.current);
       await resetBaseline(config, helper);
+      await restoreHelperStates(config, initialHelperStates);
       assert.deepEqual(await helperStates(), initialHelperStates, 'Safe helper state cleanup failed');
       remote({ mode: 'finish' });
       report.verified_cleanup = true;

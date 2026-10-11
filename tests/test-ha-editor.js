@@ -635,7 +635,7 @@ async function releasedDraftPreservation(page, panel, client, scenario, theme) {
 async function independentRoomChecks(page, panel, client, scenario, theme) {
   const fixtures = require('../ha-test/cases.json').editorRoomCases;
   const saved = (await client.call({ type: 'marao_dashboard/config/get' })).config;
-  const original = await panel.evaluate(p => ({ source: p._source(), dirty: p._dirty }));
+  const original = await panel.evaluate(p => ({ model: p._model, source: p._source(), dirty: p._dirty }));
   const roomIndex = await panel.evaluate(p => p._model.pages.findIndex(page => page.path === 'living-room'));
   assert.ok(roomIndex >= 0);
   const room = `${roomIndex}:1`;
@@ -811,10 +811,11 @@ async function independentRoomChecks(page, panel, client, scenario, theme) {
   } finally {
     await panel.evaluate((p, original) => {
       p.__roomRestoreHass?.();
-      p._monaco?.setValue(original.source); p._jsonDraft = original.source;
+      p._model = original.model; p._jsonDraft = original.source;
+      p._setEditorSource(original.source); p._dirty = original.dirty;
+      p._renderVisual(); p._updateHeader();
     }, original);
-    await panel.evaluate(async p => { await p._ensureMonaco(); p._monaco.setValue(p._jsonDraft); p._tab = 'json'; await p._switchTab('visual'); });
-    await panel.evaluate((p, dirty) => { p._dirty = dirty; p._updateHeader(); }, original.dirty);
+    assert.equal(await panel.evaluate(p => p._source()), original.source, 'Room cleanup must restore the exact original draft');
     assert.equal((await client.call({ type: 'marao_dashboard/config/get' })).config, saved);
   }
 }

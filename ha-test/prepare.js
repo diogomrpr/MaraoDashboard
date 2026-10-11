@@ -207,6 +207,26 @@ async function resetBaseline(config, helper) {
   }
 }
 
+function helperStateActions(states) {
+  return Object.entries(states).map(([entity, value]) => {
+    if (!/^input_(boolean|number|select|text)\.marao_dashboard_test_[a-z0-9_]+$/.test(entity)) throw new Error("Refusing to restore a non-fixture helper.");
+    const domain = entity.split(".")[0];
+    if (typeof value !== "string" || domain === "input_boolean" && !["on", "off"].includes(value)
+      || domain === "input_number" && (!value.trim() || !Number.isFinite(Number(value)))) throw new Error("Invalid saved fixture helper state.");
+    const service = domain === "input_boolean" ? (value === "on" ? "turn_on" : "turn_off") : domain === "input_select" ? "select_option" : "set_value";
+    const data = { entity_id: entity };
+    if (domain !== "input_boolean") data[domain === "input_select" ? "option" : "value"] = domain === "input_number" ? Number(value) : value;
+    return [domain, service, data];
+  });
+}
+
+async function restoreHelperStates(config, states) {
+  const actions = helperStateActions(states);
+  for (let offset = 0; offset < actions.length; offset += 6) {
+    await Promise.all(actions.slice(offset, offset + 6).map(([domain, service, data]) => api(config, "POST", "/api/services/" + domain + "/" + service, data)));
+  }
+}
+
 async function provisionFixtureAreas(config) {
   const fixtures = require('./cases.json').editorRoomCases.areas;
   const client = await connect(config);
@@ -406,4 +426,4 @@ if (require.main === module) {
   const dryRun = process.argv.includes("--dry-run");
   Promise.resolve().then(() => prepare(readConfig(undefined, { dryRun }), { dryRun })).catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = { haYamlOptions, changePlan, composeDashboard, patchPackages, prepare, referencedEntities, resetBaseline, restart, targetKey };
+module.exports = { haYamlOptions, changePlan, composeDashboard, helperStateActions, patchPackages, prepare, referencedEntities, resetBaseline, restoreHelperStates, restart, targetKey };
