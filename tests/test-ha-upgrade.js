@@ -517,6 +517,7 @@ async function main() {
       await finalVisualReview(directory, report, saveReport);
     }, async () => {
       if (!baseline) return;
+      client.close(); client = await connect(config);
       await disabled(true);
       const current = snapshot();
       assertUnrelatedEntries(preservedDocuments['.storage/core.config_entries'], current.documents['.storage/core.config_entries'], entryId);

@@ -138,8 +138,10 @@ async function waitReady(config) {
 
 async function restart(config) {
   console.log("Restarting the disposable Home Assistant for backend or fixture changes.");
+  const supervised = await waitForSupervisorIdle(config);
   await api(config, "POST", "/api/services/homeassistant/check_config", {});
-  // Watch concurrently: the restart can close (or time out) its own HTTP request.
+  await waitForSupervisorIdle(config);
+  // Watch concurrently: restarting can close the request before it returns.
   const stopped = (async () => {
     const deadline = Date.now() + 60000;
     while (Date.now() < deadline) {
@@ -150,10 +152,38 @@ async function restart(config) {
     return false;
   })();
   let requestError;
-  try { await api(config, "POST", "/api/services/homeassistant/restart", {}); }
+  try {
+    if (supervised) {
+      const client = await connect(config);
+      try { await client.call({ type: "supervisor/api", endpoint: "/homeassistant/restart", method: "post" }); }
+      finally { client.close(); }
+    } else await api(config, "POST", "/api/services/homeassistant/restart", {});
+  }
   catch (error) { requestError = error; }
   if (!await stopped) throw requestError || new Error("Home Assistant accepted the restart request but did not restart.");
   await waitReady(config);
+  await waitForSupervisorIdle(config);
+}
+
+function activeCoreJob(jobs) {
+  if (!Array.isArray(jobs)) throw new Error("Missing Supervisor job metadata.");
+  return jobs.some(job => typeof job.name === "string" && job.name.startsWith("home_assistant_core_") && job.done !== true
+    || activeCoreJob(job.child_jobs || []));
+}
+
+async function waitForSupervisorIdle(config) {
+  const status = await api(config, "GET", "/api/config");
+  if (!status.components.includes("hassio")) return false;
+  const client = await connect(config);
+  try {
+    const deadline = Date.now() + 180000;
+    while (Date.now() < deadline) {
+      const { jobs } = await client.call({ type: "supervisor/api", endpoint: "/jobs/info", method: "get" });
+      if (!activeCoreJob(jobs)) return true;
+      await delay(500);
+    }
+    throw new Error("Supervisor Core job did not finish within three minutes.");
+  } finally { client.close(); }
 }
 
 async function getEntries(config) {
@@ -426,4 +456,4 @@ if (require.main === module) {
   const dryRun = process.argv.includes("--dry-run");
   Promise.resolve().then(() => prepare(readConfig(undefined, { dryRun }), { dryRun })).catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = { haYamlOptions, changePlan, composeDashboard, helperStateActions, patchPackages, prepare, referencedEntities, resetBaseline, restoreHelperStates, restart, targetKey };
+module.exports = { activeCoreJob, haYamlOptions, changePlan, composeDashboard, helperStateActions, patchPackages, prepare, referencedEntities, resetBaseline, restoreHelperStates, restart, targetKey, waitForSupervisorIdle };

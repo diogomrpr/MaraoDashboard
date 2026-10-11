@@ -15,7 +15,7 @@ from homeassistant.components.lovelace import LOVELACE_DATA, MODE_YAML
 from homeassistant.components.lovelace.const import CONF_RESOURCE_TYPE_WS
 from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL, DATA_PANELS
 from homeassistant.const import CONF_URL
-from homeassistant.helpers import area_registry as ar, entity_registry as er
+from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util.yaml import load_yaml
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -900,6 +900,30 @@ async def test_registry_unit_metadata_uses_live_registered_and_unregistered_stat
     assert next(entity for entity in _registry_entities(hass) if entity["entity_id"] == entry.entity_id)["unit_of_measurement"] == "kWh"
     hass.states.async_remove(entry.entity_id)
     assert next(entity for entity in _registry_entities(hass) if entity["entity_id"] == entry.entity_id)["unit_of_measurement"] is None
+
+
+async def test_registry_device_metadata_uses_native_lookup_and_preserves_area_precedence(hass) -> None:
+    config_entry = MockConfigEntry(domain=DOMAIN)
+    config_entry.add_to_hass(hass)
+    devices = dr.async_get(hass)
+    area = ar.async_get(hass).async_create("Device fixture area")
+    override = ar.async_get(hass).async_create("Entity fixture area")
+    device = devices.async_get_or_create(config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, "safe-device")}, manufacturer="Fixture", model="Synthetic")
+    devices.async_update_device(device.id, area_id=area.id)
+    entities = er.async_get(hass)
+    entry = entities.async_get_or_create("light", "test", "safe-device-light", device_id=device.id)
+    hass.states.async_set(entry.entity_id, "on")
+    with patch.object(devices, "async_get", wraps=devices.async_get) as lookup:
+        metadata = next(row for row in _registry_entities(hass) if row["entity_id"] == entry.entity_id)
+    lookup.assert_called_once_with(device.id)
+    assert metadata["device_model"] == "Synthetic"
+    assert metadata["manufacturer"] == "Fixture"
+    assert metadata["area_name"] == metadata["device_area_name"] == area.name
+    entities.async_update_entity(entry.entity_id, area_id=override.id)
+    metadata = next(row for row in _registry_entities(hass) if row["entity_id"] == entry.entity_id)
+    assert metadata["area_name"] == override.name
+    assert metadata["device_area_name"] == area.name
 
 
 async def test_management_payload_includes_editor_context(hass) -> None:

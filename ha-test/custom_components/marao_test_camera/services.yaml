@@ -1,0 +1,9 @@
+toggle_energy_unit:
+  name: Toggle safe energy unit
+  description: Toggle the unit attribute of the disposable energy fixture.
+reset:
+  name: Reset safe fixtures
+  description: Restore the disposable climate, media and energy fixture defaults.
+reject_action:
+  name: Simulate rejected action
+  description: Report the configured safe gallery action failure without operating a device.

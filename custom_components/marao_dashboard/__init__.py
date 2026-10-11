@@ -738,7 +738,7 @@ def _registry_entities(hass: HomeAssistant) -> list[dict[str, Any]]:
         registered_entity_ids.add(entity_id)
         domain = entity_id.split(".", 1)[0]
         state = hass.states.get(entity_id)
-        device = device_registry.devices.get(entry.device_id) if entry.device_id else None
+        device = device_registry.async_get(entry.device_id) if entry.device_id else None
         area_id = entry.area_id or (device.area_id if device else None)
         area = area_registry.areas.get(area_id) if area_id else None
         device_area = area_registry.areas.get(device.area_id) if device and device.area_id else None

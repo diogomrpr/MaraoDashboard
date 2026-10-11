@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { validatePages } from '../../frontend_src/editor-model.js';
 
@@ -11,6 +12,36 @@ const { addResourceSentinel, unrelatedConfiguration, assertUnrelatedEntries, ext
 const { readKnownFailure, undeliveredFix, validateKnownFailure } = require('../native-reconnect-exception');
 const YAML = require('yaml');
 const config = { url: 'http://192.168.0.28:8123', disposable: true, sshHost: '192.168.0.28' };
+
+test('restart readiness waits for active Supervisor Core jobs, closes connections and supports unsupervised Core', async () => {
+  const { activeCoreJob } = require('../../ha-test/prepare');
+  assert.equal(activeCoreJob([{ name: 'home_assistant_core_restart', done: false }]), true);
+  assert.equal(activeCoreJob([{ name: 'backup', done: false, child_jobs: [{ name: 'home_assistant_core_start', done: false }] }]), true);
+  assert.equal(activeCoreJob([{ name: 'home_assistant_core_restart', done: true }, { name: 'unrelated', done: false }]), false);
+  assert.throws(() => activeCoreJob(undefined), /job metadata/);
+  for (const mode of ['supervised', 'standalone', 'timeout', 'failure']) {
+    let polls = 0, closed = 0, connections = 0, ticks = 0;
+    const client = { api: async () => ({ components: mode === 'standalone' ? [] : ['hassio'] }), connect: async () => {
+      connections++;
+      return { close: () => closed++, call: async message => {
+        assert.deepEqual(message, { type: 'supervisor/api', endpoint: '/jobs/info', method: 'get' });
+        if (mode === 'failure') throw new Error('Supervisor unavailable');
+        return { jobs: [{ name: 'home_assistant_core_restart', done: ++polls === 3 }] };
+      } };
+    } };
+    const module = { exports: {} }, file = path.resolve('ha-test/prepare.js');
+    vm.runInThisContext('(function(require,module,__dirname,Date,setTimeout){' + fs.readFileSync(file, 'utf8') + '\n})', { filename: file })(
+      name => name === './client' ? { ...require('../../ha-test/client'), ...client } : require(name), module, path.dirname(file),
+      { now: () => mode === 'timeout' ? ++ticks * 180001 : 0 }, callback => callback());
+    const pending = module.exports.waitForSupervisorIdle(config);
+    if (mode === 'timeout') await assert.rejects(pending, /did not finish/);
+    else if (mode === 'failure') await assert.rejects(pending, /Supervisor unavailable/);
+    else assert.equal(await pending, mode !== 'standalone');
+    assert.equal(connections, mode === 'standalone' ? 0 : 1);
+    assert.equal(closed, connections);
+    if (mode === 'supervised') assert.equal(polls, 3);
+  }
+});
 
 test('upgrade cleanup restores recorded helper values and preflights all states before sending actions', async () => {
   const { helperStateActions, restoreHelperStates } = require('../../ha-test/prepare');
