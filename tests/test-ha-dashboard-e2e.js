@@ -977,7 +977,7 @@ async function captureClimateFeedback(page, name, target, output, visualProfile)
         // HA's shifted fullscreen shell can leave scrollIntoView above the viewport.
         let scrolled = false;
         for (let parent = element; parent; parent = parent.assignedSlot || parent.parentElement || parent.getRootNode()?.host) {
-          if (parent.scrollHeight > parent.clientHeight && ['auto', 'scroll'].includes(getComputedStyle(parent).overflowY)) {
+          if (parent.clientHeight > 0 && parent.scrollHeight > parent.clientHeight && ['auto', 'scroll'].includes(getComputedStyle(parent).overflowY)) {
             parent.scrollBy({ top: title.top - minimumTop - 14, behavior: 'instant' }); scrolled = true; break;
           }
         }
@@ -991,7 +991,10 @@ async function captureClimateFeedback(page, name, target, output, visualProfile)
       const heading = element.shadowRoot.querySelector('.title');
       const { top, bottom, left, right } = heading?.getBoundingClientRect() ?? { top: 0, bottom: 0, left: 0, right: 0 };
       let minimumTop = 0;
+      const scrollers = [];
       for (let parent = element; parent; parent = parent.assignedSlot || parent.parentElement || parent.getRootNode()?.host) {
+        if (parent.scrollHeight > parent.clientHeight) scrollers.push({ tag: parent.localName, height: parent.scrollHeight,
+          viewport: parent.clientHeight, top: parent.scrollTop, overflow: getComputedStyle(parent).overflowY });
         if (parent.classList?.contains('marao-popup-sheet')) {
           minimumTop = parent.querySelector('.marao-popup-head').getBoundingClientRect().bottom;
           break;
@@ -999,7 +1002,7 @@ async function captureClimateFeedback(page, name, target, output, visualProfile)
       }
       return { top, bottom, left, right, width: innerWidth, height: innerHeight,
         visible: Boolean(heading?.getClientRects().length),
-        minimumTop };
+        minimumTop, scrollers };
     });
     assert.ok(!title.visible || title.top >= title.minimumTop - .5 && title.bottom <= title.height + .5 && title.left >= -.5 && title.right <= title.width + .5,
       `${name}: the captured card title is outside the viewport: ${JSON.stringify(title)}`);
@@ -1032,7 +1035,7 @@ async function captureClimateFeedback(page, name, target, output, visualProfile)
       const distance = Math.max(0, element.getBoundingClientRect().bottom - limit);
       let scrolled = false;
       for (let parent = element; parent; parent = parent.assignedSlot || parent.parentElement || parent.getRootNode()?.host) {
-        if (parent.scrollHeight > parent.clientHeight && ['auto', 'scroll'].includes(getComputedStyle(parent).overflowY)) {
+        if (parent.clientHeight > 0 && parent.scrollHeight > parent.clientHeight && ['auto', 'scroll'].includes(getComputedStyle(parent).overflowY)) {
           parent.scrollBy({ top: distance, behavior: 'instant' });
           scrolled = true;
           break;

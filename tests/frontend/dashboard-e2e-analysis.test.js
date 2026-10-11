@@ -2,10 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import vm from 'node:vm';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const {
   buildViewChecks,
+  captureClimateFeedback,
   climateFeedbackSnapshot,
   conditionalCardIsActive,
   dashboardNavigationViolations,
@@ -13,6 +17,26 @@ const {
   scrollDashboard,
 } = require("../test-ha-dashboard-e2e.js");
 const { visibleBounds } = require("../test-ha-room-cards.js");
+
+test('climate captures ignore collapsed scroll containers and frame both ends of a tall card', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-climate-capture-unit-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  let top = 2000, collapsedScrolls = 0;
+  const collapsed = { clientHeight: 0, scrollHeight: 4000, scrollBy: () => collapsedScrolls++, getRootNode: () => ({}) };
+  const heading = { getClientRects: () => [1], getBoundingClientRect: () => ({ top, bottom: top + 20, left: 14, right: 300 }) };
+  const element = { parentElement: collapsed, scrollIntoView() {},
+    getBoundingClientRect: () => ({ height: 900, bottom: top + 900 }),
+    shadowRoot: { querySelector: () => heading, querySelectorAll: () => [] } };
+  const environment = vm.createContext({ innerHeight: 844, innerWidth: 390, getComputedStyle: () => ({ overflowY: 'auto' }),
+    document: { scrollingElement: { scrollBy: ({ top: distance }) => { top -= distance; } } } });
+  const target = { evaluate: (run, arg) => structuredClone(vm.runInContext('(' + run.toString() + ')', environment)(element, arg)) };
+  const captures = [];
+  const page = { evaluate: async () => {}, screenshot: async () => captures.push(top), locator: selector => selector === '.marao-popup-sheet'
+    ? { count: async () => 0 } : { boundingBox: async () => ({ y: 760 }) } };
+  await captureClimateFeedback(page, 'collapsed-scroll-regression', target, directory);
+  assert.equal(collapsedScrolls, 0);
+  assert.deepEqual(captures, [14, -148]);
+});
 
 test('climate feedback records a rendered pending transition before a fast rejection, without accepting absent feedback', () => {
   let mutation, disconnected = 0, pending = false, target = '21';
