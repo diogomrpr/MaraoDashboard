@@ -148,6 +148,8 @@ cards:
         entity: cover.marao_dashboard_test_cover
         name: Cover + slider
 
+      # The live action check retains this popup's idle and active access track
+      # across updates from the safe light helper above.
       - type: custom:marao-card
         template: hc_access_card
         entity: lock.marao_dashboard_test_lock

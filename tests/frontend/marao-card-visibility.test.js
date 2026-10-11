@@ -1574,14 +1574,14 @@ for (const fail of [false, true]) test(`graph history survives a temporary HA sh
   assert.match(card.shadowRoot.innerHTML, new RegExp(`data-graph-history-state="${fail ? 'error' : 'empty'}"`));
 });
 
-test('unrelated HA updates retain an active strict access slide with the current service context', () => {
-  for (const change of ['unrelated', 'target', 'unknown', 'disconnect', 'locale']) {
+test('unrelated HA updates retain idle and active strict access slides with the current service context', () => {
+  for (const pointerId of [null, 1]) for (const change of ['unrelated', 'target', 'unknown', 'disconnect', 'locale']) {
     const card = new MaraoCard();
     card.setConfig({entity: 'lock.test', template: 'hc_access_slide_action_card', variables: {action_service: 'lock.unlock'}});
     const state = {state: 'locked', attributes: {}};
     const hass = {states: {'lock.test': state}, callService() {}, language: 'en'};
     card.hass = hass;
-    const slide = {_pointerId: 1};
+    const slide = {_pointerId: pointerId};
     card.shadowRoot.querySelector = selector => selector === 'marao-slide-to-open' ? slide : null;
     let renders = 0; card._render = () => renders++;
     const next = {...hass, states: {...hass.states, 'sensor.other': {state: '20'}}};

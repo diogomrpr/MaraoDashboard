@@ -280,6 +280,13 @@ async function checkActionDispatches(page, serviceCalls) {
   await assertCount(lock, "unlock", before, 0, "Cancelled access gestures");
   const unrelated = "input_boolean.marao_dashboard_test_light";
   const original = await page.evaluate(entity => document.querySelector('home-assistant').hass.states[entity].state, unrelated);
+  const idleTrack = await track.elementHandle();
+  await page.evaluate(entity => document.querySelector('home-assistant').hass.callService('input_boolean', 'toggle', {entity_id: entity}), unrelated);
+  await page.waitForFunction(({entity, original}) => document.querySelector('home-assistant').hass.states[entity].state !== original, {entity: unrelated, original});
+  assert.equal(await idleTrack.evaluate(element => element.isConnected), true, 'An unrelated HA update replaced the idle access track');
+  await page.evaluate(({entity, original}) => document.querySelector('home-assistant').hass.callService('input_boolean', original === 'on' ? 'turn_on' : 'turn_off', {entity_id: entity}), {entity: unrelated, original});
+  await page.waitForFunction(({entity, original}) => document.querySelector('home-assistant').hass.states[entity].state === original, {entity: unrelated, original});
+  await idleTrack.dispose();
   await gesture([[1, 0]], { afterStart: async () => {
     await page.evaluate(entity => document.querySelector('home-assistant').hass.callService('input_boolean', 'toggle', {entity_id: entity}), unrelated);
     await page.waitForFunction(({entity, original}) => document.querySelector('home-assistant').hass.states[entity].state !== original, {entity: unrelated, original});

@@ -844,7 +844,7 @@ export class MaraoCard extends BaseElement {
     }
     this._graphAvailabilityState = graphAvailability;
     const accessSlide = this.shadowRoot?.querySelector('marao-slide-to-open');
-    if (accessSlide?._pointerId != null && previousState && previousState === value?.states?.[entity]
+    if (accessSlide && previousState && previousState === value?.states?.[entity]
       && wasServiceReady === this._serviceReady && serviceTargetReady(value, entity)
       && ["themes", "locale", "language", "localize", "entities"].every(key => previous[key] === value?.[key])) {
       accessSlide.hass = value;
