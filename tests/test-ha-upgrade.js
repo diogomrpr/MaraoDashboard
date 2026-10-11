@@ -348,7 +348,7 @@ async function main() {
       await child(process.execPath, ['--test', ...sourceFiles(path.join(repoRoot, 'tests/frontend')).filter(file => file.endsWith('.test.js')).map(file => 'tests/frontend/' + file)], directory, 'candidate-frontend');
       for (const [name, check] of Object.entries(coverage.checks)) if (check.scope === 'candidate') report.runs.push({ check: name, format: 'candidate', profile: null, theme: null, passed: true, evidence: check.file.endsWith('.py') ? 'candidate-python.log' : 'candidate-frontend.log' });
       const released = path.join(directory, 'released-package'); fs.mkdirSync(released);
-      const archive = execFileSync('git', ['archive', 'v0.5.1', 'custom_components/marao_dashboard', 'frontend_src', 'package.json', 'package-lock.json'], { cwd: repoRoot });
+      const archive = execFileSync('git', ['archive', 'v0.5.1', 'custom_components/marao_dashboard', 'frontend_src', 'package.json', 'package-lock.json'], { cwd: repoRoot, maxBuffer: 16 * 1024 * 1024 });
       execFileSync('tar', ['-xf', '-', '-C', released], { input: archive });
       fs.symlinkSync(path.join(repoRoot, 'node_modules'), path.join(released, 'node_modules'), 'dir');
       execFileSync(process.execPath, ['frontend_src/build-editor.cjs'], { cwd: released, stdio: 'pipe' });
