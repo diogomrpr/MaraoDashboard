@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { validatePages } from '../../frontend_src/editor-model.js';
 
 const require = createRequire(import.meta.url);
-const { assertUnrelatedEntries, extendedSource, patchRegistration, plan, validateVisualReviews, withRecovery } = require('../test-ha-upgrade');
+const { addResourceSentinel, assertUnrelatedEntries, extendedSource, patchRegistration, plan, validateVisualReviews, withRecovery } = require('../test-ha-upgrade');
 const { undeliveredFix, validateKnownFailure } = require('../native-reconnect-exception');
 const YAML = require('yaml');
 const config = { url: 'http://192.168.0.28:8123', disposable: true, sshHost: '192.168.0.28' };
@@ -67,6 +67,20 @@ test('release registration retains Home Assistant include tags without parser wa
   for (const [keys, tag] of [[['frontend','themes'],'!include_dir_merge_named'], [['homeassistant','packages'],'!include_dir_named'], [['automation'],'!include'], [['http','api_password'],'!secret']]) {
     assert.equal(doc.getIn(keys,true).tag,tag);
   }
+});
+
+test('YAML resource sentinel appends without losing unrelated nodes and rejects ambiguous sources', () => {
+  const { haYamlOptions } = require('../../ha-test/prepare');
+  const doc=YAML.parseDocument('lovelace:\n  resource_mode: yaml\n  resources:\n    # retain resource comment\n    - url: /local/unrelated.js\n      type: module\n      retained: value\n',haYamlOptions);
+  const before=doc.getIn(['lovelace','resources']).items[0].toString();
+  const sentinel=addResourceSentinel(doc);
+  assert.equal(doc.getIn(['lovelace','resources']).items[0].toString(),before);
+  assert.ok(doc.toString().includes('# retain resource comment'));
+  assert.deepEqual(doc.toJSON().lovelace.resources.at(-1),sentinel);
+  assert.equal(doc.toJSON().lovelace.resource_mode,'yaml');
+  const empty=YAML.parseDocument('lovelace: {}');addResourceSentinel(empty);assert.equal(empty.toJSON().lovelace.resources.length,1);
+  const external=YAML.parseDocument('lovelace:\n  resources: !include resources.yaml\n',haYamlOptions),original=external.toString();
+  assert.throws(()=>addResourceSentinel(external),/explicit resource list/);assert.equal(external.toString(),original);
 });
 
 test('concurrent unrelated integration edits block cleanup', () => {

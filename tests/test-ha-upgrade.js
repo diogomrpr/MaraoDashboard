@@ -73,6 +73,15 @@ function patchRegistration(source, slug, native = false) {
   return document.toString();
 }
 
+function addResourceSentinel(document) {
+  const resources = document.getIn(['lovelace', 'resources'], true);
+  assert.ok(resources === undefined || YAML.isSeq(resources), 'Upgrade sentinel requires an explicit resource list');
+  const sentinel = { url: '/local/marao-upgrade-unrelated.js', type: 'module' };
+  if (resources) resources.add(document.createNode(sentinel));
+  else document.setIn(['lovelace', 'resources'], document.createNode([sentinel]));
+  return sentinel;
+}
+
 function hashes(directory) {
   return Object.fromEntries(sourceFiles(directory).map(file => [file, sha256(fs.readFileSync(path.join(directory, file)))]));
 }
@@ -367,10 +376,13 @@ async function main() {
       const configuration = YAML.parseDocument(baselineConfig, haYamlOptions);
       configuration.setIn(['lovelace', 'dashboards', 'unrelated-upgrade-sentinel'], configuration.createNode({ mode: 'yaml', title: ownership.dashboard.title,
         icon: 'mdi:file-outline', show_in_sidebar: false, require_admin: true, filename: 'unrelated/marao-upgrade.yaml' }));
-      const sentinelConfig = configuration.toString();
       const resourcesBefore = await client.call({ type: 'lovelace/resources' });
       originalResources = resourcesBefore;
-      const sentinelResource = await client.call({ type: 'lovelace/resources/create', res_type: 'module', url: '/local/marao-upgrade-unrelated.js' });
+      const { resource_mode: resourceMode } = await client.call({ type: 'lovelace/info' });
+      assert.ok(['yaml', 'storage'].includes(resourceMode), 'Unsupported Lovelace resource mode');
+      const sentinelResource = resourceMode === 'yaml' ? addResourceSentinel(configuration)
+        : await client.call({ type: 'lovelace/resources/create', res_type: 'module', url: '/local/marao-upgrade-unrelated.js' });
+      const sentinelConfig = configuration.toString();
       const resourcesExpected = [...resourcesBefore, sentinelResource];
       const checkedFormats = new Set();
       for (const row of selected.rows) {
@@ -525,5 +537,5 @@ function assertUnrelatedEntries(before, after, entryId) {
   assert.deepEqual(unrelated(after), unrelated(before), 'Concurrent unrelated entry change; retained recovery backup');
 }
 
-module.exports = { assertUnrelatedEntries, child, extendedSource, hashes, patchRegistration, plan, validateVisualReviews, withRecovery };
+module.exports = { addResourceSentinel, assertUnrelatedEntries, child, extendedSource, hashes, patchRegistration, plan, validateVisualReviews, withRecovery };
 if (require.main === module) main().catch(error => { console.error(error.message.split('\n')[0]); process.exitCode = 1; });
