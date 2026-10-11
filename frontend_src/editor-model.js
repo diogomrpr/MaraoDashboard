@@ -743,7 +743,7 @@ export function buildJsonSchema(catalog, entities) {
     const legacy = clone(schema);
     const paths = { type: 'string', pattern: '^[a-z0-9][a-z0-9_-]*$' };
     const freeValue = { type: 'object', required: ['template'], properties: {
-      template: { enum: ['hc_title_card', 'hc_room_card', 'hc_scene_collection_card'] },
+      template: { enum: ['hc_title_card', 'hc_navigation_card', 'hc_room_card', 'hc_scene_collection_card'] },
       id: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
       name: { type: 'string' }, icon: { type: ['string', 'null'] }, page: paths,
       variables: { type: 'object', additionalProperties: true },

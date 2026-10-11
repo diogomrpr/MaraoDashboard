@@ -121,4 +121,15 @@ test('canonical schema offers ordered pages, sections and entity-free roles with
   assert.equal(schema.properties.pages.items.properties.sections.items.properties.columns.maximum, 6);
   assert.ok(!Object.hasOwn(schema.properties, 'rooms'));
   assert.ok(!Object.hasOwn(schema.properties, 'overview'));
+  const shortcut = { id: 'office-link', template: 'hc_navigation_card', name: 'Office',
+    tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/office' } };
+  const config = { config_version: 2, name: 'Safe', landing_page: 'home', pages: [
+    { name: 'Home', path: 'home', entities: [shortcut] }, { name: 'Office', path: 'office', entities: [] },
+  ] };
+  assert.deepEqual(validateConfig(config, 2, [], {}, catalog), []);
+  assert.deepEqual(serializeConfig(normalizeConfig(config)), config);
+  const choices = schema.properties.pages.items.properties.entities.anyOf[0].items.anyOf;
+  assert.ok(choices.some(choice => choice.properties?.template?.enum?.includes(shortcut.template)
+    && !choice.required.includes('page') && !choice.required.includes('entity_id')),
+  'JSON must accept the same explicit-destination shortcut as Visual and generation');
 });
