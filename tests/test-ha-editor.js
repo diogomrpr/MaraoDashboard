@@ -1170,12 +1170,33 @@ async function main() {
         catch(error) {fs.writeFileSync(path.join(output,'fold-failure-stage.json'),JSON.stringify(await page.evaluate(()=>({stage:window.__foldStage,path:location.pathname})).catch(()=>({stage:'unavailable'}))));throw error;}
       }
       if (process.argv.includes("--header")) {
+        const originalDirty = await panel.evaluate(p => { const dirty = p._dirty; p._dirty = true; p._updateHeader(); return dirty; });
         const before = await panel.evaluate(p => p._source());
         const geometry = await panel.evaluate(p => {
           const issues = [];
+          const canvas = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+          const luminance = color => {
+            canvas.clearRect(0, 0, 1, 1); canvas.fillStyle = color; canvas.fillRect(0, 0, 1, 1);
+            return [...canvas.getImageData(0, 0, 1, 1).data].slice(0, 3).reduce((sum, channel, index) => {
+              const value = channel / 255;
+              return sum + (value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4) * [.2126, .7152, .0722][index];
+            }, 0);
+          };
+          const ink = luminance(getComputedStyle(p.shadowRoot.getElementById('dirty')).color);
+          const surface = luminance(getComputedStyle(p.shadowRoot.querySelector('.editor-header')).backgroundColor);
+          const contrast = (Math.max(ink, surface) + .05) / (Math.min(ink, surface) + .05);
+          if (contrast < 4.5) issues.push('Draft indication contrast is ' + contrast.toFixed(2) + ':1; expected 4.5:1');
           const expected = parseFloat(getComputedStyle(p.shadowRoot.querySelector('.page')).fontSize);
           const save = p.shadowRoot.getElementById('save').shadowRoot.querySelector('button');
           if(parseFloat(getComputedStyle(save).fontSize)<expected-.5)issues.push('Native button text did not scale');
+          for (const control of p.shadowRoot.querySelectorAll('ha-button')) {
+            const button = control.shadowRoot?.querySelector('button');
+            if (!button || control.disabled || !button.getBoundingClientRect().width) continue;
+            const style = getComputedStyle(button);
+            const foreground = luminance(style.color), background = luminance(style.backgroundColor);
+            const ratio = (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05);
+            if (ratio < 4.5) issues.push(control.textContent.trim() + ' contrast is ' + ratio.toFixed(2) + ':1; expected 4.5:1');
+          }
           for (const button of p.shadowRoot.querySelectorAll('[data-action="card-delete"]')) {
             const b = button.getBoundingClientRect(); const row=button.closest('.entity-row').getBoundingClientRect();
             if (b.width && (b.width<48 || b.height<48 || b.left<row.left-1 || b.right>row.right+1)) issues.push('Delete target is too small or outside its row');
@@ -1252,6 +1273,7 @@ async function main() {
         // The actual affected room rows, with the pinned controls in view.
         await panel.locator('[data-action="card-delete"]').first().scrollIntoViewIfNeeded();
         await page.screenshot({path:path.join(output,scenario.name+'-'+theme+'-rows.png'),scale:'css'});
+        await panel.evaluate((p, dirty) => { p._dirty = dirty; p._updateHeader(); }, originalDirty);
       }
       await page.screenshot({ path: path.join(output, scenario.name + "-" + theme + ".png"), scale: "css" });
       if(process.argv.includes('--surfaces')) {

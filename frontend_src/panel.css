@@ -38,7 +38,7 @@ button { font: inherit; }
 .title h1 { margin: 0; font-size: 1.25em; font-weight: var(--font-weight-secondary, 500); overflow-wrap: anywhere; }
 .title p { margin: 4px 0 0; color: var(--secondary-text-color); }
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.dirty { color: var(--warning-color); font-size: .8em; overflow-wrap: anywhere; }
+.dirty { color: var(--primary-text-color); font-size: .8em; overflow-wrap: anywhere; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--divider-color); }
 .load-feedback { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; font-size: .8125em; }
 .load-feedback[hidden] { display: none; }
@@ -49,7 +49,18 @@ button { font: inherit; }
 .secondary-actions summary::-webkit-details-marker { display: none; }
 .secondary-menu { position: absolute; inset-inline-end: 0; top: 100%; z-index: 3; display: grid; gap: 8px; width: min(260px, calc(100vw - 20px)); padding: 12px; border-radius: 12px; background: var(--card-background-color); box-shadow: var(--ha-card-box-shadow); }
 #open-dashboard { display: flex; align-items: center; min-height: 48px; padding: 8px 16px; color: var(--primary-color); text-decoration: none; overflow-wrap: anywhere; }
-ha-button { --ha-button-height: 48px; max-width: 100%; }
+ha-button {
+  --ha-button-height: 48px;
+  --wa-color-brand-fill-loud: var(--primary-color);
+  --wa-color-brand-on-loud: var(--text-primary-color);
+  --wa-color-brand-fill-normal: var(--secondary-background-color);
+  --wa-color-brand-on-normal: var(--primary-color);
+  --ha-color-fill-primary-loud-hover: var(--primary-color);
+  --ha-color-fill-primary-loud-active: var(--primary-color);
+  --ha-color-fill-primary-normal-hover: var(--secondary-background-color);
+  --ha-color-fill-primary-normal-active: var(--secondary-background-color);
+  max-width: 100%;
+}
 ha-button[hidden] { display: none !important; }
 ha-button::part(base) { height: auto; min-height: 48px; }
 ha-button::part(label) { white-space: normal; overflow-wrap: anywhere; }
