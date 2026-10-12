@@ -92,9 +92,22 @@ test('historical replay isolates entity references without changing frozen sourc
   for (const row of value.rows) {
     assert.match(row.frozen_source_sha256, /^[a-f0-9]{64}$/);
     assert.match(row.frozen_expected_sha256, /^[a-f0-9]{64}$/);
-    const entities = referencedEntities(row.expected);
+    const extended = extendedSource(row.expected, value.current);
+    const entities = referencedEntities(extended);
     assert.ok([...entities].every(entity => /^[a-z_]+\.marao_dashboard_(?:test|upgrade)_/.test(entity)), row.baseline);
-    if (row.baseline !== 'current-format-2') assert.deepEqual(historicalEntities(row.baseline, referencedEntities), entities);
+    if (row.baseline !== 'current-format-2') for (const entity of historicalEntities(row.baseline, referencedEntities)) assert.ok(entities.has(entity));
+    const names = values => {
+      const result = [];
+      const visit = value => {
+        if (!value || typeof value !== 'object') return;
+        for (const [key, child] of Object.entries(value)) {
+          if (key === 'name') result.push(child);
+          else visit(child);
+        }
+      };
+      visit(values); return result;
+    };
+    assert.deepEqual(names(extended.pages.slice(0, row.expected.pages.length)), names(row.expected.pages), 'Isolation changed configured or automatically generated names');
   }
   assert.equal(value.rows[0].source, fs.readFileSync('ha-test/upgrade/fixtures/v0.5.1-dashboard.json', 'utf8'));
   assert.deepEqual(value.rows[0].entity_aliases, {});

@@ -36,9 +36,7 @@ function plan(config) {
   for (const row of rows) {
     row.frozen_source_sha256 = sha256(row.source);
     row.frozen_expected_sha256 = sha256(JSON.stringify(row.expected));
-    row.entity_aliases = historicalEntityAliases([JSON.parse(row.source), row.expected], require('../ha-test/prepare').referencedEntities);
-    row.source = isolateHistoricalText(row.source, row.entity_aliases);
-    row.expected = JSON.parse(isolateHistoricalText(JSON.stringify(row.expected), row.entity_aliases));
+    row.entity_aliases = historicalEntityAliases(row.expected, require('../ha-test/prepare').referencedEntities);
   }
   assert.equal(new Set(rows.map(row => row.baseline)).size, 7);
   for (const row of rows) assert.equal(row.expected.config_version, 2);
@@ -208,7 +206,8 @@ function extendedSource(saved, current) {
   result.upgrade_original_navigation = structuredClone(saved.navigation);
   result.navigation = structuredClone(current.navigation);
   result.landing_page = current.landing_page;
-  return result;
+  // Isolate browser bindings only after the untouched historical migration passed.
+  return JSON.parse(isolateHistoricalText(JSON.stringify(result), historicalEntityAliases(saved, require('../ha-test/prepare').referencedEntities)));
 }
 
 async function functionalChecks(config, format, directory, receiptPath, report, saveReport) {
@@ -333,7 +332,8 @@ async function main() {
     const initialHelperStates = await helperStates();
     // Check every replay before backup or the first long browser matrix.
     const initialEntities = new Set((await client.call({ type: 'get_states' })).map(state => state.entity_id));
-    for (const row of selected.rows) assertHistoricalBindings(row.expected, initialEntities, require('../ha-test/prepare').referencedEntities);
+    for (const row of selected.rows) assertHistoricalBindings(JSON.parse(isolateHistoricalText(JSON.stringify(row.expected), row.entity_aliases)),
+      initialEntities, require('../ha-test/prepare').referencedEntities);
     const helperPaths = JSON.parse(ssh(config, 'python3 -c ' + quote("import json,pathlib;root=pathlib.Path(" + JSON.stringify(config.remoteConfigPath) + ");print(json.dumps([str(p.relative_to(root)) for p in root.rglob('marao_dashboard_card_test_helpers.yaml') if not any(x.startswith('.') for x in p.relative_to(root).parts)]))")));
     assert.equal(helperPaths.length, 1, 'Expected exactly one safe fixture package');
     const storagePaths = JSON.parse(ssh(config, 'python3 -c ' + quote("import json,pathlib;root=pathlib.Path(" + JSON.stringify(config.remoteConfigPath) + ");print(json.dumps([str(p.relative_to(root)) for p in (root/'.storage').glob('lovelace*') if p.is_file()]))")));
@@ -416,9 +416,9 @@ async function main() {
         console.log('Preserved upgrade: ' + row.baseline + ' (' + row.replay + ')');
         const rowDir = path.join(directory, row.baseline); fs.mkdirSync(rowDir, { mode: 0o700 });
         const present = new Set((await client.call({ type: 'get_states' })).map(state => state.entity_id));
-        assertHistoricalBindings(row.expected, present, require('../ha-test/prepare').referencedEntities);
+        assertHistoricalBindings(JSON.parse(isolateHistoricalText(JSON.stringify(row.expected), row.entity_aliases)), present, require('../ha-test/prepare').referencedEntities);
         fs.writeFileSync(path.join(rowDir, 'historical-binding-map.json'), JSON.stringify({ frozen_source_sha256: row.frozen_source_sha256,
-          frozen_expected_sha256: row.frozen_expected_sha256, replay_source_sha256: sha256(row.source), entity_aliases: row.entity_aliases }), { mode: 0o600 });
+          frozen_expected_sha256: row.frozen_expected_sha256, replay_source_sha256: sha256(row.source), browser_extension_aliases: row.entity_aliases }), { mode: 0o600 });
         await disabled(true);
         if (nativeId) { await client.call({ type: 'lovelace/dashboards/delete', dashboard_id: nativeId }); nativeId = undefined; }
         const slug = row.expected.slug || row.expected.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -435,7 +435,7 @@ async function main() {
         let output = {};
         if (row.generated) {
           const generated = path.join(fixtures, row.generated.directory, 'dashboard');
-          output = Object.fromEntries(sourceFiles(generated).map(file => [file, isolateHistoricalText(fs.readFileSync(path.join(generated, file), 'utf8'), row.entity_aliases)
+          output = Object.fromEntries(sourceFiles(generated).map(file => [file, fs.readFileSync(path.join(generated, file), 'utf8')
             .replaceAll('/' + row.generated.dashboard_key + '/', '/marao-dashboard/')
             .replaceAll('/config/dashboard/', config.remoteConfigPath + '/dashboard/')]));
         } else if (row.format === formats[3]) {
