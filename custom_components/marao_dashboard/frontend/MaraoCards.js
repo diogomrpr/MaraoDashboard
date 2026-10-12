@@ -628,6 +628,7 @@ export async function performAction(hass, action, entity, onOutcome) {
 function cardStyles() {
   return `
     :host { display:block; container:marao-card / inline-size; color:var(--primary-text-color); font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif); }
+    ha-icon, ha-state-icon { display:inline-flex; width:var(--mdc-icon-size,24px); height:var(--mdc-icon-size,24px); vertical-align:middle; }
     ha-card { position:relative; box-sizing:border-box; overflow:hidden; border-radius:var(--ha-card-border-radius,20px); background:var(--marao-card-background,var(--ha-card-background,var(--card-background-color))); color:var(--marao-card-text-color,inherit); border:var(--marao-card-border,0 solid transparent); transition:transform .12s ease; }
     ha-card.is-pressed { transform:scale(.985); }
     .card-action { position:absolute; inset:0; z-index:1; width:100%; height:100%; margin:0; padding:0; border:0; border-radius:inherit; background:transparent; color:transparent; cursor:pointer; }
@@ -1240,7 +1241,16 @@ export class MaraoCard extends BaseElement {
     const formattedReading = !iconOnly && Boolean(formattedPrimary || formattedPower);
     const stateMarkup = showState && kind !== "hc_wallbox_current_card" ? `<div class="state">${esc(displayValue)}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
+    const previousCard = this.shadowRoot.querySelector('ha-card');
     this.shadowRoot.innerHTML = `<style>${cardStyles()}</style><ha-card${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${climateControls}${climatePending}${formattedReading ? "" : details}${holdHint}${iconElement}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`;
+    const renderedCard = this.shadowRoot.querySelector('ha-card');
+    if (previousCard && renderedCard && previousCard !== renderedCard) {
+      // Retain the native slot so HA updates cannot temporarily collapse the gallery.
+      for (const attribute of [...previousCard.attributes]) previousCard.removeAttribute(attribute.name);
+      for (const attribute of [...renderedCard.attributes]) previousCard.setAttribute(attribute.name, attribute.value);
+      previousCard.replaceChildren(...renderedCard.childNodes);
+      renderedCard.replaceWith(previousCard);
+    }
     for (const symbol of this.shadowRoot.querySelectorAll("ha-state-icon")) {
       const readingEntity = symbol.dataset.readingEntity;
       symbol.hass = this._hass;

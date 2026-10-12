@@ -10,6 +10,7 @@ const require = createRequire(import.meta.url);
 const {
   buildViewChecks,
   captureClimateFeedback,
+  checkHistoryCases,
   climateFeedbackSnapshot,
   conditionalCardIsActive,
   dashboardNavigationViolations,
@@ -29,13 +30,57 @@ test('climate captures ignore collapsed scroll containers and frame both ends of
     shadowRoot: { querySelector: () => heading, querySelectorAll: () => [] } };
   const environment = vm.createContext({ innerHeight: 844, innerWidth: 390, getComputedStyle: () => ({ overflowY: 'auto' }),
     document: { scrollingElement: { scrollBy: ({ top: distance }) => { top -= distance; } } } });
-  const target = { evaluate: (run, arg) => structuredClone(vm.runInContext('(' + run.toString() + ')', environment)(element, arg)) };
+  const target = { evaluate: async (run, arg) => structuredClone(await vm.runInContext('(' + run.toString() + ')', environment)(element, arg)) };
   const captures = [];
   const page = { evaluate: async () => {}, screenshot: async () => captures.push(top), locator: selector => selector === '.marao-popup-sheet'
     ? { count: async () => 0 } : { boundingBox: async () => ({ y: 760 }) } };
   await captureClimateFeedback(page, 'collapsed-scroll-regression', target, directory);
   assert.equal(collapsedScrolls, 0);
   assert.deepEqual(captures, [14, -148]);
+});
+
+test('climate capture positions and measures the card only after its native slot has rendered', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-native-slot-unit-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  let rendered = false, scrolls = 0;
+  const surface = { get updateComplete() { return Promise.resolve().then(() => { rendered = true; }); } };
+  const heading = { getClientRects: () => rendered ? [1] : [],
+    getBoundingClientRect: () => ({ top: 14, bottom: 34, left: 14, right: 300 }) };
+  const element = { getRootNode: () => ({}),
+    scrollIntoView() { assert.equal(rendered, true, 'Scrolling an unslotted card can clamp the gallery'); scrolls++; rendered = false; },
+    getBoundingClientRect: () => ({ height: 128, bottom: 128 }),
+    shadowRoot: { querySelector: selector => selector === 'ha-card' ? surface : selector === '.title' ? heading : null, querySelectorAll: () => [] } };
+  const environment = vm.createContext({ innerHeight: 844, innerWidth: 390 });
+  const target = { evaluate: async (run, arg) => structuredClone(await vm.runInContext('(' + run.toString() + ')', environment)(element, arg)) };
+  let captures = 0;
+  const page = { evaluate: async () => {}, screenshot: async () => { assert.equal(rendered, true); captures++; },
+    locator: selector => selector === '.marao-popup-sheet' ? { count: async () => 0 } : { boundingBox: async () => ({ y: 760 }) } };
+  await captureClimateFeedback(page, 'native-slot', target, directory);
+  assert.equal(scrolls, 2);
+  assert.equal(captures, 1);
+});
+
+test('history checks observe loading before queued responses settle and retain the repeated-request guard', async () => {
+  const { manifest } = require('../../ha-test/cases');
+  for (const repeated of [false, true]) {
+    let settled = false, loadingReads = 0;
+    const elements = manifest.historyCases.flatMap(example => ['Graph', 'Energy', 'Timeline'].map(label => ({
+      _config: { name: `${label} history · ${example.id}` },
+      shadowRoot: { querySelector: () => ({ dataset: { historyState: example.expectedStatus === 'loading' && settled ? 'ready' : example.expectedStatus } }) },
+    })));
+    const environment = vm.createContext({ document: { querySelectorAll: selector => selector === '*' ? [] : elements }, URL,
+      performance: { getEntriesByType: () => repeated ? Array.from({ length: 4 }, () => ({ name: 'http://homeassistant.test/history?filter_entity_id=' + manifest.historyCases[0].entity })) : [] } });
+    const run = (callback, arg) => vm.runInContext('(' + callback.toString() + ')', environment)(arg);
+    const page = {
+      locator: () => ({ evaluateAll: async (callback, arg) => { assert.equal(settled, false); loadingReads++; return callback(elements, arg); } }),
+      waitForFunction: async (callback, arg) => { assert.equal(run(callback, arg), true); },
+      waitForLoadState: async state => { assert.equal(state, 'networkidle'); assert.equal(loadingReads, 3); settled = true; },
+      evaluate: async (callback, arg) => run(callback, arg),
+    };
+    if (repeated) await assert.rejects(() => checkHistoryCases(page), /4 history requests for three cards/);
+    else await checkHistoryCases(page);
+    assert.equal(settled, true);
+  }
 });
 
 test('climate feedback records a rendered pending transition before a fast rejection, without accepting absent feedback', () => {

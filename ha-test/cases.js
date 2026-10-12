@@ -276,6 +276,8 @@ function validateCoverage(view) {
   const cards = [];
   walkCards(view, (card) => cards.push(card));
   const failures = [];
+  const surface = manifest.nativeSurfaceCase;
+  if (!cards.some(card => card.name === surface.name && card.entity === surface.entity)) failures.push('Missing native-surface retention case');
   for (const template of manifest.requiredTemplates) if (!cards.some((card) => card.template === template)) failures.push(`Missing template ${template}`);
   for (const name of manifest.requiredOptions) if (!cards.some((card) => card.name === name)) failures.push(`Missing option example ${name}`);
   for (const group of manifest.entityGroupCases || []) if (!cards.some(card => card.template === 'hc_entity_group_card' && card.id === group.id && card.name === group.name)) failures.push(`Missing Entity Group ${group.id}`);

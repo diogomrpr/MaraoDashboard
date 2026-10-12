@@ -217,6 +217,8 @@ the action it affects.
 - Reflow multi-column content before controls become cramped.
 - Keep pages vertically scrollable and leave enough content space for the
   floating navbar.
+- Retain native card surfaces across state updates and reserve icons' declared
+  dimensions while they render, so updates do not collapse or clamp the page.
 - Avoid nested scrolling except inside a bounded popup.
 
 Resolve each safe edge from the Marao development override, locally inherited

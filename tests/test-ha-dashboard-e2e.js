@@ -563,6 +563,27 @@ async function checkMediaRecovery(page, serviceCalls, output) {
   }
 }
 
+async function checkNativeSurfaces(page) {
+  const result = await page.locator('marao-card').evaluateAll(async (cards, example) => {
+    const target = cards.find(card => card._config.name === example.name && card._config.entity === example.entity);
+    if (!target) throw new Error('Missing native-surface gallery fixture');
+    await Promise.all(cards.map(card => card.shadowRoot.querySelector('ha-card')?.updateComplete));
+    target.scrollIntoView({ block: 'start', behavior: 'instant' });
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const read = () => ({ height: document.scrollingElement.scrollHeight, top: document.scrollingElement.scrollTop });
+    const before = read(), surfaces = cards.map(card => card.shadowRoot.querySelector('ha-card'));
+    const hass = document.querySelector('home-assistant').hass;
+    for (const card of cards) card.hass = { ...hass, states: { ...hass.states } };
+    const during = read();
+    await Promise.all(cards.map(card => card.shadowRoot.querySelector('ha-card')?.updateComplete));
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return { before, during, after: read(), replaced: cards.filter((card, index) => card.shadowRoot.querySelector('ha-card') !== surfaces[index]).length };
+  }, manifest.nativeSurfaceCase);
+  assert.equal(result.replaced, 0, 'HA updates replaced native card surfaces');
+  assert.deepEqual(result.during, result.before, 'HA updates temporarily collapsed or clamped the gallery');
+  assert.deepEqual(result.after, result.before, 'HA updates changed the unchanged gallery layout');
+}
+
 async function checkHistoryCases(page) {
   const cards = page.locator("marao-card,marao-energy-period-card,marao-state-timeline-card");
   await page.waitForFunction(() => {
@@ -588,6 +609,7 @@ async function checkHistoryCases(page) {
       }
     }
   }
+  await page.waitForLoadState('networkidle');
   await page.waitForFunction((examples) => {
     const elements = [];
     const visit = (root) => {
@@ -959,7 +981,11 @@ async function captureClimateFeedback(page, name, target, output, visualProfile)
   fs.mkdirSync(output, { recursive: true });
   const sheet = page.locator('.marao-popup-sheet');
   if (await sheet.count()) await sheet.evaluate(async element => Promise.all(element.getAnimations().map(animation => animation.finished)));
-  if (target) await target.evaluate(element => element.scrollIntoView({ block: 'start', behavior: 'instant' }));
+  // A connected ha-card can still lack its native slot; scrolling then clamps the gallery.
+  if (target) await target.evaluate(async element => {
+    await element.shadowRoot.querySelector('ha-card')?.updateComplete;
+    element.scrollIntoView({ block: 'start', behavior: 'instant' });
+  });
   const verifyProfile = async () => {
     if (!visualProfile) return;
     const { applyVisualPreferences, emulationIssues } = require('./test-ha-dashboard-accessibility');
@@ -968,11 +994,15 @@ async function captureClimateFeedback(page, name, target, output, visualProfile)
   };
   await verifyProfile();
   // Text preferences can reflow the gallery after the first scroll.
-  if (target) await target.evaluate(element => element.scrollIntoView({ block: 'start', behavior: 'instant' }));
+  if (target) await target.evaluate(async element => {
+    await element.shadowRoot.querySelector('ha-card')?.updateComplete;
+    element.scrollIntoView({ block: 'start', behavior: 'instant' });
+  });
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   if (target) {
     for (let attempt = 0; attempt < 3; attempt++) {
-      const visible = await target.evaluate(element => {
+      const visible = await target.evaluate(async element => {
+        await element.shadowRoot.querySelector('ha-card')?.updateComplete;
         const heading = element.shadowRoot.querySelector('.title');
         if (!heading?.getClientRects().length) return true;
         const title = heading.getBoundingClientRect();
@@ -1516,6 +1546,7 @@ async function main() {
         await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);
+        await checkNativeSurfaces(page);
         await checkClimateFeedback(page, serviceCalls, path.join(__dirname, '.artifacts', `climate-feedback-${scenario.name}-${theme}`), { scenario, theme });
         await page.waitForLoadState('networkidle');
         assertNoBrowserErrors(`Climate feedback (${theme})`);
@@ -1645,6 +1676,7 @@ async function main() {
     if (cardTest.errors.length || cardTest.warnings.length) throw new Error(`Card test dashboard rendered warnings/errors: ${JSON.stringify(cardTest)}`);
     if (!cardTest.nav || cardTest.maraoCards < 10 || cardTest.popups < 1) throw new Error(`Card test dashboard rendered too few Marao cards: ${JSON.stringify(cardTest)}`);
     await checkStateCases(page, serviceCalls);
+    await checkNativeSurfaces(page);
     await checkClimateFeedback(page, serviceCalls, captureScreenshots ? path.join(screenshotRoot, 'climate-feedback') : undefined);
     await page.waitForFunction(() => {
       const graphs = new Set();

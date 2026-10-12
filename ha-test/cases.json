@@ -1,4 +1,8 @@
 {
+  "nativeSurfaceCase": {
+    "name": "Climate feedback · corrected range",
+    "entity": "climate.marao_dashboard_test_feedback_range_corrected"
+  },
   "sliderFamilies": [
     "light",
     "fan",

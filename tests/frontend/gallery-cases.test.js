@@ -18,6 +18,14 @@ function homeGroups(source) {
   return source.pages.find(page => page.path === 'overview').sections.flatMap(section => section.entities || []).filter(card => card.template === 'hc_entity_group_card');
 }
 
+test('native surface stability uses the existing safe climate gallery and rejects missing coverage', () => {
+  const example = manifest.nativeSurfaceCase;
+  assert.ok(manifest.climateFeedbackCases.some(card => card.name === example.name && card.entity === example.entity));
+  assert.ok(view.cards.some(card => card.name === example.name && card.entity === example.entity));
+  const incomplete = { ...view, cards: view.cards.filter(card => card.name !== example.name) };
+  assert.ok(validateCoverage(incomplete).includes('Missing native-surface retention case'));
+});
+
 test('editable page roles are visible descriptors with safe real bindings and independent identities', () => {
   const ids = fixtureIds(helpers);
   assert.equal(new Set(manifest.editablePageCases.map(card => card.id)).size, manifest.editablePageCases.length);

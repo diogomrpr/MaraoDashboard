@@ -17,6 +17,39 @@ const source = await fs.readFile(new URL("../../custom_components/marao_dashboar
 const dashboardSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url), "utf8");
 const { ACCESS_HOLD_MS, MaraoCard, MaraoPopupCard, callServiceWithNotification, focusRestorer, performAction, registerMaraoCards, binaryState, cardProblem, problemStyle, serviceOutcome, stateAppearance, summaryState, entityGroupState, vacuumActions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#visibility`);
 
+test('rerenders retain the native surface and slot while replacing content and obsolete attributes', () => {
+  const card = new MaraoCard();
+  card._config = { entity: 'sensor.test', name: 'Reading' };
+  const makeSurface = attributes => ({
+    attributes: Object.entries(attributes).map(([name, value]) => ({ name, value })),
+    childNodes: [], shadowRoot: { slot: true }, style: { setProperty() {} }, classList: { remove() {} },
+    removeAttribute(name) { this.attributes = this.attributes.filter(attribute => attribute.name !== name); },
+    setAttribute(name, value) { this.removeAttribute(name); this.attributes.push({ name, value }); },
+    replaceChildren(...children) { this.childNodes = children; },
+    replaceWith(surface) { current = surface; },
+  });
+  const surface = makeSurface({ class: 'obsolete', role: 'group', 'aria-busy': 'true', style: 'old' });
+  let current = surface, replacement;
+  const root = { querySelector: selector => selector === 'ha-card' ? current : null, querySelectorAll: () => [] };
+  Object.defineProperty(root, 'innerHTML', { set(markup) {
+    const attributes = Object.fromEntries([...markup.match(/<ha-card([^>]*)>/)[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(match => [match[1], match[2]]));
+    replacement = makeSurface(attributes);
+    replacement.childNodes = [{ markup }]; current = replacement;
+  } });
+  card.shadowRoot = root;
+  for (const state of ['unavailable', '21']) {
+    card._hass = { states: { 'sensor.test': { state, attributes: {} } } };
+    card._render();
+    assert.equal(current, surface);
+    assert.equal(current.shadowRoot.slot, true);
+    assert.deepEqual(current.attributes, replacement.attributes);
+    assert.equal(current.childNodes[0], replacement.childNodes[0]);
+    assert.equal(current.attributes.some(attribute => attribute.name === 'data-problem'), state === 'unavailable');
+    assert.equal(current.attributes.some(attribute => attribute.name === 'aria-busy' || attribute.name === 'role' || attribute.name === 'class'), false);
+    assert.equal(current.attributes.some(attribute => attribute.name === 'style'), state === 'unavailable');
+  }
+});
+
 test('typed groups count complete membership independently of filtering and duplicate references', () => {
   for (const [type, values, active, label] of [
     ['light', ['off', 'on', 'unknown'], ['member.1'], '1 active, 1 unavailable'],
@@ -414,7 +447,8 @@ test("room all-lights-off actions target every configured light", async () => {
 test('room lighting uses every unique selected light and ignores an unrelated primary', () => {
   const card = new MaraoCard();
   const colors = {};
-  card.shadowRoot.querySelector = selector => selector === 'ha-card' ? { classList: { remove() {} }, style: { setProperty(key, value) { colors[key] = value; } } } : null;
+  const surface = { classList: { remove() {} }, style: { setProperty(key, value) { colors[key] = value; } } };
+  card.shadowRoot.querySelector = selector => selector === 'ha-card' ? surface : null;
   card.setConfig({ template: 'hc_room_card', entity: 'sensor.unrelated', name: 'Bedroom',
     variables: { light_entities: ['light.first', 'light.second', 'light.second', 'sensor.unrelated'] },
     tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/bedroom' } });
