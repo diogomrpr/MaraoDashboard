@@ -17,6 +17,7 @@ const {
   parseArgs,
   popupFocusFailure,
   popupHasVisibleContent,
+  popupMemberTouchPosition,
   safeAreaInsetsForScenario,
   scenarios,
   selectedRuns,
@@ -24,6 +25,26 @@ const {
   themes,
   visualVariablesForScenario,
 } = require("../test-ha-dashboard-accessibility.js");
+
+test('popup member geometry uses the current button and still rejects clipping and obstruction', () => {
+  const previousHeight = globalThis.innerHeight;
+  globalThis.innerHeight = 390;
+  try {
+    let box = {left: 252, top: 158, bottom: 291, width: 339};
+    let obstructed = false;
+    const oldButton = {getRootNode: () => ({})};
+    const button = {getBoundingClientRect: () => box, getRootNode: () => ({elementFromPoint: () => button})};
+    const sheet = {querySelector: () => ({getBoundingClientRect: () => ({bottom: 146})}),
+      getBoundingClientRect: () => ({bottom: 360}), getRootNode: () => ({elementFromPoint: () => obstructed ? {} : card})};
+    const card = {shadowRoot: {querySelector: () => button}, closest: () => sheet};
+    assert.equal(oldButton.getRootNode().host, undefined, 'The old detached button has lost its owner');
+    assert.deepEqual(popupMemberTouchPosition(card), {x: 24, y: 24});
+    box = {...box, bottom: 190};
+    assert.throws(() => popupMemberTouchPosition(card), /less than 48px/);
+    box = {...box, bottom: 291}; obstructed = true;
+    assert.throws(() => popupMemberTouchPosition(card), /obstructed/);
+  } finally { globalThis.innerHeight = previousHeight; }
+});
 
 test('visual preferences reach cards mounted while fonts and scrolling settle', async () => {
   const node = localName => ({ localName, children: [], dataset: {}, style: { values: new Map(), setProperty(name, value) { this.values.set(name, value); } } });

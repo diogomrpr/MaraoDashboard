@@ -625,6 +625,17 @@ function popupHasVisibleContent(host) {
   });
 }
 
+function popupMemberTouchPosition(card) {
+  const button = card.shadowRoot.querySelector('[data-card-action]');
+  const sheet = card.closest('.marao-popup-sheet');
+  const box = button.getBoundingClientRect(), header = sheet.querySelector('.marao-popup-head').getBoundingClientRect();
+  const top = Math.max(box.top, header.bottom, 0), bottom = Math.min(box.bottom, sheet.getBoundingClientRect().bottom, innerHeight);
+  if (box.width < 48 || bottom - top < 48) throw new Error('Popup member has less than 48px of clear touch area.');
+  const x = box.left + 24, y = top + 24;
+  if (sheet.getRootNode().elementFromPoint(x, y) !== card || button.getRootNode().elementFromPoint(x, y) !== button) throw new Error('Popup member touch area is obstructed.');
+  return { x: 24, y: y - box.top };
+}
+
 async function inspectPopups(page, scenario, theme, output, runName) {
   const popups = await page.locator("marao-popup-card").evaluateAll((cards) => cards.map((card) => ({
     hash: card._config.hash, name: card._config.name || card._config.title || card._config.hash,
@@ -713,15 +724,8 @@ async function inspectPopups(page, scenario, theme, output, runName) {
             const header = sheet.querySelector('.marao-popup-head').getBoundingClientRect();
             sheet.scrollBy({ top: card.getBoundingClientRect().top - header.bottom - 12, behavior: 'instant' });
           });
-          position = await control.evaluate(button => {
-            const card = button.getRootNode().host, sheet = card.closest('.marao-popup-sheet');
-            const box = button.getBoundingClientRect(), header = sheet.querySelector('.marao-popup-head').getBoundingClientRect();
-            const top = Math.max(box.top, header.bottom, 0), bottom = Math.min(box.bottom, sheet.getBoundingClientRect().bottom, innerHeight);
-            if (box.width < 48 || bottom - top < 48) throw new Error('Popup member has less than 48px of clear touch area.');
-            const x = box.left + 24, y = top + 24;
-            if (sheet.getRootNode().elementFromPoint(x, y) !== card || button.getRootNode().elementFromPoint(x, y) !== button) throw new Error('Popup member touch area is obstructed.');
-            return { x: 24, y: y - box.top };
-          });
+          // Read the current button atomically through its retained card.
+          position = await card.evaluate(popupMemberTouchPosition);
         }
         await control.tap({ position });
       }
@@ -1082,6 +1086,7 @@ module.exports = {
   parseArgs,
   popupFocusFailure,
   popupHasVisibleContent,
+  popupMemberTouchPosition,
   safeAreaInsetsForScenario,
   scenarios,
   selectedRuns,
