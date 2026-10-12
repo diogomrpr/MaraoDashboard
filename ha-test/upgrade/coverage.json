@@ -427,6 +427,11 @@
     "dark"
   ],
   "checks": {
+    "native-surfaces": {
+      "file": "tests/test-ha-dashboard-e2e.js",
+      "assertion": "checkNativeSurfaces",
+      "scope": "format"
+    },
     "historical-source": {
       "file": "tests/components/marao_dashboard/test_upgrade_fixtures.py",
       "assertion": "test_full_expected_documents_and_owned_output_survive_generation",
@@ -619,6 +624,10 @@
     }
   },
   "cases": {
+    "nativeSurfaceCase": {
+      "identities": ["entity", "name"],
+      "checks": ["native-surfaces", "layout", "card-runtime"]
+    },
     "sliderFamilies": {
       "identities": [
         "light",

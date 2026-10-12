@@ -33,6 +33,7 @@ def test_reviewed_inventory_covers_the_current_catalog_runtime_and_gallery():
     (lambda m: m["runtime_components"].pop(), "runtime registration"),
     (lambda m: m["cases"]["entityGroupCases"]["identities"].pop(), "material state"),
     (lambda m: m["cases"]["families"]["identities"]["battery"].pop(), "material state"),
+    (lambda m: m["cases"].pop("nativeSurfaceCase"), "Cases collection"),
     (lambda m: m["checks"]["groups"].update(assertion="removedAssertion"), "executable assertion"),
     (lambda m: m["cases"]["entityGroupCases"].update(checks=[]), "executable check"),
 ])
