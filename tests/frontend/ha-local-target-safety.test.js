@@ -2,7 +2,39 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
-const { assertDisposableHaTarget, setBrowserToken } = require("../../ha-test/client.js");
+const { assertDisposableHaTarget, connect, setBrowserToken } = require("../../ha-test/client.js");
+
+test("test client rejects closed connections and a fresh session can fetch states", async () => {
+  const previous = globalThis.WebSocket;
+  const sockets = [];
+  class Socket extends EventTarget {
+    static OPEN = 1;
+    readyState = Socket.OPEN;
+    sent = [];
+    constructor() {
+      super(); sockets.push(this);
+      queueMicrotask(() => this.message({ type: "auth_ok" }));
+    }
+    message(value) { this.dispatchEvent(new MessageEvent("message", { data: JSON.stringify(value) })); }
+    send(value) { assert.equal(this.readyState, Socket.OPEN, "A closed socket must never receive a command"); this.sent.push(JSON.parse(value)); }
+    close() { this.readyState = 3; this.dispatchEvent(new Event("close")); }
+  }
+  globalThis.WebSocket = Socket;
+  try {
+    const config = { url: "http://192.168.0.28:8123" };
+    const stale = await connect(config);
+    const pending = assert.rejects(stale.call({ type: "get_states" }), /connection closed/);
+    sockets[0].close(); await pending;
+    await assert.rejects(stale.call({ type: "get_states" }), /connection closed/);
+    assert.equal(sockets[0].sent.length, 1);
+    const fresh = await connect(config), states = fresh.call({ type: "get_states" });
+    sockets[1].message({ type: "result", id: 1, success: true, result: [] });
+    assert.deepEqual(await states, []);
+  } finally {
+    for (const socket of sockets) socket.close();
+    globalThis.WebSocket = previous;
+  }
+});
 
 test("browser authentication is confined to the configured top-level HA HTML document", () => {
   const previous = Object.fromEntries(["window", "location", "document", "localStorage"].map(key => [key, globalThis[key]]));

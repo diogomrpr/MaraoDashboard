@@ -505,7 +505,10 @@ async function main() {
             output: { slug, files: expanded.output }, historical_baseline: row.baseline, fixture_domains: domains,
             fixture_files: Object.fromEntries([...helperPaths, 'www/marao-upgrade-unrelated.js'].map(file => [file, expanded.files[file]['']])) };
           const receiptPath = path.join(rowDir, 'receipt.json'); fs.writeFileSync(receiptPath, JSON.stringify(receipt), { mode: 0o600 });
+          // The editor persistence checks restart HA, invalidating the parent connection.
+          client.close();
           await functionalChecks(config, row.format, rowDir, receiptPath, report, saveReport);
+          client = await connect(config);
           checkedFormats.add(row.format);
         }
         const after = snapshot(slug);

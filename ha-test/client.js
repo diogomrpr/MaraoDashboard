@@ -59,6 +59,7 @@ function connect(config) {
     const timer = setTimeout(() => { socket.close(); reject(new Error("Home Assistant WebSocket authentication timed out.")); }, 15000);
     const client = {
       call(message) {
+        if (socket.readyState !== WebSocket.OPEN) return Promise.reject(new Error("Home Assistant connection closed."));
         const id = ++nextId;
         return new Promise((done, fail) => {
           const timeout = setTimeout(() => { pending.delete(id); fail(new Error("Home Assistant " + message.type + " timed out.")); }, 30000);
