@@ -37,17 +37,16 @@ button { font: inherit; }
 .brand-mark { width: 32px; height: 32px; flex: 0 0 32px; }
 .title h1 { margin: 0; font-size: 1.25em; font-weight: var(--font-weight-secondary, 500); overflow-wrap: anywhere; }
 .title p { margin: 4px 0 0; color: var(--secondary-text-color); }
-.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.actions { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .dirty { color: var(--primary-text-color); font-size: .8em; overflow-wrap: anywhere; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--divider-color); }
 .load-feedback { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; font-size: .8125em; }
 .load-feedback[hidden] { display: none; }
 .load-feedback span { flex: 1 1 12ch; min-width: 0; overflow-wrap: anywhere; }
 .tab { min-width: 48px; min-height: 48px; border: 0; background: transparent; color: var(--secondary-text-color); padding: 10px 14px; cursor: pointer; border-bottom: 3px solid transparent; }
-.secondary-actions { position: relative; }
 .secondary-actions summary { list-style: none; display: grid; place-items: center; width: 48px; height: 48px; cursor: pointer; border-radius: 10px; background: var(--secondary-background-color); }
 .secondary-actions summary::-webkit-details-marker { display: none; }
-.secondary-menu { position: absolute; inset-inline-end: 0; top: 100%; z-index: 3; display: grid; gap: 8px; width: min(260px, calc(100vw - 20px)); padding: 12px; border-radius: 12px; background: var(--card-background-color); box-shadow: var(--ha-card-box-shadow); }
+.secondary-menu { position: absolute; inset-inline-end: 0; top: 100%; z-index: 3; display: grid; gap: 8px; width: min(260px, 100%, calc(100vw - 20px)); padding: 12px; border-radius: 12px; background: var(--card-background-color); box-shadow: var(--ha-card-box-shadow); }
 #open-dashboard { display: flex; align-items: center; min-height: 48px; padding: 8px 16px; color: var(--primary-color); text-decoration: none; overflow-wrap: anywhere; }
 ha-button {
   --ha-button-height: 48px;
@@ -153,7 +152,7 @@ ha-dialog { --ha-icon-button-size: 48px; }
 @media (max-width: 850px) {
   .page { padding: 16px 10px 56px; }
   .toolbar { align-items: flex-start; flex-direction: column; }
-  .editor-header .actions { flex-wrap: nowrap; }
+  .editor-header .actions { width: fit-content; max-width: 100%; flex-wrap: nowrap; }
   .editor-header #save { min-width: 0; }
   .editor-header .title h1 { font-size: 1em; }
   .actions { width: 100%; }

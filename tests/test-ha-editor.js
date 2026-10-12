@@ -1172,6 +1172,10 @@ async function main() {
       if (process.argv.includes("--header")) {
         const originalDirty = await panel.evaluate(p => { const dirty = p._dirty; p._dirty = true; p._updateHeader(); return dirty; });
         const before = await panel.evaluate(p => p._source());
+        await panel.evaluate(async p => {
+          p.shadowRoot.querySelector('.secondary-actions').open = true;
+          await Promise.all([...p.shadowRoot.querySelectorAll('ha-button')].map(button => button.updateComplete));
+        });
         const geometry = await panel.evaluate(p => {
           const issues = [];
           const canvas = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
@@ -1189,9 +1193,13 @@ async function main() {
           const expected = parseFloat(getComputedStyle(p.shadowRoot.querySelector('.page')).fontSize);
           const save = p.shadowRoot.getElementById('save').shadowRoot.querySelector('button');
           if(parseFloat(getComputedStyle(save).fontSize)<expected-.5)issues.push('Native button text did not scale');
+          const menu = p.shadowRoot.querySelector('.secondary-menu').getBoundingClientRect();
+          if (menu.top < save.getBoundingClientRect().bottom - 1) issues.push('Actions menu overlaps Save');
+          if (menu.left < 0 || menu.right > innerWidth) issues.push('Actions menu leaves the viewport');
+          if (Math.abs(menu.right - p.shadowRoot.querySelector('.secondary-actions summary').getBoundingClientRect().right) > 1) issues.push('Actions menu is detached from its trigger');
           for (const control of p.shadowRoot.querySelectorAll('ha-button')) {
             const button = control.shadowRoot?.querySelector('button');
-            if (!button || control.disabled || !button.getBoundingClientRect().width) continue;
+            if (!button || control.disabled || !button.checkVisibility({ checkVisibilityCSS: true, checkOpacity: true })) continue;
             const style = getComputedStyle(button);
             const foreground = luminance(style.color), background = luminance(style.backgroundColor);
             const ratio = (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05);
@@ -1227,6 +1235,8 @@ async function main() {
           return issues;
         });
         assert.deepEqual(geometry, []);
+        await page.screenshot({ path: path.join(output, scenario.name + '-' + theme + '-menu.png'), scale: 'css' });
+        await panel.evaluate(p => { p.shadowRoot.querySelector('.secondary-actions').open = false; });
         const input=panel.locator('#general-form input').first();
         await input.scrollIntoViewIfNeeded(); await input.focus();
         const field=await input.boundingBox();const header=await panel.locator('.editor-header').boundingBox();
