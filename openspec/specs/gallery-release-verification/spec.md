@@ -53,7 +53,7 @@ changes SHALL not trigger unnecessary full-suite or device actions.
 
 #### Scenario: A shared icon-only media layout is edited
 - **WHEN** its focused verification runs
-- **THEN** alignment is checked within the runner's 0.5 CSS-pixel tolerance and every affected card is visually inspected afterward
+- **THEN** alignment is checked within the runner's 0.5 CSS-pixel tolerance and representative affected components and difficult layouts are visually inspected afterward
 
 ### Requirement: Mobile release matrix
 Release checks SHALL cover 320x700, iPhone 390x844/844x390 and Android
@@ -72,7 +72,11 @@ Release verification SHALL cover cold loads, full scroll, safe-area/navbar clear
 popup focus/scroll/close, availability/errors, real external state change,
 single dispatch and gesture cancellation. Real disconnect/recovery SHALL retain
 native warning and exception assertions. Screenshots SHALL complement diagnostics,
-including native-density slider curves and every affected-card final visual gate.
+including native-density slider curves and representative final visual review.
+Distinct interactions SHALL run once per relevant theme, with device repeats only
+for native gestures or geometry. The complete automated mobile layout matrix
+SHALL run once per release candidate. Failure screenshots SHALL remain mandatory;
+exhaustive success captures SHALL be opt-in diagnostics.
 
 #### Scenario: A browser interaction check completes without an exception
 - **WHEN** the corresponding popup is visually empty or clipped
@@ -92,7 +96,9 @@ test dependencies and secrets. Test providers SHALL never overwrite real provide
 Immediately before every push, tag, GitHub or HACS release, `npm run verify:publish`
 SHALL pass against the disposable instance. GitHub Tests, hassfest and HACS SHALL
 pass for the published commit. Known relevant contract violations SHALL prevent
-publication even when automation misses them. A past one-release exception SHALL
+publication even when automation misses them. Complete exact-candidate preserved-install browser evidence MAY be reused only
+after private capture/coverage/cleanup and restored-install validation; the gate
+still runs before every push/tag/release. A past one-release exception SHALL
 NOT become a permanent waiver or error allowlist.
 
 #### Scenario: The native reconnect check still fails for a future release

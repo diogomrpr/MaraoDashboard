@@ -67,6 +67,24 @@ any fresh-fixture preparation.
 - **WHEN** it is migrated and round-tripped through the editor
 - **THEN** its raw configuration is preserved without inventing executable support or silently dropping fields
 
+### Requirement: Shared browser verification without format multiplication
+Shared interactions and the full automated mobile layout matrix SHALL run once
+on the latest-release preserved upgrade. Device repeats SHALL target native
+gestures or geometry. All seven baselines SHALL retain preservation/recovery;
+other distinct formats SHALL receive targeted saved-page/browser checks.
+Reports SHALL distinguish these scopes and representative manual review.
+
+#### Scenario: A release checks supported historical formats
+- **WHEN** shared browser verification has passed on the latest-release upgrade
+- **THEN** other formats run targeted saved-page, navigation, popup and diagnostic checks
+- **AND** every baseline still requires independent preservation, recovery and cleanup evidence
+- **AND** shared rows are not relabeled as independent full-matrix executions
+
+#### Scenario: Automated layout verification passes
+- **WHEN** all 26 profile/theme combinations have passed
+- **THEN** manual review inspects representative changed components and difficult layouts on normal iPhone and Android zoom in both themes
+- **AND** success captures are sampled while failures retain screenshots and raw diagnostics
+
 ### Requirement: Private isolated upgrade execution and recovery
 Upgrade execution SHALL use only disposable `192.168.0.28` and safe fixtures,
 with private backups and evidence. It SHALL preserve the pre-test environment,
@@ -95,3 +113,19 @@ expose private configuration, credentials or media.
 #### Scenario: Only part of the upgrade matrix completed
 - **WHEN** one baseline, feature, profile or cleanup check is missing or failed
 - **THEN** the release report states the incomplete coverage and publication remains blocked
+
+### Requirement: Validated publication evidence reuse
+Each push/tag/release SHALL invoke the publication gate. It MAY reuse complete
+exact-candidate browser evidence after validating coverage, private capture
+hashes, cleanup and the live restored prepared installation. Changed, failed,
+incomplete or stale evidence SHALL block reuse. Native-exception expiry SHALL
+be rechecked before publication.
+
+#### Scenario: The verified candidate is pushed, tagged and released
+- **WHEN** its candidate, source, target and complete private proof remain valid
+- **THEN** publication reuses its browser results without repeating the mobile matrix
+- **AND** local checks and exact-commit CI remain required
+
+#### Scenario: Private proof or the restored installation changes
+- **WHEN** capture hashes, candidate, source, owned output, fixture ownership or served assets differ
+- **THEN** publication fails instead of reseeding data or accepting prior browser results

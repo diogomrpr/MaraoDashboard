@@ -15,6 +15,8 @@ const {
   configurePageEmulation,
   effectiveViewport,
   parseArgs,
+  capturePolicy,
+  popupReviewKey,
   popupFocusFailure,
   popupHasVisibleContent,
   popupMemberTouchPosition,
@@ -218,7 +220,7 @@ test("release runs every profile in deterministic light and dark modes", () => {
 
 test("preview arguments select one profile and one theme and reject missing values", () => {
   const options = parseArgs(["--preview", "--scenario", "android-normal", "--theme", "dark"]);
-  assert.deepEqual(options, { preview: true, scenario: "android-normal", theme: "dark" });
+  assert.deepEqual(options, { preview: true, scenario: "android-normal", theme: "dark", screenshots: 'failure' });
   assert.deepEqual(selectedRuns(options).map(({ scenario, theme }) => [scenario.name, theme]), [
     ["android-normal", "dark"],
   ]);
@@ -226,6 +228,23 @@ test("preview arguments select one profile and one theme and reject missing valu
   assert.throws(() => parseArgs(["--theme", "--preview"]), /--theme requires a value/);
   assert.throws(() => selectedRuns({ preview: true, scenario: "tablet", theme: "light" }), /Unknown accessibility profile/);
   assert.throws(() => selectedRuns({ preview: true, scenario: "iphone-normal", theme: "sepia" }), /Unknown theme/);
+});
+
+test('success capture sampling keeps the full mobile matrix and distinct popup layouts', () => {
+  assert.equal(selectedRuns(parseArgs([])).length, 26);
+  const options = parseArgs(['--screenshots', 'review']);
+  assert.equal(capturePolicy(options, { name: 'iphone-normal' }), 'review');
+  assert.equal(capturePolicy(options, { name: 'android-page-zoom-200' }), 'review');
+  assert.equal(capturePolicy(options, { name: 'iphone-bold' }), 'failure');
+  assert.equal(capturePolicy(parseArgs(['--screenshots', 'all']), { name: 'iphone-bold' }), 'all');
+  assert.throws(() => parseArgs(['--screenshots', 'silent']), /screenshot policy/);
+  assert.equal(parseArgs(['--pages-only']).pagesOnly, true);
+  const popup = { name: 'Living room', cards: [{ template: 'hc_light_card' }] };
+  assert.equal(popupReviewKey(popup), popupReviewKey({ ...popup, name: 'Another room' }));
+  for (const changed of [{ ...popup, height: '500px' }, { ...popup, name: 'Light error' },
+    { ...popup, cards: [{ template: 'hc_climate_card' }] }, { ...popup, entity_group: { type: 'light', popup_filter: 'active' } }]) {
+    assert.notEqual(popupReviewKey(popup), popupReviewKey(changed));
+  }
 });
 
 test("browser checks report failed resources and activate cards through their controls", () => {

@@ -112,13 +112,13 @@ for domain in request['domains']:
     owners[domain]=json.loads(marker.read_text()).get('owner')
     providers[domain]=tree(marker.parent,True)
 print(json.dumps({'source_sha256':digest(base/'dashboard/MaraoDashboard/dashboard.json'),
-    'operation_id':json.loads((base/'.marao-upgrade-active.json').read_text()).get('operation_id'),
+    'operation_id':json.loads((base/'.marao-upgrade-active.json').read_text()).get('operation_id') if (base/'.marao-upgrade-active.json').exists() else None,
     'output':tree(base/'dashboard/MaraoDashboard'/request['slug']),
     'recovering':(base/'dashboard/MaraoDashboard/.history/.operation').exists(),
     'package':tree(base/'custom_components/marao_dashboard',True),'owners':owners,'providers':providers,
     'fixtures':{file:digest(base/file) for file in request['files']}}))`;
 
-async function verifyPrepared(config, filename, { ssh, referencedEntities }) {
+async function verifyPrepared(config, filename, { ssh, referencedEntities, operationCompleted = false }) {
   const candidate = candidateIdentity();
   const receipt = readPreparedReceipt(filename, config, candidate);
   assert.ok(isDeepStrictEqual([...receipt.fixture_domains].sort(), fs.readdirSync(path.join(repoRoot, 'ha-test/custom_components')).sort()), 'Incomplete fixture-provider inventory');
@@ -135,7 +135,7 @@ async function verifyPrepared(config, filename, { ssh, referencedEntities }) {
       input: JSON.stringify({ root: config.remoteConfigPath, slug: receipt.output.slug, domains: receipt.fixture_domains, files: Object.keys(receipt.fixture_files) }),
     }).stdout);
     const snapshot = readSnapshot();
-    assert.equal(snapshot.operation_id, receipt.operation_id, 'Preserved-install operation changed');
+    assert.equal(snapshot.operation_id, operationCompleted ? null : receipt.operation_id, 'Preserved-install operation changed or cleanup is incomplete');
     assert.equal(snapshot.recovering, false, 'An installed dashboard operation still needs recovery');
     assert.equal(snapshot.source_sha256, receipt.source_sha256, 'Saved source changed or was reseeded');
     assert.ok(isDeepStrictEqual(snapshot.output, receipt.output.files), 'Preserved output changed or was reseeded');

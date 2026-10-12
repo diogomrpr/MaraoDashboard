@@ -228,24 +228,29 @@ async function functionalChecks(config, format, directory, receiptPath, report, 
   // Catch focused interaction failures before the longer builder and page matrices.
   await child(process.execPath, ['tests/test-ha-card-alignment.js'], directory, 'alignment', env);
   record(['alignment'], ['iphone-normal'], coverage.themes, 'alignment.log');
-  await child(process.execPath, ['tests/test-ha-value-sliders.js'], directory, 'sliders', env);
-  record(['sliders'], coverage.profiles, coverage.themes, 'sliders.log');
-  await child(process.execPath, ['tests/test-ha-climate-layout.js'], directory, 'numbers', env);
-  record(['numbers'], coverage.profiles, coverage.themes, 'numbers.log');
+  for (const profile of coverage.checks.sliders.profiles) {
+    await child(process.execPath, ['tests/test-ha-value-sliders.js', '--scenario', profile], directory, 'sliders-' + profile, env);
+    record(['sliders'], [profile], coverage.themes, 'sliders-' + profile + '.log');
+  }
+  await child(process.execPath, ['tests/test-ha-climate-layout.js', '--scenario', 'iphone-normal'], directory, 'numbers', env);
+  record(['numbers'], ['iphone-normal'], coverage.themes, 'numbers.log');
   await child(process.execPath, ['tests/test-ha-energy-format.js', '--scenario', 'iphone-normal'], directory, 'energy', env);
   record(['energy'], ['iphone-normal'], coverage.themes, 'energy.log');
-  await child(process.execPath, ['tests/test-ha-editor.js', '--matrix', '--pages', '--rooms', '--groups', '--preservation', '--energy', '--fold', '--header'], directory, 'builder-matrix', env);
-  record(['builder-pages', 'builder-rooms', 'builder-groups'], coverage.profiles, coverage.themes, 'builder-matrix.log');
-  record(['builder-preservation', 'builder-energy'], ['iphone-normal'], coverage.themes, 'builder-matrix.log');
+  await child(process.execPath, ['tests/test-ha-editor.js', '--scenario=iphone-normal', '--pages', '--rooms', '--groups', '--preservation', '--energy', '--fold', '--header'], directory, 'builder', env);
+  record(['builder-pages', 'builder-rooms', 'builder-groups', 'builder-layout'], ['iphone-normal'], coverage.themes, 'builder.log');
+  await child(process.execPath, ['tests/test-ha-editor.js', '--scenario=android-page-zoom-200', '--header'], directory, 'builder-layout', env);
+  record(['builder-layout'], ['android-page-zoom-200'], coverage.themes, 'builder-layout.log');
+  record(['builder-preservation', 'builder-energy'], ['iphone-normal'], coverage.themes, 'builder.log');
   for (const theme of coverage.themes) {
     await child(process.execPath, ['tests/test-ha-editor.js', '--scenario=iphone-normal', '--theme=' + theme, '--rooms', '--rooms-save'], directory, 'builder-save-' + theme, env);
     record(['builder-save'], ['iphone-normal'], [theme], 'builder-save-' + theme + '.log');
   }
-  await child(process.execPath, ['tests/test-ha-dashboard-accessibility.js', '--pages'], directory, 'mobile-layout', env);
+  await child(process.execPath, ['tests/test-ha-dashboard-accessibility.js', '--pages', '--screenshots', 'review'], directory, 'mobile-layout', env);
   record(['layout', 'popups'], coverage.profiles, coverage.themes, 'mobile-layout.log');
+  record(['upgraded-pages'], ['iphone-normal'], coverage.themes, 'mobile-layout.log');
   const captureRoot = path.join(directory, 'captures'); fs.mkdirSync(captureRoot, { mode: 0o700 });
   const captured = {};
-  for (const name of ['dashboard-e2e', 'accessibility', 'editor', 'room-cards', 'value-sliders', 'climate-layout', 'energy-format']) {
+  for (const name of ['accessibility', 'editor']) {
     const root = path.join(repoRoot, 'tests/.artifacts', name);
     if (!fs.existsSync(root)) continue;
     for (const file of sourceFiles(root)) {
@@ -255,7 +260,7 @@ async function functionalChecks(config, format, directory, receiptPath, report, 
       captured[name + '/' + file] = sha256(fs.readFileSync(target));
     }
   }
-  for (const profile of coverage.profiles) for (const theme of coverage.themes) assert.ok(Object.keys(captured).some(file => file.startsWith('accessibility/' + profile + '-' + theme + '-')), 'Missing upgraded mobile capture');
+  for (const profile of coverage.review_profiles) for (const theme of coverage.themes) assert.ok(Object.keys(captured).some(file => file.startsWith('accessibility/' + profile + '-' + theme + '-')), 'Missing representative upgraded capture');
   fs.writeFileSync(path.join(directory, 'captures.json'), JSON.stringify({ format, captured }), { mode: 0o600 });
   report.evidence.push({ format, captures: path.relative(path.dirname(directory), path.join(directory, 'captures.json')), captures_sha256: sha256(JSON.stringify(captured)) });
   saveReport();
@@ -263,10 +268,10 @@ async function functionalChecks(config, format, directory, receiptPath, report, 
 
 function validateVisualReviews(review, report) {
   assert.equal(review.operation_id, report.operation_id); assert.deepEqual(review.candidate, report.candidate);
-  const required = report.formats.flatMap(format => coverage.profiles.flatMap(profile => coverage.themes.map(theme => JSON.stringify([format, profile, theme]))));
+  const required = coverage.review_profiles.flatMap(profile => coverage.themes.map(theme => JSON.stringify([coverage.shared_format, profile, theme])));
   const rows = review.rows.map(row => {
     assert.equal(row.passed, true); assert.equal(row.source, 'preserved-install');
-    assert.equal(row.inspected, 'cards,realistic-pages,popups,editor');
+    assert.equal(row.inspected, 'representative-cards,realistic-pages,popups,editor');
     assert.ok(typeof row.notes === 'string' && row.notes.trim());
     const evidence = report.evidence.find(item => item.format === row.format && item.captures_sha256);
     assert.equal(row.captures_sha256, evidence?.captures_sha256, 'Visual inspection does not match preserved captures');
@@ -305,7 +310,7 @@ async function main() {
   const reportPath = path.join(directory, 'report.json');
   const venv = path.join(repoRoot, '.venv/bin/python');
   const python = process.env.MARAO_TEST_PYTHON || (fs.existsSync(venv) ? venv : 'python3');
-  const report = { version: 1, kind: 'preserved-install-upgrade', operation_id: operation, candidate, target: config.url,
+  const report = { version: 2, kind: 'preserved-install-upgrade', operation_id: operation, candidate, target: config.url,
     started_at: new Date().toISOString(), formats: selected.formats, baselines: selected.baselines, runs: [], install_assertions: [], visual_reviews: [],
     verified_cleanup: false, evidence: [] };
   const saveReport = () => fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
@@ -506,10 +511,13 @@ async function main() {
         await child(python, ['-m', 'pytest', 'tests/components/marao_dashboard/test_release_replay_recovery.py', '-q', '-k', row.baseline.replaceAll('-', '_').replaceAll('.', '_')], rowDir, 'interruption-recovery');
         assertion(row.baseline, 'interrupted-operation-recovery', 'interruption-recovery.log');
         if (!checkedFormats.has(row.format)) {
-          const extended = row.format === formats[3] ? row.expected : extendedSource(row.expected, selected.current);
-          await editorSave(config, JSON.stringify(extended, null, 2), rowDir);
-          assert.deepEqual(JSON.parse(snapshot(slug).source_bytes), extended);
-          await resetBaseline(config, helper);
+          const shared = row.baseline === 'v0.5.1';
+          const extended = shared ? extendedSource(row.expected, selected.current) : JSON.parse(active.source_bytes);
+          if (shared) {
+            await editorSave(config, JSON.stringify(extended, null, 2), rowDir);
+            assert.deepEqual(JSON.parse(snapshot(slug).source_bytes), extended);
+            await resetBaseline(config, helper);
+          }
           const expanded = snapshot(slug);
           // Build the receipt only after the original data and explicit editor additions passed.
           const receipt = { version: 1, operation_id: operation, created_at: new Date().toISOString(), target: config.url, remote_config_path: config.remoteConfigPath,
@@ -519,7 +527,12 @@ async function main() {
           const receiptPath = path.join(rowDir, 'receipt.json'); fs.writeFileSync(receiptPath, JSON.stringify(receipt), { mode: 0o600 });
           // The editor persistence checks restart HA, invalidating the parent connection.
           client.close();
-          await functionalChecks(config, row.format, rowDir, receiptPath, report, saveReport);
+          if (shared) await functionalChecks(config, row.format, rowDir, receiptPath, report, saveReport);
+          else {
+            await child(process.execPath, ['tests/test-ha-dashboard-accessibility.js', '--pages-only', '--scenario', 'iphone-normal'], rowDir, 'upgraded-pages', { MARAO_UPGRADE_RECEIPT: receiptPath });
+            for (const theme of coverage.themes) report.runs.push({ check: 'upgraded-pages', format: row.format, profile: 'iphone-normal', theme, passed: true, evidence: 'upgraded-pages.log' });
+            saveReport();
+          }
           client = await connect(config);
           checkedFormats.add(row.format);
         }

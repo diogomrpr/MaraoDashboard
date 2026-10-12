@@ -25,7 +25,7 @@ def case_identities(key: str, value):
 
 
 def validate_inventory(manifest: dict, catalog: dict, cases: dict, profiles: list[str]) -> None:
-    require(manifest.get("version") == 1, "Unsupported upgrade coverage inventory")
+    require(manifest.get("version") == 2, "Unsupported upgrade coverage inventory")
     require(set(manifest["catalog"]) == {card["id"] for card in catalog["cards"]}, "Unmapped card family")
     for card in catalog["cards"]:
         require(manifest["catalog"][card["id"]]["options"] == [option["key"] for option in card["variables"]], "Unmapped card option")
@@ -35,6 +35,8 @@ def validate_inventory(manifest: dict, catalog: dict, cases: dict, profiles: lis
     from custom_components.marao_dashboard.editor import page_templates
     require(set(manifest["page_templates"]) == set(page_templates({}, [])), "Unmapped editable page template")
     require(manifest["profiles"] == profiles and manifest["themes"] == ["light", "dark"], "Incomplete mobile/theme matrix")
+    require(manifest.get("shared_format") == "generator-json-0", "Missing latest-release shared browser scope")
+    require(manifest.get("review_profiles") == ["iphone-normal", "android-page-zoom-200"], "Incomplete representative visual review")
     require(set(manifest["cases"]) == set(cases), "Unmapped Cases collection")
     for key, value in cases.items():
         require(manifest["cases"][key]["identities"] == case_identities(key, value), "Unmapped material state or option: " + key)
@@ -42,10 +44,13 @@ def validate_inventory(manifest: dict, catalog: dict, cases: dict, profiles: lis
     registrations = set(re.findall(r'(?:define\(|\[)"(marao-[a-z-]+)"', runtime))
     require(set(manifest["runtime_components"]) == registrations, "Unmapped runtime registration")
     checks = manifest["checks"]
+    require(all(checks[name]["scope"] == "profile" for name in ["layout", "popups"]), "Layout must retain the full mobile matrix")
+    require(checks["upgraded-pages"]["scope"] == "format", "Targeted upgraded pages must cover each format")
     for check in checks.values():
         file = Path(check["file"])
         require(not file.is_absolute() and ".." not in file.parts and file.parts[0] == "tests", "Invalid assertion source")
-        require(check["scope"] in ["candidate", "format", "profile"], "Invalid assertion scope")
+        require(check["scope"] in ["candidate", "format", "profile", "shared"], "Invalid assertion scope")
+        require(all(profile in profiles for profile in check.get("profiles", [])), "Unknown interaction profile")
         require(check["assertion"] in (ROOT / file).read_text(), "Missing executable assertion: " + check["file"])
     for section in ["catalog", "cases"]:
         for item in manifest[section].values():
@@ -61,8 +66,9 @@ def required_runs(manifest: dict, formats: list[str]) -> set[tuple]:
         if check["scope"] == "candidate":
             runs.add((name, "candidate", None, None))
         else:
-            profiles = manifest["profiles"] if check["scope"] == "profile" else ["iphone-normal"]
-            runs.update((name, format_, profile, theme) for format_ in formats for profile in profiles for theme in manifest["themes"])
+            selected_formats = formats if check["scope"] == "format" else [manifest["shared_format"]]
+            profiles = manifest["profiles"] if check["scope"] == "profile" else check.get("profiles", ["iphone-normal"])
+            runs.update((name, format_, profile, theme) for format_ in selected_formats for profile in profiles for theme in manifest["themes"])
     return runs
 
 
@@ -71,7 +77,8 @@ def validate_execution(manifest: dict, report: dict, candidate: dict, formats: l
     require(origin.scheme in ("http", "https") and origin.hostname == "192.168.0.28"
             and not origin.username and not origin.password and not origin.query and not origin.fragment
             and origin.path in ("", "/"), "Upgrade evidence requires the authorized disposable origin")
-    require(report.get("version") == 1 and report.get("candidate") == candidate, "Missing or stale candidate-specific upgrade evidence")
+    require(report.get("version") == 2 and report.get("candidate") == candidate, "Missing or stale candidate-specific upgrade evidence")
+    require(not report.get("failure"), "Failed upgrade operation")
     require(report.get("target") == target, "Upgrade evidence belongs to another target")
     require(report.get("formats") == formats and report.get("baselines") == baselines, "Missing required historical scenario")
     runs = report.get("runs", [])

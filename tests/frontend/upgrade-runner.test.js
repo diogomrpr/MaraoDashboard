@@ -195,13 +195,13 @@ test('concurrent unrelated integration edits block cleanup', () => {
   after.data.entries[1].data.keep = false; assert.throws(() => assertUnrelatedEntries(before, after, 'marao'));
 });
 
-test('visual review requires actual preserved captures for every profile/theme/format and the final candidate', () => {
+test('representative visual review requires its exact preserved captures and final candidate', () => {
   const coverage = JSON.parse(fs.readFileSync('ha-test/upgrade/coverage.json'));
   const report = { operation_id: 'operation', candidate: { commit: 'final' }, formats: plan(config).formats };
   report.evidence = report.formats.map(format => ({ format, captures_sha256: 'captured-' + format }));
-  const review = { operation_id: report.operation_id, candidate: report.candidate, rows: report.formats.flatMap(format => coverage.profiles.flatMap(profile => coverage.themes.map(theme => ({
-    format, profile, theme, passed: true, source: 'preserved-install', inspected: 'cards,realistic-pages,popups,editor', notes: 'Mocked validator input; never release evidence', captures_sha256: 'captured-' + format,
-  })))) };
+  const review = { operation_id: report.operation_id, candidate: report.candidate, rows: coverage.review_profiles.flatMap(profile => coverage.themes.map(theme => ({
+    format: coverage.shared_format, profile, theme, passed: true, source: 'preserved-install', inspected: 'representative-cards,realistic-pages,popups,editor', notes: 'Mocked validator input; never release evidence', captures_sha256: 'captured-' + coverage.shared_format,
+  }))) };
   validateVisualReviews(review, report);
   for (const change of [row => row.rows.pop(), row => { row.rows[0].passed = false; }, row => { row.rows[0].captures_sha256 = 'stale'; }, row => { row.candidate = { commit: 'other' }; }, row => row.rows.push(row.rows[0])]) {
     const invalid = structuredClone(review); change(invalid); assert.throws(() => validateVisualReviews(invalid, report));

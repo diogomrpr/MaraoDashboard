@@ -76,9 +76,12 @@ workarounds SHALL NOT be introduced.
 Ordinary iteration SHALL batch related tasks and use the smallest covering check.
 Dependent migrations and shared security controls SHALL be checked early.
 UI batches SHALL deploy together to the disposable dashboard for visual and
-interactive inspection. After the last edit and focused check, every card in the
-combined affected-card set SHALL receive final inspection of alignment,
-centering, spacing, clipping, overlap and overflow.
+interactive inspection. After the last edit and focused check, representative
+changed components and affected card families SHALL receive final inspection of
+alignment, centering, spacing, clipping, overlap and overflow, including difficult
+text/zoom layouts. Equivalent cards and scroll captures need not all be manually
+reviewed. Distinct interactions run once per relevant theme; device repeats are
+reserved for gesture or geometry differences.
 
 #### Scenario: Related queued tasks affect the same shared component
 - **WHEN** their implementation is being completed together

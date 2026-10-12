@@ -30,6 +30,8 @@ def test_reviewed_inventory_covers_the_current_catalog_runtime_and_gallery():
     (lambda m: m["page_templates"].pop("home"), "editable page template"),
     (lambda m: m["profiles"].pop(), "mobile/theme"),
     (lambda m: m["themes"].pop(), "mobile/theme"),
+    (lambda m: m["checks"]["layout"].update(scope="shared"), "full mobile matrix"),
+    (lambda m: m["checks"]["upgraded-pages"].update(scope="shared"), "each format"),
     (lambda m: m["runtime_components"].pop(), "runtime registration"),
     (lambda m: m["cases"]["entityGroupCases"]["identities"].pop(), "material state"),
     (lambda m: m["cases"]["families"]["identities"]["battery"].pop(), "material state"),
@@ -51,7 +53,7 @@ def execution():
     runs = [dict(check=check, format=format_, profile=profile, theme=theme, passed=True) for check, format_, profile, theme in checker["required_runs"](MANIFEST, formats)]
     installed = [dict(baseline=baseline, assertion=assertion, passed=True) for baseline in baselines for assertion in MANIFEST["required_install_assertions"] if assertion != "baseline-package-health"]
     installed.append(dict(baseline="v0.5.1", assertion="baseline-package-health", passed=True))
-    return candidate, formats, baselines, dict(version=1, candidate=candidate, target="http://192.168.0.28:8123", formats=formats, baselines=baselines, runs=runs, install_assertions=installed)
+    return candidate, formats, baselines, dict(version=2, candidate=candidate, target="http://192.168.0.28:8123", formats=formats, baselines=baselines, runs=runs, install_assertions=installed)
 
 
 def test_complete_mock_execution_requires_every_historical_format_profile_and_cleanup():
@@ -59,7 +61,21 @@ def test_complete_mock_execution_requires_every_historical_format_profile_and_cl
     checker["validate_execution"](MANIFEST, report, candidate, formats, baselines, "http://192.168.0.28:8123")
 
 
+def test_shared_browser_scope_keeps_the_matrix_and_each_targeted_format():
+    _, formats, _, report = execution()
+    rows = report["runs"]
+    for check, count in [("layout", 26), ("popups", 26), ("numbers", 2), ("sliders", 4), ("builder-pages", 2)]:
+        selected = [row for row in rows if row["check"] == check]
+        assert len(selected) == count
+        assert {row["format"] for row in selected} == {"generator-json-0"}
+    assert {(row["format"], row["theme"]) for row in rows if row["check"] == "upgraded-pages"} == {
+        (format_, theme) for format_ in formats for theme in ["light", "dark"]
+    }
+
+
 @pytest.mark.parametrize("change, message", [
+    (lambda r: r.update(version=1), "stale candidate"),
+    (lambda r: r.update(failure="Interrupted run"), "Failed upgrade"),
     (lambda r: r.update(candidate={"commit": "changed"}), "stale candidate"),
     (lambda r: r.update(target="http://192.168.0.29:8123"), "another target"),
     (lambda r: r.update(formats=r["formats"][:-1]), "historical scenario"),

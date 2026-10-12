@@ -19,6 +19,11 @@ context: |
   The user allows the diagnosed native Home Assistant stale-unsubscribe reconnect
   failure until its upstream fix reaches a stable frontend. Keep raw assertions and
   exact native evidence; all other publication and upgrade gates remain required.
+  The approved test policy uses distinct interactions once, one shared automated
+  mobile layout matrix per release, preservation/recovery for all seven baselines,
+  targeted browser checks for other formats, failure screenshots and representative
+  manual visual review. Exact candidate browser evidence may be reused only after
+  private coverage/capture/cleanup and restored-install validation.
   OpenSpec is development tooling only. Preserve unrelated work and use the smallest
   coherent shared-root change; do not add a framework or abstraction for speculation.
   Assess saved-release compatibility before changing JSON, defaults, generated

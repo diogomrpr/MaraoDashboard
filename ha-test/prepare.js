@@ -456,4 +456,4 @@ if (require.main === module) {
   const dryRun = process.argv.includes("--dry-run");
   Promise.resolve().then(() => prepare(readConfig(undefined, { dryRun }), { dryRun })).catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = { activeCoreJob, haYamlOptions, changePlan, composeDashboard, helperStateActions, patchPackages, prepare, referencedEntities, resetBaseline, restoreHelperStates, restart, targetKey, waitForSupervisorIdle };
+module.exports = { activeCoreJob, haYamlOptions, changePlan, composeDashboard, helperStateActions, patchPackages, prepare, referencedEntities, resetBaseline, restoreHelperStates, restart, ssh, targetKey, waitForSupervisorIdle };

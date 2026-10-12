@@ -71,7 +71,8 @@ For UI edits, update both canonical Cases and realistic-page examples, run
 confirm the loaded fingerprint. Inspect only safe entities. Existing browser
 commands also prepare the current workspace, so do not deploy repeatedly without
 a reason. After the last edit and focused check, visually and interactively
-inspect every affected card as the final validation step.
+inspect representative affected components and difficult layouts as the final
+validation step.
 
 Use `npm run verify:publish` for requested full checks, final stabilization and
 immediately before any push/tag/release; do not substitute spec validation for it.
@@ -168,3 +169,11 @@ edit generated skills because an update can replace them. To refresh after an
 intentional CLI upgrade, run `OPENSPEC_TELEMETRY=0 openspec update`.
 The setup and verification here used `OPENSPEC_TELEMETRY=0`; set it on subsequent
 commands as well when keeping CLI telemetry disabled. No shell settings were changed.
+
+The user-approved 2026-10-13 verification policy uses one shared mobile layout
+matrix per release, distinct interactions once (device repeats for gestures),
+independent preservation/recovery for all seven baselines and targeted browser
+checks for other distinct formats. Manual review covers representative changed
+components and difficult layouts; failure screenshots remain mandatory.
+Publication may reuse complete exact-candidate preserved-install browser evidence
+only after private capture, coverage, cleanup and restored-install checks.

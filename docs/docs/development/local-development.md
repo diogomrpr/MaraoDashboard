@@ -212,8 +212,13 @@ mobile browser checks, icon alignment, and value-slider geometry and real
 pointer interactions. The mobile matrix prepares once and runs independent
 browser contexts in batches of three. CI runs local checks; it does not have test-instance
 credentials. GitHub Tests, hassfest, and HACS checks must pass for a published
-commit. After the last code edit and automated check, visually inspect every
-affected card on the disposable dashboard as required by the
+commit. Run one mobile layout matrix per release candidate and each distinct
+interaction once, repeating device-sensitive gestures on iPhone and Android.
+Default layout screenshots are failures only; use `--screenshots review` for
+normal iPhone and difficult Android zoom samples in both themes, or opt into
+`--screenshots all` for exhaustive diagnostics. After the last code edit and
+automated check, visually inspect changed components and representative difficult
+layouts as required by the
 [quality contract]({{ '/docs/development/dashboard-quality.html' | relative_url }}).
 
 ## Upgrade compatibility and release preparation
@@ -250,8 +255,12 @@ evidence remains required; focused tests and a dry-run plan do not provide it.
 
 `npm run verify:release -- /absolute/private/upgrade-report.json` now validates
 private candidate-specific upgrade evidence for a clean final commit before
-running `verify:publish`. It requires all historical/feature/profile rows,
-preserved-install visual reviews and verified cleanup, and rejects candidate or
+running `verify:publish -- --upgrade-report /absolute/private/report.json`.
+The validated report supplies shared browser behavior and one full mobile matrix
+on the real v0.5.1 upgrade, targeted browser checks for other distinct formats,
+all seven preservation/recovery baselines, four representative visual reviews
+and verified cleanup. Publication rechecks the restored install and exact private
+evidence before reuse; it rejects candidate or
 report changes during publication checks. Its focused tests use mocked results;
 they do not establish a live upgrade pass. First run `npm run test:ha:upgrade` against the safe fixture installation prepared
 during final stabilization. The runner requires a clean final commit, backs up

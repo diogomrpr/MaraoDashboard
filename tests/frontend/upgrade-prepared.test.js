@@ -88,6 +88,11 @@ test('preserved inspection uses only reads and detects source, output, ownership
     const result = await verifyPrepared(config, file, options);
     assert.equal(result.version, saved.candidate.frontend_fingerprint);
     assert.equal(commands.filter(command => command === 'read-snapshot').length, 2);
+    await assert.rejects(verifyPrepared(config, file, { ...options, operationCompleted: true }), /operation changed/);
+    altered = (kind, value) => { if (kind === 'snapshot') { value.operation_id = null; return value; } };
+    await verifyPrepared(config, file, { ...options, operationCompleted: true });
+    await assert.rejects(verifyPrepared(config, file, options), /operation changed/);
+    altered = undefined;
     const installed = fs.realpathSync(root);
     const contents = {
       '.marao-upgrade-active.json': JSON.stringify({ operation_id: saved.operation_id }),

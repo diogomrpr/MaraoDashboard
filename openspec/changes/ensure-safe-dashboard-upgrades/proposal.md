@@ -35,3 +35,12 @@ Implementation reaches integration setup and management/service paths, JSON load
 Coordinate the existing `independent-room-entities` proposal's `config_version: 1` conversion with this shared mechanism rather than inventing conflicting version meanings. This proposal's safe automatic saved-install upgrade supersedes deferred-save conversion for installed files when a new release requires it; read-only editor previews and local drafts still do not write data. Preserve exact archived history, and preflight compatibility before restoration.
 
 Non-goals: upgrading Home Assistant, accessing production installations, publishing now, eliminating all arbitrary raw-card incompatibilities, rewriting unrelated configuration, running full upgrade scenarios during normal iteration, or implementing pending feature proposals as part of this planning turn. All test actions use safe fixtures on `192.168.0.28`; credentials and backup/report contents remain private.
+
+The user-approved 2026-10-13 verification revision keeps all seven historical
+preservation/recovery baselines, runs shared behavior and one full mobile layout
+matrix on the actual latest-release upgrade, and uses targeted browser checks
+for other distinct formats. Failure screenshots and representative visual review
+replace exhaustive success capture review. Exact candidate browser evidence may
+be reused by publication after full report and restored-install validation.
+This harness/documentation revision has an empty affected-card set and changes
+no saved dashboard format, generated contract or product behavior.

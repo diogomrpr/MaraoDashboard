@@ -106,14 +106,21 @@ feature-to-assertion coverage. Use focused migration checks during development.
 Immediately before versioned publication, additionally require the final
 candidate's preserved-install upgrade gate: supported released formats, persisted
 expected data, all supported features/mobile profiles, failure recovery and
-verified disposable cleanup. Fresh-fixture provisioning cannot prove upgrades.
+verified disposable cleanup. Run shared behavior and the full mobile matrix once on the actual latest-release
+upgrade. Retain independent preservation/recovery for all seven baselines and
+targeted saved-page/navigation/popup checks for other distinct formats. Review
+normal iPhone and difficult Android zoom samples in both themes; this does not
+claim manual review of every format/profile. Fresh-fixture provisioning cannot prove upgrades.
 Failed, missing, incomplete or stale evidence blocks publication.
 
 Run that live scenario only during explicit release preparation, outside routine
 tests, push/PR checks, ordinary stabilization and version hooks.
 `npm run verify:release -- /absolute/private/upgrade-report.json` checks complete
 private evidence for a clean final candidate, including preserved-install visual
-reviews and verified cleanup, before running `verify:publish`. The historical runner is implemented in the development candidate; its real
+reviews and verified cleanup, before running `verify:publish`. The publication
+gate may reuse that exact candidate's browser evidence after rechecking private
+capture hashes, coverage, native-exception expiry and the restored live install.
+It still runs before each push/tag/release; any drift invalidates reuse. The historical runner is implemented in the development candidate; its real
 complete final-candidate evidence is required before publication. Existing `verify:publish`, CI and
 the final affected-card visual inspection still apply.
 
@@ -139,8 +146,10 @@ cannot apply them.
 ### Final affected-card visual gate
 
 After the batch's last edit and focused automated check, immediately before reporting
-completion, inspect every card in its combined affected-card set on the disposable Home
-Assistant dashboard. This inspection is the final validation action and must
+completion, inspect changed shared components and representative affected card
+families on the disposable Home Assistant dashboard, including difficult text/zoom
+layouts. Do not manually review every equivalent card or scrolling capture. This
+inspection is the final validation action and must
 verify:
 
 - horizontal and vertical alignment and intended centering of every visible
@@ -156,8 +165,8 @@ focused check for the correction, then repeat this final visual gate. Earlier
 screenshots or an inspection made before the last edit do not satisfy it.
 
 Use impact-based scope during normal work: inspect only the affected-card set.
-Inspect the complete gallery only when the user requests it, a shared
-foundation has gallery-wide impact, or release stabilization requires it.
+Inspect the complete gallery manually only when the user explicitly requests it.
+Automated release layout checks still cover the full gallery.
 
 ### Test timing
 
@@ -166,7 +175,12 @@ suite while related UI work is still changing. Finish queued implementation,
 then perform one complete release stabilization pass. If it finds a defect, fix
 it and repeat the focused check and affected-card inspection before verifying the
 final candidate. All publication, exact-commit CI and preserved-install gates
-remain required.
+remain required. Run distinct browser behavior once per relevant theme, with
+device repeats only for native gestures or geometry. Keep fast unit/migration
+checks. Run the full automated mobile layout matrix once per release candidate;
+check visibility, clipping, overlap, touch targets and diagnostics. Screenshots
+are failure evidence or representative visual samples, with exhaustive success
+captures available only through `--screenshots all`.
 
 Run `npm run verify:publish` only when:
 

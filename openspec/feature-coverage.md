@@ -133,3 +133,11 @@ surface, update the affected requirements and safe gallery together, and archive
 only completed verified changes. Existing documentation is supporting material;
 the binding contract wins over stale screenshots/examples. Counts and prior
 release results are dated evidence, never substitutes for the next task's checks.
+
+The user-approved 2026-10-13 verification policy uses one shared mobile layout
+matrix per release, distinct interactions once (device repeats for gestures),
+independent preservation/recovery for all seven baselines and targeted browser
+checks for other distinct formats. Manual review covers representative changed
+components and difficult layouts; failure screenshots remain mandatory.
+Publication may reuse complete exact-candidate preserved-install browser evidence
+only after private capture, coverage, cleanup and restored-install checks.

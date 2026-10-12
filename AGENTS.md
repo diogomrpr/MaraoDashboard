@@ -81,14 +81,20 @@ success; keep future work in changes and archive only completed, verified work.
 - Treat every warning, error card, console exception, failed resource, and
   repeated request as a defect. Fix its root cause; never hide, suppress, or
   ignore it.
-- Immediately before concluding a change or batch, after the last edit and focused
-  automated check, visually inspect every card in the affected-card set on the
-  disposable dashboard. Check the alignment and centering of all text, icons,
-  controls, and other elements, plus spacing, clipping, overlap, and overflow.
-  This is the final validation step. If it finds a defect, fix it, rerun the
-  focused check, and repeat the visual inspection. Inspect the full gallery only
-  when the user requests it, a shared foundation can affect the whole gallery,
-  or release stabilization requires it; otherwise inspect only affected cards.
+- After the last edit and focused check, visually inspect changed components and
+  representative difficult layouts on the disposable dashboard. Cover each
+  affected shared component and card family, including normal and enlarged-text
+  or zoom cases where relevant. Check centering, spacing, clipping, overlap and
+  overflow; fix defects and repeat the focused check and affected visual review.
+  Do not manually inspect every equivalent card or scrolling capture. Inspect
+  the complete gallery only when the user explicitly requests that review.
+- Run each distinct interaction once per relevant theme. Repeat across devices
+  only when native gestures or device geometry affect the behavior. Keep fast
+  unit, migration and recovery checks; visibility alone cannot verify actions or
+  preservation. During release preparation, run one automated mobile layout
+  matrix checking visibility, clipping, overlap, touch targets and browser/resource
+  errors. Save screenshots on failures and for representative visual review;
+  exhaustive success captures are opt-in diagnostics, never the default.
 - Finish queued implementation before the complete release stabilization pass;
   do not repeat broad checks between small edits or individual tasks. After a
   defect, rerun its focused check and visual inspection, then verify the final
@@ -133,14 +139,23 @@ success; keep future work in changes and archive only completed, verified work.
 - Immediately before versioned publication, require a separate preserved-install
   upgrade scenario in addition to `npm run verify:publish` and exact-commit CI.
   It must verify the final candidate, supported released formats, persisted data,
-  complete feature/mobile coverage, failure recovery, and disposable cleanup.
+  complete shared feature/mobile coverage, failure recovery, and disposable cleanup.
+  Keep preservation/recovery assertions for all seven supported baselines. Run
+  shared interactions and the full mobile matrix once on the actual latest-release
+  upgrade; use targeted saved-page, navigation, popup and diagnostic browser checks
+  for the other distinct formats. Report those scopes honestly without claiming
+  that every historical format independently passed the full mobile matrix.
   Missing, incomplete, failed, or stale evidence blocks publication. This live
   scenario runs only during explicit release preparation, never as a routine
   test, push/PR check, ordinary stabilization, or ordinary version hook.
 - Run `npm run verify:release -- /absolute/private/upgrade-report.json` only
   during release preparation. It requires a clean final commit, private complete
-  preserved-install evidence, the upgraded mobile/theme visual review and verified
+  preserved-install evidence, representative upgraded visual review and verified
   cleanup, then runs `verify:publish` and rejects candidate or evidence drift.
+  Publication may reuse that exact candidate's successful browser evidence after
+  revalidating the private report, coverage and restored disposable installation;
+  do not repeat the mobile matrix between its push, tag and release. Changed
+  candidate assets, saved source, target or failed/stale evidence invalidate reuse.
   Run `npm run test:ha:upgrade` for the clean final candidate to produce that
   evidence. The runner requires the safe current fixture installation from final
   stabilization, backs it up before any remote write, and never invokes fresh

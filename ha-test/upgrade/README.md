@@ -177,8 +177,12 @@ fields checked by `tests/upgrade_coverage.py`: `version`, `candidate`, `target`,
 `formats`, `baselines`, complete passing `runs` and `install_assertions`.
 Additionally it requires `kind: preserved-install-upgrade`, a UUID `operation_id`,
 valid `started_at` and `completed_at` timestamps, and `verified_cleanup: true`.
-`visual_reviews` must contain exactly one passing row for every required
-format/profile/theme combination, with `source: preserved-install`. These rows
+Report and coverage versions are 2. Shared behavior and the full mobile matrix
+run once on `generator-json-0`; other distinct formats need targeted saved-page
+checks and all seven baselines retain independent preservation/recovery.
+`visual_reviews` must contain exactly four passing rows: normal iPhone and
+Android 200% zoom, each in light/dark, on the preserved latest-release upgrade,
+with `source: preserved-install`. These rows
 record actual final review of the upgraded data before verified cleanup; normal
 fresh preparation or mocked tests cannot supply them.
 
@@ -223,16 +227,23 @@ The disposable SSH environment requires Python 3 with its standard library for
 private backup and recovery. The configured root may use the SSH add-on's
 `/config` alias; links inside owned state remain rejected.
 
-The producer reuses the complete browser matrix with guarded receipts. Its
+The producer runs the complete automated layout matrix once with guarded
+receipts, normal-profile shared behaviors and targeted other-format browser
+checks. Success images are representative samples; failures retain screenshots. Its
 private operation directory records executed checks, immutable captures and
 candidate identity. After all checks it waits for a private `visual-review.json`
-attestation for actual review of every format/profile/theme, tied to capture
-hashes. An agent or developer must inspect those captures; the runner never
+attestation for actual review of the four declared representative visual rows,
+tied to immutable capture hashes. Other profiles/formats are automated evidence,
+not invented manual reviews. An agent or developer must inspect those captures; the runner never
 manufactures passing visual rows. It then restores and verifies the pre-test
 files, integration identity and controlled helper states, and removes the marker
 only after cleanup succeeds. Failure retains private backups and a failed report;
 concurrent unrelated edits stop restoration rather than overwrite them. The
 report is accepted only after `verify:release` and exact-commit CI pass.
+`verify:publish -- --upgrade-report /absolute/private/report.json` validates that
+report and all capture hashes, rechecks the restored original prepared install
+without reseeding, and rechecks the native-exception expiry before reusing browser
+evidence. Local tests still run. Changed or incomplete evidence cannot enable reuse.
 
 The user-approved native HA reconnect exception is diagnosed separately, retains
 raw failed e2e assertions and exact stale-subscription evidence, and expires when

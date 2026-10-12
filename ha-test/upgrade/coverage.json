@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "catalog": {
     "hc_camera_card": {
       "options": [
@@ -430,7 +430,7 @@
     "native-surfaces": {
       "file": "tests/test-ha-dashboard-e2e.js",
       "assertion": "checkNativeSurfaces",
-      "scope": "format"
+      "scope": "shared"
     },
     "historical-source": {
       "file": "tests/components/marao_dashboard/test_upgrade_fixtures.py",
@@ -490,72 +490,72 @@
     "states": {
       "file": "tests/test-ha-dashboard-e2e.js",
       "assertion": "checkStateCases",
-      "scope": "format"
+      "scope": "shared"
     },
     "actions": {
       "file": "tests/test-ha-dashboard-e2e.js",
       "assertion": "checkActionDispatches",
-      "scope": "format"
+      "scope": "shared"
     },
     "content": {
       "file": "tests/test-ha-dashboard-e2e.js",
       "assertion": "checkCardContent",
-      "scope": "format"
+      "scope": "shared"
     },
     "camera": {
       "file": "tests/test-ha-dashboard-e2e.js",
       "assertion": "checkCameraCases",
-      "scope": "format"
+      "scope": "shared"
     },
     "media": {
       "file": "tests/test-ha-dashboard-e2e.js",
       "assertion": "checkMediaRecovery",
-      "scope": "format"
+      "scope": "shared"
     },
     "history": {
       "file": "tests/test-ha-dashboard-e2e.js",
       "assertion": "checkHistoryCases",
-      "scope": "format"
+      "scope": "shared"
     },
     "climate": {
       "file": "tests/test-ha-dashboard-e2e.js",
       "assertion": "checkClimateFeedback",
-      "scope": "format"
+      "scope": "shared"
     },
     "groups": {
       "file": "tests/test-ha-dashboard-e2e.js",
       "assertion": "checkEntityGroups",
-      "scope": "format"
+      "scope": "shared"
     },
     "room-actions": {
       "file": "tests/test-ha-room-cards.js",
       "assertion": "async function actions",
-      "scope": "format"
+      "scope": "shared"
     },
     "builder-preservation": {
       "file": "tests/test-ha-editor.js",
       "assertion": "releasedDraftPreservation",
-      "scope": "format"
+      "scope": "shared"
     },
     "builder-rooms": {
       "file": "tests/test-ha-editor.js",
       "assertion": "independentRoomChecks",
-      "scope": "profile"
+      "scope": "shared"
     },
     "builder-groups": {
       "file": "tests/test-ha-editor.js",
       "assertion": "entityGroupEditorChecks",
-      "scope": "profile"
+      "scope": "shared"
     },
     "builder-save": {
       "file": "tests/test-ha-editor.js",
       "assertion": "independentRoomPersistence",
-      "scope": "format"
+      "scope": "shared"
     },
     "builder-energy": {
       "file": "tests/test-ha-editor.js",
       "assertion": "energyFormatting",
-      "scope": "format"
+      "scope": "shared"
     },
     "layout": {
       "file": "tests/test-ha-dashboard-accessibility.js",
@@ -570,22 +570,26 @@
     "alignment": {
       "file": "tests/test-ha-card-alignment.js",
       "assertion": "checkControlContrast",
-      "scope": "format"
+      "scope": "shared"
     },
     "sliders": {
       "file": "tests/test-ha-value-sliders.js",
       "assertion": "checkPointerInteraction",
-      "scope": "profile"
+      "scope": "shared",
+      "profiles": [
+        "iphone-normal",
+        "android-normal"
+      ]
     },
     "numbers": {
       "file": "tests/test-ha-climate-layout.js",
       "assertion": "captureClimateFeedback",
-      "scope": "profile"
+      "scope": "shared"
     },
     "energy": {
       "file": "tests/test-ha-energy-format.js",
       "assertion": "inspectGallery",
-      "scope": "format"
+      "scope": "shared"
     },
     "page-generation": {
       "file": "tests/components/marao_dashboard/test_page_generation.py",
@@ -620,13 +624,34 @@
     "builder-pages": {
       "file": "tests/test-ha-editor.js",
       "assertion": "editablePageChecks",
-      "scope": "profile"
+      "scope": "shared"
+    },
+    "builder-layout": {
+      "file": "tests/test-ha-editor.js",
+      "assertion": "async function scrollHeader",
+      "scope": "shared",
+      "profiles": [
+        "iphone-normal",
+        "android-page-zoom-200"
+      ]
+    },
+    "upgraded-pages": {
+      "file": "tests/test-ha-dashboard-accessibility.js",
+      "assertion": "saved-page",
+      "scope": "format"
     }
   },
   "cases": {
     "nativeSurfaceCase": {
-      "identities": ["entity", "name"],
-      "checks": ["native-surfaces", "layout", "card-runtime"]
+      "identities": [
+        "entity",
+        "name"
+      ],
+      "checks": [
+        "native-surfaces",
+        "layout",
+        "card-runtime"
+      ]
     },
     "sliderFamilies": {
       "identities": [
@@ -1236,7 +1261,8 @@
       "page-model",
       "page-manager",
       "page-templates",
-      "builder-pages"
+      "builder-pages",
+      "builder-layout"
     ],
     "generation-customization-history": [
       "generation",
@@ -1265,7 +1291,8 @@
     "layout-navigation": [
       "layout",
       "popups",
-      "alignment"
+      "alignment",
+      "upgraded-pages"
     ],
     "upgrade-resilience": [
       "historical-source",
@@ -1299,8 +1326,8 @@
     "verified-cleanup"
   ],
   "limits": [
-    "Install-level assertions require the unfinished preserved-install orchestrator; ordinary gallery results do not satisfy them.",
-    "Native-storage-0 replay remains unsupported and cannot be silently excluded from release evidence."
+    "Shared browser behaviors and the full layout matrix run once on the actual v0.5.1 preserved upgrade; other distinct formats receive targeted saved-page checks.",
+    "Representative manual visual review covers the declared review profiles only; it does not claim every format/profile was manually reviewed."
   ],
   "guided_page_options": {
     "security": [
@@ -1373,5 +1400,10 @@
       "page-generation",
       "page-manager"
     ]
-  }
+  },
+  "shared_format": "generator-json-0",
+  "review_profiles": [
+    "iphone-normal",
+    "android-page-zoom-200"
+  ]
 }

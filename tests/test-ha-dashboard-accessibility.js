@@ -13,6 +13,7 @@ const themePath = path.join(
   "custom_components/marao_dashboard/frontend/themes/MaraoDashboard/marao-dashboard.yaml",
 );
 const themes = ["light", "dark"];
+const reviewProfiles = ["iphone-normal", "android-page-zoom-200"];
 const scenarios = [
   { name: "iphone-normal", device: "iphone", viewport: { width: 390, height: 844 }, textScale: 1, bold: false, pageZoom: 1 },
   { name: "iphone-bold", device: "iphone", viewport: { width: 390, height: 844 }, textScale: 1, bold: true, pageZoom: 1 },
@@ -38,13 +39,53 @@ function argumentValue(argv, name) {
 }
 
 function parseArgs(argv = process.argv.slice(2)) {
+  const screenshots = argumentValue(argv, '--screenshots') || 'failure';
+  if (!['failure', 'review', 'all'].includes(screenshots)) throw new Error('Unknown screenshot policy.');
   return {
     preview: argv.includes("--preview"),
     scenario: argumentValue(argv, "--scenario"),
     theme: argumentValue(argv, "--theme"),
     ...(argv.includes('--safe-area') ? { safeArea: true } : {}),
     ...(argv.includes('--pages') ? { pages: true } : {}),
+    ...(argv.includes('--pages-only') ? { pages: true, pagesOnly: true } : {}),
+    screenshots,
   };
+}
+
+function capturePolicy(options, scenario) {
+  return options.screenshots === 'review' && !reviewProfiles.includes(scenario.name) ? 'failure' : options.screenshots;
+}
+
+function popupReviewKey(config) {
+  const templates = new Set();
+  const visit = value => {
+    if (!value || typeof value !== 'object') return;
+    if (value.template || value.type) templates.add(value.template || value.type);
+    Object.values(value).forEach(visit);
+  };
+  visit(config.cards);
+  const name = config.name || config.title || '';
+  return JSON.stringify([config.height, config.entity_group?.domain || config.entity_group?.type, config.entity_group?.popup_filter,
+    [...templates].sort(), name.match(/empty|error|unavailable|loading|retry/i)?.[0]?.toLowerCase()]);
+}
+
+async function captureRepresentativeCards(page, prefix) {
+  const cards = page.locator('marao-card,marao-energy-period-card,marao-state-timeline-card,marao-camera-events-card,marao-frigate-events-card');
+  const selected = await cards.evaluateAll(elements => {
+    const seen = new Set();
+    return elements.flatMap((element, index) => {
+      const key = [element._config?.template || element.localName, element.getBoundingClientRect().width < 120,
+        String(element._config?.name || '').length > 35,
+        Boolean(element.shadowRoot?.querySelector('.problem,[role="status"]'))].join(':');
+      if (seen.has(key)) return [];
+      seen.add(key); return [index];
+    });
+  });
+  for (const index of selected) {
+    await cards.nth(index).evaluate(element => element.scrollIntoView({ block: 'start', behavior: 'instant' }));
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.screenshot({ path: `${prefix}-representative-${index}.png`, scale: 'css' });
+  }
 }
 
 const insetSides = ['top', 'right', 'bottom', 'left'];
@@ -637,8 +678,9 @@ function popupMemberTouchPosition(card) {
   return { x: 24, y: y - box.top };
 }
 
-async function inspectPopups(page, scenario, theme, output, runName) {
+async function inspectPopups(page, scenario, theme, output, runName, captures = 'failure') {
   const popups = await page.locator("marao-popup-card").evaluateAll((cards) => cards.map((card) => ({
+    config: card._config,
     hash: card._config.hash, name: card._config.name || card._config.title || card._config.hash,
     heading: !card._config.entity_group && card._config.cards?.some((child) => child?.template === "hc_climate_card" && child.variables?.show_mode_buttons)
       ? "" : String(card._config.title ?? card._config.name ?? ""),
@@ -658,7 +700,10 @@ async function inspectPopups(page, scenario, theme, output, runName) {
     return { index, tag: card.localName, hash };
   }));
   const issues = [];
+  const reviewed = new Set();
   for (const [index, popup] of popups.entries()) {
+    const reviewKey = popupReviewKey(popup.config);
+    const capture = captures === 'all' || (captures === 'review' && !reviewed.has(reviewKey));
     let target = targets.find(({ hash }) => hash === popup.hash);
     if (popup.directModeOnly) {
       if (target) throw new Error(`${popup.name}: single-mode climate control must not open a popup.`);
@@ -747,7 +792,7 @@ async function inspectPopups(page, scenario, theme, output, runName) {
       diagnostics.popups = await page.locator("marao-popup-card").evaluateAll((cards) => cards.filter((item) => item._open).map((item) => ({ hash: item._config.hash, background: item._backgroundState.map(({ element, inert }) => ({ tag: element.localName, previousInert: inert, currentInert: element.inert })) })));
       const prefix = path.join(output, `${runName}-popup-${index + 1}-tap-failure`);
       fs.writeFileSync(`${prefix}.json`, JSON.stringify({ popup, diagnostics }, null, 2));
-      await page.screenshot({ path: `${prefix}.png`, scale: "css" });
+      if (captures === 'all') await page.screenshot({ path: `${prefix}.png`, scale: "css" });
       throw new Error(`${popup.name}: popup trigger tap failed; diagnostics in ${prefix}.json\n${JSON.stringify(diagnostics)}\n${error.message}`);
     }
     const sheet = page.locator(".marao-popup-sheet");
@@ -797,7 +842,7 @@ async function inspectPopups(page, scenario, theme, output, runName) {
       return rect && rect.width >= 48 && rect.height >= 48;
     }));
     const prefix = path.join(output, `${runName}-popup-${String(index + 1).padStart(2, "0")}`);
-    await page.screenshot({ path: `${prefix}.png`, scale: "css" });
+    if (captures === 'all') await page.screenshot({ path: `${prefix}.png`, scale: "css" });
     issues.push(...(await layoutIssues(page)).map((issue) => `${popup.name}: ${issue}`));
     const modal = await sheet.evaluate((element) => ({
       role: element.getAttribute("role"), modal: element.getAttribute("aria-modal"),
@@ -833,14 +878,17 @@ async function inspectPopups(page, scenario, theme, output, runName) {
     await sheet.evaluate((element) => element.scrollTo({ top: 0, behavior: "instant" }));
     await applyVisualPreferences(page, scenario, theme);
     issues.push(...(await layoutIssues(page)).map((issue) => `${popup.name}: ${issue}`));
-    await page.screenshot({ path: `${prefix}-ready.png`, scale: "css" });
+    if (capture) await page.screenshot({ path: `${prefix}-ready.png`, scale: "css" });
+    reviewed.add(reviewKey);
     await checkCloseButton();
     const dimensions = await sheet.evaluate((element) => ({ total: element.scrollHeight, height: element.clientHeight }));
     if (dimensions.total > dimensions.height) {
       for (let top = dimensions.height * 0.75, segment = 1; top < dimensions.total; top += dimensions.height * 0.75, segment += 1) {
         await sheet.evaluate((element, position) => element.scrollTo({ top: position, behavior: "instant" }), top);
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-        await page.screenshot({ path: `${prefix}-scroll-${segment}.png`, scale: "css" });
+        if (captures === 'all' || (capture && top + dimensions.height >= dimensions.total)) {
+          await page.screenshot({ path: `${prefix}-scroll-${segment}.png`, scale: "css" });
+        }
         await checkCloseButton();
         const headerGap = await sheet.evaluate((element) => (
           element.querySelector(".marao-popup-head").getBoundingClientRect().top - element.getBoundingClientRect().top
@@ -881,9 +929,11 @@ async function main() {
   const output = path.join(__dirname, ".artifacts", "accessibility", ...(options.safeArea ? ['safe-area'] : []));
   if (!options.preview) fs.mkdirSync(output, { recursive: true });
   const checkProfile = async ({ scenario, theme }) => {
+    const captures = capturePolicy(options, scenario);
     // Keep each profile's touch emulation independent of other target
     // lifecycles by giving it a complete browser process.
     const browser = await chromium.launch({ headless: !options.preview });
+    let page;
     try {
       const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
       await context.addInitScript(setBrowserToken, {
@@ -893,7 +943,7 @@ async function main() {
         const apply=()=>{document.documentElement.style.setProperty('--app-safe-area-inset-top','47px');document.documentElement.style.setProperty('--app-safe-area-inset-bottom','34px');};
         if(document.documentElement)apply();else document.addEventListener('DOMContentLoaded',apply,{once:true});
       });
-      const page = await context.newPage();
+      page = await context.newPage();
       await configurePageEmulation(context, page, scenario, options.safeArea ? Object.fromEntries(insetSides.flatMap(side=>[[side,0],[side+'Max',0]])) : undefined);
       const errors = [];
       page.on("pageerror", (error) => {
@@ -920,9 +970,11 @@ async function main() {
       if (!options.preview) {
         for (const file of fs.readdirSync(output)) if (file.startsWith(`${runName}-`)) fs.rmSync(path.join(output, file));
       }
-      await page.goto(`${baseUrl}/marao-dashboard/card-test?marao_accessibility=${runName}`, { waitUntil: "domcontentloaded" });
+      const initialView = options.pagesOnly ? dashboard.views.find(view => view.path !== 'card-test')?.path : 'card-test';
+      if (!initialView) throw new Error('Missing saved dashboard page.');
+      await page.goto(`${baseUrl}/marao-dashboard/${initialView}?marao_accessibility=${runName}`, { waitUntil: "domcontentloaded" });
       try {
-        await page.locator("marao-card").first().waitFor({ state: "visible", timeout: 10000 });
+        await page.locator(options.pagesOnly ? 'marao-navbar-card nav' : 'marao-card').first().waitFor({ state: 'visible', timeout: 10000 });
       } catch (error) {
         const diagnostics = await page.evaluate(async () => {
           const names = [
@@ -1027,8 +1079,9 @@ async function main() {
         if (errors.length) throw new Error(`Preview produced browser warnings/errors:\n${errors.join("\n")}`);
         return;
       }
+      if (!options.pagesOnly) {
       await scrollDashboard(page, {
-        screenshotPrefix: path.join(output, runName),
+        screenshotPrefix: captures === 'all' ? path.join(output, runName) : undefined,
         onSegment: async () => {
           await applyVisualPreferences(page, scenario, theme);
           const issues = await emulationIssues(page, scenario, theme);
@@ -1041,26 +1094,41 @@ async function main() {
         ...await layoutIssues(page),
       ];
       if (errors.length || issues.length) throw new Error(`${runName} failed:\n${[...errors, ...issues].map((item) => `- ${item}`).join("\n")}`);
-      issues = issues.concat(await inspectPopups(page, scenario, theme, output, runName));
+      if (captures === 'review') await captureRepresentativeCards(page, path.join(output, runName));
+      issues = issues.concat(await inspectPopups(page, scenario, theme, output, runName, captures));
       if (errors.length || issues.length) throw new Error(`${runName} failed:\n${[...errors, ...issues].map((item) => `- ${item}`).join("\n")}`);
+      }
       if (options.pages) for (const view of dashboard.views.filter(view => view.path !== 'card-test')) {
         await page.waitForLoadState('networkidle');
         await page.evaluate(route => { history.pushState(null, '', route); window.dispatchEvent(new CustomEvent('location-changed')); }, '/marao-dashboard/' + view.path);
+        await page.waitForFunction(({ root, expected }) => root.config?.views?.[root._curView]?.path === expected, {
+          root: await page.locator('hui-root').elementHandle(), expected: view.path,
+        });
         await page.waitForLoadState('networkidle');
         await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
         await applyVisualPreferences(page, scenario, theme);
         const prefix = path.join(output, runName + '-page-' + view.path);
-        if (await page.locator('marao-card').count()) await scrollDashboard(page, { screenshotPrefix: prefix, onSegment: async () => {
+        if (await page.locator('marao-card').count()) await scrollDashboard(page, { screenshotPrefix: captures === 'all' ? prefix : undefined, onSegment: async () => {
           await applyVisualPreferences(page, scenario, theme);
           const found = await layoutIssues(page);
           if (found.length) throw new Error(`${runName}/${view.path}: ${found.join('\n')}`);
         } });
-        else await page.screenshot({ path: prefix + '-empty.png', scale: 'css' });
-        const found = [...await emulationIssues(page, scenario, theme), ...await layoutIssues(page), ...await inspectPopups(page, scenario, theme, output, runName + '-page-' + view.path)];
+        if (captures === 'review') await page.screenshot({ path: prefix + '-representative.png', scale: 'css' });
+        else if (captures === 'all' && !await page.locator('marao-card').count()) await page.screenshot({ path: prefix + '-empty.png', scale: 'css' });
+        const found = [...await frontendRegistrationIssues(page), ...await emulationIssues(page, scenario, theme), ...await layoutIssues(page), ...await inspectPopups(page, scenario, theme, output, runName + '-page-' + view.path, captures)];
         if (errors.length || found.length) throw new Error(`${runName}/${view.path}: ${[...errors, ...found].join('\n')}`);
       }
-      console.log(`${runName}: gallery and popup checks passed.`);
+      fs.writeFileSync(path.join(output, runName + '-result.json'), JSON.stringify({ profile: scenario.name, theme,
+        pages: options.pages ? dashboard.views.filter(view => view.path !== 'card-test').map(view => view.path) : [],
+        gallery: !options.pagesOnly, screenshots: captures, passed: true }), { mode: 0o600 });
+      console.log(`${runName}: ${options.pagesOnly ? 'saved-page' : 'gallery'} and popup checks passed.`);
       await context.close();
+    } catch (error) {
+      if (!options.preview && page && !page.isClosed()) {
+        try { await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-failure.png`), scale: 'css' }); }
+        catch (captureError) { error.message += '\nFailure screenshot could not be captured: ' + captureError.message; }
+      }
+      throw error;
     } finally {
       if (browser.isConnected()) await browser.close();
     }
@@ -1089,6 +1157,9 @@ module.exports = {
   popupFocusFailure,
   popupHasVisibleContent,
   popupMemberTouchPosition,
+  popupReviewKey,
+  capturePolicy,
+  reviewProfiles,
   safeAreaInsetsForScenario,
   scenarios,
   selectedRuns,
