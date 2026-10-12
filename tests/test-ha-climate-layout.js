@@ -43,11 +43,19 @@ async function main() {
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
         page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
-        page.on('requestfailed', request => errors.push('Failed resource: ' + new URL(request.url()).pathname));
+        page.on('requestfailed', request => errors.push(`Failed resource: ${new URL(request.url()).pathname} (${request.failure()?.errorText || 'unknown transport error'})`));
         page.on('response', response => { if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); });
         const captures = [];
         for (const view of views) {
-          await page.goto(config.url + '/marao-dashboard/' + view.path);
+          const route = '/marao-dashboard/' + view.path;
+          if (page.url() === 'about:blank') await page.goto(config.url + route);
+          else await page.evaluate(value => {
+            history.pushState(null, '', value);
+            window.dispatchEvent(new CustomEvent('location-changed'));
+          }, route);
+          await page.waitForFunction(({ root, expected }) => root.config?.views?.[root._curView]?.path === expected, {
+            root: await page.locator('hui-root').elementHandle(), expected: view.path,
+          });
           await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
           await assertCurrentFrontend(page);
           await applyVisualPreferences(page, scenario, theme);
