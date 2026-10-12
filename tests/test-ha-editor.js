@@ -179,6 +179,11 @@ async function scrollHeader(panel, allowShort = false) {
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       if (fraction && max >= 100 && scroller.scrollTop < 50) throw new Error("Header regression did not scroll");
       const box = header.getBoundingClientRect();
+      if (p._tab === 'json') for (const control of p.shadowRoot.querySelectorAll('#save, .secondary-actions summary, .tabs button')) {
+        const rect = control.getBoundingClientRect();
+        const hit = p.shadowRoot.elementFromPoint((rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2);
+        if (!hit?.closest('.editor-header')) throw new Error('JSON content obstructs header control: ' + (control.id || control.textContent.trim()));
+      }
       const host = scroller === document.scrollingElement ? { top: 0, bottom: innerHeight } : scroller.getBoundingClientRect();
       bounds.push({ top: box.top, bottom: box.bottom, hostTop: host.top, hostBottom: host.bottom, scroll: scroller.scrollTop });
     }
@@ -384,6 +389,7 @@ async function folding(page, panel) {
   const finalExpanded=await panel.evaluate((p,line)=>p._monaco.getTopForLineNumber(line+2),result.line);
   await panel.locator('#collapse-json').click();
   await page.waitForFunction(({p,line,expanded})=>p._monaco.getTopForLineNumber(line+2)<expanded,{p:await panel.elementHandle(),line:result.line,expanded:finalExpanded});
+  await scrollHeader(panel, true);
   await page.screenshot({path:path.join(output,'folding-'+(await page.evaluate(()=>document.documentElement.dataset.maraoAccessibilityProfile))+'-'+(await page.evaluate(()=>document.documentElement.dataset.maraoThemeMode))+'.png'),scale:'css'});
   await panel.evaluate(p=>p._switchTab('visual'));
 }

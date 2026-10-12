@@ -104,7 +104,7 @@ ha-sortable { display: block; }
 .load-row ha-button, .load-row ha-icon-button { flex-shrink: 0; max-width: 100%; --ha-button-height: 48px; }
 .load-row ha-button::part(base) { height: auto; min-height: 48px; }
 .load-row ha-button::part(label) { white-space: normal; overflow-wrap: anywhere; }
-.json-shell { height: min(72vh, 820px); min-height: 520px; border: 1px solid var(--divider-color); border-radius: 12px; overflow: hidden; background: #1e1e1e; }
+.json-shell { height: min(72vh, 820px); min-height: 520px; border: 1px solid var(--divider-color); border-radius: 12px; overflow: hidden; isolation: isolate; background: #1e1e1e; }
 #monaco { width: 100%; height: 100%; }
 .status { min-height: 24px; padding: 12px 2px 0; color: var(--secondary-text-color); }
 .status.success { color: var(--success-color); }
