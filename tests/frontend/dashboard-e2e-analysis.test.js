@@ -16,8 +16,33 @@ const {
   dashboardNavigationViolations,
   normalizedPathname,
   scrollDashboard,
+  titleLayoutIssues,
 } = require("../test-ha-dashboard-e2e.js");
 const { visibleBounds } = require("../test-ha-room-cards.js");
+
+test('title geometry rejects rounded-corner clipping while retaining narrow control space', async () => {
+  let top = 0, left = 1, overflow = 'hidden';
+  const surface = { getBoundingClientRect: () => ({ left: 0, right: 66, top: 0, width: 66, height: 120 }) };
+  const parent = { clientWidth: 66, children: [] };
+  const title = { parentElement: parent, closest: () => surface, getBoundingClientRect: () => ({ width: 64, top, bottom: top + 19 }) };
+  parent.children = [title];
+  const card = { _config: { name: 'Temperature' }, shadowRoot: { querySelector: () => title } };
+  const environment = vm.createContext({
+    getComputedStyle: element => element === parent ? { paddingLeft: '1px', paddingRight: '1px' }
+      : { overflow, borderTopLeftRadius: '20px', borderTopRightRadius: '20px' },
+    document: { createRange: () => ({ selectNodeContents() {}, getClientRects: () => [{ left, right: 65, top, width: 65 - left, height: 19 }] }) },
+  });
+  const page = { locator: () => ({ evaluateAll: async callback => structuredClone(vm.runInContext('(' + callback.toString() + ')', environment)([card])) }) };
+  assert.ok((await titleLayoutIssues(page)).some(issue => issue.includes('rounded corner')));
+  top = 14;
+  assert.deepEqual(await titleLayoutIssues(page), []);
+  left = 0;
+  assert.ok((await titleLayoutIssues(page)).some(issue => issue.includes('rounded corner')));
+  top = 24;
+  assert.deepEqual(await titleLayoutIssues(page), []);
+  top = 0; overflow = 'visible';
+  assert.deepEqual(await titleLayoutIssues(page), []);
+});
 
 test('climate captures ignore collapsed scroll containers and frame both ends of a tall card', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-climate-capture-unit-'));

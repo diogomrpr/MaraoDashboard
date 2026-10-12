@@ -763,10 +763,11 @@ function cardStyles() {
     .media-artwork img { width:100%; height:100%; object-fit:cover; }
     .media-artwork::after { content:''; position:absolute; inset:0; background:rgba(0,0,0,.72); }
     @container marao-card (max-width:120px) {
-      .body, .body.with-climate-modes, .body.icon-only { grid-template-columns:minmax(0,1fr); grid-template-areas:'title' 'icon' 'state' 'climate' 'control' 'modes'; padding:clamp(0px,calc((100cqi - 64px) / 2),4px); }
+      .body, .body.with-climate-modes, .body.icon-only { grid-template-columns:minmax(0,1fr); grid-template-areas:'title' 'icon' 'state' 'climate' 'control' 'modes'; padding:24px clamp(0px,calc((100cqi - 64px) / 2),4px); }
       .body.wallbox-card { grid-template-areas:'title' 'control' 'wallbox'; }
       .body.binary-card:not(:has(>.state)) { grid-template-columns:minmax(0,1fr); grid-template-areas:'title' 'icon' 'climate' 'control'; }
       .body.room-card { --room-edge-inset:clamp(0px,calc((100cqi - 64px) / 2),4px); }
+      .body.room-card .room-artwork { bottom:-24px; }
       .control.number-control { grid-area:control; justify-self:start; }
       .number-stepper { min-width:56px; max-width:100%; }
       .wallbox-shortcuts, .scene-options, .climate-modes { grid-template-columns:minmax(0,1fr); }

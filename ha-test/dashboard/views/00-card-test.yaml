@@ -352,6 +352,19 @@ cards:
         entity: sensor.marao_dashboard_test_temperature
         name: Sensor
 
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:marao-card
+            template: hc_sensor_card
+            entity: sensor.marao_dashboard_test_temperature
+            name: Narrow temperature reading
+          - type: custom:marao-card
+            template: hc_sensor_card
+            entity: sensor.marao_dashboard_test_humidity
+            name: Narrow humidity reading
+
       - type: custom:marao-card
         template: hc_battery_card
         entity: sensor.marao_dashboard_test_battery

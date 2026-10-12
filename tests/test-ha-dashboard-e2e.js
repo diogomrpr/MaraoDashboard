@@ -110,6 +110,17 @@ async function titleLayoutIssues(page) {
     const rect = title.getBoundingClientRect();
     const name = card._config?.name || card._config?.title || card._config?.template || card.localName;
     const issues = [];
+    const surface = title.closest('ha-card,.surface');
+    if (surface && getComputedStyle(surface).overflow !== 'visible') {
+      const box = surface.getBoundingClientRect(), surfaceStyle = getComputedStyle(surface);
+      const range = document.createRange(); range.selectNodeContents(title);
+      for (const line of range.getClientRects()) for (const edge of ['Left', 'Right']) {
+        const radius = Math.min(parseFloat(surfaceStyle[`borderTop${edge}Radius`]) || 0, box.width / 2, box.height / 2);
+        const x = Math.max(0, radius - (edge === 'Left' ? line.left - box.left : box.right - line.right));
+        const y = Math.max(0, radius - (line.top - box.top));
+        if (x * x + y * y > radius * radius + .25) issues.push(`${name}: title text is clipped by a rounded corner`);
+      }
+    }
     if (Math.abs(rect.width - contentWidth) > 1) issues.push(`${name}: title uses ${rect.width}px of ${contentWidth}px content width`);
     for (const child of parent.children) {
       const other = child.getBoundingClientRect();
