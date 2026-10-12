@@ -64,9 +64,11 @@ success; keep future work in changes and archive only completed, verified work.
   layout rule. If no card can be affected, record that the set is empty.
 - Inspect the affected end-to-end path before editing. Make the smallest
   coherent root-cause change and preserve unrelated user work.
-- During normal iteration, run only the smallest focused check for the changed
-  code or card. For UI changes, deploy to the disposable instance and visually
-  and interactively inspect the affected card and viewport.
+- Implement related queued tasks as one coherent batch. Run the smallest
+  covering focused check after the batch's last edit, deploy UI changes together,
+  and visually and interactively inspect the combined affected-card set before
+  concluding the batch. Check data migrations and shared security controls early
+  when later work depends on them.
 - Whenever a supported card or behavior is added or changed, update the
   canonical test gallery and safe fake entities in the same change. Keep every
   materially distinct state, behavioral option, popup, action, and layout
@@ -79,7 +81,7 @@ success; keep future work in changes and archive only completed, verified work.
 - Treat every warning, error card, console exception, failed resource, and
   repeated request as a defect. Fix its root cause; never hide, suppress, or
   ignore it.
-- Immediately before concluding a change, after the last edit and focused
+- Immediately before concluding a change or batch, after the last edit and focused
   automated check, visually inspect every card in the affected-card set on the
   disposable dashboard. Check the alignment and centering of all text, icons,
   controls, and other elements, plus spacing, clipping, overlap, and overflow.
@@ -87,6 +89,10 @@ success; keep future work in changes and archive only completed, verified work.
   focused check, and repeat the visual inspection. Inspect the full gallery only
   when the user requests it, a shared foundation can affect the whole gallery,
   or release stabilization requires it; otherwise inspect only affected cards.
+- Finish queued implementation before the complete release stabilization pass;
+  do not repeat broad checks between small edits or individual tasks. After a
+  defect, rerun its focused check and visual inspection, then verify the final
+  candidate. Keep all mandatory publication and preserved-install gates.
 - Do not run the full suite after small changes. Run `npm run verify:publish`
   only when the user requests it, during final stabilization, or immediately
   before publishing.

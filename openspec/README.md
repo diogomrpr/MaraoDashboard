@@ -46,7 +46,8 @@ HACS users need none of this development tooling.
 Before editing, read the applicable contract, context and specs; trace builder →
 validation/generator → shared runtime/theme/translations → fixtures/checks; record
 the affected-card set (empty for this baseline review); preserve unrelated work.
-Use the source/check links in the coverage map to choose the smallest check:
+Implement related queued tasks as one coherent batch. Use the source/check links
+in the coverage map to choose its smallest covering check:
 
 | Change | Focused starting check |
 | --- | --- |
@@ -75,8 +76,10 @@ inspect every affected card as the final validation step.
 Use `npm run verify:publish` for requested full checks, final stabilization and
 immediately before any push/tag/release; do not substitute spec validation for it.
 Exact-commit GitHub Tests, hassfest and HACS must pass. Record failures honestly.
-The native reconnect issue remains relevant to this gate; the historical release
-exception does not authorize a new exception.
+The native reconnect issue remains relevant to this gate. The user has explicitly
+allowed only the diagnosed stale-unsubscribe failure until its fix reaches a
+stable frontend; retain its raw assertions and native evidence and recheck that
+the exception has not expired. All other gates remain required.
 
 ## Upgrade responsibilities
 

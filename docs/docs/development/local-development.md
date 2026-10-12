@@ -199,6 +199,13 @@ frontend tests, stage the HACS package, and validate YAML and gallery coverage.
 `npm test` runs these local layers without contacting Home Assistant. Generated
 reports, screenshots, pytest cache, and coverage belong in `tests/.artifacts/`.
 
+Implement related queued tasks together, run one covering focused check after
+the batch's last edit, and deploy and inspect their combined affected-card set.
+Check migrations and shared security controls early when subsequent work depends
+on them. Finish the implementation queue before the complete release
+stabilization pass; repair findings with focused checks before verifying the
+final candidate. Required publication and preserved-install gates still apply.
+
 Run `npm run verify:publish` during final stabilization or before a push, tag,
 GitHub release, or HACS release. It includes all local tests plus end-to-end and
 mobile browser checks, icon alignment, and value-slider geometry and real

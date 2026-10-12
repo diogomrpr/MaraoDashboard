@@ -219,6 +219,15 @@ async function functionalChecks(config, format, directory, receiptPath, report, 
   record(['groups'], ['iphone-normal'], coverage.themes, 'entity-group-actions.log');
   await child(process.execPath, ['tests/test-ha-room-cards.js', '--scenario', 'iphone-normal'], directory, 'room-actions', env);
   record(['room-actions'], ['iphone-normal'], coverage.themes, 'room-actions.log');
+  // Catch focused interaction failures before the longer builder and page matrices.
+  await child(process.execPath, ['tests/test-ha-card-alignment.js'], directory, 'alignment', env);
+  record(['alignment'], ['iphone-normal'], coverage.themes, 'alignment.log');
+  await child(process.execPath, ['tests/test-ha-value-sliders.js'], directory, 'sliders', env);
+  record(['sliders'], coverage.profiles, coverage.themes, 'sliders.log');
+  await child(process.execPath, ['tests/test-ha-climate-layout.js'], directory, 'numbers', env);
+  record(['numbers'], coverage.profiles, coverage.themes, 'numbers.log');
+  await child(process.execPath, ['tests/test-ha-energy-format.js', '--scenario', 'iphone-normal'], directory, 'energy', env);
+  record(['energy'], ['iphone-normal'], coverage.themes, 'energy.log');
   await child(process.execPath, ['tests/test-ha-editor.js', '--matrix', '--pages', '--rooms', '--groups', '--preservation', '--energy', '--fold', '--header'], directory, 'builder-matrix', env);
   record(['builder-pages', 'builder-rooms', 'builder-groups'], coverage.profiles, coverage.themes, 'builder-matrix.log');
   record(['builder-preservation', 'builder-energy'], ['iphone-normal'], coverage.themes, 'builder-matrix.log');
@@ -228,14 +237,6 @@ async function functionalChecks(config, format, directory, receiptPath, report, 
   }
   await child(process.execPath, ['tests/test-ha-dashboard-accessibility.js', '--pages'], directory, 'mobile-layout', env);
   record(['layout', 'popups'], coverage.profiles, coverage.themes, 'mobile-layout.log');
-  await child(process.execPath, ['tests/test-ha-card-alignment.js'], directory, 'alignment', env);
-  record(['alignment'], ['iphone-normal'], coverage.themes, 'alignment.log');
-  await child(process.execPath, ['tests/test-ha-value-sliders.js'], directory, 'sliders', env);
-  record(['sliders'], coverage.profiles, coverage.themes, 'sliders.log');
-  await child(process.execPath, ['tests/test-ha-climate-layout.js'], directory, 'numbers', env);
-  record(['numbers'], coverage.profiles, coverage.themes, 'numbers.log');
-  await child(process.execPath, ['tests/test-ha-energy-format.js', '--scenario', 'iphone-normal'], directory, 'energy', env);
-  record(['energy'], ['iphone-normal'], coverage.themes, 'energy.log');
   const captureRoot = path.join(directory, 'captures'); fs.mkdirSync(captureRoot, { mode: 0o700 });
   const captured = {};
   for (const name of ['dashboard-e2e', 'accessibility', 'editor', 'room-cards', 'value-sliders', 'climate-layout', 'energy-format']) {

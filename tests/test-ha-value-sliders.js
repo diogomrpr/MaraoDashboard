@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright');
 const { readConfig, accessToken, setBrowserToken, api, assertCurrentFrontend, assertDisposableHaTarget } = require('../ha-test/client');
-const { prepare } = require('../ha-test/prepare');
+const { prepare, restoreHelperStates } = require('../ha-test/prepare');
 const { concreteCases } = require('../ha-test/cases');
 const { applyVisualPreferences, configurePageEmulation, contextOptionsForScenario, parseArgs, selectedRuns } = require('./test-ha-dashboard-accessibility');
 
@@ -226,28 +226,37 @@ async function main() {
         }
       }
       if (scenario.name === 'iphone-normal') {
-        for (const view of ['card-test#marao-dashboard-test-lights-popup', 'card-test#marao-dashboard-test-blinds-popup', 'living-room', 'overview#overview-lights', 'overview#overview-blinds']) {
-          await page.waitForLoadState('networkidle');
-          await page.goto(`${config.url}/marao-dashboard/${view}`, { waitUntil: 'domcontentloaded' });
-          await page.locator(view.includes('#') ? '.marao-popup-sheet input[type="range"]' : 'marao-card input[type="range"]').first().waitFor({ state: 'attached' });
-          await applyVisualPreferences(page, scenario, theme);
-          const scope = view.includes('#') ? '.marao-popup-sheet marao-card' : 'marao-card';
-          for (const card of await page.locator(scope).filter({ has: page.locator('input[type="range"]') }).all()) await card.scrollIntoViewIfNeeded();
-          await page.waitForTimeout(150);
-          const product = await sliderReadings(page, `${scope} input[type="range"]`);
-          if (!product.length || product.some(({ issues }) => issues.length)) throw new Error(`${run}/${view}: ${JSON.stringify(product)}`);
-          const cards = page.locator(scope).filter({ has: page.locator('input[type="range"]') });
-          for (const [index, card] of (await cards.all()).entries()) {
-            await card.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-            await card.evaluate(async (element) => { await element.shadowRoot.querySelector('ha-card')?.updateComplete; });
-            await page.screenshot({ path: path.join(output, `${run}-${view.replace('#', '-')}-${index}.png`), scale: 'css' });
-          }
-          if (view.endsWith('#overview-blinds')) {
-            await page.setViewportSize({ width: 539, height: 816 });
-            await page.locator('.marao-popup-sheet').evaluate((element) => element.scrollTo({ top: 0 }));
+        const fixtureLight = 'input_boolean.marao_dashboard_test_light';
+        const baseline = await api(config, 'GET', '/api/states/' + fixtureLight);
+        if (!['on', 'off'].includes(baseline.state)) throw new Error('The safe lighting fixture is unavailable');
+        try {
+          // The Home lighting popup intentionally includes only active members.
+          await api(config, 'POST', '/api/services/input_boolean/turn_on', { entity_id: fixtureLight });
+          for (const view of ['card-test#marao-dashboard-test-lights-popup', 'card-test#marao-dashboard-test-blinds-popup', 'living-room', 'overview#overview-lights', 'overview#overview-blinds']) {
+            await page.waitForLoadState('networkidle');
+            await page.goto(`${config.url}/marao-dashboard/${view}`, { waitUntil: 'domcontentloaded' });
+            await page.locator(view.includes('#') ? '.marao-popup-sheet input[type="range"]' : 'marao-card input[type="range"]').first().waitFor({ state: 'attached' });
+            await applyVisualPreferences(page, scenario, theme);
+            const scope = view.includes('#') ? '.marao-popup-sheet marao-card' : 'marao-card';
+            for (const card of await page.locator(scope).filter({ has: page.locator('input[type="range"]') }).all()) await card.scrollIntoViewIfNeeded();
             await page.waitForTimeout(150);
-            await page.screenshot({ path: path.join(output, `overview-blinds-${theme}.png`), scale: 'device' });
+            const product = await sliderReadings(page, `${scope} input[type="range"]`);
+            if (!product.length || product.some(({ issues }) => issues.length)) throw new Error(`${run}/${view}: ${JSON.stringify(product)}`);
+            const cards = page.locator(scope).filter({ has: page.locator('input[type="range"]') });
+            for (const [index, card] of (await cards.all()).entries()) {
+              await card.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+              await card.evaluate(async (element) => { await element.shadowRoot.querySelector('ha-card')?.updateComplete; });
+              await page.screenshot({ path: path.join(output, `${run}-${view.replace('#', '-')}-${index}.png`), scale: 'css' });
+            }
+            if (view.endsWith('#overview-blinds')) {
+              await page.setViewportSize({ width: 539, height: 816 });
+              await page.locator('.marao-popup-sheet').evaluate((element) => element.scrollTo({ top: 0 }));
+              await page.waitForTimeout(150);
+              await page.screenshot({ path: path.join(output, `overview-blinds-${theme}.png`), scale: 'device' });
+            }
           }
+        } finally {
+          await restoreHelperStates(config, { [fixtureLight]: baseline.state });
         }
       }
       await page.waitForLoadState('networkidle');

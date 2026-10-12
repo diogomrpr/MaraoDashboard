@@ -79,7 +79,8 @@ duplicates.
 4. Record the affected-card set: direct cards plus every consumer of a changed
    shared component, template, token, or layout rule. Record an empty set when
    the change cannot affect card rendering.
-5. Group edits into one small coherent batch.
+5. Group related queued tasks into one coherent implementation batch and combine
+   their affected-card sets.
 
 Do not require a full device matrix or a formal defect ledger for a small
 iteration. Establish only the baseline needed to understand the affected
@@ -120,8 +121,9 @@ the final affected-card visual inspection still apply.
 
 1. Make the smallest root-cause change.
 2. Update every relevant layer so the builder and generated result cannot drift.
-3. Run the smallest focused syntax, unit, static, or card check that covers the
-   change.
+3. After the batch's last edit, run the smallest focused syntax, unit, static, or
+   card check that covers the combined change. Check data migrations and shared
+   security controls early when later work depends on them.
 4. For UI work, sync to `192.168.0.28`, refresh the affected route with the
    required cache busting, and visually and interactively inspect the affected
    card at the relevant mobile viewport.
@@ -136,8 +138,8 @@ cannot apply them.
 
 ### Final affected-card visual gate
 
-After the last edit and focused automated check, immediately before reporting
-completion, inspect every card in the affected-card set on the disposable Home
+After the batch's last edit and focused automated check, immediately before reporting
+completion, inspect every card in its combined affected-card set on the disposable Home
 Assistant dashboard. This inspection is the final validation action and must
 verify:
 
@@ -160,7 +162,11 @@ foundation has gallery-wide impact, or release stabilization requires it.
 ### Test timing
 
 Focused checks are the normal development loop. Do not repeatedly run the full
-suite while related UI work is still changing.
+suite while related UI work is still changing. Finish queued implementation,
+then perform one complete release stabilization pass. If it finds a defect, fix
+it and repeat the focused check and affected-card inspection before verifying the
+final candidate. All publication, exact-commit CI and preserved-install gates
+remain required.
 
 Run `npm run verify:publish` only when:
 

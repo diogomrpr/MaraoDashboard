@@ -45,7 +45,7 @@ rules:
     - Describe historical inputs and independent expected transformations, backup/preflight/recovery, read-only paths and complete package-plus-data rollback.
   tasks:
     - Make tasks concrete and checkable; keep future or unverified work unchecked.
-    - Include the smallest relevant automated check and final affected-card visual inspection for UI work.
+    - Batch related queued implementation tasks; use one covering focused check and final combined affected-card visual inspection, with early checks for dependent migrations and shared security controls.
     - Include gallery and realistic-page examples when supported behavior changes, and alignment checks for icon-only layouts.
     - Require verify:publish before any push, tag, or release; do not require the full suite for ordinary small changes.
     - Keep focused migration checks in development; require the separate final-candidate upgrade gate only during explicit versioned-release preparation, with verified cleanup and historical feature coverage.
@@ -55,8 +55,8 @@ operations:
     guidance:
       - Follow AGENTS.md; inspect the end-to-end path and record every affected card before editing.
       - Record upgrade impact and preserve supported saved configurations; maintain historical expected fixtures when formats or generated contracts change.
-      - Run focused checks during iteration; deploy UI changes only to 192.168.0.28 and use safe fixture actions.
-      - After the last edit and focused check, visually inspect every affected card as the final validation step.
+      - Implement related queued tasks together; run a covering focused check per batch and early checks for dependent migrations and shared security controls. Deploy UI changes only to 192.168.0.28 with safe fixture actions.
+      - After the batch's last edit and focused check, visually inspect its combined affected-card set as the final validation step. Complete the implementation queue before broad release stabilization; retain all publication and upgrade gates.
   archive:
     guidance:
       - Archive only completed and verified work; never archive unresolved upstream follow-ups as complete.

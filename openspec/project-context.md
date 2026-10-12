@@ -171,6 +171,19 @@ The user explicitly authorized publication of
 [v0.5.1](https://github.com/diogomrpr/MaraoDashboard/releases/tag/v0.5.1)
 with this documented issue. That exception applied to that release only. No HA
 source was patched, experimental frontend installed, or error assertion hidden.
-Future releases retain the normal clean publication gate. The open change
-`confirm-home-assistant-reconnect-fix` records the required verification without
-claiming the fix is delivered or executing it during this setup.
+During the 0.6.0 release preparation the user separately allowed only this
+diagnosed stale-unsubscribe failure until its upstream fix reaches a stable
+frontend. Preserve raw failing assertions and native subscription evidence and
+recheck the delivery chain before applying the exception. All other publication
+and preserved-install requirements remain intact. The open change
+`confirm-home-assistant-reconnect-fix` retains the required verification without
+claiming the fix is delivered.
+
+The official delivery check on 2026-10-12 found stable Core
+[2026.10.1](https://github.com/home-assistant/core/releases/tag/2026.10.1), whose
+[frontend requirement](https://github.com/home-assistant/core/blob/2026.10.1/homeassistant/components/frontend/manifest.json)
+is 20260930.3, also the latest stable frontend. Its
+[lockfile](https://github.com/home-assistant/frontend/blob/20260930.3/pnpm-lock.yaml)
+still uses WebSocket 9.7.1; the identified fix is two commits ahead of that version.
+The fix remains undelivered and the confirmation tasks stay open. This check did
+not update Home Assistant or claim the reconnect defect is resolved.

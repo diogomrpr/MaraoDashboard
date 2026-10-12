@@ -73,10 +73,19 @@ workarounds SHALL NOT be introduced.
   runtime behavior, with corresponding documented and safe gallery examples
 
 ### Requirement: Focused checks and final visual inspection
-Ordinary iteration SHALL use the smallest relevant check. UI work SHALL be synced
-to the disposable dashboard and inspected visually and interactively. After the
-last edit and focused check, every affected card SHALL receive final visual
-inspection of alignment, centering, spacing, clipping, overlap and overflow.
+Ordinary iteration SHALL batch related tasks and use the smallest covering check.
+Dependent migrations and shared security controls SHALL be checked early.
+UI batches SHALL deploy together to the disposable dashboard for visual and
+interactive inspection. After the last edit and focused check, every card in the
+combined affected-card set SHALL receive final inspection of alignment,
+centering, spacing, clipping, overlap and overflow.
+
+#### Scenario: Related queued tasks affect the same shared component
+- **WHEN** their implementation is being completed together
+- **THEN** the batch receives one covering focused check and combined final visual inspection
+- **AND** broad release checks wait until queued implementation is finished
+- **AND** focused repairs precede final-candidate verification without removing
+  publication, exact-commit CI or preserved-install gates
 
 #### Scenario: Final inspection finds another defect
 - **WHEN** an affected card fails visual or interaction inspection
