@@ -338,6 +338,7 @@ async function applyVisualPreferences(page, scenario, theme) {
   await page.waitForTimeout(300);
   // HA may mount themed cards while fonts and scroll rendering settle.
   await apply();
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
 async function emulationIssues(page, scenario, theme) {
@@ -838,6 +839,7 @@ async function inspectPopups(page, scenario, theme, output, runName) {
     if (dimensions.total > dimensions.height) {
       for (let top = dimensions.height * 0.75, segment = 1; top < dimensions.total; top += dimensions.height * 0.75, segment += 1) {
         await sheet.evaluate((element, position) => element.scrollTo({ top: position, behavior: "instant" }), top);
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         await page.screenshot({ path: `${prefix}-scroll-${segment}.png`, scale: "css" });
         await checkCloseButton();
         const headerGap = await sheet.evaluate((element) => (

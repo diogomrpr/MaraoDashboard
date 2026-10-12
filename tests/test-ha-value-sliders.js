@@ -187,7 +187,18 @@ async function main() {
           for (const pointer of ['mouse', 'touch']) await checkPointerInteraction(page, context, config, example, calls, pointer);
         }
         await page.goto(`${config.url}/marao-dashboard/card-test#marao-dashboard-test-value-sliders-popup`, { waitUntil: 'domcontentloaded' });
-        await page.locator('.marao-popup-sheet input[type="range"]').first().waitFor({ state: 'visible' });
+        try {
+          await page.locator('.marao-popup-sheet input[type="range"]').first().waitFor({ state: 'visible' });
+        } catch (error) {
+          const location = await page.evaluate(() => ({ path: window.location.pathname, hash: window.location.hash }));
+          const popups = await page.locator('marao-popup-card').evaluateAll(cards => cards.map(card => ({
+            hash: card._config.hash, connected: card.isConnected, open: card._open, viewPath: card._viewPath,
+            content: card._overlay?.querySelector('.marao-popup-content')?.innerHTML,
+          })));
+          fs.writeFileSync(path.join(output, `${run}-popup-entry-failure.json`), JSON.stringify({ location, popups, errors }, null, 2), { mode: 0o600 });
+          await page.screenshot({ path: path.join(output, `${run}-popup-entry-failure.png`), scale: 'css' });
+          throw new Error(`${run}: slider popup did not mount; private diagnostics retained. ${error.message}`);
+        }
         await applyVisualPreferences(page, scenario, theme);
         await page.evaluate(() => {
           window.__maraoRangeTouchDefaults = [];

@@ -52,6 +52,12 @@ test('visual preferences reach cards mounted while fonts and scrolling settle', 
   html.children = [ha]; ha.shadowRoot = shadow;
   const lateCard = node('marao-card');
   const previous = globalThis.document;
+  const previousFrame = globalThis.requestAnimationFrame;
+  const painted = [];
+  globalThis.requestAnimationFrame = callback => {
+    painted.push({ size: lateCard.style.values.get('--font-size-primary'), theme: html.dataset.maraoThemeMode });
+    queueMicrotask(callback);
+  };
   globalThis.document = { documentElement: html, fonts: { ready: Promise.resolve() } };
   const page = { evaluate: async (callback, data) => callback(data), waitForTimeout: async () => { shadow.children.push(lateCard); } };
   try {
@@ -62,10 +68,12 @@ test('visual preferences reach cards mounted while fonts and scrolling settle', 
       assert.equal(element.style.values.get('--font-weight-primary'), '800');
     }
     assert.equal(html.dataset.maraoThemeMode, 'dark');
+    assert.deepEqual(painted.at(-1), { size: '36px', theme: 'dark' });
     await applyVisualPreferences(page, scenarios.find(s => s.name === 'iphone-normal'), 'light');
     assert.equal(lateCard.style.values.get('--font-size-primary'), '18px');
     assert.equal(html.dataset.maraoThemeMode, 'light');
-  } finally { globalThis.document = previous; }
+    assert.deepEqual(painted.at(-1), { size: '18px', theme: 'light' });
+  } finally { globalThis.document = previous; globalThis.requestAnimationFrame = previousFrame; }
 });
 
 test('mobile emulation explicitly restores touch together with text and safe-area settings', async () => {
