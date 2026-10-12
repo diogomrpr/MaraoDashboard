@@ -10,6 +10,22 @@ const integration = path.join(repoRoot, 'custom_components/marao_dashboard');
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const fileHashes = root => Object.fromEntries(sourceFiles(root).map(file => [file, sha256(fs.readFileSync(path.join(root, file)))]));
 
+function historicalEntityAliases(values, referencedEntities) {
+  return Object.fromEntries([...referencedEntities(values)].filter(entity => !/^[a-z_]+\.marao_dashboard_(?:test|upgrade)_/.test(entity))
+    .sort().map(entity => [entity, entity.replace('.', '.marao_dashboard_upgrade_')]));
+}
+
+function isolateHistoricalText(source, aliases) {
+  const entities = Object.keys(aliases);
+  if (!entities.length) return source;
+  return source.replace(new RegExp('\\b(?:' + entities.map(entity => entity.replace('.', '\\.')).join('|') + ')\\b', 'g'), entity => aliases[entity]);
+}
+
+function assertHistoricalBindings(expected, states, referencedEntities) {
+  assert.ok([...referencedEntities(expected)].every(entity => !states.has(entity) || /^[a-z_]+\.marao_dashboard_test_/.test(entity)),
+    'Historical bindings overlap non-fixture entities');
+}
+
 function candidateIdentity() {
   const files = fileHashes(integration);
   return {
@@ -146,7 +162,7 @@ async function verifyPrepared(config, filename, { ssh, referencedEntities }) {
     assert.equal(dashboard.views.filter(view => view.path === 'card-test').length, 1, 'Missing preserved Cases view');
     const states = new Set((await connection.call({ type: 'get_states' })).map(state => state.entity_id));
     const historical = historicalEntities(receipt.historical_baseline, referencedEntities);
-    assert.ok([...historical].every(entity => !states.has(entity) || entity.includes('marao_dashboard_test_')), 'Historical bindings overlap non-fixture entities');
+    assertHistoricalBindings([...historical], states, referencedEntities);
     assert.ok([...referencedEntities(dashboard)].every(entity => states.has(entity) || entity.includes('_missing') || historical.has(entity)), 'Preserved dashboard references missing fixtures');
     for (const file of ['MaraoDashboard.js', 'MaraoCards.js', 'MaraoFrigateEventsCard.js', 'MaraoDashboardPanel.js']) {
       const served = await api(config, 'GET', '/marao_dashboard_static/' + file + '?v=' + candidate.frontend_fingerprint, undefined, { text: true });
@@ -161,12 +177,17 @@ async function verifyPrepared(config, filename, { ssh, referencedEntities }) {
 function historicalEntities(baseline, referencedEntities) {
   if (!baseline || baseline === 'current-format-2') return new Set();
   const fixtures = path.join(__dirname, 'fixtures');
-  if (baseline === 'v0.2.0') return referencedEntities(JSON.parse(fs.readFileSync(path.join(fixtures, 'v0.2.0-storage-format-2-expected.json'))));
-  if (baseline === 'predecessor-format-1') return referencedEntities(JSON.parse(fs.readFileSync(path.join(fixtures, 'page-parity-format-2-expected.json'))));
-  const provenance = JSON.parse(fs.readFileSync(path.join(fixtures, 'provenance.json'))).find(row => row.tag === baseline);
-  const expectations = JSON.parse(fs.readFileSync(path.join(fixtures, 'page-model-expectations.json'))).records;
-  const file = expectations.find(row => row.input === provenance.fixture).expected;
-  return referencedEntities(JSON.parse(fs.readFileSync(path.join(fixtures, file))));
+  let file;
+  if (baseline === 'v0.2.0') file = 'v0.2.0-storage-format-2-expected.json';
+  else if (baseline === 'predecessor-format-1') file = 'page-parity-format-2-expected.json';
+  else {
+    const provenance = JSON.parse(fs.readFileSync(path.join(fixtures, 'provenance.json'))).find(row => row.tag === baseline);
+    const expectations = JSON.parse(fs.readFileSync(path.join(fixtures, 'page-model-expectations.json'))).records;
+    file = expectations.find(row => row.input === provenance.fixture).expected;
+  }
+  const source = fs.readFileSync(path.join(fixtures, file), 'utf8');
+  const aliases = historicalEntityAliases(JSON.parse(source), referencedEntities);
+  return referencedEntities(JSON.parse(isolateHistoricalText(source, aliases)));
 }
 
-module.exports = { candidateIdentity, historicalEntities, readPreparedReceipt, validatePreparedReceipt, verifyPrepared };
+module.exports = { assertHistoricalBindings, candidateIdentity, historicalEntityAliases, historicalEntities, isolateHistoricalText, readPreparedReceipt, validatePreparedReceipt, verifyPrepared };

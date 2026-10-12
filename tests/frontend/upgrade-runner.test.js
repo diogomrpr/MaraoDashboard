@@ -10,6 +10,8 @@ import { validatePages } from '../../frontend_src/editor-model.js';
 const require = createRequire(import.meta.url);
 const { addResourceSentinel, unrelatedConfiguration, assertUnrelatedEntries, extendedSource, patchRegistration, plan, validateVisualReviews, withRecovery } = require('../test-ha-upgrade');
 const { readKnownFailure, undeliveredFix, validateKnownFailure } = require('../native-reconnect-exception');
+const { assertHistoricalBindings, historicalEntityAliases, historicalEntities, isolateHistoricalText } = require('../../ha-test/upgrade/prepared');
+const { referencedEntities } = require('../../ha-test/prepare');
 const YAML = require('yaml');
 const config = { url: 'http://192.168.0.28:8123', disposable: true, sshHost: '192.168.0.28' };
 
@@ -71,6 +73,31 @@ test('release plan covers every frozen baseline and all four formats without rem
   for (const row of value.rows) assert.deepEqual(row.expected, JSON.parse(JSON.stringify(row.expected)));
   assert.deepEqual(JSON.parse(value.rows.at(-1).source), value.current);
   for (const change of [{ disposable: false }, { url: 'http://192.168.0.29:8123', sshHost: '192.168.0.29' }]) assert.throws(() => plan({ ...config, ...change }));
+});
+
+test('historical replay isolates entity references without changing frozen sources or action services', () => {
+  const source = '{\r\n  "entities": ["lock.front_door", "lock.front_door_extra", "light.marao_dashboard_test_light"],\r\n  "action": "lock.lock", "unknown": "keep", "raw": {"entity": "lock.front_door"}\r\n}\r\n';
+  const aliases = historicalEntityAliases(JSON.parse(source), referencedEntities);
+  assert.deepEqual(aliases, { 'lock.front_door': 'lock.marao_dashboard_upgrade_front_door', 'lock.front_door_extra': 'lock.marao_dashboard_upgrade_front_door_extra' });
+  const replay = isolateHistoricalText(source, aliases);
+  assert.equal(replay, source.replaceAll('lock.front_door', 'lock.marao_dashboard_upgrade_front_door'));
+  assert.equal(isolateHistoricalText(replay, aliases), replay);
+  assert.equal(isolateHistoricalText('lock.front_door_extra', { 'lock.front_door': aliases['lock.front_door'] }), 'lock.front_door_extra');
+  assert.deepEqual(historicalEntityAliases(JSON.parse(replay), referencedEntities), {});
+  assertHistoricalBindings(JSON.parse(replay), new Set(['lock.front_door', 'light.marao_dashboard_test_light']), referencedEntities);
+  for (const entity of ['lock.marao_dashboard_upgrade_front_door', 'lock.front_door']) {
+    assert.throws(() => assertHistoricalBindings([entity], new Set([entity]), referencedEntities), /overlap/);
+  }
+  const value = plan(config);
+  for (const row of value.rows) {
+    assert.match(row.frozen_source_sha256, /^[a-f0-9]{64}$/);
+    assert.match(row.frozen_expected_sha256, /^[a-f0-9]{64}$/);
+    const entities = referencedEntities(row.expected);
+    assert.ok([...entities].every(entity => /^[a-z_]+\.marao_dashboard_(?:test|upgrade)_/.test(entity)), row.baseline);
+    if (row.baseline !== 'current-format-2') assert.deepEqual(historicalEntities(row.baseline, referencedEntities), entities);
+  }
+  assert.equal(value.rows[0].source, fs.readFileSync('ha-test/upgrade/fixtures/v0.5.1-dashboard.json', 'utf8'));
+  assert.deepEqual(value.rows[0].entity_aliases, {});
 });
 
 test('backup precedes work and every work exit restores its exact baseline', async () => {

@@ -209,6 +209,14 @@ ordinary JSON/Visual editor; historical pages remain ordered and retain their
 selections/options and protected filenames under explicitly edited page paths.
 Historical bindings may remain absent and neutral only when backed by that
 row's frozen expectation; overlap with non-fixture entities is rejected.
+Before installation, non-gallery historical entity references are consistently
+mapped into the absent `marao_dashboard_upgrade_` namespace in the replay source,
+independent expectation and historical generated output. Frozen originals remain
+immutable; each private row records original hashes, replay hash and the exact
+binding map. Existing gallery entities retain their names, and the actual v0.5.1
+source remains byte-exact. All seven replay bindings are checked before the first
+remote write and again before each installation; an existing isolated name also
+blocks the run. This prevents historical names from reaching unrelated entities.
 
 The disposable SSH environment requires Python 3 with its standard library for
 private backup and recovery. The configured root may use the SSH add-on's

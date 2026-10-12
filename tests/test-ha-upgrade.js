@@ -6,7 +6,7 @@ const { execFileSync, spawn } = require('node:child_process');
 const YAML = require('yaml');
 const { accessToken, api, assertDisposableHaTarget, connect, readConfig, repoRoot, setBrowserToken, sourceFiles } = require('../ha-test/client');
 const { composeDashboard, haYamlOptions, resetBaseline, restoreHelperStates, restart } = require('../ha-test/prepare');
-const { candidateIdentity } = require('../ha-test/upgrade/prepared');
+const { assertHistoricalBindings, candidateIdentity, historicalEntityAliases, isolateHistoricalText } = require('../ha-test/upgrade/prepared');
 
 const fixtures = path.join(repoRoot, 'ha-test/upgrade/fixtures');
 const coverage = JSON.parse(fs.readFileSync(path.join(repoRoot, 'ha-test/upgrade/coverage.json')));
@@ -33,6 +33,13 @@ function plan(config) {
   const gallery = expandGallery(YAML.parse(fs.readFileSync(path.join(repoRoot, 'ha-test/dashboard/views/00-card-test.yaml'), 'utf8')));
   const current = JSON.parse(JSON.stringify(composeDashboard(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ha-test/marao_dashboard_test_dashboard.json'))), gallery)));
   rows.push({ baseline: 'current-format-2', format: formats[3], source: JSON.stringify(current, null, 2) + '\n', expected: current, replay: 'current-format-noop' });
+  for (const row of rows) {
+    row.frozen_source_sha256 = sha256(row.source);
+    row.frozen_expected_sha256 = sha256(JSON.stringify(row.expected));
+    row.entity_aliases = historicalEntityAliases([JSON.parse(row.source), row.expected], require('../ha-test/prepare').referencedEntities);
+    row.source = isolateHistoricalText(row.source, row.entity_aliases);
+    row.expected = JSON.parse(isolateHistoricalText(JSON.stringify(row.expected), row.entity_aliases));
+  }
   assert.equal(new Set(rows.map(row => row.baseline)).size, 7);
   for (const row of rows) assert.equal(row.expected.config_version, 2);
   return { rows, current, formats, baselines: ['v0.2.0', ...provenance.map(row => row.tag), 'predecessor-format-1', 'current-format-2'] };
@@ -324,6 +331,9 @@ async function main() {
       .flatMap(([domain, values]) => Object.entries(values).filter(([, options]) => options.initial !== undefined || domain === 'input_select').map(([name]) => domain + '.' + name));
     const helperStates = async () => Object.fromEntries((await client.call({ type: 'get_states' })).filter(row => helperIds.includes(row.entity_id)).map(row => [row.entity_id, row.state]));
     const initialHelperStates = await helperStates();
+    // Check every replay before backup or the first long browser matrix.
+    const initialEntities = new Set((await client.call({ type: 'get_states' })).map(state => state.entity_id));
+    for (const row of selected.rows) assertHistoricalBindings(row.expected, initialEntities, require('../ha-test/prepare').referencedEntities);
     const helperPaths = JSON.parse(ssh(config, 'python3 -c ' + quote("import json,pathlib;root=pathlib.Path(" + JSON.stringify(config.remoteConfigPath) + ");print(json.dumps([str(p.relative_to(root)) for p in root.rglob('marao_dashboard_card_test_helpers.yaml') if not any(x.startswith('.') for x in p.relative_to(root).parts)]))")));
     assert.equal(helperPaths.length, 1, 'Expected exactly one safe fixture package');
     const storagePaths = JSON.parse(ssh(config, 'python3 -c ' + quote("import json,pathlib;root=pathlib.Path(" + JSON.stringify(config.remoteConfigPath) + ");print(json.dumps([str(p.relative_to(root)) for p in (root/'.storage').glob('lovelace*') if p.is_file()]))")));
@@ -406,7 +416,9 @@ async function main() {
         console.log('Preserved upgrade: ' + row.baseline + ' (' + row.replay + ')');
         const rowDir = path.join(directory, row.baseline); fs.mkdirSync(rowDir, { mode: 0o700 });
         const present = new Set((await client.call({ type: 'get_states' })).map(state => state.entity_id));
-        assert.ok([...require('../ha-test/prepare').referencedEntities(row.expected)].every(entity => !present.has(entity) || entity.includes('marao_dashboard_test_')), 'Historical bindings overlap non-fixture entities');
+        assertHistoricalBindings(row.expected, present, require('../ha-test/prepare').referencedEntities);
+        fs.writeFileSync(path.join(rowDir, 'historical-binding-map.json'), JSON.stringify({ frozen_source_sha256: row.frozen_source_sha256,
+          frozen_expected_sha256: row.frozen_expected_sha256, replay_source_sha256: sha256(row.source), entity_aliases: row.entity_aliases }), { mode: 0o600 });
         await disabled(true);
         if (nativeId) { await client.call({ type: 'lovelace/dashboards/delete', dashboard_id: nativeId }); nativeId = undefined; }
         const slug = row.expected.slug || row.expected.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -423,7 +435,7 @@ async function main() {
         let output = {};
         if (row.generated) {
           const generated = path.join(fixtures, row.generated.directory, 'dashboard');
-          output = Object.fromEntries(sourceFiles(generated).map(file => [file, fs.readFileSync(path.join(generated, file), 'utf8')
+          output = Object.fromEntries(sourceFiles(generated).map(file => [file, isolateHistoricalText(fs.readFileSync(path.join(generated, file), 'utf8'), row.entity_aliases)
             .replaceAll('/' + row.generated.dashboard_key + '/', '/marao-dashboard/')
             .replaceAll('/config/dashboard/', config.remoteConfigPath + '/dashboard/')]));
         } else if (row.format === formats[3]) {
