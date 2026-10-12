@@ -61,7 +61,7 @@ ha-button {
   max-width: 100%;
 }
 ha-button[hidden] { display: none !important; }
-ha-button::part(base) { height: auto; min-height: 48px; }
+ha-button::part(base) { height: auto; min-height: 48px; transition: none; }
 ha-button::part(label) { white-space: normal; overflow-wrap: anywhere; }
 .view { scroll-margin-top: calc(var(--editor-header-height, 150px) + 12px); }
 ha-form, .entity-row, .room, .page-card { scroll-margin-top: calc(var(--editor-header-height, 150px) + 12px); }

@@ -1174,6 +1174,11 @@ async function main() {
         const before = await panel.evaluate(p => p._source());
         await panel.evaluate(async p => {
           p.shadowRoot.querySelector('.secondary-actions').open = true;
+          p._setBusy(true);
+          await Promise.all([...p.shadowRoot.querySelectorAll('ha-button')].map(button => button.updateComplete));
+          // Flush disabled colors before checking the immediate enabled state.
+          getComputedStyle(p.shadowRoot.getElementById('history').shadowRoot.querySelector('button')).backgroundColor;
+          p._setBusy(false);
           await Promise.all([...p.shadowRoot.querySelectorAll('ha-button')].map(button => button.updateComplete));
         });
         const geometry = await panel.evaluate(p => {
