@@ -146,11 +146,15 @@ files are rejected. Its fields are:
 `verifyPrepared()` checks the active operation, source/output bytes, absence of
 unfinished dashboard recovery, installed candidate/provider bytes and ownership,
 persisted semantic expectation, entry identity, admin access, native configuration
-directory, one dashboard/Cases view, fixture entities, current editor/served assets
+directory, one dashboard with the saved source's Cases count, fixture entities, current editor/served assets
 and absence of stale owned resource registrations. It rereads installed identities
 at the end to catch concurrent changes. Browser resource and current-asset checks
 remain enabled. This path never deploys, copies fixtures, resets entities, generates
 the dashboard or recovers an operation itself.
+
+Historical saved pages need not include Cases. Targeted page checks retain that
+absence; full gallery checks use the latest-release upgrade with its explicit
+editor additions. Unexpected Cases additions or deletions still fail inspection.
 
 Normal preparation fails before reseeding if the remote active-upgrade marker
 exists and the receipt environment variable is missing or empty. Cleanup must

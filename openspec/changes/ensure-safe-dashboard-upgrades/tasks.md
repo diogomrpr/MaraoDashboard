@@ -28,6 +28,8 @@
 
 - [x] 4.5 Fix the historical restart regression by limiting repair detection to manifest-owned generated content, preserving dormant unreferenced legacy files and protected custom blocks. Run cheap historical preservation/recovery checks before the shared browser matrix, retain private restart snapshots, and cover the ownership decision and ordering with focused checks. Saved formats, generated structures, component APIs and frontend assets are unchanged; the affected-card set is empty. The complete clean-candidate release scenario remains required by 5.2–5.3.
 
+- [x] 4.6 Preserve the saved source's Cases count in shared prepared-install inspection, accepting its deliberate absence for targeted historical page checks while rejecting unexpected additions or deletions. Cover both outcomes with focused runner checks. No product, saved-format or frontend changes; affected-card set is empty. The complete clean-candidate release scenario remains required by 5.2–5.3.
+
 ## 5. Integration validation and first release run
 
 

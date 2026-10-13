@@ -159,7 +159,9 @@ async function verifyPrepared(config, filename, { ssh, referencedEntities, opera
       return url.origin === config.url && ['/marao_dashboard_static/', '/hacsfiles/MaraoDashboard/', '/local/community/MaraoDashboard/'].some(prefix => url.pathname.startsWith(prefix));
     }), 'Stale owned card resources');
     const dashboard = await connection.call({ type: 'lovelace/config', url_path: 'marao-dashboard', force: true });
-    assert.equal(dashboard.views.filter(view => view.path === 'card-test').length, 1, 'Missing preserved Cases view');
+    const savedCases = Array.isArray(receipt.expected_config.pages)
+      ? receipt.expected_config.pages.filter(view => view.path === 'card-test').length : 1;
+    assert.equal(dashboard.views.filter(view => view.path === 'card-test').length, savedCases, 'Preserved Cases view differs from saved source');
     const states = new Set((await connection.call({ type: 'get_states' })).map(state => state.entity_id));
     const historical = historicalEntities(receipt.historical_baseline, referencedEntities);
     assertHistoricalBindings([...historical], states, referencedEntities);

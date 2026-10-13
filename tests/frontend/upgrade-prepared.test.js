@@ -93,6 +93,18 @@ test('preserved inspection uses only reads and detects source, output, ownership
     await verifyPrepared(config, file, { ...options, operationCompleted: true });
     await assert.rejects(verifyPrepared(config, file, options), /operation changed/);
     altered = undefined;
+    saved.expected_config = { pages: [{ path: 'overview' }] };
+    fs.writeFileSync(file, JSON.stringify(saved), { mode: 0o600 });
+    altered = kind => kind === 'lovelace/config' ? { views: [{ path: 'overview' }] } : undefined;
+    await verifyPrepared(config, file, options);
+    altered = undefined;
+    await assert.rejects(verifyPrepared(config, file, options), /Cases view differs/);
+    saved.expected_config.pages.push({ path: 'card-test' });
+    fs.writeFileSync(file, JSON.stringify(saved), { mode: 0o600 });
+    altered = kind => kind === 'lovelace/config' ? { views: [{ path: 'overview' }] } : undefined;
+    await assert.rejects(verifyPrepared(config, file, options), /Cases view differs/);
+    altered = undefined;
+    await verifyPrepared(config, file, options);
     const installed = fs.realpathSync(root);
     const contents = {
       '.marao-upgrade-active.json': JSON.stringify({ operation_id: saved.operation_id }),
