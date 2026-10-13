@@ -138,7 +138,7 @@ async function main() {
   assertDisposableHaTarget(config);
   await prepare(config);
   const tokens = await accessToken(config, config.url);
-  const output = path.join(__dirname, '.artifacts', 'value-sliders');
+  const output = path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), 'value-sliders');
   fs.mkdirSync(output, { recursive: true });
   const cases = concreteCases().filter((entry) => entry.sliderPercentage !== undefined);
   const browser = await chromium.launch();

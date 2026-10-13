@@ -252,6 +252,10 @@ async function main() {
     await checkTextScaling(page);
     if (errors.length) throw new Error(`Browser warnings/errors:\n${errors.map((error) => `- ${error}`).join("\n")}`);
     console.log(`Marao card alignment OK (${readings.length} controls; tolerance ${tolerance}px; ${narrowNames.length} narrow cards; 195px/180px popups).`);
+  } catch (error) {
+    const page = browser.contexts()[0]?.pages()[0];
+    if (page) await page.screenshot({ path: require('node:path').join(require('./verification-browser').artifactDirectory('alignment'), 'failure.png'), scale: 'css' });
+    throw error;
   } finally {
     await browser.close();
   }

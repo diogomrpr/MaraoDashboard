@@ -44,10 +44,16 @@ function parseArgs(argv = process.argv.slice(2)) {
   return {
     preview: argv.includes("--preview"),
     scenario: argumentValue(argv, "--scenario"),
+    focused: argv.includes('--focused'),
+    families: (argumentValue(argv, '--families') || '').split(',').filter(Boolean),
+    popups: argv.includes('--popups'),
+    parallel: argv.includes('--parallel'),
     theme: argumentValue(argv, "--theme"),
     ...(argv.includes('--safe-area') ? { safeArea: true } : {}),
     ...(argv.includes('--pages') ? { pages: true } : {}),
     ...(argv.includes('--pages-only') ? { pages: true, pagesOnly: true } : {}),
+    ...(argv.includes('--geometry-only-popups') ? { geometryOnlyPopups: true } : {}),
+    ...(argumentValue(argv, '--popup-hash') ? { popupHash: argumentValue(argv, '--popup-hash') } : {}),
     screenshots,
   };
 }
@@ -456,8 +462,8 @@ async function emulationIssues(page, scenario, theme) {
   });
 }
 
-async function layoutIssues(page) {
-  const issues = await page.evaluate(() => {
+async function layoutIssues(page, families = []) {
+  const issues = await page.evaluate((families) => {
     const issues = [];
     const intersects = (a, b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
     const context = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
@@ -473,6 +479,8 @@ async function layoutIssues(page) {
     }, 0);
     const visit = (root, insideMarao = false) => {
       for (const element of root?.children || []) {
+        if (families.length && element.localName?.startsWith('marao-') && element._config?.template
+          && !families.includes(element._config.template) && element.localName !== 'marao-popup-card') continue;
         const owned = insideMarao
           || element.localName?.startsWith("marao-")
           || element.classList?.contains("marao-popup-overlay");
@@ -609,8 +617,8 @@ async function layoutIssues(page) {
     const sheet = (document.querySelector("home-assistant")?.shadowRoot || document).querySelector(".marao-popup-sheet");
     if (sheet && sheet.scrollWidth > sheet.clientWidth + 1) issues.push("popup has horizontal overflow");
     return [...new Set(issues)];
-  });
-  return [...issues, ...await titleLayoutIssues(page)];
+  }, families);
+  return [...issues, ...await titleLayoutIssues(page, families)];
 }
 
 async function frontendRegistrationIssues(page) {
@@ -678,7 +686,7 @@ function popupMemberTouchPosition(card) {
   return { x: 24, y: y - box.top };
 }
 
-async function inspectPopups(page, scenario, theme, output, runName, captures = 'failure') {
+async function inspectPopups(page, scenario, theme, output, runName, captures = 'failure', families = [], behavior = true, checkedBehaviors = new Set(), popupHash) {
   const popups = await page.locator("marao-popup-card").evaluateAll((cards) => cards.map((card) => ({
     config: card._config,
     hash: card._config.hash, name: card._config.name || card._config.title || card._config.hash,
@@ -701,8 +709,14 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
   }));
   const issues = [];
   const reviewed = new Set();
+  if (popupHash && popups.filter(popup => popup.hash === popupHash).length !== 1) throw new Error('Selected popup is missing or duplicated');
   for (const [index, popup] of popups.entries()) {
+    if (popupHash && popup.hash !== popupHash) continue;
+    const containsFamily = value => value && typeof value === 'object' &&
+      (families.includes(value.template) || Object.values(value).some(child => Array.isArray(child) ? child.some(containsFamily) : containsFamily(child)));
+    if (families.length && !containsFamily(popup.config)) continue;
     const reviewKey = popupReviewKey(popup.config);
+    const checkBehavior = behavior && !checkedBehaviors.has(reviewKey);
     const capture = captures === 'all' || (captures === 'review' && !reviewed.has(reviewKey));
     let target = targets.find(({ hash }) => hash === popup.hash);
     if (popup.directModeOnly) {
@@ -857,6 +871,7 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
     if (modal.total > modal.height && !["auto", "scroll"].includes(modal.overflow)) {
       issues.push(`${popup.name}: overflowing popup does not scroll internally`);
     }
+    if (checkBehavior) {
     await page.keyboard.press("Shift+Tab");
     const focusInside = await page.evaluate(() => {
       let active = document.activeElement;
@@ -867,6 +882,7 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
       return false;
     });
     if (!focusInside) issues.push(`${popup.name}: focus escaped the popup`);
+    }
     await page.locator(".marao-popup-sheet marao-camera-events-card").evaluateAll(async (cards) => {
       await Promise.all(cards.map(async (card) => {
         const deadline = Date.now() + 10000;
@@ -901,6 +917,7 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
     await sheet.waitFor({ state: "detached" });
     await page.waitForFunction(() => !location.hash);
     // Focus restoration waits for Home Assistant's native card slot to render.
+    if (checkBehavior) {
     await page.waitForFunction(({ host, selector }) => {
       const control = host.shadowRoot?.querySelector(selector);
       return host.isConnected && control?.isConnected && host.shadowRoot.activeElement === control;
@@ -914,6 +931,8 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
       await page.screenshot({ path: `${prefix}-focus-failure.png`, scale: "css" });
       issues.push(`${popup.name}: focus was not restored to the invoking control`);
     }
+    checkedBehaviors.add(reviewKey);
+    }
   }
   return [...new Set(issues)];
 }
@@ -926,10 +945,12 @@ async function main() {
   const { dashboard } = await prepare(config);
   const baseUrl = config.url.replace(/\/$/, "");
   const token = await accessToken(config, baseUrl);
-  const output = path.join(__dirname, ".artifacts", "accessibility", ...(options.safeArea ? ['safe-area'] : []));
+  const output = path.join(require('./verification-browser').artifactDirectory('accessibility'), ...(options.safeArea ? ['safe-area'] : []));
   if (!options.preview) fs.mkdirSync(output, { recursive: true });
   const checkProfile = async ({ scenario, theme }) => {
     const captures = capturePolicy(options, scenario);
+    const checkedBehaviors = new Set();
+    const popupBehavior = scenario === runs[0].scenario && !options.geometryOnlyPopups;
     // Keep each profile's touch emulation independent of other target
     // lifecycles by giving it a complete browser process.
     const browser = await chromium.launch({ headless: !options.preview });
@@ -1028,6 +1049,27 @@ async function main() {
         if(cold.issues.length)throw new Error(`Cold app inset: ${cold.issues.join('; ')}`);
       }
       await applyVisualPreferences(page, scenario, theme);
+      if (options.focused) {
+        let inspected = 0;
+        const views = options.pages ? dashboard.views.filter(view => view.path !== 'card-test') : [{ path: initialView }];
+        for (const view of views) {
+          if (view.path !== initialView) {
+            await page.evaluate(route => { history.pushState(null, '', route); window.dispatchEvent(new CustomEvent('location-changed')); }, '/marao-dashboard/' + view.path);
+            await page.waitForFunction(({ root, expected }) => root.config?.views?.[root._curView]?.path === expected, {
+              root: await page.locator('hui-root').elementHandle(), expected: view.path,
+            });
+          }
+          await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+          if (await page.locator('marao-card').count()) inspected += await require('./verification-browser').inspectFocused(page, options, scenario, theme, output, runName + '-' + view.path);
+          else if (!options.pagesOnly) throw new Error('Selected page has no rendered affected cards');
+          else if ((await layoutIssues(page)).length) throw new Error('Saved page navigation/layout failed');
+        }
+        if (errors.length) throw new Error(errors.join('\n'));
+        fs.writeFileSync(path.join(output, runName + '-result.json'), JSON.stringify({ profile: scenario.name, theme,
+          families: options.families, inspected, focused: true, passed: true }), { mode: 0o600 });
+        console.log(`${runName}: ${inspected} representative affected cards checked.`);
+        return;
+      }
       if(options.safeArea) {
         const samples=[];
         for(const source of safeAreaCases) {
@@ -1095,7 +1137,7 @@ async function main() {
       ];
       if (errors.length || issues.length) throw new Error(`${runName} failed:\n${[...errors, ...issues].map((item) => `- ${item}`).join("\n")}`);
       if (captures === 'review') await captureRepresentativeCards(page, path.join(output, runName));
-      issues = issues.concat(await inspectPopups(page, scenario, theme, output, runName, captures));
+      issues = issues.concat(await inspectPopups(page, scenario, theme, output, runName, captures, [], popupBehavior, checkedBehaviors));
       if (errors.length || issues.length) throw new Error(`${runName} failed:\n${[...errors, ...issues].map((item) => `- ${item}`).join("\n")}`);
       }
       if (options.pages) for (const view of dashboard.views.filter(view => view.path !== 'card-test')) {
@@ -1115,7 +1157,7 @@ async function main() {
         } });
         if (captures === 'review') await page.screenshot({ path: prefix + '-representative.png', scale: 'css' });
         else if (captures === 'all' && !await page.locator('marao-card').count()) await page.screenshot({ path: prefix + '-empty.png', scale: 'css' });
-        const found = [...await frontendRegistrationIssues(page), ...await emulationIssues(page, scenario, theme), ...await layoutIssues(page), ...await inspectPopups(page, scenario, theme, output, runName + '-page-' + view.path, captures)];
+        const found = [...await frontendRegistrationIssues(page), ...await emulationIssues(page, scenario, theme), ...await layoutIssues(page), ...await inspectPopups(page, scenario, theme, output, runName + '-page-' + view.path, captures, [], popupBehavior, checkedBehaviors)];
         if (errors.length || found.length) throw new Error(`${runName}/${view.path}: ${[...errors, ...found].join('\n')}`);
       }
       fs.writeFileSync(path.join(output, runName + '-result.json'), JSON.stringify({ profile: scenario.name, theme,
@@ -1133,8 +1175,9 @@ async function main() {
       if (browser.isConnected()) await browser.close();
     }
   };
-  for (let index = 0; index < runs.length; index += 3) {
-    await Promise.all(runs.slice(index, index + 3).map(checkProfile));
+  const concurrency = options.parallel ? 3 : 1;
+  for (let index = 0; index < runs.length; index += concurrency) {
+    await Promise.all(runs.slice(index, index + concurrency).map(checkProfile));
   }
   if (!options.preview) console.log(`Accessibility layout OK (${runs.length} mobile profile/theme runs; screenshots in ${output})`);
 }

@@ -22,6 +22,19 @@ on:
       - "package-lock.json"
       - "pyproject.toml"
   workflow_dispatch:
+    inputs:
+      full:
+        description: Run comprehensive offline tests
+        type: boolean
+        default: false
+      parallel:
+        description: Allow independent checks in parallel
+        type: boolean
+        default: false
+      components:
+        description: Reviewed changed components, separated by commas
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -33,6 +46,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v7
@@ -42,9 +57,6 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Run static checks
-        run: npm run test:static
-
       - name: Setup Python
         uses: actions/setup-python@v7
         with:
@@ -53,5 +65,22 @@ jobs:
       - name: Install Python test dependencies
         run: python -m pip install -r tests/requirements.txt
 
-      - name: Run pytest
-        run: pytest --cov=custom_components.marao_dashboard --cov-report=term-missing
+      - name: Run affected checks (full and parallel are explicit options)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MARAO_FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.full }}
+          MARAO_PARALLEL: ${{ github.event_name == 'workflow_dispatch' && inputs.parallel }}
+          MARAO_COMPONENTS: ${{ inputs.components }}
+          MARAO_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          MARAO_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          args=(--offline --head "$MARAO_HEAD")
+          if [[ -n "$MARAO_BASE" && ! "$MARAO_BASE" =~ ^0+$ ]]; then
+            args+=(--base "$MARAO_BASE")
+          else
+            args+=(--release)
+          fi
+          if [[ -n "$MARAO_COMPONENTS" ]]; then args+=(--component "$MARAO_COMPONENTS"); fi
+          if [[ "$MARAO_FULL" == "true" ]]; then args+=(--full); fi
+          if [[ "$MARAO_PARALLEL" == "true" ]]; then args+=(--parallel); fi
+          node tests/verification.js "${args[@]}"

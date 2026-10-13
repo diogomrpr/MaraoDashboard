@@ -7,7 +7,7 @@ const { prepare } = require('../ha-test/prepare');
 const { manifest } = require('../ha-test/cases');
 const { selectedRuns, parseArgs, contextOptionsForScenario, configurePageEmulation, applyVisualPreferences, layoutIssues } = require('./test-ha-dashboard-accessibility');
 
-const output = path.join(__dirname, '.artifacts/energy-format');
+const output = path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), 'energy-format');
 const unitEntity = 'sensor.marao_dashboard_test_energy_format_missing_live';
 function reading(page, name) {
   return page.locator('marao-card,marao-energy-period-card').filter({

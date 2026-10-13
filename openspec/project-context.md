@@ -65,16 +65,10 @@ coverage, the shared 0→1→2 conversion/recovery path and the native storage i
 Verified completed capability deltas have been synchronized into baseline specs;
 the remaining change tasks retain their outstanding integrated verification.
 
-The separate final-candidate preserved-install gate is required before versioned
-publication. `test:ha:upgrade` now produces the private report through the real
-previous-package path, supported historical replays, feature/mobile checks,
-actual upgraded visual review and verified cleanup; `verify:release` validates
-that report for the clean final commit and runs publication checks again.
-The first complete live report remains pending as of this dated update.
-Missing upgrade evidence blocks release. This live scenario is release-only;
-ordinary implementation uses focused checks and does not authorize running it.
-Existing push/publication gates and the unresolved reconnect issue remain intact.
-No upgrade, release, migration success or browser verification is claimed here.
+The historical comprehensive runner and version-2 evidence remain available.
+The later scoped-test policy below supersedes their unconditional release
+requirements. Live proof is conditional on changed persistence/ownership/upgrade
+paths; old reports are not rewritten or claimed as current scoped evidence.
 
 ## Environment decisions
 
@@ -188,10 +182,11 @@ still uses WebSocket 9.7.1; the identified fix is two commits ahead of that vers
 The fix remains undelivered and the confirmation tasks stay open. This check did
 not update Home Assistant or claim the reconnect defect is resolved.
 
-The user-approved 2026-10-13 verification policy uses one shared mobile layout
-matrix per release, distinct interactions once (device repeats for gestures),
-independent preservation/recovery for all seven baselines and targeted browser
-checks for other distinct formats. Manual review covers representative changed
-components and difficult layouts; failure screenshots remain mandatory.
-Publication may reuse complete exact-candidate preserved-install browser evidence
-only after private capture, coverage, cleanup and restored-install checks.
+Use `npm run test:affected` (preview with `--plan`) as the default for
+implementation, hooks, CI and publication. Include changed features and shared
+consumers only. Full-suite and parallel execution require explicit requests;
+`npm run test:full -- --parallel` is the comprehensive option. Live upgrade
+checks apply only to changed persistence, migration, generated ownership or
+installation paths, with affected baselines, expected data, recovery and cleanup.
+Reuse validated unchanged scoped evidence and report omitted coverage honestly.
+See [focused testing](../docs/docs/development/focused-testing.md).

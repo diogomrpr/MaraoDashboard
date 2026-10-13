@@ -13,6 +13,7 @@ import yaml
 from homeassistant.components import frontend
 from homeassistant.components.lovelace import LOVELACE_DATA, MODE_YAML
 from homeassistant.components.lovelace.const import CONF_RESOURCE_TYPE_WS
+from homeassistant.components.lovelace.dashboard import LovelaceYAML
 from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL, DATA_PANELS
 from homeassistant.const import CONF_URL
 from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
@@ -914,6 +915,55 @@ async def test_management_editor_generates_and_restores_version(hass) -> None:
     assert restored["dashboard_url"] == "/marao-dashboard/overview"
     assert json.loads(_management_payload(hass)["config"])["name"] == "Marao Dashboard"
     assert manual_file.read_text(encoding="utf-8") == "manual card before generation\n"
+
+
+@pytest.mark.parametrize("operation", ["editor", "service", "history"])
+@pytest.mark.parametrize("members", [["cover.blinds"], []])
+async def test_saved_group_removal_refreshes_cached_yaml_includes(
+    hass, hass_ws_client, operation, members
+):
+    _reset_dashboard_files(hass)
+    Path(hass.config.path("configuration.yaml")).write_text("default_config:\n")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True, exist_ok=True)
+    config = {"config_version": 2, "name": "Marao Dashboard", "slug": "dashboard",
+              "landing_page": "home", "navigation": [], "pages": [{"name": "Home", "path": "home",
+              "entities": [{"template": "hc_entity_group_card", "id": "covers", "name": "Covers",
+                            "entity_type": "cover", "entities": members}]}]}
+    source.write_text(json.dumps(config))
+    entry = MockConfigEntry(domain=DOMAIN, data={BASE_DASHBOARD_CREATED: True})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    baseline = _management_payload(hass)["history"][0]["version"]
+    populated = json.loads(json.dumps(config))
+    populated["pages"][0]["entities"][0]["entities"] = ["cover.blinds", "cover.gate"]
+    await hass.async_add_executor_job(_save_and_generate_dashboard, hass, json.dumps(populated), [])
+    dashboard = LovelaceYAML(hass, "marao-dashboard", {
+        "filename": "dashboard/MaraoDashboard/dashboard/dashboard.yaml"})
+    hass.data[LOVELACE_DATA].dashboards["marao-dashboard"] = dashboard
+    assert "cover.gate" in json.dumps(await dashboard.async_load(False))
+    root_mtime = Path(dashboard.path).stat().st_mtime_ns
+    updates = []
+    unsubscribe = hass.bus.async_listen("lovelace_updated", lambda event: updates.append(event.data))
+    client = await hass_ws_client(hass)
+    if operation == "service":
+        source.write_text(json.dumps(config))
+        await hass.services.async_call(DOMAIN, GENERATE_DASHBOARD_SERVICE, {}, blocking=True)
+    else:
+        message = {"type": "marao_dashboard/config/generate", "config": json.dumps(config)} if operation == "editor" else {
+            "type": "marao_dashboard/history/restore", "version": baseline}
+        await client.send_json({"id": 1, **message})
+        result = await client.receive_json()
+        assert result["success"], result
+    await hass.async_block_till_done()
+    current = await dashboard.async_load(False)
+    group = current["views"][0]["cards"][0]["cards"][0]
+    assert group["variables"]["summary_entities"] == members
+    assert "cover.gate" not in json.dumps(current)
+    assert Path(dashboard.path).stat().st_mtime_ns == root_mtime
+    assert updates == [{"url_path": "marao-dashboard"}]
+    unsubscribe()
 
 
 async def test_registry_unit_metadata_uses_live_registered_and_unregistered_states(hass) -> None:

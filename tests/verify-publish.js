@@ -1,53 +1,30 @@
-const fs = require('node:fs');
-const path = require('node:path');
-const { spawn } = require('node:child_process');
-const { readConfig, repoRoot } = require('../ha-test/client');
-const { e2eWithApprovedException, readKnownFailure, undeliveredFix } = require('./native-reconnect-exception');
 const assert = require('node:assert/strict');
+const { checkIdentity, git, makePlan, parseArgs, readPrivate, runPlan, validateEvidence } = require('./verification');
 
-async function run(script, args = []) {
-  console.log('Publication check: ' + script);
-  await new Promise((resolve, reject) => {
-    const child = spawn('npm', ['run', script, ...args], { cwd: repoRoot, stdio: 'inherit', env: process.env });
-    child.on('error', reject); child.on('exit', code => code === 0 ? resolve() : reject(new Error(script + ' failed')));
-  });
+async function verifyPublish(argv = process.argv.slice(2), { release = true } = {}) {
+  const options = parseArgs(argv);
+  assert.ok(!options.full, 'Use the explicitly requested test:full command for comprehensive checks');
+  options.release = release;
+  const plan = makePlan(options);
+  console.log('Scoped publication: ' + plan.checks.map(check => check.id).join(', '));
+  if (options.plan) return plan;
+  assert.equal(git(['status', '--porcelain', '--untracked-files=normal']), '', 'Final publication requires a clean commit');
+  if (options.report) {
+    const report = readPrivate(options.report);
+    const identities = Object.fromEntries(plan.checks.map(check => [check.id, checkIdentity(check)]));
+    const target = plan.checks.some(check => check.kind !== 'offline') ? require('../ha-test/client').readConfig().url : undefined;
+    validateEvidence(report, plan, identities, { target, exactCommit: true });
+    assert.equal(git(['status', '--porcelain', '--untracked-files=normal']), '', 'Final publication requires a clean commit');
+    if (report.prepared_receipt) await require('../ha-test/prepared-batch').verifyBatch(report.prepared_receipt);
+    if (plan.upgradeRequired) {
+      assert.ok(options.upgradeReport, 'Changed persistence requires private preserved-install evidence');
+      await require('./verify-release').verifyRelease(options.upgradeReport, { publish: false, scope: plan });
+    }
+    console.log('Unchanged scoped evidence validated; applicable exact-commit CI remains required.');
+    return report;
+  }
+  return runPlan(plan, options);
 }
 
-async function main() {
-  const args = process.argv.slice(2);
-  assert.ok(args.length === 0 || (args.length === 2 && args[0] === '--upgrade-report'), 'Use verify:publish with no arguments or --upgrade-report /absolute/private/report.json.');
-  let upgrade;
-  if (args.length) {
-    upgrade = require('./verify-release').verifyRelease(args[1], { publish: false });
-    const { ssh, referencedEntities } = require('../ha-test/prepare');
-    await require('../ha-test/upgrade/prepared').verifyPrepared(readConfig(), path.join(path.dirname(args[1]), 'pretest-receipt.json'), {
-      ssh, referencedEntities, operationCompleted: true,
-    });
-    const exceptions = upgrade.runs.filter(row => row.evidence?.approved_exception);
-    for (const filename of new Set(exceptions.map(row => row.evidence.evidence))) readKnownFailure(filename, upgrade.target);
-    if (exceptions.length) await undeliveredFix();
-  }
-  await run('test');
-  const directory = path.join(repoRoot, 'tests/.artifacts/publication');
-  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-  fs.rmSync(path.join(directory, 'result.json'), { force: true });
-  if (upgrade) {
-    const { ssh, referencedEntities } = require('../ha-test/prepare');
-    await require('../ha-test/upgrade/prepared').verifyPrepared(readConfig(), path.join(path.dirname(args[1]), 'pretest-receipt.json'), {
-      ssh, referencedEntities, operationCompleted: true,
-    });
-    assert.deepEqual(require('../ha-test/upgrade/prepared').candidateIdentity(), upgrade.candidate, 'Candidate changed during publication checks.');
-    fs.writeFileSync(path.join(directory, 'result.json'), JSON.stringify({ completed_at: new Date().toISOString(), candidate: upgrade.candidate,
-      upgrade_operation: upgrade.operation_id, browser_evidence: 'preserved-install', passed: true }), { mode: 0o600 });
-    console.log('Publication checks passed using validated exact-candidate preserved-install browser evidence.');
-    return;
-  }
-  const e2e = await e2eWithApprovedException(readConfig(), directory);
-  await run('test:ha:accessibility', ['--', '--pages']);
-  await run('test:ha:alignment');
-  for (const profile of ['iphone-normal', 'android-normal']) await run('test:ha:sliders', ['--', '--scenario', profile]);
-  fs.writeFileSync(path.join(directory, 'result.json'), JSON.stringify({ completed_at: new Date().toISOString(), e2e, passed: true }, null, 2), { mode: 0o600 });
-  console.log('Publication checks passed' + (e2e.approved_exception ? ' with the explicit native reconnect exception.' : '.'));
-}
-
-if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
+if (require.main === module) verifyPublish().catch(error => { console.error(error.message); process.exitCode = 1; });
+module.exports = { verifyPublish };

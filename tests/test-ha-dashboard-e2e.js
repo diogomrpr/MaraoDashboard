@@ -100,8 +100,8 @@ function cardAction(page, title) {
   return cardByTitle(page, title).locator("[data-card-action]");
 }
 
-async function titleLayoutIssues(page) {
-  return page.locator("marao-card,marao-state-timeline-card,marao-energy-period-card,marao-camera-events-card,marao-frigate-events-card").evaluateAll((cards) => cards.flatMap((card) => {
+async function titleLayoutIssues(page, families = []) {
+  return page.locator("marao-card,marao-state-timeline-card,marao-energy-period-card,marao-camera-events-card,marao-frigate-events-card").evaluateAll((cards, families) => cards.filter(card => !families.length || families.includes(card._config?.template || card.localName)).flatMap((card) => {
     const title = card.shadowRoot?.querySelector(".body > .title,header > h2,.surface > h2");
     if (!title || !title.getBoundingClientRect().width) return [];
     const parent = title.parentElement;
@@ -127,7 +127,7 @@ async function titleLayoutIssues(page) {
       if (child !== title && other.width && other.height && other.top < rect.bottom - 1) issues.push(`${name}: content appears alongside or above its title`);
     }
     return issues;
-  }));
+  }), families);
 }
 
 async function measureCenteredIcons(locator) {
@@ -637,8 +637,8 @@ async function checkHistoryCases(page) {
     const states = await cards.evaluateAll(elements => elements.filter(card => /^(Graph|Energy|Timeline) history · /.test(card._config.name)).map(card => ({
       name: card._config.name, state: card.shadowRoot.querySelector('[data-history-state]')?.dataset.historyState || card.shadowRoot.querySelector('[data-graph-history-state]')?.dataset.graphHistoryState,
     })));
-    fs.mkdirSync(path.join(__dirname, '.artifacts/dashboard-e2e'), { recursive: true });
-    fs.writeFileSync(path.join(__dirname, '.artifacts/dashboard-e2e/history-failure.json'), JSON.stringify(states, null, 2), { mode: 0o600 });
+    fs.mkdirSync(path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), 'dashboard-e2e'), { recursive: true });
+    fs.writeFileSync(path.join(require('./verification-browser').artifactDirectory('dashboard-e2e'), 'history-failure.json'), JSON.stringify(states, null, 2), { mode: 0o600 });
     throw error;
   });
   const repeated = await page.evaluate((examples) => examples.flatMap(({ entity }) => {
@@ -652,7 +652,7 @@ async function checkOverviewPopups(page, config, screenshotRoot) {
   const lightIds = ["light.marao_dashboard_test_light", "light.marao_dashboard_test_room_light", "light.marao_dashboard_test_onoff_light"];
   const baseline = await Promise.all(lightIds.map(id => api(config, 'GET', '/api/states/' + id)));
   const { inspectPopups, scenarios } = require('./test-ha-dashboard-accessibility');
-  const output = path.join(screenshotRoot || path.join(__dirname, '.artifacts/dashboard-e2e'), 'overview-popups');
+  const output = path.join(screenshotRoot || path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), 'dashboard-e2e'), 'overview-popups');
   fs.mkdirSync(output, { recursive: true });
   const sheet = page.locator('.marao-popup-sheet');
   const empty = sheet.locator('.marao-popup-content > [role="status"]');
@@ -971,6 +971,7 @@ async function checkDisconnected(browser, config, functionalCompleted = false) {
     if (evidencePath) {
       assert.ok(path.isAbsolute(evidencePath), 'Reconnect evidence must use an absolute private path');
       fs.writeFileSync(evidencePath, JSON.stringify({ version: 1, target: config.url, checked_at: new Date().toISOString(), functional_completed: functionalCompleted,
+        ...(process.argv.includes('--disconnect-only') ? { scope: 'connection-only' } : {}),
         safe_actions_disabled: true, disconnected_dispatches: 0, authoritative_recovery: true, errors, rejections, subscriptions, native_failures: nativeFailures }), { mode: 0o600 });
     }
     if (errors.length || rejections.length) {
@@ -1460,7 +1461,7 @@ async function checkEntityGroups(page, serviceCalls, output, scenario, theme, co
 
 async function main() {
   const captureScreenshots = process.argv.includes("--screenshots");
-  const screenshotRoot = path.join(__dirname, ".artifacts", "dashboard-e2e");
+  const screenshotRoot = require('./verification-browser').artifactDirectory('dashboard-e2e');
   if (captureScreenshots) fs.mkdirSync(screenshotRoot, { recursive: true });
   let chromium;
   try { ({ chromium } = require("playwright")); } catch { throw new Error("Playwright is not installed."); }
@@ -1515,6 +1516,51 @@ async function main() {
     const observed = errors.splice(0);
     throw new Error(`${label} produced browser warnings/errors:\n${observed.map((item) => `- ${item}`).join("\n")}`);
   };
+  if (process.argv.includes('--toggle-only')) {
+    const entity = 'switch.marao_dashboard_test_switch';
+    try {
+      for (const theme of ['light', 'dark']) {
+        if (theme === 'dark') { await browser.close(); browser = await chromium.launch(); ({ context, page } = await createSession(theme)); }
+        await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
+        const action = cardAction(page, 'Switch + graph');
+        assert.equal(await cardByTitle(page, 'Switch + graph').evaluate(card => card._config.entity), entity, 'Toggle must target the safe fixture');
+        await action.waitFor({ state: 'visible' }); await assertCurrentFrontend(page);
+        await applyVisualPreferences(page, scenario, theme);
+        const before = await page.evaluate(id => document.querySelector('home-assistant').hass.states[id]?.state, entity);
+        assert.ok(['on', 'off'].includes(before), 'Safe switch fixture is unavailable');
+        const count = serviceCalls.length;
+        await action.tap();
+        await page.waitForFunction(({ id, before }) => document.querySelector('home-assistant').hass.states[id]?.state !== before, { id: entity, before });
+        assert.equal(serviceCalls.length - count, 1, 'Completed toggle must dispatch once');
+        assert.deepEqual(serviceCalls.at(-1).entities, [entity]);
+        assert.equal(await page.evaluate(() => window.__maraoHaptics.at(-1)), 'heavy');
+        assertNoBrowserErrors('Safe toggle/' + theme);
+        await page.screenshot({ path: path.join(screenshotRoot, 'toggle-' + theme + '.png'), scale: 'css' });
+      }
+    } catch (error) {
+      await page.screenshot({ path: path.join(screenshotRoot, 'toggle-failure.png'), scale: 'css' }); throw error;
+    } finally { await browser.close(); }
+    return;
+  }
+  const selectedCheck = ['actions', 'camera', 'history'].find(name => process.argv.includes('--' + name + '-only'));
+  if (selectedCheck) {
+    try {
+      for (const theme of ['light', 'dark']) {
+        if (theme === 'dark') { await browser.close(); browser = await chromium.launch(); ({ context, page } = await createSession(theme)); }
+        await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
+        await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+        await assertCurrentFrontend(page);
+        await applyVisualPreferences(page, scenario, theme);
+        await ({ actions: checkActionDispatches, camera: checkCameraCases, history: checkHistoryCases })[selectedCheck](page, serviceCalls);
+        await page.waitForLoadState('networkidle');
+        assertNoBrowserErrors(selectedCheck + '/' + theme);
+      }
+    } catch (error) {
+      await page.screenshot({ path: path.join(screenshotRoot, selectedCheck + '-failure.png'), scale: 'css' });
+      throw error;
+    } finally { await browser.close(); }
+    return;
+  }
   if (process.argv.includes('--media-only')) {
     try {
       await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
@@ -1534,7 +1580,7 @@ async function main() {
         await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);
-        await checkEntityGroups(page, serviceCalls, path.join(__dirname, '.artifacts', `entity-groups-${scenario.name}-${theme}`), scenario, theme, config);
+        await checkEntityGroups(page, serviceCalls, path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), `entity-groups-${scenario.name}-${theme}`), scenario, theme, config);
         await page.waitForLoadState('networkidle');
         assertNoBrowserErrors(`Entity Groups (${theme})`);
       }
@@ -1558,7 +1604,7 @@ async function main() {
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);
         await checkNativeSurfaces(page);
-        await checkClimateFeedback(page, serviceCalls, path.join(__dirname, '.artifacts', `climate-feedback-${scenario.name}-${theme}`), { scenario, theme });
+        await checkClimateFeedback(page, serviceCalls, path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), `climate-feedback-${scenario.name}-${theme}`), { scenario, theme });
         await page.waitForLoadState('networkidle');
         assertNoBrowserErrors(`Climate feedback (${theme})`);
         console.log(`Climate feedback, single dispatch and keyboard focus OK (${theme}).`);
@@ -2052,7 +2098,7 @@ async function main() {
 }
 
 if (require.main === module) main().catch((error) => {
-  const output = path.join(__dirname, '.artifacts/dashboard-e2e');
+  const output = path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), 'dashboard-e2e');
   fs.mkdirSync(output, { recursive: true });
   fs.writeFileSync(path.join(output, 'failure.txt'), error.stack || error.message, { mode: 0o600 });
   const evidencePath = process.argv.find(arg => arg.startsWith('--reconnect-evidence='))?.slice(21);

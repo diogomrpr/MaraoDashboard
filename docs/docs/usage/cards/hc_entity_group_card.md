@@ -74,3 +74,8 @@ untouched and the draft clean. Save & Generate persists the reviewed selections;
 explicit `[]` suppresses defaults. Saved explicit membership never follows later
 registry changes. Downgrading requires the matching prior package and exact
 source/generated/owned-state backup, as described in the update guide.
+
+After removing a member, choose **Update**, then **Save & Generate**. The saved
+dashboard refreshes immediately; no waiting period or browser cache clearing is
+needed. Removed members remain available in search results so they can be added
+again. A changed dashboard registration requires the restart reported by the editor.

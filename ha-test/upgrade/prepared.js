@@ -47,11 +47,16 @@ function relativeFile(file) {
     !file.startsWith('/') && file.split('/').every(part => part && part !== '.' && part !== '..');
 }
 
-function validatePreparedReceipt(receipt, config, candidate, now = Date.now()) {
+function validatePreparedReceipt(receipt, config, candidate, now = Date.now(), { batch = false } = {}) {
   assertDisposableHaTarget(config, { requireSsh: true });
   assert.equal(new URL(config.url).hostname, '192.168.0.28', 'Upgrade inspection requires the authorized disposable instance');
   assert.equal(config.sshHost, '192.168.0.28', 'Upgrade inspection requires the authorized SSH target');
-  assert.equal(receipt?.version, 1, 'Missing or unsupported preserved-install receipt');
+  assert.equal(receipt?.version, batch ? 2 : 1, 'Missing or unsupported prepared-install receipt');
+  if (batch) {
+    assert.equal(receipt.kind, 'prepared-browser-batch', 'Ordinary preparation is not upgrade evidence');
+    assert.ok(receipt.helper_states && typeof receipt.helper_states === 'object' && !Array.isArray(receipt.helper_states), 'Missing safe helper cleanup baseline');
+    assert.ok(Object.entries(receipt.helper_states).every(([id, value]) => /^(input_boolean|input_number|input_select|input_text)\.marao_dashboard_test_/.test(id) && typeof value === 'string'), 'Unsafe helper cleanup baseline');
+  }
   assert.match(receipt.operation_id || '', /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/, 'Missing preserved-install operation identity');
   assert.equal(receipt.target, config.url, 'Preserved-install receipt belongs to another target');
   assert.equal(receipt.remote_config_path, config.remoteConfigPath, 'Preserved-install receipt belongs to another configuration directory');
@@ -83,11 +88,11 @@ function validatePreparedReceipt(receipt, config, candidate, now = Date.now()) {
   return receipt;
 }
 
-function readPreparedReceipt(filename, config, candidate) {
+function readPreparedReceipt(filename, config, candidate, options) {
   assert.ok(typeof filename === 'string' && path.isAbsolute(filename), 'Preserved-install receipt needs an absolute path');
   const stat = fs.lstatSync(filename);
   assert.ok(stat.isFile() && !stat.isSymbolicLink() && !(stat.mode & 0o077), 'Preserved-install receipt must be a private regular file');
-  return validatePreparedReceipt(JSON.parse(fs.readFileSync(filename, 'utf8')), config, candidate);
+  return validatePreparedReceipt(JSON.parse(fs.readFileSync(filename, 'utf8')), config, candidate, Date.now(), options);
 }
 
 const snapshotScript = `import hashlib,json,pathlib,sys
@@ -118,9 +123,9 @@ print(json.dumps({'source_sha256':digest(base/'dashboard/MaraoDashboard/dashboar
     'package':tree(base/'custom_components/marao_dashboard',True),'owners':owners,'providers':providers,
     'fixtures':{file:digest(base/file) for file in request['files']}}))`;
 
-async function verifyPrepared(config, filename, { ssh, referencedEntities, operationCompleted = false }) {
+async function verifyPrepared(config, filename, { ssh, referencedEntities, operationCompleted = false, batch = false }) {
   const candidate = candidateIdentity();
-  const receipt = readPreparedReceipt(filename, config, candidate);
+  const receipt = readPreparedReceipt(filename, config, candidate, { batch });
   assert.ok(isDeepStrictEqual([...receipt.fixture_domains].sort(), fs.readdirSync(path.join(repoRoot, 'ha-test/custom_components')).sort()), 'Incomplete fixture-provider inventory');
   const connection = await connect(config);
   try {
@@ -131,7 +136,9 @@ async function verifyPrepared(config, filename, { ssh, referencedEntities, opera
     assert.ok(!entries.some(entry => ['frigate', 'unifiprotect'].includes(entry.domain)), 'Fixtures cannot replace real camera providers');
     assert.equal((await api(config, 'GET', '/api/config')).config_dir, config.remoteConfigPath, 'Unexpected disposable configuration directory');
     const quote = value => "'" + value.replace(/'/g, "'\\''") + "'";
-    const readSnapshot = () => JSON.parse(ssh(config, 'python3 -c ' + quote(snapshotScript), {
+    const readSnapshot = () => batch ? require('../prepared-batch').readBatchSnapshot(config, {
+      slug: receipt.output.slug, domains: receipt.fixture_domains, files: Object.keys(receipt.fixture_files),
+    }, ssh) : JSON.parse(ssh(config, 'python3 -c ' + quote(snapshotScript), {
       input: JSON.stringify({ root: config.remoteConfigPath, slug: receipt.output.slug, domains: receipt.fixture_domains, files: Object.keys(receipt.fixture_files) }),
     }).stdout);
     const snapshot = readSnapshot();
@@ -192,4 +199,4 @@ function historicalEntities(baseline, referencedEntities) {
   return referencedEntities(JSON.parse(isolateHistoricalText(source, aliases)));
 }
 
-module.exports = { assertHistoricalBindings, candidateIdentity, historicalEntityAliases, historicalEntities, isolateHistoricalText, readPreparedReceipt, validatePreparedReceipt, verifyPrepared };
+module.exports = { assertHistoricalBindings, candidateIdentity, fileHashes, historicalEntityAliases, historicalEntities, isolateHistoricalText, readPreparedReceipt, snapshotScript, validatePreparedReceipt, verifyPrepared };

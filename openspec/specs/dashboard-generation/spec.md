@@ -17,6 +17,17 @@ SHALL keep configuration-facing `hc_*` template keys and project component types
 - **WHEN** the dashboard is generated
 - **THEN** entity resolution chooses the appropriate project-owned card and preserves its overrides
 
+### Requirement: Refreshing committed dashboard output
+After a committed editor save, service generation, setup repair or history restore,
+the integration SHALL reload the affected registered YAML dashboard and use Home
+Assistant's update notification so changed includes do not remain cached. Dry runs
+SHALL NOT reload dashboards; changed registrations still require a restart.
+
+#### Scenario: An included group changes without changing the main YAML
+- **WHEN** the administrator removes members and completes Save & Generate
+- **THEN** ordinary dashboard requests and open dashboard clients receive the saved membership, including an explicitly empty list, without a manual forced reload
+- **AND** generation through the service and history restoration refresh the same dashboard cache
+
 ### Requirement: Configuration shapes and validation
 Generation SHALL accept supported entity strings, objects and grouped lists/maps plus explicit page card lists, layout sections and object-valued raw cards. Legacy include/exclude/overrides SHALL be preserved by versioned conversion. Slugs and page paths SHALL be normalized and resolved duplicates checked. Columns SHALL be integers from one through six, excluding booleans. All page paths SHALL be unique; invalid paths, card bindings and owned references SHALL fail before writes.
 

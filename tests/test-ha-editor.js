@@ -6,7 +6,7 @@ const { chromium } = require("playwright");
 const { accessToken, setBrowserToken, connect, fingerprint, readConfig, repoRoot } = require("../ha-test/client");
 const { scenarios, themes, contextOptionsForScenario, configurePageEmulation, applyVisualPreferences, emulationIssues } = require("./test-ha-dashboard-accessibility");
 
-const output = path.join(__dirname, ".artifacts/editor");
+const output = path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), 'editor');
 const quote = value => "'" + value.replace(/'/g, "'\\''") + "'";
 async function tapDialogCandidate(candidate) {
   const visible = await candidate.evaluate(button => {

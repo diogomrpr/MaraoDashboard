@@ -206,20 +206,12 @@ on them. Finish the implementation queue before the complete release
 stabilization pass; repair findings with focused checks before verifying the
 final candidate. Required publication and preserved-install gates still apply.
 
-Run `npm run verify:publish` during final stabilization or before a push, tag,
-GitHub release, or HACS release. It includes all local tests plus end-to-end and
-mobile browser checks, icon alignment, and value-slider geometry and real
-pointer interactions. The mobile matrix prepares once and runs independent
-browser contexts in batches of three. CI runs local checks; it does not have test-instance
-credentials. GitHub Tests, hassfest, and HACS checks must pass for a published
-commit. Run one mobile layout matrix per release candidate and each distinct
-interaction once, repeating device-sensitive gestures on iPhone and Android.
-Default layout screenshots are failures only; use `--screenshots review` for
-normal iPhone and difficult Android zoom samples in both themes, or opt into
-`--screenshots all` for exhaustive diagnostics. After the last code edit and
-automated check, visually inspect changed components and representative difficult
-layouts as required by the
-[quality contract]({{ '/docs/development/dashboard-quality.html' | relative_url }}).
+Use `npm run test:affected` after each coherent batch. Record its starting commit
+and use `--base <ref>` when completed commits are part of the implementation.
+Shared files require reviewed `--component` scope. Default execution is serial;
+full-suite and parallel runs require explicit requests. Publication uses the same
+affected scope and applicable exact-commit CI. See [focused testing](focused-testing.md)
+for browser batching, profile selection, private evidence and comprehensive options.
 
 ## Upgrade compatibility and release preparation
 
@@ -236,42 +228,20 @@ writes, retain interruption/failure recovery, keep previews/dry runs read-only a
 historical archives immutable. A downgrade needs matching package and saved-data
 baselines together; see the update guide.
 
-Versioned publication additionally requires a preserved-install upgrade scenario
-for the final candidate, supported released formats, complete features/mobile
-profiles, persisted expected data, recovery and verified cleanup. Run it only
-during explicitly requested release preparation. Keep ordinary tests, push/PR
-checks, `verify:publish`, stabilization and version hooks free of this live scenario.
-Fresh preparation replaces fixture JSON and cannot prove migration; upgrade
-checks must inspect preserved source/output before any reseeding.
+Versioned publication requires preserved-install proof only for changed saved
+data, migration, generated ownership or installation/upgrade paths. Run
+`npm run test:ha:upgrade -- --scope <components>` for affected baselines during
+explicit release preparation. Retain exact backups, independently expected data,
+recovery and verified cleanup; fresh fixture preparation cannot replace this proof.
+UI-only releases do not automatically run historical upgrades or all mobile
+profiles. `npm run verify:release` validates scoped final-candidate evidence and
+publication checks; the optional complete suite requires an explicit request.
 
-The shared browser entry point now accepts a private, candidate-specific preserved
-installation receipt and refuses ordinary reseeding while its remote operation
-marker exists. It retains current asset/resource/fixture checks and performs only
-reads. See the internal [receipt contract](../../../ha-test/upgrade/README.md)
-for fields and cleanup responsibilities. The release-only
-`npm run test:ha:upgrade` runner uses this guard after independently checking
-preservation and explicit additions through the ordinary editor. Complete live
-evidence remains required; focused tests and a dry-run plan do not provide it.
-
-`npm run verify:release -- /absolute/private/upgrade-report.json` now validates
-private candidate-specific upgrade evidence for a clean final commit before
-running `verify:publish -- --upgrade-report /absolute/private/report.json`.
-The validated report supplies shared browser behavior and one full mobile matrix
-on the real v0.5.1 upgrade, targeted browser checks for other distinct formats,
-all seven preservation/recovery baselines, four representative visual reviews
-and verified cleanup. Publication rechecks the restored install and exact private
-evidence before reuse; it rejects candidate or
-report changes during publication checks. Its focused tests use mocked results;
-they do not establish a live upgrade pass. First run `npm run test:ha:upgrade` against the safe fixture installation prepared
-during final stabilization. The runner requires a clean final commit, backs up
-the existing disposable files before remote writes, checks the real v0.5.1
-package and all historical replays, then waits for actual visual review before
-verified cleanup. It prints the private report path for `verify:release`.
-`npm run test:ha:upgrade -- --dry-run` prints its local plan without contacting HA.
-Without a complete live report for the final candidate, versioned publication remains blocked.
-`verify:publish` still applies before every push/tag/release, as do exact-commit
-Tests/hassfest/HACS and final visual inspection. No release or historical live
-upgrade run is authorized by ordinary implementation work.
+Ordinary browser batches use a separate private preparation receipt and isolated
+job artifacts. They validate current source/assets/fixture ownership without
+repeating deployment. Preserved-install receipts retain distinct provenance and
+refuse reseeding while the remote upgrade marker exists. Existing complete reports
+stay immutable; focused and comprehensive results are never relabeled.
 
 ## Add or change a feature
 

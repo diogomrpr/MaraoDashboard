@@ -30,7 +30,7 @@ async function main() {
     const views = dashboard.views.filter(hasNumericCard);
     assert.ok(views.some(view => view.path === 'card-test'), 'Missing numeric Cases');
     for (const scenario of profiles) for (const theme of themes) {
-      const run = `${scenario.name}-${theme}`, output = path.join(__dirname, '.artifacts/climate-layout', run);
+      const run = `${scenario.name}-${theme}`, output = path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), 'climate-layout', run);
       fs.rmSync(output, { recursive: true, force: true });
       fs.mkdirSync(output, { recursive: true });
       await api(config, 'POST', '/api/services/marao_test_camera/reset', {});

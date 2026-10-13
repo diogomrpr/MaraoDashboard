@@ -280,6 +280,13 @@ async function provisionFixtureAreas(config) {
 }
 
 async function prepare(config = readConfig(), { dryRun = false } = {}) {
+  if (Object.hasOwn(process.env, 'MARAO_BATCH_RECEIPT')) {
+    if (Object.hasOwn(process.env, 'MARAO_UPGRADE_RECEIPT')) throw new Error('Batch and upgrade provenance cannot be mixed');
+    const receipt = process.env.MARAO_BATCH_RECEIPT;
+    if (!receipt || !path.isAbsolute(receipt)) throw new Error('A browser batch requires its absolute private receipt');
+    if (dryRun) return { config };
+    return require('./prepared-batch').verifyBatch(receipt);
+  }
   if (Object.hasOwn(process.env, 'MARAO_UPGRADE_RECEIPT')) {
     const receipt = process.env.MARAO_UPGRADE_RECEIPT;
     if (!receipt?.trim()) throw new Error('A preserved-install check requires its private upgrade receipt.');

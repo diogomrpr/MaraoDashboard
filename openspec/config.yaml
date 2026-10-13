@@ -1,5 +1,4 @@
 schema: spec-driven
-
 context: |
   Marao is a complete mobile Home Assistant dashboard, including its integration,
   administrator builder, generator, cards, popups, navbar, theme, and Cases gallery.
@@ -19,11 +18,12 @@ context: |
   The user allows the diagnosed native Home Assistant stale-unsubscribe reconnect
   failure until its upstream fix reaches a stable frontend. Keep raw assertions and
   exact native evidence; all other publication and upgrade gates remain required.
-  The approved test policy uses distinct interactions once, one shared automated
-  mobile layout matrix per release, preservation/recovery for all seven baselines,
-  targeted browser checks for other formats, failure screenshots and representative
-  manual visual review. Exact candidate browser evidence may be reused only after
-  private coverage/capture/cleanup and restored-install validation.
+  The current user-approved policy defaults to npm run test:affected during
+  implementation, hooks, automatic CI and publication. Select changed features,
+  shared consumers and relevant mobile/action/migration checks only. Full-suite
+  and parallel execution require explicit requests; no release request implicitly
+  authorizes either. Batch related work, prepare once and inspect representative
+  changed components. Keep private per-job evidence and serialize shared mutations.
   OpenSpec is development tooling only. Preserve unrelated work and use the smallest
   coherent shared-root change; do not add a framework or abstraction for speculation.
   Assess saved-release compatibility before changing JSON, defaults, generated
@@ -31,38 +31,37 @@ context: |
   unrelated ownership. Reuse ordered conversions with preflight, private backups
   and recovery; previews/dry runs stay read-only and archives stay immutable.
   Keep historical fixtures, independent expected JSON and feature coverage current.
-  Versioned publication additionally requires a final-candidate preserved-install
-  upgrade gate during explicit release preparation only. The candidate implements
-  test:ha:upgrade and verify:release; complete real preserved-install evidence and
-  verified cleanup are still required before publication.
-
+  Versioned publication uses scoped exact-candidate evidence and applicable CI.
+  Live preserved-install checks are conditional on changed persistence, migration,
+  generated ownership or installation/upgrade paths, covering affected baselines,
+  independent expected data, recovery and cleanup. Full historical/mobile checks
+  remain an explicit option. Preserve old comprehensive evidence without relabeling.
 rules:
   proposal:
-    - State the concrete problem, scope, affected-card set (or empty), and non-goals.
-    - Distinguish observed behavior, assumptions, and intended changes; name existing capability paths.
-    - Assess saved-release and generated-contract compatibility; record preservation or the required versioned migration.
+  - State the concrete problem, scope, affected-card set (or empty), and non-goals.
+  - Distinguish observed behavior, assumptions, and intended changes; name existing capability paths.
+  - Assess saved-release and generated-contract compatibility; record preservation or the required versioned migration.
   specs:
-    - Use testable SHALL requirements and WHEN/THEN scenarios; preserve existing requirement names in deltas.
-    - Keep existing behavior in baseline specs and unfinished work in changes; never describe an unconfirmed fix as shipped.
+  - Use testable SHALL requirements and WHEN/THEN scenarios; preserve existing requirement names in deltas.
+  - Keep existing behavior in baseline specs and unfinished work in changes; never describe an unconfirmed fix as shipped.
   design:
-    - Trace relevant builder, validation, generator, shared runtime, theme, translations, documentation, tests, and fixtures.
-    - Reuse existing components and state any migration, data-preservation, privacy, and action-safety implications.
-    - Describe historical inputs and independent expected transformations, backup/preflight/recovery, read-only paths and complete package-plus-data rollback.
+  - Trace relevant builder, validation, generator, shared runtime, theme, translations, documentation, tests, and fixtures.
+  - Reuse existing components and state any migration, data-preservation, privacy, and action-safety implications.
+  - Describe historical inputs and independent expected transformations, backup/preflight/recovery, read-only paths and complete package-plus-data rollback.
   tasks:
-    - Make tasks concrete and checkable; keep future or unverified work unchecked.
-    - Batch related queued implementation tasks; use one covering focused check and final combined affected-card visual inspection, with early checks for dependent migrations and shared security controls.
-    - Include gallery and realistic-page examples when supported behavior changes, and alignment checks for icon-only layouts.
-    - Require verify:publish before any push, tag, or release; do not require the full suite for ordinary small changes.
-    - Keep focused migration checks in development; require the separate final-candidate upgrade gate only during explicit versioned-release preparation, with verified cleanup and historical feature coverage.
-
+  - Make tasks concrete and checkable; keep future or unverified work unchecked.
+  - Batch related queued implementation tasks; use one covering focused check and final combined affected-card visual inspection, with early checks for dependent migrations and shared security controls.
+  - Include gallery and realistic-page examples when supported behavior changes, and alignment checks for icon-only layouts.
+  - Require verify:publish before any push, tag, or release; do not require the full suite for ordinary small changes.
+  - Keep focused migration checks; require scoped preserved-install proof only for changed persistence, ownership or upgrade paths during explicit release preparation.
 operations:
   apply:
     guidance:
-      - Follow AGENTS.md; inspect the end-to-end path and record every affected card before editing.
-      - Record upgrade impact and preserve supported saved configurations; maintain historical expected fixtures when formats or generated contracts change.
-      - Implement related queued tasks together; run a covering focused check per batch and early checks for dependent migrations and shared security controls. Deploy UI changes only to 192.168.0.28 with safe fixture actions.
-      - After the batch's last edit and focused check, visually inspect its combined affected-card set as the final validation step. Complete the implementation queue before broad release stabilization; retain all publication and upgrade gates.
+    - Follow AGENTS.md; inspect the end-to-end path and record every affected card before editing.
+    - Record upgrade impact and preserve supported saved configurations; maintain historical expected fixtures when formats or generated contracts change.
+    - Implement related queued tasks together; run a covering focused check per batch and early checks for dependent migrations and shared security controls. Deploy UI changes only to 192.168.0.28 with safe fixture actions.
+    - After the focused batch check, inspect representative affected components. Use affected checks for publication; full-suite and parallel runs require explicit user requests.
   archive:
     guidance:
-      - Archive only completed and verified work; never archive unresolved upstream follow-ups as complete.
-      - Keep baseline specs synchronized with the accepted change and report remaining limitations honestly.
+    - Archive only completed and verified work; never archive unresolved upstream follow-ups as complete.
+    - Keep baseline specs synchronized with the accepted change and report remaining limitations honestly.

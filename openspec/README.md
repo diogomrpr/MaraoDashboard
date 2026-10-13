@@ -74,13 +74,10 @@ a reason. After the last edit and focused check, visually and interactively
 inspect representative affected components and difficult layouts as the final
 validation step.
 
-Use `npm run verify:publish` for requested full checks, final stabilization and
-immediately before any push/tag/release; do not substitute spec validation for it.
-Exact-commit GitHub Tests, hassfest and HACS must pass. Record failures honestly.
-The native reconnect issue remains relevant to this gate. The user has explicitly
-allowed only the diagnosed stale-unsubscribe failure until its fix reaches a
-stable frontend; retain its raw assertions and native evidence and recheck that
-the exception has not expired. All other gates remain required.
+Use the scoped `npm run verify:publish` gate before publication, with applicable
+exact-commit Tests/hassfest/HACS checks. Selected failures remain failures. A
+release request does not authorize the full suite. Preserve raw native reconnect
+evidence and check exception expiry whenever the approved exception is applied.
 
 ## Upgrade responsibilities
 
@@ -92,17 +89,13 @@ preflight, exact backups and recoverable writes, read-only previews/dry runs and
 immutable archives. Maintain historical provenance, independent expected JSON
 and complete feature coverage with each relevant change.
 
-Use focused migration checks during implementation. Versioned publication also
-requires a final-candidate preserved-install upgrade gate during explicit release
-preparation only, alongside existing publication checks and exact-commit CI.
-Fresh-fixture tests cannot replace that evidence. The candidate now includes
-`test:ha:upgrade` as the separate preserved-install producer and `verify:release`
-as its final evidence/publication verifier. The
-[upgrade change](changes/ensure-safe-dashboard-upgrades/proposal.md) retains its
-first live release tasks until they actually pass; missing, incomplete, failed
-or stale evidence blocks publication.
-Do not run the live scenario in routine tests, push/PR checks or stabilization,
-and do not claim this contract update verifies an upgrade or completes the change.
+Use focused migration checks during implementation. Versioned publication
+requires live preserved-install proof only when persistence, migration, generated
+ownership or installation/upgrade behavior changes. Cover affected baselines,
+independent expected data, recovery and verified cleanup. Fresh fixtures cannot
+prove an upgrade. `test:ha:upgrade -- --scope <components>` produces scoped proof;
+`verify:release` validates final-candidate evidence and affected checks. The full
+historical/feature/mobile scenario remains available only on explicit request.
 
 ## Add a future task
 
@@ -170,10 +163,11 @@ intentional CLI upgrade, run `OPENSPEC_TELEMETRY=0 openspec update`.
 The setup and verification here used `OPENSPEC_TELEMETRY=0`; set it on subsequent
 commands as well when keeping CLI telemetry disabled. No shell settings were changed.
 
-The user-approved 2026-10-13 verification policy uses one shared mobile layout
-matrix per release, distinct interactions once (device repeats for gestures),
-independent preservation/recovery for all seven baselines and targeted browser
-checks for other distinct formats. Manual review covers representative changed
-components and difficult layouts; failure screenshots remain mandatory.
-Publication may reuse complete exact-candidate preserved-install browser evidence
-only after private capture, coverage, cleanup and restored-install checks.
+Use `npm run test:affected` (preview with `--plan`) as the default for
+implementation, hooks, CI and publication. Include changed features and shared
+consumers only. Full-suite and parallel execution require explicit requests;
+`npm run test:full -- --parallel` is the comprehensive option. Live upgrade
+checks apply only to changed persistence, migration, generated ownership or
+installation paths, with affected baselines, expected data, recovery and cleanup.
+Reuse validated unchanged scoped evidence and report omitted coverage honestly.
+See [focused testing](../docs/docs/development/focused-testing.md).

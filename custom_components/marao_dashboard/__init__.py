@@ -196,6 +196,7 @@ async def _async_setup_dashboard(hass: HomeAssistant, entry: ConfigEntry) -> boo
             legacy_resources,
         )
         hass.data[DOMAIN]["base_dashboard"] = generated
+        await _async_refresh_dashboard(hass, generated)
         hass.config_entries.async_update_entry(
             entry,
             data={**entry.data, BASE_DASHBOARD_CREATED: True},
@@ -249,7 +250,7 @@ def _register_services(hass: HomeAssistant) -> None:
         async with _dashboard_operation_lock(hass):
             config_path = _dashboard_config_path(hass, call.data["config_path"])
             registry_entities = _registry_entities(hass)
-            return await hass.async_add_executor_job(
+            generated = await hass.async_add_executor_job(
                 _generate_dashboard_from_path,
                 hass,
                 config_path,
@@ -258,6 +259,8 @@ def _register_services(hass: HomeAssistant) -> None:
                 registry_entities,
                 _editor_areas(hass),
             )
+            await _async_refresh_dashboard(hass, generated)
+            return generated
 
     hass.services.async_register(
         DOMAIN,
@@ -320,6 +323,7 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
             except ValueError as err:
                 connection.send_error(msg["id"], "invalid_config", str(err))
                 return
+            await _async_refresh_dashboard(hass, generated)
             generated["history"] = await hass.async_add_executor_job(
                 list_dashboard_history, hass.config.path(DASHBOARD_BASE_DIR)
             )
@@ -346,6 +350,7 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
             except ValueError as err:
                 connection.send_error(msg["id"], "invalid_version", str(err))
                 return
+            await _async_refresh_dashboard(hass, restored)
             restored["history"] = await hass.async_add_executor_job(
                 list_dashboard_history, hass.config.path(DASHBOARD_BASE_DIR)
             )
@@ -355,6 +360,20 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_generate_config)
     websocket_api.async_register_command(hass, websocket_restore_history)
     hass.data[DOMAIN][WEBSOCKET_REGISTERED] = True
+
+
+async def _async_refresh_dashboard(hass: HomeAssistant, result: dict[str, Any]) -> None:
+    """Reload committed YAML includes and notify open dashboards through HA."""
+    if result.get("dry_run") or not (lovelace := hass.data.get(LOVELACE_DATA)):
+        return
+    dashboard = lovelace.dashboards.get(result["dashboard_key"])
+    if dashboard is None or dashboard.mode != MODE_YAML:
+        return
+    if filename := result.get("filename"):
+        if Path(dashboard.path) != Path(hass.config.path(filename)):
+            return  # A changed dashboard registration still requires HA's restart.
+    # HA watches the root YAML timestamp, but generation can change only includes.
+    await dashboard.async_load(force=True)
 
 
 def _management_payload(
@@ -459,6 +478,7 @@ def _restore_history(hass: HomeAssistant, version: str) -> dict[str, Any]:
         "restored_version": version,
         "dashboard_key": key,
         "dashboard_url": f"/{key}/{config.get('landing_page', 'overview')}",
+        "filename": planned.filename,
         "config_changed": metadata.get("config_changed", False),
     }
 

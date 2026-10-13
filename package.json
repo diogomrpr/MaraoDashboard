@@ -1,6 +1,6 @@
 {
   "name": "marao-dashboard",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "description": "Marao Dashboard Home Assistant dashboard development tools",
   "scripts": {
@@ -8,10 +8,10 @@
     "build:editor": "node frontend_src/build-editor.cjs",
     "check:editor": "node frontend_src/build-editor.cjs --check",
     "build:hacs": "npm run build:editor && node frontend_src/build-hacs-dist.cjs",
-    "test:frontend": "node --test tests/frontend/*.test.js",
+    "test:frontend": "node --test --test-concurrency=1 tests/frontend/*.test.js",
     "test:static": "npm run check:editor && npm run test:frontend && node frontend_src/build-hacs-dist.cjs && node --check ha-test/.cache/dist/custom_components/marao_dashboard/frontend/MaraoDashboard.js && node tests/validate-yaml.js",
     "test:python": "pytest --cov=custom_components.marao_dashboard --cov-report=term-missing",
-    "test": "npm run test:static && npm run test:python",
+    "test": "npm run test:affected",
     "test:ha:e2e": "node tests/test-ha-dashboard-e2e.js",
     "test:ha:alignment": "node tests/test-ha-card-alignment.js",
     "test:ha:rooms": "node tests/test-ha-room-cards.js",
@@ -21,10 +21,12 @@
     "ha:preview:accessibility": "node tests/test-ha-dashboard-accessibility.js --preview",
     "verify:publish": "node tests/verify-publish.js",
     "verify:release": "node tests/verify-release.js",
-    "preversion": "npm run verify:publish",
+    "preversion": "npm run test:affected -- --offline",
     "ha:sync": "node ha-test/prepare.js",
     "ha:sync:dry-run": "node ha-test/prepare.js --dry-run",
-    "test:ha:upgrade": "node tests/test-ha-upgrade.js"
+    "test:ha:upgrade": "node tests/test-ha-upgrade.js",
+    "test:affected": "node tests/verification.js",
+    "test:full": "node tests/verification.js --full"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

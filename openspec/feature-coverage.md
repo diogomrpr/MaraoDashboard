@@ -110,13 +110,12 @@ The candidate includes [the executable inventory](../ha-test/upgrade/coverage.js
 [upgrade change](changes/ensure-safe-dashboard-upgrades/proposal.md) retains its
 first live release tasks until real final-candidate evidence passes.
 
-Every public family and material behavior must remain mapped. The scenario backs
-up the installed disposable state, verifies the prior package and supported
-historical formats before explicit editor additions, checks preservation,
-features/mobile layouts and failure recovery, then requires actual upgraded
-visual review and verified cleanup. Fresh-fixture checks and mocked gate tests
-cannot establish upgrade success. Run this scenario only during explicit release
-preparation; missing, stale or incomplete evidence blocks versioned publication.
+Every public family and material behavior remains mapped for optional complete
+verification. Default release checks cover changed contracts and consumers only.
+Required preserved-install checks back up exact installed state, verify affected
+expected JSON/recovery and restore the disposable installation. Fresh fixtures
+and mocked gates cannot establish a required live upgrade pass. Unaffected
+historical formats and all mobile profiles are not implicit release requirements.
 
 ## Review outcome and maintenance
 
@@ -134,10 +133,11 @@ only completed verified changes. Existing documentation is supporting material;
 the binding contract wins over stale screenshots/examples. Counts and prior
 release results are dated evidence, never substitutes for the next task's checks.
 
-The user-approved 2026-10-13 verification policy uses one shared mobile layout
-matrix per release, distinct interactions once (device repeats for gestures),
-independent preservation/recovery for all seven baselines and targeted browser
-checks for other distinct formats. Manual review covers representative changed
-components and difficult layouts; failure screenshots remain mandatory.
-Publication may reuse complete exact-candidate preserved-install browser evidence
-only after private capture, coverage, cleanup and restored-install checks.
+Use `npm run test:affected` (preview with `--plan`) as the default for
+implementation, hooks, CI and publication. Include changed features and shared
+consumers only. Full-suite and parallel execution require explicit requests;
+`npm run test:full -- --parallel` is the comprehensive option. Live upgrade
+checks apply only to changed persistence, migration, generated ownership or
+installation paths, with affected baselines, expected data, recovery and cleanup.
+Reuse validated unchanged scoped evidence and report omitted coverage honestly.
+See [focused testing](../docs/docs/development/focused-testing.md).

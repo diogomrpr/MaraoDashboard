@@ -7,7 +7,7 @@ const { prepare } = require('../ha-test/prepare');
 const { parseArgs, selectedRuns, contextOptionsForScenario, configurePageEmulation, applyVisualPreferences, emulationIssues, layoutIssues } = require('./test-ha-dashboard-accessibility');
 const { checkRoomComposition } = require('./test-ha-card-alignment');
 
-const output = path.join(__dirname, '.artifacts/room-cards');
+const output = path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), 'room-cards');
 const safeLights = ['light.marao_dashboard_test_light', 'light.marao_dashboard_test_room_light'];
 const namedCard = (page, name) => page.locator('marao-card').filter({ has: page.locator('.title').filter({ hasText: new RegExp('^' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$') }) }).first();
 

@@ -103,26 +103,17 @@ Downgrades restore matching package assets and saved data together.
 
 Maintain provenance-backed historical fixtures, independent expected JSON and
 feature-to-assertion coverage. Use focused migration checks during development.
-Immediately before versioned publication, additionally require the final
-candidate's preserved-install upgrade gate: supported released formats, persisted
-expected data, all supported features/mobile profiles, failure recovery and
-verified disposable cleanup. Run shared behavior and the full mobile matrix once on the actual latest-release
-upgrade. Retain independent preservation/recovery for all seven baselines and
-targeted saved-page/navigation/popup checks for other distinct formats. Review
-normal iPhone and difficult Android zoom samples in both themes; this does not
-claim manual review of every format/profile. Fresh-fixture provisioning cannot prove upgrades.
-Failed, missing, incomplete or stale evidence blocks publication.
+For a versioned release, require preserved-install proof only when changed code
+affects saved data, migration, generated ownership or installation/upgrade paths.
+Select affected baselines and features, verify expected preservation/recovery and
+cleanup, and reject failed, incomplete or stale selected evidence. Fresh fixture
+provisioning cannot establish an upgrade pass. UI-only releases need no historical
+replay. Full historical/feature/mobile coverage requires an explicit request.
 
-Run that live scenario only during explicit release preparation, outside routine
-tests, push/PR checks, ordinary stabilization and version hooks.
-`npm run verify:release -- /absolute/private/upgrade-report.json` checks complete
-private evidence for a clean final candidate, including preserved-install visual
-reviews and verified cleanup, before running `verify:publish`. The publication
-gate may reuse that exact candidate's browser evidence after rechecking private
-capture hashes, coverage, native-exception expiry and the restored live install.
-It still runs before each push/tag/release; any drift invalidates reuse. The historical runner is implemented in the development candidate; its real
-complete final-candidate evidence is required before publication. Existing `verify:publish`, CI and
-the final affected-card visual inspection still apply.
+`npm run verify:release` validates scoped clean-candidate evidence and relevant
+publication checks. Reuse successful unchanged scoped inputs after validating
+private evidence and the prepared installation; bind proof to the final commit.
+See [focused testing](focused-testing.md) for command and evidence contracts.
 
 ### During iteration
 
@@ -170,27 +161,18 @@ Automated release layout checks still cover the full gallery.
 
 ### Test timing
 
-Focused checks are the normal development loop. Do not repeatedly run the full
-suite while related UI work is still changing. Finish queued implementation,
-then perform one complete release stabilization pass. If it finds a defect, fix
-it and repeat the focused check and affected-card inspection before verifying the
-final candidate. All publication, exact-commit CI and preserved-install gates
-remain required. Run distinct browser behavior once per relevant theme, with
-device repeats only for native gestures or geometry. Keep fast unit/migration
-checks. Run the full automated mobile layout matrix once per release candidate;
-check visibility, clipping, overlap, touch targets and diagnostics. Screenshots
-are failure evidence or representative visual samples, with exhaustive success
-captures available only through `--screenshots all`.
+Batch related implementation before the covering focused check. Default to
+`npm run test:affected`, using the recorded starting commit and shared-component
+scope when needed. Run serially; parallel execution and `test:full` require explicit
+requests. No normal hook, automatic CI, stabilization or release implicitly runs
+the full suite or complete mobile matrix. Select relevant layouts and interactions,
+prepare once and save failures/representative successes. Repair focused failures
+before validating the final scoped candidate. See [focused testing](focused-testing.md).
 
-Run `npm run verify:publish` only when:
-
-- the user requests the full gate;
-- the work enters final stabilization; or
-- a push, tag, GitHub release, or HACS release is the next step.
-
-`npm run test:ha:e2e` is a release check and may target only the configured
-disposable instance. Never publish when `verify:publish` fails. GitHub Tests,
-hassfest, and HACS validation must pass for the published commit.
+Run the scoped `npm run verify:publish` before pushes/tags/releases, with applicable
+exact-commit CI and conditional upgrade proof. Known relevant defects and selected
+failures still block publication. Reuse validated unchanged results instead of
+repeating browser work between the push, tag and release.
 
 ### Reporting
 
@@ -615,7 +597,9 @@ The complete release gate covers the generated dashboard and card gallery at:
 | Representative Android landscape | 800 × 360 |
 
 Also inspect a larger phone where a changed layout needs it. The release check
-must cover light and dark theme behavior and the supported typography matrix:
+in explicitly requested comprehensive verification cover light and dark behavior
+and the supported typography matrix below. Focused releases select relevant
+profiles for changed components:
 normal, bold, 200% text, 200% zoom, and bold plus 200% text. Test 200% text and
 200% browser zoom as distinct configurations.
 

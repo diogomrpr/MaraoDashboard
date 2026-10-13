@@ -61,10 +61,44 @@ function assertCleanCandidate() {
   assert.equal(execFileSync('git', ['status', '--porcelain', '--untracked-files=normal'], { cwd: repoRoot, encoding: 'utf8' }).trim(), '', 'Release verification requires a clean final commit.');
 }
 
-function verifyRelease(filename, { publish = true } = {}) {
+function validateScopedUpgrade(report, config, candidate, scope) {
+  assert.equal(report.version, 3);
+  assert.equal(report.kind, 'preserved-install-upgrade-scoped');
+  assertDisposableHaTarget(config, { requireSsh: true });
+  assert.equal(new URL(config.url).hostname, '192.168.0.28');
+  assert.equal(report.target, config.url);
+  assert.deepEqual(report.candidate, candidate, 'Candidate changed since preserved upgrade');
+  assert.ok(!report.failure && report.verified_cleanup, 'Upgrade failed or cleanup is incomplete');
+  assert.deepEqual(report.scope_components, scope.components, 'Upgrade scope changed');
+  const selected = require('./test-ha-upgrade').scopedPlan(config, scope.components);
+  assert.deepEqual(report.baselines, selected.baselines, 'Affected historical baselines are missing');
+  const coverage = JSON.parse(fs.readFileSync(path.join(repoRoot, 'ha-test/upgrade/coverage.json')));
+  const expected = selected.baselines.flatMap(baseline => coverage.required_install_assertions
+    .filter(name => name !== 'baseline-package-health' || baseline === 'v0.5.1').map(name => baseline + '/' + name));
+  const actual = report.install_assertions.map(row => { assert.equal(row.passed, true); return row.baseline + '/' + row.assertion; });
+  assert.equal(new Set(actual).size, actual.length, 'Duplicate preservation proof');
+  assert.deepEqual(actual.sort(), expected.sort(), 'Missing preservation or recovery assertion');
+  const formats = report.runs.filter(row => row.check === 'upgraded-pages').map(row => {
+    assert.equal(row.passed, true); assert.equal(row.profile, 'iphone-normal'); return row.format + '/' + row.theme;
+  });
+  const expectedFormats = [...new Set(selected.rows.map(row => row.format))].sort();
+  assert.deepEqual(formats.sort(), expectedFormats.flatMap(format => ['light', 'dark'].map(theme => format + '/' + theme)).sort(), 'Incomplete targeted saved-page checks');
+  const completed = Date.parse(report.completed_at);
+  assert.ok(Number.isFinite(completed) && completed <= Date.now() && Date.now() - completed < 86400000, 'Stale upgrade proof');
+  return report;
+}
+
+function verifyRelease(filename, { publish = true, scope } = {}) {
   const bytes = readReleaseReport(filename), report = JSON.parse(bytes);
   const config = readConfig(), candidate = candidateIdentity();
   const coverage = JSON.parse(fs.readFileSync(path.join(repoRoot, 'ha-test/upgrade/coverage.json')));
+  if (report.version === 3) {
+    scope ||= require('./verification').makePlan({ release: true });
+    validateScopedUpgrade(report, config, candidate, scope);
+    assertCleanCandidate();
+    if (publish) execFileSync('npm', ['run', 'verify:publish', '--', '--component', scope.components.join(','), '--upgrade-report', filename], { cwd: repoRoot, stdio: 'inherit' });
+    return report;
+  }
   validateReleaseReport(report, config, candidate, coverage);
   assertCleanCandidate();
   validateCapturedEvidence(report, filename);
@@ -90,9 +124,9 @@ function verifyRelease(filename, { publish = true } = {}) {
 
 if (require.main === module) {
   try {
-    assert.equal(process.argv.length, 3, 'Use npm run verify:release -- /absolute/private/upgrade-report.json.');
-    verifyRelease(process.argv[2]);
+    if (process.argv.length === 3 && path.isAbsolute(process.argv[2])) verifyRelease(process.argv[2]);
+    else require('./verify-publish').verifyPublish(process.argv.slice(2)).catch(error => { console.error(error.message); process.exitCode = 1; });
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }
 
-module.exports = { readReleaseReport, validateReleaseReport, validateCapturedEvidence, verifyRelease };
+module.exports = { readReleaseReport, validateReleaseReport, validateScopedUpgrade, validateCapturedEvidence, verifyRelease };

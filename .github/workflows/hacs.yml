@@ -5,12 +5,22 @@ on:
     paths:
       - ".github/workflows/hacs.yml"
       - "hacs.json"
-      - "custom_components/**"
+      - "custom_components/marao_dashboard/manifest.json"
+      - "custom_components/marao_dashboard/strings.json"
+      - "custom_components/marao_dashboard/translations/**"
+      - "custom_components/marao_dashboard/services.yaml"
+      - "custom_components/marao_dashboard/config_flow.py"
+      - "custom_components/marao_dashboard/__init__.py"
   pull_request:
     paths:
       - ".github/workflows/hacs.yml"
       - "hacs.json"
-      - "custom_components/**"
+      - "custom_components/marao_dashboard/manifest.json"
+      - "custom_components/marao_dashboard/strings.json"
+      - "custom_components/marao_dashboard/translations/**"
+      - "custom_components/marao_dashboard/services.yaml"
+      - "custom_components/marao_dashboard/config_flow.py"
+      - "custom_components/marao_dashboard/__init__.py"
   workflow_dispatch:
 
 permissions: {}

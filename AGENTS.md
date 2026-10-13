@@ -59,62 +59,49 @@ success; keep future work in changes and archive only completed, verified work.
 
 ## Development workflow
 
-- Before editing, identify the affected-card set: every card changed directly
-  and every card that consumes a changed shared component, template, token, or
-  layout rule. If no card can be affected, record that the set is empty.
-- Inspect the affected end-to-end path before editing. Make the smallest
-  coherent root-cause change and preserve unrelated user work.
-- Implement related queued tasks as one coherent batch. Run the smallest
-  covering focused check after the batch's last edit, deploy UI changes together,
-  and visually and interactively inspect the combined affected-card set before
-  concluding the batch. Check data migrations and shared security controls early
-  when later work depends on them.
-- Whenever a supported card or behavior is added or changed, update the
-  canonical test gallery and safe fake entities in the same change. Keep every
-  materially distinct state, behavioral option, popup, action, and layout
-  configuration visible, and also place a representative example on the
-  realistic generated page where users would encounter it. Arbitrary custom
-  labels, colors, and equivalent value permutations do not require a Cartesian
-  set of duplicate examples.
-- Use `npm run test:ha:alignment` as the focused geometry check whenever an
-  icon-only action card or its shared layout changes.
-- Treat every warning, error card, console exception, failed resource, and
-  repeated request as a defect. Fix its root cause; never hide, suppress, or
-  ignore it.
-- After the last edit and focused check, visually inspect changed components and
-  representative difficult layouts on the disposable dashboard. Cover each
-  affected shared component and card family, including normal and enlarged-text
-  or zoom cases where relevant. Check centering, spacing, clipping, overlap and
-  overflow; fix defects and repeat the focused check and affected visual review.
-  Do not manually inspect every equivalent card or scrolling capture. Inspect
-  the complete gallery only when the user explicitly requests that review.
-- Run each distinct interaction once per relevant theme. Repeat across devices
-  only when native gestures or device geometry affect the behavior. Keep fast
-  unit, migration and recovery checks; visibility alone cannot verify actions or
-  preservation. During release preparation, run one automated mobile layout
-  matrix checking visibility, clipping, overlap, touch targets and browser/resource
-  errors. Save screenshots on failures and for representative visual review;
-  exhaustive success captures are opt-in diagnostics, never the default.
-- Finish queued implementation before the complete release stabilization pass;
-  do not repeat broad checks between small edits or individual tasks. After a
-  defect, rerun its focused check and visual inspection, then verify the final
-  candidate. Keep all mandatory publication and preserved-install gates.
-- Do not run the full suite after small changes. Run `npm run verify:publish`
-  only when the user requests it, during final stabilization, or immediately
-  before publishing.
-- Before every push, tag, GitHub release, or HACS release, run
-  `npm run verify:publish`. Do not publish unless it passes against the
-  disposable instance. GitHub Tests, hassfest, and HACS validation must pass for
-  the published commit.
-- Do not publish while a known, relevant violation of this contract remains,
-  even when the automated gate does not detect it.
-- The user explicitly allows the known Home Assistant native stale-unsubscribe
-  reconnect failure until its upstream fix reaches a stable frontend. Preserve
-  raw failing assertions and native subscription evidence; only that diagnosed
-  failure is exempt. All other publication and preserved-install requirements
-  still apply, and the exception expires when the stable fix is available.
-- Keep routine completion reports concise. Use a detailed verification report
-  only for a release, final stabilization, or material security/safety work.
+- Record the starting commit and affected-card set before editing, including all
+  consumers of changed shared components. Record an empty set for tooling-only work.
+- Inspect the affected end-to-end path, preserve unrelated work, and implement
+  related queued tasks as one batch with the smallest coherent shared-root fix.
+- Default to `npm run test:affected`; use `--base <starting-commit>` for committed
+  batch work and `--component <id>` for reviewed shared-file changes. Preview the
+  scope with `--plan`. Keep the source/component/check map current; unresolved
+  scope is an error, never permission to skip checks or run everything.
+- Run the smallest covering check after the batch's last edit. Check dependent
+  migrations and security controls early. Deploy compatible UI changes together
+  only to the disposable instance, then inspect representative affected components
+  and difficult layouts as the final step. Fix defects and repeat focused checks
+  and inspection. Do not manually review every equivalent card or scroll capture.
+- Update the canonical gallery, safe entities and a realistic-page example when
+  supported behavior changes. Cover materially distinct states/options/layouts,
+  without duplicating equivalent labels, colors or values into a Cartesian matrix.
+- Select `test:ha:alignment` for changed icon-only actions/shared action geometry,
+  and relevant slider, action, migration and recovery checks for those contracts.
+  Visibility checks cannot establish correct dispatch or data preservation.
+- Run distinct interactions once per relevant theme; repeat devices only for
+  native gestures or geometry. Use relevant narrow/text/zoom/landscape profiles
+  for changed layouts. Save failures and representative success captures only.
+- Run tests serially by default. Parallel checks require an explicit request and
+  `--parallel`. Use isolated contexts/private job outputs; serialize deployment,
+  shared builds, dashboard writes, conflicting helper changes, restarts and recovery.
+- Run `npm run test:full -- --parallel` only when the user explicitly requests
+  comprehensive testing. Do not run the full suite, 26-profile mobile matrix,
+  exhaustive gallery review or all historical scenarios implicitly during normal
+  implementation, hooks, automatic CI, stabilization or publication.
+- Before pushes/tags/releases, use the scoped `npm run verify:publish` gate.
+  Publication requires relevant feature/component checks and applicable exact-commit
+  Tests/hassfest/HACS validation; a release request alone does not request full tests.
+  Reuse unchanged validated scoped evidence rather than repeating browser work.
+- Treat observed warnings, error cards, console exceptions, failed resources,
+  repeated requests and duplicate service calls as defects. Fix their shared root;
+  never hide, suppress or relabel failures. Known relevant violations block release.
+- The user permits only the diagnosed native Home Assistant stale-unsubscribe
+  reconnect failure until its upstream fix reaches a stable frontend. Preserve raw
+  assertions/native evidence and check expiry when applying it. Other selected
+  checks and required cleanup remain binding.
+- Keep routine completion reports concise and honest about selected, omitted,
+  automated and manually inspected coverage. Use detailed reports only for releases,
+  final stabilization or material security/safety work.
 
 ## Upgrade compatibility
 
@@ -136,43 +123,33 @@ success; keep future work in changes and archive only completed, verified work.
 - Keep provenance-backed historical fixtures, independently specified expected
   JSON, and upgrade feature coverage current with each relevant change. Run
   focused migration checks during development.
-- Immediately before versioned publication, require a separate preserved-install
-  upgrade scenario in addition to `npm run verify:publish` and exact-commit CI.
-  It must verify the final candidate, supported released formats, persisted data,
-  complete shared feature/mobile coverage, failure recovery, and disposable cleanup.
-  Keep preservation/recovery assertions for all seven supported baselines. Run
-  shared interactions and the full mobile matrix once on the actual latest-release
-  upgrade; use targeted saved-page, navigation, popup and diagnostic browser checks
-  for the other distinct formats. Report those scopes honestly without claiming
-  that every historical format independently passed the full mobile matrix.
-  Missing, incomplete, failed, or stale evidence blocks publication. This live
-  scenario runs only during explicit release preparation, never as a routine
-  test, push/PR check, ordinary stabilization, or ordinary version hook.
-- Run `npm run verify:release -- /absolute/private/upgrade-report.json` only
-  during release preparation. It requires a clean final commit, private complete
-  preserved-install evidence, representative upgraded visual review and verified
-  cleanup, then runs `verify:publish` and rejects candidate or evidence drift.
-  Publication may reuse that exact candidate's successful browser evidence after
-  revalidating the private report, coverage and restored disposable installation;
-  do not repeat the mobile matrix between its push, tag and release. Changed
-  candidate assets, saved source, target or failed/stale evidence invalidate reuse.
-  Run `npm run test:ha:upgrade` for the clean final candidate to produce that
-  evidence. The runner requires the safe current fixture installation from final
-  stabilization, backs it up before any remote write, and never invokes fresh
-  preparation while collecting upgrade evidence. Without its real complete
-  evidence, versioned publication remains blocked.
-  Do not claim fresh-fixture checks or mocked gate tests satisfy that requirement.
-  A downgrade requires the matching prior package and saved data/owned-state
-  baseline together, not package assets alone.
+- Versioned publication requires live preserved-install verification only when
+  persisted data, migration, generated-output ownership or installation/upgrade
+  behavior changes. Select affected formats/features with independent expected
+  data, relevant failure recovery and verified disposable cleanup. Changes affecting
+  every supported conversion still require every affected baseline; UI-only releases
+  do not automatically run historical upgrades or a full mobile matrix.
+- Use `npm run test:ha:upgrade -- --scope <components>` for required scoped live
+  upgrade proof during explicit release preparation. It preserves the safe existing
+  installation and exact backups before remote writes; fresh fixture preparation
+  cannot replace preserved-install evidence. Full upgrade/browser coverage requires
+  an explicit comprehensive request. Missing, failed, incomplete or stale selected
+  proof blocks publication. Downgrades restore the matching package and saved data
+  together, not package assets alone.
+- `npm run verify:release` checks scoped final-candidate evidence and relevant
+  publication checks. Revalidate private coverage, source/asset identities, cleanup
+  and the prepared installation before reuse; candidate changes recompute scope
+  and invalidate changed inputs. Bind valid proof to the clean final release commit.
+  Keep historical comprehensive reports immutable and distinct from scoped reports.
 
 ## Binding UI and interaction rules
 
-- The acceptance target is mobile only. Release checks cover 320 CSS pixels and
+- The acceptance target is mobile only. Relevant UI checks cover 320 CSS pixels and
   representative iPhone and Android layouts in portrait and landscape.
 - Use scalable Montserrat typography. Test normal text, bold text, 200% text,
   200% browser zoom, and bold plus 200% text. Essential content wraps; secondary
   content may use ellipsis.
-- The automated mobile profiles are the release gate. Real-phone inspection is
+- Selected automated mobile profiles form the scoped UI gate. Real-phone inspection is
   recommended when available but is not required; do not claim it was performed
   unless it was. VoiceOver, TalkBack, and OS high-contrast modes are outside the
   current acceptance target.

@@ -8,7 +8,8 @@ const fix = '4c5674c36cc898bbd38abc54b4d89777e37a8496';
 
 function validateKnownFailure(evidence, target) {
   assert.equal(evidence.version, 1); assert.equal(evidence.target, target);
-  assert.equal(evidence.functional_completed, true, 'The comprehensive e2e did not finish');
+  if (evidence.scope === 'connection-only') assert.equal(evidence.functional_completed, false, 'Focused reconnect evidence must identify its limited scope');
+  else assert.equal(evidence.functional_completed, true, 'The comprehensive e2e did not finish');
   assert.equal(evidence.safe_actions_disabled, true); assert.equal(evidence.disconnected_dispatches, 0);
   assert.equal(evidence.authoritative_recovery, true);
   assert.equal(evidence.errors.length, 1);
@@ -58,7 +59,7 @@ function readKnownFailure(evidencePath, target) {
   assert.equal(exit.message, `Disconnect scenario produced unexpected browser errors:\n${[...evidence.errors, ...evidence.rejections].join('\n')}\nSubscription lifecycle: ${JSON.stringify(evidence.subscriptions)}`);
 }
 
-async function e2eWithApprovedException(config, directory, theme = 'light', env = {}) {
+async function e2eWithApprovedException(config, directory, theme = 'light', env = {}, { args = [], signal } = {}) {
   const evidencePath = path.join(directory, `native-reconnect-${theme}.json`);
   fs.rmSync(evidencePath, { force: true });
   fs.rmSync(evidencePath + '.exit.json', { force: true });
@@ -66,9 +67,11 @@ async function e2eWithApprovedException(config, directory, theme = 'light', env 
   let status;
   try {
     status = await new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, ['tests/test-ha-dashboard-e2e.js', '--screenshots', '--theme=' + theme, '--reconnect-evidence=' + evidencePath],
+      const child = spawn(process.execPath, ['tests/test-ha-dashboard-e2e.js', ...args, '--screenshots', '--theme=' + theme, '--reconnect-evidence=' + evidencePath],
         { cwd: repoRoot, env: { ...process.env, ...env }, stdio: ['ignore', fd, fd] });
-      child.on('error', reject); child.on('exit', resolve);
+      const stop = () => child.kill('SIGTERM');
+      signal?.addEventListener('abort', stop, { once: true });
+      child.on('error', reject); child.on('exit', code => { signal?.removeEventListener('abort', stop); resolve(code); });
     });
   } finally { fs.closeSync(fd); }
   if (status === 0) return { passed: true, log };

@@ -220,7 +220,7 @@ test("release runs every profile in deterministic light and dark modes", () => {
 
 test("preview arguments select one profile and one theme and reject missing values", () => {
   const options = parseArgs(["--preview", "--scenario", "android-normal", "--theme", "dark"]);
-  assert.deepEqual(options, { preview: true, scenario: "android-normal", theme: "dark", screenshots: 'failure' });
+  assert.deepEqual(options, { preview: true, scenario: "android-normal", theme: "dark", screenshots: 'failure', focused: false, families: [], popups: false, parallel: false });
   assert.deepEqual(selectedRuns(options).map(({ scenario, theme }) => [scenario.name, theme]), [
     ["android-normal", "dark"],
   ]);

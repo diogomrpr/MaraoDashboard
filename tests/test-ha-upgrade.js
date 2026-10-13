@@ -44,6 +44,18 @@ function plan(config) {
   return { rows, current, formats, baselines: ['v0.2.0', ...provenance.map(row => row.tag), 'predecessor-format-1', 'current-format-2'] };
 }
 
+function scopedPlan(config, components) {
+  const selected = plan(config);
+  assert.ok(components.some(id => require('./verification-map').components[id]?.upgrade), 'No changed upgrade contract in selected scope');
+  const baselines = components.includes('migration') ? selected.baselines
+    : components.includes('saved-history') ? ['v0.2.0', 'v0.5.1', 'predecessor-format-1', 'current-format-2']
+    : ['v0.5.1', 'current-format-2'];
+  selected.rows = selected.rows.filter(row => baselines.includes(row.baseline));
+  selected.baselines = selected.baselines.filter(baseline => baselines.includes(baseline));
+  selected.formats = [...new Set(selected.rows.map(row => row.format))].sort();
+  return selected;
+}
+
 function ssh(config, command, input) {
   try {
     return execFileSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', ...(config.sshKeyPath ? ['-i', config.sshKeyPath] : []),
@@ -252,7 +264,7 @@ async function functionalChecks(config, format, directory, receiptPath, report, 
   const captureRoot = path.join(directory, 'captures'); fs.mkdirSync(captureRoot, { mode: 0o700 });
   const captured = {};
   for (const name of ['accessibility', 'editor']) {
-    const root = path.join(repoRoot, 'tests/.artifacts', name);
+    const root = path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(repoRoot, 'tests/.artifacts'), name);
     if (!fs.existsSync(root)) continue;
     for (const file of sourceFiles(root)) {
       if (!file.endsWith('.png') || fs.statSync(path.join(root, file)).mtimeMs < started) continue;
@@ -295,10 +307,14 @@ async function finalVisualReview(directory, report, saveReport) {
 }
 
 async function main() {
-  const config = readConfig(), selected = plan(config);
+  const full = process.argv.includes('--full');
+  const scopeIndex = process.argv.indexOf('--scope');
+  let scope = scopeIndex >= 0 ? process.argv[scopeIndex + 1]?.split(',') : undefined;
+  if (!full && !scope) scope = require('./verification').makePlan({ release: true }).components;
+  const config = readConfig(), selected = full ? plan(config) : scopedPlan(config, scope || []);
   if (process.argv.includes('--dry-run')) {
     console.log(JSON.stringify({ target: config.url, baselines: selected.rows.map(({ baseline, format, replay }) => ({ baseline, format, replay })),
-      profiles: coverage.profiles, themes: coverage.themes, phases: ['private backup', 'released package health', 'package-only replacement and setup',
+      profiles: full ? coverage.profiles : ['iphone-normal'], themes: coverage.themes, scope: full ? 'full' : scope, phases: ['private backup', 'released package health', 'package-only replacement and setup',
         'independent preservation', 'editor feature additions', 'shared checks', 'final visual review', 'verified cleanup'] }, null, 2));
     return;
   }
@@ -311,7 +327,8 @@ async function main() {
   const reportPath = path.join(directory, 'report.json');
   const venv = path.join(repoRoot, '.venv/bin/python');
   const python = process.env.MARAO_TEST_PYTHON || (fs.existsSync(venv) ? venv : 'python3');
-  const report = { version: 2, kind: 'preserved-install-upgrade', operation_id: operation, candidate, target: config.url,
+  const report = { version: full ? 2 : 3, kind: full ? 'preserved-install-upgrade' : 'preserved-install-upgrade-scoped',
+    ...(full ? {} : { scope_components: scope }), operation_id: operation, candidate, target: config.url,
     started_at: new Date().toISOString(), formats: selected.formats, baselines: selected.baselines, runs: [], install_assertions: [], visual_reviews: [],
     verified_cleanup: false, evidence: [] };
   const saveReport = () => fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
@@ -381,9 +398,11 @@ async function main() {
         output: { slug: selected.current.slug, files: pretest.output }, fixture_domains: domains, fixture_files: Object.fromEntries(helperPaths.map(file => [file, pretest.files[file]['']])) };
       const initialReceiptPath = path.join(directory, 'pretest-receipt.json'); fs.writeFileSync(initialReceiptPath, JSON.stringify(initialReceipt), { mode: 0o600 });
       await require('../ha-test/upgrade/prepared').verifyPrepared(config, initialReceiptPath, { ssh: (config, command, options) => ({ stdout: ssh(config, command, options?.input) }), referencedEntities: require('../ha-test/prepare').referencedEntities });
-      await child(python, ['-m', 'pytest', 'tests/components/marao_dashboard', '-q'], directory, 'candidate-python');
-      await child(process.execPath, ['--test', ...sourceFiles(path.join(repoRoot, 'tests/frontend')).filter(file => file.endsWith('.test.js')).map(file => 'tests/frontend/' + file)], directory, 'candidate-frontend');
-      for (const [name, check] of Object.entries(coverage.checks)) if (check.scope === 'candidate') report.runs.push({ check: name, format: 'candidate', profile: null, theme: null, passed: true, evidence: check.file.endsWith('.py') ? 'candidate-python.log' : 'candidate-frontend.log' });
+      if (full) {
+        await child(python, ['-m', 'pytest', 'tests/components/marao_dashboard', '-q'], directory, 'candidate-python');
+        await child(process.execPath, ['--test', '--test-concurrency=' + (process.env.MARAO_TEST_PARALLEL === '1' ? 3 : 1), ...sourceFiles(path.join(repoRoot, 'tests/frontend')).filter(file => file.endsWith('.test.js')).map(file => 'tests/frontend/' + file)], directory, 'candidate-frontend');
+        for (const [name, check] of Object.entries(coverage.checks)) if (check.scope === 'candidate') report.runs.push({ check: name, format: 'candidate', profile: null, theme: null, passed: true, evidence: check.file.endsWith('.py') ? 'candidate-python.log' : 'candidate-frontend.log' });
+      }
       const released = path.join(directory, 'released-package'); fs.mkdirSync(released);
       const archive = execFileSync('git', ['archive', 'v0.5.1', 'custom_components/marao_dashboard', 'frontend_src', 'package.json', 'package-lock.json'], { cwd: repoRoot, maxBuffer: 16 * 1024 * 1024 });
       execFileSync('tar', ['-xf', '-', '-C', released], { input: archive });
@@ -514,7 +533,7 @@ async function main() {
         await child(python, ['-m', 'pytest', 'tests/components/marao_dashboard/test_release_replay_recovery.py', '-q', '-k', row.baseline.replaceAll('-', '_').replaceAll('.', '_')], rowDir, 'interruption-recovery');
         assertion(row.baseline, 'interrupted-operation-recovery', 'interruption-recovery.log');
         if (!checkedFormats.has(row.format) && (row.format !== coverage.shared_format || row.baseline === 'v0.5.1')) {
-          const shared = row.baseline === 'v0.5.1';
+          const shared = full && row.baseline === 'v0.5.1';
           const extended = shared ? extendedSource(row.expected, selected.current)
             : JSON.parse(isolateHistoricalText(active.source_bytes, row.entity_aliases));
           if (shared || Object.keys(row.entity_aliases).length) {
@@ -533,7 +552,7 @@ async function main() {
           client.close();
           if (shared) await functionalChecks(config, row.format, rowDir, receiptPath, report, saveReport);
           else {
-            await child(process.execPath, ['tests/test-ha-dashboard-accessibility.js', '--pages-only', '--scenario', 'iphone-normal'], rowDir, 'upgraded-pages', { MARAO_UPGRADE_RECEIPT: receiptPath });
+            await child(process.execPath, ['tests/test-ha-dashboard-accessibility.js', '--pages-only', '--scenario', 'iphone-normal', ...(!full ? ['--focused'] : [])], rowDir, 'upgraded-pages', { MARAO_UPGRADE_RECEIPT: receiptPath });
             for (const theme of coverage.themes) report.runs.push({ check: 'upgraded-pages', format: row.format, profile: 'iphone-normal', theme, passed: true, evidence: 'upgraded-pages.log' });
             saveReport();
           }
@@ -545,9 +564,9 @@ async function main() {
         assertion(row.baseline, 'history-immutable', sha256(JSON.stringify(history)));
         report.evidence.push({ baseline: row.baseline, format: row.format, replay: row.replay, before_sha256: sha256(JSON.stringify(before)), after_sha256: sha256(JSON.stringify(after)) }); saveReport();
       }
-      assert.deepEqual([...checkedFormats].sort(), [...formats].sort());
+      assert.deepEqual([...checkedFormats].sort(), [...selected.formats].sort());
       assertCandidate();
-      await finalVisualReview(directory, report, saveReport);
+      if (full) await finalVisualReview(directory, report, saveReport);
     }, async () => {
       if (!baseline) return;
       client.close(); client = await connect(config);
@@ -582,5 +601,5 @@ function assertUnrelatedEntries(before, after, entryId) {
   assert.deepEqual(unrelated(after), unrelated(before), 'Concurrent unrelated entry change; retained recovery backup');
 }
 
-module.exports = { unrelatedConfiguration, addResourceSentinel, assertUnrelatedEntries, child, extendedSource, hashes, patchRegistration, plan, validateVisualReviews, withRecovery };
+module.exports = { unrelatedConfiguration, addResourceSentinel, assertUnrelatedEntries, child, extendedSource, hashes, patchRegistration, plan, scopedPlan, validateVisualReviews, withRecovery };
 if (require.main === module) main().catch(error => { console.error(error.message.split('\n')[0]); process.exitCode = 1; });
