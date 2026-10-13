@@ -54,6 +54,10 @@ interaction and keeps focus inside the sheet. Empty selections and empty active
 results have readable localized messages. Fully unknown/unavailable groups are
 neutral and disabled; a usable secondary keeps a partial group reachable.
 
+The converted `overview-maintenance` group retains legacy sensors with `battery`
+in their entity ID even without a battery device class. Other battery groups
+require battery metadata or an explicit `hc_battery_card` member template.
+
 Lights default to Active only; other types default to All entities. Brightness,
 blind position, single/dual thermostat targets and modes retain their existing
 options. Battery rows are read-only. Door/garage/gate covers retain strict slide

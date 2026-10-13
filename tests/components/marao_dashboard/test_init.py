@@ -1097,6 +1097,26 @@ async def test_setup_regenerates_contract_preserving_exact_empty_source_and_entr
     assert list_dashboard_history(source.parent) == versions
 
 
+async def test_setup_keeps_converted_maintenance_without_battery_metadata(hass):
+    _reset_dashboard_files(hass)
+    Path(hass.config.path("configuration.yaml")).write_text("default_config:\n")
+    _create_area_entity(hass, "Fixture", "sensor.fixture_battery")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True)
+    config = {"config_version": 2, "name": "Marao Dashboard", "slug": "dashboard", "landing_page": "overview",
+              "pages": [{"name": "Home", "path": "overview", "entities": [{"template": "hc_entity_group_card",
+                  "id": "overview-maintenance", "name": "Maintenance", "entity_type": "battery",
+                  "entities": ["sensor.fixture_battery"]}]}]}
+    exact = json.dumps(config, indent=2).encode() + b"\n"
+    source.write_bytes(exact)
+    entry = MockConfigEntry(domain=DOMAIN, data={BASE_DASHBOARD_CREATED: True})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert source.read_bytes() == exact
+    assert "sensor.fixture_battery" in (source.parent / "dashboard/components/popups/page-overview-overview-maintenance-popup.yaml").read_text()
+
+
 async def test_generation_waits_for_setup_before_reading_the_saved_source(hass, monkeypatch):
     from custom_components.marao_dashboard import panel_custom
     _reset_dashboard_files(hass)

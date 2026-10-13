@@ -134,7 +134,8 @@
                   "entity_id": "sensor.marao_dashboard_test_battery",
                   "name": "Battery",
                   "template": "hc_battery_card"
-                }
+                },
+                "sensor.marao_dashboard_test_legacy_battery"
               ],
               "variables": {
                 "popup_hash": "#overview-maintenance"

@@ -1405,6 +1405,16 @@
   "entityGroupCases": [
     {
       "template": "hc_entity_group_card",
+      "id": "overview-maintenance",
+      "name": "Entity Group · legacy maintenance",
+      "entity_type": "battery",
+      "popup_filter": "all",
+      "entities": [
+        "sensor.marao_dashboard_test_legacy_battery"
+      ]
+    },
+    {
+      "template": "hc_entity_group_card",
       "id": "gallery-light-all",
       "name": "Entity Group · light all",
       "entity_type": "light",

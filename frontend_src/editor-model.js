@@ -461,7 +461,7 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
       const metadata = entities?.find(entity => entity.entity_id === value.entity_id);
       if (value.variables != null && (typeof value.variables !== 'object' || Array.isArray(value.variables))) errors.push('Entity Group member options must be an object.');
       if (['name', 'icon'].some(key => value[key] != null && typeof value[key] !== 'string')) errors.push('Entity Group member name and icon must be strings.');
-      const legacyBattery = overview && id === 'overview-maintenance' && value.entity_id.includes('battery');
+      const legacyBattery = (overview || version === 2) && id === 'overview-maintenance' && value.entity_id.includes('battery');
       if (!entityGroupMemberCompatible(kind, value, metadata, legacyBattery)) errors.push('Entity Group has an incompatible member.');
     }
   };

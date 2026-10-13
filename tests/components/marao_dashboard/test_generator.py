@@ -1626,6 +1626,32 @@ def test_battery_group_rejects_known_arbitrary_sensor_and_retains_missing_refere
     assert _room(resolved)["entities_by_domain"]["entity_group"][0]["entities"][0]["entity_id"] == "sensor.charge"
 
 
+@pytest.mark.parametrize("explicit", [False, True])
+@pytest.mark.parametrize("device_class", [None, "battery"])
+def test_legacy_maintenance_members_survive_page_conversion(tmp_path, explicit, device_class):
+    member = {"entity_id": "sensor.fixture_battery", "name": "Saved battery", "variables": {"future": 42}}
+    group = {"template": "hc_entity_group_card", "id": "overview-maintenance", "name": "Maintenance",
+             "entity_type": "battery", "entities": [member]}
+    source = {"config_version": 1, "name": "Groups", "rooms": [{"name": "Room", "entities": [member]}],
+              "overview": {"entity_groups": [group]} if explicit else {}}
+    before = json.loads(json.dumps(source))
+    registry = [{"entity_id": member["entity_id"], "device_class": device_class}]
+    converted = generator.migrate_dashboard_config(source, registry)
+    saved = json.loads(json.dumps(converted))
+    resolved = resolve_dashboard_config(converted, registry)
+    assert _home_groups(resolved)[0]["entities"][0]["entity_id"] == member["entity_id"]
+    assert _home_groups(converted)[0]["entities"] == [member]
+    generated = write_dashboard(converted, tmp_path, registry)
+    popup = tmp_path / generated.slug / "components/popups/overview_maintenance.yaml"
+    assert member["entity_id"] in popup.read_text()
+    assert source == before and converted == saved
+    other = json.loads(json.dumps(converted))
+    _home_groups(other)[0]["id"] = "other-batteries"
+    if device_class is None:
+        with pytest.raises(ValueError, match="incompatible"):
+            resolve_dashboard_config(other, registry)
+
+
 def test_legacy_group_adapter_preserves_source_options_empty_intent_and_registry_independence():
     source = {"config_version": 1, "name": "Legacy", "rooms": [{"name": "Office", "entities": [
         {"entity_id": "light.main", "variables": {"enable_slider": False}, "future": 42},

@@ -687,7 +687,7 @@ def _resolve_entity_group(group, registry, used_ids, *, legacy_overview=False, c
         if domain != ("sensor" if kind == "battery" else kind) or (
             kind == "battery" and live is not None and live.get("device_class") != "battery"
             and source.get("template") != "hc_battery_card"
-            and not (legacy_overview and group_id == "overview-maintenance" and "battery" in entity_id)
+            and not ((legacy_overview or canonical_page) and group_id == "overview-maintenance" and "battery" in entity_id)
         ) or (source.get("template") is not None and (not isinstance(source["template"], str) or source["template"] not in templates[kind])):
             raise ValueError(f"Entity Group has an incompatible member: {group_id}, {entity_id}")
         selected[entity_id] = {**(live or {}), **selected.get(entity_id, {}), **source}

@@ -80,6 +80,23 @@ test('Entity Group validation rejects invalid, incompatible, nested and collidin
   assert.deepEqual(validateConfig(config, 1, []), []);
 });
 
+test('converted maintenance keeps legacy battery members without relaxing other groups', () => {
+  const member = { entity_id: 'sensor.fixture_battery', name: 'Saved battery', variables: { future: 42 } };
+  const group = { template: 'hc_entity_group_card', id: 'overview-maintenance', name: 'Maintenance', entity_type: 'battery', entities: [member] };
+  const metadata = [{ entity_id: member.entity_id, device_class: null }];
+  const legacy = { config_version: 1, name: 'Groups', rooms: [], overview: { entity_groups: [group] } };
+  const current = { config_version: 2, name: 'Groups', landing_page: 'home', pages: [{ name: 'Home', path: 'home', sections: [{ entities: [group] }] }] };
+  for (const config of [legacy, current]) {
+    assert.deepEqual(validateConfig(config, 2, metadata), []);
+    assert.deepEqual(serializeConfig(normalizeConfig(config)), config);
+  }
+  for (const change of [{ id: 'other-group' }, { entities: ['sensor.temperature'] }, { entities: ['light.fixture_battery'] },
+    { entities: [{ ...member, template: 'hc_climate_card' }] }]) {
+    const config = { ...current, pages: [{ ...current.pages[0], sections: [{ entities: [{ ...group, ...change }] }] }] };
+    assert.ok(validateConfig(config, 2, [...metadata, { entity_id: 'sensor.temperature', device_class: 'temperature' }]).some(error => error.includes('incompatible')));
+  }
+});
+
 test("dashboard format survives Visual/JSON round trips with raw and unknown content", () => {
   const source = {
     config_version: 0, name: "Home", overview: {}, pages: {},

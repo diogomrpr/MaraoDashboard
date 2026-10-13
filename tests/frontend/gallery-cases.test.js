@@ -139,6 +139,12 @@ test('typed group gallery covers both filters, safe capabilities and realistic e
   const source = JSON.parse(fs.readFileSync(new URL('../../ha-test/marao_dashboard_test_dashboard.json', import.meta.url), 'utf8'));
   assert.equal(homeGroups(source).length, 4);
   assert.ok(roomContent(source, 'living-room').entities.entity_group.length);
+  const legacy = groups.find(group => group.id === 'overview-maintenance');
+  assert.deepEqual(legacy.entities, ['sensor.marao_dashboard_test_legacy_battery']);
+  assert.ok(homeGroups(source).find(group => group.id === legacy.id).entities.includes(legacy.entities[0]));
+  const sensor = helpers.template.flatMap(block => block.sensor || []).find(entity => entity.unique_id === 'marao_dashboard_test_legacy_battery');
+  assert.equal(sensor.device_class, undefined);
+  assert.equal(sensor.unit_of_measurement, '%');
 });
 
 test('every stable state has a separate named gallery card and its own safe fixture', () => {

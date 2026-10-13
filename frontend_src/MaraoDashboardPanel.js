@@ -1332,7 +1332,7 @@ class MaraoDashboardPanel extends HTMLElement {
       host.innerHTML = members.map((member, index) => {
         const entity_id = this._entityId(member), metadata = entityMeta(this._entities, entity_id);
         const source = typeof member === 'string' ? { entity_id } : member;
-        const compatible = entityGroupMemberCompatible(data.entity_type, source, metadata, kind === 'overview' && group.id === 'overview-maintenance' && entity_id.includes('battery'));
+        const compatible = entityGroupMemberCompatible(data.entity_type, source, metadata, ['overview', 'page'].includes(kind) && group.id === 'overview-maintenance' && entity_id.includes('battery'));
         const warning = !compatible ? this._l('Incompatible member') : !metadata ? this._l('Missing entity') : ['unknown', 'unavailable'].includes(metadata.state) ? this._t(metadata.state) : '';
         return `<div class="entity-row"><div class="entity-icon"><ha-icon icon="${esc(source.icon || metadata?.icon || 'mdi:view-list')}"></ha-icon></div><div class="entity-main"><div class="entity-name">${esc(source.name || metadata?.name || entity_id)}</div><div class="entity-meta">${esc(entity_id)}${warning ? ' · ' + esc(warning) : ''}</div></div><div class="row-actions">${this._iconButton('mdi:arrow-up', 'Move up', 'member-up', index, index === 0)}${this._iconButton('mdi:arrow-down', 'Move down', 'member-down', index, index === members.length - 1)}${this._iconButton('mdi:pencil', this._t('edit'), 'member-edit', index)}${this._iconButton('mdi:delete-outline', this._t('delete'), 'member-delete', index)}</div></div>`;
       }).join('');

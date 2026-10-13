@@ -626,6 +626,10 @@ template:
         unit_of_measurement: "%"
         device_class: battery
         state_class: measurement
+      - name: Marao Dashboard Test Legacy Battery
+        unique_id: marao_dashboard_test_legacy_battery
+        state: "{{ states('input_number.marao_dashboard_test_battery') }}"
+        unit_of_measurement: "%"
       - name: Marao Dashboard Test Group Invalid Battery
         default_entity_id: sensor.marao_dashboard_test_group_invalid_battery
         unique_id: marao_dashboard_test_group_invalid_battery
