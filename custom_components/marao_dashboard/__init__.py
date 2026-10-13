@@ -53,8 +53,10 @@ from .legacy_migration import (
 from .editor import EDITOR_CATALOG, page_templates
 from .native_storage import NativeDashboardPlan, async_find_native_dashboard, async_restore_native_cache, staged_native_dashboard
 from .generator import (
+    CUSTOM_START,
     GENERATION_CONTRACT_VERSION,
     MANIFEST_NAME,
+    _extract_custom_cards,
     _load_generation_manifest,
     build_base_dashboard_config,
     dashboard_identity,
@@ -503,11 +505,23 @@ def _generated_dashboard_needs_self_contained_repair(dashboard_dir: Path) -> boo
 
     if not dashboard_dir.is_dir():
         return False
-    for path in dashboard_dir.rglob("*.yaml"):
+    owned = _load_generation_manifest(dashboard_dir) if (dashboard_dir / MANIFEST_NAME).exists() else None
+    paths = (
+        (dashboard_dir / relative for relative in (*owned["plain"], *owned["containers"]))
+        if owned is not None else dashboard_dir.rglob("*.yaml")
+    )
+    for path in paths:
+        if path.suffix != ".yaml":
+            continue
         try:
             source = path.read_text(encoding="utf-8")
         except OSError:
             continue
+        # Dormant files and protected custom cards do not belong to generated repair.
+        relative = path.relative_to(dashboard_dir).as_posix()
+        if owned is not None and relative in owned["containers"] and CUSTOM_START in source:
+            custom = _extract_custom_cards(source, relative)
+            source = source.replace(CUSTOM_START + custom, CUSTOM_START, 1)
         if any(marker in source for marker in (
             "custom:button-card",
             "custom:bubble-card",

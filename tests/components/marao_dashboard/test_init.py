@@ -223,6 +223,35 @@ def test_generated_dashboard_repairs_legacy_blank_spacer(tmp_path: Path) -> None
     assert not _generated_dashboard_needs_self_contained_repair(dashboard_dir)
 
 
+def test_generated_repair_ignores_unowned_legacy_files_and_protected_cards(tmp_path: Path) -> None:
+    dormant = tmp_path / "components/popups/energy_month.yaml"
+    dormant.parent.mkdir(parents=True)
+    dormant.write_text("type: custom:bubble-card\ncards:\n  - type: custom:button-card\n")
+    (tmp_path / "dashboard.yaml").write_text("views: !include view.yaml\n")
+    view = tmp_path / "view.yaml"
+    source = """cards:
+  # marao:generated:start
+  - type: custom:marao-card
+  # marao:generated:end
+  # marao:custom:start
+  - type: markdown
+    content: "custom:button-card remains a protected note"
+  # marao:custom:end
+  # marao:generated-footer:start
+  # marao:generated-footer:end
+"""
+    view.write_text(source)
+    (tmp_path / ".marao-generated.json").write_text(json.dumps({
+        "version": 1, "generated_contract": 2,
+        "plain": ["dashboard.yaml"], "containers": ["view.yaml"],
+    }))
+    before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    assert not _generated_dashboard_needs_self_contained_repair(tmp_path)
+    assert all(path.read_bytes() == data for path, data in before.items())
+    view.write_text(source.replace("type: custom:marao-card", "type: custom:button-card"))
+    assert _generated_dashboard_needs_self_contained_repair(tmp_path)
+
+
 async def test_setup_entry_installs_base_dashboard_once(hass) -> None:
     _reset_dashboard_files(hass)
     Path(hass.config.path("configuration.yaml")).write_text(

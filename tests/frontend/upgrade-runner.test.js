@@ -67,11 +67,11 @@ test('upgrade cleanup restores recorded helper values and preflights all states 
 
 test('release plan covers every frozen baseline and all four formats without remote operations', () => {
   const value = plan(config);
-  assert.equal(value.rows.length, 7); assert.equal(value.rows[0].baseline, 'v0.5.1');
+  assert.equal(value.rows.length, 7); assert.equal(value.rows.at(-1).baseline, 'v0.5.1');
   assert.deepEqual(new Set(value.rows.map(row => row.format)), new Set(value.formats));
   assert.deepEqual(value.current, JSON.parse(JSON.stringify(value.current)), 'The expected installed fixture must contain only persisted JSON values');
   for (const row of value.rows) assert.deepEqual(row.expected, JSON.parse(JSON.stringify(row.expected)));
-  assert.deepEqual(JSON.parse(value.rows.at(-1).source), value.current);
+  assert.deepEqual(JSON.parse(value.rows.find(row => row.baseline === 'current-format-2').source), value.current);
   for (const change of [{ disposable: false }, { url: 'http://192.168.0.29:8123', sshHost: '192.168.0.29' }]) assert.throws(() => plan({ ...config, ...change }));
 });
 
@@ -109,8 +109,9 @@ test('historical replay isolates entity references without changing frozen sourc
     };
     assert.deepEqual(names(extended.pages.slice(0, row.expected.pages.length)), names(row.expected.pages), 'Isolation changed configured or automatically generated names');
   }
-  assert.equal(value.rows[0].source, fs.readFileSync('ha-test/upgrade/fixtures/v0.5.1-dashboard.json', 'utf8'));
-  assert.deepEqual(value.rows[0].entity_aliases, {});
+  const latest = value.rows.find(row => row.baseline === 'v0.5.1');
+  assert.equal(latest.source, fs.readFileSync('ha-test/upgrade/fixtures/v0.5.1-dashboard.json', 'utf8'));
+  assert.deepEqual(latest.entity_aliases, {});
 });
 
 test('backup precedes work and every work exit restores its exact baseline', async () => {
@@ -129,7 +130,7 @@ test('backup precedes work and every work exit restores its exact baseline', asy
 });
 
 test('normal editor extension retains historical selections/options and uses independent page and popup paths', () => {
-  const value = plan(config), saved = value.rows[0].expected, before = structuredClone(saved);
+  const value = plan(config), saved = value.rows.find(row => row.baseline === 'v0.5.1').expected, before = structuredClone(saved);
   const result = extendedSource(saved, value.current);
   assert.deepEqual(saved, before); assert.deepEqual(result.legacy_page_options, saved.legacy_page_options);
   assert.equal(result.pages.length, saved.pages.length + value.current.pages.length);

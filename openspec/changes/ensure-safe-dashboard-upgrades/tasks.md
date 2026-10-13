@@ -26,6 +26,8 @@
 
 - [x] 4.4 Adopt the user-approved reduced verification workflow: shared distinct interactions once, one full automated mobile layout matrix on the latest-release preserved upgrade, targeted browser checks for other distinct formats, all seven preservation/recovery baselines, failure-only and representative success captures, four representative visual rows and validated exact-candidate browser evidence reuse at publication. Align runner, coverage/report validators, focused rejection tests, AGENTS and project/OpenSpec guidance. Affected-card set is empty; no saved format or product API changes. Reject old, failed, incomplete and drifted evidence.
 
+- [x] 4.5 Fix the historical restart regression by limiting repair detection to manifest-owned generated content, preserving dormant unreferenced legacy files and protected custom blocks. Run cheap historical preservation/recovery checks before the shared browser matrix, retain private restart snapshots, and cover the ownership decision and ordering with focused checks. Saved formats, generated structures, component APIs and frontend assets are unchanged; the affected-card set is empty. The complete clean-candidate release scenario remains required by 5.2–5.3.
+
 ## 5. Integration validation and first release run
 
 

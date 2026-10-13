@@ -24,7 +24,6 @@ function plan(config) {
   const rows = provenance.map(row => ({ baseline: row.tag, format: 'generator-json-0', source: read(row.fixture),
     expected: JSON.parse(read(expectations.records.find(record => record.input === row.fixture).expected)), generated: row.generated,
     replay: row.tag === 'v0.5.1' ? 'released-package-install' : 'historical-data' }));
-  rows.sort((a, b) => (a.baseline === 'v0.5.1' ? -1 : b.baseline === 'v0.5.1' ? 1 : 0));
   const native = JSON.parse(read('inventory.json')).storage_baseline;
   rows.push({ baseline: 'v0.2.0', format: formats[0], source: read(native.fixture), expected: JSON.parse(read(native.canonical_expected)), replay: 'historical-storage-data' });
   const predecessor = expectations.records.find(row => row.input === 'page-parity-format-1-input.json');
@@ -33,6 +32,8 @@ function plan(config) {
   const gallery = expandGallery(YAML.parse(fs.readFileSync(path.join(repoRoot, 'ha-test/dashboard/views/00-card-test.yaml'), 'utf8')));
   const current = JSON.parse(JSON.stringify(composeDashboard(JSON.parse(fs.readFileSync(path.join(repoRoot, 'ha-test/marao_dashboard_test_dashboard.json'))), gallery)));
   rows.push({ baseline: 'current-format-2', format: formats[3], source: JSON.stringify(current, null, 2) + '\n', expected: current, replay: 'current-format-noop' });
+  // Finish cheap preservation/recovery checks before the shared browser matrix.
+  rows.sort((a, b) => (a.baseline === 'v0.5.1' ? 1 : b.baseline === 'v0.5.1' ? -1 : 0));
   for (const row of rows) {
     row.frozen_source_sha256 = sha256(row.source);
     row.frozen_expected_sha256 = sha256(JSON.stringify(row.expected));
@@ -477,6 +478,7 @@ async function main() {
         assertion(row.baseline, 'source-before-regeneration', 'before.json');
         await disabled(false);
         const active = snapshot(slug);
+        fs.writeFileSync(path.join(rowDir, 'active.json'), JSON.stringify(active), { mode: 0o600 });
         assert.deepEqual(JSON.parse(active.source_bytes), row.expected, 'Startup did not persist the independent complete expectation');
         assert.equal(active.recovering, false);
         assertion(row.baseline, 'independent-canonical-source', { expected_sha256: sha256(JSON.stringify(row.expected)), input_sha256: sha256(row.source) });
@@ -506,11 +508,12 @@ async function main() {
         const history = active.history;
         await reboot();
         const repeated = snapshot(slug);
+        fs.writeFileSync(path.join(rowDir, 'repeated.json'), JSON.stringify(repeated), { mode: 0o600 });
         assert.equal(repeated.source_bytes, active.source_bytes); assert.deepEqual(repeated.output, active.output);
         assertion(row.baseline, 'second-restart-noop', 'exact source/output bytes');
         await child(python, ['-m', 'pytest', 'tests/components/marao_dashboard/test_release_replay_recovery.py', '-q', '-k', row.baseline.replaceAll('-', '_').replaceAll('.', '_')], rowDir, 'interruption-recovery');
         assertion(row.baseline, 'interrupted-operation-recovery', 'interruption-recovery.log');
-        if (!checkedFormats.has(row.format)) {
+        if (!checkedFormats.has(row.format) && (row.format !== coverage.shared_format || row.baseline === 'v0.5.1')) {
           const shared = row.baseline === 'v0.5.1';
           const extended = shared ? extendedSource(row.expected, selected.current) : JSON.parse(active.source_bytes);
           if (shared) {

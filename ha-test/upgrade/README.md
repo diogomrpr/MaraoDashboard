@@ -227,6 +227,12 @@ The disposable SSH environment requires Python 3 with its standard library for
 private backup and recovery. The configured root may use the SSH add-on's
 `/config` alias; links inside owned state remain rejected.
 
+Preservation, second-restart and recovery checks for the historical data run
+before the latest-release shared browser matrix, so a cheap compatibility failure
+stops the run early. Active and repeated output fingerprints are retained privately.
+Current generation manifests define repair ownership: dormant, unreferenced old
+files and protected custom blocks remain preserved and do not trigger regeneration.
+
 The producer runs the complete automated layout matrix once with guarded
 receipts, normal-profile shared behaviors and targeted other-format browser
 checks. Success images are representative samples; failures retain screenshots. Its
