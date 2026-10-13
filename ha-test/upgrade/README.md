@@ -155,6 +155,12 @@ the dashboard or recovers an operation itself.
 Historical saved pages need not include Cases. Targeted page checks retain that
 absence; full gallery checks use the latest-release upgrade with its explicit
 editor additions. Unexpected Cases additions or deletions still fail inspection.
+Targeted historical page checks apply only the existing browser entity aliases
+through the ordinary editor, after untouched migration, restart and recovery
+assertions pass. They preserve pages, navigation and settings without adding
+Cases. Shared latest-release checks also add their explicit newer feature pages.
+Only provenance-backed isolated references may be absent; alias overlap with
+installed non-fixture entities is rejected before writes and during inspection.
 
 Normal preparation fails before reseeding if the remote active-upgrade marker
 exists and the receipt environment variable is missing or empty. Cleanup must

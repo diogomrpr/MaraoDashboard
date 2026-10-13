@@ -30,6 +30,8 @@
 
 - [x] 4.6 Preserve the saved source's Cases count in shared prepared-install inspection, accepting its deliberate absence for targeted historical page checks while rejecting unexpected additions or deletions. Cover both outcomes with focused runner checks. No product, saved-format or frontend changes; affected-card set is empty. The complete clean-candidate release scenario remains required by 5.2–5.3.
 
+- [x] 4.7 Apply the existing browser entity aliases through ordinary editor save before targeted historical page inspection, after untouched source/output migration, restart and recovery assertions pass. Keep saved pages, navigation and settings without adding Cases. Retain the provenance-backed missing-reference and non-fixture overlap guards, and cover every historical baseline with focused isolation checks. Product and frontend assets remain unchanged; affected-card set is empty.
+
 ## 5. Integration validation and first release run
 
 

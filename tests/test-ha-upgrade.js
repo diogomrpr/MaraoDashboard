@@ -515,12 +515,13 @@ async function main() {
         assertion(row.baseline, 'interrupted-operation-recovery', 'interruption-recovery.log');
         if (!checkedFormats.has(row.format) && (row.format !== coverage.shared_format || row.baseline === 'v0.5.1')) {
           const shared = row.baseline === 'v0.5.1';
-          const extended = shared ? extendedSource(row.expected, selected.current) : JSON.parse(active.source_bytes);
-          if (shared) {
+          const extended = shared ? extendedSource(row.expected, selected.current)
+            : JSON.parse(isolateHistoricalText(active.source_bytes, row.entity_aliases));
+          if (shared || Object.keys(row.entity_aliases).length) {
             await editorSave(config, JSON.stringify(extended, null, 2), rowDir);
             assert.deepEqual(JSON.parse(snapshot(slug).source_bytes), extended);
-            await resetBaseline(config, helper);
           }
+          if (shared) await resetBaseline(config, helper);
           const expanded = snapshot(slug);
           // Build the receipt only after the original data and explicit editor additions passed.
           const receipt = { version: 1, operation_id: operation, created_at: new Date().toISOString(), target: config.url, remote_config_path: config.remoteConfigPath,

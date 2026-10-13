@@ -95,7 +95,17 @@ test('historical replay isolates entity references without changing frozen sourc
     const extended = extendedSource(row.expected, value.current);
     const entities = referencedEntities(extended);
     assert.ok([...entities].every(entity => /^[a-z_]+\.marao_dashboard_(?:test|upgrade)_/.test(entity)), row.baseline);
-    if (row.baseline !== 'current-format-2') for (const entity of historicalEntities(row.baseline, referencedEntities)) assert.ok(entities.has(entity));
+    if (row.baseline !== 'current-format-2') {
+      const saved = JSON.stringify(row.expected);
+      const targeted = JSON.parse(isolateHistoricalText(saved, row.entity_aliases));
+      assert.deepEqual(historicalEntities(row.baseline, referencedEntities), referencedEntities(targeted));
+      assert.deepEqual(targeted.pages.map(page => [page.id, page.path, page.name]), row.expected.pages.map(page => [page.id, page.path, page.name]));
+      assert.deepEqual(targeted.navigation, row.expected.navigation);
+      assert.equal(targeted.pages.some(page => page.path === 'card-test'), row.expected.pages.some(page => page.path === 'card-test'));
+      assert.equal(JSON.stringify(row.expected), saved, 'Targeted browser isolation changed the frozen migration expectation');
+      assertHistoricalBindings(targeted, new Set(['lock.front_door']), referencedEntities);
+      for (const entity of historicalEntities(row.baseline, referencedEntities)) assert.ok(entities.has(entity));
+    }
     const names = values => {
       const result = [];
       const visit = value => {
