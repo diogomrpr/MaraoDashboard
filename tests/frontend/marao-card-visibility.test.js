@@ -790,7 +790,7 @@ test("hold completion runs once while release, departure, and cancellation stop 
     const button = new EventTarget();
     button.disabled = false;
     button.getBoundingClientRect = () => ({ left: 0, right: 100, top: 0, bottom: 100 });
-    const surface = { classList: { add() {}, remove() {} } };
+    const surface = { classList: { add() {}, remove() {} }, querySelector: selector => selector === ".hold-progress rect" ? progressLine : null };
     const progressLine = { style: {} };
     card.shadowRoot.querySelector = (selector) => selector === ".hold-progress rect" ? progressLine : null;
     let completions = 0;

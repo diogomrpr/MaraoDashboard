@@ -71,7 +71,7 @@ const source = await fs.readFile(
 const sourceWithoutFrontendImports = source.slice(source.indexOf("const MARAO_FONT_URL"));
 const cardsSource = await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8');
 const instrumentedSource = `
-import { cardProblem, problemStyle, serviceOutcome } from "data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}";
+import { cardProblem, problemStyle, serviceOutcome, serviceConnectionReady, serviceTargetReady, accessOpenerService } from "data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}";
 const haptic = (value) => globalThis.__maraoTestHaptics.push(value);
 const callServiceWithNotification = (hass, domain, service, data, onOutcome) => {
   try {
@@ -392,9 +392,11 @@ test("slide control gives one strong haptic per milestone and distinct completio
   const complete = pointerEvent(track, 194, 11);
   slide._move(complete, complete);
   const end = pointerEvent(track, 194, 11);
+  const beforeCompletion = globalThis.__maraoTestHaptics.length;
   slide._end(end, end);
   assert.deepEqual(serviceCalls, [["lock", "unlock", { entity_id: "lock.front_door" }]]);
-  assert.equal(globalThis.__maraoTestHaptics.at(-1), "success");
+  assert.equal(globalThis.__maraoTestHaptics.at(-1), "heavy");
+  assert.equal(globalThis.__maraoTestHaptics.length, beforeCompletion + 1);
   assert.equal(track.classList.contains("completing"), true);
   slide.disconnectedCallback();
 });
@@ -426,25 +428,32 @@ test("slide control cannot execute through the keyboard", () => {
 test("slide control remains available in every known access state", () => {
   const { slide } = slideFixture();
   slide.setAttribute("state", "unknown");
+  slide._hass.states["lock.front_door"].state = "unknown";
   assert.equal(slide._disabled(), true);
 
   slide.setAttribute("state", "unavailable");
+  slide._hass.states["lock.front_door"].state = "unavailable";
   assert.equal(slide._disabled(), true);
 
   slide.setAttribute("state", "unlocked");
+  slide._hass.states["lock.front_door"].state = "unlocked";
   assert.equal(slide._disabled(), false);
 
   slide.setAttribute("state", "locking");
+  slide._hass.states["lock.front_door"].state = "locking";
   assert.equal(slide._disabled(), false);
 
   slide.setAttribute("state", "unlocking");
+  slide._hass.states["lock.front_door"].state = "unlocking";
   assert.equal(slide._disabled(), false);
 
   slide.setAttribute("entity", "cover.front_gate");
   slide.setAttribute("state", "open");
+  slide._hass.states = { "cover.front_gate": { state: "open" } };
   assert.equal(slide._disabled(), false);
 
   slide.setAttribute("state", "opening");
+  slide._hass.states["cover.front_gate"].state = "opening";
   assert.equal(slide._disabled(), false);
 
   slide.setAttribute("state", "locked");
