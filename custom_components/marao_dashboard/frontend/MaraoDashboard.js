@@ -12,7 +12,7 @@ const [cardsModule, cameraEventsModule] = await Promise.all([
   import(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`),
   import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`),
 ]);
-const { energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, focusRestorer, haptic, registerMaraoCards } = cardsModule;
+const { energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, registerMaraoCards } = cardsModule;
 registerMaraoCards();
 cameraEventsModule.registerMaraoCameraEventCards();
 
@@ -394,6 +394,15 @@ const TRANSLATIONS = {
     "wallbox.shortcuts": "Charging current shortcuts",
     "security.arming": "Arming...",
     "security.arm_away": "Arm away",
+    "alarm.home": "Arm home",
+    "alarm.away": "Arm away",
+    "alarm.night": "Arm night",
+    "alarm.vacation": "Arm vacation",
+    "alarm.custom_bypass": "Arm with bypass",
+    "alarm.disarm": "Disarm",
+    "alarm.code": "Alarm code",
+    "alarm.code_required": "Enter a valid alarm code",
+    "alarm.request_failed": "Alarm request failed",
     "security.armed_home": "Armed Home",
     "security.armed_away": "Armed Away",
     "security.disarmed": "Disarmed",
@@ -537,6 +546,15 @@ const TRANSLATIONS = {
     "wallbox.shortcuts": "Atalhos de corrente de carregamento",
     "security.arming": "A armar...",
     "security.arm_away": "Armar fora",
+    "alarm.home": "Armar em casa",
+    "alarm.away": "Armar fora",
+    "alarm.night": "Armar noite",
+    "alarm.vacation": "Armar férias",
+    "alarm.custom_bypass": "Armar com exclusão",
+    "alarm.disarm": "Desarmar",
+    "alarm.code": "Código do alarme",
+    "alarm.code_required": "Introduza um código de alarme válido",
+    "alarm.request_failed": "Falha no pedido ao alarme",
     "security.armed_home": "Armado em casa",
     "security.armed_away": "Armado fora",
     "security.disarmed": "Desarmado",
@@ -672,6 +690,7 @@ class MaraoSlideToOpen extends HTMLElement {
   }
 
   setConfig(config) {
+    this._resetGesture(this.shadowRoot?.querySelector(".track"));
     this._config = config || {};
     this._actionError = "";
     this._actionRequest = (this._actionRequest || 0) + 1;
@@ -680,15 +699,24 @@ class MaraoSlideToOpen extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    if (this._disabled()) this._resetGesture(this.shadowRoot?.querySelector(".track"));
     if (this._pointerId === null) this._render();
   }
 
   connectedCallback() {
     this._actionLive = true;
+    this._cancelHiddenSlide ||= event => {
+      if (event.type === "visibilitychange" && !globalThis.document?.hidden) return;
+      this._resetGesture(this.shadowRoot?.querySelector(".track"));
+    };
+    for (const type of ["location-changed", "popstate"]) globalThis.window?.addEventListener?.(type, this._cancelHiddenSlide);
+    globalThis.document?.addEventListener?.("visibilitychange", this._cancelHiddenSlide);
     this._render();
   }
 
   disconnectedCallback() {
+    for (const type of ["location-changed", "popstate"]) globalThis.window?.removeEventListener?.(type, this._cancelHiddenSlide);
+    globalThis.document?.removeEventListener?.("visibilitychange", this._cancelHiddenSlide);
     this._actionLive = false;
     this._actionError = "";
     this._actionRequest = (this._actionRequest || 0) + 1;
@@ -718,8 +746,13 @@ class MaraoSlideToOpen extends HTMLElement {
 
   _disabled() {
     const hass = this._hassInstance();
-    if (!hass?.callService || hass.connected === false || hass.connection?.connected === false) return true;
-    return ["unknown", "unavailable"].includes(this._state());
+    return this._sending || !hass?.states?.[this._entityId()] || !this._state()
+      || !serviceConnectionReady(hass) || !serviceTargetReady(hass, this._entityId())
+      || !accessOpenerService(this._entityId(), this._openerOptions().action_service);
+  }
+
+  _openerOptions() {
+    return this._config?.variables || this.getRootNode()?.host?._config?.variables || {};
   }
 
   _label() {
@@ -1006,17 +1039,19 @@ class MaraoSlideToOpen extends HTMLElement {
     this._completionTimer = setTimeout(() => track.classList.remove("completing"), 300);
   }
 
-  _trigger() {
+  async _trigger() {
     const entityId = this._entityId();
     const hass = this._hassInstance();
-    if (!entityId || !hass) return;
-    const [domain] = entityId.split(".", 1);
-    const service = domain === "lock" ? "unlock" : "open_cover";
+    if (!entityId || !hass || this._disabled() || this._actionLive === false) return;
+    const [domain, service] = accessOpenerService(entityId, this._openerOptions().action_service).split(".");
+    this._sending = true;
     this._animateCompletion();
     const owner = this.getRootNode()?.host;
-    if (owner?._callService) owner._callService(domain, service, { entity_id: entityId });
-    else callServiceWithNotification(hass, domain, service, { entity_id: entityId }, serviceOutcome(this));
-    haptic("success");
+    haptic("heavy");
+    try {
+      if (owner?._callService) await owner._callService(domain, service, { entity_id: entityId });
+      else await callServiceWithNotification(hass, domain, service, { entity_id: entityId }, serviceOutcome(this));
+    } finally { this._sending = false; if (this.isConnected) this._render(); }
   }
 
   getCardSize() {

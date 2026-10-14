@@ -345,6 +345,17 @@
               "id": "card-8"
             }
           ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "building-door",
+              "template": "hc_access_slide_action_card",
+              "entity_id": "button.marao_dashboard_test_opener",
+              "name": "Building door"
+            }
+          ]
         }
       ]
     },

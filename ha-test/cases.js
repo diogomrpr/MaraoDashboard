@@ -182,6 +182,12 @@ function expandGallery(source) {
 
 function expandHelpers(source) {
   const helpers = structuredClone(source);
+  const alarm = helpers.template.flatMap(group => group.alarm_control_panel || []).find(entity => entity.unique_id === 'marao_dashboard_test_alarm');
+  for (const format of ['text', 'no_code']) {
+    const id = 'marao_dashboard_test_alarm_' + format;
+    helpers.template.push({ alarm_control_panel: [{ ...structuredClone(alarm), name: 'Safe alarm ' + format,
+      unique_id: id, default_entity_id: 'alarm_control_panel.' + id, code_format: format, code_arm_required: format !== 'no_code' }] });
+  }
   const templates = new Map();
   for (const block of source.template || []) for (const [domain, values] of Object.entries(block)) {
     if (!Array.isArray(values) || domain === 'trigger') continue;

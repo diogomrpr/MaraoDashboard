@@ -505,7 +505,7 @@ async function layoutIssues(page, families = []) {
           }
         }
         if (element.localName === "marao-card") {
-          const body = element.shadowRoot?.querySelector(".body");
+          const body = element.shadowRoot?.querySelector(".body,.alarm-body");
           const card = element.shadowRoot?.querySelector("ha-card");
           if (body && body.scrollWidth > body.clientWidth + 1) issues.push(`${element._config?.name || element._config?.entity || "card"}: horizontal overflow`);
           const labels = [...(element.shadowRoot?.querySelectorAll(".title,.state,.climate") || [])];
@@ -524,7 +524,7 @@ async function layoutIssues(page, families = []) {
             if (links.slice(index + 1).some((other) => intersects(link, other))) issues.push("navbar touch targets overlap");
           }
         }
-        if (owned && element.matches?.('[data-history-retry],[data-graph-retry],[data-media-retry],.surface > .problem[role="status"]')) {
+        if (owned && element.matches?.('[data-history-retry],[data-graph-retry],[data-media-retry],.surface > .problem[role="status"],[data-alarm-action],[data-alarm-code],.alarm-body label')) {
           const probe = document.createElement('span');
           probe.style.cssText = 'font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500)';
           element.parentElement.append(probe);
@@ -570,7 +570,7 @@ async function layoutIssues(page, families = []) {
             }
           }
         }
-        if (owned && element.matches?.(".title,.state,.climate,.current-temperature,.number-value,.value,.empty,h1,h2,.message,.climate-mode,.legend span,.meta strong,.detail-meta strong,.reading dt,.reading dd,.header-date,.media-summary")) {
+        if (owned && element.matches?.(".title,.state,.climate,.current-temperature,.number-value,.value,.empty,h1,h2,.message,.climate-mode,.legend span,.meta strong,.detail-meta strong,.reading dt,.reading dd,.header-date,.media-summary,.alarm-body label,[data-alarm-action]:not(:disabled)")) {
           if (element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1) {
             issues.push(`${element.textContent?.trim() || element.localName}: essential text is clipped`);
           }

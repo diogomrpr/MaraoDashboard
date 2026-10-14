@@ -96,7 +96,14 @@ EDITOR_CATALOG: dict[str, Any] = {
         },
         {
             "id": "hc_security_card", "label": "Alarm", "icon": "mdi:shield-home", "domains": ["alarm_control_panel"],
-            "description": "The authoritative alarm state and native alarm controls.", "variables": [],
+            "description": "Alarm state and supported controls with transient code entry.",
+            "variables": [_field("popup_hash", "Popup hash", "text", advanced=True)],
+        },
+        {
+            "id": "hc_access_slide_action_card", "label": "Access opener", "icon": "mdi:door-open",
+            "domains": ["lock", "cover", "button", "switch", "script"],
+            "description": "Slide deliberately to unlock or open the selected access point.",
+            "variables": [],
         },
         {
             "id": "hc_access_hold_action_card", "label": "Security action", "icon": "mdi:shield-alert", "domains": ["button", "switch", "input_boolean"],

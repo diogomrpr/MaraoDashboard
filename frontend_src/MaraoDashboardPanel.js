@@ -82,7 +82,7 @@ const PT_LABELS = {
   "Raw cards are retained and editable in JSON.": "Os cartões livres são preservados e podem ser editados em JSON.",
   "Choose an existing suggestion area.": "Escolha uma área de sugestões existente.", "Choose a supported page template.": "Escolha um modelo de página suportado.",
   "Title": "Título", "Weather": "Meteorologia", "Forecast": "Previsão", "Room shortcut": "Atalho de divisão", "Room lights": "Luzes da divisão", "Primary source": "Entidade principal",
-  "Scene collection": "Coleção de cenários", "Security action": "Ação de segurança", "Energy period": "Período de energia", "Period": "Período", "Day": "Dia", "Month": "Mês", "History popup": "Popup de histórico",
+  "Scene collection": "Coleção de cenários", "Security action": "Ação de segurança", "Access opener": "Abertura de acesso", "Energy period": "Período de energia", "Period": "Período", "Day": "Dia", "Month": "Mês", "History popup": "Popup de histórico",
   "Media app": "Aplicação multimédia", "App source": "Origem da aplicação", "Apps": "Aplicações", "Add app": "Adicionar aplicação", "Edit app": "Editar aplicação", "Apple TV controls": "Controlos Apple TV",
   "Mixed legacy and canonical page configuration.": "A configuração mistura páginas antigas e páginas do formato atual.",
   "Each page requires a name.": "Cada página precisa de um nome.", "Each page must be an object.": "Cada página tem de ser um objeto.",
@@ -105,6 +105,15 @@ const PT_LABELS = {
   "Energy period must be day or month.": "O período de energia tem de ser dia ou mês.", "Charging shortcuts require at most three finite numbers.": "Os atalhos de corrente aceitam até três números finitos.",
   "Room lights must be an explicit list of light entities.": "As luzes da divisão têm de ser uma lista explícita de entidades de iluminação.", "Media app requires an explicit source.": "A aplicação multimédia precisa de uma origem explícita.",
   "Security action must control its selected entity with the native service.": "A ação de segurança tem de usar o serviço nativo da entidade selecionada.",
+  "Access opener must use its selected entity's native opening service": "A abertura de acesso tem de usar o serviço nativo da entidade selecionada.",
+  "Access openers use only the strict slide": "A abertura de acessos requer o controlo de deslizar.",
+  "Vacuum action data must be an object": "Os dados da ação do aspirador têm de ser um objeto.",
+  "Explicit command data can override the default segment parameters.": "Os dados explícitos do comando podem substituir os parâmetros predefinidos do segmento.",
+  "Action 1 command data": "Dados do comando da ação 1",
+  "Action 2 command data": "Dados do comando da ação 2",
+  "Action 3 command data": "Dados do comando da ação 3",
+  "Alarm state and supported controls with transient code entry.": "Estado e controlos do alarme com introdução temporária do código.",
+  "Slide deliberately to unlock or open the selected access point.": "Deslize para desbloquear ou abrir o acesso selecionado.",
   "Apple TV options must be an object or false.": "As opções Apple TV têm de ser um objeto ou falso.", "Choose a compatible media remote entity.": "Escolha uma entidade de comando multimédia compatível.", "Media apps require an explicit ordered list of sources.": "As aplicações precisam de uma lista explícita e ordenada de origens.",
   "An editable heading inside any page or section.": "Um título editável em qualquer página ou secção.", "Current weather with an optional native forecast.": "Meteorologia atual com previsão nativa opcional.",
   "Open a page and switch off its explicitly selected lights.": "Abrir uma página e desligar as luzes escolhidas explicitamente.", "Open an ordered collection of native scenes and toggle helpers.": "Abrir uma coleção ordenada de cenários nativos e auxiliares de alternância.",
@@ -1607,6 +1616,7 @@ class MaraoDashboardPanel extends HTMLElement {
     if (field.kind === "energy_period") selector = { select: { mode: 'dropdown', options: [{ value: 'day', label: this._l('Day') }, { value: 'month', label: this._l('Month') }] } };
     if (field.kind === "icon") selector = { icon: {} };
     if (field.kind === "number") selector = { number: {} };
+    if (field.kind === "object") selector = { object: {} };
     if (field.kind === "color") selector = { text: { type: "color" } };
     if (field.kind === "energy_precision") selector = { select: { mode: "dropdown", options: [
       { value: "auto", label: this._l("Automatic") }, ...Array.from({length: 7}, (_, value) => ({value: String(value), label: String(value)})),
@@ -1636,7 +1646,8 @@ class MaraoDashboardPanel extends HTMLElement {
     return fields.flatMap((field) => field.kind !== "vacuum_action" ? [field] : [
       { key: `${field.key}.icon`, label: `${field.label} icon`, kind: "icon", advanced: true },
       { key: `${field.key}.on_action`, label: `${field.label} service`, kind: "text", advanced: true },
-      { key: `${field.key}.segment`, label: `${field.label} segment`, kind: "number", advanced: true },
+      { key: `${field.key}.segment`, label: `${field.label} segment`, kind: "number", advanced: true, description: "Explicit command data can override the default segment parameters." },
+      { key: `${field.key}.data`, label: `${field.label} command data`, kind: "object", advanced: true, description: "Explicit command data can override the default segment parameters." },
     ]);
   }
 

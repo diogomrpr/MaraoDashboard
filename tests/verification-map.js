@@ -12,12 +12,16 @@ const python = file => ({ id: 'python:' + file, kind: 'offline', command: ['pyth
 const browser = (id, file, args = [], exclusive = true) => ({ id, kind: 'browser', command: ['node', 'tests/' + file + '.js', ...args],
   inputs: [runtime, 'tests/' + file + '.js', 'tests/test-ha-dashboard-accessibility.js', 'tests/test-ha-dashboard-e2e.js', 'ha-test'], exclusive });
 const families = {
+  security: ['hc_security_card', 'hc_alarm_controls_card', 'hc_access_slide_action_card', 'hc_access_card'],
   slider: ['hc_light_card', 'hc_fan_card', 'hc_cover_card'],
   popup: ['hc_media_card', 'hc_climate_card', 'hc_entity_group_card', 'hc_access_card'],
   rooms: ['hc_room_card'], groups: ['hc_entity_group_card'], climate: ['hc_climate_card', 'hc_number_card', 'hc_wallbox_current_card'],
   camera: ['hc_camera_card'], history: ['hc_graph_card', 'hc_timeline_card', 'hc_toggle_graph_card'],
 };
 const components = {
+  security: { units: [['marao-security']], python: ['test_security'], templates: [...families.security, 'hc_dishwasher_card', 'hc_vacuum_card'],
+    profiles: ['iphone-normal', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200', 'narrow-320', 'iphone-landscape', 'android-normal', 'android-landscape'],
+    browser: [browser('security:iphone', 'test-ha-security', ['--scenario', 'iphone-normal']), browser('security:android', 'test-ha-security', ['--scenario', 'android-normal'])] },
   labels: { units: [['marao-text-scale'], ['marao-card-visibility']], profiles: ['iphone-normal', 'narrow-320', 'iphone-bold-text-200'] },
   slider: { units: [['marao-climate-card', 'slider|brightness|percentage|cover']], consumers: ['light', 'fan', 'cover'],
     browser: [browser('sliders:iphone', 'test-ha-value-sliders', ['--scenario', 'iphone-normal']), browser('sliders:android', 'test-ha-value-sliders', ['--scenario', 'android-normal'])] },
@@ -50,6 +54,7 @@ const components = {
 };
 
 const rules = [
+  [/^tests\/test-ha-security\.js$/, ['security']],
   [/^(AGENTS\.md|README\.md|docs\/|openspec\/|\.agents\/)/, ['docs']],
   [/^tests\/frontend\/([^/]+)\.test\.js$/, 'test'],
   [/^tests\/components\/marao_dashboard\/(test_[^/]+)\.py$/, 'test'],
@@ -85,7 +90,7 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     let ids = rule[1];
     if (ids === 'shared') {
       if (!declared.length && !conservativeShared) throw new Error(file + ': declare --component after reviewing the shared-component diff.');
-      const consumers = ['labels', 'slider', 'light', 'fan', 'cover', 'popup', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
+      const consumers = ['security', 'labels', 'slider', 'light', 'fan', 'cover', 'popup', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
       ids = declared.length ? declared.filter(id => consumers.includes(id)) : consumers;
       if (!ids.length) throw new Error(file + ': a runtime component is required; documentation scope cannot omit its checks.');
     }
@@ -131,7 +136,7 @@ function checksFor(selection, { full = false, offline = false, parallel = false 
   } else {
     const templates = [...new Set(ids.flatMap(id => components[id].templates || families[id] || []))];
     const profiles = [...new Set(ids.flatMap(id => components[id].profiles || []))];
-    for (const profile of profiles) add(browser('layout:' + profile, 'test-ha-dashboard-accessibility', ['--scenario', profile, '--focused', ...(templates.length ? ['--families', templates.join(',')] : []), ...(ids.includes('popup') ? ['--popups', ...(profile !== 'iphone-normal' ? ['--geometry-only-popups'] : [])] : [])], false));
+    for (const profile of profiles) add(browser('layout:' + profile, 'test-ha-dashboard-accessibility', ['--scenario', profile, '--focused', ...(templates.length ? ['--families', templates.join(',')] : []), ...(ids.some(id => ['popup', 'security'].includes(id)) ? ['--popups', ...(profile !== 'iphone-normal' ? ['--geometry-only-popups'] : [])] : [])], false));
     if (ids.includes('actions') || ids.includes('navbar')) add(browser('alignment', 'test-ha-card-alignment'));
   }
   const checks = [...result.values()];

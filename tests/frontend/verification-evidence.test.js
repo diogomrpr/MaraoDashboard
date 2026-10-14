@@ -2,13 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { validateEvidence } = require('../verification');
+const { validateEvidence, runPlan } = require('../verification');
 const { validateScopedUpgrade } = require('../verify-release');
 const { scopedPlan } = require('../test-ha-upgrade');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { digest } = require('../verification');
+
+test('executed plans emit reusable version-3 evidence independently of the plan schema', async () => {
+  const plan = { version: 1, base: 'baseline', head: 'candidate', mode: 'affected', components: ['docs'], checks: [] };
+  const { filename, report } = await runPlan(plan);
+  try {
+    assert.equal(report.version, 3);
+    assert.equal(JSON.parse(fs.readFileSync(filename)).version, 3);
+    assert.equal(validateEvidence(report, plan, {}, { exactCommit: true }), report);
+  } finally { fs.rmSync(path.dirname(filename), { recursive: true, force: true }); }
+});
 
 test('scoped evidence rejects omitted consumers, changed inputs, target drift and false full claims', () => {
   const plan = { base: 'base', head: 'candidate', mode: 'affected', components: ['cover', 'fan', 'light', 'slider'], checks: [{ id: 'slider' }] };

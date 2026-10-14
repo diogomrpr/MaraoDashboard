@@ -560,6 +560,12 @@ export function validatePages(config, catalog) {
         if (['name', 'icon'].some(key => card[key] != null && typeof card[key] !== 'string')) errors.push('Card name and icon must be strings.');
         if (card.variables != null && !object(card.variables)) errors.push('Card options must be an object.');
         const options = object(card.variables) ? card.variables : {};
+        if (card.template === 'hc_vacuum_card' && ['action_1', 'action_2', 'action_3'].some(key => object(options[key]) && Object.hasOwn(options[key], 'data') && !object(options[key].data))) errors.push('Vacuum action data must be an object');
+        if (card.template === 'hc_access_slide_action_card') {
+          const opener = { lock: 'lock.unlock', cover: 'cover.open_cover', button: 'button.press', switch: 'switch.turn_on', script: 'script.turn_on' }[card.entity_id?.split('.')[0]];
+          if (!opener || (Object.hasOwn(options, 'action_service') ? options.action_service : opener) !== opener) errors.push("Access opener must use its selected entity's native opening service");
+          if (['tap_action', 'hold_action', 'double_tap_action'].some(key => (card[key]?.action ?? 'none') !== 'none')) errors.push('Access openers use only the strict slide');
+        }
         if (card.template === 'hc_energy_period_card' && !['day', 'month'].includes(options.period ?? 'day')) errors.push('Energy period must be day or month.');
         if (card.template === 'hc_wallbox_current_card' && Object.hasOwn(options, 'shortcuts') && (!Array.isArray(options.shortcuts) || options.shortcuts.length > 3 || options.shortcuts.some(value => typeof value !== 'number' || !Number.isFinite(value)))) errors.push('Charging shortcuts require at most three finite numbers.');
         if (card.template === 'hc_room_card' && Object.hasOwn(options, 'light_entities') && (!Array.isArray(options.light_entities) || options.light_entities.some(value => !entityId(value) || !value.startsWith('light.')))) errors.push('Room lights must be an explicit list of light entities.');

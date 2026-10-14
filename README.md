@@ -56,18 +56,19 @@ python -m pip install -r tests/requirements.txt
 ```
 
 During development, run only the focused check for the code or card being
-changed. Before a push, tag, or release, `npm run verify:publish` runs the full
-suite and the local Home Assistant browser check. That check requires the
+changed. Before a push, tag, or release, `npm run verify:publish` runs the scoped
+checks for the affected components. Browser checks require the
 disposable environment described in the
 [development guide](docs/docs/development/local-development.md) and must never
 target a live Home Assistant instance. Configure its URL, administrator long-lived
 token, and SSH access in the ignored `ha-test/local.json`. `npm run ha:sync`
 builds and installs the current working tree, creates safe demonstration entities,
 and generates the complete test dashboard. Browser tests prepare it automatically.
-Versioned publication also requires the clean final candidate’s preserved-install
-upgrade scenario and `verify:release`, including historical data, mobile/theme
-visual inspection and verified disposable cleanup. Fresh fixture checks alone
-do not establish upgrade compatibility.
+Changes to saved data, generated ownership or installation/upgrade behavior also
+require the clean final candidate’s scoped preserved-install upgrade scenario and
+`verify:release`, including affected historical data and verified disposable cleanup.
+Fresh fixture checks alone do not establish upgrade compatibility. Full-suite and
+complete mobile-matrix testing require an explicit request.
 
 Frontend changes need an integration reload and browser refresh; backend changes
 need a Home Assistant restart. Preparation handles both.

@@ -2089,8 +2089,8 @@ def _resolve_pages(config, registry=None):
                     entity["unit_of_measurement"] = metadata.get(entity_id, {}).get("unit_of_measurement")
                 variables = dict(source.get("variables") or {})
                 prefix = f"#page-{page['path']}-{entity['id']}"
-                popup_role = role in ("hc_media_card", "hc_camera_card", "hc_entity_group_card", "hc_scene_collection_card", "hc_energy_period_card")
-                if popup_role or entity_id and _is_access_entity(entity):
+                popup_role = role in ("hc_media_card", "hc_camera_card", "hc_entity_group_card", "hc_scene_collection_card", "hc_energy_period_card", "hc_security_card")
+                if popup_role or entity_id and role != "hc_access_slide_action_card" and _is_access_entity(entity):
                     variables.setdefault("popup_hash", prefix + "-popup")
                 if role == "hc_graph_card" and variables.get("history_popup"):
                     variables.setdefault("popup_hash", prefix + "-history")
@@ -2165,6 +2165,8 @@ def _page_card(entity, dashboard_key, language="en"):
     elif role == "hc_access_hold_action_card":
         card = _page_action_card(item)
         card["template"] = role
+    elif role == "hc_access_slide_action_card":
+        card = _entity_card(item)
     elif str(item.get("entity_id") or "").startswith("scene."):
         card = _scene_card(item)
     else:
@@ -2184,6 +2186,10 @@ def _page_card(entity, dashboard_key, language="en"):
 def _page_card_popups(entity, language="en"):
     item = {**entity, "name": _configured_name(entity, language)}
     role, variables = item["template"], item.get("variables", {})
+    if role == "hc_access_slide_action_card":
+        return []
+    if role == "hc_security_card" and "tap_action" not in item:
+        return [_alarm_popup(item)]
     if role == "hc_entity_group_card":
         return [_entity_group_popup(item, language), *_entity_group_secondary_popups(item, language)]
     if role == "hc_scene_collection_card":
@@ -2453,7 +2459,21 @@ def _domain_template(entity: dict[str, Any]) -> str:
     return _sensor_template(entity) or DOMAIN_TEMPLATES[entity["entity_id"].split(".", 1)[0]]
 
 
+def _alarm_popup(entity: dict[str, Any]) -> dict[str, Any]:
+    name = entity.get("name") or _friendly_name(entity["entity_id"])
+    popup_hash = (entity.get("variables") or {}).get("popup_hash") or f"#alarm-{make_slug(entity['entity_id'].replace('.', '-'))}"
+    return {**_popup_header(popup_hash, entity["entity_id"], name, "mdi:shield-home", "auto"),
+            "cards": [{"type": "custom:marao-card", "template": "hc_alarm_controls_card",
+                       "entity": entity["entity_id"], "name": name}]}
+
+
 def _room_entity_card(entity: dict[str, Any]) -> dict[str, Any]:
+    if entity.get("template") == "hc_access_slide_action_card":
+        return _entity_card(entity)
+    if entity.get("template") == "hc_security_card" and "tap_action" not in entity:
+        variables = {"popup_hash": f"#alarm-{make_slug(entity['entity_id'].replace('.', '-'))}",
+                     **(entity.get("variables") or {})}
+        return _entity_card({**entity, "variables": variables})
     if _is_access_entity(entity):
         if _is_open_only_access(entity):
             return _access_action_card(

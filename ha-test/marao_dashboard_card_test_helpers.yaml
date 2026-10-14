@@ -1,5 +1,15 @@
 history: {}
 
+script:
+  marao_dashboard_test_opener:
+    alias: Safe script access opener
+    sequence:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.marao_dashboard_test_opener_count
+        data:
+          value: "{{ states('input_number.marao_dashboard_test_opener_count') | int + 1 }}"
+
 unifiprotect:
 
 scene:
@@ -47,6 +57,12 @@ input_boolean:
     name: Marao Dashboard Test Wallbox Pause
 
 input_number:
+  marao_dashboard_test_opener_count:
+    name: Safe opener dispatch count
+    min: 0
+    max: 1000
+    step: 1
+    initial: 0
   marao_dashboard_test_light_brightness:
     name: Marao Dashboard Test Light Brightness
     min: 1
@@ -177,6 +193,9 @@ input_select:
       - disarmed
       - armed_home
       - armed_away
+      - armed_night
+      - armed_vacation
+      - armed_custom_bypass
       - arming
       - triggered
   marao_dashboard_test_vacuum:
@@ -274,6 +293,21 @@ homeassistant:
         - "heat"
 
 template:
+  - sensor:
+      - name: Marao Dashboard Test Refill Confirmation
+        default_entity_id: sensor.marao_dashboard_test_refill_confirmation
+        unique_id: marao_dashboard_test_refill_confirmation
+        state: "confirmed"
+  - button:
+      - name: Marao Dashboard Test Opener
+        default_entity_id: button.marao_dashboard_test_opener
+        unique_id: marao_dashboard_test_opener
+        press:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_opener_count
+            data:
+              value: "{{ states('input_number.marao_dashboard_test_opener_count') | int + 1 }}"
   - weather:
       - name: Marao Dashboard Test Weather
         default_entity_id: weather.marao_dashboard_test_weather
@@ -461,7 +495,19 @@ template:
             target:
               entity_id: input_select.marao_dashboard_test_alarm
             data:
-              option: armed_home
+              option: armed_night
+        arm_vacation:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.marao_dashboard_test_alarm
+            data:
+              option: armed_vacation
+        arm_custom_bypass:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.marao_dashboard_test_alarm
+            data:
+              option: armed_custom_bypass
         arm_away:
           - action: input_select.select_option
             target:

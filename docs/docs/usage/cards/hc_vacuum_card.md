@@ -28,6 +28,11 @@ The `hc_vacuum_card` is used to control a robot vacuum. It shows the supported r
 
 **Remember to take care of indentation**
 
+An imported segment action may retain an explicit `data` object beside
+`segment`, including the device's original `command` and `params` structure.
+Without it, the normal `app_segment_clean` segment shorthand is unchanged.
+The action always targets the card's selected vacuum.
+
 ## Variable / entry
 
 | Variable | Default | Required | Example |

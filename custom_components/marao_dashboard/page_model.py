@@ -105,6 +105,19 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                 if card.get("variables") is not None and not isinstance(card["variables"], dict):
                     raise ValueError("Card options must be an object")
                 options = card.get("variables") or {}
+                if role == "hc_vacuum_card":
+                    for key in ("action_1", "action_2", "action_3"):
+                        action = options.get(key)
+                        if isinstance(action, dict) and "data" in action and not isinstance(action["data"], dict):
+                            raise ValueError("Vacuum action data must be an object")
+                if role == "hc_access_slide_action_card":
+                    opener = {"lock": "lock.unlock", "cover": "cover.open_cover", "button": "button.press",
+                              "switch": "switch.turn_on", "script": "script.turn_on"}.get((entity or "").split(".")[0])
+                    if not opener or options.get("action_service", opener) != opener:
+                        raise ValueError("Access opener must use its selected entity's native opening service")
+                    if any(key in card and (not isinstance(card[key], dict) or card[key].get("action", "none") != "none")
+                           for key in ("tap_action", "hold_action", "double_tap_action")):
+                        raise ValueError("Access openers use only the strict slide")
                 if role == "hc_energy_period_card" and options.get("period", "day") not in ("day", "month"):
                     raise ValueError("Energy period must be day or month")
                 if role == "hc_wallbox_current_card" and "shortcuts" in options:

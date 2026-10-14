@@ -6,9 +6,12 @@ explicit room membership, Entity Groups, energy formatting and shared problem
 presentation. Linked checks identify coverage; they do not establish a release
 or preserved-install pass. This documentation change affects no cards.
 
+The alarm sheet and explicit service-opener work is tracked in [add-alarm-controls-and-service-access-openers](changes/add-alarm-controls-and-service-access-openers/proposal.md). Its focused security checks also cover original appliance warning/command compatibility.
+
 ## Shared card catalog
 
-These are all 20 entries in [the editor catalog](../custom_components/marao_dashboard/editor.py).
+These shared entity cards are entries in [the editor catalog](../custom_components/marao_dashboard/editor.py).
+The additional page roles and security controls are covered below.
 Each also inherits [mobile layout](specs/mobile-theme-layout/spec.md) and
 [state/action rules](specs/entity-state-actions/spec.md). Public options below
 are configuration keys, not a second schema; read the catalog, card documentation
@@ -27,7 +30,7 @@ and affected runtime before changing their shape.
 | `hc_switch_card` | Toggle, `power_entity`, `power_unit`, power graph, active/graph colors and line/fill visibility | [Cards](specs/card-behaviors/spec.md), [history](specs/camera-history-content/spec.md) |
 | `hc_number_card` | Native number/input-number min/max/step up/down input | [Values](specs/value-numeric-controls/spec.md) |
 | `hc_wallbox_current_card` | Shared current input, up to three `shortcuts` | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
-| `hc_vacuum_card` | Native start/pause/return capabilities; icon and `action_1`–`action_3` with explicit segment, optional name/icon/service; documented segment command default | [Cards](specs/card-behaviors/spec.md) |
+| `hc_vacuum_card` | Native start/pause/return capabilities; icon and `action_1`–`action_3` with explicit segment, optional name/icon/service/native data; documented segment command default | [Cards](specs/card-behaviors/spec.md), [command compatibility](../tests/frontend/marao-security.test.js) |
 | `hc_battery_card` | Battery thresholds, `on_icon`, `hc_card_color`, neutral unavailable state | [Cards](specs/card-behaviors/spec.md) |
 | `hc_dishwasher_card` | Operation, progress, remaining time, program, salt and rinse-aid entities | [Cards](specs/card-behaviors/spec.md) |
 | `hc_washing_machine_card` | Running/idle state and domain treatment | [Cards](specs/card-behaviors/spec.md) |
@@ -55,9 +58,9 @@ page roles through ordinary section/card descriptors; raw cards remain preserved
 | `hc_header_card`, `hc_weather_card`, `hc_glance_card` | Date/person/air-quality header; condition/temperature/available forecasts; one–three independent named/icon readings | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
 | `hc_room_card` | Room navigation, explicit readings and lighting membership; guarded multi-light All off action; approved room-only background state | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
 | `hc_scene_card` | Native input-select/select options and authoritative selected state; separate from overview `scene.turn_on` buttons | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
-| `hc_security_card` | Alarm state presentation; no promise of a separate built-in alarm keypad | [Cards](specs/card-behaviors/spec.md), [actions](specs/entity-state-actions/spec.md) |
+| `hc_security_card`, internal `hc_alarm_controls_card` | Authoritative alarm state, generated capability-aware sheet, transient masked numeric/text code, tap arming and held disarm/bypass | [Alarm change](changes/add-alarm-controls-and-service-access-openers/specs/card-behaviors/spec.md); [security checks](../tests/frontend/marao-security.test.js), [native safe checks](../tests/test-ha-security.js) |
 | `hc_media_app_card` | Apple TV source shortcut | [Cards](specs/card-behaviors/spec.md); [generator checks](../tests/components/marao_dashboard/test_generator.py) |
-| `hc_access_action_card`, `hc_access_hold_action_card`, `hc_access_slide_action_card` | Explicit service actions, 1.2-second security hold, strict access slide | [Actions](specs/entity-state-actions/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
+| `hc_access_action_card`, `hc_access_hold_action_card`, `hc_access_slide_action_card` | Explicit service actions, 1.2-second security hold, strict access slide for lock/cover and explicitly selected button/switch/script openers | [Actions](specs/entity-state-actions/spec.md), [opener change](changes/add-alarm-controls-and-service-access-openers/specs/entity-state-actions/spec.md); [security checks](../tests/frontend/marao-security.test.js), [card checks](../tests/frontend/marao-climate-card.test.js) |
 | `custom:marao-card`, `custom:marao-navbar-card`, `custom:marao-popup-card` | Shared renderer, floating routes, modal sheet | [Navigation/popups](specs/navigation-popups/spec.md); [MaraoCards.js](../custom_components/marao_dashboard/frontend/MaraoCards.js), [navbar checks](../tests/frontend/marao-navbar-card.test.js) |
 | `marao-slide-to-open` | Embedded strict-slide element and gesture lifecycle | [Actions](specs/entity-state-actions/spec.md); [MaraoDashboard.js](../custom_components/marao_dashboard/frontend/MaraoDashboard.js) |
 | `custom:marao-state-timeline-card`, `custom:marao-energy-period-card` | 24-hour state transitions and day/month period sheets | [History](specs/camera-history-content/spec.md); [history checks](../tests/frontend/marao-history-cards.test.js) |

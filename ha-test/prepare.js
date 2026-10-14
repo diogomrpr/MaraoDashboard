@@ -206,7 +206,7 @@ async function ensureEntry(config) {
 
 function referencedEntities(value, result = new Set()) {
   if (typeof value === "string") {
-    for (const match of value.matchAll(/\b(?:alarm_control_panel|binary_sensor|button|camera|climate|cover|device_tracker|fan|input_boolean|input_datetime|input_number|input_select|input_text|light|lock|media_player|number|person|remote|scene|select|sensor|switch|vacuum|weather)\.[a-z0-9_]+\b/g)) result.add(match[0]);
+    for (const match of value.matchAll(/\b(?:alarm_control_panel|binary_sensor|button|camera|climate|cover|device_tracker|fan|input_boolean|input_datetime|input_number|input_select|input_text|light|lock|media_player|number|person|remote|scene|script|select|sensor|switch|vacuum|weather)\.[a-z0-9_]+\b/g)) result.add(match[0]);
   } else if (value && typeof value === "object") {
     for (const [key, child] of Object.entries(value)) {
       if (!["service", "action", "perform_action", "action_service", "type"].includes(key)) referencedEntities(child, result);

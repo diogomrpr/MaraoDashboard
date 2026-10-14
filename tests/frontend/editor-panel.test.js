@@ -17,6 +17,19 @@ const context = vm.createContext({
 // Execute the actual panel with only browser/Monaco imports omitted.
 vm.runInContext(source.slice(source.indexOf("const TEXT =")).replaceAll("import.meta.url", '"https://example.invalid/MaraoDashboardPanel.js?v=test"'), context);
 
+test("vacuum native command data is editable and survives sibling option changes", () => {
+  const p = new Panel();
+  const fields = p._expandedFields([{ key: "action_1", label: "Action 1", kind: "vacuum_action" }]);
+  const dataField = fields.find(field => field.key === "action_1.data");
+  assert.deepEqual(JSON.parse(JSON.stringify(p._variableSchema(dataField).selector)), { object: {} });
+  const data = { command: "app_segment_clean", params: [{ segments: [21], repeat: 1 }] };
+  const variables = { action_1: { segment: 21, data } };
+  p._writeVariable(variables, fields.find(field => field.key === "action_1.icon"), "mdi:sofa");
+  assert.deepEqual(variables.action_1.data, data);
+  p._writeVariable(variables, dataField, { command: "app_segment_clean", params: [{ segments: [22], repeat: 1 }] });
+  assert.deepEqual(variables.action_1.data.params, [{ segments: [22], repeat: 1 }]);
+});
+
 function panel(config) {
   confirmations = [];
   const p = new Panel();

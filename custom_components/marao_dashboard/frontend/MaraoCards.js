@@ -9,6 +9,33 @@ const domainOf = (entity) => text(entity).split(".", 1)[0];
 const roomLightEntities = config => [...new Set((Array.isArray(config.variables?.light_entities) ? config.variables.light_entities : []).filter(entity => typeof entity === "string" && entity.startsWith("light.")))];
 export const ACCESS_HOLD_MS = 1200;
 
+export function accessOpenerService(entity, configured) {
+  const native = { lock: "lock.unlock", cover: "cover.open_cover", button: "button.press", switch: "switch.turn_on", script: "script.turn_on" }[domainOf(entity)];
+  return native && (!configured || configured === native) ? native : "";
+}
+
+const alarmModes = [
+  ["home", 1], ["away", 2], ["night", 4], ["custom_bypass", 16], ["vacation", 32],
+];
+
+export function alarmActions(state) {
+  const actions = alarmModes.filter(([, feature]) => Number(state?.attributes?.supported_features) & feature)
+    .map(([mode]) => ({ service: `alarm_arm_${mode}`, mode, hold: mode === "custom_bypass" }));
+  return [...actions, { service: "alarm_disarm", mode: "disarm", hold: true }];
+}
+
+export function alarmCodeRequired(state, service) {
+  return Boolean(state?.attributes?.code_format)
+    && (service === "alarm_disarm" || state.attributes.code_arm_required !== false);
+}
+
+export function dishwasherWarning(state) {
+  const value = text(state?.state).trim().toLowerCase();
+  if (!value || ["unknown", "unavailable"].includes(value)) return false;
+  const options = (Array.isArray(state.attributes?.options) ? state.attributes.options : []).map(option => text(option).toLowerCase());
+  return options.includes("off") ? value !== "off" : ["on", "true", "1", "2", "present", "confirmed"].includes(value);
+}
+
 function localize(key, hass, placeholders = {}, fallback = key) {
   const translated = globalThis.window?.MaraoDashboard?.localize?.(key, hass, placeholders);
   return translated && translated !== key ? text(translated) : text(fallback);
@@ -123,7 +150,8 @@ export function vacuumActions(state, variables = {}) {
     if (service === "vacuum.send_command" && !(features & 256)) continue;
     actions.push({ key: `segment_${index}`, service, icon: action.icon || "mdi:floor-plan",
       label: action.name, labelKey: "vacuum.clean_segment", segment: action.segment,
-      data: service === "vacuum.send_command" ? { command: "app_segment_clean", params: [action.segment] } : {},
+      data: service === "vacuum.send_command" ? { command: "app_segment_clean", params: [action.segment],
+        ...(action.data && typeof action.data === "object" && !Array.isArray(action.data) ? structuredClone(action.data) : {}) } : {},
     });
   }
   return actions;
@@ -486,6 +514,13 @@ export async function callServiceWithNotification(hass, domain, service, data, o
     result = await hass.callService(domain, service, data, target, false);
   } catch (error) {
     rejectClimateRequest(requests);
+    // Native provider errors can echo submitted service data. Never surface a PIN.
+    if (domain === "alarm_control_panel" && data?.code) {
+      const code = String(data.code);
+      const message = text(error?.message || error?.body?.message || (typeof error === "string" ? error : ""));
+      error = new Error(message.split(JSON.stringify(code)).join("[redacted]").split(code).join("[redacted]")
+        || localize("alarm.request_failed", hass, {}, "Alarm request failed"));
+    }
     notifyActionError(hass, error);
     onOutcome?.("error", error);
     return;
@@ -538,7 +573,7 @@ export function cardProblem(config, hass, { error = "", contentError = "", loadi
     || kind === "hc_washing_machine_card" && value === "error"
     || (domainOf(entity) === "alarm_control_panel" || kind === "hc_security_card") && value === "triggered");
   for (const [key, label] of kind === "hc_dishwasher_card" ? [["salt_entity", "salt"], ["rinse_aid_entity", "rinse_aid"]] : []) {
-    if (variables[key] && hass.states[variables[key]]?.state === "on") {
+    if (variables[key] && dishwasherWarning(hass.states[variables[key]])) {
       details.push(localize(`dishwasher.${label}`, hass, {}, label.replaceAll("_", " ")));
       severity ||= "warning";
     }
@@ -824,9 +859,24 @@ export class MaraoCard extends BaseElement {
   constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._hass = null; this._sliderTargets = new Map(); this._sliderGesture = null; this._graphHistory = new Map(); this._graphRequests = new Map(); this._graphErrors = new Set(); this._holdTimer = null; this._holdFrame = null; this._holdActive = false; this._holdCompleted = false; }
   setConfig(config) {
     const historyIdentity = value => JSON.stringify({...value, variables: {...value.variables, display_unit: undefined, display_precision: undefined}});
+    this._clearAlarmPIN();
+    this._alarmSignature = "";
+    this._alarmBusy = false;
+    this._cancelHold();
     this._cancelSliderGesture();
     if (historyIdentity(this._config) !== historyIdentity(config)) { this._graphRequests.clear(); this._graphHistory.clear(); this._graphErrors.clear(); } this._config = { ...config }; this._actionError = ""; this._mediaError = ""; this._mediaURL = ""; this._actionRequest = (this._actionRequest || 0) + 1; this._subscribeClimate(); this._render(); }
-  connectedCallback() { this._actionLive = true; this._climateConnected = true; this._subscribeClimate(); this._render(); }
+  connectedCallback() {
+    this._actionLive = true; this._climateConnected = true; this._subscribeClimate();
+    this._cancelHiddenControls ||= event => {
+      if (event.type === "visibilitychange" && !globalThis.document?.hidden) return;
+      this._clearAlarmPIN(); this._cancelHold(); this._cancelSliderGesture();
+      const slide = this.shadowRoot?.querySelector("marao-slide-to-open");
+      slide?._resetGesture(slide.shadowRoot?.querySelector(".track"));
+    };
+    for (const type of ["location-changed", "popstate"]) globalThis.window?.addEventListener?.(type, this._cancelHiddenControls);
+    globalThis.document?.addEventListener?.("visibilitychange", this._cancelHiddenControls);
+    this._render();
+  }
   set hass(value) {
     const entity = text(this._config.entity);
     const previous = this._hass;
@@ -834,6 +884,11 @@ export class MaraoCard extends BaseElement {
     const wasServiceReady = this._serviceReady;
     this._hass = value;
     this._serviceReady = serviceConnectionReady(value);
+    if (this._config.template === "hc_alarm_controls_card") {
+      if (!this._serviceReady || !serviceTargetReady(value, entity)) { this._clearAlarmPIN(); this._cancelHold(); }
+      this._renderAlarm();
+      return;
+    }
     this._subscribeClimate();
     if (this._climateEntity) reconcileClimate(this._climateEntity, value, previousState !== value?.states?.[entity]);
     const graphEntity = this._config.variables?.graph_entity || this._config.variables?.power_entity
@@ -870,7 +925,90 @@ export class MaraoCard extends BaseElement {
     this._render();
   }
   get hass() { return this._hass; }
-  disconnectedCallback() { this._actionLive = false; this._actionError = ""; this._mediaError = ""; this._mediaURL = ""; this._actionRequest = (this._actionRequest || 0) + 1; this._climateConnected = false; this._subscribeClimate(); this._cancelHold(); this._cancelSliderGesture(); }
+  disconnectedCallback() {
+    for (const type of ["location-changed", "popstate"]) globalThis.window?.removeEventListener?.(type, this._cancelHiddenControls);
+    globalThis.document?.removeEventListener?.("visibilitychange", this._cancelHiddenControls);
+    this._clearAlarmPIN(); this._alarmSignature = ""; this._actionLive = false; this._actionError = ""; this._mediaError = ""; this._mediaURL = ""; this._actionRequest = (this._actionRequest || 0) + 1; this._climateConnected = false; this._subscribeClimate(); this._cancelHold(); this._cancelSliderGesture();
+  }
+
+  _clearAlarmPIN() {
+    this._alarmPIN = "";
+    const input = this.shadowRoot?.querySelector("[data-alarm-code]");
+    if (input) input.value = "";
+  }
+
+  _renderAlarm() {
+    if (!this.shadowRoot) return;
+    const entity = text(this._config.entity), state = stateOf(this._hass, entity);
+    const problem = cardProblem(this._config, this._hass, { error: this._actionError });
+    const ready = Boolean(state.state) && domainOf(entity) === "alarm_control_panel" && serviceConnectionReady(this._hass) && serviceTargetReady(this._hass, entity);
+    const codeFormat = state.attributes?.code_format;
+    const signature = JSON.stringify([state.state, state.attributes?.supported_features, codeFormat, state.attributes?.code_arm_required,
+      ready, this._alarmBusy, problem?.reason, this._hass?.language, this._hass?.locale]);
+    if (signature === this._alarmSignature) return;
+    this._alarmSignature = signature;
+    const restoreFocus = this.shadowRoot.activeElement ? focusRestorer(deepActiveElement()) : null;
+    this._cancelHold();
+    const label = localize("alarm.code", this._hass, {}, "Alarm code");
+    const actions = alarmActions(state);
+    this.shadowRoot.innerHTML = `<style>${cardStyles()}
+      .alarm-body { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; padding:16px; min-width:0; font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-secondary,500); line-height:1.25; }
+      .alarm-body > * { grid-area:auto; min-width:0; }
+      .alarm-body > .state { white-space:normal; overflow-wrap:anywhere; }
+      .alarm-actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,9em),1fr)); gap:10px; }
+      .alarm-action { position:relative; min-width:0; border-radius:16px; }
+      .alarm-action button { position:relative; width:100%; min-height:64px; padding:12px; border-radius:16px; font:inherit; overflow-wrap:anywhere; user-select:none; -webkit-user-select:none; touch-action:manipulation; color:var(--primary-text-color); background:var(--ha-card-background,var(--card-background-color)); }
+      .alarm-action button:disabled { opacity:.6; background:var(--secondary-background-color); }
+      .alarm-body label { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; overflow-wrap:anywhere; }
+      .alarm-body input { box-sizing:border-box; width:100%; min-width:0; height:max(48px,calc(1.25em + 20px)); min-height:48px; padding:10px; border:1px solid currentColor; border-radius:12px; background:var(--ha-card-background,var(--card-background-color)); color:inherit; font:inherit; outline:none; }
+      @container marao-card (max-width:240px) { .alarm-actions { grid-template-columns:minmax(0,1fr); } }
+    </style><ha-card style="${esc(problemStyle(problem) || "")}"><div class="alarm-body">
+      <div class="state" aria-live="polite">${esc(entityStateLabel(state, entity, "hc_security_card", this._hass))}</div>
+      ${problem ? `<div class="problem" role="status"><span>${esc(problem.reason)}</span></div>` : ""}
+      ${codeFormat ? `<label>${esc(label)}<input data-alarm-code type="password" inputmode="${codeFormat === "number" ? "numeric" : "text"}" autocomplete="off" aria-label="${esc(label)}"${!ready || this._alarmBusy ? " disabled" : ""}></label>` : ""}
+      <div class="alarm-actions">${actions.map(action => {
+        const name = localize(`alarm.${action.mode}`, this._hass, {}, action.mode.replaceAll("_", " "));
+        const caption = action.hold ? localize("access.hold_to_activate", this._hass, { action: name }, `Hold to ${name}`) : name;
+        const disabled = !ready || this._alarmBusy || state.state === `armed_${action.mode}`
+          || action.mode === "disarm" && state.state === "disarmed";
+        return `<div class="alarm-action"><button type="button" data-alarm-action="${action.service}" aria-label="${esc(caption)}"${disabled ? " disabled" : ""}>${esc(caption)}</button>${action.hold ? '<svg class="hold-progress" aria-hidden="true"><rect x="1.5" y="1.5" pathLength="100"></rect></svg>' : ""}</div>`;
+      }).join("")}</div></div></ha-card>`;
+    const input = this.shadowRoot.querySelector("[data-alarm-code]");
+    if (input) {
+      input.value = this._alarmPIN || "";
+      input.addEventListener("input", () => { this._alarmPIN = input.value; });
+    }
+    for (const button of this.shadowRoot.querySelectorAll("[data-alarm-action]")) {
+      const service = button.dataset.alarmAction;
+      const action = actions.find(item => item.service === service);
+      if (action.hold) this._bindHoldAction(button, button.parentElement, () => this._sendAlarm(service, true));
+      else this._bindTapAction(button, button.parentElement, () => this._sendAlarm(service));
+    }
+    restoreFocus?.();
+  }
+
+  async _sendAlarm(service, held = false) {
+    const entity = text(this._config.entity), state = stateOf(this._hass, entity);
+    const action = alarmActions(state).find(item => item.service === service);
+    if (!state.state || !action || action.hold && !held || this._alarmBusy || this._actionLive === false
+      || domainOf(entity) !== "alarm_control_panel" || !serviceConnectionReady(this._hass) || !serviceTargetReady(this._hass, entity)) return;
+    if (state.state === `armed_${action.mode}` || action.mode === "disarm" && state.state === "disarmed") return;
+    const code = this._alarmPIN || "";
+    this._clearAlarmPIN();
+    if (alarmCodeRequired(state, service) && (!code || state.attributes.code_format === "number" && !/^\d+$/.test(code))) {
+      this._actionError = localize("alarm.code_required", this._hass, {}, "Enter a valid alarm code");
+      this._renderAlarm();
+      return;
+    }
+    const config = this._config;
+    this._alarmBusy = true;
+    this._renderAlarm();
+    haptic("heavy");
+    const data = { entity_id: entity };
+    if (alarmCodeRequired(state, service)) data.code = code;
+    try { await this._callService("alarm_control_panel", service, data); }
+    finally { if (this._config === config) { this._alarmBusy = false; this._renderAlarm(); } }
+  }
 
   _subscribeClimate() {
     const entity = this._climateConnected && this._config.template === "hc_climate_card" && domainOf(this._config.entity) === "climate" ? this._config.entity : "";
@@ -1043,6 +1181,7 @@ export class MaraoCard extends BaseElement {
 
   _render() {
     if (!this.shadowRoot) return;
+    if (this._config.template === "hc_alarm_controls_card") { this._renderAlarm(); return; }
     const gesture = this._sliderGesture;
     if (gesture?.input.isConnected) {
       const state = stateOf(this._hass, this._config.entity);
@@ -1181,7 +1320,7 @@ export class MaraoCard extends BaseElement {
         if (variables[key]) readings += readingMarkup(variables[key], "", icon, this._hass);
       }
       for (const [key, label] of [["salt_entity","salt"], ["rinse_aid_entity","rinse_aid"]]) {
-        if (stateOf(this._hass, variables[key]).state === "on") readings += readingMarkup(variables[key], localize(`dishwasher.${label}`, this._hass, {}, label.replaceAll('_',' ')), "mdi:alert-circle-outline", this._hass);
+        if (dishwasherWarning(stateOf(this._hass, variables[key]))) readings += readingMarkup(variables[key], localize(`dishwasher.${label}`, this._hass, {}, label.replaceAll('_',' ')), "mdi:alert-circle-outline", this._hass);
       }
     }
     const showName = config.show_name !== false && (!glance || Boolean(config.name));
@@ -1284,7 +1423,7 @@ export class MaraoCard extends BaseElement {
         event.stopPropagation();
         if (button.disabled || !serviceConnectionReady(this._hass)) return;
         const entry = vacuum[Number(button.dataset.vacuumAction)];
-        this._performAction({ action: "call-service", service: entry.service, data: entry.data, haptic: "heavy" }, entity);
+        this._performAction({ action: "call-service", service: entry.service, data: { ...entry.data, entity_id: entity }, haptic: "heavy" }, entity);
       });
     }
     if (roomLightsControl) {
@@ -1435,6 +1574,7 @@ export class MaraoCard extends BaseElement {
       if (button.disabled || this._holdActive || (event.button != null && event.button !== 0)) return;
       suppressClick = false;
       this._holdActive = true;
+      this._holdControl = card;
       this._holdCompleted = false;
       haptic("heavy");
       card?.classList.add("is-pressed");
@@ -1486,7 +1626,7 @@ export class MaraoCard extends BaseElement {
 
   _setHoldProgress(value) {
     const progress = Math.max(0, Math.min(100, Number(value) || 0));
-    const line = this.shadowRoot?.querySelector(".hold-progress rect");
+    const line = this._holdControl?.querySelector(".hold-progress rect") || this.shadowRoot?.querySelector(".hold-progress rect");
     if (line) {
       line.style.strokeDashoffset = text(100 - progress);
       line.style.opacity = progress > 0 ? "1" : "0";
@@ -1501,6 +1641,8 @@ export class MaraoCard extends BaseElement {
     this._holdActive = false;
     this._holdCompleted = false;
     this._setHoldProgress(0);
+    this._holdControl?.classList.remove("is-pressed");
+    this._holdControl = null;
     this.shadowRoot?.querySelector("ha-card")?.classList.remove("is-pressed");
   }
 

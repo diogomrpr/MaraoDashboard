@@ -318,7 +318,9 @@
       ]
     },
     "hc_security_card": {
-      "options": [],
+      "options": [
+        "popup_hash"
+      ],
       "checks": [
         "page-generation",
         "page-model",
@@ -367,6 +369,15 @@
       "options": [
         "app_source"
       ],
+      "checks": [
+        "page-generation",
+        "page-model",
+        "content",
+        "card-runtime"
+      ]
+    },
+    "hc_access_slide_action_card": {
+      "options": [],
       "checks": [
         "page-generation",
         "page-model",
@@ -1143,7 +1154,8 @@
         "Configured dishwasher warning",
         "Camera preview \u00b7 failed media",
         "Media artwork \u00b7 failed media",
-        "Simulate media failure"
+        "Simulate media failure",
+        "Dishwasher \u00b7 vendor refill confirmation"
       ],
       "checks": [
         "states",
@@ -1206,6 +1218,7 @@
     },
     "entityGroupCases": {
       "identities": [
+        "overview-maintenance",
         "gallery-light-all",
         "gallery-light-active",
         "gallery-cover-all",
@@ -1235,7 +1248,14 @@
         "empty-scenes",
         "daily-energy",
         "monthly-energy",
-        "media-app"
+        "media-app",
+        "alarm-number",
+        "alarm-text",
+        "alarm-no_code",
+        "opener-button",
+        "opener-switch",
+        "opener-script",
+        "vacuum-native-command"
       ],
       "checks": [
         "page-generation",

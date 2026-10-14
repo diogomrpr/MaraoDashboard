@@ -161,7 +161,7 @@ async function runPlan(plan, options = {}) {
   const directory = fs.mkdtempSync(path.join(root, 'tests/.artifacts/verification/run-'));
   fs.chmodSync(directory, 0o700);
   const identities = Object.fromEntries(plan.checks.map(check => [check.id, checkIdentity(check)]));
-  const report = { version: 3, kind: 'scoped-verification', ...plan, required: plan.checks.map(check => check.id), results: [],
+  const report = { ...plan, version: 3, kind: 'scoped-verification', required: plan.checks.map(check => check.id), results: [],
     artifact_root: directory, started_at: new Date().toISOString(), passed: false, verified_cleanup: false };
   const filename = path.join(directory, 'report.json');
   const save = () => fs.writeFileSync(filename, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });

@@ -114,8 +114,12 @@ test('independent room examples keep explicit lists and safe suggestion-area fix
 
 function fixtureIds(config) {
   const ids = new Set();
-  for (const domain of ['input_boolean', 'input_number', 'input_select']) for (const key of Object.keys(config[domain] || {})) ids.add(`${domain}.${key}`);
-  for (const domain of ['camera', 'climate', 'cover', 'media_player', 'remote', 'scene']) for (const item of config[domain] || []) ids.add(`${domain}.${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`);
+  for (const domain of ['input_boolean', 'input_number', 'input_select', 'script']) for (const key of Object.keys(config[domain] || {})) ids.add(`${domain}.${key}`);
+  for (const domain of ['camera', 'climate', 'cover', 'media_player', 'remote', 'scene', 'vacuum']) for (const item of config[domain] || []) {
+    const name = item.name || (item.platform === 'marao_test_vacuum' ? 'Marao Dashboard Test Vacuum Commands' : '');
+    assert.ok(name, 'Synthetic provider must have an explicit or independently known name');
+    ids.add(`${domain}.${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`);
+  }
   for (const block of config.template) for (const [domain, entries] of Object.entries(block)) {
     if (!Array.isArray(entries) || domain === 'trigger') continue;
     for (const entry of entries) ids.add(entry.default_entity_id || `${domain}.${entry.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`);
