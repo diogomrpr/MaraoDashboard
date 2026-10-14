@@ -32,7 +32,7 @@ test('title geometry rejects rounded-corner clipping while retaining narrow cont
       : { overflow, borderTopLeftRadius: '20px', borderTopRightRadius: '20px' },
     document: { createRange: () => ({ selectNodeContents() {}, getClientRects: () => [{ left, right: 65, top, width: 65 - left, height: 19 }] }) },
   });
-  const page = { locator: () => ({ evaluateAll: async callback => structuredClone(vm.runInContext('(' + callback.toString() + ')', environment)([card])) }) };
+  const page = { locator: () => ({ evaluateAll: async (callback, argument) => structuredClone(vm.runInContext('(' + callback.toString() + ')', environment)([card], argument)) }) };
   assert.ok((await titleLayoutIssues(page)).some(issue => issue.includes('rounded corner')));
   top = 14;
   assert.deepEqual(await titleLayoutIssues(page), []);
