@@ -67,7 +67,7 @@ Builder generation, setup repair and history restoration refuse native destinati
 
 ## Example with the standard Home Assistant shell
 
-The [safe native dashboard example](../../../ha-test/examples/native-dashboard.yaml)
+The [safe native dashboard example](https://github.com/diogomrpr/MaraoDashboard/blob/main/ha-test/examples/native-dashboard.yaml)
 contains Home, Devices and Energy Sections views with 20 Marao cards. It demonstrates
 light and climate controls, media remotes/apps, groups, appliance bindings, automatic
 detail sheets, energy history and charging presets using disposable demo entities.
