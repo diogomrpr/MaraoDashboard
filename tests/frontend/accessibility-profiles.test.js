@@ -86,12 +86,16 @@ test('visual preferences reach cards mounted while fonts and scrolling settle', 
   const previous = globalThis.document;
   const previousFrame = globalThis.requestAnimationFrame;
   const painted = [];
+  const emulation = [];
   globalThis.requestAnimationFrame = callback => {
     painted.push({ size: lateCard.style.values.get('--font-size-primary'), theme: html.dataset.maraoThemeMode });
+    assert.deepEqual(emulation.at(-1), { method: 'Emulation.setTouchEmulationEnabled', params: { enabled: true, maxTouchPoints: 1 } });
     queueMicrotask(callback);
   };
   globalThis.document = { documentElement: html, fonts: { ready: Promise.resolve() } };
-  const page = { evaluate: async (callback, data) => callback(data), waitForTimeout: async () => { shadow.children.push(lateCard); } };
+  let sessions = 0;
+  const page = { evaluate: async (callback, data) => callback(data), waitForTimeout: async () => { shadow.children.push(lateCard); },
+    context: () => ({ newCDPSession: async () => { sessions += 1; return { send: async (method, params) => emulation.push({ method, params }) }; } }) };
   try {
     await applyVisualPreferences(page, scenarios.find(s => s.name === 'iphone-bold-text-200'), 'dark');
     for (const element of [html, ha, lateCard]) {
@@ -105,6 +109,8 @@ test('visual preferences reach cards mounted while fonts and scrolling settle', 
     assert.equal(lateCard.style.values.get('--font-size-primary'), '18px');
     assert.equal(html.dataset.maraoThemeMode, 'light');
     assert.deepEqual(painted.at(-1), { size: '18px', theme: 'light' });
+    assert.equal(sessions, 1, 'Reuse the page session without replacing its safe-area and text overrides');
+    assert.equal(emulation.length, 2, 'Restore actual touch before every inspected frame');
   } finally { globalThis.document = previous; globalThis.requestAnimationFrame = previousFrame; }
 });
 

@@ -312,12 +312,17 @@ function safeAreaInsetsForScenario(scenario) {
 
 const pageEmulationSessions = new WeakMap();
 
-async function configurePageEmulation(context, page, scenario, insets = safeAreaInsetsForScenario(scenario)) {
+async function emulationSession(context, page) {
   let session = pageEmulationSessions.get(page);
   if (!session) {
     session = await context.newCDPSession(page);
     pageEmulationSessions.set(page, session);
   }
+  return session;
+}
+
+async function configurePageEmulation(context, page, scenario, insets = safeAreaInsetsForScenario(scenario)) {
+  const session = await emulationSession(context, page);
   await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
   await session.send("Emulation.setSafeAreaInsetsOverride", {
     insets,
@@ -386,6 +391,9 @@ async function applyVisualPreferences(page, scenario, theme) {
   await page.waitForTimeout(300);
   // HA may mount themed cards while fonts and scroll rendering settle.
   await apply();
+  // Chromium can reset touch when its renderer changes after initial setup.
+  const session = await emulationSession(page.context(), page);
+  await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
