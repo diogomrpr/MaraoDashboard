@@ -13,6 +13,7 @@ function fixture() {
   const paths = ['configuration.yaml', 'dashboard/MaraoDashboard', '.storage/lovelace_dashboards'];
   fs.mkdirSync(path.join(root, 'dashboard/MaraoDashboard'), { recursive: true });
   fs.writeFileSync(path.join(root, 'configuration.yaml'), '# exact original\nsecret: !secret safe_fixture\n', { mode: 0o640 });
+  fs.chmodSync(path.join(root, 'configuration.yaml'), 0o640);
   fs.writeFileSync(path.join(root, 'dashboard/MaraoDashboard/custom card.yaml'), 'protected: true\n');
   const run = (_config, command, { input } = {}) => {
     const result = spawnSync('sh', ['-c', command], { input, encoding: 'utf8' });
@@ -25,6 +26,7 @@ function fixture() {
 
 test('native proof restores exact bytes, protected paths, absent storage and original file modes', () => {
   const f = fixture();
+  const originalMask = process.umask(0o077);
   try {
     const before = f.tool({ mode: 'backup', paths: f.paths });
     fs.writeFileSync(path.join(f.root, 'configuration.yaml'), 'changed: true\n');
@@ -35,7 +37,7 @@ test('native proof restores exact bytes, protected paths, absent storage and ori
     assert.equal(fs.readFileSync(path.join(f.root, 'dashboard/MaraoDashboard/custom card.yaml'), 'utf8'), 'protected: true\n');
     assert.equal(fs.existsSync(path.join(f.root, '.storage/lovelace_dashboards')), false);
     assert.equal(f.tool({ mode: 'finish' }).verified_cleanup, true);
-  } finally { f.close(); }
+  } finally { process.umask(originalMask); f.close(); }
 });
 
 test('native recovery refuses concurrent changes and keeps its exact recovery archive', () => {

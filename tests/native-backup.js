@@ -52,7 +52,7 @@ function nativeBackup(config, operation, paths, { run = ssh } = {}) {
       const stage = directory + '/restore-stage';
       const commands = ['(' + scanCommand(paths) + ') > ' + quote(directory + '/current.scan'),
         'cmp ' + quote(directory + '/expected.scan') + ' ' + quote(directory + '/current.scan'),
-        'mkdir ' + quote(stage), 'tar -C ' + quote(stage) + ' -xf ' + quote(directory + '/baseline.tar')];
+        'mkdir ' + quote(stage), 'tar -C ' + quote(stage) + ' -xpf ' + quote(directory + '/baseline.tar')];
       for (const relative of paths) {
         const destination = quote(root + '/' + relative), saved = quote(stage + '/' + relative), previous = quote(directory + '/previous/' + relative);
         commands.push('mkdir -p ' + quote(directory + '/previous/' + require('node:path').posix.dirname(relative)));
