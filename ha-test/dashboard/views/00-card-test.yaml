@@ -339,7 +339,7 @@ cards:
 
       - type: custom:marao-card
         template: hc_access_hold_action_card
-        entity: alarm_control_panel.marao_dashboard_test_alarm
+        entity: alarm_control_panel.marao_dashboard_test_alarm_no_code
         name: Arm away · hold
         icon: mdi:shield-lock
         variables:

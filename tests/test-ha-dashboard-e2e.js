@@ -312,7 +312,7 @@ async function checkActionDispatches(page, serviceCalls) {
   await page.locator(".marao-popup-close").tap();
   await page.waitForFunction(() => !location.hash);
 
-  const alarm = "alarm_control_panel.marao_dashboard_test_alarm";
+  const alarm = "alarm_control_panel.marao_dashboard_test_alarm_no_code";
   const hold = cardAction(page, "Arm away · hold");
   await page.locator(".marao-popup-sheet").waitFor({ state: "detached" });
   await hold.scrollIntoViewIfNeeded();

@@ -18,6 +18,18 @@ function homeGroups(source) {
   return source.pages.find(page => page.path === 'overview').sections.flatMap(section => section.entities || []).filter(card => card.template === 'hc_entity_group_card');
 }
 
+test('standalone security holds use the PIN-free helper and preserve PIN-required alarm coverage', () => {
+  const hold = view.cards.flatMap(card => card.cards || [card]).find(card => card.name === 'Arm away · hold');
+  assert.equal(hold.entity, 'alarm_control_panel.marao_dashboard_test_alarm_no_code');
+  const alarms = helpers.template.flatMap(group => group.alarm_control_panel || []);
+  const pinless = alarms.find(alarm => alarm.default_entity_id === hold.entity);
+  assert.equal(pinless.code_arm_required, false);
+  assert.equal(pinless.code_format, 'no_code');
+  const coded = alarms.find(alarm => alarm.default_entity_id === 'alarm_control_panel.marao_dashboard_test_alarm');
+  assert.ok(coded);
+  assert.notEqual(coded.code_arm_required, false);
+});
+
 test('every published native family has a canonical safe example and a realistic page', () => {
   const native = require('../../ha-test/native-cases.js').nativeCases(view, manifest, require('../../ha-test/cases.js').walkCards);
   const catalog = JSON.parse(fs.readFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoNativeCatalog.js', import.meta.url), 'utf8').replace(/^export const catalog = /, '').trim().replace(/;$/, ''));
