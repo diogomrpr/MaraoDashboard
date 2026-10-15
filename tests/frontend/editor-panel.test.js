@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
 import * as model from "../../frontend_src/editor-model.js";
+import { PT_LABELS } from "../../frontend_src/editor-labels.js";
 
 const source = await fs.readFile(new URL("../../frontend_src/MaraoDashboardPanel.js", import.meta.url), "utf8");
 let Panel;
 let confirmations;
 const context = vm.createContext({
   ...model,
+  PT_LABELS,
   HTMLElement: class { attachShadow() { this.shadowRoot = { querySelector() { return null; } }; } },
   customElements: { get() {}, define(_name, value) { Panel = value; } },
   BRAND_MARK: '/brand/mark.svg?v=test', BRAND_MARK_DARK: '/brand/mark-dark.svg?v=test',

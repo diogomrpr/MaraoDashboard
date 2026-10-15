@@ -143,7 +143,8 @@ async function main() {
   const cases = concreteCases().filter((entry) => entry.sliderPercentage !== undefined);
   const browser = await chromium.launch();
   try {
-    for (const { scenario, theme } of selectedRuns(parseArgs())) {
+    const options = parseArgs();
+    for (const { scenario, theme } of selectedRuns(options)) {
       const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
       await context.addInitScript(setBrowserToken, { ...tokens, hassUrl: config.url, clientId: `${config.url}/`, expires: Date.now() + tokens.expires_in * 1000 });
       const page = await context.newPage();
@@ -216,9 +217,13 @@ async function main() {
         await page.locator('.marao-popup-close').click();
         await page.locator('.marao-popup-sheet').waitFor({ state: 'detached' });
       }
-      if (['iphone-normal', 'android-normal', 'iphone-bold-text-200', 'android-page-zoom-200'].includes(scenario.name)) {
+      if (options.screenshots !== 'failure' && ['iphone-normal', 'android-normal', 'iphone-bold-text-200', 'android-page-zoom-200'].includes(scenario.name)) {
         const cards = page.locator('marao-card').filter({ has: page.locator('input[type="range"]') });
+        const captured = new Set();
         for (const [index, card] of (await cards.all()).entries()) {
+          const family = await card.evaluate(element => element._config?.template);
+          if (options.screenshots === 'review' && captured.has(family)) continue;
+          captured.add(family);
           await card.evaluate((element, block) => element.scrollIntoView({ block }), scenario.pageZoom > 1 ? 'start' : 'center');
           await card.evaluate(async (element) => { await element.shadowRoot.querySelector('ha-card')?.updateComplete; });
           // Oversized element screenshots resize Chromium and reset mobile emulation.

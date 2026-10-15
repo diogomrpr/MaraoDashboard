@@ -501,9 +501,30 @@ function rejectClimateRequest(requests) {
   }
 }
 
-export async function callServiceWithNotification(hass, domain, service, data, onOutcome, target) {
+export function requiresAccessSlide(hass, domain, service, data, target) {
+  if (domain === "lock" && ["unlock", "open", "toggle"].includes(service)) return true;
+  if (!["cover", "homeassistant"].includes(domain) || !["open_cover", "toggle", "set_cover_position"].includes(service)) return false;
+  const selected = data?.entity_id || target?.entity_id;
+  const entities = selected == null ? [] : Array.isArray(selected) ? selected : [selected];
+  if (domain === "cover" && (!entities.length || target?.area_id || target?.device_id || data?.area_id || data?.device_id || entities.includes("all"))) return true;
+  return entities.some(entity => {
+    const state = stateOf(hass, entity);
+    if (domainOf(entity) === "lock") return true;
+    if (domainOf(entity) !== "cover" || !["door", "garage", "gate"].includes(text(state.attributes?.device_class).toLowerCase())) return false;
+    return service !== "set_cover_position" || Number(data.position) > 0 &&
+      (!Number.isFinite(Number(state.attributes?.current_position)) || Number(data.position) > Number(state.attributes.current_position));
+  });
+}
+
+export async function callServiceWithNotification(hass, domain, service, data, onOutcome, target, intent = {}) {
   const ready = () => serviceConnectionReady(hass) && serviceTargetReady(hass, data?.entity_id || target?.entity_id);
   if (!ready()) { onOutcome?.("skipped"); return; }
+  const strictSlide = intent.accessSlide === true && typeof data?.entity_id === "string" && !target &&
+    accessOpenerService(data.entity_id) === `${domain}.${service}`;
+  if (requiresAccessSlide(hass, domain, service, data, target) && !strictSlide) {
+    const error = new Error(localize("access.slide_required", hass, {}, "Use the access slide to open or unlock."));
+    notifyActionError(hass, error); onOutcome?.("error", error); return;
+  }
   const requests = domain === "climate" && ["set_temperature", "set_hvac_mode"].includes(service) ? prepareClimateRequest(hass, service, data) : [];
   if (!requests) { onOutcome?.("skipped"); return; }
   previewClimateRequest(hass, requests);
@@ -634,14 +655,14 @@ export async function performAction(hass, action, entity, onOutcome) {
     const event = new CustomEvent("hass-more-info", { bubbles: true, composed: true, detail: { entityId: action.entity || entity } });
     return document.dispatchEvent(event);
   }
-  const target = action.target?.entity_id || action.entity_id || entity;
+  const target = action.target?.entity_id || action.entity_id || action.data?.entity_id || action.service_data?.entity_id || entity;
   if (!target && !action.target?.area_id && !action.target?.device_id) return;
   if (kind === "toggle") return callServiceWithNotification(hass, domainOf(target), "toggle", { entity_id: target }, onOutcome);
   if (kind === "call-service" || kind === "perform-action") {
     const service = action.service || action.perform_action || "";
     const [domain, name] = service.split(".", 2);
     if (!domain || !name) return;
-    const data = { ...(action.data || {}) };
+    const data = { ...(action.data ?? action.service_data ?? {}) };
     if (domain === "media_player" && name === "media_seek" && action.seek_offset != null) {
       const current = stateOf(hass, target);
       const attrs = current.attributes || {};
@@ -857,6 +878,12 @@ export function energyLabel(reading, variables, hass) {
 
 export class MaraoCard extends BaseElement {
   constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._hass = null; this._sliderTargets = new Map(); this._sliderGesture = null; this._graphHistory = new Map(); this._graphRequests = new Map(); this._graphErrors = new Set(); this._holdTimer = null; this._holdFrame = null; this._holdActive = false; this._holdCompleted = false; }
+  get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
+  set preview(value) {
+    this._preview = Boolean(value);
+    if (this._preview) { this._cancelSliderGesture(); this._cancelHold(); }
+    if (this._authoritativeHass) this.hass = this._authoritativeHass;
+  }
   setConfig(config) {
     const historyIdentity = value => JSON.stringify({...value, variables: {...value.variables, display_unit: undefined, display_precision: undefined}});
     this._clearAlarmPIN();
@@ -878,6 +905,8 @@ export class MaraoCard extends BaseElement {
     this._render();
   }
   set hass(value) {
+    this._authoritativeHass = value;
+    if (this.preview && value) value = { ...value, connected: false, connection: { ...value.connection, connected: false } };
     const entity = text(this._config.entity);
     const previous = this._hass;
     const previousState = previous?.states?.[entity];
@@ -1647,11 +1676,13 @@ export class MaraoCard extends BaseElement {
   }
 
   _performAction(action, entity) {
+    if (this.preview) return;
     return performAction(this._hass, action, entity, isServiceAction(action) ? serviceOutcome(this) : undefined);
   }
 
-  _callService(domain, service, data, target) {
-    return callServiceWithNotification(this._hass, domain, service, data, serviceOutcome(this), target);
+  _callService(domain, service, data, target, intent) {
+    if (this.preview) return Promise.resolve();
+    return callServiceWithNotification(this._hass, domain, service, data, serviceOutcome(this), target, intent);
   }
 
   _setRange(entity, kind, value) {
@@ -1667,7 +1698,7 @@ export class MaraoCard extends BaseElement {
         const input = this.shadowRoot.querySelector("input.action-slider");
         input?.setAttribute("disabled", "true");
         haptic("heavy");
-        this._callService(serviceDomain, serviceName, { entity_id: entity })
+        this._callService(serviceDomain, serviceName, { entity_id: entity }, undefined, { accessSlide: true })
           .finally(() => { if (input) { input.value = "0"; input.removeAttribute("disabled"); } });
       }
     }
@@ -1716,7 +1747,7 @@ export class MaraoCard extends BaseElement {
   getCardSize() { return 2; }
 }
 
-const safeArea = (side) => `var(--marao-safe-area-inset-${side}, var(--safe-area-inset-${side}, env(safe-area-inset-${side}, 0px)))`;
+export const safeArea = (side) => `var(--marao-safe-area-inset-${side}, var(--safe-area-inset-${side}, env(safe-area-inset-${side}, 0px)))`;
 
 export class MaraoNavbarCard extends BaseElement {
   constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; }
@@ -1726,18 +1757,25 @@ export class MaraoNavbarCard extends BaseElement {
     this._config = { ...config, routes }; this._render();
   }
   connectedCallback() { registerFullscreen(this); this._render(); }
+  get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
+  set preview(value) { this._preview = Boolean(value); if (this._config && this._renderedPreview !== this.preview) this._render(); applyFullscreen(); }
   disconnectedCallback() { unregisterFullscreen(this); }
   set hass(value) { this._hass = value; this.shadowRoot?.querySelector("nav")?.setAttribute("aria-label", localize("navigation.label", value, {}, "Marao navigation")); }
   _render() {
     if (!this.shadowRoot) return;
     const routes = this._config.routes || [];
+    this.toggleAttribute?.("data-empty", routes.length === 0);
+    this.toggleAttribute?.("data-preview", this.preview);
+    this._renderedPreview = this.preview;
     const routeCount = Math.max(routes.length, 1);
     const bottom = /iPhone|iPod/i.test(navigator.userAgent || "") ? `max(4px, calc(${safeArea("bottom")} - 20px))` : "12px";
-    this.shadowRoot.innerHTML = `<style>:host{display:block;height:128px;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}.nav{position:fixed;z-index:1001;left:calc(50% + (${safeArea("left")} - ${safeArea("right")}) / 2);bottom:${bottom};transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(2px,.5vw,4px);width:min(calc(100vw - 24px - ${safeArea("left")} - ${safeArea("right")}),calc(${routeCount} * 54px + 20px));height:auto;min-height:60px;box-sizing:border-box;padding:6px 10px;border-radius:999px;background:var(--ha-card-background,var(--card-background-color));box-shadow:0 8px 30px rgba(0,0,0,.22)}a{display:grid;place-items:center;flex:0 0 48px;min-width:48px;width:48px;height:48px;aspect-ratio:1 / 1;align-self:center;justify-self:center;color:var(--icon-color,var(--primary-text-color));text-decoration:none;border-radius:50%;font-size:clamp(1.125rem,4vw,1.75rem);transition:transform .12s ease,filter .12s ease}a:active{transform:scale(.92);filter:brightness(.96)}a.active{color:var(--text-primary-color,var(--active-text-color));background:var(--primary-color)}a:focus{outline:none}ha-icon{--mdc-icon-size:26px}@media(max-width:300px){:host{height:228px}.nav{display:flex;flex-wrap:wrap;justify-content:center;height:auto;min-height:60px;border-radius:28px}a{flex:0 0 48px}}@media(prefers-reduced-motion:reduce){a{transition:none}}</style><nav class="nav" aria-label="${esc(localize("navigation.label", this._hass, {}, "Marao navigation"))}">${routes.map((route) => `<a href="${esc(route.url || route.path || "#")}" title="${esc(route.label)}" aria-label="${esc(route.label)}"><ha-icon icon="${esc(route.icon_selected || route.icon || "mdi:circle-outline")}"></ha-icon></a>`).join("")}</nav>`;
+    this.shadowRoot.innerHTML = `<style>:host{display:block;height:128px;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}:host([data-empty]){display:none}:host([data-preview]){height:auto}:host([data-preview]) .nav{position:relative;left:auto;bottom:auto;transform:none;width:min(100%,calc(${routeCount} * 54px + 20px));margin:12px auto}:host([data-preview]) a{cursor:default}.nav{position:fixed;z-index:1001;left:calc(50% + (${safeArea("left")} - ${safeArea("right")}) / 2);bottom:${bottom};transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(2px,.5vw,4px);width:min(calc(100vw - 24px - ${safeArea("left")} - ${safeArea("right")}),calc(${routeCount} * 54px + 20px));height:auto;min-height:60px;box-sizing:border-box;padding:6px 10px;border-radius:999px;background:var(--ha-card-background,var(--card-background-color));box-shadow:0 8px 30px rgba(0,0,0,.22)}a{display:grid;place-items:center;flex:0 0 48px;min-width:48px;width:48px;height:48px;aspect-ratio:1 / 1;align-self:center;justify-self:center;color:var(--icon-color,var(--primary-text-color));text-decoration:none;border-radius:50%;font-size:clamp(1.125rem,4vw,1.75rem);transition:transform .12s ease,filter .12s ease}a:active{transform:scale(.92);filter:brightness(.96)}a.active{color:var(--text-primary-color,var(--active-text-color));background:var(--primary-color)}a:focus{outline:none}ha-icon{--mdc-icon-size:26px}@media(max-width:300px){:host{height:228px}.nav{display:flex;flex-wrap:wrap;justify-content:center;height:auto;min-height:60px;border-radius:28px}a{flex:0 0 48px}}@media(prefers-reduced-motion:reduce){a{transition:none}}</style><nav class="nav" aria-label="${esc(localize("navigation.label", this._hass, {}, "Marao navigation"))}">${routes.map((route) => `<a href="${esc(route.url || route.path || "#")}" title="${esc(route.label)}" aria-label="${esc(route.label)}"><ha-icon icon="${esc(route.icon_selected || route.icon || "mdi:circle-outline")}"></ha-icon></a>`).join("")}</nav>`;
     this.shadowRoot.querySelectorAll("a").forEach((link) => {
       const active = link.getAttribute("href") === `${window.location.pathname}${window.location.hash}` || link.getAttribute("href") === window.location.pathname;
       link.classList.toggle("active", active);
-      link.addEventListener("click", (event) => { event.preventDefault(); haptic("heavy"); navigate(link.getAttribute("href")); this._render(); });
+      link.setAttribute("aria-disabled", String(this.preview));
+      if (this.preview) link.tabIndex = -1;
+      link.addEventListener("click", (event) => { event.preventDefault(); if (this.preview) return; haptic("heavy"); navigate(link.getAttribute("href")); this._render(); });
     });
     if (this.isConnected) applyFullscreen();
   }
@@ -1789,6 +1827,8 @@ export function focusRestorer(element) {
 }
 function applyFullscreen() {
   const owned = new Map();
+  const activeNavbars = new Set();
+  const nativeAdminBars = new Set();
   for (const navbar of fullscreenUsers) {
     if (!navbar.isConnected || !navbar.getClientRects().length) continue;
     const active = navbar._config.routes.some((route) => {
@@ -1799,30 +1839,48 @@ function applyFullscreen() {
     if (!active) continue;
     let root = navbar;
     while (root && root.localName !== "hui-root") root = root.parentElement || root.getRootNode()?.host;
-    for (const header of root?.shadowRoot?.querySelectorAll("app-header, ha-app-layout > header, .header") || []) owned.set(header, ["display"]);
+    if (navbar.preview || root?.lovelace?.editMode) continue;
+    const nativeDashboard = root?.lovelace?.config?.marao?.mode === "native" || root?.lovelace?.rawConfig?.marao?.mode === "native"
+      || root?.lovelace?.rawConfig?.strategy?.type === "custom:marao-starter";
+    activeNavbars.add(navbar);
     const view = root?.shadowRoot?.querySelector("#view");
+    if (navbar.nativeHost && !nativeDashboard) {
+      // An individually added floating navbar needs room at the bottom while
+      // retaining the ordinary Home Assistant toolbar and view shell.
+      if (view && !owned.has(view)) owned.set(view, ["padding-bottom"]);
+      continue;
+    }
+    if (nativeDashboard && navbar._config.native && navbar._hass?.user?.is_admin) nativeAdminBars.add(navbar);
+    for (const header of root?.shadowRoot?.querySelectorAll("app-header, ha-app-layout > header, .header") || []) owned.set(header, ["display"]);
     if (view) owned.set(view, ["padding-top", "padding-right", "padding-left", "padding-bottom"]);
   }
   for (const [node, original] of fullscreenOriginals) {
-    if (owned.has(node)) continue;
+    const properties = owned.get(node) || [];
     for (const [property, { value, priority }] of Object.entries(original)) {
+      if (properties.includes(property)) continue;
       if (value) node.style.setProperty(property, value, priority);
       else node.style.removeProperty(property);
+      delete original[property];
     }
-    fullscreenOriginals.delete(node);
+    if (!Object.keys(original).length) fullscreenOriginals.delete(node);
   }
   for (const [node, properties] of owned) {
-    if (!fullscreenOriginals.has(node)) {
-      fullscreenOriginals.set(node, Object.fromEntries(properties.map((property) => [property, {
+    if (!fullscreenOriginals.has(node)) fullscreenOriginals.set(node, {});
+    for (const property of properties) {
+      if (!Object.hasOwn(fullscreenOriginals.get(node), property)) {
+        fullscreenOriginals.get(node)[property] = {
         value: node.style.getPropertyValue(property), priority: node.style.getPropertyPriority(property),
-      }])));
+        };
+      }
     }
     for (const property of properties) {
       const original = fullscreenOriginals.get(node)[property];
       // Native top padding includes the hidden header and inset; retain only its ordinary spacing token.
       const normal = original.value || (["padding-top", "padding-bottom"].includes(property) ? `var(--view-container-${property}, 0px)` : "0px");
-      const clearance = property === "padding-bottom"
-        ? `calc(${Math.max(60, ...[...fullscreenUsers].map(navbar => navbar.shadowRoot?.querySelector("nav")?.getBoundingClientRect().height || 0))}px + ${safeArea("bottom")} + 12px)`
+      const clearance = property === "padding-top" && nativeAdminBars.size
+        ? `calc(60px + ${safeArea("top")})`
+        : property === "padding-bottom"
+        ? `calc(${Math.max(60, ...[...activeNavbars].map(navbar => navbar.shadowRoot?.querySelector("nav")?.getBoundingClientRect().height || 0))}px + ${safeArea("bottom")} + 12px)`
         : safeArea(property.slice(8));
       node.style.setProperty(property, property === "display" ? "none"
         : `max(${normal}, ${clearance})`, "important");
@@ -1850,25 +1908,43 @@ function unregisterFullscreen(element) {
 export class MaraoPopupCard extends BaseElement {
   constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._hass = null; this._open = false; this._focus = null; this._childrenRenderId = 0; this._backgroundState = []; }
   setConfig(config) { this._config = { height: "auto", max_height: "80dvh", ...config }; this._renderHost(); this._sync(); if (this._open) this._renderChildren(); }
-  set hass(value) { this._hass = value; this._updateChildrenHass(); }
+  get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
+  set preview(value) { this._preview = Boolean(value); if (this._preview) this._close(false); }
+  set hass(value) { this._hass = value; this._syncTheme(); this._updateChildrenHass(); }
   connectedCallback() {
     this._viewPath = window.location.pathname;
     this._viewOwner = null;
     let card;
     for (let node = this; node; node = node.parentElement || node.getRootNode()?.host) {
       if (node.localName === "hui-card") card = node;
-      if (node.localName === "hui-masonry-view") { this._viewOwner = { view: node, card }; break; }
+      if (["hui-masonry-view", "hui-sections-view"].includes(node.localName)) { this._viewOwner = { view: node, card }; break; }
     }
     window.addEventListener("hashchange", this._sync); window.addEventListener("location-changed", this._sync); window.addEventListener("popstate", this._sync); this._sync();
   }
   disconnectedCallback() {
     // Masonry temporarily detaches retained cards while rebuilding its columns.
     if (this._viewOwner?.view.isConnected && this._viewOwner.view.cards?.includes(this._viewOwner.card)) return;
+    if (this._viewOwner?.view.isConnected && this._viewOwner.view.localName === "hui-sections-view") {
+      queueMicrotask(() => { if (!this.isConnected) this._disconnectSheet(); });
+      return;
+    }
+    this._disconnectSheet();
+  }
+  _disconnectSheet() {
     window.removeEventListener("hashchange", this._sync); window.removeEventListener("location-changed", this._sync); window.removeEventListener("popstate", this._sync);
     this._viewOwner = null; this._close(false);
   }
+  _syncTheme() {
+    if (!this._overlay || !globalThis.getComputedStyle) return;
+    const style = getComputedStyle(this);
+    for (let index = 0; index < style.length; index++) {
+      const property = style[index];
+      if (property.startsWith("--")) this._overlay.style.setProperty(property, style.getPropertyValue(property));
+    }
+  }
   _renderHost() { if (this.shadowRoot) this.shadowRoot.innerHTML = "<style>:host{display:block;height:0;overflow:visible}</style>"; }
   _sync = () => {
+    if (this.preview) { this._close(false); return; }
     const hash = text(this._config.hash);
     if (window.location.pathname !== this._viewPath || !hash || window.location.hash !== hash) {
       const next = this._open && window.location.pathname === this._viewPath && findElements("marao-popup-card", this._viewOwner?.view.shadowRoot || this._viewOwner?.view).find((popup) => popup !== this && popup.isConnected && popup._config.hash === window.location.hash);
@@ -1886,7 +1962,7 @@ export class MaraoPopupCard extends BaseElement {
     const height = this._config.height === "auto" ? "auto" : text(this._config.height);
     const isClimateModePopup = !this._config.entity_group && this._config.cards?.some((card) => card?.template === "hc_climate_card" && card.variables?.show_mode_buttons);
     const title = isClimateModePopup ? "" : text(this._config.title ?? this._config.name);
-    const column = this._viewOwner?.view.shadowRoot?.querySelector("#columns > div:first-child");
+    const column = this._viewOwner?.view.shadowRoot?.querySelector("#columns > div:first-child, hui-section, .section");
     const columnWidth = column ? Math.round(column.getBoundingClientRect().width) : 0;
     const maxWidth = columnWidth > 0 ? `${columnWidth}px` : "100%";
     const closeLabel = localize("popup.close", this._hass, {}, "Close popup");
@@ -1903,9 +1979,10 @@ export class MaraoPopupCard extends BaseElement {
     const root = document.querySelector?.("home-assistant")?.shadowRoot || document.body;
     root.append(overlay);
     this._overlay = overlay;
+    this._syncTheme();
     if (this._viewOwner) {
       this._columnObserver = new ResizeObserver(() => {
-        const width = this._viewOwner?.view.shadowRoot?.querySelector("#columns > div:first-child")?.getBoundingClientRect().width;
+        const width = this._viewOwner?.view.shadowRoot?.querySelector("#columns > div:first-child, hui-section, .section")?.getBoundingClientRect().width;
         if (width > 0) overlay.querySelector(".marao-popup-sheet").style.maxWidth = `${Math.round(width)}px`;
       });
       this._columnObserver.observe(this._viewOwner.view);

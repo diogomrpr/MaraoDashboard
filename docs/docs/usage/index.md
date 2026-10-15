@@ -11,3 +11,6 @@ We made Marao Dashboard easy to use but you need to know a few basics.
 Marao Dashboard is self-contained: the theme provides its visual tokens and
 the Marao frontend runtime renders the `hc_*` card variants, navigation bar,
 and bottom-sheet popovers.
+
+You can also use [Home Assistant's native editor](native-dashboard.md) with
+independent Marao cards or an editable Marao starter dashboard.

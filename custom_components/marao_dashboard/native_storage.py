@@ -51,6 +51,10 @@ async def async_find_native_dashboard(hass, source=None):
                 raise ValueError("The native Marao dashboard data is missing") from None
             continue
         config = document["data"].get("config")
+        from .native import native_owned
+        proven_builder = source is not None and "legacy_storage_dashboard" in source and key == "marao-dashboard"
+        if native_owned(config, aliases=not proven_builder):
+            continue
         owned = _old_builder_dashboard(config) or source is not None and key == "marao-dashboard" and isinstance(config, dict) and "custom:marao-navbar-card" in _card_types(config.get("views"))
         if not owned and key == "marao-dashboard":
             raise ValueError("Cannot safely import the existing native Marao dashboard")
@@ -115,13 +119,16 @@ class NativeDashboardPlan:
     content: bytes | None = None
 
     @classmethod
-    def capture(cls, dashboard, base_dir):
+    def capture(cls, dashboard, base_dir, *, allow_builder_aliases=False):
         path = Path(dashboard._store.path)
         if path.is_symlink():
             raise ValueError("Native dashboard storage cannot be a symlink")
         before = path.read_bytes()
         document = _read_native_document(dashboard)
         data = document["data"]
+        from .native import native_owned
+        if native_owned(data.get("config"), aliases=not allow_builder_aliases):
+            raise ValueError("Native-owned dashboards cannot be adopted by the builder")
         if data != dashboard._data:
             raise ValueError("Native dashboard changed independently before migration")
         base_dir = Path(base_dir)

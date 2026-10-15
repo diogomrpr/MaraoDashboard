@@ -50,6 +50,7 @@ function fakeDocument(foreignMeta) {
   };
   return {
     head,
+    querySelector: () => null,
     createElement() {
       const attributes = new Map();
       const element = {
@@ -68,7 +69,9 @@ const source = await fs.readFile(
   new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url),
   "utf8",
 );
-const sourceWithoutFrontendImports = source.slice(source.indexOf("const MARAO_FONT_URL"));
+// This harness loads only the shared shell/gesture implementation; native module
+// registration is checked by marao-native.test.js with a real module URL.
+const sourceWithoutFrontendImports = source.slice(source.indexOf("const MARAO_FONT_URL"), source.indexOf("await import(`./MaraoNativeCards.js"));
 const cardsSource = await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8');
 const instrumentedSource = `
 import { cardProblem, problemStyle, serviceOutcome, serviceConnectionReady, serviceTargetReady, accessOpenerService } from "data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}";

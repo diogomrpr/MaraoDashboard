@@ -1,0 +1,222 @@
+# Safe disposable example: dashboard-maraowithhomeassistant.
+# Ordinary Home Assistant Sections views; replace demo entities for your own dashboard.
+title: Marao with Home Assistant
+views:
+  - title: Home
+    path: home
+    icon: mdi:home-outline
+    type: sections
+    max_columns: 1
+    theme: Marao Dashboard
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Marao cards in Home Assistant
+          - type: markdown
+            content: These cards use safe demo entities. Use **Edit dashboard** in Home
+              Assistant’s menu, then select a card to configure it visually or
+              view its YAML.
+          - type: custom:marao-native-weather-card
+            entity: weather.marao_dashboard_test_weather
+            variables:
+              show_forecast: false
+            name: Weather
+      - type: grid
+        cards:
+          - type: heading
+            heading: Living room
+          - type: custom:marao-native-light-card
+            entity: light.marao_dashboard_test_light
+            name: Living room light
+          - type: custom:marao-native-climate-card
+            entity: climate.marao_dashboard_test_climate
+            name: Living room climate
+            variables: {}
+          - type: custom:marao-native-media-card
+            entity: media_player.marao_dashboard_test_apple_tv
+            name: Living room TV
+            variables: {}
+            apple_tv:
+              remote_entity: remote.marao_dashboard_test_apple_tv
+              apps:
+                - source: TV
+                  name: Television
+                  icon: mdi:television
+                - source: YouTube
+                  name: YouTube
+                  icon: mdi:youtube
+          - name: Room lights
+            entity_type: light
+            popup_filter: all
+            entities:
+              - light.marao_dashboard_test_case_light_on
+              - light.marao_dashboard_test_case_light_off
+              - light.marao_dashboard_test_onoff_light
+            type: custom:marao-native-entity-group-card
+          - type: custom:marao-native-navigation-card
+            name: Devices
+            icon: mdi:devices
+            tap_action:
+              action: navigate
+              navigation_path: /dashboard-maraowithhomeassistant/devices
+      - type: grid
+        cards:
+          - type: custom:marao-native-navbar-card
+            native: true
+            routes:
+              - url: /dashboard-maraowithhomeassistant/home
+                label: Home
+                icon: mdi:home-outline
+              - url: /dashboard-maraowithhomeassistant/devices
+                label: Devices
+                icon: mdi:devices
+              - url: /dashboard-maraowithhomeassistant/energy
+                label: Energy
+                icon: mdi:lightning-bolt-outline
+  - title: Devices
+    path: devices
+    icon: mdi:devices
+    type: sections
+    max_columns: 1
+    theme: Marao Dashboard
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Comfort
+          - type: custom:marao-native-fan-card
+            entity: fan.marao_dashboard_test_fan
+            name: Room fan
+            variables:
+              enable_slider: true
+          - type: custom:marao-native-cover-card
+            entity: cover.marao_dashboard_test_cover
+            name: Window blind
+          - type: custom:marao-native-switch-card
+            entity: switch.marao_dashboard_test_switch
+            name: Desk outlet
+            variables:
+              power_entity: sensor.marao_dashboard_test_graph_history
+              show_graph: true
+          - type: custom:marao-native-scene-card
+            entity: input_select.marao_dashboard_test_scene
+            variables:
+              icon_1: mdi:sofa
+              name_1: Relax
+              icon_2: mdi:movie
+              name_2: Movie
+              icon_3: mdi:silverware-fork-knife
+              name_3: Dinner
+              icon_4: mdi:weather-night
+              name_4: Night
+              icon_5: mdi:power
+              name_5: Off
+            name: Room scenes
+      - type: grid
+        cards:
+          - type: heading
+            heading: Appliances
+          - type: custom:marao-native-vacuum-card
+            entity: vacuum.marao_dashboard_test_vacuum_commands
+            name: Cleaning
+            variables:
+              action_1:
+                segment: 1
+                name: Living room
+                icon: mdi:sofa
+                on_action: true
+                data:
+                  command: app_segment_clean
+                  params:
+                    - 1
+          - type: custom:marao-native-dishwasher-card
+            entity: input_select.marao_dashboard_test_dishwasher_state
+            variables:
+              progress_entity: sensor.marao_dashboard_test_dishwasher_progress
+              salt_entity: input_boolean.marao_dashboard_test_dishwasher_salt
+              rinse_aid_entity: input_boolean.marao_dashboard_test_dishwasher_rinse_aid
+              remaining_time_entity: sensor.marao_dashboard_test_dishwasher_remaining
+              active_program_entity: input_select.marao_dashboard_test_dishwasher_program
+            name: Dishwasher
+          - type: custom:marao-native-washing-machine-card
+            entity: binary_sensor.marao_dashboard_test_washing_machine
+            name: Washing machine
+      - type: grid
+        cards:
+          - type: heading
+            heading: Safe security demos
+          - type: custom:marao-native-security-card
+            entity: alarm_control_panel.marao_dashboard_test_alarm
+            variables: {}
+            name: Demo alarm
+          - type: custom:marao-native-access-card
+            entity: lock.marao_dashboard_test_lock
+            name: Demo door lock
+            variables: {}
+      - type: grid
+        cards:
+          - type: custom:marao-native-navbar-card
+            native: true
+            routes:
+              - url: /dashboard-maraowithhomeassistant/home
+                label: Home
+                icon: mdi:home-outline
+              - url: /dashboard-maraowithhomeassistant/devices
+                label: Devices
+                icon: mdi:devices
+              - url: /dashboard-maraowithhomeassistant/energy
+                label: Energy
+                icon: mdi:lightning-bolt-outline
+  - title: Energy
+    path: energy
+    icon: mdi:lightning-bolt-outline
+    type: sections
+    max_columns: 1
+    theme: Marao Dashboard
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Usage
+          - type: custom:marao-native-energy-period-card
+            entity: sensor.marao_dashboard_test_month_energy
+            name: Monthly consumption
+            period: month
+            variables:
+              period: month
+          - type: custom:marao-native-graph-card
+            entity: sensor.marao_dashboard_test_graph_history
+            name: Power history
+          - type: custom:marao-native-sensor-card
+            entity: sensor.marao_dashboard_test_temperature
+            name: Room temperature
+      - type: grid
+        cards:
+          - type: heading
+            heading: Charging
+          - type: custom:marao-native-battery-card
+            entity: sensor.marao_dashboard_test_battery
+            name: Device battery
+          - type: custom:marao-native-wallbox-current-card
+            entity: input_number.marao_dashboard_test_wallbox_current
+            name: Charging current
+            variables:
+              shortcuts:
+                - 6
+                - 12
+                - 16
+      - type: grid
+        cards:
+          - type: custom:marao-native-navbar-card
+            native: true
+            routes:
+              - url: /dashboard-maraowithhomeassistant/home
+                label: Home
+                icon: mdi:home-outline
+              - url: /dashboard-maraowithhomeassistant/devices
+                label: Devices
+                icon: mdi:devices
+              - url: /dashboard-maraowithhomeassistant/energy
+                label: Energy
+                icon: mdi:lightning-bolt-outline

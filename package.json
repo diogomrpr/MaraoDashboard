@@ -1,6 +1,6 @@
 {
   "name": "marao-dashboard",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "Marao Dashboard Home Assistant dashboard development tools",
   "scripts": {
@@ -17,6 +17,7 @@
     "test:ha:rooms": "node tests/test-ha-room-cards.js",
     "test:ha:climate-layout": "node tests/test-ha-climate-layout.js",
     "test:ha:sliders": "node tests/test-ha-value-sliders.js",
+    "test:ha:native": "node tests/test-ha-native.js",
     "test:ha:accessibility": "node tests/test-ha-dashboard-accessibility.js",
     "ha:preview:accessibility": "node tests/test-ha-dashboard-accessibility.js --preview",
     "verify:publish": "node tests/verify-publish.js",

@@ -143,6 +143,10 @@ The initial open change is
 Its tasks are deliberately uncompleted. Creating it does not run an upgrade,
 publish a release, or waive a failing check.
 
+[Native dashboard editing](changes/support-native-dashboard-editing/proposal.md)
+tracks the independent Home Assistant editing mode and its selected verification.
+See the [usage guide](../docs/docs/usage/native-dashboard.md) for creation and editing.
+
 ## Tool installation and ownership
 
 OpenSpec **1.14.1** was installed globally with npm; it is free, MIT-licensed

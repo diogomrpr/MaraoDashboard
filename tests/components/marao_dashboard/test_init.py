@@ -1045,6 +1045,7 @@ def test_editor_catalog_maps_to_installed_templates() -> None:
     assert len(card_ids) == len(EDITOR_CATALOG["cards"])
     assert card_ids == {
         "hc_title_card", "hc_weather_card", "hc_room_card", "hc_scene_collection_card",
+        "hc_header_card", "hc_glance_card", "hc_scene_card", "hc_access_action_card", "hc_access_slide_action_card", "hc_alarm_controls_card",
         "hc_security_card", "hc_access_hold_action_card", "hc_base_card", "hc_energy_period_card", "hc_media_app_card",
         "hc_entity_group_card",
         "hc_access_card",

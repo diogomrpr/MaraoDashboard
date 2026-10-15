@@ -10,6 +10,7 @@ PAGE_FORMAT_VERSION = 2
 FREE_CARD_ROLES = {
     "hc_title_card", "hc_navigation_card", "hc_room_card",
     "hc_entity_group_card", "hc_scene_collection_card",
+    "hc_header_card", "hc_glance_card",
 }
 ENTITY_ID = re.compile(r"[a-z0-9_]+\.[a-z0-9_]+")
 PAGE_PATH = re.compile(r"[a-z0-9][a-z0-9_-]*")

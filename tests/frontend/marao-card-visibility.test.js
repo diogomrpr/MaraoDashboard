@@ -1171,7 +1171,14 @@ test("popup restores its original control or the live replacement after HA reren
 });
 
 test("popup preserves child cards while forwarding Home Assistant state updates", () => {
-  assert.match(source, /set hass\(value\) \{ this\._hass = value; this\._updateChildrenHass\(\); \}/);
+  const popup = new MaraoPopupCard();
+  let updates = 0, themes = 0;
+  popup._updateChildrenHass = () => updates++;
+  popup._syncTheme = () => themes++;
+  const hass = { states: {} }; popup.hass = hass;
+  assert.equal(popup._hass, hass);
+  assert.equal(updates, 1);
+  assert.equal(themes, 1);
   assert.match(source, /for \(const card of host\?\.children \|\| \[\]\) card\.hass = this\._hass/);
   assert.doesNotMatch(source, /set hass\(value\) \{ this\._hass = value; this\._renderChildren\(\); \}/);
 });

@@ -36,6 +36,13 @@
                 "show_forecast": true
               },
               "id": "card-1"
+            },
+            {
+              "id": "overview-native",
+              "template": "hc_navigation_card",
+              "name": "Native controls",
+              "icon": "mdi:pencil",
+              "page": "native-example"
             }
           ]
         },
@@ -1207,6 +1214,44 @@
             {
               "type": "markdown",
               "content": "Saved layout: energy, lighting and television together."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "native-example",
+      "name": "Native controls",
+      "path": "native-example",
+      "icon": "mdi:pencil",
+      "sections": [
+        {
+          "columns": 1,
+          "cards": [
+            {
+              "type": "custom:marao-native-security-card",
+              "entity": "alarm_control_panel.marao_dashboard_test_alarm",
+              "variables": {},
+              "name": "Native Alarm"
+            },
+            {
+              "type": "custom:marao-native-light-card",
+              "entity": "light.marao_dashboard_test_light",
+              "name": "Native Light"
+            },
+            {
+              "type": "custom:marao-native-climate-card",
+              "entity": "climate.marao_dashboard_test_climate",
+              "name": "Native Climate",
+              "variables": {}
+            },
+            {
+              "type": "custom:marao-native-media-card",
+              "entity": "media_player.marao_dashboard_test_apple_tv",
+              "name": "Native Media player",
+              "variables": {
+                "apple_tv": true
+              }
             }
           ]
         }

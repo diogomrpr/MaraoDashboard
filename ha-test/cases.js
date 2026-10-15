@@ -1,5 +1,6 @@
 // Canonical case expansion stays in development tooling. HACS never ships this file.
 const manifest = require('./cases.json');
+const { nativeCases } = require('./native-cases');
 const prefix = 'marao_dashboard_test_case_';
 const unavailableStates = ['unknown', 'unavailable', 'missing'];
 const slug = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, '_');
@@ -177,6 +178,10 @@ function expandGallery(source) {
       ...(example.source ? { unifi_protect_media_source: example.source } : {}),
     }] });
   }
+  view.cards.push({ type: 'vertical-stack', cards: [
+    { type: 'custom:marao-card', template: 'hc_title_card', name: 'Native Home Assistant cards' },
+    ...nativeCases(view, manifest, walkCards),
+  ] });
   return view;
 }
 

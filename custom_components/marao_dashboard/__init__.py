@@ -273,7 +273,7 @@ def _register_services(hass: HomeAssistant) -> None:
 
 
 def _register_websocket_commands(hass: HomeAssistant) -> None:
-    """Register the admin-only management panel API once."""
+    """Register admin management and authenticated, read-only native compilation."""
 
     if hass.data[DOMAIN].get(WEBSOCKET_REGISTERED):
         return
@@ -356,6 +356,41 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
             )
             connection.send_result(msg["id"], restored)
 
+    from .native import compile_card, compile_starter
+
+    @websocket_api.websocket_command({
+        "type": "marao_dashboard/native/card", vol.Required("config"): dict,
+        vol.Required("instance"): str, vol.Required("url_path"): str,
+        vol.Optional("entities", default=list): list, vol.Optional("language", default="en"): str,
+        vol.Optional("validate_units", default=True): bool,
+    })
+    @websocket_api.async_response
+    async def websocket_native_card(hass, connection, msg):
+        try:
+            result = await hass.async_add_executor_job(
+                compile_card, msg["config"], msg["instance"], msg["url_path"], msg["entities"], msg["language"], msg["validate_units"])
+        except (ValueError, TypeError, KeyError) as err:
+            connection.send_error(msg["id"], "invalid_config", str(err))
+            return
+        connection.send_result(msg["id"], result)
+
+    @websocket_api.websocket_command({
+        "type": "marao_dashboard/native/starter", vol.Required("title"): str,
+        vol.Required("url_path"): str, vol.Required("entities"): list,
+        vol.Optional("areas", default=list): list, vol.Optional("language", default="en"): str,
+    })
+    @websocket_api.async_response
+    async def websocket_native_starter(hass, connection, msg):
+        try:
+            result = await hass.async_add_executor_job(
+                compile_starter, msg["title"], msg["url_path"], msg["entities"], msg["areas"], msg["language"])
+        except (ValueError, TypeError, KeyError) as err:
+            connection.send_error(msg["id"], "invalid_config", str(err))
+            return
+        connection.send_result(msg["id"], result)
+
+    websocket_api.async_register_command(hass, websocket_native_card)
+    websocket_api.async_register_command(hass, websocket_native_starter)
     websocket_api.async_register_command(hass, websocket_get_config)
     websocket_api.async_register_command(hass, websocket_generate_config)
     websocket_api.async_register_command(hass, websocket_restore_history)
@@ -464,6 +499,9 @@ def _save_and_generate_dashboard(
 
 
 def _restore_history(hass: HomeAssistant, version: str) -> dict[str, Any]:
+    from .history import read_dashboard_version
+    config, metadata, _ = read_dashboard_version(hass.config.path(DASHBOARD_BASE_DIR), version)
+    _assert_builder_destination(hass, metadata.get("dashboard_key") or dashboard_identity(config).dashboard_key)
     _recover_dashboard_state(hass)
     config, metadata = restore_dashboard_version(
         _dashboard_config_path(hass), hass.config.path(DASHBOARD_BASE_DIR), version,
@@ -574,6 +612,25 @@ def _generate_dashboard_from_path(hass, config_path, dashboard_key, dry_run, reg
         )
 
 
+def _assert_builder_destination(hass, key):
+    """Refuse native storage destinations before any builder mutation."""
+    from .native import native_owned
+    from .native_storage import _read_native_document
+    lovelace = hass.data.get(LOVELACE_DATA)
+    dashboard = lovelace.dashboards.get(key) if lovelace else None
+    if dashboard is None or dashboard.mode != "storage":
+        return
+    data = getattr(dashboard, "_data", None)
+    if data is None:
+        try:
+            data = _read_native_document(dashboard)["data"]
+        except FileNotFoundError:
+            data = {}
+    proven_builder = dashboard is hass.data.get(DOMAIN, {}).get("native_dashboard")
+    if native_owned(data.get("config"), aliases=not proven_builder) or not proven_builder:
+        raise ValueError("Home Assistant owns this dashboard; the Marao builder cannot replace it")
+
+
 def _generate_dashboard(
     hass: HomeAssistant,
     config: dict[str, Any],
@@ -620,6 +677,7 @@ def _generate_dashboard(
             registry_entities,
             dashboard_key_override=dashboard_key,
         )
+        _assert_builder_destination(hass, planned.dashboard_key)
         validate_dashboard_registration(configuration_path, planned.dashboard_key, planned.filename,
                                         previous_dashboard_key, previous_filename)
         if dry_run:
@@ -632,7 +690,7 @@ def _generate_dashboard(
                 "config_changed": False,
             }
 
-        native_plan = NativeDashboardPlan.capture(native, base_dir) if native is not None else None
+        native_plan = NativeDashboardPlan.capture(native, base_dir, allow_builder_aliases=True) if native is not None else None
         output_dir = base_dir / planned.slug
         theme_dir = Path(hass.config.path("themes", "MaraoDashboard"))
         baseline = None

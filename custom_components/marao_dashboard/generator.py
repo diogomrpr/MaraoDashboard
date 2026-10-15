@@ -2049,7 +2049,7 @@ def _configured_name(item, language="en"):
     return item.get("name") or _friendly_name(item.get("entity_id") or item.get("path") or item.get("id") or "")
 
 
-def _resolve_pages(config, registry=None):
+def _resolve_pages(config, registry=None, *, validate_source_units=True):
     """Validate and resolve each occurrence without persisting live metadata."""
     from .editor import EDITOR_CATALOG
     from .page_model import page_entries, page_sections, validate_pages
@@ -2103,7 +2103,7 @@ def _resolve_pages(config, registry=None):
             section["ordered_cards"] = selected
         page["_sections"] = sections
     # Historical options remain opaque and never participate in current validation.
-    _validate_energy_formatting(resolved["pages"], list(metadata.values()))
+    _validate_energy_formatting(resolved["pages"], list(metadata.values()), validate_source_units=validate_source_units)
     for page in resolved["pages"]:
         hashes = set()
         for section in page["_sections"]:
@@ -2160,12 +2160,14 @@ def _page_card(entity, dashboard_key, language="en"):
     elif item.get("page"):
         card = _page_shortcut_card(item, dashboard_key)
         card["template"] = role
-    elif role in ("hc_navigation_card", "hc_room_card") and not item.get("entity_id"):
+    elif role in ("hc_navigation_card", "hc_room_card", "hc_header_card", "hc_glance_card") and not item.get("entity_id"):
         card = {"type": "custom:marao-card", "template": role, "variables": deepcopy(variables)}
     elif role == "hc_access_hold_action_card":
         card = _page_action_card(item)
         card["template"] = role
     elif role == "hc_access_slide_action_card":
+        card = _entity_card(item)
+    elif role == "hc_access_action_card":
         card = _entity_card(item)
     elif str(item.get("entity_id") or "").startswith("scene."):
         card = _scene_card(item)
@@ -2186,7 +2188,7 @@ def _page_card(entity, dashboard_key, language="en"):
 def _page_card_popups(entity, language="en"):
     item = {**entity, "name": _configured_name(entity, language)}
     role, variables = item["template"], item.get("variables", {})
-    if role == "hc_access_slide_action_card":
+    if role in ("hc_access_slide_action_card", "hc_access_action_card"):
         return []
     if role == "hc_security_card" and "tap_action" not in item:
         return [_alarm_popup(item)]

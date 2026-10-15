@@ -19,6 +19,10 @@ const families = {
   camera: ['hc_camera_card'], history: ['hc_graph_card', 'hc_timeline_card', 'hc_toggle_graph_card'],
 };
 const components = {
+  native: { units: [['marao-native'], ['native-backup']], python: ['test_native'], editor: true,
+    templates: [...Object.values(families).flat(), 'hc_weather_card', 'hc_scene_collection_card', 'hc_access_hold_action_card', 'hc_access_action_card', 'hc_header_card', 'hc_glance_card', 'hc_scene_card', 'hc_number_card', 'hc_wallbox_current_card', 'hc_vacuum_card', 'hc_dishwasher_card', 'hc_washing_machine_card', 'hc_sensor_card', 'hc_switch_card', 'hc_battery_card', 'hc_navigation_card', 'hc_energy_period_card', 'hc_media_app_card', 'hc_title_card', 'hc_base_card'],
+    profiles: ['iphone-normal', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200', 'narrow-320', 'iphone-landscape', 'android-normal', 'android-landscape'],
+    browser: [browser('native-editor', 'test-ha-native', ['--scenario', 'iphone-normal'])] },
   security: { units: [['marao-security']], python: ['test_security'], templates: [...families.security, 'hc_dishwasher_card', 'hc_vacuum_card'],
     profiles: ['iphone-normal', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200', 'narrow-320', 'iphone-landscape', 'android-normal', 'android-landscape'],
     browser: [browser('security:iphone', 'test-ha-security', ['--scenario', 'iphone-normal']), browser('security:android', 'test-ha-security', ['--scenario', 'android-normal'])] },
@@ -54,6 +58,14 @@ const components = {
 };
 
 const rules = [
+  [/^tests\/test-ha-native\.js$/, ['native']],
+  [/^tests\/native-backup\.js$/, ['native', 'verification']],
+  [/^ha-test\/native-cases\.js$/, ['native', 'gallery']],
+  [/^frontend_src\/(native-model|MaraoNativeCards|MaraoNativeCardEditor)\.js$/, ['native']],
+  [/^frontend_src\/editor-labels\.js$/, ['native', 'editor-ui']],
+  [/^frontend_src\/native-labels\.js$/, ['native']],
+  [/^custom_components\/marao_dashboard\/frontend\/MaraoNative/, ['native', 'packaging']],
+  [/^custom_components\/marao_dashboard\/native\.py$/, ['native', 'generator', 'lifecycle', 'migration']],
   [/^tests\/test-ha-security\.js$/, ['security']],
   [/^(AGENTS\.md|README\.md|docs\/|openspec\/|\.agents\/)/, ['docs']],
   [/^tests\/frontend\/([^/]+)\.test\.js$/, 'test'],
@@ -90,7 +102,7 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     let ids = rule[1];
     if (ids === 'shared') {
       if (!declared.length && !conservativeShared) throw new Error(file + ': declare --component after reviewing the shared-component diff.');
-      const consumers = ['security', 'labels', 'slider', 'light', 'fan', 'cover', 'popup', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
+      const consumers = ['native', 'security', 'labels', 'slider', 'light', 'fan', 'cover', 'popup', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
       ids = declared.length ? declared.filter(id => consumers.includes(id)) : consumers;
       if (!ids.length) throw new Error(file + ': a runtime component is required; documentation scope cannot omit its checks.');
     }

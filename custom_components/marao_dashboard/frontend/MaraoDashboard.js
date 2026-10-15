@@ -372,6 +372,7 @@ const TRANSLATIONS = {
     "access.hold_1_second": "Hold 1 second",
     "access.hold_to_activate": "Hold to {action}",
     "access.open": "Open",
+    "access.slide_required": "Use the access slide to open or unlock.",
     "access.slide_to_open": "Slide to open",
     "access.slide_to_unlock": "Slide to unlock",
     "navigation.label": "Marao navigation",
@@ -524,6 +525,7 @@ const TRANSLATIONS = {
     "access.hold_1_second": "Premir 1 segundo",
     "access.hold_to_activate": "Manter premido para {action}",
     "access.open": "Abrir",
+    "access.slide_required": "Use o deslizador para abrir ou destrancar.",
     "access.slide_to_open": "Deslize para abrir",
     "access.slide_to_unlock": "Deslize para desbloquear",
     "navigation.label": "Navegação Marao",
@@ -1049,8 +1051,8 @@ class MaraoSlideToOpen extends HTMLElement {
     const owner = this.getRootNode()?.host;
     haptic("heavy");
     try {
-      if (owner?._callService) await owner._callService(domain, service, { entity_id: entityId });
-      else await callServiceWithNotification(hass, domain, service, { entity_id: entityId }, serviceOutcome(this));
+      if (owner?._callService) await owner._callService(domain, service, { entity_id: entityId }, undefined, { accessSlide: true });
+      else await callServiceWithNotification(hass, domain, service, { entity_id: entityId }, serviceOutcome(this), undefined, { accessSlide: true });
     } finally { this._sending = false; if (this.isConnected) this._render(); }
   }
 
@@ -1595,7 +1597,8 @@ function installPopupScrollGuard() {
       value.classList.contains("bubble-pop-up") ||
       value.classList.contains("bubble-pop-up-container"));
 
-  const hasOpenPopup = () => isMaraoDashboardPath(window.location.pathname) && Boolean(window.location.hash);
+  const hasOpenPopup = () => Boolean(window.location.hash) &&
+    (isMaraoDashboardPath(window.location.pathname) || Boolean(document.querySelector("home-assistant")?.shadowRoot?.querySelector(".marao-popup-overlay")));
   const isSlideToOpen = (element) => element instanceof HTMLElement && element.tagName === "MARAO-SLIDE-TO-OPEN";
 
   const scrollableFromPath = (path) =>
@@ -1670,3 +1673,5 @@ window.MaraoDashboard = {
 };
 
 console.info("%c Marao Dashboard loaded", "color: #d4b392; font-weight: 700;");
+
+await import(`./MaraoNativeCards.js${MARAO_RESOURCE_QUERY}`);

@@ -286,14 +286,14 @@ EDITOR_CATALOG: dict[str, Any] = {
             "id": "hc_dishwasher_card",
             "label": "Dishwasher",
             "icon": "mdi:dishwasher",
-            "domains": ["sensor"],
+            "domains": ["sensor", "input_select"],
             "description": "Operation state, progress, remaining time, and refill warnings.",
             "variables": [
                 _field("progress_entity", "Progress", "entity", domains=["sensor"]),
                 _field("remaining_time_entity", "Remaining time", "entity", domains=["sensor"]),
-                _field("salt_entity", "Salt warning", "entity", domains=["binary_sensor", "sensor"]),
-                _field("rinse_aid_entity", "Rinse-aid warning", "entity", domains=["binary_sensor", "sensor"]),
-                _field("active_program_entity", "Active program", "entity", domains=["select", "sensor"]),
+                _field("salt_entity", "Salt warning", "entity", domains=["binary_sensor", "sensor", "input_boolean"]),
+                _field("rinse_aid_entity", "Rinse-aid warning", "entity", domains=["binary_sensor", "sensor", "input_boolean"]),
+                _field("active_program_entity", "Active program", "entity", domains=["select", "sensor", "input_select"]),
             ],
         },
         {
@@ -435,7 +435,33 @@ EDITOR_CATALOG: dict[str, Any] = {
     },
 }
 
+EDITOR_CATALOG["cards"].extend([
+    {"id": "hc_alarm_controls_card", "label": "Alarm controls", "icon": "mdi:shield-home", "domains": ["alarm_control_panel"],
+     "description": "Capability-aware alarm controls with transient PIN entry and guarded actions.", "variables": []},
+    {"id": "hc_header_card", "label": "Header", "icon": "mdi:calendar", "domains": ["weather"],
+     "entity_optional": True, "description": "Date, weather and optional person and air quality.",
+     "variables": [_field("person_entity", "Person", "entity", domains=["person"]),
+                   _field("air_quality_sensor", "Air quality", "entity", domains=["sensor"])]},
+    {"id": "hc_glance_card", "label": "Glance", "icon": "mdi:view-dashboard", "domains": [],
+     "entity_optional": True, "description": "Up to three independently configured readings.",
+     "variables": [field for index in range(1, 4) for field in (
+         _field(f"entity{index}", f"Reading {index}", "entity"),
+         _field(f"entity{index}_name", f"Reading {index} name", "text"),
+         _field(f"entity{index}_icon", f"Reading {index} icon", "icon"))]},
+    {"id": "hc_scene_card", "label": "Scene selector", "icon": "mdi:palette", "domains": ["select", "input_select"],
+     "description": "Native selector options and authoritative selection.", "variables": []},
+    {"id": "hc_access_action_card", "label": "Close or lock", "icon": "mdi:lock", "domains": ["lock", "cover"],
+     "description": "An explicit safe close or lock action.",
+     "variables": [_field("action_service", "Action service", "text")]},
+])
+
 for _card in EDITOR_CATALOG["cards"]:
+    if _card["id"] in ("hc_base_card", "hc_media_app_card", "hc_access_slide_action_card", "hc_access_hold_action_card", "hc_access_action_card"):
+        _card["variables"].extend([
+            _field("action_color", "Action color", "color", advanced=True),
+            _field("action_label", "Action label", "text", advanced=True),
+            _field("action_label_key", "Action translation key", "text", advanced=True),
+        ])
     if _card["id"] in ENERGY_FORMAT_TEMPLATES:
         _card["variables"].extend(ENERGY_FORMAT_FIELDS)
 
