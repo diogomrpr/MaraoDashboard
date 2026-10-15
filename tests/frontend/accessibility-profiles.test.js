@@ -26,7 +26,25 @@ const {
   themeVariables,
   themes,
   visualVariablesForScenario,
+  waitForNavbar,
 } = require("../test-ha-dashboard-accessibility.js");
+
+test('saved-page readiness preserves empty navigation and still requires configured routes', async () => {
+  for (const routes of [[], [{ url: '/marao-dashboard/home' }]]) {
+    const waits = [];
+    const card = { _config: { routes }, waitFor: async options => waits.push(['card', options.state]),
+      evaluate: async callback => callback(card), locator: selector => ({
+        waitFor: async options => waits.push([selector, options.state]), count: async () => routes.length,
+      }) };
+    await waitForNavbar({ locator: () => card });
+    assert.deepEqual(waits, [['card', 'attached'], ['nav', 'attached'], ['nav', routes.length ? 'visible' : 'hidden']]);
+    if (routes.length) {
+      const locator = card.locator;
+      card.locator = selector => ({ ...locator(selector), count: async () => 0 });
+      await assert.rejects(waitForNavbar({ locator: () => card }), /retain every configured route/);
+    }
+  }
+});
 
 test('popup member geometry uses the current button and still rejects clipping and obstruction', () => {
   const previousHeight = globalThis.innerHeight;

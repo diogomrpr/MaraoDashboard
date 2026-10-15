@@ -1,3 +1,4 @@
+const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const YAML = require("yaml");
@@ -937,6 +938,15 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
   return [...new Set(issues)];
 }
 
+async function waitForNavbar(page) {
+  const card = page.locator('marao-navbar-card');
+  await card.waitFor({ state: 'attached' });
+  await card.locator('nav').waitFor({ state: 'attached' });
+  const routes = await card.evaluate(element => element._config.routes.length);
+  assert.equal(await card.locator('nav a').count(), routes, 'Navbar must retain every configured route');
+  await card.locator('nav').waitFor({ state: routes ? 'visible' : 'hidden' });
+}
+
 async function main() {
   const options = parseArgs();
   const runs = selectedRuns(options);
@@ -995,7 +1005,8 @@ async function main() {
       if (!initialView) throw new Error('Missing saved dashboard page.');
       await page.goto(`${baseUrl}/marao-dashboard/${initialView}?marao_accessibility=${runName}`, { waitUntil: "domcontentloaded" });
       try {
-        await page.locator(options.pagesOnly ? 'marao-navbar-card nav' : 'marao-card').first().waitFor({ state: 'visible', timeout: 10000 });
+        if (options.pagesOnly) await waitForNavbar(page);
+        else await page.locator('marao-card').first().waitFor({ state: 'visible', timeout: 10000 });
       } catch (error) {
         const diagnostics = await page.evaluate(async () => {
           const names = [
@@ -1059,7 +1070,7 @@ async function main() {
               root: await page.locator('hui-root').elementHandle(), expected: view.path,
             });
           }
-          await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+          await waitForNavbar(page);
           if (await page.locator('marao-card').count()) inspected += await require('./verification-browser').inspectFocused(page, options, scenario, theme, output, runName + '-' + view.path);
           else if (!options.pagesOnly) throw new Error('Selected page has no rendered affected cards');
           else if ((await layoutIssues(page)).length) throw new Error('Saved page navigation/layout failed');
@@ -1147,7 +1158,7 @@ async function main() {
           root: await page.locator('hui-root').elementHandle(), expected: view.path,
         });
         await page.waitForLoadState('networkidle');
-        await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+        await waitForNavbar(page);
         await applyVisualPreferences(page, scenario, theme);
         const prefix = path.join(output, runName + '-page-' + view.path);
         if (await page.locator('marao-card').count()) await scrollDashboard(page, { screenshotPrefix: captures === 'all' ? prefix : undefined, onSegment: async () => {
@@ -1209,4 +1220,5 @@ module.exports = {
   themeVariables,
   themes,
   visualVariablesForScenario,
+  waitForNavbar,
 };
