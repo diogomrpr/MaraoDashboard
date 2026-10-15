@@ -581,6 +581,17 @@ async function checkMediaRecovery(page, serviceCalls, output) {
 }
 
 async function checkNativeSurfaces(page) {
+  await page.waitForFunction(() => {
+    function ready(root) {
+      for (const element of root?.children || []) {
+        if (element.localName.startsWith('marao-native-') && (element._loading || !element._children?.length)) return false;
+        if (element.getAttribute('data-graph-history-state') === 'loading' || element.getAttribute('data-history-state') === 'loading') return false;
+        if (!ready(element.shadowRoot) || !ready(element)) return false;
+      }
+      return true;
+    }
+    return ready(document);
+  }, undefined, { timeout: 20000 });
   const result = await page.locator('marao-card').evaluateAll(async (cards, example) => {
     const target = cards.find(card => card._config.name === example.name && card._config.entity === example.entity);
     if (!target) throw new Error('Missing native-surface gallery fixture');

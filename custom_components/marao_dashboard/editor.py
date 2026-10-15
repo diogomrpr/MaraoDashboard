@@ -106,7 +106,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             "variables": [],
         },
         {
-            "id": "hc_access_hold_action_card", "label": "Security action", "icon": "mdi:shield-alert", "domains": ["button", "switch", "input_boolean"],
+            "id": "hc_access_hold_action_card", "label": "Security action", "icon": "mdi:shield-alert", "domains": ["button", "switch", "input_boolean", "alarm_control_panel"],
             "description": "A deliberate security service action with a 1.2-second hold.", "variables": [],
         },
         {

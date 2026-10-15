@@ -8,7 +8,8 @@ function nativeCases(view, manifest, walk) {
   walk(view, card => candidates.push(card));
   const cards = [];
   for (const spec of catalog.cards.filter(card => !card.runtime_type)) {
-    let example = candidates.find(card => (card.template === spec.id || spec.legacy_type === card.type) && (!card.entity || card.entity.includes('.marao_dashboard_test_')));
+    let example = candidates.find(card => (card.template === spec.id || spec.legacy_type && spec.legacy_type === card.type) && (!card.entity || card.entity.includes('.marao_dashboard_test_')));
+    if (spec.id === 'hc_alarm_controls_card') example = { entity: 'alarm_control_panel.marao_dashboard_test_alarm' };
     if (spec.id === 'hc_entity_group_card') example = manifest.entityGroupCases.find(card => card.entity_type === 'light');
     if (spec.id === 'hc_scene_collection_card') example = manifest.editablePageCases.find(card => card.template === spec.id && card.entities.length);
     if (!example) throw new Error('Missing safe native example: ' + spec.id);

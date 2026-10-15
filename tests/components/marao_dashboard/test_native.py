@@ -28,6 +28,14 @@ def test_every_published_role_compiles_without_mutating_its_options(spec, tmp_pa
     assert not list(tmp_path.iterdir())
 
 
+def test_native_security_hold_accepts_the_published_alarm_binding():
+    source = {"type": native_type("hc_access_hold_action_card"), "entity": "alarm_control_panel.safe",
+              "variables": {"action_service": "alarm_control_panel.alarm_arm_away"}}
+    compiled = compile_card(source, "native-hold", "marao-native")
+    assert compiled["card"]["entity"] == source["entity"]
+    assert compiled["card"]["template"] == "hc_access_hold_action_card"
+
+
 def test_dishwasher_accepts_existing_state_and_refill_helpers():
     source = {"type": native_type("hc_dishwasher_card"), "entity": "input_select.safe",
               "variables": {"salt_entity": "input_boolean.salt",
