@@ -20,6 +20,7 @@ const {
   popupFocusFailure,
   popupHasVisibleContent,
   popupMemberTouchPosition,
+  popupTriggerTargets,
   safeAreaInsetsForScenario,
   scenarios,
   selectedRuns,
@@ -28,6 +29,17 @@ const {
   visualVariablesForScenario,
   waitForNavbar,
 } = require("../test-ha-dashboard-accessibility.js");
+
+test('popup triggers retain their live identity when earlier sheets insert cards', () => {
+  const card = hash => ({ localName: 'marao-card', _config: { tap_action: { navigation_path: hash } },
+    attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } });
+  const first = card('#first'), second = card('#second');
+  const targets = popupTriggerTargets([first, second]);
+  const liveCards = [card('#inserted'), first, second];
+  assert.notEqual(liveCards[targets[1].index], second, 'A cached position now selects another control');
+  assert.equal(liveCards.find(card => card.attributes['data-marao-popup-probe'] === String(targets[1].index)), second);
+  assert.deepEqual(targets.map(target => target.hash), ['#first', '#second']);
+});
 
 test('saved-page readiness preserves empty navigation and still requires configured routes', async () => {
   for (const routes of [[], [{ url: '/marao-dashboard/home' }]]) {

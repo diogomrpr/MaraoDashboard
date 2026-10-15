@@ -687,6 +687,18 @@ function popupMemberTouchPosition(card) {
   return { x: 24, y: y - box.top };
 }
 
+function popupTriggerTargets(cards) {
+  return cards.map((card, index) => {
+    const config = card._config || {};
+    const modes = card._hass?.states?.[config.entity]?.attributes?.hvac_modes?.filter(Boolean) || [];
+    const hash = config.tap_action ? config.tap_action.navigation_path
+      : config.template === 'hc_climate_card' ? modes.length > 1 && config.variables?.mode_selector_hash
+      : config.variables?.popup_hash || config.popup_hash;
+    card.setAttribute('data-marao-popup-probe', String(index));
+    return { index, tag: card.localName, hash };
+  });
+}
+
 async function inspectPopups(page, scenario, theme, output, runName, captures = 'failure', families = [], behavior = true, checkedBehaviors = new Set(), popupHash) {
   const popups = await page.locator("marao-popup-card").evaluateAll((cards) => cards.map((card) => ({
     config: card._config,
@@ -700,14 +712,8 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
     ))?._config.hash,
   })));
   const triggers = page.locator("marao-card,marao-energy-period-card");
-  const targets = await triggers.evaluateAll((cards) => cards.map((card, index) => {
-    const config = card._config || {};
-    const modes = card._hass?.states?.[config.entity]?.attributes?.hvac_modes?.filter(Boolean) || [];
-    const hash = config.tap_action ? config.tap_action.navigation_path
-      : config.template === 'hc_climate_card' ? modes.length > 1 && config.variables?.mode_selector_hash
-      : config.variables?.popup_hash || config.popup_hash;
-    return { index, tag: card.localName, hash };
-  }));
+  const targets = await triggers.evaluateAll(popupTriggerTargets);
+  const triggerCard = target => page.locator('[data-marao-popup-probe="' + target.index + '"]');
   const issues = [];
   const reviewed = new Set();
   if (popupHash && popups.filter(popup => popup.hash === popupHash).length !== 1) throw new Error('Selected popup is missing or duplicated');
@@ -724,14 +730,14 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
       if (target) throw new Error(`${popup.name}: single-mode climate control must not open a popup.`);
       continue;
     }
-    let card = target && triggers.nth(target.index);
+    let card = target && triggerCard(target);
     let returnCard = card;
     let viaParent = false;
     if (!target && popup.parentHash) {
       viaParent = true;
       const parent = targets.find(({ hash }) => hash === popup.parentHash);
       if (!parent) throw new Error(`Popup ${popup.name} has no parent group control.`);
-      returnCard = triggers.nth(parent.index);
+      returnCard = triggerCard(parent);
       const parentControl = returnCard.locator('[data-card-action]');
       if (await parentControl.isDisabled()) continue;
       await parentControl.focus();
@@ -1211,6 +1217,7 @@ module.exports = {
   popupFocusFailure,
   popupHasVisibleContent,
   popupMemberTouchPosition,
+  popupTriggerTargets,
   popupReviewKey,
   capturePolicy,
   reviewProfiles,
