@@ -1939,7 +1939,12 @@ export class MaraoPopupCard extends BaseElement {
     const style = getComputedStyle(this);
     for (let index = 0; index < style.length; index++) {
       const property = style[index];
-      if (property.startsWith("--")) this._overlay.style.setProperty(property, style.getPropertyValue(property));
+      if (!property.startsWith("--")) continue;
+      if (/^--(?:marao-|app-)?safe-area-/.test(property)) {
+        this._overlay.style.removeProperty(property);
+        continue;
+      }
+      this._overlay.style.setProperty(property, style.getPropertyValue(property));
     }
   }
   _renderHost() { if (this.shadowRoot) this.shadowRoot.innerHTML = "<style>:host{display:block;height:0;overflow:visible}</style>"; }

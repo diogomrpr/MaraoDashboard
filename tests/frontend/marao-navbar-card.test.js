@@ -4,6 +4,25 @@ import fs from "node:fs/promises";
 
 const source = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8");
 
+test("ported sheets copy theme colors while viewport insets keep inheriting live values", async () => {
+  const { MaraoPopupCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoCards.js');
+  const previous = globalThis.getComputedStyle;
+  const entries = { '--ha-card-background': '#fff', '--font-size-primary': '1.25rem',
+    '--safe-area-inset-top': '47px', '--app-safe-area-inset-bottom': '34px', '--marao-safe-area-inset-left': '47px' };
+  const computed = Object.assign(Object.keys(entries), { getPropertyValue: key => entries[key] });
+  const copied = new Map(Object.entries(entries));
+  globalThis.getComputedStyle = () => computed;
+  try {
+    MaraoPopupCard.prototype._syncTheme.call({ _overlay: { style: {
+      setProperty: (key, value) => copied.set(key, value), removeProperty: key => copied.delete(key),
+    } } });
+    assert.deepEqual(Object.fromEntries(copied), { '--ha-card-background': '#fff', '--font-size-primary': '1.25rem' });
+  } finally {
+    if (previous === undefined) delete globalThis.getComputedStyle;
+    else globalThis.getComputedStyle = previous;
+  }
+});
+
 test("navbar and sheets share the host-aware inset fallback", () => {
   assert.match(source, /var\(--marao-safe-area-inset-\$\{side\}, var\(--safe-area-inset-\$\{side\}, env\(safe-area-inset-\$\{side\}, 0px\)\)\)/);
   assert.match(source, /max\(4px, calc\(\$\{safeArea\("bottom"\)\} - 20px\)\)/);
