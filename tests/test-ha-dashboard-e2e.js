@@ -314,8 +314,14 @@ async function checkActionDispatches(page, serviceCalls) {
 
   const alarm = "alarm_control_panel.marao_dashboard_test_alarm";
   const hold = cardAction(page, "Arm away · hold");
+  await page.locator(".marao-popup-sheet").waitFor({ state: "detached" });
   await hold.scrollIntoViewIfNeeded();
-  const holdBox = await hold.boundingBox();
+  await hold.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
+  let holdBox;
+  await require('playwright/test').expect.poll(async () => {
+    holdBox = await hold.boundingBox();
+    return Boolean(holdBox && holdBox.width >= 48 && holdBox.height >= 48);
+  }, { message: "The safe security hold must have a visible touch target" }).toBe(true);
   const point = { x: holdBox.x + holdBox.width / 2, y: holdBox.y + holdBox.height / 2 };
   const holdBefore = count(alarm, "alarm_arm_away");
   const touch = await page.context().newCDPSession(page);
