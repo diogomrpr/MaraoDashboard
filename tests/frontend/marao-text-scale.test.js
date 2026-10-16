@@ -233,9 +233,9 @@ test("popup scrolling preserves native range touches while containing background
     range.classList = fakeClassList();
     range.matches = (selector) => selector === 'input[type="range"][data-slider-key]';
     installPopupScrollGuard();
-    const move = (path, type = "touchmove", y = 100) => {
+    const move = (path, type = "touchmove", y = 100, cancelable = true) => {
       root.emit("touchstart", { touches: [{ clientY: 100 }] });
-      const event = { touches: [{ clientY: y }], deltaY: 20, composedPath: () => path, prevented: false, stopped: false,
+      const event = { cancelable, touches: [{ clientY: y }], deltaY: 20, composedPath: () => path, prevented: false, stopped: false,
         preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } };
       root.emit(type, event);
       return event;
@@ -248,6 +248,9 @@ test("popup scrolling preserves native range touches while containing background
     sheet.scrollTop = 300;
     assert.equal(move([sheet], "touchmove", 80).prevented, true, "bottom edge contains scrolling");
     assert.equal(move([]).prevented, true, "background remains blocked");
+    const nativeScroll = move([], "touchmove", 80, false);
+    assert.equal(nativeScroll.prevented, false, "a committed native scroll cannot be cancelled");
+    assert.equal(nativeScroll.stopped, true, "non-cancelable events stay contained");
     root.location.pathname = "/config/dashboard";
     assert.equal(move([]).prevented, false, "other Home Assistant pages retain native scrolling");
   } finally { globalThis.window = previousWindow; }
@@ -338,6 +341,29 @@ test("slide control keeps vertical gestures available for page scrolling", () =>
   assert.equal(slide._pointerId, null);
   assert.equal(slide._progress, 0);
   assert.deepEqual(captured, []);
+});
+
+test("slide control cancels when the browser owns a non-cancelable touch gesture", () => {
+  for (const alreadyDragging of [false, true]) {
+    const { captured, released, serviceCalls, slide, track } = slideFixture();
+    const start = pointerEvent(track, 10, 10);
+    slide._start(start, start);
+    if (alreadyDragging) {
+      const horizontal = pointerEvent(track, 110, 12);
+      slide._move(horizontal, horizontal);
+    }
+    const nativeScroll = pointerEvent(track, 240, 12);
+    nativeScroll.cancelable = false;
+    slide._move(nativeScroll, nativeScroll);
+    slide._end(nativeScroll, nativeScroll);
+    assert.equal(nativeScroll.prevented, false);
+    assert.equal(slide._pointerId, null);
+    assert.equal(slide._progress, 0);
+    assert.equal(track.classList.contains("dragging"), false);
+    assert.deepEqual(released, alreadyDragging ? [1] : []);
+    assert.deepEqual(captured, alreadyDragging ? [1] : []);
+    assert.deepEqual(serviceCalls, []);
+  }
 });
 
 test("slide control captures only horizontal intent and resets partial or cancelled gestures", () => {

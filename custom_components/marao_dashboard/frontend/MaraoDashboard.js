@@ -970,6 +970,10 @@ class MaraoSlideToOpen extends HTMLElement {
   _move(event, point) {
     if (!point || (point.pointerId ?? point.identifier) !== this._pointerId) return;
     const track = event.currentTarget;
+    if (event.cancelable === false) {
+      this._resetGesture(track);
+      return;
+    }
     const deltaX = point.clientX - this._startX;
     const deltaY = point.clientY - this._startY;
     if (!this._horizontalIntent) {
@@ -1644,7 +1648,7 @@ function installPopupScrollGuard() {
   };
 
   const block = (event) => {
-    event.preventDefault();
+    if (event.cancelable) event.preventDefault();
     event.stopPropagation();
   };
 
