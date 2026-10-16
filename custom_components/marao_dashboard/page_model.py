@@ -170,8 +170,8 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
     if not isinstance(config.get("landing_page"), str) or config["landing_page"] not in paths:
         raise ValueError("Select an existing landing page")
     navigation = config.get("navigation", [])
-    if not isinstance(navigation, list) or len(navigation) > 5:
-        raise ValueError("Navigation must be a list of at most five entries")
+    if not isinstance(navigation, list):
+        raise ValueError("Navigation must be a list")
     for route in navigation:
         if isinstance(route, str):
             references.append(route)

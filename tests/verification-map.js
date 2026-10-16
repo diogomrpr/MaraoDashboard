@@ -5,7 +5,7 @@ const runtime = 'custom_components/marao_dashboard/frontend/';
 const backend = 'custom_components/marao_dashboard/';
 const unit = (file, pattern) => ({ id: 'unit:' + file + (pattern ? ':' + pattern : ''), kind: 'offline',
   command: ['node', '--test', '--test-concurrency=1', ...(pattern ? ['--test-name-pattern', pattern] : []), 'tests/frontend/' + file + '.test.js'],
-  inputs: ['tests/frontend/' + file + '.test.js', 'tests/frontend/package.json', runtime, 'frontend_src',
+  inputs: ['tests/frontend/' + file + '.test.js', 'tests/frontend/package.json', 'custom_components/package.json', runtime, 'frontend_src',
     ...(file === 'accessibility-profiles' ? ['tests/test-ha-dashboard-accessibility.js'] : []),
     ...(/verification|upgrade|release-gate/.test(file) ? ['ha-test', 'tests/verify-release.js', 'tests/verify-publish.js', 'tests/test-ha-upgrade.js', 'tests/verification-browser.js', 'tests/native-reconnect-exception.js'] : [])], exclusive: false });
 const python = file => ({ id: 'python:' + file, kind: 'offline', command: ['python', '-m', 'pytest', '-q', 'tests/components/marao_dashboard/' + file + '.py'],
@@ -46,6 +46,15 @@ const components = {
       ...['iphone-normal', 'android-normal', 'narrow-320'].map(profile => browser('scroll:chromium:' + profile, 'test-ha-scroll', ['--scenario', profile])),
       browser('scroll:security', 'test-ha-security', ['--scenario', 'iphone-normal']),
       browser('scroll:sliders', 'test-ha-value-sliders', ['--scenario', 'iphone-normal']),
+    ] },
+  'navbar-overflow': { units: [['upgrade-runner'], ['editor-model'], ['marao-navbar-card'], ['canonical-page-model'], ['page-manager-model'], ['editor-panel'], ['marao-native'], ['verification']],
+    python: ['test_navbar_overflow', 'test_generator', 'test_page_generation', 'test_page_migration', 'test_history', 'test_native'], editor: true, upgrade: true,
+    browser: [
+      ...['iphone-normal', 'android-normal', 'narrow-320', 'iphone-landscape', 'android-landscape', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200'].map(profile =>
+        browser('navbar-overflow:' + profile, 'test-ha-navbar-overflow', ['--scenario', profile])),
+      browser('navbar-overflow:native', 'test-ha-native', ['--navbar-only', '--scenario', 'iphone-normal']),
+      browser('navbar-overflow:safe-area', 'test-ha-dashboard-accessibility', ['--safe-area']),
+      browser('navbar-overflow:alignment', 'test-ha-card-alignment', ['--navbar']),
     ] },
   navbar: { units: [['marao-navbar-card']], profiles: ['iphone-normal', 'iphone-landscape', 'narrow-320'], browser: [browser('safe-area', 'test-ha-dashboard-accessibility', ['--safe-area'])] },
   actions: { units: [['marao-climate-card', 'action|hold|slide|dispatch|disabled|unavailable']],
@@ -99,6 +108,7 @@ const rules = [
   [/^custom_components\/marao_dashboard\/native\.py$/, ['native', 'generator', 'lifecycle', 'migration']],
   [/^tests\/test-ha-security\.js$/, ['security']],
   [/^tests\/test-ha-scroll\.js$/, ['scroll']],
+  [/^tests\/test-ha-navbar-overflow\.js$|^tests\/frontend\/navbar-overflow\.fixture\.json$/, ['navbar-overflow']],
   [/^tests\/test-ha-energy-format\.js$/, ['energy']],
   [/^(AGENTS\.md|README\.md|docs\/|openspec\/|\.agents\/)/, ['docs']],
   [/^tests\/frontend\/([^/]+)\.test\.js$/, 'test'],
@@ -118,7 +128,7 @@ const rules = [
   [/^custom_components\/marao_dashboard\/(page_migration|page_model|native_storage|legacy_migration|migration|operation|recovery).*\.py$/, ['migration']],
   [/^custom_components\/marao_dashboard\/(history)\.py$/, ['saved-history']],
   [/^custom_components\/marao_dashboard\/(__init__|config_flow|config_patch|const)\.py$/, ['lifecycle']],
-  [/^custom_components\/marao_dashboard\/(manifest\.json|strings\.json)|^(hacs\.json|package(-lock)?\.json)$/, ['packaging']],
+  [/^custom_components\/marao_dashboard\/(manifest\.json|strings\.json)|^(custom_components\/package\.json|hacs\.json|package(-lock)?\.json)$/, ['packaging']],
   [/^\.github\/workflows\//, ['verification']],
   [/^ha-test\/(client|prepare)\.js$/, ['verification']],
   [/^ha-test\//, ['gallery']],
@@ -133,11 +143,13 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     const rule = rules.find(([pattern]) => pattern.test(file));
     if (!rule) throw new Error('Unmapped changed file: ' + file + '. Add its component/check mapping.');
     let ids = rule[1];
+    if (declared.includes('navbar-overflow') && /^(frontend_src\/(?:MaraoDashboardPanel|editor-model|editor-labels|MaraoNativeCardEditor|native-labels)\.js|custom_components\/marao_dashboard\/(?:generator|native|page_model)\.py|tests\/test-ha-dashboard-accessibility\.js|tests\/test-ha-card-alignment\.js|tests\/test-ha-editor\.js|tests\/test-ha-native\.js|tests\/test-ha-upgrade\.js|ha-test\/upgrade\/coverage\.json|ha-test\/(?:marao_dashboard_test_dashboard\.json|cases\.json))$/.test(file)) ids = ['navbar-overflow'];
+    if (declared.includes('navbar-overflow') && /^custom_components\/marao_dashboard\/frontend\/MaraoDashboard(?:Panel|JsonEditor)\.js$/.test(file)) ids = ['navbar-overflow', 'packaging'];
     // Reviewed additive movement labels have no native-card consumer. Other label edits retain both consumers.
     if (ids === 'editor-labels') ids = declared.includes('editor-drag') && !declared.includes('native') ? ['editor-ui', 'editor-drag'] : ['native', 'editor-ui'];
     if (ids === 'shared') {
       if (!declared.length && !conservativeShared) throw new Error(file + ': declare --component after reviewing the shared-component diff.');
-      const consumers = ['native', 'security', 'labels', 'slider', 'light', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
+      const consumers = ['navbar-overflow', 'native', 'security', 'labels', 'slider', 'light', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
       ids = declared.length ? declared.filter(id => consumers.includes(id)) : consumers;
       if (!ids.length) throw new Error(file + ': a runtime component is required; documentation scope cannot omit its checks.');
     }

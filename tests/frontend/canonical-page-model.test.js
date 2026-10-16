@@ -88,7 +88,7 @@ const invalid = [
   ['missing shortcut destination', config => { config.pages[0].sections[1].entities[0].page = 'removed'; }],
   ['unbound shortcut', config => { delete config.pages[0].sections[1].entities[0].page; }],
   ['missing navbar destination', config => { config.navigation = ['removed']; }],
-  ['sixth pin', config => { config.navigation = Array(6).fill('home'); }],
+  ['malformed route', config => { config.navigation = [{ label: 'Missing destination' }]; }],
   ['invalid scene member', config => { config.pages[0].sections[1].entities[1].entities = ['lock.safe']; }],
 ];
 for (const [name, mutate] of invalid) test(`canonical preflight rejects ${name} without changing the input`, () => {
@@ -117,7 +117,7 @@ test('canonical schema offers ordered pages, sections and entity-free roles with
   assert.equal(native.properties.views.minItems, 1);
   assert.deepEqual(schema.required, ['name', 'config_version', 'pages', 'landing_page']);
   assert.equal(schema.properties.pages.type, 'array');
-  assert.equal(schema.properties.navigation.maxItems, 5);
+  assert.equal(schema.properties.navigation.maxItems, undefined);
   assert.equal(schema.properties.pages.items.properties.sections.items.properties.columns.maximum, 6);
   assert.ok(!Object.hasOwn(schema.properties, 'rooms'));
   assert.ok(!Object.hasOwn(schema.properties, 'overview'));
@@ -194,5 +194,25 @@ test('moving every published option shape preserves all fields and page-wide ide
     expected.pages[0].sections[1].entities = cards.map((card, i) => ({ ...structuredClone(card), id: card.id || `card-${i+1}` }));
     assert.deepEqual(serializeConfig(model), expected);
     assert.deepEqual(serializeConfig(normalizeConfig(expected)), expected);
+  }
+});
+
+test('long explicit URL lists retain unknown options through Visual and JSON', () => {
+  const routes = JSON.parse(fs.readFileSync(new URL('./navbar-overflow.fixture.json', import.meta.url))).routes
+    .map(route => ({ ...route, url: route.url || route.path }));
+  for (const count of [0, 1, 5, 6, 8]) {
+    const config = { ...structuredClone(source), navigation: routes.slice(0, count) };
+    const before = JSON.stringify(config);
+    assert.deepEqual(validateConfig(config, catalog), []);
+    assert.deepEqual(serializeConfig(normalizeConfig(config)), config);
+    assert.equal(JSON.stringify(config), before);
+  }
+});
+
+
+test('legacy route objects keep validity checks when their count is uncapped', () => {
+  for (const version of [0,1]) for (const route of [' ',{}, {page:null},{url:'/x'},{url:' ',label:'Bad'}]) {
+    const config={name:'Safe',rooms:[],navigation:[route],...(version?{config_version:version}:{})};
+    assert.ok(validateConfig(config,catalog).some(error=>/Navigation entries/.test(error)));
   }
 });

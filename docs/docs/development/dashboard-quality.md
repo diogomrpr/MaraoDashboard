@@ -524,8 +524,11 @@ large and readable.
 
 ### Floating navbar
 
-- The navbar is simple, floating, compact, and limited to five entries.
-- Width and spacing scale automatically with the number of routes.
+- The navbar is simple, floating, compact, and stays in one horizontal row.
+- Configuration has no route-count cap. Fit full-size controls to the safe host
+  width; reserve the rightmost slot for More when additional routes overflow.
+- Center the matching vertical icon menu above More, bound it to the safe viewport
+  and scroll it internally. Preserve configured order and active-route feedback.
 - Active icon backgrounds remain circular.
 - Keep button gaps compact without violating the visible 48-by-48 control rule.
 - Derive iPhone positioning from the shared host-aware bottom inset and preserve

@@ -159,7 +159,7 @@ async function safeAreaGeometry(page, source) {
     if(nav && (nav.left<(expected.left||0)-1||nav.right>innerWidth-(expected.right||0)+1))issues.push('Navbar overlaps a safe side edge');
     const navBottom=/iPhone|iPod/.test(navigator.userAgent)?Math.max(4,(expected.bottom||0)-20):12;
     if(nav && Math.abs(innerHeight-nav.bottom-navBottom)>1)issues.push('Navbar ignores the selected bottom inset');
-    if(nav && [...(navbar||findNav(document)).shadowRoot.querySelectorAll('a')].some(a=>{const r=a.getBoundingClientRect();return r.width<48||r.height<48||r.left<nav.left||r.right>nav.right||r.top<nav.top||r.bottom>nav.bottom;}))issues.push('Navbar touch target is too small or outside its bar');
+    if(nav && [...(navbar||findNav(document)).shadowRoot.querySelectorAll('.nav a,.nav button')].some(a=>{const r=a.getBoundingClientRect();return r.width<48||r.height<48||r.left<nav.left||r.right>nav.right||r.top<nav.top||r.bottom>nav.bottom;}))issues.push('Navbar touch target is too small or outside its bar');
     return {issues, first:bounds.toJSON(), padding, nav:nav?.toJSON(), top: view.getBoundingClientRect().top,
       ownerStyles: [...(ancestors.find(e=>e.localName==='hui-root')?.shadowRoot?.adoptedStyleSheets||[])].flatMap(s=>[...s.cssRules].map(r=>r.cssText)).filter(s=>/padding|header-height|#view/.test(s)),
       ancestors:ancestors.map(e=>e.localName), resolved:getComputedStyle(view).getPropertyValue('--safe-area-inset-top')};
@@ -526,7 +526,7 @@ async function layoutIssues(page, families = []) {
         }
         if (element.localName === "marao-navbar-card") {
           const nav = element.shadowRoot?.querySelector("nav")?.getBoundingClientRect();
-          const links = [...(element.shadowRoot?.querySelectorAll("a") || [])].map((link) => link.getBoundingClientRect());
+          const links = [...(element.shadowRoot?.querySelectorAll(".nav a,.nav button") || [])].map((link) => link.getBoundingClientRect());
           if (nav && (nav.left < 0 || nav.right > innerWidth + 1)) issues.push("navbar extends outside the viewport");
           for (const [index, link] of links.entries()) {
             if (nav && (link.left < nav.left - 1 || link.right > nav.right + 1 || link.top < nav.top - 1 || link.bottom > nav.bottom + 1)) issues.push("navbar target extends outside its surface");
@@ -957,7 +957,8 @@ async function waitForNavbar(page) {
   await card.waitFor({ state: 'attached' });
   await card.locator('nav').waitFor({ state: 'attached' });
   const routes = await card.evaluate(element => element._config.routes.length);
-  assert.equal(await card.locator('nav a').count(), routes, 'Navbar must retain every configured route');
+  assert.equal(await card.locator('.nav a').count(), await card.evaluate(element => element._visibleCount), 'Visible prefix differs from layout partition');
+  assert.equal(await card.locator('[data-overflow]').count(), routes > await card.evaluate(element => element._visibleCount) ? 1 : 0);
   await card.locator('nav').waitFor({ state: routes ? 'visible' : 'hidden' });
 }
 

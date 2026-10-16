@@ -102,7 +102,7 @@ async function checkNavbar(page) {
   const issues = await page.locator("marao-navbar-card .nav").evaluateAll((navbars) => navbars.flatMap((navbar) => {
     const failures = [];
     const box = navbar.getBoundingClientRect();
-    const links = [...navbar.querySelectorAll("a")].map((link) => link.getBoundingClientRect());
+    const links = [...navbar.querySelectorAll("a,button")].map((link) => link.getBoundingClientRect());
     for (const [index, rect] of links.entries()) {
       if (rect.width < 48 || rect.height < 48) failures.push(`link ${index} below 48px`);
       if (rect.left < box.left - 1 || rect.right > box.right + 1 || rect.top < box.top - 1 || rect.bottom > box.bottom + 1) failures.push(`link ${index} outside bar`);
@@ -114,6 +114,11 @@ async function checkNavbar(page) {
 }
 
 async function main() {
+  if (process.argv.includes('--navbar')) {
+    const result = require('node:child_process').spawnSync(process.execPath, [require('node:path').join(__dirname, 'test-ha-navbar-overflow.js'), '--scenario', 'narrow-320', '--alignment'], {stdio:'inherit',env:process.env});
+    if (result.status !== 0) throw new Error('Navbar overflow alignment failed');
+    return;
+  }
   if (process.argv.includes('--editor-drag')) {
     const result = require('node:child_process').spawnSync(process.execPath, [require('node:path').join(__dirname, 'test-ha-editor.js'), '--drag-geometry', '--scenario=iphone-normal'], { stdio: 'inherit', env: process.env });
     if (result.status !== 0) throw new Error('Editor movement alignment failed');

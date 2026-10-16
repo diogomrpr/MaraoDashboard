@@ -1021,7 +1021,7 @@ async function editablePageChecks(page, panel, client, config, originalBytes, sc
     await capture('create'); await saveDialog();
     const index = await panel.evaluate(p => p._model.pages.findIndex(page => page.path === 'editable-tv'));
     assert.ok(index >= 0);
-    assert.equal(await panel.evaluate(p => p._navigationEntries().length), Math.min(5, pins + 1));
+    assert.equal(await panel.evaluate(p => p._navigationEntries().length), pins + 1);
     const position = `${index}:0`;
     const initial = await panel.evaluate((p, position) => p._container('page', position).entities.length, position);
     assert.ok(initial > 1, 'Real Media template must expose its editable cards');

@@ -48,6 +48,7 @@ function scopedPlan(config, components) {
   const selected = plan(config);
   assert.ok(components.some(id => require('./verification-map').components[id]?.upgrade), 'No changed upgrade contract in selected scope');
   const baselines = components.includes('migration') ? selected.baselines
+    : components.includes('navbar-overflow') ? ['v0.5.1', 'predecessor-format-1', 'current-format-2']
     : components.includes('saved-history') ? ['v0.2.0', 'v0.5.1', 'predecessor-format-1', 'current-format-2']
     : ['v0.5.1', 'current-format-2'];
   selected.rows = selected.rows.filter(row => baselines.includes(row.baseline));

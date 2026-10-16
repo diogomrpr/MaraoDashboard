@@ -8,6 +8,9 @@
     "rooms",
     "security",
     "energy",
+    "wallbox",
+    "media",
+    "appliances",
     {
       "url": "/marao-dashboard/card-test",
       "label": "Cases",

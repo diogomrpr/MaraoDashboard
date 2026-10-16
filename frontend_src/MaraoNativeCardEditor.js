@@ -176,7 +176,7 @@ export class MaraoNativeCardEditor extends (globalThis.HTMLElement || class {}) 
     }
     if (spec.id === "hc_wallbox_current_card") this._repeat(host, "variables.shortcuts", "Charging shortcuts", [field("value", "Charging Current", "number")], { value: 6 }, 3);
     if (spec.id === "navbar") this._repeat(host, "routes", "Navigation routes",
-      [field("url", "URL"), field("label", "Label"), field("icon", "Icon", "icon"), field("icon_selected", "Selected icon", "icon")], { url: "", label: "" }, 5);
+      [field("url", "URL"), field("label", "Label"), field("icon", "Icon", "icon"), field("icon_selected", "Selected icon", "icon")], { url: "", label: "" });
     if (spec.id === "popup") this._repeat(host, "cards", "Popup contents",
       [choices("type", "Native card", catalog.cards.map(card => card.type)), field("entity", "Entity", "entity"), field("name", "Name"), field("variables", "Advanced", "object")], { type: "custom:marao-native-light-card" });
     const details = document.createElement("details"); const summary = document.createElement("summary"); summary.textContent = this._label("Advanced"); details.append(summary);

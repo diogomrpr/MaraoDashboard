@@ -231,7 +231,7 @@ export function createPage(model, details, templates) {
     if (card.variables) { delete card.variables.popup_hash; delete card.variables.mode_selector_hash; }
   }
   model.pages.push(normalized);
-  if ((model.navigation || []).length < 5) pinPage(model, path, true);
+  pinPage(model, path, true);
   return normalized;
 }
 
@@ -314,7 +314,6 @@ export function pinPage(model, path, pinned) {
   const has = entry => entry === path || entry?.page === path;
   if (!pinned) model.navigation = navigation.filter(entry => !has(entry));
   else if (!navigation.some(has)) {
-    if (navigation.length >= 5) throw new Error('Unpin another page before adding a sixth navbar entry.');
     model.navigation = [...navigation, path];
   }
 }
@@ -444,7 +443,9 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
     if (room.columns != null && (!Number.isInteger(room.columns) || room.columns < 1 || room.columns > 6)) errors.push(`Room ${index + 1} columns must be between 1 and 6.`);
   }
   if (config.navigation != null && !Array.isArray(config.navigation)) errors.push("Navigation must be a list.");
-  if (Array.isArray(config.navigation) && config.navigation.length > 5) errors.push("Navigation supports at most five entries.");
+  if (Array.isArray(config.navigation) && config.navigation.some(route => typeof route === 'string' ? !route.trim()
+    : !route || typeof route !== 'object' || Array.isArray(route) || (Object.hasOwn(route, 'page') ? typeof route.page !== 'string' || !route.page.trim()
+      : typeof route.url !== 'string' || !route.url.trim() || typeof route.label !== 'string' || !route.label.trim()))) errors.push('Navigation entries require a page or a labeled URL.');
   if (config.pages?.custom != null && !Array.isArray(config.pages.custom)) errors.push("Custom pages must be a list.");
   for (const [index, page] of (Array.isArray(config.pages?.custom) ? config.pages.custom : []).entries()) {
     if (!page || typeof page !== 'object' || Array.isArray(page)) { errors.push('Each custom page must be an object.'); continue; }
@@ -613,7 +614,7 @@ export function validatePages(config, catalog) {
   }
   if (!paths.has(config.landing_page)) errors.push('Select an existing landing page.');
   const navigation = config.navigation ?? [];
-  if (!Array.isArray(navigation) || navigation.length > 5) errors.push('Navigation must be a list of at most five entries.');
+  if (!Array.isArray(navigation)) errors.push('Navigation must be a list.');
   else for (const route of navigation) {
     if (typeof route === 'string') references.push(route);
     else if (object(route) && Object.hasOwn(route, 'page')) references.push(route.page);
@@ -844,7 +845,6 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
     schema.required = ['name', 'config_version', 'pages', 'landing_page'];
     schema.properties.config_version = { const: 2, description: 'Ordered editable pages.' };
     schema.properties.landing_page = pagePath;
-    schema.properties.navigation.maxItems = 5;
     schema.properties.navigation.items.anyOf.push({ type: 'object', required: ['page'], properties: { page: pagePath }, additionalProperties: true });
     schema.properties.pages = { type: 'array', minItems: 1, items: {
       type: 'object', required: ['name', 'path'], properties: {

@@ -1328,6 +1328,15 @@
       "page-manager",
       "page-templates",
       "builder-pages"
+    ],
+    "navbar-overflow": [
+      "generation",
+      "page-migration",
+      "page-manager",
+      "builder-pages",
+      "upgraded-pages",
+      "native-storage",
+      "history-recovery"
     ]
   },
   "required_install_assertions": [

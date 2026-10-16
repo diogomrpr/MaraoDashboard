@@ -25,7 +25,10 @@ Sections views. Afterward, additions, removals, order and empty pages belong to
 Home Assistant. Registry changes and Marao restarts do not refill them.
 
 The starter applies the **Marao Dashboard** theme and floating navbar. Its pencil
-is separate from the five navigation entries. While editing, Home Assistant's
+is separate from navigation entries. The navbar stays in one row and places
+additional destinations in a matching vertical menu above its rightmost toggle.
+The native route editor accepts the complete ordered list without a count limit;
+preview shows the available-width partition without navigation or shell effects. While editing, Home Assistant's
 toolbar returns. Cards added to other dashboards do not change their native shell.
 
 ## Add and edit cards

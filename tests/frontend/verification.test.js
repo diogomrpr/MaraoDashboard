@@ -123,3 +123,12 @@ test('automatic CI uses affected ranges and manual comprehensive/parallel option
   assert.match(step.env.MARAO_PARALLEL, /workflow_dispatch/);
   assert.doesNotMatch(step.run, /npm run test:static|pytest --cov|verify:release/);
 });
+
+test('navbar overflow scope covers configuration, preservation, native, geometry and bounded mobile checks', () => {
+  const plan = makePlan({components:['navbar-overflow']}, {base:'base',head:'head',files:['frontend_src/editor-model.js','custom_components/marao_dashboard/native.py','custom_components/marao_dashboard/frontend/MaraoCards.js']});
+  assert.equal(plan.upgradeRequired,true);
+  assert.ok(plan.checks.some(check=>check.id==='python:test_navbar_overflow'));
+  assert.ok(plan.checks.some(check=>check.id==='navbar-overflow:alignment'));
+  assert.ok(plan.checks.some(check=>check.id==='navbar-overflow:iphone-bold-text-200'));
+  assert.ok(!plan.checks.some(check=>/mobile-matrix|editor-drag|json-editor|preserved-upgrade/.test(check.id)));
+});

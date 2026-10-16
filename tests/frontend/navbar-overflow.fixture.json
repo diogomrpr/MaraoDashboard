@@ -1,0 +1,16 @@
+{
+  "routes": [
+    {"url":"/marao-dashboard/overview","label":"Home","icon":"mdi:home","future":{"keep":[]}},
+    {"path":"/marao-dashboard/rooms","label":"Rooms","icon":"mdi:sofa"},
+    {"url":"/marao-dashboard/energy","label":"Power","icon":"mdi:flash","icon_selected":"mdi:flash-outline"},
+    {"url":"/marao-dashboard/security","label":"Security","icon":"mdi:shield"},
+    {"url":"/marao-dashboard/media","label":"Music","icon":"mdi:music"},
+    {"url":"/marao-dashboard/wallbox","label":"Charging","icon":"mdi:ev-station"},
+    {"url":"/marao-dashboard/studio","label":"Studio","icon":"mdi:desk"},
+    {"url":"/marao-dashboard/card-test","label":"Cases","icon":"mdi:test-tube"}
+  ],
+  "legacy_automatic": [
+    {"icon":"mdi:home-variant-outline","icon_selected":"mdi:home-variant","label":"Home","url":"/marao-dashboard/overview"},
+    {"icon":"mdi:sofa-outline","icon_selected":"mdi:sofa","label":"Rooms","url":"/marao-dashboard/rooms"}
+  ]
+}

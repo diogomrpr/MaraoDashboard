@@ -5,7 +5,7 @@ const labels = {
   "Invalid native entity metadata": "Metadados de entidades nativas inválidos",
   "Native entity metadata must be a bounded list": "Os metadados de entidades nativas têm de ser uma lista limitada",
   "Choose a supported native Marao card": "Escolha um cartão nativo Marao suportado",
-  "Marao navbar supports at most five routes": "A barra de navegação Marao suporta até cinco destinos",
+  "Navigation routes must be a list": "Os destinos de navegação têm de ser uma lista",
   "Native actions must be objects": "As ações nativas têm de ser objetos",
   "Close and lock cards use their explicit safe service": "Os cartões para fechar e trancar usam o seu serviço seguro explícito",
   "Native dashboard requires a title": "O painel nativo precisa de um título",

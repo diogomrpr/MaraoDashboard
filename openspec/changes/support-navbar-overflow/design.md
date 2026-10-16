@@ -98,3 +98,24 @@ Update AGENTS.md and the quality guide during implementation to replace the coun
 No automatic conversion or repinning. Ship backend validators, builder/native editors and shared runtime together so all paths accept longer lists consistently. Rebuild bundled editor assets and deploy only to disposable `192.168.0.28`, with exact source/generated/affected-state backups. Verify save/reload/repeated generation/history, then restore and verify the disposable baseline.
 
 Run focused compatibility/security-of-dispatch checks early, then one covering scoped affected batch and final combined inspection of normal/exact-fit/overflow/long-menu cases in both themes, representative iPhone/Android, 320px, landscape and required text/zoom profiles. Include alignment and relevant popup/shell geometry. During explicit release preparation require scoped preserved-install proof for affected navigation/generator/native contracts and recovery, then scoped publication/release gates and applicable exact-commit CI. Do not implicitly run the full historical/mobile matrix or parallel checks.
+
+## Implementation verification (2026-10-16)
+
+Implementation started at `4f4e3bb3bf9f2a68a7ead783b535ad4868c83a36` (v0.9.2).
+Format 2, public route keys and existing automatic first-five selection remain
+unchanged. Explicit lists are uncapped across the builder, native compiler/editor
+and shared renderer; malformed routes preflight before writes.
+
+`npm run test:affected -- --component navbar-overflow` passed all 31 scoped
+checks, including independent route expectations, supported legacy conversions,
+protected history, generated/native ownership, reproducible assets, nine selected
+mobile layouts in both themes, safe-area geometry and icon alignment. Live checks
+covered Visual/JSON and native Visual/YAML preservation, exact-fit and overflow
+boundaries, long-menu scrolling, hash/back/forward navigation, safe dismissal,
+popup focus restoration and disabled bounded previews. Exact disposable cleanup
+was verified. Representative normal, landscape and zoomed captures were reviewed;
+WebKit outside-touch dismissal and the following touch also passed in both themes.
+
+No physical-phone inspection or full suite was performed. This implementation
+was not published; release preparation still requires scoped preserved-install
+proof and publication gates for the affected navigation/generator/native paths.

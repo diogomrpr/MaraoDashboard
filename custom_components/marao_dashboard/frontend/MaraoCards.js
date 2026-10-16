@@ -1758,35 +1758,189 @@ export class MaraoCard extends BaseElement {
 
 export const safeArea = (side) => `var(--marao-safe-area-inset-${side}, var(--safe-area-inset-${side}, env(safe-area-inset-${side}, 0px)))`;
 
+export function navbarRouteCurrent(route, location = window.location) {
+  try {
+    const target = new URL(route.url || route.path, location.href);
+    return target.origin === location.origin && target.pathname === location.pathname
+      && (!target.hash || target.hash === location.hash) && (!target.search || target.search === location.search);
+  } catch { return false; }
+}
+
+export function navbarPartition(routes, width, size = 48, gap = 4, padding = 20) {
+  const slots = Math.max(1, Math.floor((Math.max(0, width - padding) + gap) / (Math.max(48, size) + gap)));
+  const count = routes.length > slots ? slots - 1 : routes.length;
+  return { slots, visible: routes.slice(0, count), overflow: routes.slice(count) };
+}
+
 export class MaraoNavbarCard extends BaseElement {
-  constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; }
+  constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._slots = 1; }
   setConfig(config) {
-    const routes = Array.isArray(config?.routes) ? config.routes : [];
-    if (routes.length > 5) throw new Error("Marao navbar supports at most five routes");
+    const routes = config?.routes === undefined ? [] : config.routes;
+    if (!Array.isArray(routes)) throw new Error("Navigation routes must be a list");
+    if (routes.some(route => !route || typeof route !== 'object' || Array.isArray(route)
+      || typeof (route.url || route.path) !== 'string' || !(route.url || route.path).trim()
+      || typeof route.label !== 'string' || !route.label.trim())) throw new Error("Navigation entries require a destination and label");
+    this._closeOverflow(false);
     this._config = { ...config, routes }; this._render();
   }
-  connectedCallback() { registerFullscreen(this); this._render(); }
+  connectedCallback() {
+    registerFullscreen(this); this._render();
+    this._observer = new ResizeObserver(this._scheduleLayout);
+    for (const node of [this, this._view(), this.shadowRoot.querySelector('.bounds')]) if (node) this._observer.observe(node);
+    for (const event of ['location-changed', 'popstate', 'hashchange']) window.addEventListener(event, this._locationChanged);
+    window.addEventListener('resize', this._scheduleLayout);
+    window.visualViewport?.addEventListener('resize', this._scheduleLayout);
+    window.visualViewport?.addEventListener('scroll', this._scheduleLayout);
+    this._layout();
+  }
   get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
-  set preview(value) { this._preview = Boolean(value); if (this._config && this._renderedPreview !== this.preview) this._render(); applyFullscreen(); }
-  disconnectedCallback() { unregisterFullscreen(this); }
-  set hass(value) { this._hass = value; this.shadowRoot?.querySelector("nav")?.setAttribute("aria-label", localize("navigation.label", value, {}, "Marao navigation")); }
+  set preview(value) {
+    this._preview = Boolean(value);
+    if (this._config && this._renderedPreview !== this.preview) { this._closeOverflow(false); this._render(); }
+    applyFullscreen();
+  }
+  disconnectedCallback() {
+    this._closeOverflow(false); this._clearDismissGesture(); this._observer?.disconnect(); cancelAnimationFrame(this._frame);
+    for (const event of ['location-changed', 'popstate', 'hashchange']) window.removeEventListener(event, this._locationChanged);
+    window.removeEventListener('resize', this._scheduleLayout);
+    window.visualViewport?.removeEventListener('resize', this._scheduleLayout);
+    window.visualViewport?.removeEventListener('scroll', this._scheduleLayout);
+    unregisterFullscreen(this);
+  }
+  set hass(value) { this._hass = value; this._updateCurrent(); }
+  _root() {
+    let root = this;
+    while (root && root.localName !== 'hui-root') root = root.parentElement || root.getRootNode()?.host;
+    return root;
+  }
+  _view() { return this._root()?.shadowRoot?.querySelector('#view'); }
+  _syncContext() {
+    const editing = Boolean(this._root()?.lovelace?.editMode);
+    if (editing !== this._editing) { this._editing = editing; this._closeOverflow(false); this._updateCurrent(); }
+  }
+  _locationChanged = () => { this._closeOverflow(false); this._updateCurrent(); this._scheduleLayout(); };
+  _scheduleLayout = () => {
+    cancelAnimationFrame(this._frame);
+    this._frame = requestAnimationFrame(() => { if (this.isConnected) this._layout(); });
+  };
+  _layout() {
+    const nav = this.shadowRoot?.querySelector('.nav'), bounds = this.shadowRoot?.querySelector('.bounds');
+    if (!this.isConnected || !nav || !bounds || !this.getClientRects().length) return;
+    const safe = bounds.getBoundingClientRect(), host = (this.preview ? this : this._view())?.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const left = Math.max(safe.left, host?.left ?? safe.left, viewport?.offsetLeft || 0);
+    const right = Math.min(safe.right, host?.right ?? safe.right, (viewport?.offsetLeft || 0) + (viewport?.width || innerWidth));
+    const edit = this.nativeOwner?.shadowRoot?.querySelector('.native-edit')?.getBoundingClientRect();
+    const top = Math.max(safe.top, this.preview ? 0 : host?.top || 0, viewport?.offsetTop || 0, edit ? edit.bottom + 8 : 0);
+    const style = getComputedStyle(nav), size = nav.querySelector('a,button')?.getBoundingClientRect().width || 48;
+    const gap = parseFloat(style.columnGap) || 0, padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    const { slots } = navbarPartition(this._config.routes || [], right - left, size, gap, padding);
+    const geometry = [left, right, top, safe.bottom, slots].map(value => Math.round(value * 2) / 2).join(':');
+    if (this._geometry !== geometry) this._closeOverflow(false);
+    this._geometry = geometry; this._safeTop = top;
+    this.style.setProperty('--marao-navbar-left', `${(left + right) / 2}px`);
+    if (this.preview) this.style.setProperty('--marao-navbar-preview-left', `${(left + right) / 2 - host.left}px`);
+    this.style.setProperty('--marao-navbar-width', `${Math.max(68, right - left)}px`);
+    if (slots !== this._slots) { this._slots = slots; this._render(); }
+    applyFullscreen();
+  }
+  _link(route, index) {
+    return `<a data-route="${index}" href="${esc(route.url || route.path)}" aria-label="${esc(route.label)}"><ha-icon></ha-icon></a>`;
+  }
   _render() {
     if (!this.shadowRoot) return;
+    this._observer?.unobserve(this.shadowRoot.querySelector('.bounds'));
     const routes = this._config.routes || [];
-    this.toggleAttribute?.("data-empty", routes.length === 0);
-    this.toggleAttribute?.("data-preview", this.preview);
+    this._visibleCount = routes.length > this._slots ? this._slots - 1 : routes.length;
+    const overflow = routes.length > this._visibleCount;
+    this.toggleAttribute?.('data-empty', !routes.length); this.toggleAttribute?.('data-preview', this.preview);
     this._renderedPreview = this.preview;
-    const routeCount = Math.max(routes.length, 1);
-    const bottom = /iPhone|iPod/i.test(navigator.userAgent || "") ? `max(4px, calc(${safeArea("bottom")} - 20px))` : "12px";
-    this.shadowRoot.innerHTML = `<style>:host{display:block;height:128px;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}:host([data-empty]){display:none}:host([data-preview]){height:auto}:host([data-preview]) .nav{position:relative;left:auto;bottom:auto;transform:none;width:min(100%,calc(${routeCount} * 54px + 20px));margin:12px auto}:host([data-preview]) a{cursor:default}.nav{position:fixed;z-index:1001;left:calc(50% + (${safeArea("left")} - ${safeArea("right")}) / 2);bottom:${bottom};transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(2px,.5vw,4px);width:min(calc(100vw - 24px - ${safeArea("left")} - ${safeArea("right")}),calc(${routeCount} * 54px + 20px));height:auto;min-height:60px;box-sizing:border-box;padding:6px 10px;border-radius:999px;background:var(--ha-card-background,var(--card-background-color));box-shadow:0 8px 30px rgba(0,0,0,.22)}a{display:grid;place-items:center;flex:0 0 48px;min-width:48px;width:48px;height:48px;aspect-ratio:1 / 1;align-self:center;justify-self:center;color:var(--icon-color,var(--primary-text-color));text-decoration:none;border-radius:50%;font-size:clamp(1.125rem,4vw,1.75rem);transition:transform .12s ease,filter .12s ease}a:active{transform:scale(.92);filter:brightness(.96)}a.active{color:var(--text-primary-color,var(--active-text-color));background:var(--primary-color)}a:focus{outline:none}ha-icon{--mdc-icon-size:26px}@media(max-width:300px){:host{height:228px}.nav{display:flex;flex-wrap:wrap;justify-content:center;height:auto;min-height:60px;border-radius:28px}a{flex:0 0 48px}}@media(prefers-reduced-motion:reduce){a{transition:none}}</style><nav class="nav" aria-label="${esc(localize("navigation.label", this._hass, {}, "Marao navigation"))}">${routes.map((route) => `<a href="${esc(route.url || route.path || "#")}" title="${esc(route.label)}" aria-label="${esc(route.label)}"><ha-icon icon="${esc(route.icon_selected || route.icon || "mdi:circle-outline")}"></ha-icon></a>`).join("")}</nav>`;
-    this.shadowRoot.querySelectorAll("a").forEach((link) => {
-      const active = link.getAttribute("href") === `${window.location.pathname}${window.location.hash}` || link.getAttribute("href") === window.location.pathname;
-      link.classList.toggle("active", active);
-      link.setAttribute("aria-disabled", String(this.preview));
-      if (this.preview) link.tabIndex = -1;
-      link.addEventListener("click", (event) => { event.preventDefault(); if (this.preview) return; haptic("heavy"); navigate(link.getAttribute("href")); this._render(); });
+    const bottom = /iPhone|iPod/i.test(navigator.userAgent || '') ? `max(4px, calc(${safeArea("bottom")} - 20px))` : '12px';
+    this.shadowRoot.innerHTML = `<style>
+      :host{display:block;height:128px;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}
+      :host([data-empty]){display:none}:host([data-preview]){height:auto}
+      .bounds{position:fixed;visibility:hidden;pointer-events:none;inset:${safeArea("top")} calc(12px + ${safeArea("right")}) ${safeArea("bottom")} calc(12px + ${safeArea("left")})}
+      .surface{display:flex;gap:clamp(2px,.5vw,4px);box-sizing:border-box;padding:6px 10px;border-radius:999px;background:var(--ha-card-background,var(--card-background-color));box-shadow:0 8px 30px rgba(0,0,0,.22)}
+      .nav{position:fixed;z-index:1001;left:var(--marao-navbar-left,50%);bottom:${bottom};transform:translateX(-50%);flex-wrap:nowrap;justify-content:center;width:max-content;max-width:var(--marao-navbar-width,calc(100vw - 24px - ${safeArea("left")} - ${safeArea("right")}));height:60px}
+      :host([data-preview]) .nav{position:relative;left:var(--marao-navbar-preview-left,50%);bottom:auto;margin:12px 0}
+      a,button{display:grid;place-items:center;box-sizing:border-box;flex:0 0 48px;min-width:48px;width:48px;height:48px;aspect-ratio:1 / 1;align-self:center;justify-self:center;padding:0;border:0;color:var(--icon-color,var(--primary-text-color));background:transparent;text-decoration:none;border-radius:50%;font:inherit;cursor:pointer;transition:transform .12s ease,filter .12s ease}
+      a:active,button:active{transform:scale(.92);filter:brightness(.96)}.active{color:var(--text-primary-color,var(--active-text-color));background:var(--primary-color)}
+      a:focus,button:focus{outline:none}[aria-disabled=true]{cursor:default}ha-icon{--mdc-icon-size:26px}
+      .overflow{position:fixed;z-index:1002;transform:translateX(-50%);width:68px;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:none}
+      @media(prefers-reduced-motion:reduce){a,button{transition:none}}
+    </style><div class="bounds" aria-hidden="true"></div><nav class="nav surface">${routes.slice(0, this._visibleCount).map((route, i) => this._link(route, i)).join('')}${overflow ? '<button type="button" data-overflow aria-expanded="false" aria-controls="marao-overflow"><ha-icon icon="mdi:dots-horizontal"></ha-icon></button>' : ''}</nav>`;
+    this._bindLinks(this.shadowRoot.querySelector('.nav'));
+    this.shadowRoot.querySelector('[data-overflow]')?.addEventListener('click', () => {
+      if (this.preview || this._editing) return;
+      haptic('heavy'); this._open ? this._closeOverflow(true) : this._openOverflow();
     });
-    if (this.isConnected) applyFullscreen();
+    this._updateCurrent();
+    if (this._observer) this._observer.observe(this.shadowRoot.querySelector('.bounds'));
+    if (this.isConnected) this._layout();
+  }
+  _bindLinks(root) {
+    root?.querySelectorAll('a').forEach(link => link.addEventListener('click', event => {
+      event.preventDefault(); if (this.preview || this._editing) return;
+      const href = link.getAttribute('href'), target = new URL(href, window.location.href);
+      this._closeOverflow(target.pathname === window.location.pathname && Boolean(target.hash)); haptic('heavy'); navigate(href);
+    }));
+  }
+  _updateCurrent() {
+    if (!this.shadowRoot) return;
+    const routes = this._config.routes || [], disabled = this.preview || this._editing;
+    const current = route => route && navbarRouteCurrent(route);
+    this.shadowRoot.querySelector('.nav')?.setAttribute('aria-label', localize('navigation.label', this._hass, {}, 'Marao navigation'));
+    this.shadowRoot.querySelectorAll('a[data-route]').forEach(link => {
+      const route = routes[Number(link.dataset.route)], active = current(route);
+      link.classList.toggle('active', active); link.setAttribute('aria-disabled', String(Boolean(disabled))); link.tabIndex = disabled ? -1 : 0;
+      if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
+      link.querySelector('ha-icon').setAttribute('icon', active ? route.icon_selected || route.icon || 'mdi:circle' : route.icon || route.icon_selected || 'mdi:circle-outline');
+    });
+    const toggle = this.shadowRoot.querySelector('[data-overflow]');
+    if (toggle) {
+      const selected = routes.slice(this._visibleCount).find(current);
+      const label = this._open ? localize('navigation.close', this._hass, {}, 'Close additional destinations') : localize('navigation.more', this._hass, {}, 'More destinations');
+      toggle.classList.toggle('active', Boolean(selected)); toggle.setAttribute('aria-label', selected ? `${label} · ${localize('navigation.current', this._hass, {name:selected.label}, `Current destination: ${selected.label}`)}` : label);
+      toggle.disabled = Boolean(disabled); toggle.setAttribute('aria-expanded', String(Boolean(this._open)));
+    }
+  }
+  _openOverflow() {
+    if (this._open || this.preview || this._editing) return;
+    const toggle = this.shadowRoot.querySelector('[data-overflow]'); if (!toggle) return;
+    this._open = true;
+    const menu = document.createElement('nav'); menu.id = 'marao-overflow'; menu.className = 'overflow surface';
+    menu.setAttribute('aria-label', localize('navigation.open', this._hass, {}, 'Additional destinations'));
+    menu.innerHTML = this._config.routes.slice(this._visibleCount).map((route, i) => this._link(route, i + this._visibleCount)).join('');
+    this.shadowRoot.append(menu); this._bindLinks(menu); this._updateCurrent();
+    const box = toggle.getBoundingClientRect();
+    menu.style.left = `${box.left + box.width / 2}px`; menu.style.bottom = `${innerHeight - box.top + 8}px`;
+    menu.style.maxHeight = `${Math.max(0, box.top - (this._safeTop || 0) - 8)}px`;
+    const focus = menu.querySelector('[aria-current=page]') || menu.querySelector('a');
+    focus?.focus({preventScroll:true}); if (focus) menu.scrollTop = focus.offsetTop - menu.clientHeight / 2 + 24;
+    document.addEventListener('pointerdown', this._outside, true); document.addEventListener('keydown', this._key, true); document.addEventListener('focusin', this._focusOutside);
+  }
+  _closeOverflow(restore) {
+    if (!this._open) return;
+    this._open = false; this.shadowRoot.querySelector('.overflow')?.remove(); this._updateCurrent();
+    document.removeEventListener('pointerdown', this._outside, true); document.removeEventListener('keydown', this._key, true); document.removeEventListener('focusin', this._focusOutside);
+    if (restore && this.isConnected) this.shadowRoot.querySelector('[data-overflow]')?.focus({preventScroll:true});
+  }
+  _key = event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); this._closeOverflow(true); } };
+  _focusOutside = event => { if (!event.composedPath().includes(this)) this._closeOverflow(false); };
+  _outside = event => {
+    if (event.composedPath().includes(this)) return;
+    event.preventDefault(); event.stopImmediatePropagation(); this._closeOverflow(false);
+    const target = event.composedPath().find(node => node.matches?.(FOCUSABLE));
+    if (target) target.focus({preventScroll:true}); else this.shadowRoot.querySelector('[data-overflow]')?.focus({preventScroll:true});
+    this._dismissPointer = event.pointerId;
+    document.addEventListener('click', this._dismissClick, true); document.addEventListener('pointerup', this._dismissEnd, true); document.addEventListener('pointercancel', this._dismissEnd, true); document.addEventListener('pointerdown', this._nextGesture, true); window.addEventListener('blur', this._nextGesture);
+  };
+  _dismissClick = event => { if (event.pointerId === this._dismissPointer) { event.preventDefault(); event.stopImmediatePropagation(); this._clearDismissGesture(); } };
+  _nextGesture = () => this._clearDismissGesture();
+  _dismissEnd = event => { if (event.type === 'pointercancel') this._clearDismissGesture(); else this._dismissTimer = setTimeout(() => this._clearDismissGesture(), 500); };
+  _clearDismissGesture() {
+    clearTimeout(this._dismissTimer); this._dismissPointer = null;
+    document.removeEventListener('click', this._dismissClick, true); document.removeEventListener('pointerup', this._dismissEnd, true); document.removeEventListener('pointercancel', this._dismissEnd, true); document.removeEventListener('pointerdown', this._nextGesture, true); window.removeEventListener('blur', this._nextGesture);
   }
   getCardSize() { return 0; }
 }
@@ -1840,6 +1994,7 @@ function applyFullscreen() {
   const nativeAdminBars = new Set();
   for (const navbar of fullscreenUsers) {
     if (!navbar.isConnected || !navbar.getClientRects().length) continue;
+    navbar._syncContext?.();
     const active = navbar._config.routes.some((route) => {
       const path = new URL(route.url || route.path || "#", window.location.href).pathname;
       const root = `/${path.split("/")[1]}`;
@@ -1969,6 +2124,7 @@ export class MaraoPopupCard extends BaseElement {
   };
   _openSheet(returnFocus) {
     if (this._open) return;
+    for (const navbar of fullscreenUsers) navbar._closeOverflow?.(true);
     const previous = findElements("marao-popup-card", this._viewOwner?.view.shadowRoot || this._viewOwner?.view).find((popup) => popup !== this && popup._open);
     this._focus = returnFocus || previous?._focus || focusRestorer(deepActiveElement());
     previous?._close(false, false);
@@ -1981,7 +2137,7 @@ export class MaraoPopupCard extends BaseElement {
     const maxWidth = columnWidth > 0 ? `${columnWidth}px` : "100%";
     const closeLabel = localize("popup.close", this._hass, {}, "Close popup");
     const overlay = document.createElement("div"); overlay.className = "marao-popup-overlay";
-    overlay.innerHTML = `<style>@keyframes marao-popup-slide-up{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}.marao-popup-overlay{position:fixed;inset:0;z-index:1100;display:flex;align-items:flex-end;box-sizing:border-box;padding:${safeArea("top")} ${safeArea("right")} 0 ${safeArea("left")};background:rgba(0,0,0,.42);font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}.marao-popup-sheet{box-sizing:border-box;width:100%;max-width:${maxWidth};height:${esc(height)};max-height:min(${esc(this._config.max_height)}, 100%);margin:0 auto;overflow:auto;padding:0 16px;border-radius:22px 22px 0 0;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);overscroll-behavior:contain;animation:marao-popup-slide-up .28s cubic-bezier(.2,.8,.2,1) both}.marao-popup-head{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;padding:12px 0 8px;background:inherit;z-index:1}.marao-popup-head h2{min-width:0;margin:0;font-size:var(--font-size-primary,1.25rem);line-height:1.2;overflow-wrap:anywhere}.marao-popup-close{flex:0 0 48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;font-size:1.5rem;background:var(--secondary-background-color);color:inherit;cursor:pointer;transition:transform .12s ease,filter .12s ease}.marao-popup-close:active{transform:scale(.92);filter:brightness(.96)}.marao-popup-close:focus,.marao-popup-sheet:focus{outline:none}.marao-popup-content>p{min-width:0;font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.4;overflow-wrap:anywhere}.marao-popup-content{display:grid;min-width:0;gap:12px;isolation:isolate;padding-bottom:calc(92px + ${safeArea("bottom")})}@media(max-width:300px){.marao-popup-content{padding-bottom:calc(192px + ${safeArea("bottom")})}}@media(max-width:240px){.marao-popup-sheet{padding-left:4px;padding-right:4px}}@media(prefers-reduced-motion:reduce){.marao-popup-sheet{animation:none}.marao-popup-close{transition:none}}</style><section class="marao-popup-sheet" role="dialog" aria-modal="true" aria-label="${esc(title || this._config.name || localize("popup.title", this._hass, {}, "Marao popup"))}" tabindex="-1"><div class="marao-popup-head"><h2>${esc(title)}</h2><button class="marao-popup-close" type="button" aria-label="${esc(closeLabel)}" title="${esc(closeLabel)}">×</button></div><div class="marao-popup-content"></div></section>`;
+    overlay.innerHTML = `<style>@keyframes marao-popup-slide-up{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}.marao-popup-overlay{position:fixed;inset:0;z-index:1100;display:flex;align-items:flex-end;box-sizing:border-box;padding:${safeArea("top")} ${safeArea("right")} 0 ${safeArea("left")};background:rgba(0,0,0,.42);font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}.marao-popup-sheet{box-sizing:border-box;width:100%;max-width:${maxWidth};height:${esc(height)};max-height:min(${esc(this._config.max_height)}, 100%);margin:0 auto;overflow:auto;padding:0 16px;border-radius:22px 22px 0 0;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);overscroll-behavior:contain;animation:marao-popup-slide-up .28s cubic-bezier(.2,.8,.2,1) both}.marao-popup-head{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;padding:12px 0 8px;background:inherit;z-index:1}.marao-popup-head h2{min-width:0;margin:0;font-size:var(--font-size-primary,1.25rem);line-height:1.2;overflow-wrap:anywhere}.marao-popup-close{flex:0 0 48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;font-size:1.5rem;background:var(--secondary-background-color);color:inherit;cursor:pointer;transition:transform .12s ease,filter .12s ease}.marao-popup-close:active{transform:scale(.92);filter:brightness(.96)}.marao-popup-close:focus,.marao-popup-sheet:focus{outline:none}.marao-popup-content>p{min-width:0;font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.4;overflow-wrap:anywhere}.marao-popup-content{display:grid;min-width:0;gap:12px;isolation:isolate;padding-bottom:calc(92px + ${safeArea("bottom")})}@media(max-width:240px){.marao-popup-sheet{padding-left:4px;padding-right:4px}}@media(prefers-reduced-motion:reduce){.marao-popup-sheet{animation:none}.marao-popup-close{transition:none}}</style><section class="marao-popup-sheet" role="dialog" aria-modal="true" aria-label="${esc(title || this._config.name || localize("popup.title", this._hass, {}, "Marao popup"))}" tabindex="-1"><div class="marao-popup-head"><h2>${esc(title)}</h2><button class="marao-popup-close" type="button" aria-label="${esc(closeLabel)}" title="${esc(closeLabel)}">×</button></div><div class="marao-popup-content"></div></section>`;
     overlay.addEventListener("click", (event) => { if (event.target === overlay) this._close(true); });
     overlay.querySelector(".marao-popup-close").addEventListener("click", () => { haptic("heavy"); this._close(true); });
     overlay.addEventListener("keydown", (event) => {

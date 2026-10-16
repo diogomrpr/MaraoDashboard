@@ -11,7 +11,7 @@ Marao Dashboard no longer requires third-party Lovelace cards. The generated
 dashboard uses three namespaced Marao cards and Home Assistant's native cards:
 
 - `custom:marao-card` — generated `hc_*` card variants and controls.
-- `custom:marao-navbar-card` — the floating five-entry navigation bar.
+- `custom:marao-navbar-card` — the floating single-row navigation bar with overflow.
 - `custom:marao-popup-card` — bottom-sheet popovers with scrolling content.
 - Native Sensor and History Graph cards — metric and history graphs.
 
@@ -48,7 +48,7 @@ to the first dashboard column instead of stretching across the page.
 
 ## Navigation configuration
 
-The navbar accepts at most five routes:
+The navbar accepts any finite list of valid routes:
 
 ```yaml
 type: custom:marao-navbar-card
@@ -59,10 +59,10 @@ routes:
     url: /marao-dashboard/overview
 ```
 
-The Marao builder enforces this limit and reports an actionable validation
-error for larger explicit lists. The runtime sizes the compact floating bar
-from its route count and uses the iPhone safe-area inset for its accepted
-bottom position.
+The builder preserves the complete list. The runtime fits a single row to the
+safe screen width and places additional routes in a matching vertical menu above
+the rightmost More destinations toggle. It uses the iPhone safe-area inset for
+its accepted bottom position.
 
 ## Migrating from older releases
 

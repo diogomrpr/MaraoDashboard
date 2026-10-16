@@ -85,7 +85,15 @@ async function creation(page, config) {
   await waitCards(page);
 }
 
-function fixtureDashboard(starter) {
+function fixtureDashboard(starter, { overflow = false } = {}) {
+  if (overflow) {
+    const paths = ["home","card-test","rooms","energy","security","media","wallbox","studio"];
+    const routes = paths.map(path => ({url:"/marao-dashboard/"+path,label:path,icon:"mdi:home",future:{keep:[]}}));
+    return {...starter, views:paths.map(path => ({type:"sections",path,title:path,theme:"Marao Dashboard",max_columns:1,sections:[{type:"grid",cards:[
+      {type:"custom:marao-native-light-card",entity:"light.marao_dashboard_test_onoff_light",name:"Safe light"},
+      {type:"custom:marao-native-navbar-card",native:true,routes},
+    ]}]}))};
+  }
   const { nativeCases } = require('../ha-test/native-cases');
   const { expandGallery, manifest, walkCards } = require('../ha-test/cases');
   const gallery = expandGallery(YAML.parse(fs.readFileSync(path.join(__dirname, '../ha-test/dashboard/views/00-card-test.yaml'), 'utf8')));
@@ -261,13 +269,16 @@ async function main() {
     assert.deepEqual(await ws.call({ type: 'lovelace/config', url_path: rootRoute, force: true }), frozen);
     report.assertions.push('native creation, expanded Take control, builder generation/history exclusion'); save();
     console.log('Native creation, Take control and ownership guards passed.');
-    const fixture = fixtureDashboard(frozen);
+    const navbarOnly = process.argv.includes("--navbar-only");
+    const fixture = fixtureDashboard(frozen, {overflow:navbarOnly});
     const vacuum = fixture.views[0].sections[0].cards.find(card => card.type === 'custom:marao-native-vacuum-card');
+    if (!navbarOnly) {
     vacuum.entity = 'vacuum.marao_dashboard_test_vacuum_commands';
     vacuum.variables ||= {};
     vacuum.variables.action_1 = { name: 'Living room', icon: 'mdi:sofa', on_action: 'vacuum.send_command',
       data: { command: 'app_segment_clean', params: [{ segments: [21], repeat: 2 }] } };
     vacuum.future = { keep: [] };
+    }
     await ws.call({ type: 'lovelace/config/save', url_path: rootRoute, config: fixture });
     await active.close(); active = null;
     for (const run of runs) {
@@ -278,14 +289,22 @@ async function main() {
       await applyVisualPreferences(active.page, run.scenario, run.theme);
       assert.deepEqual(await emulationIssues(active.page, run.scenario, run.theme), []);
       assert.deepEqual(await layoutIssues(active.page), []);
-      if (run.scenario.name === 'iphone-normal') { await interactions(active.page, active.calls); await editor(active.page, active.calls, run.theme); }
+      if (run.scenario.name === 'iphone-normal') {
+        if (navbarOnly) await require('./test-ha-navbar-overflow').nativeEditor(active.page, active.calls, run.theme);
+        else { await interactions(active.page, active.calls); await editor(active.page, active.calls, run.theme); }
+      }
       await active.page.locator('marao-native-navbar-card').evaluate(card => {
         card.hass = { ...card._hass, user: { ...card._hass.user, is_admin: false } };
       });
       assert.equal(await active.page.locator('.native-edit').count(), 0, 'Non-administrator sees Edit dashboard');
+      if (navbarOnly) {
+        await active.page.locator('marao-native-navbar-card [data-overflow]').tap();
+        await active.page.locator('marao-native-navbar-card .overflow a').first().waitFor();
+        await active.page.keyboard.press('Escape');
+      }
       assert.deepEqual(active.issues, [], 'Native browser warnings/errors');
       if (['iphone-normal', 'narrow-320', 'iphone-bold-text-200', 'iphone-landscape', 'android-normal'].includes(run.scenario.name)) {
-        await active.page.locator('marao-native-climate-card').first().scrollIntoViewIfNeeded();
+        await active.page.locator(navbarOnly ? 'marao-native-light-card' : 'marao-native-climate-card').first().scrollIntoViewIfNeeded();
         await active.page.screenshot({ path: path.join(output, run.scenario.name + '-' + run.theme + '.png'), scale: 'css' });
       }
       const coverage = run.scenario.name === 'iphone-normal' ? 'sheets, guards, visual/YAML, layout and viewer presentation' : 'layout and viewer presentation';

@@ -78,8 +78,8 @@ cards, independent detail sheets and an empty section for trying these moves.
 Dashboard format **2**, being prepared for the next release, stores every page in
 one ordered `pages` array. `landing_page` names an existing page path. The
 landing view is generated first; the remaining views retain their saved order.
-Navbar entries are a separate ordered list of at most five page references or
-labeled URLs. An empty navbar list stays empty.
+Navbar entries are a separate ordered list of page references or labeled URLs,
+without a count limit. An empty navbar list stays empty.
 
 ```json
 {
@@ -161,8 +161,12 @@ choosing Rooms creates independent shortcuts to the current room-page drafts.
 
 Page order, **Landing page** and navbar order are independent. **Pin to navbar**
 and **Unpin** change only the menu; unpinning retains the page and all its cards.
-The navbar supports five entries. A sixth page can be created unpinned and reached
-with a Room or Navigation shortcut. Unpin another entry before pinning a sixth.
+The navbar stays in one row. When selected routes exceed the safe screen width,
+the rightmost **More destinations** button opens a matching vertical icon menu.
+The menu scrolls internally for longer lists and closes on selection, a second
+toggle, an outside tap or Escape. Its selected destination stays in configured
+order; More indicates when the current page belongs to overflow. New pages are
+pinned normally, while existing unpinned pages stay unpinned.
 Renaming a path updates owned page and popup links. Duplicating regenerates local
 card/popup identities and creates an unpinned copy with independent options.
 

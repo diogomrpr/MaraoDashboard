@@ -488,3 +488,13 @@ test('energy formatting cases use safe readings and carry period choices into th
   assert.ok(duplicate.some(card => card.variables.display_precision === 2));
   assert.ok(duplicate.some(card => card.variables.display_precision === 6));
 });
+
+
+test('realistic pages and Cases share a long explicit navbar without another dashboard root', () => {
+  const source = JSON.parse(fs.readFileSync(new URL('../../ha-test/marao_dashboard_test_dashboard.json', import.meta.url)));
+  assert.deepEqual(source.navigation, ['overview','rooms','security','energy','wallbox','media','appliances',{
+    url:'/marao-dashboard/card-test',label:'Cases',icon:'mdi:test-tube',icon_selected:'mdi:test-tube',
+  }]);
+  const paths = new Set([...source.pages.map(page=>page.path),'card-test']);
+  for (const route of source.navigation) assert.ok(paths.has(typeof route==='string'?route:route.url.split('/').at(-1)));
+});

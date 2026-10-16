@@ -78,15 +78,16 @@ test('duplicating known raw popups repairs only their owned hashes and links', (
   assert.equal(model.pages[0].cards[1].hash, '#raw-saved');
 });
 
-test('unpin preserves the page, a sixth pin fails, and template creation at capacity remains unpinned', () => {
+test('unpin preserves the page and newly created pages pin beyond five entries', () => {
   const model = initial();
   for (const path of ['one', 'two', 'three', 'four']) model.pages.push({ name: path, path, entities: [] });
   model.navigation = ['home', 'one', 'two', 'three', 'four'];
   const template = { icon: 'mdi:chart-line', entities: [{ id: 'draft', template: 'hc_graph_card', name: 'House power' }] };
   const created = createPage(model, { template: 'energy', name: 'Energy', path: 'energy' }, { energy: template });
   assert.equal(created.entities[0].entity_id, undefined);
-  assert.equal(model.navigation.length, 5);
-  assert.throws(() => pinPage(model, 'energy', true), /sixth/);
+  assert.equal(model.navigation.length, 6);
+  pinPage(model, 'energy', true);
+  assert.equal(model.navigation.filter(entry => entry === 'energy').length, 1);
   pinPage(model, 'home', false);
   assert.ok(model.pages.some(page => page.path === 'home'));
   pinPage(model, 'energy', true);

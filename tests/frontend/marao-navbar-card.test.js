@@ -30,27 +30,28 @@ test("navbar and sheets share the host-aware inset fallback", () => {
   assert.match(source, /max-height:min\(\$\{esc\(this\._config\.max_height\)\}, 100%\)/);
 });
 
-test("navbar width scales compactly with its route count", () => {
-  assert.match(source, /calc\(\$\{routeCount\} \* 54px \+ 20px\)/);
-  assert.doesNotMatch(source, /\* 74px \+ 32px/);
+test("navbar partition preserves every route at exact fit, overflow and one-slot widths", async () => {
+  const { navbarPartition } = await import('../../custom_components/marao_dashboard/frontend/MaraoCards.js');
+  for (const [count, width, visible, overflow] of [[0,276,0,0],[1,68,1,0],[5,276,5,0],[6,276,4,2],[5,275,3,2],[18,68,0,18],[18,1008,18,0],[20,1008,18,2]]) {
+    const routes = Array.from({length:count}, (_,index)=>({label:String(index),url:'/route/'+index,future:[]}));
+    const result = navbarPartition(routes,width);
+    assert.equal(result.visible.length,visible); assert.equal(result.overflow.length,overflow);
+    assert.deepEqual([...result.visible,...result.overflow],routes);
+    assert.equal(new Set([...result.visible,...result.overflow]).size,count);
+  }
 });
 
-test("navbar keeps 48px touch targets inside the compact 60px bar", () => {
-  assert.match(source, /:host\{display:block;height:128px;/);
-  assert.match(source, /height:auto;min-height:60px;box-sizing:border-box;padding:6px 10px/);
-  assert.match(source, /min-width:48px;width:48px;height:48px;aspect-ratio:1 \/ 1/);
-  assert.match(source, /a:active\{transform:scale\(\.92\)/);
-});
-
-test("zoomed navbar wraps full-size controls and reserves space above it", () => {
-  assert.match(source, /display:flex;flex-wrap:wrap;justify-content:center;height:auto;min-height:60px/);
-  assert.match(source, /a\{flex:0 0 48px\}/);
-  assert.match(source, /@media\(max-width:300px\)\{:host\{height:228px\}/);
-  assert.match(source, /padding-bottom:calc\(192px \+ \$\{safeArea\("bottom"\)\}/);
+test("navbar retains full-size controls in one row and a separately bounded vertical surface", () => {
+  assert.match(source, /flex-wrap:nowrap/);
+  assert.match(source, /min-width:48px;width:48px;height:48px/);
+  assert.match(source, /height:60px/);
+  assert.match(source, /overscroll-behavior:contain;touch-action:pan-y/);
+  assert.doesNotMatch(source.slice(source.indexOf('export class MaraoNavbarCard'),source.indexOf('const fullscreenUsers')), /flex-wrap:wrap/);
+  assert.doesNotMatch(source, /padding-bottom:calc\(192px/);
 });
 
 test("fullscreen behavior starts only after the navbar is connected", () => {
-  assert.match(source, /connectedCallback\(\) \{ registerFullscreen\(this\);/);
+  assert.match(source, /connectedCallback\(\) \{\s+registerFullscreen\(this\);/);
   assert.doesNotMatch(source, /this\._render\(\); registerFullscreen\(this\);/);
 });
 
@@ -152,4 +153,25 @@ test("popup cleanup distinguishes retained masonry cards from removed cards and 
   popup.disconnectedCallback();
   assert.equal(closes, 2);
   assert.deepEqual(removed, ['hashchange','location-changed','popstate','hashchange','location-changed','popstate']);
+});
+
+test('navbar accepts long explicit routes and rejects malformed entries without replacing source', async () => {
+  const { MaraoNavbarCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoCards.js');
+  const routes = JSON.parse(await fs.readFile(new URL('./navbar-overflow.fixture.json', import.meta.url))).routes;
+  const card = { _closeOverflow() {}, _render() {} };
+  for (const count of [0, 1, 5, 6, 8]) {
+    MaraoNavbarCard.prototype.setConfig.call(card, { routes: routes.slice(0, count), future: [] });
+    assert.deepEqual(card._config.routes, routes.slice(0, count));
+  }
+  const before = card._config;
+  for (const invalid of [null, {}, [null], [{label:'Missing'}], [{url:'/x',label:''}]]) {
+    assert.throws(() => MaraoNavbarCard.prototype.setConfig.call(card, { routes: invalid }));
+    assert.equal(card._config, before);
+  }
+});
+
+test('active routes resolve path aliases, same-view hashes and origin without promoting routes', async () => {
+  const { navbarRouteCurrent } = await import('../../custom_components/marao_dashboard/frontend/MaraoCards.js');
+  const location={href:'http://disposable.test/marao-dashboard/overview#details',origin:'http://disposable.test',pathname:'/marao-dashboard/overview',hash:'#details',search:''};
+  for(const [route,expected] of [[{url:'#details'},true],[{path:'/marao-dashboard/overview#details'},true],[{url:'/marao-dashboard/overview'},true],[{url:'#other'},false],[{url:'/marao-dashboard/rooms'},false],[{url:'http://external.test/marao-dashboard/overview'},false]])assert.equal(navbarRouteCurrent(route,location),expected);
 });

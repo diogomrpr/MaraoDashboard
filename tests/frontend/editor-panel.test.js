@@ -138,15 +138,13 @@ test('named page deletion requires confirmation and explicit replacement before 
   assert.equal(saved.pages[0].entities[0].page, 'office');
 });
 
-test('page manager handles a sixth pin as a visible error without changing source', () => {
+test('page manager pins a sixth entry without dropping existing selections', () => {
   const p = panel(canonical());
   p._model.navigation = ['home', { url: '/one', label: 'One' }, { url: '/two', label: 'Two' }, { url: '/three', label: 'Three' }, { url: '/four', label: 'Four' }];
   const before = p._source();
   p._setStatus = (message, kind) => { p.status = { message, kind }; };
   p._pageAction({ dataset: { action: 'page-pin', room: '1' } });
-  assert.equal(p._source(), before);
-  assert.match(p.status.message, /sixth/);
-  assert.equal(p.status.kind, 'error');
+  assert.deepEqual(JSON.parse(p._source()).navigation, [...JSON.parse(before).navigation, 'office']);
 });
 
 test('shared numeric-list fields retain explicit empty presets and reject invalid input', () => {

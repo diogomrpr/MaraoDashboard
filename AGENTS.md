@@ -188,8 +188,9 @@ success; keep future work in changes and archive only completed, verified work.
   border progress and strong haptics at hold start and completion. Releasing
   early, cancelling, or moving outside the control cancels the action.
 - Keep simple, short action animations.
-- Keep the navbar floating, compact, safe-area aware on iPhone, and limited to
-  five auto-scaling entries. Keep popovers above it.
+- Keep the navbar floating, compact, safe-area aware on iPhone, and in one row
+  of full-size controls. Preserve every configured entry; use a rightmost toggle
+  for a matching vertical overflow menu when needed. Keep popovers above it.
 - Hide Home Assistant's native top bar only while a Marao dashboard is active,
   and restore the normal shell after leaving it.
 - Sliders retain a contrasting rounded track, current-value fill, independently

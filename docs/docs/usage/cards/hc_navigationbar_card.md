@@ -9,8 +9,8 @@ parent: Cards
 
 `custom:marao-navbar-card` is Marao's project-owned floating mobile
 navigation. The builder and generator create it automatically as the final
-card in each generated view. It supports one to five routes and sizes the bar
-from the number of entries.
+card in each generated view. It accepts an ordered list without a count limit,
+keeps full-size controls in one row, and sizes the bar to its available safe width.
 
 ![Navigation bar card](../../../assets/images/cards/hc_navigationbar_card/navigationcard_light.png)
 
@@ -28,7 +28,7 @@ from the number of entries.
         url: /marao-dashboard/rooms
 
 Use the builder for generated dashboards so its route order, available pages,
-translations, and five-entry validation stay aligned. A manually authored
+translations, and route validation stay aligned. A manually authored
 view must also leave enough bottom content space for the floating bar.
 
 ## Route fields
@@ -48,7 +48,11 @@ must never depend on a tooltip.
 
 - Every control is visibly at least 48 by 48 CSS pixels.
 - Active icon backgrounds are perfect circles and use the Marao theme.
-- Gaps remain compact while route width auto-scales.
+- Gaps remain compact while the visible route count follows the available width.
+- When routes exceed that width, the rightmost More destinations toggle opens a
+  matching vertical icon menu centered above it. Long menus scroll internally.
+- Selecting an overflow destination keeps its configured position; More indicates
+  the active overflow route. Escape, an outside tap or the toggle closes the menu.
 - iPhone positioning uses Home Assistant's app-aware safe-area value, falling
   back to browser insets, and keeps the
   accepted lowered offset without an extra generic bottom margin.

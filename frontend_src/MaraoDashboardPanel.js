@@ -287,7 +287,7 @@ class MaraoDashboardPanel extends HTMLElement {
     if (!this._loaded) return;
     const root = this.shadowRoot.getElementById("visual-view");
     if (this._model.config_version === 2) {
-      root.innerHTML = `<div class="section-grid"><ha-card class="span-two"><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:view-dashboard-outline"></ha-icon><h2>${this._t('pages')}</h2><span class="grow"></span><ha-button id="add-page">${this._t('addNavPage')}</ha-button></div><div id="page-manager"></div></div></ha-card><ha-card><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:tune"></ha-icon><h2>${this._t('general')}</h2></div><div id="general-form"></div></div></ha-card><ha-card><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:navigation-variant-outline"></ha-icon><h2>${this._t('navigation')}</h2></div><div id="navbar-list"></div></div></ha-card></div>`;
+      root.innerHTML = `<div class="section-grid"><ha-card class="span-two"><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:view-dashboard-outline"></ha-icon><h2>${this._t('pages')}</h2><span class="grow"></span><ha-button id="add-page">${this._t('addNavPage')}</ha-button></div><div id="page-manager"></div></div></ha-card><ha-card><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:tune"></ha-icon><h2>${this._t('general')}</h2></div><div id="general-form"></div></div></ha-card><ha-card><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:navigation-variant-outline"></ha-icon><h2>${this._t('navigation')}</h2></div><p class="helper">${this._l("Additional destinations appear in the navbar overflow menu.")}</p><div id="navbar-list"></div></div></ha-card></div>`;
       this._renderPageManager(root.querySelector('#page-manager'));
       this._mountGeneralForm(root.querySelector('#general-form'));
       this._renderNavigation(root.querySelector('#navbar-list'));
@@ -296,7 +296,7 @@ class MaraoDashboardPanel extends HTMLElement {
     }
     root.innerHTML = `
       <div class="section-grid">
-        <ha-card class="span-two"><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:navigation-variant-outline"></ha-icon><h2>${this._t("navigation")}</h2><span class="grow"></span><ha-button id="add-nav-page">${this._t("addNavPage")}</ha-button></div><div id="navbar-list"></div></div></ha-card>
+        <ha-card class="span-two"><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:navigation-variant-outline"></ha-icon><h2>${this._t("navigation")}</h2><span class="grow"></span><ha-button id="add-nav-page">${this._t("addNavPage")}</ha-button></div><p class="helper">${this._l("Additional destinations appear in the navbar overflow menu.")}</p><div id="navbar-list"></div></div></ha-card>
         <ha-card><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:tune"></ha-icon><h2>${this._t("general")}</h2></div><div id="general-form"></div></div></ha-card>
         <ha-card><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:home-outline"></ha-icon><h2>${this._t("overview")}</h2></div><div id="overview-form"></div></div></ha-card>
         <ha-card class="span-two"><ha-expansion-panel id="rooms-section"><div class="expansion-heading" slot="header"><ha-icon icon="mdi:sofa-outline"></ha-icon><h2>${this._t("rooms")}</h2><span class="grow"></span><ha-button id="add-room">${this._t("addRoom")}</ha-button></div><div class="expansion-body"><div id="room-list"></div></div></ha-expansion-panel></ha-card>
@@ -411,7 +411,6 @@ class MaraoDashboardPanel extends HTMLElement {
         existing.name = value.name.trim(); existing.icon = value.icon || 'mdi:file-outline';
         if (value.area) existing.area = value.area; else delete existing.area;
       } else {
-        const atCapacity = this._navigationEntries().length >= 5;
         const selectedTemplates = clone(templates);
         if (value.template === 'rooms') selectedTemplates.rooms = roomPageTemplate(this._model);
         if (value.template === 'room' && value.area) {
@@ -423,7 +422,6 @@ class MaraoDashboardPanel extends HTMLElement {
           else template.entities = imported.entities;
         }
         createPage(this._model, value, selectedTemplates);
-        if (atCapacity) this._setStatus(this._l('Page created unpinned. Add a shortcut or unpin another navbar entry.'), 'success');
       }
       this._setDirty(); this._renderVisual();
     }, existing ? this._t('update') : this._t('create'));
@@ -475,10 +473,6 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   _openNavigationDialog() {
-    if (this._navigationEntries().length >= 5) {
-      this._setStatus("The Marao navbar supports at most five entries.", "error");
-      return;
-    }
     const used = new Set(this._navigationEntries().map((entry) => typeof entry === "string" ? entry : entry?.page).filter(Boolean));
     const options = this._availablePages().filter((page) => !used.has(page.path)).map((page) => ({ value: page.path, label: page.name }));
     if (!options.length) { this._setStatus("Every generated page is already in the navigation bar.", "success"); return; }

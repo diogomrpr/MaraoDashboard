@@ -478,12 +478,21 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     navigation = config.get("navigation")
     if navigation is not None and not isinstance(navigation, list):
         raise ValueError("navigation must be a list")
-    if isinstance(navigation, list) and len(navigation) > 5:
-        raise ValueError("navigation supports at most five entries")
     if isinstance(navigation, list) and any(
         not isinstance(item, (str, dict)) for item in navigation
     ):
         raise ValueError("navigation entries must be page paths or route objects")
+
+    for route in navigation or []:
+        if isinstance(route, str):
+            valid = bool(route.strip())
+        elif isinstance(route, dict) and "page" in route:
+            valid = isinstance(route["page"], str) and bool(route["page"].strip())
+        else:
+            valid = (isinstance(route, dict) and isinstance(route.get("url"), str) and bool(route["url"].strip())
+                     and isinstance(route.get("label"), str) and bool(route["label"].strip()))
+        if not valid:
+            raise ValueError("Navigation entries require a page or a labeled URL")
 
     configured_theme = config.get("theme")
     if configured_theme is not None and not isinstance(configured_theme, str):
@@ -1532,7 +1541,7 @@ def _navigation_bar(config: dict[str, Any], dashboard_key: str, language: str = 
 
     configured = config.get("navigation")
     if configured is None:
-        # Keep the automatic menu within the component's five-route contract.
+        # Preserve the established automatic first-five selection.
         routes = list(available.values())[:5]
     else:
         explicit = any(
@@ -1548,8 +1557,6 @@ def _navigation_bar(config: dict[str, Any], dashboard_key: str, language: str = 
                 routes.append(available[page_path])
             elif isinstance(route, dict) and route.get("url") and route.get("label"):
                 routes.append(route)
-    if len(routes) > 5:
-        raise ValueError("navigation supports at most five entries")
     return {
         "type": "vertical-stack",
         "cards": [
