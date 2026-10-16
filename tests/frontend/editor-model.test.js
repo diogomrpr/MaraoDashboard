@@ -340,12 +340,14 @@ test("Monaco schema includes dynamic entity and page completions", () => {
   ]);
 
   assert.deepEqual(schema.required, ["name", "rooms"]);
-  assert.deepEqual(schema.properties.overview.properties.weather_entity.enum, ["weather.home"]);
+  const weather = schema.properties.overview.properties.weather_entity;
+  assert.deepEqual(schema.$defs[weather.$ref.split('/').at(-1)].anyOf[0].enum, ["weather.home"]);
   assert.equal(schema.properties.pages.properties.energy.type, "object");
   assert.equal(schema.properties.rooms.items.properties.columns.maximum, 6);
   assert.ok(schema.properties.pages.properties.energy.properties.house_power);
+  const choices = schema.properties.pages.properties.energy.properties.house_power.anyOf[0];
   assert.equal(
-    schema.properties.pages.properties.energy.properties.house_power.anyOf[0].anyOf[1].pattern,
+    schema.$defs[choices.$ref.split('/').at(-1)].anyOf[1].pattern,
     "^[a-z0-9_]+\\.[a-z0-9_]+$",
   );
   assert.equal(flattenEntities("light.kitchen")[0].entity_id, "light.kitchen");

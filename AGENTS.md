@@ -155,6 +155,9 @@ success; keep future work in changes and archive only completed, verified work.
   current acceptance target.
 - Every interactive control must be visibly at least 48 by 48 CSS pixels. The
   dashboard is touch-first: no hover-only behavior and no hidden swipe action.
+- The JSON code editor uses stock Microsoft Monaco typography, sizing, themes
+  and native widgets, as explicitly requested by the user. Keep Marao's UI rules
+  on the surrounding controls; do not restyle Monaco's internal presentation.
 - Use native semantic controls and internal accessible names. Icons may have an
   optional tooltip, but meaning must not depend on it. Do not add visible focus
   rings or other focus-only styling.

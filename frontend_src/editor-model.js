@@ -185,6 +185,20 @@ export function moveItem(items, from, to) {
   return copy;
 }
 
+// Boundaries refer to the destination before removal. Raw cards and section metadata stay put.
+// Require the same occurrence object: entity IDs are not unique within a page.
+export function movePageCard(page, fromSection, fromIndex, toSection, boundary, occurrence) {
+  if (!page || ![fromSection, fromIndex, toSection, boundary].every(Number.isInteger)) return false;
+  const sections = pageContainers(page), source = sections[fromSection]?.entities, target = sections[toSection]?.entities;
+  if (!Array.isArray(source) || !Array.isArray(target) || fromIndex < 0 || fromIndex >= source.length
+    || boundary < 0 || boundary > target.length || !occurrence || source[fromIndex] !== occurrence) return false;
+  const insertion = boundary - (source === target && boundary > fromIndex ? 1 : 0);
+  if (source === target && insertion === fromIndex) return false;
+  source.splice(fromIndex, 1);
+  target.splice(insertion, 0, occurrence);
+  return true;
+}
+
 export function pageContainers(page) {
   return Array.isArray(page.sections) ? page.sections : [page];
 }
@@ -618,24 +632,70 @@ export function entityGroupMemberCompatible(kind, member, metadata, legacyBatter
     && (kind !== 'battery' || !metadata || metadata.device_class === 'battery' || member.template === 'hc_battery_card' || legacyBattery));
 }
 
-export function buildJsonSchema(catalog, entities) {
-  const entityIds = entities.map((entity) => entity.entity_id).sort();
-  const entityDescriptions = entityIds.map((entityId) => {
-    const entity = entities.find((item) => item.entity_id === entityId);
-    return [entity?.name, entity?.state, entity?.area_name].filter(Boolean).join(" · ") || entityId;
-  });
-  const entityIdValue = {
-    anyOf: [
-      { type: "string", enum: entityIds, markdownEnumDescriptions: entityDescriptions },
-      { type: "string", pattern: "^[a-z0-9_]+\\.[a-z0-9_]+$" },
-    ],
+export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '/marao-dashboard') {
+  const bindings = {};
+  const descriptions = new Map(entities.map(entity => [entity.entity_id,
+    [entity.name, entity.state, entity.area_name].filter(Boolean).join(' · ') || entity.entity_id]));
+  const suggested = (values, base = { type: 'string' }) => values.length ? { anyOf: [{ ...base, enum: values }, base] } : base;
+  const pagePath = suggested((Array.isArray(draft.pages) ? draft.pages : []).map(page => page.path).filter(Boolean));
+  const navigationPath = suggested((Array.isArray(draft.pages) ? draft.pages : []).map(page => page.path && `${dashboardPath}/${page.path}`).filter(Boolean));
+  const binding = (domains = [], deviceClasses = []) => {
+    const key = 'entities_' + [...domains].sort().join('_') + '__' + [...deviceClasses].sort().join('_');
+    if (bindings[key]) return { $ref: '#/$defs/' + key };
+    const values = entities.filter(entity => (!domains.length || domains.includes(entity.entity_id.split('.')[0]))
+      && (!deviceClasses.length || deviceClasses.includes(entity.device_class))).map(entity => entity.entity_id).sort();
+    bindings[key] = suggested(values, { type: 'string', pattern: '^[a-z0-9_]+\\.[a-z0-9_]+$' });
+    if (values.length) bindings[key].anyOf[0].markdownEnumDescriptions = values.map(value => descriptions.get(value));
+    return { $ref: '#/$defs/' + key };
   };
+  const entityIdValue = binding();
+  const object = properties => ({ type: 'object', properties, additionalProperties: true });
+  const fieldSchema = field => {
+    let schema;
+    if (field.kind === 'entity') schema = binding(field.domains, field.device_classes);
+    else if (field.kind === 'boolean') schema = { type: 'boolean' };
+    else if (['number', 'energy_precision'].includes(field.kind)) schema = { type: 'number' };
+    else if (field.kind === 'number_list') return { type: 'array', items: { type: 'number' }, description: field.description || field.label };
+    else if (field.kind === 'vacuum_action') return object({ icon: { type: 'string' }, name: { type: 'string' }, segment: { type: 'number' },
+      on_action: { type: 'string' }, data: { description: 'Native command data is preserved verbatim; command and params depend on the vacuum integration.' } });
+    else if (field.kind === 'object') schema = {};
+    else schema = suggested(field.options || (field.kind === 'energy_period' ? ['day', 'month'] : field.kind === 'energy_unit' ? Object.keys(catalog.energy_units || {}) : []));
+    if (field.multiple) schema = { type: 'array', items: schema };
+    return { ...schema, description: field.description || field.label };
+  };
+  const action = object({ action: suggested(['none', 'toggle', 'more-info', 'navigate', 'url', 'perform-action', 'call-service']),
+    navigation_path: navigationPath, perform_action: { type: 'string' }, service: { type: 'string' },
+    target: object({ entity_id: { anyOf: [entityIdValue, { type: 'array', items: entityIdValue }] } }), data: {} });
+  const catalogRules = (catalog.cards || []).map(card => {
+    const properties = { entity_id: binding(card.domains, card.device_classes), page: pagePath,
+      variables: object(Object.fromEntries((card.variables || []).map(field => [field.key, fieldSchema(field)]))),
+      tap_action: action, hold_action: action, double_tap_action: action };
+    if (card.id === 'hc_camera_card') properties.variables.properties.event_provider = suggested(['auto', 'frigate', 'unifi_protect']);
+    if (card.id === 'hc_media_card') properties.apple_tv = { anyOf: [{ type: ['boolean', 'null'] }, object({
+      remote_entity: binding(['remote']), volume_remote_entity: binding(['remote', 'media_player']),
+      apps: { type: 'array', items: object({ name: { type: 'string' }, source: { type: 'string' }, icon: { type: 'string' } }) },
+    })] };
+    if (card.id === 'hc_media_card') Object.assign(properties, {
+      remote_entity: binding(['remote']), volume_remote_entity: binding(['remote', 'media_player']),
+      apple_tv_apps: properties.apple_tv.anyOf[1].properties.apps,
+    });
+    if (card.id === 'hc_entity_group_card') Object.assign(properties, {
+      entity_type: suggested(['light', 'cover', 'battery', 'climate']), popup_filter: suggested(['all', 'active']),
+      entities: { type: 'array', items: { anyOf: [entityIdValue, object({ entity_id: entityIdValue, name: { type: 'string' }, template: suggested(catalog.cards.map(card => card.id)) })] } },
+    });
+    return { if: { required: ['template'], properties: { template: { const: card.id } } }, then: { properties } };
+  });
   const groupValue = {
     type: 'object', required: ['template', 'id', 'name', 'entity_type', 'entities'],
     properties: { template: { const: 'hc_entity_group_card' }, id: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
       name: { type: 'string', minLength: 1 }, icon: { type: ['string', 'null'] }, entity_type: { enum: ['light', 'cover', 'battery', 'climate'] },
-      popup_filter: { enum: ['all', 'active'] }, entities: { type: 'array', items: { anyOf: [entityIdValue,
-        { type: 'object', required: ['entity_id'], properties: { entity_id: entityIdValue }, additionalProperties: true }] } } },
+      popup_filter: { enum: ['all', 'active'] }, entities: { type: 'array', items: { anyOf: [binding(),
+        { type: 'object', required: ['entity_id'], properties: { entity_id: binding() }, additionalProperties: true }] } } },
+    allOf: Object.entries({ light: ['light'], cover: ['cover'], climate: ['climate'], battery: ['sensor'] }).map(([type, domains]) => ({
+      if: { required: ['entity_type'], properties: { entity_type: { const: type } } },
+      then: { properties: { entities: { items: { anyOf: [binding(domains, type === 'battery' ? ['battery'] : []),
+        object({ entity_id: binding(domains, type === 'battery' ? ['battery'] : []) })] } } } },
+    })),
     additionalProperties: true,
   };
   const entityValue = {
@@ -644,15 +704,13 @@ export function buildJsonSchema(catalog, entities) {
       {
         type: "object",
         required: ["entity_id"],
+        allOf: [{ $ref: '#/$defs/cardOptions' }],
         properties: {
-          entity_id: entityIdValue,
+          entity_id: { type: 'string', pattern: '^[a-z0-9_]+\\.[a-z0-9_]+$' },
           name: { type: "string" },
           icon: { type: ["string", "null"] },
           template: { type: "string", enum: catalog.cards.map((card) => card.id) },
-          variables: { type: "object", properties: {
-            display_unit: { type: "string", enum: Object.keys(catalog.energy_units || {}) },
-            display_precision: { type: "integer", minimum: 0, maximum: 6 },
-          }, additionalProperties: true },
+          variables: { type: 'object', additionalProperties: true },
         },
         additionalProperties: true,
       },
@@ -660,7 +718,7 @@ export function buildJsonSchema(catalog, entities) {
         type: "object",
         required: ["page"],
         properties: {
-          page: { type: "string" },
+          page: pagePath,
           name: { type: "string" },
           icon: { type: ["string", "null"] },
           template: { const: "hc_navigation_card" },
@@ -670,6 +728,25 @@ export function buildJsonSchema(catalog, entities) {
     ],
   };
   const cardValue = { anyOf: [...entityValue.anyOf, groupValue] };
+  const rawCard = object({ type: suggested(['custom:marao-card', 'custom:marao-popup-card', 'custom:marao-navbar-card',
+    'custom:marao-state-timeline-card', 'custom:marao-energy-period-card', 'grid', 'vertical-stack', 'horizontal-stack']),
+    template: suggested((catalog.cards || []).map(card => card.id)), name: { type: 'string' },
+    entity: binding(), variables: { type: 'object', additionalProperties: true },
+    cards: { type: 'array', items: { $ref: '#/$defs/rawCard' } },
+  });
+  const rawRules = catalogRules.map(rule => {
+    const { entity_id, ...properties } = rule.then.properties;
+    return { ...rule, then: { properties: { ...properties, entity: entity_id } } };
+  });
+  rawCard.allOf = [{ $ref: '#/$defs/rawOptions' }];
+  // Disjoint branches keep matching-schema results proportional to the document,
+  // rather than retaining every catalog condition for every card in a large file.
+  const templateOptions = rules => ({ anyOf: [
+    ...rules.map(rule => ({ type: 'object', required: ['template'],
+      properties: { ...rule.then.properties, template: rule.if.properties.template } })),
+    { not: { required: ['template'], properties: { template: { enum: catalog.cards.map(card => card.id) } } } },
+  ] });
+  const definitions = Object.assign(bindings, { rawCard, cardOptions: templateOptions(catalogRules), rawOptions: templateOptions(rawRules) });
   const entityContainer = {
     type: "object",
     required: ["name"],
@@ -689,6 +766,7 @@ export function buildJsonSchema(catalog, entities) {
   };
   const schema = {
     $id: "https://marao-dashboard.local/dashboard.schema.json",
+    $defs: definitions,
     type: "object",
     required: ["name", "rooms"],
     properties: {
@@ -701,7 +779,7 @@ export function buildJsonSchema(catalog, entities) {
         type: "array",
         items: {
           anyOf: [
-            { type: "string" },
+            pagePath,
             { type: "object", required: ["label", "url"], additionalProperties: true },
           ],
         },
@@ -709,7 +787,7 @@ export function buildJsonSchema(catalog, entities) {
       overview: {
         type: "object",
         properties: {
-          weather_entity: { type: "string", enum: entityIds.filter((id) => id.startsWith("weather.")) },
+          weather_entity: binding(['weather']),
           scenes: { type: "array", items: entityValue },
           entity_groups: { type: 'array', items: groupValue },
         },
@@ -751,23 +829,23 @@ export function buildJsonSchema(catalog, entities) {
     const freeValue = { type: 'object', required: ['template'], properties: {
       template: { enum: ['hc_title_card', 'hc_navigation_card', 'hc_room_card', 'hc_scene_collection_card'] },
       id: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
-      name: { type: 'string' }, icon: { type: ['string', 'null'] }, page: paths,
+      name: { type: 'string' }, icon: { type: ['string', 'null'] }, page: pagePath,
       variables: { type: 'object', additionalProperties: true },
       entities: { type: 'array', items: entityValue },
-    }, additionalProperties: true };
+    }, allOf: [{ $ref: '#/$defs/cardOptions' }], additionalProperties: true };
     const content = { ...entityContainer.properties,
       entities: { anyOf: [
         { type: 'array', items: { anyOf: [...cardValue.anyOf, freeValue] } },
         { type: 'object', additionalProperties: { type: 'array', items: { anyOf: [...cardValue.anyOf, freeValue] } } },
         ...cardValue.anyOf, freeValue,
       ] },
-      cards: { type: 'array', items: { type: 'object', additionalProperties: true } },
+      cards: { type: 'array', items: rawCard },
     };
     schema.required = ['name', 'config_version', 'pages', 'landing_page'];
     schema.properties.config_version = { const: 2, description: 'Ordered editable pages.' };
-    schema.properties.landing_page = paths;
+    schema.properties.landing_page = pagePath;
     schema.properties.navigation.maxItems = 5;
-    schema.properties.navigation.items.anyOf.push({ type: 'object', required: ['page'], properties: { page: paths }, additionalProperties: true });
+    schema.properties.navigation.items.anyOf.push({ type: 'object', required: ['page'], properties: { page: pagePath }, additionalProperties: true });
     schema.properties.pages = { type: 'array', minItems: 1, items: {
       type: 'object', required: ['name', 'path'], properties: {
         ...content, path: paths, id: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
@@ -779,8 +857,11 @@ export function buildJsonSchema(catalog, entities) {
     delete schema.properties.rooms;
     delete schema.properties.overview;
     schema.not = { anyOf: [{ required: ['rooms'] }, { required: ['overview'] }] };
+    delete schema.$defs; delete legacy.$defs;
+    delete schema.$id; delete legacy.$id;
     return {
-      $id: schema.$id, type: 'object',
+      $id: 'https://marao-dashboard.local/dashboard.schema.json', type: 'object',
+      $defs: definitions,
       properties: { config_version: legacy.properties.config_version },
       allOf: [{ if: { required: ['config_version'], properties: { config_version: { const: 2 } } },
         then: schema, else: { anyOf: [legacy, {

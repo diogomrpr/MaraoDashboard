@@ -374,3 +374,21 @@ export function editorLabel(label, hass) {
   const language = String(hass?.locale?.language || hass?.language || "en").toLowerCase().split("-")[0];
   return language === "pt" ? PT_LABELS[label] || PT_LABELS[label + "."]?.replace(/\.$/, "") || label : label;
 }
+
+export const MOVE_PT_LABELS = {
+  "Edit card": "Editar cartão",
+  "Edit page": "Editar página",
+  "Drag card": "Arrastar cartão",
+  "Drop here": "Largar aqui",
+  "Drop a card here": "Largue um cartão aqui",
+  "Move to section": "Mover para secção",
+  "Move card": "Mover cartão",
+  "Destination section": "Secção de destino",
+  "Position": "Posição",
+  "Before": "Antes de",
+  "At the end": "No fim",
+  "Card moved. Save & Generate to apply.": "Cartão movido. Guarde e gere para aplicar.",
+  "The card changed. Close and try again.": "O cartão foi alterado. Feche e tente novamente.",
+  "Drag the handle to move a card. Use arrows or Move to section without dragging.": "Arraste a pega para mover um cartão. Use as setas ou Mover para secção sem arrastar.",
+  "Automatic layout groups cards by type. Choose fixed columns for exact mixed order.": "A disposição automática agrupa os cartões por tipo. Escolha colunas fixas para uma ordem mista exata.",
+};

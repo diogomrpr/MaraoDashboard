@@ -142,7 +142,37 @@
                   "name": "Battery",
                   "template": "hc_battery_card"
                 },
-                "sensor.marao_dashboard_test_legacy_battery"
+                "sensor.marao_dashboard_test_legacy_battery",
+                "sensor.marao_dashboard_test_maintenance_battery_1",
+                "sensor.marao_dashboard_test_maintenance_battery_2",
+                "sensor.marao_dashboard_test_maintenance_battery_3",
+                "sensor.marao_dashboard_test_maintenance_battery_4",
+                "sensor.marao_dashboard_test_maintenance_battery_5",
+                "sensor.marao_dashboard_test_maintenance_battery_6",
+                "sensor.marao_dashboard_test_maintenance_battery_7",
+                "sensor.marao_dashboard_test_maintenance_battery_8",
+                "sensor.marao_dashboard_test_maintenance_battery_9",
+                "sensor.marao_dashboard_test_maintenance_battery_10",
+                "sensor.marao_dashboard_test_maintenance_battery_11",
+                "sensor.marao_dashboard_test_maintenance_battery_12",
+                "sensor.marao_dashboard_test_maintenance_battery_13",
+                "sensor.marao_dashboard_test_maintenance_battery_14",
+                "sensor.marao_dashboard_test_maintenance_battery_15",
+                "sensor.marao_dashboard_test_maintenance_battery_16",
+                "sensor.marao_dashboard_test_maintenance_battery_17",
+                "sensor.marao_dashboard_test_maintenance_battery_18",
+                "sensor.marao_dashboard_test_maintenance_battery_19",
+                "sensor.marao_dashboard_test_maintenance_battery_20",
+                "sensor.marao_dashboard_test_maintenance_battery_21",
+                "sensor.marao_dashboard_test_maintenance_battery_22",
+                "sensor.marao_dashboard_test_maintenance_battery_23",
+                "sensor.marao_dashboard_test_maintenance_battery_24",
+                "sensor.marao_dashboard_test_maintenance_battery_25",
+                "sensor.marao_dashboard_test_maintenance_battery_26",
+                "sensor.marao_dashboard_test_maintenance_battery_27",
+                "sensor.marao_dashboard_test_maintenance_battery_28",
+                "sensor.marao_dashboard_test_maintenance_battery_29",
+                "sensor.marao_dashboard_test_maintenance_battery_30"
               ],
               "variables": {
                 "popup_hash": "#overview-maintenance"
@@ -1186,8 +1216,20 @@
               "template": "hc_light_card",
               "entity_id": "light.marao_dashboard_test_light",
               "name": "Studio reading light"
+            },
+            {
+              "id": "studio-light-night",
+              "template": "hc_light_card",
+              "entity_id": "light.marao_dashboard_test_light",
+              "name": "Studio evening light",
+              "variables": {
+                "enable_slider": false
+              }
             }
           ]
+        },
+        {
+          "entities": []
         },
         {
           "columns": 1,

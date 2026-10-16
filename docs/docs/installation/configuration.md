@@ -7,6 +7,24 @@ nav_order: 1.3
 
 # Configure Marao Dashboard
 
+## JSON editor
+
+The **JSON** tab uses the standard Microsoft Monaco editor: monospace text,
+syntax highlighting, line numbers, native folding arrows, minimap, search/replace,
+suggestions and diagnostic widgets. It uses Monaco's default light/dark themes
+and control sizes, without a Marao editor skin or a separate editing toolbar.
+
+Use Ctrl+F to search, Ctrl+H to replace, Ctrl+Space for suggestions, F8 to navigate
+issues, Shift+Alt+F to format, and Ctrl+Z / Ctrl+Shift+Z to undo/redo. On macOS use
+Command+F, Command+Option+F and Command+Z / Command+Shift+Z. F1 opens Monaco's
+command palette. Native context menus and gutter arrows expose its normal tools.
+
+Suggestions use Marao's catalog, compatible entities and current page paths.
+Unknown/raw options, empty lists and native command data remain editable.
+Returning through Visual without edits retains text, undo history and position.
+Only **Save & Generate** changes the saved dashboard; invalid JSON still blocks
+Visual and Save. Editor assets and workers load locally on first use.
+
 After installing Marao Dashboard with HACS, add the **Marao Dashboard**
 integration from Home Assistant's integrations page. On first setup, the
 integration creates a base dashboard JSON from your current area-assigned
@@ -35,6 +53,25 @@ The editable source of truth is:
 ```text
 dashboard/MaraoDashboard/dashboard.json
 ```
+
+## Moving cards in Visual
+
+Drag a card's dotted handle to a position before, between or after other cards.
+Keep the pointer near the screen edge to scroll. You can move cards into another
+section of the same expanded page, including an empty section. Release to place
+it; Escape or a cancelled gesture leaves the draft unchanged. Scrolling elsewhere
+on the row works normally.
+
+The arrows move one position at a time. **Move to section** offers a destination
+section and a position before a named card or at the end, using ordinary controls.
+Cards with the same entity remain separate occurrences with their own settings.
+Raw Lovelace `cards` stay in their authored section and are edited in JSON.
+
+Automatic layout still groups by type. Choose fixed columns in **Edit layout**
+when you want an exact mixed order. Moving does not change section widths or
+save anything until **Save & Generate**. **Discard changes** restores the saved
+source. The disposable Studio example includes mixed widths, duplicate lighting
+cards, independent detail sheets and an empty section for trying these moves.
 
 ## Ordered page format
 

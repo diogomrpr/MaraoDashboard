@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { normalizeConfig, serializeConfig, validateConfig, buildJsonSchema, moveItem } from '../../frontend_src/editor-model.js';
+import { normalizeConfig, serializeConfig, validateConfig, buildJsonSchema, moveItem, movePageCard } from '../../frontend_src/editor-model.js';
 
 const source = JSON.parse(fs.readFileSync(new URL('./canonical-pages.fixture.json', import.meta.url)));
 const catalog = { config_version: 2, cards: [
@@ -132,4 +132,67 @@ test('canonical schema offers ordered pages, sections and entity-free roles with
   assert.ok(choices.some(choice => choice.properties?.template?.enum?.includes(shortcut.template)
     && !choice.required.includes('page') && !choice.required.includes('entity_id')),
   'JSON must accept the same explicit-destination shortcut as Visual and generation');
+});
+
+
+// Independent boundary expectations cover the shared operation used by arrows, drag and dialogs.
+for (const [from, boundary, expected] of [
+  [0, 3, ['b', 'c', 'a']], [2, 0, ['c', 'a', 'b']],
+  [0, 2, ['b', 'a', 'c']], [2, 1, ['a', 'c', 'b']],
+]) test(`move occurrence ${from} to boundary ${boundary}`, () => {
+  const page = { entities: ['a', 'b', 'c'].map(id => ({ id })) }, occurrence = page.entities[from];
+  assert.equal(movePageCard(page, 0, from, 0, boundary, occurrence), true);
+  assert.deepEqual(page.entities.map(card => card.id), expected);
+  assert.equal(page.entities[expected.indexOf(occurrence.id)], occurrence);
+});
+
+test('same-page transfer keeps empty sections, raw content, options and local occurrence identity', () => {
+  const input = { config_version: 2, pages: [{ name: 'Home', path: 'home', sections: [
+    { columns: 2, future: [], entities: [{ entity_id: 'media_player.same', apple_tv: { apps: [] }, variables: { popup_hash: '#explicit', future: { empty: [] } } }], cards: [{ type: 'markdown', content: 'Protected raw' }] },
+    { future: { retained: true }, entities: [] },
+  ] }] };
+  const model = normalizeConfig(input), page = model.pages[0], occurrence = page.sections[0].entities[0];
+  assert.equal(movePageCard(page, 0, 0, 1, 0, occurrence), true);
+  assert.equal(page.sections[1].entities[0], occurrence);
+  const expected = structuredClone(input);
+  expected.pages[0].sections[1].entities.push({ ...expected.pages[0].sections[0].entities.pop(), id: 'card-1' });
+  assert.deepEqual(serializeConfig(model), expected);
+  assert.deepEqual(serializeConfig(normalizeConfig(expected)), expected);
+});
+
+test('invalid, stale and equivalent moves never touch canonical or released source shapes', () => {
+  for (const entities of ['light.same', { light: ['light.same', { entity_id: 'light.same', future: [] }] }, ['light.same', { entity_id: 'light.same', future: [] }]]) {
+    const input = { config_version: 2, pages: [{ name: 'Home', path: 'home', entities }] }, model = normalizeConfig(input), page = model.pages[0], card = page.entities[0];
+    for (const coords of [[0,0,0,0], [0,0,0,1], [-1,0,0,0], [0,-1,0,0], [0,99,0,0], [0,0,1,0], [0,0,0,-1], [0,0,0,99], [0,0,0,0.5]]) {
+      assert.equal(movePageCard(page, ...coords, card), false);
+      assert.deepEqual(serializeConfig(model), input);
+    }
+    assert.equal(movePageCard(page, 0, 0, 0, 0, { ...card }), false);
+    assert.deepEqual(serializeConfig(model), input);
+  }
+});
+
+test('moving every published option shape preserves all fields and page-wide identities', () => {
+  const cards = [
+    { entity_id: 'media_player.safe', apple_tv: { remote_entity: 'remote.safe', apps: [] } },
+    { entity_id: 'media_player.safe', name: 'Duplicate', variables: { popup_hash: '#retained' } },
+    { entity_id: 'climate.safe', variables: { modes: [], mode_selector_hash: '#mode' } },
+    { template: 'hc_entity_group_card', id: 'lights', entity_type: 'light', entities: [{ entity_id: 'light.safe', future: [] }], popup_filter: 'all' },
+    { entity_id: 'alarm_control_panel.safe', variables: { future: [] } },
+    { template: 'hc_energy_period_card', entity_id: 'sensor.safe', variables: { period: 'day', display_unit: 'kWh', display_precision: 0 } },
+    { template: 'hc_vacuum_card', entity_id: 'vacuum.safe', variables: { action_1: { data: { command: 'app_segment_clean', params: [{ segments: [21, 22], repeat: 2 }] } } } },
+    { template: 'hc_title_card', name: 'Heading', future: {} },
+    { template: 'hc_scene_collection_card', entities: [], future: [] },
+    { page: 'home', name: 'Back', future: true },
+  ];
+  for (const entities of [cards, { cards }]) {
+    const input = { config_version: 2, pages: [{ name: 'Home', path: 'home', sections: [{ columns: 2, entities }, { entities: [] }] }] };
+    const model = normalizeConfig(input), page = model.pages[0];
+    for (let i = cards.length - 1; i >= 0; i--) assert.equal(movePageCard(page, 0, i, 1, 0, page.sections[0].entities[i]), true);
+    const expected = structuredClone(input);
+    expected.pages[0].sections[0].entities = [];
+    expected.pages[0].sections[1].entities = cards.map((card, i) => ({ ...structuredClone(card), id: card.id || `card-${i+1}` }));
+    assert.deepEqual(serializeConfig(model), expected);
+    assert.deepEqual(serializeConfig(normalizeConfig(expected)), expected);
+  }
 });

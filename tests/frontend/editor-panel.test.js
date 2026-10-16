@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
 import * as model from "../../frontend_src/editor-model.js";
-import { PT_LABELS } from "../../frontend_src/editor-labels.js";
+import { PT_LABELS, MOVE_PT_LABELS } from "../../frontend_src/editor-labels.js";
 
 const source = await fs.readFile(new URL("../../frontend_src/MaraoDashboardPanel.js", import.meta.url), "utf8");
 let Panel;
 let confirmations;
 const context = vm.createContext({
   ...model,
-  PT_LABELS,
+  PT_LABELS, MOVE_PT_LABELS,
   HTMLElement: class { attachShadow() { this.shadowRoot = { querySelector() { return null; } }; } },
   customElements: { get() {}, define(_name, value) { Panel = value; } },
   BRAND_MARK: '/brand/mark.svg?v=test', BRAND_MARK_DARK: '/brand/mark-dark.svg?v=test',
@@ -41,6 +41,8 @@ function panel(config) {
   p._entities = [{ entity_id: "light.test", domain: "light", area_id: "office" }];
   p._hass = { callWS() { assert.fail("A local deletion must not save or delete an HA entity"); } };
   p._updateHeader = () => {};
+  p._setStatus = () => {};
+  p._moveHaptic = () => {};
   p._renderVisual = () => { p.renders = (p.renders || 0) + 1; };
   return p;
 }
@@ -49,6 +51,21 @@ const canonical = () => ({ config_version: 2, name: 'Safe', landing_page: 'home'
   { name: 'Home', path: 'home', sections: [{ entities: [{ id: 'first', entity_id: 'light.test' }, { id: 'second', entity_id: 'light.test', name: 'Duplicate' }], future: true }] },
   { name: 'Office', path: 'office', entities: [{ page: 'home', name: 'Back home' }], cards: [{ type: 'markdown', content: 'Saved note' }] },
 ] });
+
+test('unchanged Visual/JSON switching retains exact text, model history and view state', async () => {
+  const p = panel(canonical()); p._loaded = true; p._tab = 'json'; p.isConnected = true;
+  p._catalog = { config_version: 2, cards: [], pages: {} };
+  const source = JSON.stringify(canonical()), view = { selection: [4, 9], scrollTop: 120, folds: [2] };
+  let restored;
+  p._monaco = { getValue: () => source, setValue: () => assert.fail('Unchanged text resets undo history'),
+    saveViewState: () => view, restoreViewState: value => { restored = value; }, layout() {} };
+  p._ensureMonaco = async () => {};
+  p._setStatus = () => {};
+  p.shadowRoot = { querySelectorAll: () => [], getElementById: () => ({}) };
+  context.requestAnimationFrame = callback => callback();
+  await p._switchTab('visual'); assert.equal(p._jsonDraft, source);
+  await p._switchTab('json'); assert.equal(restored, view);
+});
 
 test('successful legacy preview replaces the JSON draft only after canonical validation', async () => {
   const source = canonical(), p = panel(source);
@@ -387,4 +404,28 @@ test('load editor preserves nested source options and makes formatting independe
   assert.deepEqual(load.power_entity,{entity_id:'sensor.power',future:true,variables:{source_retained:true}});
   assert.deepEqual(load.variables,{retained:true,display_precision:6});
   assert.equal(config.pages.energy.loads[0].power_entity.variables.display_precision,0);
+});
+
+
+test('card arrows and transfers share validated no-op/identity behavior without writes', () => {
+  const p = panel(canonical());
+  p._model.pages[0].sections.push({ entities: [], future: true });
+  p._savedSource = p._source();
+  const first = p._cardSource('page', '0:0', 0), before = p._source();
+  p._roomAction({ dataset: { action: 'card-up', kind: 'page', room: '0:0', card: '0' } });
+  assert.equal(p._source(), before); assert.equal(Boolean(p._dirty), false); assert.equal(p.renders, undefined);
+  assert.equal(p._commitCardMove(first, 1, 0), true);
+  assert.equal(p._model.pages[0].sections[1].entities[0], first.card);
+  assert.equal(p.renders, 1); assert.equal(p._dirty, true);
+  assert.equal(p._commitCardMove(first, 0, 0), false, 'A consumed/stale source cannot move twice');
+  const second = p._cardSource('page', '0:0', 0); p._setDirty();
+  assert.equal(p._commitCardMove(second, 1, 0), false, 'A changed draft invalidates a captured source');
+});
+
+test('a replaced document, busy mode or JSON tab rejects a pending move', () => {
+  for (const change of [p => { p._model = model.normalizeConfig(canonical()); }, p => { p._busy = true; }, p => { p._tab = 'json'; }, p => { p._lifecycle++; }]) {
+    const p = panel(canonical()), source = p._cardSource('page', '0:0', 0); change(p);
+    const before = p._source();
+    assert.equal(p._commitCardMove(source, 0, 2), false); assert.equal(p._source(), before);
+  }
 });

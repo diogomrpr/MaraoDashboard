@@ -114,6 +114,17 @@ async function checkNavbar(page) {
 }
 
 async function main() {
+  if (process.argv.includes('--editor-drag')) {
+    const result = require('node:child_process').spawnSync(process.execPath, [require('node:path').join(__dirname, 'test-ha-editor.js'), '--drag-geometry', '--scenario=iphone-normal'], { stdio: 'inherit', env: process.env });
+    if (result.status !== 0) throw new Error('Editor movement alignment failed');
+    return;
+  }
+  if (process.argv.includes('--json-editor')) {
+    const result = require('node:child_process').spawnSync(process.execPath,
+      ['tests/test-ha-editor.js', '--json-geometry', '--scenario=iphone-normal'], { stdio: 'inherit' });
+    if (result.status !== 0) throw new Error('JSON editor control alignment failed');
+    return;
+  }
   const config = readConfig();
   assertDisposableHaTarget(config);
   await prepare(config);

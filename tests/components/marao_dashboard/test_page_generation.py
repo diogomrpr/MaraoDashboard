@@ -239,3 +239,56 @@ def test_explicit_and_derived_output_path_collision_is_rejected_before_writes():
     ]}
     with pytest.raises(ValueError, match="same generated view"):
         g._page_assets(g._resolve_pages(source), "/config/test", "marao-dashboard")
+
+
+def test_editor_section_moves_preserve_generated_identities_sheets_and_protected_content(tmp_path):
+    """Exercise the actual frontend operation against the existing generation boundary."""
+    import subprocess
+
+    cards = [
+        {"entity_id": "media_player.safe", "apple_tv": {"apps": []}},
+        {"entity_id": "media_player.safe", "name": "Second TV", "apple_tv": False},
+        {"entity_id": "climate.safe"},
+        {"id": "group", "name": "Thermostats", "template": "hc_entity_group_card", "entity_type": "climate", "entities": ["climate.safe"], "popup_filter": "all"},
+        {"entity_id": "alarm_control_panel.safe", "template": "hc_security_card"},
+        {"entity_id": "sensor.safe", "template": "hc_energy_period_card", "variables": {"period": "day", "display_precision": 0}},
+        {"entity_id": "vacuum.safe", "variables": {"action_1": {"data": {"command": "app_segment_clean", "params": [{"segments": [21, 22], "repeat": 2}]}}}},
+        {"template": "hc_title_card", "name": "Heading", "future": []},
+        {"page": "home", "name": "Home", "future": {"keep": True}},
+    ]
+    source = {"config_version": 2, "name": "Move test", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "sections": [
+        {"columns": 2, "entities": cards, "cards": [{"type": "markdown", "content": "Raw stays", "tap_action": {"action": "navigate", "navigation_path": "#page-home-card-1-popup"}}]},
+        {"entities": [], "future": []},
+    ]}]}
+    script = """
+      import { normalizeConfig, serializeConfig, movePageCard } from './frontend_src/editor-model.js';
+      let input = ''; for await (const chunk of process.stdin) input += chunk;
+      const model = normalizeConfig(JSON.parse(input)), page = model.pages[0];
+      for (let i = page.sections[0].entities.length - 1; i >= 0; i--)
+        if (!movePageCard(page, 0, i, 1, 0, page.sections[0].entities[i])) throw Error('Move failed');
+      process.stdout.write(JSON.stringify(serializeConfig(model)));
+    """
+    moved = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", script], input=json.dumps(source).encode(), cwd=Path(__file__).parents[3]))
+    assert moved["pages"][0]["sections"][0] == {"columns": 2, "entities": [], "cards": source["pages"][0]["sections"][0]["cards"]}
+    expected = [dict(card, id=card.get("id", f"card-{i+1}")) for i, card in enumerate(cards)]
+    assert moved["pages"][0]["sections"][1] == {"entities": expected, "future": []}
+
+    def entries(config):
+        return [card for section in g._resolve_pages(config)["pages"][0]["_sections"] for card in section["ordered_cards"]]
+
+    original_entries, moved_entries = entries(source), entries(moved)
+    assert [g._page_card(card, "marao-dashboard") for card in moved_entries] == [g._page_card(card, "marao-dashboard") for card in original_entries]
+    assert [g._page_card_popups(card) for card in moved_entries] == [g._page_card_popups(card) for card in original_entries]
+    original = g.write_dashboard(source, tmp_path)
+    root = tmp_path / original.slug
+    popup = root / "components/popups/page-home-card-1-popup.yaml"
+    protected = "  - type: markdown\n    content: Preserve custom sheet content exactly\n"
+    popup.write_text(popup.read_text().replace("  # marao:custom:start\n", "  # marao:custom:start\n" + protected))
+    before = {p.relative_to(root): p.read_bytes() for p in (root / "components/popups").glob("*.yaml")}
+    g.write_dashboard(moved, tmp_path)
+    assert {p.relative_to(root): p.read_bytes() for p in (root / "components/popups").glob("*.yaml")} == before
+    first_view = (root / "views/pages/home.yaml").read_bytes()
+    g.write_dashboard(moved, tmp_path)
+    assert (root / "views/pages/home.yaml").read_bytes() == first_view
+    # Destination remains automatic; changing membership does not force fixed columns.
+    assert "columns" not in moved["pages"][0]["sections"][1]

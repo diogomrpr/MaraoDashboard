@@ -18,6 +18,25 @@ function homeGroups(source) {
   return source.pages.find(page => page.path === 'overview').sections.flatMap(section => section.entities || []).filter(card => card.template === 'hc_entity_group_card');
 }
 
+test('long maintenance popup uses 32 safe battery sensors in the realistic page and gallery', () => {
+  const source = require('../../ha-test/marao_dashboard_test_dashboard.json');
+  const members = homeGroups(source).find(group => group.id === 'overview-maintenance').entities;
+  assert.equal(members.length, 32);
+  const ids = members.map(member => typeof member === 'string' ? member : member.entity_id);
+  assert.equal(new Set(ids).size, 32);
+  const sensors = helpers.template.flatMap(block => block.sensor || []);
+  const popup = view.cards.find(card => card.hash === '#marao-dashboard-test-maintenance-popup');
+  assert.equal(popup.cards[0].cards.length, 32);
+  for (let index = 1; index <= 30; index++) {
+    const id = `sensor.marao_dashboard_test_maintenance_battery_${index}`;
+    assert.ok(ids.includes(id));
+    assert.ok(popup.cards[0].cards.some(card => card.entity === id));
+    const sensor = sensors.find(sensor => sensor.default_entity_id === id);
+    assert.equal(sensor.device_class, 'battery');
+    assert.match(sensor.state, /input_number\.marao_dashboard_test_battery/);
+  }
+});
+
 test('standalone security holds use the PIN-free helper and preserve PIN-required alarm coverage', () => {
   const hold = view.cards.flatMap(card => card.cards || [card]).find(card => card.name === 'Arm away · hold');
   assert.equal(hold.entity, 'alarm_control_panel.marao_dashboard_test_alarm_no_code');
@@ -73,7 +92,7 @@ test('editable page roles are visible descriptors with safe real bindings and in
 test('a saved mixed page reuses safe entities with independent popups and an unpinned shortcut', () => {
   const source = require('../../ha-test/marao_dashboard_test_dashboard.json');
   const studio = source.pages.find(page => page.id === 'studio');
-  assert.deepEqual(studio.sections.map(section => section.columns), [1, 2, 1]);
+  assert.deepEqual(studio.sections.map(section => section.columns), [1, 2, undefined, 1]);
   const cards = studio.sections.flatMap(section => section.entities || []);
   const television = cards.find(card => card.template === 'hc_media_card');
   const energy = cards.find(card => card.template === 'hc_energy_period_card');
@@ -81,7 +100,9 @@ test('a saved mixed page reuses safe entities with independent popups and an unp
   assert.equal(energy.entity_id, source.pages.find(page => page.id === 'energy').sections[2].entities[0].entity_id);
   assert.equal(energy.variables.popup_hash, undefined);
   assert.deepEqual(television.apple_tv.apps.map(app => app.source), ['YouTube']);
-  assert.ok(studio.sections[2].cards.some(card => card.type === 'markdown'));
+  assert.ok(studio.sections[3].cards.some(card => card.type === 'markdown'));
+  assert.deepEqual(studio.sections[2].entities, []);
+  assert.equal(cards.filter(card => card.entity_id === 'light.marao_dashboard_test_light').length, 2);
   assert.ok(!source.navigation.includes(studio.path));
   assert.ok(source.pages.find(page => page.id === 'overview').sections.flatMap(section => section.entities).some(card => card.tap_action?.navigation_path === '/marao-dashboard/studio'));
 });

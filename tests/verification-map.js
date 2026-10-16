@@ -20,6 +20,11 @@ const families = {
   camera: ['hc_camera_card'], history: ['hc_graph_card', 'hc_timeline_card', 'hc_toggle_graph_card'],
 };
 const components = {
+  'json-editor': { units: [['json-editor'], ['editor-model'], ['canonical-page-model'], ['editor-panel']], editor: true,
+    browser: [browser('json-alignment', 'test-ha-card-alignment', ['--json-editor']),
+      ...['iphone-normal', 'android-normal', 'narrow-320', 'iphone-landscape', 'android-landscape', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200'].map(profile =>
+      browser('json-editor:' + profile, 'test-ha-editor', ['--json-tools', '--scenario=' + profile, ...(profile === 'iphone-normal' ? ['--json-save', '--startup', '--portuguese'] : [])]))],
+  },
   native: { units: [['marao-native'], ['native-backup']], python: ['test_native'], editor: true,
     templates: [...Object.values(families).flat(), 'hc_weather_card', 'hc_scene_collection_card', 'hc_access_hold_action_card', 'hc_access_action_card', 'hc_header_card', 'hc_glance_card', 'hc_scene_card', 'hc_number_card', 'hc_wallbox_current_card', 'hc_vacuum_card', 'hc_dishwasher_card', 'hc_washing_machine_card', 'hc_sensor_card', 'hc_switch_card', 'hc_battery_card', 'hc_navigation_card', 'hc_energy_period_card', 'hc_media_app_card', 'hc_title_card', 'hc_base_card'],
     profiles: ['iphone-normal', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200', 'narrow-320', 'iphone-landscape', 'android-normal', 'android-landscape'],
@@ -44,6 +49,11 @@ const components = {
   camera: { units: [['marao-frigate-events-card']], browser: [browser('camera', 'test-ha-dashboard-e2e', ['--camera-only'])] },
   history: { units: [['marao-history-cards']], browser: [browser('history', 'test-ha-dashboard-e2e', ['--history-only'])] },
   energy: { units: [['marao-energy-format']], browser: [browser('energy', 'test-ha-energy-format', ['--scenario', 'iphone-normal'])] },
+  'editor-drag': { units: [['editor-drag'], ['canonical-page-model'], ['editor-panel']], python: ['test_page_generation', 'test_page_migration'], editor: true,
+    browser: [browser('editor-drag:iphone-normal', 'test-ha-editor', ['--drag', '--drag-save', '--scenario=iphone-normal']),
+      browser('editor-drag:android-normal', 'test-ha-editor', ['--drag', '--portuguese', '--scenario=android-normal']),
+      browser('editor-drag:alignment', 'test-ha-card-alignment', ['--editor-drag']),
+      ...['narrow-320', 'iphone-landscape', 'android-landscape', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200'].map(profile => browser('editor-drag:' + profile, 'test-ha-editor', ['--drag-geometry', '--scenario=' + profile]))] },
   'editor-model': { units: [['editor-model'], ['page-manager-model'], ['canonical-page-model']] },
   'editor-ui': { units: [['editor-panel']], browser: [browser('editor', 'test-ha-editor', ['--scenario=iphone-normal', '--header'])], editor: true },
   generator: { python: ['test_generator', 'test_page_generation'], upgrade: true },
@@ -56,15 +66,27 @@ const components = {
     browser: [browser('tooling-layout', 'test-ha-dashboard-accessibility', ['--focused', '--families', 'hc_light_card', '--scenario', 'iphone-normal', '--screenshots', 'review', '--popups', '--popup-hash', '#marao-dashboard-test-value-sliders-popup'], false),
       browser('tooling-actions', 'test-ha-dashboard-e2e', ['--toggle-only'])] },
   docs: {},
+  'verification-map': { units: [['verification']] },
 };
 
 const rules = [
+  [/^tests\/verification-map\.js$/, ['verification-map']],
+  [/^tests\/editor-drag-checks\.js$/, ['editor-drag']],
+  [/^frontend_src\/editor-drag\.js$/, ['editor-drag']],
+  [/^tests\/json-editor-checks\.js$/, ['json-editor']],
+  [/^tests\/test-ha-card-alignment\.js$/, ['json-editor']],
+  [/^tests\/test-ha-editor\.js$/, ['editor-ui', 'json-editor']],
+  [/^frontend_src\/json-/, ['json-editor']],
+  [/^frontend_src\/panel\.css$/, ['editor-ui', 'json-editor']],
+  [/^custom_components\/marao_dashboard\/frontend\/MaraoDashboardJsonEditor\./, ['json-editor']],
   [/^tests\/test-ha-native\.js$/, ['native']],
   [/^tests\/native-backup\.js$/, ['native', 'verification']],
   [/^ha-test\/native-cases\.js$/, ['native', 'gallery']],
   [/^frontend_src\/(native-model|MaraoNativeCards|MaraoNativeCardEditor)\.js$/, ['native']],
-  [/^frontend_src\/editor-labels\.js$/, ['native', 'editor-ui']],
+  [/^frontend_src\/editor-labels\.js$/, 'editor-labels'],
   [/^frontend_src\/native-labels\.js$/, ['native']],
+  // Generated entry changes are checked for reproducibility; native source rules select behavior checks.
+  [/^custom_components\/marao_dashboard\/frontend\/MaraoNative(?:Cards|CardEditor)\.js$/, ['packaging']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoNative/, ['native', 'packaging']],
   [/^custom_components\/marao_dashboard\/native\.py$/, ['native', 'generator', 'lifecycle', 'migration']],
   [/^tests\/test-ha-security\.js$/, ['security']],
@@ -101,6 +123,8 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     const rule = rules.find(([pattern]) => pattern.test(file));
     if (!rule) throw new Error('Unmapped changed file: ' + file + '. Add its component/check mapping.');
     let ids = rule[1];
+    // Reviewed additive movement labels have no native-card consumer. Other label edits retain both consumers.
+    if (ids === 'editor-labels') ids = declared.includes('editor-drag') && !declared.includes('native') ? ['editor-ui', 'editor-drag'] : ['native', 'editor-ui'];
     if (ids === 'shared') {
       if (!declared.length && !conservativeShared) throw new Error(file + ': declare --component after reviewing the shared-component diff.');
       const consumers = ['native', 'security', 'labels', 'slider', 'light', 'fan', 'cover', 'popup', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];

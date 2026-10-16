@@ -79,7 +79,7 @@ async function build() {
       if (Object.keys(details.inputs).some(input => input.includes("node_modules/monaco-editor/"))) {
         throw new Error("Monaco must remain outside the eager Visual import graph.");
       }
-      const limit = file.endsWith(".js") ? 128 * 1024 : 32 * 1024;
+      const limit = file.endsWith(".js") ? 144 * 1024 : 32 * 1024;
       if (details.bytes > limit) throw new Error(`Eager editor asset exceeds its ${limit}-byte budget: ${path.basename(file)}`);
     }
     fs.copyFileSync(

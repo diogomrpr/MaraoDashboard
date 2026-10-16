@@ -810,6 +810,130 @@ cards:
             template: hc_battery_card
             entity: sensor.marao_dashboard_test_battery
             name: Marao Dashboard Test Battery
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_legacy_battery
+            name: Legacy battery
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_1
+            name: Maintenance battery 1
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_2
+            name: Maintenance battery 2
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_3
+            name: Maintenance battery 3
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_4
+            name: Maintenance battery 4
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_5
+            name: Maintenance battery 5
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_6
+            name: Maintenance battery 6
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_7
+            name: Maintenance battery 7
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_8
+            name: Maintenance battery 8
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_9
+            name: Maintenance battery 9
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_10
+            name: Maintenance battery 10
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_11
+            name: Maintenance battery 11
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_12
+            name: Maintenance battery 12
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_13
+            name: Maintenance battery 13
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_14
+            name: Maintenance battery 14
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_15
+            name: Maintenance battery 15
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_16
+            name: Maintenance battery 16
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_17
+            name: Maintenance battery 17
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_18
+            name: Maintenance battery 18
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_19
+            name: Maintenance battery 19
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_20
+            name: Maintenance battery 20
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_21
+            name: Maintenance battery 21
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_22
+            name: Maintenance battery 22
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_23
+            name: Maintenance battery 23
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_24
+            name: Maintenance battery 24
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_25
+            name: Maintenance battery 25
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_26
+            name: Maintenance battery 26
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_27
+            name: Maintenance battery 27
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_28
+            name: Maintenance battery 28
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_29
+            name: Maintenance battery 29
+          - type: custom:marao-card
+            template: hc_battery_card
+            entity: sensor.marao_dashboard_test_maintenance_battery_30
+            name: Maintenance battery 30
 
   - type: custom:marao-popup-card
     hash: "#marao-dashboard-test-energy-month-popup"

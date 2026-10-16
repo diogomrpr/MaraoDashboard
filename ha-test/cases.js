@@ -200,6 +200,12 @@ function expandHelpers(source) {
   }
   const templateEntities = {};
   function addTemplate(domain, value) { (templateEntities[domain] ||= []).push(value); }
+  for (let index = 1; index <= 30; index++) {
+    const key = `marao_dashboard_test_maintenance_battery_${index}`;
+    addTemplate('sensor', { name: `Maintenance battery ${index}`, unique_id: key,
+      default_entity_id: `sensor.${key}`, device_class: 'battery', unit_of_measurement: '%',
+      state: "{{ states('input_number.marao_dashboard_test_battery') }}" });
+  }
   for (const domain of ['light', 'fan']) {
     const key = `marao_dashboard_test_onoff_${domain}`;
     helpers.input_boolean[key] = { name: `Marao Dashboard Test OnOff ${domain}` };

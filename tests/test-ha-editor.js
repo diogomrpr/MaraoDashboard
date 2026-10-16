@@ -247,7 +247,8 @@ async function startupChecks(page, panel) {
       await probe._switchTab('json');
       assert(probe._monaco.getValue() === latest && probe._dirty, 'JSON lost latest draft');
       const oldEditor = probe._monaco;
-      probe.remove(); assert(probe._monaco === null, 'Editor not disposed'); parent.append(probe);
+      probe.remove(); assert(probe._monaco === null, 'Editor not disposed');
+      assert(!probe.shadowRoot.querySelector('.monaco-aria-container'), 'Detached JSON announcements not disposed'); parent.append(probe);
       await probe._ensureMonaco(); await probe._switchTab('json');
       assert(probe._monaco !== oldEditor && probe._monaco.getValue() === latest && probe._dirty, 'Revisit lost draft');
       // Exercise the real Restore action with a local management stub only.
@@ -324,12 +325,12 @@ async function folding(page, panel) {
     const expanded=editor.getTopForLineNumber(line+2);
     return {line,expanded,nested:nested.startLine+1,source,dirty,ranges:ranges.length};
   });
-  await panel.locator('#collapse-json').click();
+  await require('./json-editor-checks').clickFold(page, panel, result.line);
   await page.waitForFunction(({p,line,expanded})=>p._monaco.getTopForLineNumber(line+2)<expanded,{p:await panel.elementHandle(),line:result.line,expanded:result.expanded});
   const collapsed=await panel.evaluate((p,line)=>p._monaco.getTopForLineNumber(line+2),result.line);
   await panel.evaluate(async p=>{await p._switchTab('visual');await p._switchTab('json');});
   assert.equal(await panel.evaluate((p,line)=>p._monaco.getTopForLineNumber(line+2),result.line),collapsed);
-  await panel.locator('#expand-json').click();
+  await panel.evaluate(p => p._monaco.getAction('editor.unfold').run());
   await page.waitForFunction(({p,line,expanded})=>p._monaco.getTopForLineNumber(line+2)===expanded,{p:await panel.elementHandle(),line:result.line,expanded:result.expanded});
   // Fold a nested region and check its sibling stays expanded through public geometry.
   const nested=await panel.evaluate(async(p,line)=>{
@@ -381,13 +382,11 @@ async function folding(page, panel) {
   await page.waitForFunction(p=>p._tab==='visual',await panel.elementHandle());
   await panel.locator('[data-tab="json"]').click();
   await page.waitForFunction(p=>p._tab==='json',await panel.elementHandle());
-  const sizes=await panel.evaluate(p=>['collapse-json','expand-json'].map(id=>{const e=p.shadowRoot.getElementById(id);const r=e.getBoundingClientRect();return {width:r.width,height:r.height,label:e.textContent};}));
-  assert.ok(sizes.every(s=>s.width>=48&&s.height>=48&&s.label));
-  await panel.evaluate(p=>{const language=p._hass.language;p._hass={...p._hass,language:'pt'};p._updateHeader();if(p.shadowRoot.getElementById('collapse-json').textContent!=='Recolher região')throw new Error('Portuguese folding label missing');p._hass={...p._hass,language};p._updateHeader();});
-  fs.writeFileSync(path.join(output,'folding.json'),JSON.stringify({...result,source:undefined,collapsed,sizes}));
+  await require('./json-editor-checks').geometry(panel);
+  fs.writeFileSync(path.join(output,'folding.json'),JSON.stringify({...result,source:undefined,collapsed}));
   await panel.evaluate((p,line)=>{p._monaco.setPosition({lineNumber:line,column:1});p._monaco.revealLineInCenter(line);},result.line);
   const finalExpanded=await panel.evaluate((p,line)=>p._monaco.getTopForLineNumber(line+2),result.line);
-  await panel.locator('#collapse-json').click();
+  await require('./json-editor-checks').clickFold(page, panel, result.line);
   await page.waitForFunction(({p,line,expanded})=>p._monaco.getTopForLineNumber(line+2)<expanded,{p:await panel.elementHandle(),line:result.line,expanded:finalExpanded});
   await scrollHeader(panel, true);
   await page.screenshot({path:path.join(output,'folding-'+(await page.evaluate(()=>document.documentElement.dataset.maraoAccessibilityProfile))+'-'+(await page.evaluate(()=>document.documentElement.dataset.maraoThemeMode))+'.png'),scale:'css'});
@@ -1162,6 +1161,12 @@ async function main() {
         panel = await ready(page, config, { navigate: false });
       }
       if (process.argv.includes('--preservation')) await releasedDraftPreservation(page, panel, client, scenario, theme);
+      if (process.argv.includes('--json-tools') || process.argv.includes('--json-geometry')) await require('./json-editor-checks').jsonEditorChecks(page, panel, {
+        output, scenario, theme, client, config,
+        persist: process.argv.includes('--json-save') && scenario === runs[0] && theme === runThemes[0],
+        geometryOnly: process.argv.includes('--json-geometry'),
+      });
+      if (process.argv.includes('--drag') || process.argv.includes('--drag-geometry')) await require('./editor-drag-checks').editorDragChecks(page, panel, { output, scenario, theme, client, config, persist: process.argv.includes('--drag-save') && scenario === runs[0] && theme === runThemes[0], geometryOnly: process.argv.includes('--drag-geometry') });
       if (process.argv.includes('--energy')) await energyFormatting(page, panel, config, client, original, scenario.name + '-' + theme, scenario === runs[0] && theme === runThemes[0]);
       if (process.argv.includes("--startup") && scenario === runs[0] && theme === runThemes[0]) await startupChecks(page, panel);
       if (process.argv.includes("--delete") && scenario === runs[0] && theme === runThemes[0]) await deletion(page, panel, config, client, original);

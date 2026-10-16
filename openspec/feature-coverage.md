@@ -68,6 +68,12 @@ page roles through ordinary section/card descriptors; raw cards remain preserved
 
 ## Configuration and product operations
 
+Stock Monaco search/replace, contextual completion, native diagnostics/folding
+and session continuity use [`json-editor.test.js`](../tests/frontend/json-editor.test.js)
+and the focused [`json-editor-checks.js`](../tests/json-editor-checks.js) scenarios.
+The safe [JSON draft](../ha-test/json-editor-example.json) uses existing Studio and
+Cases entities; runtime card behavior is unchanged.
+
 | Existing surface | Baseline contract | Source/check |
 | --- | --- | --- |
 | Single-entry integration/config flow, admin editor/WS, generation service/dry run, fingerprinted assets and unload | [Integration lifecycle](specs/integration-lifecycle/spec.md) | [Setup](../custom_components/marao_dashboard/__init__.py), [flow](../custom_components/marao_dashboard/config_flow.py), [setup checks](../tests/components/marao_dashboard/test_init.py) |
@@ -84,7 +90,7 @@ page roles through ordinary section/card descriptors; raw cards remain preserved
 | Owned dashboard/theme patches, exact legacy migration, manual Repair, unrelated configuration preservation | [Integration lifecycle](specs/integration-lifecycle/spec.md) | [Patches](../custom_components/marao_dashboard/config_patch.py), [migration](../custom_components/marao_dashboard/legacy_migration.py), [patch checks](../tests/components/marao_dashboard/test_config_patch.py), [update guide](../docs/docs/installation/update.md) |
 
 The realistic unpinned **Studio** fixture combines a title section, a two-column
-energy/light section, independently configured Media and Energy popups and a raw
+energy/light section with duplicate light occurrences, an empty drop section, independently configured Media and Energy popups and a raw
 card. Home links to it through an entity-free shortcut. The release mobile runner’s
 `--pages` option checks every generated view in addition to Cases and popups;
 [fixture tests](../tests/frontend/gallery-cases.test.js) retain its composition.
@@ -144,3 +150,13 @@ checks apply only to changed persistence, migration, generated ownership or
 installation paths, with affected baselines, expected data, recovery and cleanup.
 Reuse validated unchanged scoped evidence and report omitted coverage honestly.
 See [focused testing](../docs/docs/development/focused-testing.md).
+
+Visual card movement uses the shared [`movePageCard`](../frontend_src/editor-model.js)
+operation and [`editor-drag.js`](../frontend_src/editor-drag.js) Pointer Events handles.
+[`canonical-page-model.test.js`](../tests/frontend/canonical-page-model.test.js),
+[`editor-drag.test.js`](../tests/frontend/editor-drag.test.js) and the focused
+[`editor-drag-checks.js`](../tests/editor-drag-checks.js) scenarios cover boundaries,
+section transfers, cancellation, native input, layout and explicit moves.
+[`test_page_generation.py`](../tests/components/marao_dashboard/test_page_generation.py)
+checks stable sheets/raw/protected content. Source format and save/history APIs
+are unchanged; live persistence probes retain exact backups and verify cleanup.

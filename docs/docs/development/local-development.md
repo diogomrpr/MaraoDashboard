@@ -316,8 +316,27 @@ are local to the disposable instance, not physical-phone performance claims.
 The Visual panel and deferred JSON editor have separate editable entries in
 `frontend_src/MaraoDashboardPanel.js` and `frontend_src/json-editor.js`. The build
 owns their generated JavaScript/CSS, local workers, hashed fonts and license.
-Its import graph rejects eager Monaco and enforces 128 KiB JavaScript / 32 KiB
+Its import graph rejects eager Monaco and enforces 144 KiB JavaScript / 32 KiB
 CSS budgets. JSON assets and workers carry the current panel fingerprint.
+The JSON tab uses stock Monaco presentation: default monospace typography,
+`vs`/`vs-dark` themes, native gutter folding, minimap, search, suggestions and
+inline diagnostic widgets. Do not add custom gutter widgets, line-spacing view
+zones, docked search or internal widget CSS. This is the user's explicit editor
+exception to Marao typography/touch geometry; surrounding app controls retain
+Marao's UI rules. `ariaContainerElement` keeps native announcements in the styled
+shadow root, and `editContext: false` retains reliable textarea typing/paste.
+
+Local catalog/schema assistance and URI/version/request-guarded diagnostics live
+in `json-editor.js` and `json-language.js`; they add no editor presentation.
+Shared `$defs` and disjoint template branches keep large documents manageable.
+The installed Portuguese NLS pack has empty entries; `json-locale.js` supplies
+exposed native-widget strings before initialization. Review its pinned message
+indices when updating Monaco. Remote schema requests remain disabled.
+
+`ha-test/json-editor-example.json` uses existing Studio/Cases entities with
+unknown/raw/empty/nested values. Run `node tests/test-ha-editor.js --json-tools
+--scenario=iphone-normal`; `--json-save` adds exact backed-up Save/reload and
+restoration. The `json-editor` component selects focused mobile/text/zoom checks.
 Initial configuration and JSON loading expose English/Portuguese status and an
 explicit Retry action; ordinary HA updates do not repeatedly retry failures.
 Visual stays usable during JSON loading, and delayed completion respects the

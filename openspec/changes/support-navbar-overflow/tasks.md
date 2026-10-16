@@ -1,0 +1,31 @@
+# Tasks
+
+## 1. Configuration, compatibility and policy
+
+- [ ] 1.1 Record the implementation starting commit and shared navbar/footer/popup consumers; preserve unrelated work and verify the superseded six-entry tasks are not selected. Update AGENTS.md and the quality guide from a fixed entry cap to a single row plus overflow, retaining every other touch/safety/preservation rule.
+- [ ] 1.2 Remove product count limits from builder pin/create paths, schema/model validation, Python canonical/legacy generation/validation, native compiler/editor repeater and shared runtime; verify zero/one/five/six and longer valid lists plus malformed-entry rejection through focused model/Python/frontend parity tests. Keep established automatic defaults and other unrelated list limits unchanged.
+- [ ] 1.3 Add independently expected navigation fixtures for supported existing sources, unpinned pages, long explicit current/legacy/native lists, custom labels/icons/URLs/path aliases, unknown fields and explicit emptiness; verify read-only compilation/preview, save/reload/repeated generation/history and native ownership preserve complete lists and existing backup/recovery behavior through focused compatibility checks early.
+- [ ] 1.4 Remove obsolete full-navbar messages and add English/Portuguese More/open/close/current-destination/help strings; update configuration and native editor docs. Verify any number of valid selected routes remains editable through Visual/JSON and native Visual/YAML without repinning saved pages or changing route order/options.
+
+## 2. Shared single-row overflow behavior
+
+- [ ] 2.1 Implement deterministic full-size slot calculation from safe active-view/preview width, measured controls, gaps and padding; verify independently specified zero, exact-fit, one-over, one-slot, larger-screen and long-list partitions, with every configured route appearing exactly once and no layout-dependent source edits.
+- [ ] 2.2 Implement one horizontal row and the rightmost More toggle with a matching vertical icon surface above it, centered on the toggle; verify 48px controls, current styling, safe bounds, internal menu scrolling and final-entry reachability in generated/native/preview hosts without extra horizontal rows or horizontal scrolling.
+- [ ] 2.3 Add semantic expanded/control relationships, named links, focus entry/return and toggle/outside/Escape dismissal using the existing navigation/haptic helpers; verify tap/keyboard navigation dispatches once, menu scroll does not move the background and dismissal cannot actuate a covered safe fake card or leave gesture suppression active.
+- [ ] 2.4 Preserve stable visible-prefix ordering and show active-overflow feedback on More and the selected link; verify direct URL/back/forward/hash navigation and unrelated HA state updates update active state without promoting routes, losing menu scroll or recreating the open menu.
+- [ ] 2.5 Add bounded resize/viewport/lifecycle observation and shared modal-opening dismissal; verify repartition/rotation/zoom, source replacement, panel removal, editing/preview transitions and popup opening clean up listeners/observers and preserve bar clearance, native shell restoration, modal focus/inert behavior and separate admin-only Edit.
+- [ ] 2.6 Update safe gallery/editor examples and one realistic `/marao-dashboard` page for no-overflow, exact-fit, overflow and long-scroll states, using real safe view destinations under the same root. Verify light/dark surface matching and alignment, a final page control and a representative popup; document stable ordering and overflow interaction without multiplying equivalent card cases or adding another dashboard.
+
+## 3. Scoped integrated verification
+
+- [ ] 3.1 Update `tests/verification-map.js` for reviewed shared navbar/popup/editor/native/generator paths, focused overflow interactions, alignment, safe-area geometry and applicable upgrade proof; verify every changed path resolves with `npm run test:affected -- --plan`. Rebuild bundled editor/native assets and pass reproducibility checks.
+- [ ] 3.2 After the batch's last edit, run the smallest covering `npm run test:affected` selection serially, using `--base <starting-commit>` for committed work or reviewed component scopes. Verify complete long-list round trips, read-only menu/resize actions, no entity service calls, invalid-source preflight nonmutation and applicable focused migration/history recovery checks.
+- [ ] 3.3 Deploy compatible backend/editor/runtime together only to `192.168.0.28` with exact source/generated/affected-state backups. Verify explicit long-list save/reload/regeneration/history and native ownership using safe fixtures, then restore and verify the disposable baseline and cleanup without modifying the existing separate user example dashboard.
+- [ ] 3.4 Perform final combined representative inspection in both themes: iPhone/Android touch and keyboard, 320px, landscape, normal/bold/200% text/200% zoom/bold-plus-200% layouts, native standalone and bounded preview. Verify one row, toggle/menu alignment, safe bounds, long-menu last-item reachability, focus/dismissal, active-overflow feedback, final controls, popup layers, shell restoration and console/resource/request diagnostics. Retain failures and representative successes only; fix defects and repeat focused checks/inspection, reporting real-device/Safari limitations honestly.
+
+## Workflow follow-up
+
+- All tasks remain unchecked until implemented and verified. Implement this change instead of `allow-six-navbar-entries`; do not archive the superseded plan as completed work or apply its six-entry cap/wrapping design.
+- Before any push, tag or release, run scoped `npm run verify:publish` and applicable exact-commit Tests/hassfest/HACS checks.
+- During explicit release preparation, require scoped preserved-install proof via `test:ha:upgrade -- --scope <actual-affected-component-ids>` for navigation/generator/native preservation and recovery, plus scoped `verify:release`. Bind evidence to the final candidate and verify cleanup. Restore matching package/data together for downgrade; no full historical/mobile matrix, full suite or parallel execution is implied.
+- Sync/archive only completed, reviewed and verified work when the corresponding workflow is requested. The separate drag-and-drop and Monaco plans remain independent.
