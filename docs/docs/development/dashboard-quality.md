@@ -550,6 +550,9 @@ large and readable.
   behavior, and restore focus.
 - Recognize Marao's native sheet in scroll containment. Preserve native value
   slider touch defaults inside it; cancelling `touchmove` prevents iOS dragging.
+- Keep each card's native `ha-card` surface connected during state updates.
+  Connect replacement content before removing the previous content. Detaching
+  the surface or emptying it during an update can reset WebKit's page/sheet scroll.
 
 ### Cameras, graphs, and media
 

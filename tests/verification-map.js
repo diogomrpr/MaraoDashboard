@@ -40,6 +40,13 @@ const components = {
   fan: { units: [['marao-climate-card', 'fan|percentage']], templates: ['hc_fan_card'] },
   cover: { units: [['marao-climate-card', 'cover|position']], templates: ['hc_cover_card'] },
   popup: { units: [['marao-navbar-card'], ['marao-climate-card', 'popup|focus|inert']], profiles: ['iphone-normal', 'iphone-landscape', 'narrow-320'], popups: true },
+  scroll: { units: [['marao-card-visibility'], ['marao-climate-card'], ['marao-security']],
+    browser: [
+      ...['iphone-normal', 'iphone-landscape', 'iphone-text-200'].map(profile => browser('scroll:webkit:' + profile, 'test-ha-scroll', ['--webkit', '--scenario', profile])),
+      ...['iphone-normal', 'android-normal', 'narrow-320'].map(profile => browser('scroll:chromium:' + profile, 'test-ha-scroll', ['--scenario', profile])),
+      browser('scroll:security', 'test-ha-security', ['--scenario', 'iphone-normal']),
+      browser('scroll:sliders', 'test-ha-value-sliders', ['--scenario', 'iphone-normal']),
+    ] },
   navbar: { units: [['marao-navbar-card']], profiles: ['iphone-normal', 'iphone-landscape', 'narrow-320'], browser: [browser('safe-area', 'test-ha-dashboard-accessibility', ['--safe-area'])] },
   actions: { units: [['marao-climate-card', 'action|hold|slide|dispatch|disabled|unavailable']],
     browser: [browser('actions', 'test-ha-dashboard-e2e', ['--actions-only'])] },
@@ -91,6 +98,7 @@ const rules = [
   [/^custom_components\/marao_dashboard\/frontend\/MaraoNative/, ['native', 'packaging']],
   [/^custom_components\/marao_dashboard\/native\.py$/, ['native', 'generator', 'lifecycle', 'migration']],
   [/^tests\/test-ha-security\.js$/, ['security']],
+  [/^tests\/test-ha-scroll\.js$/, ['scroll']],
   [/^(AGENTS\.md|README\.md|docs\/|openspec\/|\.agents\/)/, ['docs']],
   [/^tests\/frontend\/([^/]+)\.test\.js$/, 'test'],
   [/^tests\/components\/marao_dashboard\/(test_[^/]+)\.py$/, 'test'],
@@ -128,7 +136,7 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     if (ids === 'editor-labels') ids = declared.includes('editor-drag') && !declared.includes('native') ? ['editor-ui', 'editor-drag'] : ['native', 'editor-ui'];
     if (ids === 'shared') {
       if (!declared.length && !conservativeShared) throw new Error(file + ': declare --component after reviewing the shared-component diff.');
-      const consumers = ['native', 'security', 'labels', 'slider', 'light', 'fan', 'cover', 'popup', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
+      const consumers = ['native', 'security', 'labels', 'slider', 'light', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
       ids = declared.length ? declared.filter(id => consumers.includes(id)) : consumers;
       if (!ids.length) throw new Error(file + ': a runtime component is required; documentation scope cannot omit its checks.');
     }

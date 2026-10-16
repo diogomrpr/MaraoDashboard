@@ -17,7 +17,7 @@ const source = await fs.readFile(new URL("../../custom_components/marao_dashboar
 const dashboardSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url), "utf8");
 const { ACCESS_HOLD_MS, MaraoCard, MaraoPopupCard, callServiceWithNotification, focusRestorer, performAction, registerMaraoCards, binaryState, cardProblem, problemStyle, serviceOutcome, stateAppearance, summaryState, entityGroupState, vacuumActions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#visibility`);
 
-test('rerenders retain the native surface and slot while replacing content and obsolete attributes', () => {
+test('rerenders never detach the native surface while replacing content and obsolete attributes', () => {
   const card = new MaraoCard();
   card._config = { entity: 'sensor.test', name: 'Reading' };
   const makeSurface = attributes => ({
@@ -25,29 +25,42 @@ test('rerenders retain the native surface and slot while replacing content and o
     childNodes: [], shadowRoot: { slot: true }, style: { setProperty() {} }, classList: { remove() {} },
     removeAttribute(name) { this.attributes = this.attributes.filter(attribute => attribute.name !== name); },
     setAttribute(name, value) { this.removeAttribute(name); this.attributes.push({ name, value }); },
-    replaceChildren(...children) { this.childNodes = children; },
-    replaceWith(surface) { current = surface; },
+    append(...children) { this.childNodes.push(...children); },
   });
   const surface = makeSurface({ class: 'obsolete', role: 'group', 'aria-busy': 'true', style: 'old' });
-  let current = surface, replacement;
-  const root = { querySelector: selector => selector === 'ha-card' ? current : null, querySelectorAll: () => [] };
-  Object.defineProperty(root, 'innerHTML', { set(markup) {
-    const attributes = Object.fromEntries([...markup.match(/<ha-card([^>]*)>/)[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(match => [match[1], match[2]]));
-    replacement = makeSurface(attributes);
-    replacement.childNodes = [{ markup }]; current = replacement;
-  } });
+  let replacement;
+  const style = { textContent: '' };
+  const root = { querySelector: selector => selector === 'ha-card' ? surface : selector === 'style' ? style : null, querySelectorAll: () => [] };
+  Object.defineProperty(root, 'innerHTML', { set() { assert.fail('Replacing the shadow root detaches the live HA surface'); } });
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement(tag) {
+    assert.equal(tag, 'template');
+    return { set innerHTML(markup) {
+      const attributes = Object.fromEntries([...markup.match(/<ha-card([^>]*)>/)[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(match => [match[1], match[2]]));
+      replacement = makeSurface(attributes);
+      replacement.childNodes = [{ markup, remove() { surface.childNodes = surface.childNodes.filter(node => node !== this); } }];
+      this.content = { querySelector: selector => selector === 'ha-card' ? replacement : { textContent: markup.match(/<style>([\s\S]*?)<\/style>/)[1] } };
+    } };
+  } };
   card.shadowRoot = root;
-  for (const state of ['unavailable', '21']) {
+  try { for (const state of ['unavailable', '21']) {
     card._hass = { states: { 'sensor.test': { state, attributes: {} } } };
     card._render();
-    assert.equal(current, surface);
-    assert.equal(current.shadowRoot.slot, true);
-    assert.deepEqual(current.attributes, replacement.attributes);
-    assert.equal(current.childNodes[0], replacement.childNodes[0]);
-    assert.equal(current.attributes.some(attribute => attribute.name === 'data-problem'), state === 'unavailable');
-    assert.equal(current.attributes.some(attribute => attribute.name === 'aria-busy' || attribute.name === 'role' || attribute.name === 'class'), false);
-    assert.equal(current.attributes.some(attribute => attribute.name === 'style'), state === 'unavailable');
+    assert.equal(root.querySelector('ha-card'), surface);
+    assert.equal(surface.shadowRoot.slot, true);
+    assert.deepEqual(surface.attributes, replacement.attributes);
+    assert.equal(surface.childNodes[0], replacement.childNodes[0]);
+    assert.equal(surface.childNodes.length, 1, 'Old card content must be removed after mounting the replacement');
+    assert.equal(surface.attributes.some(attribute => attribute.name === 'data-problem'), state === 'unavailable');
+    assert.equal(surface.attributes.some(attribute => attribute.name === 'aria-busy' || attribute.name === 'role' || attribute.name === 'class'), false);
+    assert.equal(surface.attributes.some(attribute => attribute.name === 'style'), state === 'unavailable');
   }
+    card._config = { template: 'hc_alarm_controls_card', entity: 'alarm_control_panel.test' };
+    card._hass = { states: { 'alarm_control_panel.test': { state: 'disarmed', attributes: {} } } };
+    card._render();
+    assert.equal(root.querySelector('ha-card'), surface);
+    assert.match(style.textContent, /\.alarm-body/);
+  } finally { globalThis.document = previousDocument; }
 });
 
 test('typed groups count complete membership independently of filtering and duplicate references', () => {
@@ -446,6 +459,7 @@ test("room all-lights-off actions target every configured light", async () => {
 
 test('room lighting uses every unique selected light and ignores an unrelated primary', () => {
   const card = new MaraoCard();
+  card._setMarkup = markup => { card.shadowRoot.innerHTML = markup; };
   const colors = {};
   const surface = { classList: { remove() {} }, style: { setProperty(key, value) { colors[key] = value; } } };
   card.shadowRoot.querySelector = selector => selector === 'ha-card' ? surface : null;

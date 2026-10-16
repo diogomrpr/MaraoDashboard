@@ -35,6 +35,15 @@ test('editor browser evidence includes the delegated gesture and JSON checks', (
   }
 });
 
+test('shared scroll fixes select WebKit, Chromium and control lifecycle checks', () => {
+  const selected = checksFor(selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js', 'tests/test-ha-scroll.js'], ['scroll']));
+  assert.ok(selected.some(check => check.command.includes('--webkit')));
+  assert.ok(selected.some(check => check.command.includes('tests/test-ha-scroll.js') && !check.command.includes('--webkit')));
+  assert.ok(selected.some(check => check.command.includes('tests/test-ha-security.js')));
+  assert.ok(selected.some(check => check.command.includes('tests/test-ha-value-sliders.js')));
+  assert.ok(!selected.some(check => /mobile-matrix|editor|preserved-upgrade/.test(check.id)));
+});
+
 test('unknown paths, ambiguous shared sources and invalid flags cannot broaden or skip scope', () => {
   assert.throws(() => selectComponents(['new-unknown.js']), /Unmapped/);
   assert.throws(() => selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js']), /declare --component/);

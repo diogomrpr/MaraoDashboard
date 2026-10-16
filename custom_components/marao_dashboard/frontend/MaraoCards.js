@@ -966,6 +966,24 @@ export class MaraoCard extends BaseElement {
     if (input) input.value = "";
   }
 
+  _setMarkup(markup) {
+    const surface = this.shadowRoot.querySelector('ha-card');
+    if (!surface) { this.shadowRoot.innerHTML = markup; return; }
+    // Removing even a retained HA surface resets its ancestor's scroll in WebKit.
+    const template = document.createElement('template');
+    template.innerHTML = markup;
+    const next = template.content.querySelector('ha-card');
+    const style = this.shadowRoot.querySelector('style');
+    const css = template.content.querySelector('style').textContent;
+    if (style.textContent !== css) style.textContent = css;
+    for (const attribute of [...surface.attributes]) surface.removeAttribute(attribute.name);
+    for (const attribute of [...next.attributes]) surface.setAttribute(attribute.name, attribute.value);
+    // Connect the replacement before removing old content so WebKit never clamps an empty card.
+    const previous = [...surface.childNodes];
+    surface.append(...next.childNodes);
+    for (const node of previous) node.remove();
+  }
+
   _renderAlarm() {
     if (!this.shadowRoot) return;
     const entity = text(this._config.entity), state = stateOf(this._hass, entity);
@@ -980,7 +998,7 @@ export class MaraoCard extends BaseElement {
     this._cancelHold();
     const label = localize("alarm.code", this._hass, {}, "Alarm code");
     const actions = alarmActions(state);
-    this.shadowRoot.innerHTML = `<style>${cardStyles()}
+    this._setMarkup(`<style>${cardStyles()}
       .alarm-body { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; padding:16px; min-width:0; font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-secondary,500); line-height:1.25; }
       .alarm-body > * { grid-area:auto; min-width:0; }
       .alarm-body > .state { white-space:normal; overflow-wrap:anywhere; }
@@ -1001,7 +1019,7 @@ export class MaraoCard extends BaseElement {
         const disabled = !ready || this._alarmBusy || state.state === `armed_${action.mode}`
           || action.mode === "disarm" && state.state === "disarmed";
         return `<div class="alarm-action"><button type="button" data-alarm-action="${action.service}" aria-label="${esc(caption)}"${disabled ? " disabled" : ""}>${esc(caption)}</button>${action.hold ? '<svg class="hold-progress" aria-hidden="true"><rect x="1.5" y="1.5" pathLength="100"></rect></svg>' : ""}</div>`;
-      }).join("")}</div></div></ha-card>`;
+      }).join("")}</div></div></ha-card>`);
     const input = this.shadowRoot.querySelector("[data-alarm-code]");
     if (input) {
       input.value = this._alarmPIN || "";
@@ -1410,16 +1428,7 @@ export class MaraoCard extends BaseElement {
     const formattedReading = !iconOnly && Boolean(formattedPrimary || formattedPower);
     const stateMarkup = showState && kind !== "hc_wallbox_current_card" ? `<div class="state">${esc(displayValue)}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    const previousCard = this.shadowRoot.querySelector('ha-card');
-    this.shadowRoot.innerHTML = `<style>${cardStyles()}</style><ha-card${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${climateControls}${climatePending}${formattedReading ? "" : details}${holdHint}${iconElement}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`;
-    const renderedCard = this.shadowRoot.querySelector('ha-card');
-    if (previousCard && renderedCard && previousCard !== renderedCard) {
-      // Retain the native slot so HA updates cannot temporarily collapse the gallery.
-      for (const attribute of [...previousCard.attributes]) previousCard.removeAttribute(attribute.name);
-      for (const attribute of [...renderedCard.attributes]) previousCard.setAttribute(attribute.name, attribute.value);
-      previousCard.replaceChildren(...renderedCard.childNodes);
-      renderedCard.replaceWith(previousCard);
-    }
+    this._setMarkup(`<style>${cardStyles()}</style><ha-card${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${climateControls}${climatePending}${formattedReading ? "" : details}${holdHint}${iconElement}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`);
     for (const symbol of this.shadowRoot.querySelectorAll("ha-state-icon")) {
       const readingEntity = symbol.dataset.readingEntity;
       symbol.hass = this._hass;

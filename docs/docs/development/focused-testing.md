@@ -38,6 +38,12 @@ and ambiguous shared changes fail with a scope message. They never trigger a
 full-suite fallback. Add the missing mapping rather than skipping the file.
 Documentation-only changes need no application deployment or browser tests.
 
+Use `--component scroll` for native card-surface lifecycle changes. Its WebKit
+and Chromium regressions update cards after scrolling the realistic Maintenance
+sheet, its 32-card Cases counterpart and the dashboard page. They cover both
+themes with selected phone, narrow, landscape and enlarged-text layouts.
+Playwright WebKit is additional engine coverage, not physical iPhone proof.
+
 Unit/static checks run before browser work. A compatible browser batch prepares
 the safe disposable installation once. Each job receives a private artifact
 directory and validates the prepared assets, saved source and fixture ownership.
