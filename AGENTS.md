@@ -78,8 +78,11 @@ success; keep future work in changes and archive only completed, verified work.
 - Select `test:ha:alignment` for changed icon-only actions/shared action geometry,
   and relevant slider, action, migration and recovery checks for those contracts.
   Visibility checks cannot establish correct dispatch or data preservation.
-- Run distinct interactions once per relevant theme; repeat devices only for
-  native gestures or geometry. Use relevant narrow/text/zoom/landscape profiles
+- Run reviewed theme-independent geometry and behavior in one reference theme;
+  retain representative appearance/state checks in both themes and additional
+  combinations where theme changes the contract. Repeat devices only for native
+  gestures or geometry. Share compatible visits and validate explicitly supplied
+  completed evidence against the current required scope. Use relevant narrow/text/zoom/landscape profiles
   for changed layouts. Save failures and representative success captures only.
 - Run tests serially by default. Parallel checks require an explicit request and
   `--parallel`. Use isolated contexts/private job outputs; serialize deployment,

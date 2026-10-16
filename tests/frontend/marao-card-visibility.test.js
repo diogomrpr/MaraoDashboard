@@ -292,9 +292,9 @@ test("card registration can be retried after the custom-element registry becomes
   };
   try {
     registerMaraoCards();
-    assert.deepEqual([...registered.keys()], ["marao-card", "marao-navbar-card", "marao-popup-card"]);
+    assert.deepEqual([...registered.keys()], ["marao-card", "marao-control-grid", "marao-navbar-card", "marao-popup-card"]);
     registerMaraoCards();
-    assert.equal(registered.size, 3);
+    assert.equal(registered.size, 4);
   } finally {
     globalThis.customElements = previousRegistry;
   }

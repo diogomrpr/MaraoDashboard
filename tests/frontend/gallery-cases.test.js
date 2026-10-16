@@ -92,7 +92,7 @@ test('editable page roles are visible descriptors with safe real bindings and in
 test('a saved mixed page reuses safe entities with independent popups and an unpinned shortcut', () => {
   const source = require('../../ha-test/marao_dashboard_test_dashboard.json');
   const studio = source.pages.find(page => page.id === 'studio');
-  assert.deepEqual(studio.sections.map(section => section.columns), [1, 2, undefined, 1]);
+  assert.deepEqual(studio.sections.map(section => section.columns), [1, 2, 2, undefined, 1]);
   const cards = studio.sections.flatMap(section => section.entities || []);
   const television = cards.find(card => card.template === 'hc_media_card');
   const energy = cards.find(card => card.template === 'hc_energy_period_card');
@@ -100,9 +100,9 @@ test('a saved mixed page reuses safe entities with independent popups and an unp
   assert.equal(energy.entity_id, source.pages.find(page => page.id === 'energy').sections[2].entities[0].entity_id);
   assert.equal(energy.variables.popup_hash, undefined);
   assert.deepEqual(television.apple_tv.apps.map(app => app.source), ['YouTube']);
-  assert.ok(studio.sections[3].cards.some(card => card.type === 'markdown'));
-  assert.deepEqual(studio.sections[2].entities, []);
-  assert.equal(cards.filter(card => card.entity_id === 'light.marao_dashboard_test_light').length, 2);
+  assert.ok(studio.sections[4].cards.some(card => card.type === 'markdown'));
+  assert.deepEqual(studio.sections[3].entities, []);
+  assert.equal(cards.filter(card => card.entity_id === 'light.marao_dashboard_test_light').length, 4);
   assert.ok(!source.navigation.includes(studio.path));
   assert.ok(source.pages.find(page => page.id === 'overview').sections.flatMap(section => section.entities).some(card => card.tap_action?.navigation_path === '/marao-dashboard/studio'));
 });

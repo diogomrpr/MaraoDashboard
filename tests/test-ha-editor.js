@@ -1,3 +1,4 @@
+const { capture: captureScreenshot } = require('./verification-browser');
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -76,7 +77,7 @@ async function brandHeader(page, panel, theme, scenario, run) {
     return issues;
   }), []);
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  await page.screenshot({ path: path.join(output, run + '-brand-header.png'), scale: 'css' });
+  await captureScreenshot(page, { path: path.join(output, run + '-brand-header.png'), scale: 'css' });
 }
 
 async function brandSidebar(page) {
@@ -194,7 +195,7 @@ async function scrollHeader(panel, allowShort = false) {
 
 async function startupChecks(page, panel) {
   if(process.argv.includes('--surfaces'))await page.exposeFunction('captureEditorStartup', async name => {
-    await page.screenshot({path:path.join(output,'startup-'+name+'.png'),scale:'css'});
+    await captureScreenshot(page, {path:path.join(output,'startup-'+name+'.png'),scale:'css'});
   });
   await panel.evaluate(async original => {
     const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -292,7 +293,7 @@ async function assetRetry(browser, config, scenario, file) {
     await panel.evaluate(p => Promise.race([p._switchTab('json'), new Promise((_resolve, reject)=>setTimeout(()=>reject(new Error('Injected asset failure did not settle')),10000))]));
     assert.equal(await panel.evaluate(p => p._retryKind), 'json', 'Failed asset did not offer retry: ' + file);
     assert.equal(await panel.evaluate(p => p._source()), source);
-    if(process.argv.includes('--surfaces'))await page.screenshot({path:path.join(output,file+'-failure.png'),scale:'css'});
+    if(process.argv.includes('--surfaces'))await captureScreenshot(page, {path:path.join(output,file+'-failure.png'),scale:'css'});
     await panel.locator('#retry').click();
     await page.waitForFunction(p => p._tab === 'json', await panel.elementHandle());
     assert.equal(await panel.evaluate(p => p._monaco.getValue()), source);
@@ -389,7 +390,7 @@ async function folding(page, panel) {
   await require('./json-editor-checks').clickFold(page, panel, result.line);
   await page.waitForFunction(({p,line,expanded})=>p._monaco.getTopForLineNumber(line+2)<expanded,{p:await panel.elementHandle(),line:result.line,expanded:finalExpanded});
   await scrollHeader(panel, true);
-  await page.screenshot({path:path.join(output,'folding-'+(await page.evaluate(()=>document.documentElement.dataset.maraoAccessibilityProfile))+'-'+(await page.evaluate(()=>document.documentElement.dataset.maraoThemeMode))+'.png'),scale:'css'});
+  await captureScreenshot(page, {path:path.join(output,'folding-'+(await page.evaluate(()=>document.documentElement.dataset.maraoAccessibilityProfile))+'-'+(await page.evaluate(()=>document.documentElement.dataset.maraoThemeMode))+'.png'),scale:'css'});
   await panel.evaluate(p=>p._switchTab('visual'));
 }
 
@@ -421,7 +422,7 @@ async function weatherChecks(context, scenario, theme, config) {
           return problems;
         });
         assert.deepEqual(errors,[]);
-        await card.screenshot({path:path.join(output,`${scenario.name}-${theme}-${route}-${template}-${i}.png`),scale:'css'});
+        await captureScreenshot(card, {path:path.join(output,`${scenario.name}-${theme}-${route}-${template}-${i}.png`),scale:'css'});
       }
     }
     fs.writeFileSync(path.join(output,`${scenario.name}-${theme}-weather-diagnostics.json`),JSON.stringify(diagnostics));
@@ -444,7 +445,7 @@ async function feedbackChecks(page, panel, scenario, theme) {
       const retry=await panel.locator('#retry').boundingBox();
       assert.ok(retry.width>=48&&retry.height>=48&&retry.y>=rect.y&&retry.y+retry.height<=rect.y+rect.height+1,'Retry is not visible in the header');
     }
-    await page.screenshot({path:path.join(output,`${scenario.name}-${theme}-json-${kind}.png`),scale:'css'});
+    await captureScreenshot(page, {path:path.join(output,`${scenario.name}-${theme}-json-${kind}.png`),scale:'css'});
   }
   await panel.evaluate(p=>{p._retryKind=null;p._setStatus('','');p._updateHeader();});
   assert.equal(await panel.evaluate(p=>p._source()),source);
@@ -507,7 +508,7 @@ async function energyFormatting(page, panel, config, client, original, run, save
       assert.ok(options.includes('Wh') && options.includes('J'));
       assert.ok(!options.includes('W') && !options.includes('kW'), 'Power unit offered for an energy source');
     }
-    if (capture) await page.screenshot({ path: path.join(output, run + '-energy-options.png'), scale: 'css' });
+    if (capture) await captureScreenshot(page, { path: path.join(output, run + '-energy-options.png'), scale: 'css' });
     await item.click();
     await item.waitFor({ state: 'hidden' });
   };
@@ -549,9 +550,9 @@ async function energyFormatting(page, panel, config, client, original, run, save
       return issues;
     }), []);
     await dialog.evaluate(element => { element.shadowRoot.querySelector('.body').scrollTop = 0; });
-    await page.screenshot({ path: path.join(output, run + '-energy-dialog.png'), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, run + '-energy-dialog.png'), scale: 'css' });
     await dialog.evaluate(element => { const body = element.shadowRoot.querySelector('.body'); body.scrollTop = body.scrollHeight; });
-    await page.screenshot({ path: path.join(output, run + '-energy-dialog-bottom.png'), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, run + '-energy-dialog-bottom.png'), scale: 'css' });
     await panel.locator('ha-dialog [data-save]').click();
     await panel.locator('ha-dialog').waitFor({ state: 'detached' });
     assert.deepEqual(await panel.evaluate(p => p._container('page', window.__energyPosition).entities[0].variables), {
@@ -579,7 +580,7 @@ async function energyFormatting(page, panel, config, client, original, run, save
       return { dialogs: p.shadowRoot.querySelectorAll('ha-dialog').length, open: dialog?.open,
         actions: [...(dialog?.querySelectorAll('[data-save]') || [])].map(button => ({ box: button.getBoundingClientRect().toJSON(), display: getComputedStyle(button).display, visibility: getComputedStyle(button).visibility })) };
     }), null, 2));
-    await page.screenshot({ path: path.join(output, run + '-energy-failure.png'), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, run + '-energy-failure.png'), scale: 'css' });
     throw error;
   } finally {
     const current = await client.call({ type: 'marao_dashboard/config/get' });
@@ -618,10 +619,10 @@ async function releasedDraftPreservation(page, panel, client, scenario, theme) {
       assert.deepEqual(JSON.parse(await panel.evaluate(p => p._source())), expected, record.tag);
       await applyVisualPreferences(page, scenario, theme);
       assert.deepEqual(await emulationIssues(page, scenario, theme), [], 'Historical Visual draft profile');
-      await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-${record.tag}-preserved-visual.png`), scale: 'css' });
+      await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-${record.tag}-preserved-visual.png`), scale: 'css' });
       await panel.evaluate(p => p._switchTab('json'));
       assert.deepEqual(JSON.parse(await panel.evaluate(p => p._monaco.getValue())), expected, record.tag);
-      await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-${record.tag}-preserved-json.png`), scale: 'css' });
+      await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-${record.tag}-preserved-json.png`), scale: 'css' });
     }
   } catch (error) {
     fs.writeFileSync(path.join(output, `${scenario.name}-${theme}-preservation-failure.txt`), error.stack || error.message);
@@ -688,9 +689,9 @@ async function independentRoomChecks(page, panel, client, scenario, theme) {
       visit(element);
       return issues;
     }), []);
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-rooms-${name}.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-rooms-${name}.png`), scale: 'css' });
     await dialog.evaluate(element => { const body = element.shadowRoot.querySelector('.body'); body.scrollTop = body.scrollHeight; });
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-rooms-${name}-bottom.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-rooms-${name}-bottom.png`), scale: 'css' });
   };
   try {
     await open();
@@ -853,9 +854,9 @@ async function entityGroupEditorChecks(page, panel, client, config, originalByte
       for (const row of element.querySelectorAll('.entity-row')) if (row.scrollWidth > row.clientWidth + 1) issues.push('Group member row overflows');
       return issues;
     }), []);
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-groups-${name}.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-groups-${name}.png`), scale: 'css' });
     await dialog.evaluate(element => { const body = element.shadowRoot.querySelector('.body'); body.scrollTop = body.scrollHeight; });
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-groups-${name}-bottom.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-groups-${name}-bottom.png`), scale: 'css' });
   };
   try {
     assert.equal(original.dirty, false, 'Displayed defaults must start clean');
@@ -1000,7 +1001,7 @@ async function editablePageChecks(page, panel, client, config, originalBytes, sc
   const capture = async name => {
     await applyVisualPreferences(page, scenario, theme);
     assert.deepEqual(await emulationIssues(page, scenario, theme), []);
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-pages-${name}.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-pages-${name}.png`), scale: 'css' });
     assert.deepEqual(await panel.evaluate(p => {
       const issues = [], dialog = p.shadowRoot.querySelector('ha-dialog');
       const root = dialog || p.shadowRoot.querySelector('#page-manager');
@@ -1011,7 +1012,7 @@ async function editablePageChecks(page, panel, client, config, originalBytes, sc
       for (const row of root.querySelectorAll('.entity-row, .room-header, .card-heading')) if (row.scrollWidth > row.clientWidth + 1) issues.push('Page row overflows');
       return issues;
     }), []);
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-pages-${name}.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-pages-${name}.png`), scale: 'css' });
   };
   try {
     const pins = await panel.evaluate(p => p._navigationEntries().length);
@@ -1143,7 +1144,7 @@ async function main() {
             const box = element.getBoundingClientRect();
             return box.left >= -1 && box.right <= innerWidth + 1;
           }, sidebar);
-          await page.screenshot({ path: path.join(output, scenario.name + '-' + theme + '-brand-sidebar.png'), scale: 'css' });
+          await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-brand-sidebar.png'), scale: 'css' });
           await drawer.evaluate(async element => { element.open = false; await element.updateComplete; });
           await page.waitForFunction(element => element.getBoundingClientRect().right <= 1, sidebar);
         }
@@ -1246,7 +1247,7 @@ async function main() {
           return issues;
         });
         assert.deepEqual(geometry, []);
-        await page.screenshot({ path: path.join(output, scenario.name + '-' + theme + '-menu.png'), scale: 'css' });
+        await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-menu.png'), scale: 'css' });
         await panel.evaluate(p => { p.shadowRoot.querySelector('.secondary-actions').open = false; });
         const input=panel.locator('#general-form input').first();
         await input.scrollIntoViewIfNeeded(); await input.focus();
@@ -1254,7 +1255,7 @@ async function main() {
         assert.ok(field.y>=header.y+header.height-1,'Focused field is hidden behind the pinned header');
         const bounds = await scrollHeader(panel);
         fs.writeFileSync(path.join(output, scenario.name + "-" + theme + "-bounds.json"), JSON.stringify(bounds));
-        await page.screenshot({ path: path.join(output, scenario.name + "-" + theme + ".png"), scale: "css" });
+        await captureScreenshot(page, { path: path.join(output, scenario.name + "-" + theme + ".png"), scale: "css" });
         assert.ok(bounds.every(b => b.top >= b.hostTop - 1 && (b.scroll === 0 || b.top <= b.hostTop + 1) && b.bottom < b.hostBottom - 48), "Pinned header must remain visible and leave usable form space");
         await panel.locator('.secondary-actions summary').click();
         assert.equal(await panel.locator('#open-dashboard').getAttribute('target'), '_blank');
@@ -1293,22 +1294,22 @@ async function main() {
         assert.equal(await panel.evaluate(p=>p._source()),before);
         // The actual affected room rows, with the pinned controls in view.
         await panel.locator('[data-action="card-delete"]').first().scrollIntoViewIfNeeded();
-        await page.screenshot({path:path.join(output,scenario.name+'-'+theme+'-rows.png'),scale:'css'});
+        await captureScreenshot(page, {path:path.join(output,scenario.name+'-'+theme+'-rows.png'),scale:'css'});
         await panel.evaluate((p, dirty) => { p._dirty = dirty; p._updateHeader(); }, originalDirty);
       }
-      await page.screenshot({ path: path.join(output, scenario.name + "-" + theme + ".png"), scale: "css" });
+      await captureScreenshot(page, { path: path.join(output, scenario.name + "-" + theme + ".png"), scale: "css" });
       if(process.argv.includes('--surfaces')) {
         for(const id of ['general-form','page-manager','navbar-list']) {
           await panel.locator('#'+id).scrollIntoViewIfNeeded();
-          await page.screenshot({path:path.join(output,scenario.name+'-'+theme+'-'+id+'.png'),scale:'css'});
+          await captureScreenshot(page, {path:path.join(output,scenario.name+'-'+theme+'-'+id+'.png'),scale:'css'});
         }
         const custom=panel.locator('#page-manager [data-kind="page"][data-action="card-delete"]').last();
         await custom.scrollIntoViewIfNeeded();
         const customBounds=await custom.boundingBox();
         assert.ok(customBounds.width>=48&&customBounds.height>=48,'Custom-page Delete target is too small');
-        await page.screenshot({path:path.join(output,scenario.name+'-'+theme+'-custom-rows.png'),scale:'css'});
+        await captureScreenshot(page, {path:path.join(output,scenario.name+'-'+theme+'-custom-rows.png'),scale:'css'});
         await panel.locator('.secondary-actions summary').click();
-        await page.screenshot({path:path.join(output,scenario.name+'-'+theme+'-menu.png'),scale:'css'});
+        await captureScreenshot(page, {path:path.join(output,scenario.name+'-'+theme+'-menu.png'),scale:'css'});
         await panel.locator('#history').click();
         await panel.locator('ha-dialog [data-close]').waitFor({state:'visible'});
         await page.waitForFunction(p=>p.shadowRoot.querySelector('ha-dialog')?.shadowRoot.querySelector('wa-dialog')?.shadowRoot.querySelector('dialog')?.open,await panel.elementHandle());
@@ -1316,7 +1317,7 @@ async function main() {
           const modal=d.shadowRoot.querySelector('wa-dialog').shadowRoot.querySelector('dialog');
           await Promise.all(modal.getAnimations().map(a=>a.finished));
         });
-        await page.screenshot({path:path.join(output,scenario.name+'-'+theme+'-history.png'),scale:'css'});
+        await captureScreenshot(page, {path:path.join(output,scenario.name+'-'+theme+'-history.png'),scale:'css'});
         await panel.locator('ha-dialog [data-close]').click();
         await panel.locator('ha-dialog').waitFor({state:'detached'});
         await feedbackChecks(page,panel,scenario,theme);
@@ -1329,6 +1330,10 @@ async function main() {
       console.log("Editor checked: " + scenario.name + " (" + theme + ")");
     }
     if (process.argv.includes("--startup")) for (const file of ["MaraoDashboardJsonEditor.js", "MaraoDashboardJsonEditor.css", "MaraoDashboardJsonWorker.js"]) await assetRetry(browser, config, runs[0], file);
+  } catch (error) {
+    const page = browser.contexts().at(-1)?.pages().at(-1);
+    if (page && !page.isClosed()) await captureScreenshot(page, { path: path.join(output, 'editor-failure.png'), scale: 'css' });
+    throw error;
   } finally { client.close(); await browser.close(); }
 }
 

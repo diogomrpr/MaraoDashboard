@@ -51,3 +51,12 @@ retargets known internal links; deletion requires resolving remaining links.
 Supported older configurations retain compatible explicit sheet references.
 Raw cards and unknown options are retained; raw sheets stay where they were
 authored. Manual YAML cards must point to an actual sheet in their own view.
+# Uniform access controls
+
+Access summaries, strict openers, close/lock actions and lock/cover-targeted
+guarded actions share the light/cover 174px minimum outer height and title/icon
+header. Text and errors can grow beyond that baseline. Gesture and service
+contracts remain unchanged. Use fixed-column sections for a continuous mixed
+control grid; full-width panels belong in separate explicit sections. Raw and
+automatic layouts retain their saved composition. Manual/native cards share the
+minimum; `custom:marao-control-grid` provides equal rows throughout one container.

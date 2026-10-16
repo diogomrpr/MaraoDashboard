@@ -1235,6 +1235,66 @@
           ]
         },
         {
+          "columns": 2,
+          "entities": [
+            {
+              "template": "hc_light_card",
+              "name": "Studio · simple light",
+              "entity_id": "light.marao_dashboard_test_onoff_light",
+              "id": "studio-grid-0"
+            },
+            {
+              "template": "hc_light_card",
+              "name": "Studio · brightness",
+              "entity_id": "light.marao_dashboard_test_light",
+              "id": "studio-grid-1"
+            },
+            {
+              "template": "hc_cover_card",
+              "name": "Studio · cover",
+              "entity_id": "cover.marao_dashboard_test_cover",
+              "id": "studio-grid-2"
+            },
+            {
+              "template": "hc_access_action_card",
+              "name": "Studio · lock",
+              "variables": {
+                "action_service": "lock.lock"
+              },
+              "entity_id": "lock.marao_dashboard_test_lock",
+              "id": "studio-grid-3"
+            },
+            {
+              "template": "hc_light_card",
+              "name": "Studio · hidden icon",
+              "show_icon": false,
+              "variables": {
+                "enable_slider": false
+              },
+              "entity_id": "light.marao_dashboard_test_room_light",
+              "id": "studio-grid-4"
+            },
+            {
+              "template": "hc_light_card",
+              "name": "Studio · hidden title",
+              "show_name": false,
+              "show_state": false,
+              "show_label": false,
+              "variables": {
+                "enable_slider": false
+              },
+              "entity_id": "light.marao_dashboard_test_light",
+              "id": "studio-grid-5"
+            },
+            {
+              "template": "hc_access_slide_action_card",
+              "name": "Studio · front entrance opening control with a deliberately long later-row title",
+              "entity_id": "lock.marao_dashboard_test_lock",
+              "id": "studio-grid-6"
+            }
+          ]
+        },
+        {
           "entities": []
         },
         {
@@ -1300,6 +1360,32 @@
               "variables": {
                 "apple_tv": true
               }
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "cards": [
+            {
+              "type": "custom:marao-control-grid",
+              "columns": 2,
+              "cards": [
+                {
+                  "type": "custom:marao-native-light-card",
+                  "entity": "light.marao_dashboard_test_light",
+                  "name": "Native grid light"
+                },
+                {
+                  "type": "custom:marao-native-cover-card",
+                  "entity": "cover.marao_dashboard_test_cover",
+                  "name": "Native grid cover"
+                },
+                {
+                  "type": "custom:marao-native-access-card",
+                  "entity": "lock.marao_dashboard_test_lock",
+                  "name": "Native grid door"
+                }
+              ]
             }
           ]
         }

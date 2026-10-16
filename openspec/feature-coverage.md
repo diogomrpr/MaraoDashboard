@@ -168,3 +168,14 @@ Navbar overflow keeps complete saved navigation lists and uses the shared render
 - Battery group severity: `entityGroupState.minimumReading`, shared battery palette and problem composition; focused `battery-groups` scope covers boundaries, recovery, safe live helpers and popup reachability.
 - Access label geometry: shared `MaraoSlideToOpen`, focused `access-label` scope covers actual same-row text/thumb geometry at narrow/wide widths, both languages and the selected mobile text profiles.
 - Visual editor rendering: focused `editor-rendering` scope covers section-local mutation, landing-only initial mounting, independent page expansion, complete unopened source preservation, current coordinates and JSON/drag continuity. Paired timing is private and bound to installed asset hashes.
+
+- Uniform controls: the `control-grid` scope covers shared 174px minimum surfaces,
+  equal rows, responsive preferred columns, native/group hosts and preserved
+  raw/automatic generation. Publication requires affected-format preserved-install
+  proof when generated container types change.
+- Factored verification retains reviewed geometry/behavior in one reference theme
+  and appearance/state coverage in both themes. Compatible visits share assertions
+  and editor alignment aliases canonical geometry. Explicit version-4 reuse
+  independently selects current requirements and validates original dependencies,
+  environment, captures and cleanup. Full/parallel execution remains explicit;
+  final inspection is current. Historical reports/fixtures remain immutable.

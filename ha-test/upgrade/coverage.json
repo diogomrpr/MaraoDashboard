@@ -650,6 +650,16 @@
       "file": "tests/test-ha-dashboard-accessibility.js",
       "assertion": "saved-page",
       "scope": "format"
+    },
+    "control-grid-generation": {
+      "file": "tests/components/marao_dashboard/test_control_grid.py",
+      "assertion": "test_released_sources_preserve_source_and_generated_children",
+      "scope": "candidate"
+    },
+    "control-grid-layout": {
+      "file": "tests/control-grid-checks.js",
+      "assertion": "controlGridChecks",
+      "scope": "shared"
     }
   },
   "cases": {
@@ -1264,6 +1274,19 @@
         "energy",
         "media"
       ]
+    },
+    "controlGridCases": {
+      "identities": [
+        "names",
+        "templates",
+        "columns",
+        "gap",
+        "minimumHeight"
+      ],
+      "checks": [
+        "control-grid-generation",
+        "control-grid-layout"
+      ]
     }
   },
   "capabilities": {
@@ -1337,6 +1360,13 @@
       "upgraded-pages",
       "native-storage",
       "history-recovery"
+    ],
+    "control-grid": [
+      "control-grid-generation",
+      "control-grid-layout",
+      "page-migration",
+      "history-recovery",
+      "upgraded-pages"
     ]
   },
   "required_install_assertions": [

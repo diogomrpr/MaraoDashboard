@@ -1,11 +1,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { factorChecks, geometryProfiles, profileOf } = require('./verification-policy');
 
 const runtime = 'custom_components/marao_dashboard/frontend/';
 const backend = 'custom_components/marao_dashboard/';
 const unit = (file, pattern) => ({ id: 'unit:' + file + (pattern ? ':' + pattern : ''), kind: 'offline',
   command: ['node', '--test', '--test-concurrency=1', ...(pattern ? ['--test-name-pattern', pattern] : []), 'tests/frontend/' + file + '.test.js'],
-  inputs: ['tests/frontend/' + file + '.test.js', 'tests/frontend/package.json', 'custom_components/package.json', runtime, 'frontend_src',
+  inputs: [...(file === 'verification' ? ['tests/verification-map.js'] : []), 'tests/frontend/' + file + '.test.js', 'tests/frontend/package.json', 'custom_components/package.json', runtime, 'frontend_src',
     ...(file === 'accessibility-profiles' ? ['tests/test-ha-dashboard-accessibility.js'] : []),
     ...(/verification|upgrade|release-gate/.test(file) ? ['ha-test', 'tests/verify-release.js', 'tests/verify-publish.js', 'tests/test-ha-upgrade.js', 'tests/verification-browser.js', 'tests/native-reconnect-exception.js'] : [])], exclusive: false });
 const python = file => ({ id: 'python:' + file, kind: 'offline', command: ['python', '-m', 'pytest', '-q', 'tests/components/marao_dashboard/' + file + '.py'],
@@ -22,6 +23,11 @@ const families = {
   camera: ['hc_camera_card'], history: ['hc_graph_card', 'hc_timeline_card', 'hc_toggle_graph_card'],
 };
 const components = {
+  'control-grid': { units: [['marao-control-grid'], ['marao-card-visibility'], ['marao-text-scale'], ['marao-native'], ['marao-security'], ['marao-climate-card', 'group|slider|brightness|cover|hold'], ['gallery-cases']],
+    python: ['test_control_grid', 'test_generator', 'test_page_generation', 'test_page_migration', 'test_release_replay_recovery', 'test_gallery_fixtures'], editor: true, upgrade: true,
+    browser: [...geometryProfiles.map(profile => browser('control-grid:' + profile, 'test-ha-card-alignment', ['--control-grid', '--scenario', profile])),
+      browser('sliders:iphone', 'test-ha-value-sliders', ['--scenario', 'iphone-normal']), browser('sliders:android', 'test-ha-value-sliders', ['--scenario', 'android-normal']),
+      browser('slider-headers:access', 'test-ha-security', ['--scenario', 'iphone-normal']), browser('access-label:android-gesture', 'test-ha-security', ['--scenario', 'android-normal'])] },
   'slider-headers': { units: [['marao-card-visibility'], ['marao-text-scale'], ['marao-climate-card', 'slider|brightness|percentage|cover'], ['marao-security'], ['gallery-cases']],
     python: ['test_gallery_fixtures'], templates: [...families.slider, 'hc_access_slide_action_card'],
     browser: [
@@ -45,6 +51,9 @@ const components = {
       ...['iphone-normal', 'android-normal', 'narrow-320', 'iphone-landscape', 'android-landscape', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200'].map(profile => browser('editor-rendering:' + profile, 'test-ha-editor', [profile === 'iphone-normal' ? '--rendering' : '--rendering-geometry', '--scenario=' + profile, ...(profile === 'iphone-normal' ? ['--drag', '--drag-save'] : profile === 'android-normal' ? ['--drag', '--portuguese'] : ['--drag-geometry'])])),
       browser('editor-rendering:pages', 'test-ha-editor', ['--pages', '--scenario=iphone-normal']),
       browser('editor-rendering:json', 'test-ha-editor', ['--json-tools', '--json-save', '--scenario=iphone-normal']),
+      {...browser('editor-json-appearance', 'test-ha-editor', ['--json-geometry', '--scenario=iphone-normal', '--theme=dark', '--screenshots=review']),
+        cases: [{id:'editor-json:dark:appearance',assertion:'json-editor',profile:'iphone-normal',theme:'dark',engine:'chromium',dimensions:['appearance','geometry'],themeIndependent:false,
+          reason:'Stock Monaco/native widget appearance retains an explicit dark geometry check.'}]},
       browser('editor-rendering:alignment', 'test-ha-card-alignment', ['--editor-rendering']),
     ] },
   'json-editor': { units: [['json-editor'], ['editor-model'], ['canonical-page-model'], ['editor-panel']], editor: true,
@@ -105,7 +114,7 @@ const components = {
   'saved-history': { python: ['test_history'], upgrade: true },
   packaging: { units: [['package-boundary'], ['brand-assets']], package: true },
   gallery: { units: [['gallery-cases']], python: ['test_gallery_fixtures'] },
-  verification: { units: [['verification'], ['verification-browser'], ['verification-evidence'], ['accessibility-profiles'], ['upgrade-prepared'], ['upgrade-runner'], ['release-gate']],
+  verification: { units: [['verification'], ['verification-policy'], ['verification-reuse'], ['verification-browser'], ['verification-evidence'], ['accessibility-profiles'], ['upgrade-prepared'], ['upgrade-runner'], ['release-gate']],
     browser: [browser('tooling-layout', 'test-ha-dashboard-accessibility', ['--focused', '--families', 'hc_light_card', '--scenario', 'iphone-normal', '--screenshots', 'review', '--popups', '--popup-hash', '#marao-dashboard-test-value-sliders-popup'], false),
       browser('tooling-actions', 'test-ha-dashboard-e2e', ['--toggle-only'])] },
   docs: {},
@@ -113,6 +122,8 @@ const components = {
 };
 
 const rules = [
+  [/^tests\/control-grid-checks\.js$/, ['control-grid']],
+  [/^tests\/verification-(policy|reuse)\.js$/, ['verification']],
   [/^tests\/(editor-rendering-checks|measure-ha-editor)\.js$/, ['editor-rendering']],
   [/^tests\/test-ha-ui-batch\.js$/, ['battery-groups', 'access-label']],
   [/^tests\/verification-map\.js$/, ['verification-map']],
@@ -171,6 +182,9 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     const rule = rules.find(([pattern]) => pattern.test(file));
     if (!rule) throw new Error('Unmapped changed file: ' + file + '. Add its component/check mapping.');
     let ids = rule[1];
+    if (declared.includes('control-grid') && /^tests\/test-ha-security\.js$/.test(file)) ids = ['control-grid'];
+    if (declared.includes('editor-rendering') && declared.includes('verification') && file === 'tests/json-editor-checks.js') ids = ['editor-rendering'];
+    if (declared.includes('control-grid') && /^(custom_components\/marao_dashboard\/generator\.py|frontend_src\/MaraoNativeCards\.js|custom_components\/marao_dashboard\/frontend\/MaraoNativeCards\.js|ha-test\/(cases\.json|dashboard\/|marao_dashboard_test_dashboard\.json|upgrade\/coverage\.json))/.test(file)) ids = ['control-grid'];
     if (declared.includes('slider-headers') && /^(tests\/test-ha-(card-alignment|dashboard-e2e)\.js|ha-test\/(cases\.json|dashboard\/|marao_dashboard_test_dashboard\.json))/.test(file)) ids = ['slider-headers'];
     if (declared.includes('editor-rendering') && /^(frontend_src\/MaraoDashboardPanel\.js|custom_components\/marao_dashboard\/frontend\/MaraoDashboardPanel\.|tests\/(test-ha-editor|editor-drag-checks|measure-ha-editor|editor-rendering-checks)\.js)/.test(file)) ids = ['editor-rendering'];
     if (declared.includes('access-label') && file === 'tests/test-ha-dashboard-accessibility.js') ids = ['access-label'];
@@ -180,7 +194,7 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     if (ids === 'editor-labels') ids = declared.includes('editor-drag') && !declared.includes('native') ? ['editor-ui', 'editor-drag'] : ['native', 'editor-ui'];
     if (ids === 'shared') {
       if (!declared.length && !conservativeShared) throw new Error(file + ': declare --component after reviewing the shared-component diff.');
-      const consumers = ['battery-groups', 'access-label', 'slider-headers', 'navbar-overflow', 'native', 'security', 'labels', 'slider', 'light', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
+      const consumers = ['control-grid', 'battery-groups', 'access-label', 'slider-headers', 'navbar-overflow', 'native', 'security', 'labels', 'slider', 'light', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
       ids = declared.length ? declared.filter(id => consumers.includes(id)) : consumers;
       if (!ids.length) throw new Error(file + ': a runtime component is required; documentation scope cannot omit its checks.');
     }
@@ -239,7 +253,13 @@ function checksFor(selection, { full = false, offline = false, parallel = false 
     const patterns = [previous, check].map(row => row.command.includes('--test-name-pattern') ? row.command[row.command.indexOf('--test-name-pattern') + 1] : null);
     merged.set(file, unit(path.basename(file, '.test.js'), patterns.every(Boolean) ? patterns.join('|') : undefined));
   }
-  return [...merged.values()].sort((a, b) => (a.kind !== 'offline') - (b.kind !== 'offline'));
+  return factorChecks([...merged.values()], { full }).map(check => check.kind === 'browser' && !check.cases ? {
+    ...check, cases: [{ id: check.id, assertion: check.command[1], dimensions: ['registered-contract'],
+      profile: check.command.some(arg => arg === '--scenario' || arg.startsWith('--scenario=')) ? profileOf(check) : 'runner-defined',
+      theme: check.command.find(arg => arg.startsWith('--theme='))?.split('=')[1] || 'both',
+      engine: check.command.includes('--webkit') ? 'webkit' : 'chromium', themeIndependent: false,
+      reason: 'Retain the existing runner assertions and theme coverage; no equivalence reduction.' }],
+  } : check).sort((a, b) => (a.kind !== 'offline') - (b.kind !== 'offline'));
 }
 
 module.exports = { checksFor, components, families, rules, selectComponents };

@@ -23,6 +23,7 @@ cards:
           entity3: input_boolean.marao_dashboard_test_three
           entity3_name: Three
 
+
       - type: entities
         title: State simulators
         show_header_toggle: false
@@ -1256,3 +1257,5 @@ cards:
               perform_action: media_player.volume_up
               target:
                 entity_id: media_player.marao_dashboard_test_apple_tv
+
+  - {"type": "custom:marao-control-grid", "columns": 2, "cards": [{"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.marao_dashboard_test_onoff_light", "name": "Grid · simple light"}, {"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.marao_dashboard_test_light", "name": "Grid · brightness"}, {"type": "custom:marao-card", "template": "hc_cover_card", "entity": "cover.marao_dashboard_test_cover", "name": "Grid · cover"}, {"type": "custom:marao-card", "template": "hc_access_action_card", "entity": "lock.marao_dashboard_test_lock", "name": "Grid · lock", "variables": {"action_service": "lock.lock"}}, {"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.marao_dashboard_test_room_light", "name": "Grid · hidden icon", "show_icon": false, "variables": {"enable_slider": false}}, {"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.marao_dashboard_test_light", "name": "Grid · hidden title", "show_name": false, "show_state": false, "show_label": false, "variables": {"enable_slider": false}}, {"type": "custom:marao-card", "template": "hc_access_hold_action_card", "entity": "lock.marao_dashboard_test_lock", "name": "Grid · guarded lock", "variables": {"action_service": "lock.lock", "action_label": "Lock safely"}}, {"type": "custom:marao-card", "template": "hc_access_card", "entity": "lock.marao_dashboard_test_lock", "name": "Grid · door summary", "tap_action": {"action": "none"}}, {"type": "custom:marao-card", "template": "hc_access_slide_action_card", "entity": "lock.marao_dashboard_test_lock", "name": "Grid · front entrance opening control with a deliberately long later-row title"}]}

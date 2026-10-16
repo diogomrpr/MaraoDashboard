@@ -40,9 +40,10 @@ test('slider header scope retains geometry, optional variants and safe gestures 
     'tests/test-ha-dashboard-e2e.js', 'ha-test/cases.json', 'ha-test/dashboard/views/00-card-test.yaml'], ['slider-headers']);
   assert.deepEqual(selection.components, ['slider-headers']);
   const checks = checksFor(selection);
-  assert.equal(checks.filter(check => check.command.includes('--slider-headers')).length, 9);
+  assert.equal(checks.flatMap(check => check.cases || []).filter(row => row.assertion === 'slider-headers' && row.dimensions.includes('geometry')).length, 9);
   assert.ok(checks.some(check => check.id === 'slider-headers:access'));
-  for (const id of ['sliders:iphone', 'sliders:android', 'slider-headers:iphone-page-zoom-200', 'slider-headers:iphone-bold-text-200']) assert.ok(checks.some(check => check.id === id));
+  for (const id of ['sliders:iphone', 'sliders:android']) assert.ok(checks.some(check => check.id === id));
+  for (const profile of ['iphone-page-zoom-200', 'iphone-bold-text-200']) assert.ok(checks.some(check => check.cases?.some(row => row.id === 'slider-headers:' + profile + ':light')));
   assert.ok(!checks.some(check => /camera|editor|mobile-matrix|preserved-upgrade|native-reconnect/.test(check.id)));
 });
 
@@ -150,7 +151,7 @@ test('UI batch selection keeps bounded runtime and editor consumers without hist
   assert.deepEqual(selection.components, ['access-label', 'battery-groups', 'editor-rendering']);
   const checks = checksFor(selection);
   assert.ok(checks.some(c => c.command.includes('--battery')));
-  assert.ok(checks.some(c => c.command.includes('--access-label')));
+  assert.ok(checks.some(c => c.command.includes('--access')));
   assert.ok(checks.some(c => c.command.includes('--rendering')));
   assert.ok(checks.some(c => c.command.includes('--drag-save')));
   assert.ok(!checks.some(c => /mobile-matrix|preserved-upgrade|native-reconnect|camera/.test(c.id)));

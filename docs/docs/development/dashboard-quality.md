@@ -157,7 +157,7 @@ screenshots or an inspection made before the last edit do not satisfy it.
 
 Use impact-based scope during normal work: inspect only the affected-card set.
 Inspect the complete gallery manually only when the user explicitly requests it.
-Automated release layout checks still cover the full gallery.
+Selected automated layout checks cover the affected gallery families.
 
 ### Test timing
 
@@ -597,7 +597,7 @@ large and readable.
 
 ## Release verification
 
-The complete release gate covers the generated dashboard and card gallery at:
+Affected release checks select relevant profiles from the following supported layouts; the complete gallery matrix requires an explicit comprehensive request:
 
 | Profile | Viewport |
 |---|---:|
@@ -652,7 +652,7 @@ A change is done when:
 - no essential content clips under the relevant mobile/text configuration;
 - state and safety gestures are correct for affected actions, with one dispatch
   per completed interaction;
-- the full gate passes when requested, stabilizing, or publishing;
+- the affected gate passes, with comprehensive coverage only when explicitly requested;
 - no known relevant violation of this contract remains at publish time, even
   when the automated gate cannot detect it;
 - routine results are reported concisely and any known limitation is stated.
@@ -660,3 +660,22 @@ A change is done when:
 Battery-group defaults use the minimum valid member percentage for the shared battery palette: below 20 red, 20–below 80 yellow, 80–100 green. The first usable reading and existing counts keep their meaning. A critical group with partial availability retains its red surface and low/unavailable details; noncritical partial warnings, complete neutral loss and reported errors retain their existing priority.
 
 Strict-access cards in Home Assistant grids use the available grid row when the configured columns would leave less than 144px per cell. This keeps the fixed thumb and wrapping label contained at 200% zoom, including generated, popup and native card hosts, without changing saved column preferences.
+
+### Uniform control grids
+
+Light, cover, access-summary and opening/closing/locking controls share a 174 CSS
+pixel minimum outer surface, including sliderless and hidden-field variants.
+This is a minimum, not a clipping limit. Titles and icons share their header;
+fan cards retain their header without adopting this size.
+
+Wholly eligible owned sections use `custom:marao-control-grid`: all rows share
+the tallest necessary height, with an 8px gap and equal-width cells. Columns
+are a preferred maximum and reflow together before controls become cramped.
+An incomplete final row keeps its normal card width. Raw/non-control sections
+retain their composition; independent grids do not share a global maximum.
+
+Reviewed theme-independent geometry/behavior runs in light; representative
+appearance, state cues and contrast remain covered in both themes. Theme-sensitive
+contracts keep their additional combinations. Share compatible visits, preserve
+distinct native gestures and text-versus-zoom cases, and validate explicit reuse
+against current dependencies, environment and cleanup. Final inspection is current.

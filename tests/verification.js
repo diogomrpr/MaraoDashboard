@@ -14,13 +14,15 @@ function parseArgs(argv = process.argv.slice(2)) {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (['--full', '--parallel', '--plan', '--offline', '--release', '--help'].includes(arg)) options[arg.slice(2)] = true;
-    else if (['--base', '--head', '--component', '--report', '--upgrade-report'].includes(arg)) {
+    else if (['--base', '--head', '--component', '--report', '--upgrade-report', '--reuse'].includes(arg)) {
       assert.ok(argv[i + 1] && !argv[i + 1].startsWith('--'), arg + ' requires a value');
       const value = argv[++i];
       if (arg === '--component') options.components.push(...value.split(','));
       else options[arg.slice(2).replace('-report', 'Report')] = value;
     } else throw new Error('Unknown verification option: ' + arg);
   }
+  assert.ok(!(options.reuse && options.full), 'Per-check reuse is available only in affected mode');
+  assert.ok(!(options.reuse && options.report), '--reuse and --report cannot be combined');
   return options;
 }
 
@@ -79,12 +81,38 @@ function inputHashes(inputs, cwd = root) {
   return result;
 }
 
+function dependencyInputs(inputs, cwd = root) {
+  const result = new Set(inputs), visited = new Set();
+  const visit = relative => {
+    if (visited.has(relative)) return; visited.add(relative);
+    const file = path.join(cwd, relative);
+    if (!fs.existsSync(file)) return;
+    if (fs.lstatSync(file).isDirectory()) {
+      for (const name of fs.readdirSync(file)) if (!name.startsWith('.') && !['node_modules', '__pycache__', 'ssh'].includes(name)) visit(relative + '/' + name);
+      return;
+    }
+    if (!/\.[cm]?js$/.test(relative)) return;
+    const source = fs.readFileSync(file, 'utf8');
+    for (const match of source.matchAll(/(?:require\(|from\s+|import\(|new URL\()\s*["'](\.[^"']+)["']/g)) {
+      const target = path.resolve(path.dirname(file), match[1]);
+      const resolved = [target, target + '.js', target + '.json', path.join(target, 'index.js')].find(item => fs.existsSync(item));
+      if (!resolved) continue;
+      const dependency = path.relative(cwd, resolved);
+      assert.ok(!dependency.startsWith('..') && !path.isAbsolute(dependency), 'Dependency escaped repository');
+      if (dependency === 'tests/verification-map.js' && !inputs.includes(dependency)) continue;
+      result.add(dependency); visit(dependency);
+    }
+  };
+  for (const input of inputs) visit(input);
+  return [...result].sort();
+}
+
 function checkIdentity(check, cwd = root) {
-  return digest(JSON.stringify({ command: check.command, inputs: inputHashes([...check.inputs, 'tests/verification.js', 'tests/verification-map.js', 'package-lock.json'], cwd) }));
+  return digest(JSON.stringify({ command: check.command, cases: check.cases || [], inputs: inputHashes([...dependencyInputs(check.inputs, cwd), 'tests/verification.js', 'tests/verification-policy.js', 'tests/verification-reuse.js', 'package-lock.json'], cwd) }));
 }
 
 function validateEvidence(report, plan, identities, { target, now = Date.now(), exactCommit = false } = {}) {
-  assert.equal(report?.version, 3, 'Unsupported scoped verification report');
+  assert.ok([3, 4].includes(report?.version), 'Unsupported scoped verification report');
   assert.equal(report.kind, 'scoped-verification');
   assert.equal(report.passed, true, 'Scoped verification failed');
   assert.equal(report.verified_cleanup, true, 'Verification cleanup is incomplete');
@@ -102,14 +130,23 @@ function validateEvidence(report, plan, identities, { target, now = Date.now(), 
     assert.equal(rows.length, 1, 'Missing or duplicate result: ' + id);
     assert.equal(rows[0].passed, true, 'Failed selected check: ' + id);
     assert.equal(rows[0].input_sha256, identities[id], 'Changed code/test/selector inputs: ' + id);
+    if (report.version === 4) {
+      assert.deepEqual(rows[0].cases || [], plan.checks.find(check => check.id === id).cases || [], 'Required logical cases changed');
+      const original = rows[0].origin ? require('./verification-reuse').originResult(report.filename, rows[0]) : { row: rows[0] };
+      require('./verification-reuse').validateRoutes(plan.checks.find(check => check.id === id), (original.report || report).visits);
+      const executed = Date.parse(original.row.executed_at);
+      assert.ok(Number.isFinite(executed) && executed <= now && now - executed < 86400000, 'Original execution is stale');
+      require('./verification-reuse').capturesValid(original.row, rows[0].capture_root || report.artifact_root);
+    }
   }
-  const requiresCaptures = plan.checks.some(check => check.command?.includes('--screenshots') && check.command.includes('review'));
+  const requiresCaptures = plan.checks.some(require('./verification-reuse').reviewCapturesRequired);
   if (requiresCaptures || report.results.some(row => Object.keys(row.captures || {}).length)) assert.ok(report.artifact_root, 'Missing captured evidence root');
   if (report.artifact_root) {
     assert.ok(path.isAbsolute(report.artifact_root), 'Invalid private artifact root');
     for (const row of report.results) {
       const check = plan.checks.find(check => check.id === row.id);
-      if (check?.command?.includes('--screenshots') && check.command.includes('review')) assert.ok(Object.keys(row.captures || {}).length, 'Missing representative capture');
+      if (require('./verification-reuse').reviewCapturesRequired(check)) assert.ok(Object.keys(row.captures || {}).length, 'Missing representative capture');
+      if (report.version === 4) continue;
       for (const [relative, hash] of Object.entries(row.captures || {})) {
       assert.ok(!path.isAbsolute(relative) && relative.split('/').every(part => part && part !== '..' && part !== '.'), 'Invalid capture path');
       const file = path.join(report.artifact_root, relative), stat = fs.lstatSync(file);
@@ -121,15 +158,15 @@ function validateEvidence(report, plan, identities, { target, now = Date.now(), 
   return report;
 }
 
-async function schedule(checks, execute, { parallel = false, signal } = {}) {
+async function schedule(checks, execute, { parallel = false, signal, onResult = () => {} } = {}) {
   const results = [];
   const pending = new Set();
   let failed;
   const start = check => {
     const started = Date.now();
     const task = Promise.resolve().then(() => execute(check, signal)).then(value => {
-      results.push({ id: check.id, passed: true, duration_ms: Date.now() - started, ...value });
-    }, error => { failed ||= error; results.push({ id: check.id, passed: false, duration_ms: Date.now() - started, error: error.message }); })
+      const row = { id: check.id, passed: true, duration_ms: Date.now() - started, ...value }; results.push(row); onResult(row);
+    }, error => { failed ||= error; const row = { id: check.id, passed: false, duration_ms: Date.now() - started, error: error.message, ...error.result }; results.push(row); onResult(row); })
       .finally(() => pending.delete(task));
     pending.add(task);
     return task;
@@ -151,20 +188,28 @@ async function schedule(checks, execute, { parallel = false, signal } = {}) {
 
 function readPrivate(filename) {
   assert.ok(path.isAbsolute(filename), 'Evidence requires an absolute private path');
-  const stat = fs.lstatSync(filename);
-  assert.ok(stat.isFile() && !stat.isSymbolicLink() && !(stat.mode & 0o077), 'Evidence must be a private regular file');
-  return JSON.parse(fs.readFileSync(filename));
+  return JSON.parse(require('./verification-reuse').privateFile(filename));
 }
 
 async function runPlan(plan, options = {}) {
+  const overallStarted = Date.now();
+  assert.ok(!(options.reuse && (plan.mode === 'full' || options.report)), 'Conflicting reuse options');
+  const { readReuse, reusableResult, atomicReport, liveEnvironment, originResult, capturesValid } = require('./verification-reuse');
+  const reuse = options.reuse ? readReuse(options.reuse) : null;
+  if (reuse) for (const row of reuse.results.filter(row => row.passed)) {
+    const original = originResult(options.reuse, row); capturesValid(original.row, original.report.artifact_root);
+    require('./verification-reuse').validateRoutes(original.row, original.report.visits);
+  }
   fs.mkdirSync(path.join(root, 'tests/.artifacts/verification'), { recursive: true, mode: 0o700 });
   const directory = fs.mkdtempSync(path.join(root, 'tests/.artifacts/verification/run-'));
   fs.chmodSync(directory, 0o700);
+  const identityStarted = Date.now();
   const identities = Object.fromEntries(plan.checks.map(check => [check.id, checkIdentity(check)]));
-  const report = { ...plan, version: 3, kind: 'scoped-verification', required: plan.checks.map(check => check.id), results: [],
-    artifact_root: directory, started_at: new Date().toISOString(), passed: false, verified_cleanup: false };
+  const report = { ...plan, version: 4, kind: 'scoped-verification', required: plan.checks.map(check => check.id), results: [],
+    artifact_root: directory, started_at: new Date(overallStarted).toISOString(), preflight_ms: identityStarted - overallStarted, identity_ms: Date.now() - identityStarted, passed: false, verified_cleanup: false };
   const filename = path.join(directory, 'report.json');
-  const save = () => fs.writeFileSync(filename, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
+  report.filename = filename; report.visits = []; report.reuse_reasons = {};
+  const save = () => atomicReport(filename, report);
   let receipt, preparation;
   const controller = new AbortController();
   const cancel = () => controller.abort();
@@ -185,10 +230,23 @@ async function runPlan(plan, options = {}) {
     save();
     const execution = await schedule(plan.checks, async check => {
       if (check.kind === 'browser' && check.id !== 'preserved-upgrade' && !receipt) {
+        const prepareStarted = Date.now();
         preparation ||= require('../ha-test/prepared-batch').prepareBatch(directory);
         receipt = await preparation;
         report.prepared_receipt = receipt;
+        report.environment = await liveEnvironment(receipt);
+        report.preparation_ms = Date.now() - prepareStarted; save();
       }
+      if (reuse && check.id !== 'preserved-upgrade') {
+        const validationStarted = Date.now();
+        const result = reusableResult(options.reuse, reuse, check, identities[check.id], report.environment);
+        report.reuse_reasons[check.id] = result.reason;
+        if (result.row) {
+          console.log('Reused check: ' + check.id);
+          return { ...result.row, validation_ms: Date.now() - validationStarted, duration_ms: 0 };
+        }
+      }
+      const executedAt = new Date().toISOString();
       const jobDirectory = path.join(directory, check.id.replace(/[^a-z0-9_-]/gi, '_'));
       fs.mkdirSync(jobDirectory, { mode: 0o700 });
       const [program, ...args] = check.command;
@@ -212,7 +270,13 @@ async function runPlan(plan, options = {}) {
         child.once('error', reject);
         child.once('exit', (code, signal) => {
           controller.signal.removeEventListener('abort', stop);
-          code === 0 && !signal ? resolve() : reject(new Error(check.id + ' failed' + (signal ? ': ' + signal : '')));
+          if (code === 0 && !signal) resolve();
+          else {
+            const error = new Error(check.id + ' failed' + (signal ? ': ' + signal : ''));
+            const outcomes = path.join(jobDirectory, 'logical-outcomes.json');
+            if (fs.existsSync(outcomes)) error.result = { outcomes: JSON.parse(fs.readFileSync(outcomes)) };
+            reject(error);
+          }
         });
       });
       assert.equal(checkIdentity(check), identities[check.id], 'Inputs changed during check: ' + check.id);
@@ -230,11 +294,23 @@ async function runPlan(plan, options = {}) {
         }
       };
       privateFiles(jobDirectory);
-      return { input_sha256: identities[check.id], artifacts: path.relative(directory, jobDirectory), captures };
-    }, { parallel: plan.parallel, signal: controller.signal });
-    report.results = execution.results;
+      const cases = check.cases || [];
+      const outcomesFile = path.join(jobDirectory, 'logical-outcomes.json');
+      const outcomes = fs.existsSync(outcomesFile) ? JSON.parse(fs.readFileSync(outcomesFile)) : undefined;
+      if (check.kind !== 'offline') {
+        const visitsFile = path.join(jobDirectory, 'visits.json');
+        const visits = fs.existsSync(visitsFile) ? JSON.parse(fs.readFileSync(visitsFile)) : [{ route: check.command[1] }];
+        const recorded = visits.map((visit, index) => ({ ...visit, id: check.id + ':' + index, cases: cases.map(row => row.id), executed_at: executedAt }));
+        require('./verification-reuse').validateRoutes(check, recorded);
+        report.visits.push(...recorded);
+      }
+      return { input_sha256: identities[check.id], artifacts: path.relative(directory, jobDirectory), captures, cases, outcomes,
+        execution_ms: Date.now() - Date.parse(executedAt), executed_at: executedAt, environment: check.kind !== 'offline' ? report.environment : undefined, reused: false };
+    }, { parallel: plan.parallel, signal: controller.signal, onResult: row => { report.results.push(row); save(); } });
     if (execution.failure) throw execution.failure;
+    const cleanupStarted = Date.now();
     if (receipt) await require('../ha-test/prepared-batch').restoreBatch(receipt);
+    report.cleanup_ms = Date.now() - cleanupStarted;
     report.verified_cleanup = true;
     report.passed = true;
   } catch (error) { report.failure = error.message; throw error; }
@@ -245,6 +321,12 @@ async function runPlan(plan, options = {}) {
     }
     process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel);
     report.completed_at = new Date().toISOString();
+    report.metrics = { wall_ms: Date.parse(report.completed_at) - Date.parse(report.started_at),
+      fresh: report.results.filter(row => !row.reused && row.passed).length, reused: report.results.filter(row => row.reused).length,
+      logical_cases: report.results.reduce((count, row) => count + (row.cases?.length || 0), 0), visits: report.visits.length,
+      capture_count: report.results.reduce((count, row) => count + Object.keys(row.captures || {}).length, 0),
+      execution_ms: report.results.filter(row => !row.reused).reduce((total, row) => total + (row.execution_ms ?? row.duration_ms), 0),
+      validation_ms: report.preflight_ms + report.identity_ms + report.results.reduce((total, row) => total + (row.validation_ms || 0), 0) };
     save();
     console.log('Scoped verification report: ' + filename);
   }
@@ -254,14 +336,14 @@ async function runPlan(plan, options = {}) {
 async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
   if (options.help) {
-    console.log('test:affected [--base ref] [--head ref] [--component id] [--plan] [--offline] [--parallel]\n' +
+    console.log('test:affected [--base ref] [--head ref] [--component id] [--plan] [--offline] [--parallel] [--reuse /absolute/private/report.json]\n' +
       'test:full [--plan] [--offline] [--parallel]\nDefault: affected checks, serial. Components: ' + Object.keys(components).join(', '));
     return;
   }
   const plan = makePlan(options);
   if (options.plan) {
     console.log(JSON.stringify({ mode: plan.mode, base: plan.baseRef, head: plan.head, components: plan.components, reasons: plan.reasons,
-      parallel: plan.parallel, checks: plan.checks.map(({ id, command }) => ({ id, command })), excluded: plan.excluded }, null, 2));
+      parallel: plan.parallel, checks: plan.checks.map(({ id, command, cases }) => ({ id, command, cases })), excluded: plan.excluded }, null, 2));
     return plan;
   }
   console.log(`${plan.mode}: ${plan.checks.length} selected checks; ${plan.components.join(', ')}; ${plan.parallel ? 'parallel requested' : 'serial'}. Use --plan for selection reasons.`);
@@ -270,4 +352,4 @@ async function main(argv = process.argv.slice(2)) {
 }
 
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
-module.exports = { changedFiles, checkIdentity, digest, git, inputHashes, main, makePlan, parseArgs, readPrivate, root, runPlan, schedule, validateEvidence };
+module.exports = { changedFiles, checkIdentity, dependencyInputs, digest, git, inputHashes, main, makePlan, parseArgs, readPrivate, root, runPlan, schedule, validateEvidence };

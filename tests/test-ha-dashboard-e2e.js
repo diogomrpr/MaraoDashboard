@@ -100,8 +100,8 @@ function cardAction(page, title) {
   return cardByTitle(page, title).locator("[data-card-action]");
 }
 
-async function titleLayoutIssues(page, families = []) {
-  return page.locator("marao-card,marao-state-timeline-card,marao-energy-period-card,marao-camera-events-card,marao-frigate-events-card").evaluateAll((cards, families) => cards.filter(card => !families.length || families.includes(card._config?.template || card.localName)).flatMap((card) => {
+async function titleLayoutIssues(page, families = [], subtree) {
+  return page.locator("marao-card,marao-state-timeline-card,marao-energy-period-card,marao-camera-events-card,marao-frigate-events-card").evaluateAll((cards, { families, subtree }) => cards.filter(card => (!subtree || card === subtree || subtree.contains(card)) && (!families.length || families.includes(card._config?.template || card.localName))).flatMap((card) => {
     const title = card.shadowRoot?.querySelector(".body > .title,header > h2,.surface > h2");
     if (!title || !title.getBoundingClientRect().width) return [];
     const parent = title.parentElement;
@@ -123,7 +123,9 @@ async function titleLayoutIssues(page, families = []) {
     }
     const config = card._config || {};
     const service = config.variables?.action_service || config.tap_action?.service || config.tap_action?.perform_action;
-    const sliderHeader = ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_slide_action_card'].includes(config.template)
+    const sliderHeader = ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_card', 'hc_access_slide_action_card'].includes(config.template)
+      || config.template === 'hc_access_action_card' && ['lock.lock','cover.close_cover'].includes(service)
+      || config.template === 'hc_access_hold_action_card' && /^(lock|cover)\./.test(config.entity || '')
       || config.template?.startsWith('hc_access_') && ['lock.unlock', 'cover.open_cover'].includes(service);
     const icon = sliderHeader ? parent.querySelector(':scope > .icon, :scope > .binary-cue') : null;
     const iconBox = icon?.getBoundingClientRect();
@@ -136,7 +138,7 @@ async function titleLayoutIssues(page, families = []) {
       if (child !== title && child !== icon && other.width && other.height && other.top < (iconBox ? Math.max(rect.bottom, iconBox.bottom) : rect.bottom) - 1) issues.push(`${name}: content appears alongside or above its title`);
     }
     return issues;
-  }), families);
+  }), { families, subtree });
 }
 
 async function measureCenteredIcons(locator) {

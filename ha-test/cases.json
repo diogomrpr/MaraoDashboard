@@ -1813,5 +1813,32 @@
         }
       }
     }
-  ]
+  ],
+  "controlGridCases": {
+    "names": [
+      "Grid \u00b7 simple light",
+      "Grid \u00b7 brightness",
+      "Grid \u00b7 cover",
+      "Grid \u00b7 lock",
+      "Grid \u00b7 hidden icon",
+      "Grid \u00b7 hidden title",
+      "Grid \u00b7 guarded lock",
+      "Grid \u00b7 door summary",
+      "Grid \u00b7 front entrance opening control with a deliberately long later-row title"
+    ],
+    "templates": [
+      "hc_light_card",
+      "hc_light_card",
+      "hc_cover_card",
+      "hc_access_action_card",
+      "hc_light_card",
+      "hc_light_card",
+      "hc_access_hold_action_card",
+      "hc_access_card",
+      "hc_access_slide_action_card"
+    ],
+    "columns": 2,
+    "gap": 8,
+    "minimumHeight": 174
+  }
 }

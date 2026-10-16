@@ -42,3 +42,15 @@ control appear below.
 The slider uses the entity's supported color modes to detect dimming support.
 On/off-only lights have a toggle without a slider. Set `enable_slider: false` to
 hide it on dimmable lights. `custom_label` adds a prefix to useful nonbinary state content or retains a substantive label on a binary card.
+
+Standard light, cover and access controls share a 174px minimum outer height,
+with title and icon in the same header. Omitted sliders remain absent; essential
+text and problems can increase the required height.
+
+Use **Edit layout → fixed columns** for one continuous mixed control grid in
+saved order. Eligible sections use equal rows throughout, an 8px gap and a
+responsive column count up to the selected maximum. The final card keeps its
+normal width. Keep full-width cameras, charts and detailed panels in separate
+explicit sections. Automatic mode retains domain grouping, and raw/non-control
+sections retain their existing layout. Manual/native cards share the minimum;
+place eligible cards inside `custom:marao-control-grid` for whole-grid equality.

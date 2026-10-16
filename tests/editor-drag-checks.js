@@ -1,3 +1,4 @@
+const { capture: captureScreenshot } = require('./verification-browser');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -147,7 +148,7 @@ async function editorDragChecks(page, panel, { scenario, theme, output, client, 
         return r.top>=p.shadowRoot.querySelector('.editor-header').getBoundingClientRect().bottom && r.bottom<innerHeight-40;
       },{p:await panel.elementHandle(),index:pageIndex},{timeout:15000});
       await touch('touchMove',await point(list(1)));
-      await page.screenshot({path:path.join(output,`${scenario.name}-${theme}-drag-target.png`),scale:'css'});
+      await captureScreenshot(page, {path:path.join(output,`${scenario.name}-${theme}-drag-target.png`),scale:'css'});
       await release(await point(list(1)));
       assert.deepEqual(await currentIds(0),['drag-b','drag-c','drag-d']);assert.deepEqual(await currentIds(1),['drag-a']);
       assert.equal(await panel.evaluate(p=>p.shadowRoot.activeElement?.matches('[data-card-handle]')),true,'Moved card focus lost');
@@ -201,7 +202,7 @@ async function editorDragChecks(page, panel, { scenario, theme, output, client, 
     await panel.locator('ha-dialog').waitFor({state:'detached'});
     assert.deepEqual(await currentIds(2),['drag-a','studio-media']);
     await geometry(); await reveal(row(2,0));
-    await page.screenshot({path:path.join(output,`${scenario.name}-${theme}-move-section.png`),scale:'css'});
+    await captureScreenshot(page, {path:path.join(output,`${scenario.name}-${theme}-move-section.png`),scale:'css'});
     assert.deepEqual(await panel.evaluate(p=>p.__moveWrites),[],'Moves must stay local');
     assert.equal((await client.call({type:'marao_dashboard/config/get'})).config,stored);
     if (persist) {
@@ -238,7 +239,7 @@ async function editorDragChecks(page, panel, { scenario, theme, output, client, 
     await page.waitForFunction(p=>!p._busy&&!p._loading&&!p._dirty,await panel.elementHandle());
     assert.deepEqual(JSON.parse(await sourceText()),JSON.parse(stored));
   } catch(error) {
-    await page.screenshot({path:path.join(output,`${scenario.name}-${theme}-drag-failure.png`),scale:'css'}).catch(()=>{});
+    await captureScreenshot(page, {path:path.join(output,`${scenario.name}-${theme}-drag-failure.png`),scale:'css'}).catch(()=>{});
     throw error;
   } finally {
     await session?.detach();

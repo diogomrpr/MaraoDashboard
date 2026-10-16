@@ -1,3 +1,4 @@
+const { capture: captureScreenshot } = require('./verification-browser');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -85,7 +86,7 @@ async function main() {
       await page.waitForFunction(() => document.querySelector('home-assistant').hass.states['alarm_control_panel.marao_dashboard_test_alarm'].state === 'disarmed');
       assert.equal(calls.length, count + 1, 'Completed hold must dispatch once');
       assert.equal(await code.inputValue(), '');
-      await page.screenshot({ path: path.join(output, scenario.name + '-' + theme + '-alarm.png'), scale: 'css' });
+      await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-alarm.png'), scale: 'css' });
       await page.locator('.marao-popup-close').click();
       assert.equal(await page.locator('[data-alarm-code]').count(), 0, 'Closed popup retained PIN input');
 
@@ -123,15 +124,19 @@ async function main() {
         await page.waitForTimeout(300);
         const dispatched = calls.filter(call => call.target === target).length;
         if (dispatched !== before + 1) {
-          await page.screenshot({ path: path.join(output, scenario.name + '-' + theme + '-' + domain + '-failure.png'), scale: 'css' });
+          await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-' + domain + '-failure.png'), scale: 'css' });
           console.error(JSON.stringify(await track.evaluate(element => element._securityTrace)));
         }
         assert.equal(dispatched, before + 1, domain + ' completed opener must dispatch once');
       }
-      await page.screenshot({ path: path.join(output, scenario.name + '-' + theme + '-openers.png'), scale: 'css' });
+      await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-openers.png'), scale: 'css' });
       assert.deepEqual(issues, [], 'Security browser warnings/errors');
       console.log(scenario.name + ' ' + theme + ': safe alarm and opener interactions passed');
       await context.close();
+    } catch (error) {
+      const page = browser.contexts().at(-1)?.pages().at(-1);
+      if (page && !page.isClosed()) await captureScreenshot(page, { path: path.join(output, 'security-failure.png'), scale: 'css' });
+      throw error;
     } finally { await browser.close(); }
   }
 }

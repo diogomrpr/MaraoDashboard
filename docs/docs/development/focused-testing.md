@@ -7,6 +7,46 @@ nav_order: 3
 
 # Focused testing
 
+Reviewed theme-independent geometry and behavior run in light; representative
+appearance/state/contrast checks remain in both themes. Theme-sensitive and
+unreviewed contracts retain additional combinations. Distinct text versus zoom,
+native gestures, safety, preservation and cold loads remain covered. Compatible
+gallery cases share visits; editor alignment aliases narrow-320 rendering/drag.
+
+`--component control-grid` selects shared sizing, generated/native/group hosts,
+preservation, alignment and safe slider/access checks. Generated container types
+change, so future release preparation requires preserved-install proof with
+`npm run test:ha:upgrade -- --scope control-grid`.
+
+```sh
+npm run test:affected -- --component control-grid,verification --plan
+npm run test:affected -- --component slider-headers,access-label,editor-rendering,battery-groups
+npm run test:affected -- --component slider-headers,access-label,editor-rendering,battery-groups --reuse /absolute/private/report.json
+npm run verify:publish -- --base <released-ref> --component control-grid --reuse /absolute/private/report.json
+```
+
+Reuse is explicit and affected-only. `--report` retains whole-proof validation
+and conflicts with `--reuse`; full mode rejects reuse. Version-4 evidence records
+independently required logical cases, physical route visits, capture counts,
+execution/validation timings and original provenance, with atomic checkpoints.
+Successful checks from a failed batch are eligible only after verified cleanup.
+Failed, absent, stale or changed-input/coverage/environment checks rerun with a
+recorded reason. Unsafe paths, malformed/unsupported evidence, missing artifacts
+and unverified cleanup fail preflight. Reuse chains cannot refresh original age.
+Shared visit duration is counted once. Historical reports remain immutable.
+
+Every live run prepares and validates the current installation; an old receipt
+cannot establish current package/source/fixture identities. Cleanup, final visual
+inspection, conditional upgrades, exact-commit CI and reconnect-exception expiry
+are never cached. Version-3 reports retain their original whole-proof validator
+and cannot supply per-check reuse.
+
+Capture policy is `failure` by default, `review` for representative successes,
+and explicitly `all` for exhaustive captures. Pixel comparisons remain assertions
+even without saved images. Readiness waits for native mounts, fonts and frames,
+restores touch emulation and can inspect newly mounted subtrees without repeating
+whole-gallery scans for equivalent samples.
+
 Use the smallest checks covering the implementation and its shared consumers.
 This is the default during development, versioning, CI and release preparation.
 A release request does not request the full suite or parallel execution.

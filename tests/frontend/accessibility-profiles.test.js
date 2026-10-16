@@ -130,6 +130,22 @@ test('visual preferences wait for native card rendering and reach late mounts', 
   } finally { globalThis.document = previous; globalThis.requestAnimationFrame = previousFrame; }
 });
 
+test('readiness waits for finite dialog animation without waiting for continuous spinners', { timeout: 1000 }, async () => {
+  let height = 46;
+  const animation = { playState: 'running', effect: { getComputedTiming: () => ({ endTime: 15 }) },
+    finished: new Promise(resolve => setTimeout(() => { height = 48; resolve(); }, 15)) };
+  const spinner = { playState: 'running', effect: { getComputedTiming: () => ({ endTime: Infinity }) },
+    get finished() { assert.fail('Continuous spinners cannot block readiness'); } };
+  const html = { localName: 'html', children: [], dataset: {}, style: { setProperty() {} }, getAnimations: () => [animation, spinner] };
+  const previous = { document: globalThis.document, requestAnimationFrame: globalThis.requestAnimationFrame };
+  globalThis.document = { documentElement: html, fonts: { ready: Promise.resolve() } };
+  globalThis.requestAnimationFrame = callback => queueMicrotask(callback);
+  const page = { evaluate: async (callback, data) => callback(data), waitForLoadState: async () => {},
+    context: () => ({ newCDPSession: async () => ({ send: async () => {} }) }) };
+  try { await applyVisualPreferences(page, scenarios.find(s => s.name === 'iphone-normal'), 'light'); assert.equal(height, 48); }
+  finally { Object.assign(globalThis, previous); }
+});
+
 test('mobile emulation explicitly restores touch together with text and safe-area settings', async () => {
   const calls=[];
   let sessions = 0;

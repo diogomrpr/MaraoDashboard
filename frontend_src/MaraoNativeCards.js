@@ -142,7 +142,7 @@ export class MaraoNativeCard extends BaseElement {
     }
     this.shadowRoot.replaceChildren();
     const style = document.createElement("style");
-    style.textContent = ":host{display:block;min-width:0;height:auto}button:focus{outline:none}.native-edit{position:fixed;top:max(12px," + safeArea("top") + ");right:max(12px," + safeArea("right") + ");z-index:1002;width:48px;height:48px;border:0;border-radius:50%;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow);cursor:pointer}";
+    style.textContent = ":host{display:block;min-width:0;height:auto}:host([data-marao-control-cell]){display:flex;flex-direction:column;align-items:stretch}:host([data-marao-control-cell])>marao-card{flex:1}button:focus{outline:none}.native-edit{position:fixed;top:max(12px," + safeArea("top") + ");right:max(12px," + safeArea("right") + ");z-index:1002;width:48px;height:48px;border:0;border-radius:50%;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow);cursor:pointer}";
     this.shadowRoot.append(style, ...children); this._children = children;
     // The host controls editor drag handles; prevent only the rendered card's own inputs.
     for (const event of ["click", "pointerdown", "pointerup", "keydown", "keyup"]) this.shadowRoot.addEventListener(event, this._guardPreview, true);

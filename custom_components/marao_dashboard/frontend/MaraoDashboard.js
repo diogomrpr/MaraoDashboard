@@ -299,6 +299,7 @@ const TRANSLATIONS = {
     "group.all_closed": "All closed",
     "group.low_count": "{count} low",
     "popup.controls_unavailable": "Controls unavailable",
+    "grid.invalid": "Use light, cover or access cards and one to six columns.",
     "common.on_count": "{count} on",
     "common.open_count": "{count} open",
     "common.need_attention_count": "{count} need attention",
@@ -456,6 +457,7 @@ const TRANSLATIONS = {
     "group.all_closed": "Tudo fechado",
     "group.low_count": "{count} com bateria fraca",
     "popup.controls_unavailable": "Controlos indisponíveis",
+    "grid.invalid": "Use cartões de luz, cobertura ou acesso e uma a seis colunas.",
     "common.on_count": "{count} ligados",
     "common.open_count": "{count} abertos",
     "common.need_attention_count": "{count} precisam de atenção",
@@ -728,6 +730,7 @@ class MaraoSlideToOpen extends HTMLElement {
   _fitAccessGrid() {
     // A fixed-size thumb and readable label cannot share a sub-100px grid cell.
     for (let item = this; item; item = item.parentElement || item.getRootNode?.()?.host) {
+      if (item.localName === "marao-control-grid" || item.classList?.contains("control-grid")) return;
       const grid = item.parentElement;
       if (grid?.id !== 'root' || grid.getRootNode().host?.localName !== 'hui-grid-card') continue;
       const root = grid.getRootNode(), columns = Number(root.host._config?.columns) || 3;
