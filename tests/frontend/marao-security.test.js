@@ -171,3 +171,20 @@ test("strict slide routes every native opener once and rejects incompatible over
     assert.equal(accessOpenerService(id, "homeassistant.toggle"), "");
   }
 });
+
+test('strict access hosts share one responsive grid rule across generated and native nesting', () => {
+  const styles = [], attributes = new Set();
+  const document = { createElement: () => ({ dataset: {} }) };
+  const Slide = new Function('document', dashboard.slice(dashboard.indexOf('class MaraoSlideToOpen'), dashboard.indexOf('if (!customElements.get("marao-slide-to-open"))')) + '; return MaraoSlideToOpen;')(document);
+  const root = { host: { localName: 'hui-grid-card', _config: { columns: 2 } }, querySelector: () => styles[0], append: style => styles.push(style) };
+  const grid = { id: 'root', getRootNode: () => root };
+  const item = { parentElement: grid, setAttribute: key => attributes.add(key) };
+  for (const nested of [false, true]) {
+    const slide = new Slide();
+    if (nested) slide.getRootNode = () => ({ host: { parentElement: item } }); else slide.parentElement = item;
+    slide._fitAccessGrid(); assert.equal(slide._accessGridItem, item);
+  }
+  assert.ok(attributes.has('data-marao-access-grid-item'));
+  assert.equal(styles.length, 1); assert.match(styles[0].textContent, /max-width:296px/);
+  assert.match(styles[0].textContent, /grid-column:1\/-1/);
+});

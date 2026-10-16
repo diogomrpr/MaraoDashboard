@@ -363,6 +363,15 @@ function visualVariablesForScenario(scenario, theme) {
 }
 
 async function applyVisualPreferences(page, scenario, theme) {
+  // Native card creation can outlast a fixed delay, especially in the gallery.
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(async () => {
+    const visit = async (element) => {
+      await element.updateComplete;
+      await Promise.all([...element.children, ...(element.shadowRoot?.children || [])].map(visit));
+    };
+    await visit(document.documentElement);
+  });
   const variables = visualVariablesForScenario(scenario, theme);
   const apply = () => page.evaluate(({ cssVariables, profile, mode }) => {
     const apply = (element) => {
@@ -394,6 +403,9 @@ async function applyVisualPreferences(page, scenario, theme) {
   // Chromium can reset touch when its renderer changes after initial setup.
   const session = await emulationSession(page.context(), page);
   await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  // Frame-scheduled native children need the same simulation as their parents.
+  await apply();
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
@@ -550,8 +562,16 @@ async function layoutIssues(page, families = []) {
           if (track && getComputedStyle(track).outlineStyle !== 'none') issues.push('access slide has a focus-only outline');
           if (label && thumb) {
             const range = document.createRange(); range.selectNodeContents(label);
-            if ([...range.getClientRects()].some(rect => rect.width && rect.height && intersects(rect, thumb.getBoundingClientRect()))) {
+            const lines = [...range.getClientRects()].filter(rect => rect.width && rect.height);
+            const thumbBox = thumb.getBoundingClientRect(), trackBox = track.getBoundingClientRect();
+            if (lines.some(rect => intersects(rect, thumbBox))) {
               issues.push(`${label.textContent.trim()}: access slide label overlaps its thumb`);
+            }
+            if (lines.length && !track.matches('.dragging,.completing')) {
+              const top = Math.min(...lines.map(rect => rect.top)), bottom = Math.max(...lines.map(rect => rect.bottom));
+              // Text glyph boxes can differ from their line box by a few pixels.
+              if (Math.abs((top + bottom - thumbBox.top - thumbBox.bottom) / 2) > 4) issues.push(`${label.textContent.trim()}: access label is not centered beside its thumb`);
+              if (lines.some(rect => rect.left < thumbBox.right + 1 || rect.right > trackBox.right - 1 || rect.top < trackBox.top || rect.bottom > trackBox.bottom)) issues.push(`${label.textContent.trim()}: access label is not contained to the right of its thumb`);
             }
           }
         }

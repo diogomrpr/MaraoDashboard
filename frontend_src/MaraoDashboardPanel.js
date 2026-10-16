@@ -93,6 +93,8 @@ class MaraoDashboardPanel extends HTMLElement {
     this._tab = "visual";
     this._expandedSections = { rooms: true, pages: true };
     this._collapsedRooms = new Set();
+    this._openPages = new Set();
+    this._pageEntries = new Map();
   }
 
   set hass(value) {
@@ -118,6 +120,7 @@ class MaraoDashboardPanel extends HTMLElement {
       header: () => this.shadowRoot.querySelector(".editor-header").getBoundingClientRect(),
       label: () => this._l("Drop here"), haptic: () => this._moveHaptic(),
     });
+    if (this._loaded && !this.shadowRoot.getElementById("visual-view").firstElementChild) this._renderVisual();
     if (this._loaded && this._requestedTab === "json") this._switchTab("json");
   }
 
@@ -287,11 +290,25 @@ class MaraoDashboardPanel extends HTMLElement {
     if (!this._loaded) return;
     const root = this.shadowRoot.getElementById("visual-view");
     if (this._model.config_version === 2) {
+      const restoreFocus = this._pageModel && this._pageModel !== this._model && root.contains(this.shadowRoot.activeElement);
+      if (this._pageModel && this._pageModel !== this._model) {
+        this._revision = (this._revision || 0) + 1;
+        this.shadowRoot.querySelectorAll('ha-dialog').forEach(dialog => { dialog.open = false; dialog.remove(); });
+      }
       root.innerHTML = `<div class="section-grid"><ha-card class="span-two"><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:view-dashboard-outline"></ha-icon><h2>${this._t('pages')}</h2><span class="grow"></span><ha-button id="add-page">${this._t('addNavPage')}</ha-button></div><div id="page-manager"></div></div></ha-card><ha-card><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:tune"></ha-icon><h2>${this._t('general')}</h2></div><div id="general-form"></div></div></ha-card><ha-card><div class="card-content"><div class="card-heading"><ha-icon icon="mdi:navigation-variant-outline"></ha-icon><h2>${this._t('navigation')}</h2></div><p class="helper">${this._l("Additional destinations appear in the navbar overflow menu.")}</p><div id="navbar-list"></div></div></ha-card></div>`;
+      this._pageEntries = new Map();
       this._renderPageManager(root.querySelector('#page-manager'));
+      const manager = root.querySelector('#page-manager'); manager.tabIndex = -1;
+      manager.addEventListener('click', event => {
+        const button = event.composedPath().find(element => element.dataset?.action);
+        if (!button || !manager.contains(button) || this._busy) return;
+        event.stopPropagation();
+        if (button.dataset.action.startsWith('card-')) this._roomAction(button); else this._pageAction(button);
+      });
       this._mountGeneralForm(root.querySelector('#general-form'));
       this._renderNavigation(root.querySelector('#navbar-list'));
       root.querySelector('#add-page').addEventListener('click', () => this._openPageDialog());
+      if (restoreFocus) manager.focus({ preventScroll: true });
       return;
     }
     root.innerHTML = `
@@ -344,36 +361,143 @@ class MaraoDashboardPanel extends HTMLElement {
     return (this._dashboardUrl || '/marao-dashboard/overview').replace(/\/[a-z0-9_-]+$/, '');
   }
 
-  _renderPageManager(host) {
+  _reconcilePageExpansion() {
+    if (this._pageModel === this._model) return;
     const pages = this._model.pages;
-    host.innerHTML = pages.map((page, index) => {
-      const pinned = this._navigationEntries().some(entry => entry === page.path || entry?.page === page.path);
-      return `<article class="room"><ha-expansion-panel data-page-panel="${index}"><div class="room-header" slot="header"><ha-icon icon="${esc(page.icon || 'mdi:file-outline')}"></ha-icon><div class="room-title"><strong>${esc(page.name)}</strong><span>${esc(page.path)}${page.path === this._model.landing_page ? ' · ' + this._l('Landing page') : ''}</span></div><div class="row-actions">${this._iconButton('mdi:arrow-up', 'Move up', 'page-up', index, index === 0)}${this._iconButton('mdi:arrow-down', 'Move down', 'page-down', index, index === pages.length - 1)}${this._iconButton('mdi:pencil', 'Edit page', 'page-edit', index)}${this._iconButton('mdi:content-copy', this._t('duplicate'), 'page-duplicate', index)}${this._iconButton(pinned ? 'mdi:pin-off' : 'mdi:pin', pinned ? 'Unpin' : 'Pin to navbar', 'page-pin', index)}${this._iconButton('mdi:delete-outline', 'Delete page', 'page-delete', index, pages.length === 1)}</div></div><div class="room-body">${pageContainers(page).map((section, sectionIndex) => {
-        const position = `${index}:${sectionIndex}`;
-        return `<section class="page-section"><div class="card-heading"><h3>${this._l('Section')} ${sectionIndex + 1}</h3><span class="grow"></span><div class="row-actions">${this._iconButton('mdi:arrow-up', 'Move up', 'section-up', position, !page.sections || sectionIndex === 0)}${this._iconButton('mdi:arrow-down', 'Move down', 'section-down', position, !page.sections || sectionIndex === pageContainers(page).length - 1)}${this._iconButton('mdi:view-grid-outline', 'Edit layout', 'section-edit', position)}${this._iconButton('mdi:delete-outline', 'Delete section', 'section-delete', position, !page.sections)}</div></div>${this._entityList(section, position, 'page')}${section.cards?.length ? `<p class="helper">${this._l('Raw cards are retained and editable in JSON.')} (${section.cards.length})</p>` : ''}<ha-button data-action="card-add" data-kind="page" data-room="${position}">${this._t('addCard')}</ha-button></section>`;
-      }).join('')}<ha-button data-action="section-add" data-room="${index}">${this._l('Add section')}</ha-button></div></ha-expansion-panel></article>`;
-    }).join('');
-    host.querySelectorAll('[data-page-panel]').forEach(panel => {
-      const page = pages[Number(panel.dataset.pagePanel)], key = page.id || page.path;
-      panel.expanded = !this._collapsedRooms.has(key);
-      panel.addEventListener('expanded-changed', event => { this._cardDrag?.cancel(); if (event.target.expanded) this._collapsedRooms.delete(key); else this._collapsedRooms.add(key); });
+    if (!this._pageModel) this._openPages = new Set(pages.filter(page => page.path === this._model.landing_page));
+    else {
+      const oldPages = this._pageModel.pages;
+      const unique = (items, key, value) => value && items.filter(page => page[key] === value).length === 1;
+      const opened = new Set();
+      for (const old of this._openPages) {
+        const match = pages.includes(old) ? old : unique(oldPages, 'id', old.id) && unique(pages, 'id', old.id)
+          ? pages.find(page => page.id === old.id)
+          : unique(oldPages, 'path', old.path) && unique(pages, 'path', old.path)
+            ? pages.find(page => page.path === old.path && (!page.id || !old.id)) : null;
+        if (match) opened.add(match);
+      }
+      this._openPages = opened;
+    }
+    this._pageModel = this._model;
+  }
+
+  _pageHeader(page, index) {
+    const pinned = this._navigationEntries().some(entry => entry === page.path || entry?.page === page.path);
+    return `<ha-icon icon="${esc(page.icon || 'mdi:file-outline')}"></ha-icon><div class="room-title"><strong>${esc(page.name)}</strong><span>${esc(page.path)}${page.path === this._model.landing_page ? ' · ' + this._l('Landing page') : ''}</span></div><div class="row-actions">${this._iconButton('mdi:arrow-up', 'Move up', 'page-up', index, index === 0)}${this._iconButton('mdi:arrow-down', 'Move down', 'page-down', index, index === this._model.pages.length - 1)}${this._iconButton('mdi:pencil', 'Edit page', 'page-edit', index)}${this._iconButton('mdi:content-copy', this._t('duplicate'), 'page-duplicate', index)}${this._iconButton(pinned ? 'mdi:pin-off' : 'mdi:pin', pinned ? 'Unpin' : 'Pin to navbar', 'page-pin', index)}${this._iconButton('mdi:delete-outline', 'Delete page', 'page-delete', index, this._model.pages.length === 1)}</div>`;
+  }
+
+  _sectionHeader(page, index, sectionIndex) {
+    const position = `${index}:${sectionIndex}`;
+    return `<h3>${this._l('Section')} ${sectionIndex + 1}</h3><span class="grow"></span><div class="row-actions">${this._iconButton('mdi:arrow-up', 'Move up', 'section-up', position, !page.sections || sectionIndex === 0)}${this._iconButton('mdi:arrow-down', 'Move down', 'section-down', position, !page.sections || sectionIndex === pageContainers(page).length - 1)}${this._iconButton('mdi:view-grid-outline', 'Edit layout', 'section-edit', position)}${this._iconButton('mdi:delete-outline', 'Delete section', 'section-delete', position, !page.sections)}</div>`;
+  }
+
+  _renderPageBody(entry, page, index, changed) {
+    const sections = pageContainers(page);
+    if (!entry.add) {
+      entry.add = document.createElement('ha-button'); entry.add.dataset.action = 'section-add';
+      entry.add.textContent = this._l('Add section'); entry.body.append(entry.add);
+    }
+    if (entry.add.dataset.room !== String(index)) entry.add.dataset.room = String(index);
+    for (const [section, element] of entry.sections) if (!sections.includes(section)) { element.remove(); entry.sections.delete(section); }
+    sections.forEach((section, sectionIndex) => {
+      const position = `${index}:${sectionIndex}`;
+      let element = entry.sections.get(section);
+      if (!element) {
+        element = document.createElement('section'); element.className = 'page-section';
+        entry.sections.set(section, element); changed.add(section);
+      }
+      const coordinates = `${position}:${sections.length}:${Boolean(page.sections)}`;
+      if (changed.has(section)) { element._headerMarkup = this._sectionHeader(page, index, sectionIndex); element.innerHTML = `<div class="card-heading">${this._sectionHeader(page, index, sectionIndex)}</div>${this._entityList(section, position, 'page')}${section.cards?.length ? `<p class="helper">${this._l('Raw cards are retained and editable in JSON.')} (${section.cards.length})</p>` : ''}<ha-button data-action="card-add" data-kind="page" data-room="${position}">${this._t('addCard')}</ha-button>`; }
+      else if (element._coordinates !== coordinates) {
+        const heading = element.querySelector('.card-heading');
+        const markup = this._sectionHeader(page, index, sectionIndex);
+        if (element._headerMarkup !== markup) { heading.innerHTML = markup; element._headerMarkup = markup; }
+        element.querySelectorAll('[data-room]').forEach(control => { control.dataset.room = position; });
+        element.querySelector('[data-card-list]').dataset.movePage = `page:${index}`;
+        element.querySelector('[data-card-list]').dataset.moveSection = String(sectionIndex);
+        element.querySelectorAll('[data-card-drag]').forEach(row => {
+          const move = row.querySelector('[data-action="card-move"]');
+          if (sections.length < 2) move?.remove();
+          else if (!move) row.querySelector('[data-action="card-edit"]').insertAdjacentHTML('beforebegin', this._iconButton('mdi:tray-arrow-down', 'Move to section', 'card-move', position, false, Number(row.dataset.cardDrag), 'page'));
+        });
+      }
+      element._coordinates = coordinates;
+      const next = [...entry.body.children][sectionIndex];
+      if (next !== element) entry.body.insertBefore(element, next || entry.add);
     });
-    host.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', event => {
-      event.stopPropagation();
-      if (button.dataset.action.startsWith('card-')) this._roomAction(button); else this._pageAction(button);
-    }));
-    this._bindDrag(host);
+  }
+
+  _renderPageManager(host, changed = new Set()) {
+    this._reconcilePageExpansion();
+    this._pageEntries ||= new Map();
+    const pages = this._model.pages;
+    for (const [page, entry] of this._pageEntries) if (!pages.includes(page)) {
+      entry.article.remove(); this._pageEntries.delete(page); this._openPages.delete(page);
+    }
+    pages.forEach((page, index) => {
+      let entry = this._pageEntries.get(page);
+      if (!entry) {
+        const article = document.createElement('article'); article.className = 'room';
+        article.innerHTML = '<ha-expansion-panel><div class="room-header" slot="header"></div><div class="room-body"></div></ha-expansion-panel>';
+        const panel = article.querySelector('ha-expansion-panel');
+        entry = { article, panel, header: article.querySelector('.room-header'), body: article.querySelector('.room-body'), sections: new Map() };
+        this._pageEntries.set(page, entry);
+        panel.addEventListener('expanded-changed', event => {
+          if (event.target !== panel || !panel.isConnected || this._pageEntries.get(page) !== entry) return;
+          this._cardDrag?.cancel();
+          if (panel.expanded) { this._openPages.add(page); this._renderPageBody(entry, page, this._model.pages.indexOf(page), new Set()); }
+          else {
+            this._openPages.delete(page);
+            const focused = this.shadowRoot.activeElement;
+            if (focused && entry.body.contains(focused)) entry.header.focus({ preventScroll: true });
+            entry.body.replaceChildren(); entry.sections.clear(); entry.add = null;
+          }
+        });
+      }
+      const header = this._pageHeader(page, index);
+      if (entry.headerMarkup !== header) { entry.header.innerHTML = header; entry.headerMarkup = header; }
+      entry.header.tabIndex = -1;
+      if (entry.panel.dataset.pagePanel !== String(index)) entry.panel.dataset.pagePanel = String(index);
+      entry.panel.expanded = this._openPages.has(page);
+      if (entry.panel.expanded) this._renderPageBody(entry, page, index, changed);
+      const next = host.children[index];
+      if (next !== entry.article) host.insertBefore(entry.article, next || null);
+    });
+  }
+
+  _refreshCards(kind, ...positions) {
+    const host = this.shadowRoot.querySelector('#page-manager');
+    if (kind !== 'page' || !host) return this._renderVisual();
+    this._renderPageManager(host, new Set(positions.map(position => this._container(kind, position)).filter(Boolean)));
+  }
+
+  _refreshPages(changed = new Set(), references = false) {
+    const host = this.shadowRoot.querySelector('#page-manager');
+    if (!host) return this._renderVisual();
+    this._renderPageManager(host, changed);
+    if (references) {
+      this._renderNavigation(this.shadowRoot.querySelector('#navbar-list'));
+      const form = this.shadowRoot.querySelector('#general-form ha-form');
+      form.schema = form.schema.map(field => field.name === 'landing_page' ? this._schema('landing_page', 'Landing page', { select: { mode: 'dropdown', options: this._availablePages().map(page => ({ value: page.path, label: page.name })) } }, true) : field);
+      form.data = { ...form.data, landing_page: this._model.landing_page };
+    }
+  }
+
+  _referenceSections(path) {
+    const contains = value => value && typeof value === 'object' && (value.page === path || value.navigation_path === `${this._dashboardRoot()}/${path}` || typeof value.navigation_path === 'string' && value.navigation_path.startsWith(`#page-${path}-`) || Object.entries(value).some(([key, item]) => !key.startsWith('__') && contains(item)));
+    return new Set(this._model.pages.flatMap(page => pageContainers(page).filter(contains)));
   }
 
   _pageAction(button) {
     const action = button.dataset.action;
     const [index, sectionIndex = 0] = button.dataset.room.split(':').map(Number);
     const page = this._model.pages[index];
+    let focusPage = page;
     try {
       if (action === 'page-edit') return this._openPageDialog(index);
       if (action === 'page-delete') return this._openPageDeleteDialog(index);
       if (action === 'page-up' || action === 'page-down') this._model.pages = moveItem(this._model.pages, index, index + (action === 'page-up' ? -1 : 1));
-      if (action === 'page-duplicate') duplicatePage(this._model, index, `${page.name} ${this._l('copy')}`, this._dashboardRoot());
+      if (action === 'page-duplicate') { focusPage = duplicatePage(this._model, index, `${page.name} ${this._l('copy')}`, this._dashboardRoot()); this._openPages.add(focusPage); }
       if (action === 'page-pin') pinPage(this._model, page.path, !this._navigationEntries().some(entry => entry === page.path || entry?.page === page.path));
       if (action === 'section-add') addPageSection(page);
       if (action === 'section-up' || action === 'section-down') page.sections = moveItem(page.sections, sectionIndex, sectionIndex + (action === 'section-up' ? -1 : 1));
@@ -383,18 +507,20 @@ class MaraoDashboardPanel extends HTMLElement {
         return this._openFormDialog('Edit layout', { columns: section.columns ? String(section.columns) : 'auto' }, [this._columnsSchema()], value => {
           const columns = Number(value.columns);
           if (Number.isInteger(columns) && columns >= 1 && columns <= 6) section.columns = columns; else delete section.columns;
-          this._setDirty(); this._renderVisual();
+          this._setDirty(); this._refreshCards('page', `${index}:${sectionIndex}`);
         });
       }
-      this._setDirty(); this._renderVisual();
+      this._setDirty(); this._refreshPages(new Set(), action.startsWith('page-'));
+      this._pageEntries.get(focusPage)?.header.focus({ preventScroll: true });
     } catch (error) { this._setStatus(this._error(error), 'error'); }
   }
 
   async _openPageDialog(index = null) {
+    const lifecycle = this._lifecycle, revision = this._revision;
     if (index == null) {
       try { await this._refreshEditorMetadata(); }
       catch (error) { this._setStatus(this._error(error), 'error'); return; }
-      if (!this.isConnected) return;
+      if (!this.isConnected || lifecycle !== this._lifecycle || revision !== this._revision) return;
     }
     const existing = index == null ? null : this._model.pages[index];
     const templates = this._pageTemplates || this._catalog.page_templates || { empty: { entities: [] } };
@@ -406,6 +532,7 @@ class MaraoDashboardPanel extends HTMLElement {
       this._schema('icon', 'Icon', { icon: {} }), this._schema('area', 'Suggestion area', { area: {} }),
     ], value => {
       if (!String(value.name || '').trim()) throw new Error('Each page requires a name.');
+      const references = existing ? this._referenceSections(existing.path) : new Set();
       if (existing) {
         renamePage(this._model, index, value.path || slugify(value.name), this._dashboardRoot());
         existing.name = value.name.trim(); existing.icon = value.icon || 'mdi:file-outline';
@@ -421,9 +548,9 @@ class MaraoDashboardPanel extends HTMLElement {
           if (Array.isArray(template.sections)) template.sections.at(-1).entities = imported.entities;
           else template.entities = imported.entities;
         }
-        createPage(this._model, value, selectedTemplates);
+        this._openPages.add(createPage(this._model, value, selectedTemplates));
       }
-      this._setDirty(); this._renderVisual();
+      this._setDirty(); this._refreshPages(references, true);
     }, existing ? this._t('update') : this._t('create'));
   }
 
@@ -436,8 +563,9 @@ class MaraoDashboardPanel extends HTMLElement {
       ...(references.length ? [this._schema('replacement', 'Replace existing links with', { select: { mode: 'dropdown', options: this._availablePages().filter(item => item.path !== page.path).map(item => ({ value: item.path, label: item.name })) } }, true)] : []),
     ], value => {
       if (!value.confirm_delete) throw new Error('Confirm the named page deletion.');
+      const sections = this._referenceSections(page.path);
       deletePage(this._model, index, value.replacement, this._dashboardRoot());
-      this._setDirty(); this._renderVisual();
+      this._setDirty(); this._refreshPages(sections, true);
     }, this._t('delete'));
   }
 
@@ -456,19 +584,21 @@ class MaraoDashboardPanel extends HTMLElement {
   _renderNavigation(host) {
     const available = new Map(this._availablePages().map((page) => [page.path, page]));
     const entries = this._navigationEntries();
-    host.innerHTML = entries.length ? `<div class="navigation-list">${entries.map((entry, index) => {
+    const markup = entries.length ? `<div class="navigation-list">${entries.map((entry, index) => {
       const path = typeof entry === "string" ? entry : entry?.page;
       const page = available.get(path);
       const label = entry?.label || page?.name || path || entry?.url || "Unknown page";
       const detail = page ? page.path : entry?.url || "Page is not currently generated";
       return `<div class="navigation-row"><ha-icon icon="${esc(entry?.icon || page?.icon || "mdi:link-variant")}"></ha-icon><div class="entity-main"><div class="entity-name">${esc(label)}</div><div class="entity-meta">${esc(detail)}</div></div><div class="row-actions">${this._iconButton("mdi:arrow-up", "Move up", "nav-up", index, index === 0)}${this._iconButton("mdi:arrow-down", "Move down", "nav-down", index, index === entries.length - 1)}${this._iconButton("mdi:pin-off", "Unpin", "nav-delete", index)}</div></div>`;
     }).join("")}</div>` : `<div class="empty">No pages in the navigation bar.</div>`;
+    if (host._navigationMarkup === markup) return;
+    host.innerHTML = markup; host._navigationMarkup = markup;
     host.querySelectorAll("[data-action^='nav-']").forEach((button) => button.addEventListener("click", () => {
       const index = Number(button.dataset.room);
       const navigation = this._editableNavigation();
       if (button.dataset.action === "nav-delete") navigation.splice(index, 1);
       else this._model.navigation = moveItem(navigation, index, index + (button.dataset.action === "nav-up" ? -1 : 1));
-      this._setDirty(); this._renderVisual();
+      this._setDirty(); this._renderNavigation(host); if (this._model.config_version === 2) this._refreshPages();
     }));
   }
 
@@ -480,7 +610,7 @@ class MaraoDashboardPanel extends HTMLElement {
       this._schema("page", "Target page", { select: { mode: "dropdown", options } }, true),
     ], (value) => {
       this._editableNavigation().push(value.page);
-      this._setDirty(); this._renderVisual();
+      this._setDirty(); this._refreshPages(new Set(), true);
     });
   }
 
@@ -494,8 +624,10 @@ class MaraoDashboardPanel extends HTMLElement {
       this._schema("icon", "Icon", { icon: {} }),
       ...(this._model.config_version === 2 ? [this._schema('landing_page', 'Landing page', { select: { mode: 'dropdown', options: this._availablePages().map(page => ({ value: page.path, label: page.name })) } }, true)] : []),
     ], (value) => {
+      const landing = this._model.landing_page;
       Object.assign(this._model, value);
       this._setDirty();
+      if (this._model.config_version === 2 && landing !== this._model.landing_page) this._refreshPages();
     });
   }
 
@@ -643,7 +775,7 @@ class MaraoDashboardPanel extends HTMLElement {
       if (source && this._commitCardMove(source, source.section, cardIndex + (action === "card-up" ? -1 : 2))) this._moveHaptic();
       return;
     }
-    this._setDirty(); this._renderVisual();
+    this._setDirty(); this._refreshCards(kind, roomIndex);
   }
 
   _container(kind, index) {
@@ -677,18 +809,19 @@ class MaraoDashboardPanel extends HTMLElement {
     if (this._busy || this._tab !== 'visual' || source.model !== this._model || source.revision !== this._revision || source.lifecycle !== this._lifecycle) return false;
     if (source.kind === 'page' && this._model.pages[Number(String(source.room).split(':')[0])] !== source.page) return false;
     if (!movePageCard(source.page, source.section, source.index, section, boundary, source.card)) return false;
-    this._setDirty(); this._renderVisual();
+    this._setDirty(); this._refreshCards(source.kind, source.room, `${String(source.room).split(':')[0]}:${section}`);
     this._setStatus(this._l('Card moved. Save & Generate to apply.'), 'success');
     this._focusMovedCard(source, section);
     return true;
   }
 
   async _focusMovedCard(source, section) {
+    const revision = this._revision, lifecycle = this._lifecycle;
     const room = source.kind === 'page' ? `${String(source.room).split(':')[0]}:${section}` : source.room;
     const index = pageContainers(source.page)[section].entities.indexOf(source.card);
     const row = this.shadowRoot.querySelector(`[data-card-drag="${index}"][data-kind="${source.kind}"][data-room="${room}"]`);
     await row?.closest('ha-expansion-panel')?.updateComplete;
-    if (!row?.isConnected || source.model !== this._model) return;
+    if (!row?.isConnected || source.model !== this._model || revision !== this._revision || lifecycle !== this._lifecycle) return;
     row.querySelector('[data-card-handle]')?.focus({ preventScroll: true });
     row?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }
@@ -884,9 +1017,10 @@ class MaraoDashboardPanel extends HTMLElement {
         }
         const errors = validateConfig(parsed, this._catalog.config_version, this._entities, this._catalog.energy_units, this._catalog);
         if (errors.length) throw new Error(errors.map((error) => this._l(error)).join(" "));
-        this._model = normalizeConfig(parsed);
+        const next = normalizeConfig(parsed);
+        const changed = JSON.stringify(serializeConfig(next)) !== JSON.stringify(serializeConfig(this._model));
         this._jsonDraft = legacy ? null : jsonSource;
-        this._renderVisual();
+        if (changed) { this._model = next; this._renderVisual(); }
         this._dirty = (legacy ? this._source() : jsonSource).trim() !== this._savedSource.trim(); this._updateHeader();
       } catch (error) {
         this._setStatus(`JSON: ${this._error(error)}`, "error"); return;
@@ -1213,7 +1347,7 @@ class MaraoDashboardPanel extends HTMLElement {
         if (memberOptions) { delete entity.__simple; this._closeDialog(dialog); memberOptions.save(entity); return; }
         const container = this._editableContainer(kind, roomIndex);
         if (cardIndex == null) container.entities.push(entity); else container.entities[cardIndex] = entity;
-        this._closeDialog(dialog); this._setDirty(); this._renderVisual();
+        this._closeDialog(dialog); this._setDirty(); this._refreshCards(kind, roomIndex);
     });
   }
 
@@ -1289,7 +1423,7 @@ class MaraoDashboardPanel extends HTMLElement {
       if (errors.length) { content.querySelector('#group-error').textContent = errors.map(error => this._l(error)).join(' '); return; }
       const container = this._editableContainer(kind, roomIndex);
       if (cardIndex == null) container.entities = [...container.entities, value]; else container.entities[cardIndex] = value;
-      this._closeDialog(dialog); this._setDirty(); this._renderVisual();
+      this._closeDialog(dialog); this._setDirty(); this._refreshCards(kind, roomIndex);
     });
     if (draft) render(); else refresh();
   }
@@ -1431,7 +1565,14 @@ class MaraoDashboardPanel extends HTMLElement {
   _dialog(title) {
     this._cardDrag?.cancel();
     const dialog = document.createElement("ha-dialog"); dialog.open = true; dialog.heading = this._l(title); dialog.headerTitle = this._l(title);
-    dialog.innerHTML = `<div class="dialog-content"></div>`; dialog.addEventListener("closed", () => dialog.remove());
+    const invoking = this.shadowRoot.activeElement, lifecycle = this._lifecycle, model = this._model;
+    dialog.innerHTML = `<div class="dialog-content"></div>`; dialog.addEventListener("closed", () => {
+      dialog.remove();
+      if (this.isConnected && lifecycle === this._lifecycle && model === this._model) {
+        const target = invoking?.isConnected ? invoking : this.shadowRoot.querySelector('#page-manager');
+        target?.focus({ preventScroll: true });
+      }
+    });
     this.shadowRoot.append(dialog);
     this._containForm(dialog).catch((error) => this._setStatus(this._error(error), "error"));
     return dialog;
@@ -1563,7 +1704,21 @@ class MaraoDashboardPanel extends HTMLElement {
 
   _entityId(value) { return typeof value === "string" ? value : value?.entity_id || ""; }
   _entityIds(values) { if (values == null) return []; return (Array.isArray(values) ? values : [values]).map((value) => this._entityId(value)).filter(Boolean); }
-  _setBusy(busy) { this._cardDrag?.cancel(); this._busy = busy; this.shadowRoot.getElementById("visual-view").inert = busy; this.shadowRoot.querySelectorAll("ha-button,ha-icon-button").forEach((button) => { button.disabled = busy; }); this._updateHeader(); }
+  _setBusy(busy) {
+    this._cardDrag?.cancel(); this._busy = busy;
+    this.shadowRoot.getElementById("visual-view").inert = busy;
+    if (busy) {
+      this._busyControls ||= new Map();
+      this.shadowRoot.querySelectorAll("ha-button,ha-icon-button").forEach(button => {
+        if (!this._busyControls.has(button)) this._busyControls.set(button, button.disabled);
+        button.disabled = true;
+      });
+    } else {
+      for (const [button, disabled] of this._busyControls || []) if (button.isConnected) button.disabled = disabled;
+      this._busyControls = null;
+    }
+    this._updateHeader();
+  }
   _setStatus(message, kind) { const status = this.shadowRoot.getElementById("status"); status.textContent = message; status.className = `status ${kind || ""}`; this.shadowRoot.getElementById("retry").hidden = !this._retryKind; }
   _error(error) {
     const message = String(error?.message || error?.body?.message || error), split = message.indexOf(': ');

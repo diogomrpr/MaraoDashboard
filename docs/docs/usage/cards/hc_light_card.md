@@ -11,8 +11,9 @@ Normal binary states use distinct card backgrounds and a filled or outlined stat
 Generated overview lighting popups list every configured light, including lights
 that are off. Unknown and unavailable lights remain visible with disabled controls.
 The `hc_light_card` is used to turn on and off a light. You have the option to show or hide the brightness slider.
-The title uses the full content width above the state, icon and brightness control;
-long names wrap at the chosen text size.
+The icon and title share one header row, including when brightness is hidden or
+unsupported. Long names wrap beside the icon; useful labels and the brightness
+control appear below.
 
 ![light Card Light](../../../assets/images/cards/hc_light_card/lightcard_light.png)
 

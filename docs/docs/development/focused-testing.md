@@ -38,6 +38,11 @@ and ambiguous shared changes fail with a scope message. They never trigger a
 full-suite fallback. Add the missing mapping rather than skipping the file.
 Documentation-only changes need no application deployment or browser tests.
 
+For shared light/fan/cover/access-opener title and icon layout, use
+`--component slider-headers`. It selects the header geometry profiles, optional
+slider variants and relevant value-slider/access interactions. Run a single
+geometry profile with `npm run test:ha:alignment -- --slider-headers --scenario iphone-normal`.
+
 Use `--component scroll` for native card-surface lifecycle changes. Its WebKit
 and Chromium regressions update cards after scrolling the realistic Maintenance
 sheet, its 32-card Cases counterpart and the dashboard page. They cover both
@@ -103,3 +108,9 @@ successful checks can be reused; changed code, tests, selection, target, source 
 fixtures invalidate the corresponding proof. Final publication binds validated
 evidence to the clean candidate commit. Focused results never mean the full suite
 passed. Existing historical reports remain immutable.
+
+### Battery groups, strict access labels and editor rendering
+
+Use `--component battery-groups --component access-label --component editor-rendering` for the reviewed batch. Include `--component slider-headers` while the preceding header batch remains uncommitted. The selection covers aggregate/palette/problem behavior, safe gallery fixtures, strict gesture cancellation/dispatch, actual label line geometry, editor preservation, native drag and JSON continuity. Geometry compares the text glyph union with the resting thumb (4 CSS pixel center tolerance) and checks every line is contained to its right; the former stacked rule is injected to prove rejection. Access widths include 239/241px and narrow wrapped English/Portuguese labels.
+
+Editor timing uses `node tests/measure-ha-editor.js before --fixture /private/tmp/<fixture>.json --expected-editor-sha256 <installed-hash>` and the matching `after` invocation. It never deploys. Retain the same private format-2 fixture and bind each phase to the served asset hash. Three serial cold and warm samples at normal/4× CPU report native readiness, mounted controls, startup versus interaction long tasks and two-frame interaction delay (not measured paint). First expansion and reopen costs are reported separately. Saved source must remain byte-identical.

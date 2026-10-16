@@ -54,6 +54,14 @@ interaction and keeps focus inside the sheet. Empty selections and empty active
 results have readable localized messages. Fully unknown/unavailable groups are
 neutral and disabled; a usable secondary keeps a partial group reachable.
 
+Battery-group tile colors follow the lowest valid percentage across the complete
+deduplicated selection: red below 20, yellow from 20 to below 80, and green at 80
+or above. The displayed percentage remains the first usable reading. A known
+critical battery stays red when another member is unavailable, with both low and
+unavailable details visible. Noncritical partial groups keep their warning
+surface; complete loss or disconnection stays neutral. Reported errors retain
+their existing priority. Filtering the popup does not change severity.
+
 The converted `overview-maintenance` group retains legacy sensors with `battery`
 in their entity ID even without a battery device class. Other battery groups
 require battery metadata or an explicit `hc_battery_card` member template.

@@ -238,6 +238,18 @@ test('climate feedback examples isolate each delayed or failed behavior and shar
   assert.ok(roomContent(source, 0).entities.climate.some(entity => entity.entity_id === delayed.entity));
 });
 
+test('slider header cases retain absent capabilities, hidden fields and a realistic disabled slider', () => {
+  const cases = manifest.titleLayoutCases;
+  assert.ok(cases.some(card => card.variables?.enable_slider === false && card.template === 'hc_light_card'));
+  for (const entity of ['light.marao_dashboard_test_onoff_light', 'fan.marao_dashboard_test_onoff_fan']) assert.ok(cases.some(card => card.entity === entity));
+  assert.ok(cases.some(card => card.show_icon === false));
+  assert.ok(cases.some(card => card.variables?.show_icon === false));
+  assert.ok(cases.some(card => card.show_name === false && card.show_state === false && card.show_label === false));
+  assert.ok(cases.some(card => card.template === 'hc_access_action_card' && card.variables.action_service === 'lock.unlock'));
+  const source = require('../../ha-test/marao_dashboard_test_dashboard.json');
+  assert.equal(roomContent(source, 0).entities.light[1].variables.enable_slider, false);
+});
+
 test('long titles cover shared controls and separate headers using existing safe fixtures', () => {
   const ids = fixtureIds(helpers);
   assert.deepEqual(new Set(manifest.titleLayoutCases.map(card => card.type)), new Set([

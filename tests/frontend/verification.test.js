@@ -35,6 +35,17 @@ test('editor browser evidence includes the delegated gesture and JSON checks', (
   }
 });
 
+test('slider header scope retains geometry, optional variants and safe gestures without unrelated suites', () => {
+  const selection = selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js', 'tests/test-ha-card-alignment.js',
+    'tests/test-ha-dashboard-e2e.js', 'ha-test/cases.json', 'ha-test/dashboard/views/00-card-test.yaml'], ['slider-headers']);
+  assert.deepEqual(selection.components, ['slider-headers']);
+  const checks = checksFor(selection);
+  assert.equal(checks.filter(check => check.command.includes('--slider-headers')).length, 9);
+  assert.ok(checks.some(check => check.id === 'slider-headers:access'));
+  for (const id of ['sliders:iphone', 'sliders:android', 'slider-headers:iphone-page-zoom-200', 'slider-headers:iphone-bold-text-200']) assert.ok(checks.some(check => check.id === id));
+  assert.ok(!checks.some(check => /camera|editor|mobile-matrix|preserved-upgrade|native-reconnect/.test(check.id)));
+});
+
 test('shared scroll fixes select WebKit, Chromium and control lifecycle checks', () => {
   const selected = checksFor(selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js', 'tests/test-ha-scroll.js'], ['scroll']));
   assert.ok(selected.some(check => check.command.includes('--webkit')));
@@ -131,4 +142,17 @@ test('navbar overflow scope covers configuration, preservation, native, geometry
   assert.ok(plan.checks.some(check=>check.id==='navbar-overflow:alignment'));
   assert.ok(plan.checks.some(check=>check.id==='navbar-overflow:iphone-bold-text-200'));
   assert.ok(!plan.checks.some(check=>/mobile-matrix|editor-drag|json-editor|preserved-upgrade/.test(check.id)));
+});
+
+test('UI batch selection keeps bounded runtime and editor consumers without historical matrices', () => {
+  const selection = selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js', 'custom_components/marao_dashboard/frontend/MaraoDashboard.js',
+    'frontend_src/MaraoDashboardPanel.js', 'tests/test-ha-dashboard-accessibility.js', 'tests/test-ha-editor.js', 'tests/measure-ha-editor.js', 'tests/editor-rendering-checks.js'], ['battery-groups', 'access-label', 'editor-rendering']);
+  assert.deepEqual(selection.components, ['access-label', 'battery-groups', 'editor-rendering']);
+  const checks = checksFor(selection);
+  assert.ok(checks.some(c => c.command.includes('--battery')));
+  assert.ok(checks.some(c => c.command.includes('--access-label')));
+  assert.ok(checks.some(c => c.command.includes('--rendering')));
+  assert.ok(checks.some(c => c.command.includes('--drag-save')));
+  assert.ok(!checks.some(c => /mobile-matrix|preserved-upgrade|native-reconnect|camera/.test(c.id)));
+  for (const c of checks.filter(c => c.command.includes('tests/test-ha-editor.js'))) assert.ok(c.inputs.includes('tests/editor-rendering-checks.js'));
 });

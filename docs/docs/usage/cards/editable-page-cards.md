@@ -31,6 +31,13 @@ state and disable entity actions. Navigation remains usable independently of
 an optional entity. Names and icons belong to each card occurrence, so the same
 entity can appear differently on several pages.
 
+Access openers place the icon beside the wrapping title, above the strict slide
+control. Inside the track, the action label stays beside the resting thumb even
+in narrow columns; long localized labels wrap and the track grows vertically.
+Light, fan and cover cards use the same header, including light/fan
+variants whose slider is disabled or unsupported. Explicitly hidden titles and
+icons remain hidden in pages, popups and native previews.
+
 Media cards expose ordered Apple TV apps, remote, and optional volume target in
 their card editor. An explicitly empty app list stays empty; `apple_tv: false`
 keeps the generic controls. A remote volume target uses native remote commands;

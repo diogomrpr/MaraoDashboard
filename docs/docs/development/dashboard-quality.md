@@ -210,9 +210,14 @@ the action it affects.
 - Use content-driven card height and minimum sizes; do not clip essential
   content into a fixed-height composition.
 - Let essential titles, states, errors, and action labels wrap.
-  Balance broken action words above the thumb in narrow access controls.
-- Give every visible Marao card title the full content width in its first row.
-  Put icons, readings and controls below it, including climate steppers, Wallbox
+  Access labels wrap beside the vertically centered resting thumb, including in
+  narrow tracks. Let the track grow; never stack the label above the thumb.
+- Light, fan, cover and strict access-opener cards keep their visible icon beside
+  the title in one header row, including variants with disabled or unsupported
+  sliders. Titles wrap in the available width; states, problems and sliders stay
+  below. Hidden titles/icons and icon-only intent remain respected.
+- Give other visible Marao card titles the full content width in their first row.
+  Put icons, readings and controls below them, including climate steppers, Wallbox
   shortcuts, media apps and separate history, energy and camera-event headers.
   Preserve intentionally hidden titles and centered icon-only controls.
 - Secondary, nonessential metadata may use an ellipsis.
@@ -651,3 +656,7 @@ A change is done when:
 - no known relevant violation of this contract remains at publish time, even
   when the automated gate cannot detect it;
 - routine results are reported concisely and any known limitation is stated.
+
+Battery-group defaults use the minimum valid member percentage for the shared battery palette: below 20 red, 20–below 80 yellow, 80–100 green. The first usable reading and existing counts keep their meaning. A critical group with partial availability retains its red surface and low/unavailable details; noncritical partial warnings, complete neutral loss and reported errors retain their existing priority.
+
+Strict-access cards in Home Assistant grids use the available grid row when the configured columns would leave less than 144px per cell. This keeps the fixed thumb and wrapping label contained at 200% zoom, including generated, popup and native card hosts, without changing saved column preferences.

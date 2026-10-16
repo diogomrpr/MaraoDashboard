@@ -427,3 +427,46 @@ test('a replaced document, busy mode or JSON tab rejects a pending move', () => 
     assert.equal(p._commitCardMove(source, 0, 2), false); assert.equal(p._source(), before);
   }
 });
+
+test('page expansion is presentation-only and reconciles unique identity across accepted documents', () => {
+  const p = panel(canonical());
+  const source = p._source(); p._reconcilePageExpansion();
+  assert.deepEqual([...p._openPages].map(page => page.path), ['home']);
+  p._openPages.add(p._model.pages[1]);
+  p._model.pages[1].id = 'office-id';
+  const next = model.normalizeConfig(JSON.parse(p._source()));
+  next.pages.reverse(); next.pages[0].path = 'renamed-office';
+  next.pages.push({ name: 'New', path: 'new', entities: [] });
+  p._model = next; p._reconcilePageExpansion();
+  assert.deepEqual([...p._openPages].map(page => page.path).sort(), ['home', 'renamed-office']);
+  const serialized = p._source(); p._openPages.clear(); p._reconcilePageExpansion();
+  assert.equal(p._source(), serialized); assert.equal(p._openPages.size, 0);
+  assert.ok(!source.includes('_openPages'));
+});
+
+test('expansion never guesses ambiguous identities or matches changed explicit IDs by path', () => {
+  const p = panel(canonical()); p._model.pages[0].id = 'home-id'; p._reconcilePageExpansion();
+  const next = model.normalizeConfig(JSON.parse(p._source())); next.pages[0].id = 'different';
+  p._model = next; p._reconcilePageExpansion(); assert.equal(p._openPages.size, 0);
+  p._openPages.add(next.pages[1]);
+  p._model = { ...next, pages: [{ ...next.pages[1] }, { ...next.pages[1] }] };
+  p._reconcilePageExpansion(); assert.equal(p._openPages.size, 0);
+});
+
+test('complete unopened raw, empty, nested and duplicate occurrences survive local edits independently', () => {
+  const source = canonical(); source.pages[1].unknown = { empty: [], nested: { preserve: true } };
+  source.pages.push({ name: 'Raw', path: 'raw', cards: [{ type: 'markdown', content: 'Keep me' }] }, { name: 'Empty', path: 'empty', entities: [] });
+  const p = panel(source); p._reconcilePageExpansion();
+  p._roomAction({ dataset: { action: 'card-delete', kind: 'page', room: '0:0', card: '0' } });
+  const expected = structuredClone(source); expected.pages[0].sections[0].entities.splice(0, 1);
+  assert.deepEqual(JSON.parse(p._source()), expected);
+  assert.equal(p._openPages.size, 1);
+});
+
+test('busy completion retains boundary-disabled controls and does not enable newly rendered boundaries', () => {
+  const p = panel(canonical()), first = { disabled: true, isConnected: true }, enabled = { disabled: false, isConnected: true }, replacement = { disabled: true, isConnected: true };
+  p.shadowRoot = { getElementById: () => ({}), querySelectorAll: () => [first, enabled] };
+  p._setBusy(true); assert.equal(enabled.disabled, true);
+  p.shadowRoot.querySelectorAll = () => [first, enabled, replacement];
+  p._setBusy(false); assert.equal(first.disabled, true); assert.equal(enabled.disabled, false); assert.equal(replacement.disabled, true);
+});

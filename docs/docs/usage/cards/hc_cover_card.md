@@ -8,6 +8,9 @@ parent: Cards
 
 The `hc_cover_card` is used to control a cover, blind, or shutter. It shows the current position, opening and closing states, and a position slider.
 
+The icon and title share one header row. Long names wrap beside the icon, with
+position, movement state and the slider below.
+
 ## Usage
 
 ```yaml

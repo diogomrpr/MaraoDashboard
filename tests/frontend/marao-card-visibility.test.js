@@ -101,6 +101,54 @@ test('battery groups retain first usable reading and count secondary lows and in
   assert.match(card.shadowRoot.innerHTML, /Unavailable/);
 });
 
+test('battery group severity uses all valid readings without changing the first reading', () => {
+  for (const [values, expected, low, unavailable] of [
+    [['75', '10', '10'], 10, 2, 0], [['100', '0'], 0, 1, 0], [['80', '19.99'], 19.99, 1, 0],
+    [['80', '20'], 20, 0, 0], [['100', '79.99'], 79.99, 0, 0], [['100', '80'], 80, 0, 0],
+    [['100', 'unknown', '', '-1', '101', 'bad'], 100, 0, 5], [['unavailable', 'bad'], null, 0, 2], [[], null, 0, 0],
+  ]) {
+    const states = Object.fromEntries(values.map((state, i) => ['sensor.' + i, { state }]));
+    const ids = Object.keys(states);
+    const group = entityGroupState('battery', [...ids, ...ids], { states });
+    assert.equal(group.minimumReading, expected);
+    assert.equal(group.activeEntities.length, low);
+    assert.equal(group.unavailableEntities.length, unavailable);
+    assert.equal(entityGroupState('battery', [...ids].reverse(), { states }).minimumReading, expected);
+    if (expected !== null) assert.equal(group.reading, Number(values[0]));
+  }
+  assert.equal(entityGroupState('battery', ['sensor.first'], {}).minimumReading, null);
+});
+
+test('battery group rendered surfaces reconcile thresholds, partial availability and reported errors', () => {
+  const card = new MaraoCard(), colors = {};
+  card._setMarkup = markup => { card.shadowRoot.innerHTML = markup; for (const key of Object.keys(colors)) delete colors[key]; };
+  card.shadowRoot.querySelector = selector => selector === 'ha-card' ? { classList: { remove() {} }, style: { setProperty: (key, value) => { colors[key] = value; } } } : null;
+  const config = { template: 'hc_entity_group_card', name: 'Independent battery group', variables: { entity_type: 'battery', summary_entities: ['sensor.first', 'sensor.second'] }, tap_action: { action: 'navigate', navigation_path: '#batteries' } };
+  card.setConfig(config);
+  const render = (first, second, extra = {}) => { card.hass = { callService() {}, connected: true, states: { 'sensor.first': { state: first }, 'sensor.second': { state: second } }, ...extra }; return card.shadowRoot.innerHTML.split('</style>')[1]; };
+  for (const [second, color] of [['10', 'red'], ['20', 'yellow'], ['80', 'green'], ['19.99', 'red']]) {
+    render('100', second);
+    assert.equal(colors['--marao-card-background'], 'var(--color-' + color + ')');
+  }
+  let markup = render('10', 'unavailable');
+  assert.match(markup, /data-problem="warning" style="background:var\(--color-red\)/);
+  assert.match(markup, /1 low, 1 unavailable/);
+  assert.doesNotMatch(markup, /data-card-action[^>]* disabled/);
+  assert.match(render('80', 'unavailable'), /background:var\(--marao-problem-warning-background/);
+  assert.match(render('unavailable', 'unknown'), /data-problem="neutral"/);
+  assert.match(render('10', '80', { connected: false }), /data-problem="neutral"/);
+  card._actionError = 'Reported failure';
+  markup = render('10', 'unknown');
+  assert.match(markup, /data-problem="error" style="background:var\(--marao-problem-error-background/);
+  assert.match(markup, /Reported failure/);
+  card._actionError = '';
+  render('80', '100');
+  assert.equal(colors['--marao-card-background'], 'var(--color-green)');
+  card.setConfig({ ...config, variables: { ...config.variables, summary_entities: ['sensor.first'] } });
+  assert.equal(colors['--marao-card-background'], 'var(--color-green)');
+  assert.equal(stateAppearance('hc_battery_card', '10', { variables: { card_color: '#123456' } }).background, '#123456');
+});
+
 test('entity-free group cards preserve counts, readable inactive/empty states and connection guards', () => {
   const card = new MaraoCard();
   card.setConfig({ template: 'hc_entity_group_card', name: 'Lights', variables: { entity_type: 'light', summary_entities: ['light.on', 'light.off'] }, tap_action: { action: 'navigate', navigation_path: '#group' } });
@@ -601,6 +649,50 @@ test("title cards render as text-only section headings", () => {
   assert.doesNotMatch(card.shadowRoot.innerHTML, /class="state"|class="icon"/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action/);
   assert.match(source, /\.body\.title-card \{[^}]*padding:0 0 20px;/);
+});
+
+test("slider headers follow family and preserve optional controls and hidden fields", () => {
+  const cases = [
+    ["hc_light_card", "light.test", { supported_color_modes: ["brightness"], brightness: 128 }, {}, true],
+    ["hc_light_card", "light.test", { supported_color_modes: ["brightness"] }, { enable_slider: false }, false],
+    ["hc_light_card", "light.test", { supported_color_modes: ["onoff"] }, {}, false],
+    ["hc_fan_card", "fan.test", { supported_features: 1, percentage: 50 }, {}, true],
+    ["hc_fan_card", "fan.test", { supported_features: 1 }, { enable_slider: false }, false],
+    ["hc_fan_card", "fan.test", { supported_features: 0 }, {}, false],
+    ["hc_cover_card", "cover.test", { current_position: 50 }, {}, true],
+    ["hc_access_slide_action_card", "lock.test", {}, { action_service: "lock.unlock" }, false],
+    ["hc_access_action_card", "lock.test", {}, { action_service: "lock.unlock" }, false],
+  ];
+  for (const [template, entity, attributes, variables, range] of cases) {
+    const card = new MaraoCard();
+    const config = { template, entity, name: "Long localized title", variables };
+    card.setConfig(config);
+    card.hass = { states: { [entity]: { state: entity.startsWith("lock.") ? "locked" : "on", attributes } } };
+    const markup = () => card.shadowRoot.innerHTML.split("</style>")[1];
+    assert.match(markup(), /class="body slider-header/, template);
+    assert.equal(markup().includes('type="range"'), range, template);
+    if (entity.startsWith("lock.")) {
+      assert.match(markup(), /<marao-slide-to-open/);
+      assert.doesNotMatch(markup(), /data-card-action/);
+    }
+    card.setConfig({ ...config, show_icon: false });
+    assert.doesNotMatch(markup(), /class="icon"/);
+    card.setConfig({ ...config, variables: { ...variables, show_icon: false } });
+    assert.doesNotMatch(markup(), /class="icon"/);
+    card.setConfig({ ...config, show_name: false, show_state: false, show_label: false });
+    assert.match(markup(), /class="body icon-only/);
+    assert.doesNotMatch(markup(), /slider-header|class="title"/);
+    for (const state of ["unknown", "unavailable"]) {
+      card.setConfig(config);
+      card.hass = { states: { [entity]: { state, attributes } } };
+      assert.match(markup(), /class="body slider-header/);
+    }
+  }
+  for (const template of ["hc_switch_card", "hc_navigation_card", "hc_media_card", "hc_climate_card"]) {
+    const card = new MaraoCard();
+    card.setConfig({ template, name: "Other family" });
+    assert.doesNotMatch(card.shadowRoot.innerHTML.split("</style>")[1], /slider-header/);
+  }
 });
 
 test("media app shortcuts retain a full-width title above the centered icon", () => {

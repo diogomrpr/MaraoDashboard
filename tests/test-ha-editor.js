@@ -1166,6 +1166,7 @@ async function main() {
         persist: process.argv.includes('--json-save') && scenario === runs[0] && theme === runThemes[0],
         geometryOnly: process.argv.includes('--json-geometry'),
       });
+      if (process.argv.includes('--rendering') || process.argv.includes('--rendering-geometry')) await require('./editor-rendering-checks').editorRenderingChecks(page, panel, { client, scenario, theme, output, geometryOnly: process.argv.includes('--rendering-geometry') });
       if (process.argv.includes('--drag') || process.argv.includes('--drag-geometry')) await require('./editor-drag-checks').editorDragChecks(page, panel, { output, scenario, theme, client, config, persist: process.argv.includes('--drag-save') && scenario === runs[0] && theme === runThemes[0], geometryOnly: process.argv.includes('--drag-geometry') });
       if (process.argv.includes('--energy')) await energyFormatting(page, panel, config, client, original, scenario.name + '-' + theme, scenario === runs[0] && theme === runThemes[0]);
       if (process.argv.includes("--startup") && scenario === runs[0] && theme === runThemes[0]) await startupChecks(page, panel);
