@@ -41,19 +41,25 @@ test('popup triggers retain their live identity when earlier sheets insert cards
   assert.deepEqual(targets.map(target => target.hash), ['#first', '#second']);
 });
 
-test('saved-page readiness preserves empty navigation and still requires configured routes', async () => {
-  for (const routes of [[], [{ url: '/marao-dashboard/home' }]]) {
+test('saved-page readiness requires the visible prefix and overflow toggle without dropping empty navigation', async () => {
+  for (const [count, visible] of [[0, 0], [1, 1], [6, 4], [20, 0]]) {
+    const routes = Array.from({ length: count }, (_, index) => ({ url: '/marao-dashboard/page-' + index }));
     const waits = [];
-    const card = { _config: { routes }, waitFor: async options => waits.push(['card', options.state]),
+    const card = { _config: { routes }, _visibleCount: visible, waitFor: async options => waits.push(['card', options.state]),
       evaluate: async callback => callback(card), locator: selector => ({
-        waitFor: async options => waits.push([selector, options.state]), count: async () => routes.length,
+        waitFor: async options => waits.push([selector, options.state]),
+        count: async () => selector === '.nav a' ? visible : selector === '[data-overflow]' ? Number(count > visible) : 1,
       }) };
     await waitForNavbar({ locator: () => card });
     assert.deepEqual(waits, [['card', 'attached'], ['nav', 'attached'], ['nav', routes.length ? 'visible' : 'hidden']]);
-    if (routes.length) {
-      const locator = card.locator;
-      card.locator = selector => ({ ...locator(selector), count: async () => 0 });
-      await assert.rejects(waitForNavbar({ locator: () => card }), /retain every configured route/);
+    const locator = card.locator;
+    if (visible) {
+      card.locator = selector => ({ ...locator(selector), count: selector === '.nav a' ? async () => 0 : locator(selector).count });
+      await assert.rejects(waitForNavbar({ locator: () => card }), /Visible prefix differs/);
+    }
+    if (count > visible) {
+      card.locator = selector => ({ ...locator(selector), count: selector === '[data-overflow]' ? async () => 0 : locator(selector).count });
+      await assert.rejects(waitForNavbar({ locator: () => card }), { code: 'ERR_ASSERTION' });
     }
   }
 });
