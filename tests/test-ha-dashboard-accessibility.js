@@ -363,6 +363,15 @@ function visualVariablesForScenario(scenario, theme) {
 }
 
 async function applyVisualPreferences(page, scenario, theme) {
+  // Native card creation can outlast a fixed delay, especially in the gallery.
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(async () => {
+    const visit = async (element) => {
+      await element.updateComplete;
+      await Promise.all([...element.children, ...(element.shadowRoot?.children || [])].map(visit));
+    };
+    await visit(document.documentElement);
+  });
   const variables = visualVariablesForScenario(scenario, theme);
   const apply = () => page.evaluate(({ cssVariables, profile, mode }) => {
     const apply = (element) => {
@@ -394,6 +403,9 @@ async function applyVisualPreferences(page, scenario, theme) {
   // Chromium can reset touch when its renderer changes after initial setup.
   const session = await emulationSession(page.context(), page);
   await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  // Frame-scheduled native children need the same simulation as their parents.
+  await apply();
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 

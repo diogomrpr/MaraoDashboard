@@ -84,27 +84,37 @@ test('popup member geometry uses the current button and still rejects clipping a
   } finally { globalThis.innerHeight = previousHeight; }
 });
 
-test('visual preferences reach cards mounted while fonts and scrolling settle', async () => {
+test('visual preferences wait for native card rendering and reach late mounts', async () => {
   const node = localName => ({ localName, children: [], dataset: {}, style: { values: new Map(), setProperty(name, value) { this.values.set(name, value); } } });
   const html = node('html'), ha = node('home-assistant'), shadow = node('shadow-root');
   html.children = [ha]; ha.shadowRoot = shadow;
   const lateCard = node('marao-card');
+  const frameCard = node('marao-popup-card');
+  const native = node('hui-card');
+  let nativeRendered = false;
+  Object.defineProperty(native, 'updateComplete', { get: () => Promise.resolve().then(() => {
+    native.children = [lateCard]; nativeRendered = true;
+  }) });
   const previous = globalThis.document;
   const previousFrame = globalThis.requestAnimationFrame;
   const painted = [];
   const emulation = [];
   globalThis.requestAnimationFrame = callback => {
-    painted.push({ size: lateCard.style.values.get('--font-size-primary'), theme: html.dataset.maraoThemeMode });
+    if (!native.children.includes(frameCard)) native.children.push(frameCard);
+    painted.push({ size: frameCard.style.values.get('--font-size-primary'), theme: html.dataset.maraoThemeMode });
     assert.deepEqual(emulation.at(-1), { method: 'Emulation.setTouchEmulationEnabled', params: { enabled: true, maxTouchPoints: 1 } });
     queueMicrotask(callback);
   };
   globalThis.document = { documentElement: html, fonts: { ready: Promise.resolve() } };
   let sessions = 0;
-  const page = { evaluate: async (callback, data) => callback(data), waitForTimeout: async () => { shadow.children.push(lateCard); },
+  const page = { evaluate: async (callback, data) => callback(data), waitForLoadState: async state => {
+    assert.equal(state, 'networkidle'); shadow.children = [native];
+  }, waitForTimeout: async () => {},
     context: () => ({ newCDPSession: async () => { sessions += 1; return { send: async (method, params) => emulation.push({ method, params }) }; } }) };
   try {
     await applyVisualPreferences(page, scenarios.find(s => s.name === 'iphone-bold-text-200'), 'dark');
-    for (const element of [html, ha, lateCard]) {
+    assert.equal(nativeRendered, true);
+    for (const element of [html, ha, lateCard, frameCard]) {
       assert.equal(element.style.values.get('--font-size-primary'), '36px');
       assert.equal(element.style.values.get('--font-size-secondary'), '32px');
       assert.equal(element.style.values.get('--font-weight-primary'), '800');
