@@ -11,7 +11,8 @@ const unit = (file, pattern) => ({ id: 'unit:' + file + (pattern ? ':' + pattern
 const python = file => ({ id: 'python:' + file, kind: 'offline', command: ['python', '-m', 'pytest', '-q', 'tests/components/marao_dashboard/' + file + '.py'],
   inputs: ['tests/components/marao_dashboard/' + file + '.py', backend, 'tests/conftest.py', 'pyproject.toml'], exclusive: false });
 const browser = (id, file, args = [], exclusive = true) => ({ id, kind: 'browser', command: ['node', 'tests/' + file + '.js', ...args],
-  inputs: [runtime, 'tests/' + file + '.js', 'tests/test-ha-dashboard-accessibility.js', 'tests/test-ha-dashboard-e2e.js', 'ha-test'], exclusive });
+  inputs: [runtime, 'tests/' + file + '.js', 'tests/test-ha-dashboard-accessibility.js', 'tests/test-ha-dashboard-e2e.js', 'ha-test',
+    ...(['test-ha-editor', 'test-ha-card-alignment'].includes(file) ? ['tests/test-ha-editor.js', 'tests/json-editor-checks.js', 'tests/editor-drag-checks.js'] : [])], exclusive });
 const families = {
   security: ['hc_security_card', 'hc_alarm_controls_card', 'hc_access_slide_action_card', 'hc_access_card'],
   slider: ['hc_light_card', 'hc_fan_card', 'hc_cover_card'],

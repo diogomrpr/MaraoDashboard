@@ -264,6 +264,14 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
         await panel.locator('.monaco-editor .codicon-widget-close').tap();
       } finally { await page.setViewportSize(viewport); }
     }
+    assert.deepEqual(await panel.evaluate(p => {
+      const root=p.shadowRoot, save=root.getElementById('save'), box=save.getBoundingClientRect(), failures=[];
+      for (const x of [box.left+4,box.left+box.width/2,box.right-4]) for (const y of [box.top+4,box.top+box.height/2,box.bottom-4]) {
+        const hit=root.elementFromPoint(x,y);
+        if(hit!==save && !save.contains(hit)) failures.push('A Monaco widget covers Save');
+      }
+      return failures;
+    }), [], 'The pinned toolbar must stay above native Monaco widgets while the page scrolls');
     await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-json-tools.png`), scale: 'css' });
     if (persist) {
       const { nativeBackup } = require('./native-backup');

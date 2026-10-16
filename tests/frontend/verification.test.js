@@ -27,6 +27,14 @@ test('focused components retain shared consumers and exclude unrelated suites', 
   assert.equal(checksFor(selectComponents(['docs/docs/development/local-development.md'])).length, 0);
 });
 
+test('editor browser evidence includes the delegated gesture and JSON checks', () => {
+  const selected=checksFor(selectComponents([], ['editor-drag', 'json-editor'])).filter(check=>check.kind==='browser');
+  assert.ok(selected.length);
+  for (const check of selected) for (const file of ['tests/test-ha-editor.js','tests/editor-drag-checks.js','tests/json-editor-checks.js']) {
+    assert.ok(check.inputs.includes(file), check.id+' is missing '+file);
+  }
+});
+
 test('unknown paths, ambiguous shared sources and invalid flags cannot broaden or skip scope', () => {
   assert.throws(() => selectComponents(['new-unknown.js']), /Unmapped/);
   assert.throws(() => selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js']), /declare --component/);
