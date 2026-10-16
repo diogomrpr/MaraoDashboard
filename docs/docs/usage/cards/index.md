@@ -115,7 +115,9 @@ It never applies a converted label to an unconverted value.
 Numeric energy history retains each raw record and its original unit in the
 existing bounded request/cache. Compatible records are converted without rounding
 before bounds and geometry are calculated; only visible labels are rounded.
-Missing or incompatible required historical units produce an error instead of a
+Past `unknown`, `unavailable` and other nonnumeric states are omitted from numeric
+conversion, without becoming zero or invalidating usable readings. Missing or
+incompatible units on numeric historical readings produce an error instead of a
 misleading continuous trace. A separately selected graph sensor uses its own
 metadata. Changing only format settings reuses raw history and keeps the selected
 period. Source or period changes invalidate obsolete requests.

@@ -44,6 +44,12 @@ test('shared scroll fixes select WebKit, Chromium and control lifecycle checks',
   assert.ok(!selected.some(check => /mobile-matrix|editor|preserved-upgrade/.test(check.id)));
 });
 
+test('energy history regressions select energy checks without unrelated verification scenarios', () => {
+  const selection = selectComponents(['tests/test-ha-energy-format.js']);
+  assert.deepEqual(selection.components, ['energy']);
+  assert.deepEqual(checksFor(selection).map(check => check.id), ['unit:marao-energy-format', 'energy']);
+});
+
 test('unknown paths, ambiguous shared sources and invalid flags cannot broaden or skip scope', () => {
   assert.throws(() => selectComponents(['new-unknown.js']), /Unmapped/);
   assert.throws(() => selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js']), /declare --component/);

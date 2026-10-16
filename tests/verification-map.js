@@ -99,6 +99,7 @@ const rules = [
   [/^custom_components\/marao_dashboard\/native\.py$/, ['native', 'generator', 'lifecycle', 'migration']],
   [/^tests\/test-ha-security\.js$/, ['security']],
   [/^tests\/test-ha-scroll\.js$/, ['scroll']],
+  [/^tests\/test-ha-energy-format\.js$/, ['energy']],
   [/^(AGENTS\.md|README\.md|docs\/|openspec\/|\.agents\/)/, ['docs']],
   [/^tests\/frontend\/([^/]+)\.test\.js$/, 'test'],
   [/^tests\/components\/marao_dashboard\/(test_[^/]+)\.py$/, 'test'],

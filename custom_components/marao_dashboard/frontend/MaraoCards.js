@@ -1188,7 +1188,7 @@ export class MaraoCard extends BaseElement {
     }).map(record => {
       const reading = formatted ? energyHistoryValue(record, state.attributes?.unit_of_measurement, variables) : {value: Number(record.state)};
       const time = new Date(record.last_changed || record.last_updated).getTime();
-      if (formatted && (!reading || reading.error)) error = true;
+      if (reading?.error) error = true;
       return {value: reading?.value, time};
     }).filter(record => Number.isFinite(record.value) && Number.isFinite(record.time) && record.time >= start && record.time <= end);
     const current = formatted ? energyValue(state.state, state.attributes?.unit_of_measurement, variables) : {value: Number(state.state)};

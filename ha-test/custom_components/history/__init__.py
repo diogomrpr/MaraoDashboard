@@ -15,8 +15,8 @@ CONFIG_SCHEMA = core_history.CONFIG_SCHEMA
 
 
 ENERGY_HISTORY = {
-    "sensor.marao_dashboard_test_energy_format_mixed": ((.1, "1000.001", "Wh"), (.5, "3600007.2", "J"), (.9, "1000.003", "Wh")),
-    "sensor.marao_dashboard_test_energy_format_power": ((.1, "1000", "W"), (.5, "1.5", "kW"), (.9, "1500", "W")),
+    "sensor.marao_dashboard_test_energy_format_mixed": ((.1, "1000.001", "Wh"), (.3, "unavailable", None), (.5, "3600007.2", "J"), (.7, "unknown", None), (.9, "1000.003", "Wh")),
+    "sensor.marao_dashboard_test_energy_format_power": ((.1, "1000", "W"), (.3, "unknown", None), (.5, "1.5", "kW"), (.7, "unavailable", None), (.9, "1500", "W")),
     "sensor.marao_dashboard_test_energy_format_export": ((.1, "-1000", "Wh"), (.5, "-7200000", "J"), (.9, "0", "Wh")),
     "sensor.marao_dashboard_test_energy_format_zero": ((.1, "0", "W"), (.5, "0", "kW"), (.9, "0", "W")),
     "sensor.marao_dashboard_test_energy_format_cost": ((.1, "1.23001", "EUR"), (.5, "1.23002", "EUR"), (.9, "1.2345", "EUR")),

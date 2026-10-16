@@ -78,6 +78,13 @@ async function inspectGallery(page, run, requests) {
   assert.match(await text('cost precision'), /^1[.,]23 EUR$/);
   assert.match(await text('secondary conversion'), /^1[.,]50 kW$/);
   assert.match(await text('legacy label only'), /^1500(?:\.0)? MW$/);
+  for (const label of ['converted two decimals', 'toggle power']) {
+    const card = byLabel(label);
+    assert.deepEqual(await card.evaluate(element => element._graphHistory.get(element._config.entity)
+      .filter(record => ['unknown', 'unavailable'].includes(record.state)).map(record => record.state).sort()), ['unavailable', 'unknown']);
+    assert.equal(await card.locator('ha-card').getAttribute('data-problem'), null, 'Past unavailable readings must not reject conversion');
+    assert.equal(await card.locator('polyline').count(), 1);
+  }
   assert.deepEqual(await byLabel('source six decimals').locator('.state').evaluate(element => {
     const range = document.createRange();
     range.setStart(element.firstChild, 0);
@@ -135,6 +142,11 @@ async function inspectGallery(page, run, requests) {
     await sheet.evaluate(async element => Promise.all(element.getAnimations().map(animation => animation.finished)));
     const period = sheet.locator('marao-energy-period-card');
     await waitIdle(period);
+    if (example.entity === 'sensor.marao_dashboard_test_energy_format_mixed') {
+      assert.equal(await period.evaluate(card => card._history.filter(record => ['unknown', 'unavailable'].includes(record.state)).length), 2);
+      assert.equal(await period.locator('.surface').getAttribute('data-problem'), null);
+      assert.equal(await period.locator('polyline').count(), 1);
+    }
     assert.equal(await period.locator('[data-period="next"]').isDisabled(), true);
     await capture(page, period, run + '-' + example.name.split(' · ')[1].replaceAll(' ', '-') + '-sheet');
     const before = await period.evaluate(card => ({ key: card._loadedKey, history: JSON.stringify(card._history) }));

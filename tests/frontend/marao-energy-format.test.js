@@ -53,6 +53,39 @@ test('mixed raw unit history converts before geometry and formatting changes reu
   card._graphHistory.set('sensor.energy',[sample('1000')]);card._render();assert.match(card.shadowRoot.innerHTML,/Reading format is incompatible/);assert.doesNotMatch(card.shadowRoot.innerHTML,/<polyline/);
 });
 
+test('nonnumeric history does not reject valid graph conversion or fabricate zero readings', async () => {
+  const records = [sample('1000', 'W'), ...['unavailable', 'unknown', '', ' ', 'invalid'].map(value => sample(value)), sample('2', 'kW')];
+  const original = JSON.stringify(records);
+  const variables = { display_unit: 'kW', display_precision: 2, show_graph: true, graph_entity: 'sensor.power', power_entity: 'sensor.power' };
+  for (const template of ['hc_graph_card', 'hc_toggle_graph_card', 'hc_switch_card', 'hc_sensor_card', 'hc_base_card']) {
+    const card = new MaraoCard();
+    card.setConfig({ template, entity: template === 'hc_switch_card' ? 'switch.load' : 'sensor.power', variables });
+    card.hass = hass({ 'sensor.power': sample('1500', 'W'), 'switch.load': sample('on') }, async () => [records]);
+    await tick();
+    const data = card._graphValues('sensor.power', variables);
+    assert.equal(data.error, false, template);
+    assert.deepEqual(data.values.map(record => record.value), [1, 2, 1.5], template);
+    assert.match(card.shadowRoot.innerHTML, /1.50 kW/);
+    assert.match(card.shadowRoot.innerHTML, /<polyline/);
+    assert.doesNotMatch(card.shadowRoot.innerHTML, /Reading format is incompatible/);
+  }
+  assert.equal(JSON.stringify(records), original);
+});
+
+test('nonnumeric period history leaves numeric conversion and bounds usable', async () => {
+  const records = [sample('1000', 'Wh'), sample('unavailable'), sample('unknown'), sample(''), sample('2', 'kWh')];
+  const period = new MaraoEnergyPeriodCard();
+  period.setConfig({ entity: 'sensor.energy', popup: true, display_unit: 'kWh', display_precision: 2 });
+  period.hass = hass({ 'sensor.energy': sample('1500', 'Wh') }, async () => [records]);
+  await tick();
+  assert.equal(period._values().error, false);
+  assert.deepEqual(period._values().values.map(record => record.value), [1, 2]);
+  assert.match(period.shadowRoot.innerHTML, /1.00 kWh/);
+  assert.match(period.shadowRoot.innerHTML, /2.00 kWh/);
+  assert.doesNotMatch(period.shadowRoot.innerHTML, /energy.format_error/);
+  assert.equal(period._history, records);
+});
+
 test('period summaries and sheets share formatting without resetting selected history',async()=>{
   const states={'sensor.energy':sample('1234.5','Wh')};let calls=0,url;
   const config={entity:'sensor.energy',popup:true,display_unit:'kWh',display_precision:2};

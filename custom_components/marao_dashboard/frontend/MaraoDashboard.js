@@ -1504,7 +1504,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     let error = false;
     const values = this._history.map(record => {
       const reading = formatting ? energyHistoryValue(record, unit, this._config) : {value: Number(record.state)};
-      if (formatting && (!reading || reading.error)) error = true;
+      if (reading?.error) error = true;
       return {value: reading?.value, time: new Date(record.last_changed || record.last_updated).getTime()};
     }).filter(item => Number.isFinite(item.value) && Number.isFinite(item.time));
     return {values: error ? [] : values, error};

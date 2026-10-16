@@ -180,8 +180,11 @@ async def test_history_fixture_uses_native_routes_auth_and_delegation(hass, hass
     with pytest.raises(web.HTTPUnauthorized):
         await request("sensor.marao_dashboard_test_energy_format_mixed", False)
     mixed = json.loads((await request("sensor.marao_dashboard_test_energy_format_mixed")).body)[0]
-    assert [record["state"] for record in mixed] == ["1000.001", "3600007.2", "1000.003"]
-    assert [record["attributes"]["unit_of_measurement"] for record in mixed] == ["Wh", "J", "Wh"]
+    assert [record["state"] for record in mixed] == ["1000.001", "unavailable", "3600007.2", "unknown", "1000.003"]
+    assert [record["attributes"].get("unit_of_measurement") for record in mixed] == ["Wh", None, "J", None, "Wh"]
+    power = json.loads((await request("sensor.marao_dashboard_test_energy_format_power")).body)[0]
+    assert [record["state"] for record in power] == ["1000", "unknown", "1.5", "unavailable", "1500"]
+    assert [record["attributes"].get("unit_of_measurement") for record in power] == ["W", None, "kW", None, "W"]
     missing = json.loads((await request("sensor.marao_dashboard_test_energy_format_missing_history")).body)[0]
     assert all(record["attributes"] == {} for record in missing)
     incompatible = json.loads((await request("sensor.marao_dashboard_test_energy_format_incompatible_history")).body)[0]

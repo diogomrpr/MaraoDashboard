@@ -124,6 +124,11 @@ Configured energy unit and precision SHALL apply consistently to current reading
 - **WHEN** a requested conversion cannot interpret some samples in the target dimension
 - **THEN** the sheet reports the incompatibility without drawing a misleading mixed-unit line or altering recorded history
 
+#### Scenario: History includes past nonnumeric states
+- **WHEN** compatible numeric samples are interspersed with unknown, unavailable or other nonnumeric states
+- **THEN** the card and history sheet convert the numeric samples without a unit error
+- **AND** nonnumeric samples are omitted from numeric conversion without becoming zero or modifying recorded history
+
 ### Requirement: Formatting preserves history request lifecycle
 Display-option changes SHALL reuse available raw history without new requests solely for formatting. Unit or precision changes SHALL NOT alter period selection, request identity, controls or authoritative state. Existing loading/empty/error/availability states and stale-response cleanup SHALL remain intact. Source-unit changes SHALL invalidate derived presentation without converting already-converted data again.
 
