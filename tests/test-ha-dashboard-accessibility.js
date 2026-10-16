@@ -550,8 +550,16 @@ async function layoutIssues(page, families = []) {
           if (track && getComputedStyle(track).outlineStyle !== 'none') issues.push('access slide has a focus-only outline');
           if (label && thumb) {
             const range = document.createRange(); range.selectNodeContents(label);
-            if ([...range.getClientRects()].some(rect => rect.width && rect.height && intersects(rect, thumb.getBoundingClientRect()))) {
+            const lines = [...range.getClientRects()].filter(rect => rect.width && rect.height);
+            const thumbBox = thumb.getBoundingClientRect(), trackBox = track.getBoundingClientRect();
+            if (lines.some(rect => intersects(rect, thumbBox))) {
               issues.push(`${label.textContent.trim()}: access slide label overlaps its thumb`);
+            }
+            if (lines.length && !track.matches('.dragging,.completing')) {
+              const top = Math.min(...lines.map(rect => rect.top)), bottom = Math.max(...lines.map(rect => rect.bottom));
+              // Text glyph boxes can differ from their line box by a few pixels.
+              if (Math.abs((top + bottom - thumbBox.top - thumbBox.bottom) / 2) > 4) issues.push(`${label.textContent.trim()}: access label is not centered beside its thumb`);
+              if (lines.some(rect => rect.left < thumbBox.right + 1 || rect.right > trackBox.right - 1 || rect.top < trackBox.top || rect.bottom > trackBox.bottom)) issues.push(`${label.textContent.trim()}: access label is not contained to the right of its thumb`);
             }
           }
         }

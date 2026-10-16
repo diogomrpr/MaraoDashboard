@@ -25,9 +25,9 @@ async function editorDragChecks(page, panel, { scenario, theme, output, client, 
   const reset = async () => {
     await panel.evaluate(async (p, { fixture, pageIndex }) => {
       await p._switchTab('json'); p._monaco.setValue(JSON.stringify(fixture, null, 2)); await p._switchTab('visual');
-      p._collapsedRooms = new Set(p._model.pages.filter((_, i) => i !== pageIndex).map(page => page.id || page.path));
-      p._renderVisual(); p._savedSource = p._source(); p._dirty = false; p._updateHeader();
+      p._savedSource = p._source(); p._dirty = false; p._updateHeader();
     }, { fixture, pageIndex });
+    await require('./editor-rendering-checks').openPage(panel, pageIndex);
     await applyVisualPreferences(page, scenario, theme);
     await panel.locator(`[data-card-list][data-move-page="page:${pageIndex}"]`).first().waitFor({ state: 'visible' });
   };

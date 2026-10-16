@@ -715,6 +715,7 @@ class MaraoSlideToOpen extends HTMLElement {
 
   connectedCallback() {
     this._actionLive = true;
+    this._fitAccessGrid();
     this._cancelHiddenSlide ||= event => {
       if (event.type === "visibilitychange" && !globalThis.document?.hidden) return;
       this._resetGesture(this.shadowRoot?.querySelector(".track"));
@@ -724,7 +725,25 @@ class MaraoSlideToOpen extends HTMLElement {
     this._render();
   }
 
+  _fitAccessGrid() {
+    // A fixed-size thumb and readable label cannot share a sub-100px grid cell.
+    for (let item = this; item; item = item.parentElement || item.getRootNode?.()?.host) {
+      const grid = item.parentElement;
+      if (grid?.id !== 'root' || grid.getRootNode().host?.localName !== 'hui-grid-card') continue;
+      const root = grid.getRootNode(), columns = Number(root.host._config?.columns) || 3;
+      item.setAttribute('data-marao-access-grid-item', '');
+      this._accessGridItem = item;
+      if (!root.querySelector('style[data-marao-access-grid]')) {
+        const style = document.createElement('style'); style.dataset.maraoAccessGrid = '';
+        style.textContent = `:host{container:marao-access-grid / inline-size}@container marao-access-grid (max-width:${columns * 144 + (columns - 1) * 8}px){#root>[data-marao-access-grid-item]{grid-column:1/-1}}`;
+        root.append(style);
+      }
+      break;
+    }
+  }
+
   disconnectedCallback() {
+    this._accessGridItem?.removeAttribute('data-marao-access-grid-item'); this._accessGridItem = null;
     for (const type of ["location-changed", "popstate"]) globalThis.window?.removeEventListener?.(type, this._cancelHiddenSlide);
     globalThis.document?.removeEventListener?.("visibilitychange", this._cancelHiddenSlide);
     this._actionLive = false;
@@ -868,10 +887,6 @@ class MaraoSlideToOpen extends HTMLElement {
           pointer-events: none;
         }
         .thumb ha-icon { --mdc-icon-size: 32px; }
-        @container marao-access (max-width: 240px) {
-          .label { padding: 8px 8px 72px; word-break: break-all; text-wrap: balance; }
-          .thumb { top: auto; bottom: 4px; }
-        }
         .problem { display:flex; gap:8px; padding:12px; margin:0; font-size:var(--font-size-secondary,1rem); line-height:1.25; overflow-wrap:anywhere; }
         .problem ha-icon { flex:0 0 24px; }
         .track[aria-disabled="true"] .thumb {

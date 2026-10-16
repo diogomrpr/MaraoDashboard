@@ -186,6 +186,8 @@ to Visual. Invalid or newer JSON remains untouched for correction. Card identiti
 are retained when content is edited or reordered, so existing popup links keep
 pointing to the same card; an unchanged round trip retains the original shorthand.
 
+A fresh Visual session opens only the landing page. Each page can be expanded independently; closing it releases its controls without changing the draft. New and duplicated pages open for editing. Expansion is a session preference and is never saved. Local card edits refresh their section while unrelated page controls and General inputs stay in place.
+
 Changes remain local until **Save & Generate**. The title, save action and tabs
 stay visible while scrolling. **More actions** contains History, Discard changes
 and Open dashboard; the latter opens the saved dashboard in another tab.

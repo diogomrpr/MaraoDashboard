@@ -736,7 +736,10 @@
               },
               {
                 "entity_id": "light.marao_dashboard_test_room_light",
-                "name": "Accent Lights"
+                "name": "Accent Lights",
+                "variables": {
+                  "enable_slider": false
+                }
               },
               {
                 "entity_id": "light.marao_dashboard_test_onoff_light",

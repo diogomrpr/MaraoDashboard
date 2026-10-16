@@ -121,10 +121,19 @@ async function titleLayoutIssues(page, families = []) {
         if (x * x + y * y > radius * radius + .25) issues.push(`${name}: title text is clipped by a rounded corner`);
       }
     }
-    if (Math.abs(rect.width - contentWidth) > 1) issues.push(`${name}: title uses ${rect.width}px of ${contentWidth}px content width`);
+    const config = card._config || {};
+    const service = config.variables?.action_service || config.tap_action?.service || config.tap_action?.perform_action;
+    const sliderHeader = ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_slide_action_card'].includes(config.template)
+      || config.template?.startsWith('hc_access_') && ['lock.unlock', 'cover.open_cover'].includes(service);
+    const icon = sliderHeader ? parent.querySelector(':scope > .icon, :scope > .binary-cue') : null;
+    const iconBox = icon?.getBoundingClientRect();
+    const titleWidth = contentWidth - (iconBox ? iconBox.width + parseFloat(style.columnGap) : 0);
+    if (Math.abs(rect.width - titleWidth) > 1) issues.push(`${name}: title uses ${rect.width}px of ${titleWidth}px available title width`);
+    if (iconBox && (Math.abs((rect.top + rect.bottom - iconBox.top - iconBox.bottom) / 2) > 1
+      || rect.right > iconBox.left - parseFloat(style.columnGap) + 1)) issues.push(`${name}: title and icon do not share a separated header row`);
     for (const child of parent.children) {
       const other = child.getBoundingClientRect();
-      if (child !== title && other.width && other.height && other.top < rect.bottom - 1) issues.push(`${name}: content appears alongside or above its title`);
+      if (child !== title && child !== icon && other.width && other.height && other.top < (iconBox ? Math.max(rect.bottom, iconBox.bottom) : rect.bottom) - 1) issues.push(`${name}: content appears alongside or above its title`);
     }
     return issues;
   }), families);

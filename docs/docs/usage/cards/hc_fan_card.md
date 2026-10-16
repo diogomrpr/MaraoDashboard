@@ -13,6 +13,9 @@ Normal binary states use distinct card backgrounds and a filled or outlined stat
 speed control. Single-speed fans have only the toggle. Unknown and unavailable
 entities keep their controls disabled.
 
+The icon and title share one header row with or without a speed slider. Long
+names wrap beside the icon, with useful state and controls below.
+
 ![Fan Card Light](../../../assets/images/cards/hc_fan_card/fancard_light.png)
 
 ```yaml

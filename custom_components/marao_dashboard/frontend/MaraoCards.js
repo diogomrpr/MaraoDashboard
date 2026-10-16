@@ -228,9 +228,9 @@ function batteryReading(value) {
 
 export function entityGroupState(type, entities, hass) {
   const ids = [...new Set((Array.isArray(entities) ? entities : []).filter(id => typeof id === 'string'))];
-  if (!hass?.states) return { state: 'loading', label: localize('common.loading', hass, {}, 'Loading…'), activeEntities: [], unavailableEntities: [], available: 0, reading: null };
+  if (!hass?.states) return { state: 'loading', label: localize('common.loading', hass, {}, 'Loading…'), activeEntities: [], unavailableEntities: [], available: 0, reading: null, minimumReading: null };
   const activeEntities = [], unavailableEntities = [], usable = [];
-  let unknown = false;
+  let unknown = false, minimumReading = null;
   for (const id of ids) {
     const value = text(stateOf(hass, id).state, 'unknown').trim().toLowerCase();
     const reading = type === 'battery' ? batteryReading(value) : null;
@@ -238,6 +238,7 @@ export function entityGroupState(type, entities, hass) {
       unavailableEntities.push(id); unknown ||= value === 'unknown'; continue;
     }
     usable.push({ id, reading });
+    if (reading !== null) minimumReading = minimumReading === null ? reading : Math.min(minimumReading, reading);
     const active = type === 'light' ? value === 'on' : type === 'cover' ? ['open', 'opening'].includes(value)
       : type === 'climate' ? value !== 'off' : type === 'battery' && reading < 20;
     if (active) activeEntities.push(id);
@@ -251,7 +252,7 @@ export function entityGroupState(type, entities, hass) {
     : type === 'cover' ? localize('group.all_closed', hass, {}, 'All closed') : localize('common.all_off', hass, {}, 'All off');
   if (type === 'battery' && activeEntities.length) label += ' · ' + localize('group.low_count', hass, { count: activeEntities.length }, `${activeEntities.length} low`);
   if (usable.length && unavailableEntities.length) label = localize('common.partial_summary', hass, { label, count: unavailableEntities.length }, `${label}, ${unavailableEntities.length} unavailable`);
-  return { state, label, activeEntities, unavailableEntities, available: usable.length, reading };
+  return { state, label, activeEntities, unavailableEntities, available: usable.length, reading, minimumReading };
 }
 
 function readingMarkup(entity, name, icon, hass, kind = "hc_sensor_card") {
@@ -627,10 +628,10 @@ export function cardProblem(config, hass, { error = "", contentError = "", loadi
   return severity ? { kind: severity, reason: [...new Set(details)].join(" · "), complete: Boolean(complete) } : null;
 }
 
-export function problemStyle(problem) {
+export function problemStyle(problem, appearance = null) {
   if (!problem || problem.kind === "loading") return "";
-  const background = `var(--marao-problem-${problem.kind}-background,var(--secondary-background-color))`;
-  const color = `var(--marao-problem-${problem.kind}-text,var(--primary-text-color))`;
+  const background = appearance?.background || `var(--marao-problem-${problem.kind}-background,var(--secondary-background-color))`;
+  const color = appearance?.text || `var(--marao-problem-${problem.kind}-text,var(--primary-text-color))`;
   return `background:${background};color:${color};--marao-card-background:${background};--marao-card-text-color:${color};--marao-state-color:${color};--marao-icon-color:${color};--marao-icon-background:transparent;--marao-accent-color:${color};--primary-text-color:${color};--secondary-text-color:${color};--subtext-color:${color};--error-color:${color};opacity:1`;
 }
 
@@ -828,6 +829,8 @@ function cardStyles() {
       .number-stepper { min-width:56px; max-width:100%; }
       .wallbox-shortcuts, .scene-options, .climate-modes { grid-template-columns:minmax(0,1fr); }
     }
+    .body.slider-header, .body.slider-header.binary-card:not(:has(>.state)) { grid-template-columns:minmax(0,1fr) auto; grid-template-areas:'title icon' 'state state' 'control control'; }
+    .body.slider-header:not(:has(>.icon,>.binary-cue)) .title { grid-column:1/-1; }
     @media (prefers-reduced-motion:reduce) { ha-card,button,.slider-thumb { transition:none; } }
   `;
 }
@@ -1279,7 +1282,11 @@ export class MaraoCard extends BaseElement {
     });
     const requestedClimate = kind === "hc_climate_card" ? climateSettings(entity, state) : null;
     const value = loading ? "loading" : requestedClimate?.mode || text(state.state, "unknown");
-    const appearance = stateAppearance(kind, value, config, this._hass);
+    const batteryGroup = entityGroup && variables.entity_type === 'battery' && summary.minimumReading !== null;
+    const batteryConfig = batteryGroup && variables.hc_color ? { ...config, variables: { ...variables, active_color: variables.hc_color } } : config;
+    const appearance = stateAppearance(batteryGroup ? 'hc_battery_card' : kind, batteryGroup ? summary.minimumReading : value, batteryConfig, this._hass);
+    const criticalPartial = batteryGroup && summary.minimumReading < 20 && summary.unavailableEntities.length && problem?.kind === 'warning' && !problem.complete;
+    const problemAppearance = criticalPartial ? stateAppearance('hc_battery_card', summary.minimumReading, {}, this._hass) : null;
     const interactionUnavailable = ["unknown", "unavailable"].includes(text(interactionState.state, "unknown").toLowerCase());
     const stateDisabled = loading || entityGroup && (this._hass?.connected === false || this._hass?.connection?.connected === false)
       || Boolean(entity || toggleEntity || entityGroup) && (toggleEntity ? interactionUnavailable : appearance.unavailable);
@@ -1371,6 +1378,7 @@ export class MaraoCard extends BaseElement {
       }
     }
     const showName = config.show_name !== false && (!glance || Boolean(config.name));
+    const sliderHeader = showName && ["hc_light_card", "hc_fan_card", "hc_cover_card", "hc_access_slide_action_card"].includes(kind);
     const titleCard = kind === "hc_title_card";
     const stateWanted = !titleCard && !glance && (kind === "hc_room_card" ? Boolean(displayValue) : Boolean(entity || entityGroup)) && config.show_state !== false;
     const showState = stateWanted && !problem?.complete && (!redundantState || Boolean(displayValue));
@@ -1428,7 +1436,7 @@ export class MaraoCard extends BaseElement {
     const formattedReading = !iconOnly && Boolean(formattedPrimary || formattedPower);
     const stateMarkup = showState && kind !== "hc_wallbox_current_card" ? `<div class="state">${esc(displayValue)}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    this._setMarkup(`<style>${cardStyles()}</style><ha-card${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${climateControls}${climatePending}${formattedReading ? "" : details}${holdHint}${iconElement}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`);
+    this._setMarkup(`<style>${cardStyles()}</style><ha-card${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem, problemAppearance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${climateControls}${climatePending}${formattedReading ? "" : details}${holdHint}${iconElement}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`);
     for (const symbol of this.shadowRoot.querySelectorAll("ha-state-icon")) {
       const readingEntity = symbol.dataset.readingEntity;
       symbol.hass = this._hass;
