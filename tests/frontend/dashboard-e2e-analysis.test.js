@@ -244,7 +244,7 @@ function scrollPage({ settle = () => {}, blocked = false } = {}) {
   const page = {
     locator: () => ({
       first: () => ({ evaluateHandle: () => handle }),
-      evaluateAll: (run) => run([]),
+      evaluateAll: (run, value) => run([], value),
     }),
     evaluate: () => {},
     waitForTimeout: () => { settle(element, ++frames); visits.push(element.scrollTop); },
