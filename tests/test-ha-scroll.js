@@ -44,11 +44,54 @@ async function main() {
       page.setDefaultTimeout(15000);
       page.setDefaultNavigationTimeout(30000);
       const errors = [];
+      const services = [];
+      page.on('websocket', socket => socket.on('framesent', ({payload}) => {
+        const message = JSON.parse(String(payload));
+        if (message.type === 'call_service') services.push(message.domain + '.' + message.service);
+      }));
       page.on('pageerror', error => errors.push(error.message));
       page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
       page.on('requestfailed', request => errors.push('Failed ' + new URL(request.url()).pathname));
       page.on('response', response => { if (response.status() >= 400) errors.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
       const results = [];
+      if (engine === chromium) {
+        await page.goto(config.url + '/marao-dashboard/overview#overview-blinds');
+        const sheet = page.locator('.marao-popup-sheet');
+        await sheet.locator('marao-card input[type=range]').last().waitFor({state:'attached'});
+        await assertCurrentFrontend(page);
+        await page.waitForFunction(() => document.fonts.status === 'loaded');
+        await page.waitForTimeout(600);
+        const session = await context.newCDPSession(page);
+        try {
+          for (const [index, selector] of [[0, '.body'], [0, 'input[type=range]'], [2, 'marao-slide-to-open .track']]) {
+            await sheet.evaluate(element => { element.scrollTop = 0; });
+            const target = sheet.locator('marao-card').nth(index).locator(selector);
+            await target.scrollIntoViewIfNeeded();
+            const before = await sheet.evaluate(element => element.scrollTop);
+            const box = await target.boundingBox();
+            assert.ok(box, selector + ' must be rendered');
+            const start = {x:box.x + box.width / 2,y:box.y + box.height / 2};
+            await session.send('Input.dispatchTouchEvent', {type:'touchStart',touchPoints:[start]});
+            // Recover from a small downward start at the sheet's top edge.
+            if (selector === '.body') await session.send('Input.dispatchTouchEvent', {type:'touchMove',touchPoints:[{x:start.x,y:start.y+40}]});
+            for (let step=1; step<=12; step++) {
+              await session.send('Input.dispatchTouchEvent', {type:'touchMove',touchPoints:[{x:start.x,y:start.y-step*10}]});
+              await page.waitForTimeout(25);
+            }
+            await session.send('Input.dispatchTouchEvent', {type:'touchEnd',touchPoints:[]});
+            await page.waitForTimeout(400);
+            const top = await sheet.evaluate(element=>element.scrollTop);
+            results.push({target:selector,before,top});
+            assert.ok(top > before + 30, 'Native vertical touch over ' + selector + ' must scroll the cover summary: ' + JSON.stringify({before,top}));
+          }
+        } finally { await session.detach(); }
+        assert.deepEqual(services, [], 'Scrolling must not actuate any cover');
+        assert.deepEqual(errors, []);
+        fs.writeFileSync(path.join(output,name+'-covers.json'),JSON.stringify({results,errors},null,2),{mode:0o600});
+        console.log(name + ': native cover summary touch scrolling OK');
+        await page.locator('.marao-popup-close').click();
+        if (process.argv.includes('--covers-only')) continue;
+      }
       for (const route of ['overview#overview-maintenance', 'card-test#marao-dashboard-test-maintenance-popup']) {
         await page.goto(config.url + '/marao-dashboard/' + route);
         console.log(name + ': loaded ' + route);

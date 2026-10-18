@@ -75,7 +75,7 @@ const components = {
   fan: { units: [['marao-climate-card', 'fan|percentage']], templates: ['hc_fan_card'] },
   cover: { units: [['marao-climate-card', 'cover|position']], templates: ['hc_cover_card'] },
   popup: { units: [['marao-navbar-card'], ['marao-climate-card', 'popup|focus|inert']], profiles: ['iphone-normal', 'iphone-landscape', 'narrow-320'], popups: true },
-  scroll: { units: [['marao-card-visibility'], ['marao-climate-card'], ['marao-security']],
+  scroll: { units: [['marao-card-visibility'], ['marao-climate-card'], ['marao-security'], ['marao-text-scale']],
     browser: [
       ...['iphone-normal', 'iphone-landscape', 'iphone-text-200'].map(profile => browser('scroll:webkit:' + profile, 'test-ha-scroll', ['--webkit', '--scenario', profile])),
       ...['iphone-normal', 'android-normal', 'narrow-320'].map(profile => browser('scroll:chromium:' + profile, 'test-ha-scroll', ['--scenario', profile])),

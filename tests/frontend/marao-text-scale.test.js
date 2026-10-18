@@ -216,7 +216,7 @@ function fakeClassList() {
   };
 }
 
-test("popup scrolling preserves native range touches while containing background and edge scrolling", () => {
+test("native popup touch scrolling stays browser-owned while legacy edges and the background remain guarded", () => {
   const previousWindow = globalThis.window;
   globalThis.Element = globalThis.HTMLElement;
   globalThis.ShadowRoot = class {};
@@ -242,11 +242,20 @@ test("popup scrolling preserves native range touches while containing background
     };
     assert.equal(move([range, sheet]).prevented, false, "native horizontal slider movement reaches its default handler");
     assert.equal(move([sheet], "touchmove", 80).prevented, false, "Marao popup scrolls internally");
+    const initialMove = move([sheet]);
+    assert.equal(initialMove.prevented, false, "zero vertical movement must not cancel a WebView gesture before it scrolls");
+    assert.equal(initialMove.stopped, false, "popup controls still receive their touch events");
     assert.equal(move([range, sheet], "wheel").prevented, false, "wheel over a slider still scrolls the popup");
     sheet.scrollTop = 0;
-    assert.equal(move([sheet], "touchmove", 120).prevented, true, "top edge contains scrolling");
+    assert.equal(move([sheet], "touchmove", 120).prevented, false, "CSS contains the native top edge without cancelling the gesture");
     sheet.scrollTop = 300;
-    assert.equal(move([sheet], "touchmove", 80).prevented, true, "bottom edge contains scrolling");
+    assert.equal(move([sheet], "touchmove", 80).prevented, false, "CSS contains the native bottom edge without cancelling the gesture");
+    sheet.classList = fakeClassList();
+    sheet.classList.add("bubble-pop-up");
+    assert.equal(move([sheet], "touchmove", 80).prevented, true, "legacy bottom-edge guarding remains intact");
+    sheet.scrollTop = 0;
+    assert.equal(move([sheet], "touchmove", 120).prevented, true, "legacy top-edge guarding remains intact");
+    assert.equal(move([range, sheet]).prevented, false, "legacy native sliders retain their default touch handling");
     assert.equal(move([]).prevented, true, "background remains blocked");
     const nativeScroll = move([], "touchmove", 80, false);
     assert.equal(nativeScroll.prevented, false, "a committed native scroll cannot be cancelled");

@@ -592,7 +592,7 @@ function localize(key, hassOrLanguage, placeholders = {}) {
   );
 }
 
-const POPUP_SCROLL_GUARD_VERSION = 3;
+const POPUP_SCROLL_GUARD_VERSION = 4;
 const MARAO_TEXT_SCALE_ATTRIBUTE = "data-marao-dashboard-text-scale";
 const MARAO_TAP_DRAG_THRESHOLD = 10;
 const MARAO_TAP_BLOCK_MS = 500;
@@ -1663,7 +1663,10 @@ function installPopupScrollGuard() {
       return;
     }
     const popupPath = path.slice(0, popupIndex + 1);
-    // iOS moves native range thumbs in the touch event's default handler.
+    // Native sheets contain overscroll in CSS; cancelling a first touchmove can
+    // prevent WebView from starting its scroll (including zero-delta movement).
+    if (event.type === "touchmove" && path[popupIndex].classList.contains("marao-popup-sheet")) return;
+    // Legacy popup hosts still need the native range's default touch handler.
     if (event.type === "touchmove" && popupPath.some((element) => element instanceof Element && element.matches('input[type="range"][data-slider-key]'))) return;
 
     const deltaY =

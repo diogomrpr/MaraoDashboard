@@ -101,6 +101,34 @@
                   "name": "Pedestrian Gate",
                   "device_class": "door",
                   "supported_features": 1
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_closed",
+                  "name": "Living room blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_open",
+                  "name": "Kitchen blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_opening",
+                  "name": "Bedroom blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_closing",
+                  "name": "Office blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_slider_minimum",
+                  "name": "Guest room blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_slider_middle",
+                  "name": "Dining room blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_slider_maximum",
+                  "name": "Hallway blinds"
                 }
               ],
               "variables": {
@@ -1459,6 +1487,34 @@
               "name": "Pedestrian Gate",
               "device_class": "door",
               "supported_features": 1
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_closed",
+              "name": "Living room blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_open",
+              "name": "Kitchen blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_opening",
+              "name": "Bedroom blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_closing",
+              "name": "Office blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_slider_minimum",
+              "name": "Guest room blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_slider_middle",
+              "name": "Dining room blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_slider_maximum",
+              "name": "Hallway blinds"
             }
           ]
         },
