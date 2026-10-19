@@ -876,7 +876,10 @@ async def test_generate_dashboard_service_writes_dashboard_and_raw_room_cards(ha
     # include with HA's own loader, including the nested room navbar include.
     resolved = await hass.async_add_executor_job(load_yaml, str(dashboard))
     office = next(view for view in resolved["views"] if view["title"] == "Office")
-    assert {"type": "markdown", "content": "Raw service card"} in office["cards"]
+    section = next(card for card in office["cards"] if card.get("type") == "custom:marao-control-grid"
+                   and any(child.get("entity") == "light.office_main" for child in card["cards"]))
+    assert section["cards"][-1] == {"type": "markdown", "content": "Raw service card"}
+    assert sum(card == {"type": "markdown", "content": "Raw service card"} for card in section["cards"]) == 1
     assert office["cards"][-1]["cards"][0]["type"] == "custom:marao-navbar-card"
 
 
@@ -1514,3 +1517,160 @@ def test_group_page_conversion_preview_is_read_only_and_saved_groups_stay_indepe
     _save_and_generate_dashboard(hass, preview["config"], [])
     assert json.loads(source.read_bytes()) == shown
     assert json.loads(_management_payload(hass, [{"entity_id": "light.new", "area_id": "kitchen", "has_state": True}])["config"]) == shown
+
+
+def _scoped_source(hass):
+    _reset_dashboard_files(hass)
+    Path(hass.config.path('configuration.yaml')).write_text('default_config:\n')
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True, exist_ok=True)
+    config = {'config_version': 2, 'name': 'Scoped safe', 'landing_page': 'studio', 'navigation': [],
+              'future': {'empty': []}, 'pages': [
+                  {'name': 'Home', 'path': 'home', 'entities': ['light.unopened']},
+                  {'name': 'Studio', 'path': 'studio', 'sections': [
+                      {'entities': ['light.registered', {'entity_id': 'sensor.unregistered'},
+                                    {'entity_id': 'light.missing'}, {'page': 'home'},
+                                    {'template': 'hc_entity_group_card', 'id': 'safe-group', 'name': 'Group',
+                                     'entity_type': 'light', 'entities': ['light.member']}],
+                       'cards': [{'type': 'markdown', 'entity': 'light.raw', 'content': 'Keep'}]},
+                      {'entities': []}]}]}
+    source.write_text(json.dumps(config, indent=2) + '\n')
+    return source, config
+
+
+def test_management_scopes_select_products_before_optional_work(hass):
+    from custom_components.marao_dashboard.editor import display_catalog
+    source, config = _scoped_source(hass)
+    exact = source.read_bytes()
+    with patch('custom_components.marao_dashboard.page_templates', side_effect=AssertionError('Optional templates')), \
+         patch('custom_components.marao_dashboard.list_dashboard_history', side_effect=AssertionError('Optional History')):
+        initial = _management_payload(hass, scope='initial')
+    assert json.loads(initial['config']) == config
+    assert set(initial) == {'config', 'conversion_pending', 'config_path', 'dashboard_url', 'editor'}
+    assert initial['editor']['display_entity_ids'] == ['light.missing', 'light.registered', 'sensor.unregistered']
+    assert initial['editor']['catalog'] == display_catalog()
+    assert all(set(card) <= {'id', 'label', 'entity_optional', 'domains', 'device_classes'}
+               for card in initial['editor']['catalog']['cards'])
+    assert initial['dashboard_url'].endswith('/studio')
+    with patch('custom_components.marao_dashboard.list_dashboard_history', side_effect=AssertionError('Optional History')):
+        context = _management_payload(hass, [], [], scope='context')
+    assert set(context) == {'editor', 'page_templates'}
+    assert context['editor'] == {'catalog': EDITOR_CATALOG, 'entities': [], 'areas': []}
+    with patch('custom_components.marao_dashboard.load_dashboard_config', side_effect=AssertionError('Optional source')), \
+         patch('custom_components.marao_dashboard.page_templates', side_effect=AssertionError('Optional templates')):
+        assert _management_payload(hass, scope='history') == {'history': []}
+    assert source.read_bytes() == exact
+    assert not Path(hass.config.path('dashboard/MaraoDashboard/.history')).exists()
+
+
+@pytest.mark.parametrize('entities,cards', [([], []), ([], [{'type': 'markdown', 'content': 'Raw'}])])
+def test_initial_empty_and_raw_landing_pages_need_no_entity_sentinel(hass, entities, cards):
+    from custom_components.marao_dashboard.editor import initial_entity_ids
+    source, config = _scoped_source(hass)
+    config['pages'][1] = {'name': 'Studio', 'path': 'studio', 'entities': entities, 'cards': cards}
+    source.write_text(json.dumps(config))
+    assert initial_entity_ids(config) == []
+    assert _management_payload(hass, scope='initial')['editor']['display_entity_ids'] == []
+
+
+async def test_initial_metadata_uses_only_keyed_registry_and_state_lookups(hass):
+    _create_area_entity(hass, 'Safe area', 'light.registered')
+    hass.states.async_set('sensor.unregistered', '12', {'friendly_name': 'Safe unregistered', 'device_class': 'temperature'})
+    registry = er.async_get(hass)
+    entries = registry.entities
+    class NoWalk:
+        def values(self):
+            raise AssertionError('Full registry walk')
+        def get_entry(self, entity_id):
+            return entries.get_entry(entity_id)
+    with patch.object(registry, 'entities', NoWalk()), \
+         patch.object(type(hass.states), 'async_all', side_effect=AssertionError('Full state walk')):
+        result = _registry_entities(hass, ['light.registered', 'sensor.unregistered', 'light.missing'])
+    assert [item['entity_id'] for item in result] == ['light.registered', 'sensor.unregistered']
+    assert result[0]['area_name'] == 'Safe area'
+    assert result[1]['name'] == 'Safe unregistered'
+    assert result[1]['device_class'] == 'temperature'
+    assert result[1]['has_state'] is True
+
+
+@pytest.mark.parametrize('scope', ['full', 'initial', 'context', 'history'])
+async def test_scoped_websocket_admin_recovery_and_preview_contract(hass, hass_ws_client, hass_read_only_access_token, scope):
+    from custom_components.marao_dashboard import _register_websocket_commands
+    source, config = _scoped_source(hass)
+    exact = source.read_bytes()
+    hass.data.setdefault(DOMAIN, {})
+    _register_websocket_commands(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json({'id': 1, 'type': 'marao_dashboard/config/get', 'scope': scope})
+    result = await client.receive_json()
+    assert result['success'], result
+    if scope == 'full':
+        full = result['result']
+        await client.send_json({'id': 2, 'type': 'marao_dashboard/config/get', 'config': json.dumps(config)})
+        preview = await client.receive_json()
+        assert preview['result'] == full
+    else:
+        await client.send_json({'id': 2, 'type': 'marao_dashboard/config/get', 'scope': scope, 'config': json.dumps(config)})
+        invalid = await client.receive_json()
+        assert invalid['success'] is False and invalid['error']['code'] == 'invalid_config'
+    checkpoint = Path(hass.config.path('dashboard/MaraoDashboard/.history/.operation/operation.json'))
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint.write_text('{}')
+    await client.send_json({'id': 3, 'type': 'marao_dashboard/config/get', 'scope': scope})
+    recovery = await client.receive_json()
+    assert not recovery['success'] and recovery['error']['code'] == 'invalid_config'
+    checkpoint.unlink()
+    non_admin = await hass_ws_client(hass, access_token=hass_read_only_access_token)
+    await non_admin.send_json({'id': 1, 'type': 'marao_dashboard/config/get', 'scope': scope})
+    denied = await non_admin.receive_json()
+    assert not denied['success'] and denied['error']['code'] == 'unauthorized'
+    assert source.read_bytes() == exact
+
+
+async def test_invalid_management_scope_is_a_websocket_validation_error(hass, hass_ws_client):
+    from custom_components.marao_dashboard import _register_websocket_commands
+    _scoped_source(hass)
+    hass.data.setdefault(DOMAIN, {})
+    _register_websocket_commands(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json({'id': 1, 'type': 'marao_dashboard/config/get', 'scope': 'other'})
+    result = await client.receive_json()
+    assert not result['success'] and result['error']['code'] == 'invalid_format'
+
+
+async def test_canonical_initial_websocket_never_collects_optional_products(hass, hass_ws_client):
+    from custom_components.marao_dashboard import _register_websocket_commands
+    _scoped_source(hass)
+    _create_area_entity(hass, 'Safe area', 'light.registered')
+    hass.states.async_set('sensor.unregistered', '12', {'friendly_name': 'Safe reading'})
+    hass.data.setdefault(DOMAIN, {})
+    _register_websocket_commands(hass)
+    client = await hass_ws_client(hass)
+    def selective(target, ids=None):
+        assert ids == ['light.missing', 'light.registered', 'sensor.unregistered']
+        return _registry_entities(target, ids)
+    with patch('custom_components.marao_dashboard._registry_entities', side_effect=selective) as registry, \
+         patch('custom_components.marao_dashboard._editor_areas', side_effect=AssertionError('Full areas')), \
+         patch('custom_components.marao_dashboard.page_templates', side_effect=AssertionError('Optional templates')), \
+         patch('custom_components.marao_dashboard.list_dashboard_history', side_effect=AssertionError('Optional History')):
+        await client.send_json({'id': 1, 'type': 'marao_dashboard/config/get', 'scope': 'initial'})
+        result = await client.receive_json()
+    assert result['success'], result
+    assert registry.call_count == 1
+    assert [entity['entity_id'] for entity in result['result']['editor']['entities']] == ['light.registered', 'sensor.unregistered']
+
+
+def test_scoped_initial_preserves_independent_released_conversion_and_saved_bytes(hass):
+    source, _ = _scoped_source(hass)
+    fixtures = Path(__file__).parents[3] / 'ha-test/upgrade/fixtures'
+    historical = (fixtures / 'v0.5.1-dashboard.json').read_bytes()
+    expected = json.loads((fixtures / 'v0.5.1-dashboard-format-2-expected.json').read_text())
+    source.write_bytes(historical)
+    baseline = Path(hass.config.path('dashboard/MaraoDashboard/.history/20261010T180000000000Z/fixture.json'))
+    baseline.parent.mkdir(parents=True)
+    baseline.write_bytes(historical)
+    for scope in ['full', 'initial']:
+        result = _management_payload(hass, [], [], scope=scope)
+        assert json.loads(result['config']) == expected
+        assert result['conversion_pending'] is True
+    assert source.read_bytes() == historical and baseline.read_bytes() == historical

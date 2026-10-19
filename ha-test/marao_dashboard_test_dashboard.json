@@ -101,6 +101,34 @@
                   "name": "Pedestrian Gate",
                   "device_class": "door",
                   "supported_features": 1
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_closed",
+                  "name": "Living room blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_open",
+                  "name": "Kitchen blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_opening",
+                  "name": "Bedroom blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_closing",
+                  "name": "Office blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_slider_minimum",
+                  "name": "Guest room blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_slider_middle",
+                  "name": "Dining room blinds"
+                },
+                {
+                  "entity_id": "cover.marao_dashboard_test_case_cover_slider_maximum",
+                  "name": "Hallway blinds"
                 }
               ],
               "variables": {
@@ -877,7 +905,7 @@
             "camera": [
               {
                 "entity_id": "camera.marao_dashboard_test_camera",
-                "name": "Front Door Camera",
+                "name": "Front Door Camera · automatic live video",
                 "variables": {
                   "event_provider": "frigate",
                   "frigate_instance_id": "marao_test"
@@ -1197,6 +1225,7 @@
               "id": "studio-title",
               "template": "hc_title_card",
               "name": "Studio controls",
+              "label": "Hold a navbar icon for three seconds to refresh this device. Sign-in, settings and the current page are kept.",
               "show_icon": false,
               "show_state": false
             }
@@ -1235,6 +1264,66 @@
           ]
         },
         {
+          "columns": 2,
+          "entities": [
+            {
+              "template": "hc_light_card",
+              "name": "Studio · simple light",
+              "entity_id": "light.marao_dashboard_test_onoff_light",
+              "id": "studio-grid-0"
+            },
+            {
+              "template": "hc_light_card",
+              "name": "Studio · brightness",
+              "entity_id": "light.marao_dashboard_test_light",
+              "id": "studio-grid-1"
+            },
+            {
+              "template": "hc_cover_card",
+              "name": "Studio · cover",
+              "entity_id": "cover.marao_dashboard_test_cover",
+              "id": "studio-grid-2"
+            },
+            {
+              "template": "hc_access_action_card",
+              "name": "Studio · lock",
+              "variables": {
+                "action_service": "lock.lock"
+              },
+              "entity_id": "lock.marao_dashboard_test_lock",
+              "id": "studio-grid-3"
+            },
+            {
+              "template": "hc_light_card",
+              "name": "Studio · hidden icon",
+              "show_icon": false,
+              "variables": {
+                "enable_slider": false
+              },
+              "entity_id": "light.marao_dashboard_test_room_light",
+              "id": "studio-grid-4"
+            },
+            {
+              "template": "hc_light_card",
+              "name": "Studio · hidden title",
+              "show_name": false,
+              "show_state": false,
+              "show_label": false,
+              "variables": {
+                "enable_slider": false
+              },
+              "entity_id": "light.marao_dashboard_test_light",
+              "id": "studio-grid-5"
+            },
+            {
+              "template": "hc_access_slide_action_card",
+              "name": "Studio · front entrance opening control with a deliberately long later-row title",
+              "entity_id": "lock.marao_dashboard_test_lock",
+              "id": "studio-grid-6"
+            }
+          ]
+        },
+        {
           "entities": []
         },
         {
@@ -1262,6 +1351,37 @@
             {
               "type": "markdown",
               "content": "Saved layout: energy, lighting and television together."
+            }
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "id": "studio-compact-a",
+              "entity_id": "light.marao_dashboard_test_onoff_light",
+              "name": "Studio simple light"
+            },
+            {
+              "id": "studio-compact-b",
+              "template": "hc_fan_card",
+              "entity_id": "fan.marao_dashboard_test_onoff_fan",
+              "name": "Studio simple fan"
+            }
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "id": "studio-compact-c",
+              "entity_id": "light.marao_dashboard_test_light",
+              "name": "Studio slider light"
+            },
+            {
+              "id": "studio-compact-d",
+              "entity_id": "cover.marao_dashboard_test_cover",
+              "name": "Studio slider blind"
             }
           ]
         }
@@ -1300,6 +1420,32 @@
               "variables": {
                 "apple_tv": true
               }
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "cards": [
+            {
+              "type": "custom:marao-control-grid",
+              "columns": 2,
+              "cards": [
+                {
+                  "type": "custom:marao-native-light-card",
+                  "entity": "light.marao_dashboard_test_light",
+                  "name": "Native grid light"
+                },
+                {
+                  "type": "custom:marao-native-cover-card",
+                  "entity": "cover.marao_dashboard_test_cover",
+                  "name": "Native grid cover"
+                },
+                {
+                  "type": "custom:marao-native-access-card",
+                  "entity": "lock.marao_dashboard_test_lock",
+                  "name": "Native grid door"
+                }
+              ]
             }
           ]
         }
@@ -1373,6 +1519,34 @@
               "name": "Pedestrian Gate",
               "device_class": "door",
               "supported_features": 1
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_closed",
+              "name": "Living room blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_open",
+              "name": "Kitchen blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_opening",
+              "name": "Bedroom blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_closing",
+              "name": "Office blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_slider_minimum",
+              "name": "Guest room blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_slider_middle",
+              "name": "Dining room blinds"
+            },
+            {
+              "entity_id": "cover.marao_dashboard_test_case_cover_slider_maximum",
+              "name": "Hallway blinds"
             }
           ]
         },

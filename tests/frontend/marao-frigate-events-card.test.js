@@ -6,7 +6,7 @@ let source = await fs.readFile(
   new URL("../../custom_components/marao_dashboard/frontend/MaraoFrigateEventsCard.js", import.meta.url),
   "utf8",
 );
-const cardsSource = await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8');
+const cardsSource = (await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8')).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 source = source.replace('await import(`./MaraoCards.js${new URL(import.meta.url).search}`)', `await import("data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}")`);
 const dashboardSource = await fs.readFile(
   new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url),

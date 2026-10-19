@@ -1,3 +1,4 @@
+const { capture: captureScreenshot } = require('./verification-browser');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
@@ -95,11 +96,11 @@ async function editorRenderingChecks(page, panel, { client, scenario, theme, out
     assert.deepEqual(issues, []);
     if (['iphone-normal', 'narrow-320', 'iphone-bold-text-200'].includes(scenario.name)) {
       await expansion.scrollIntoViewIfNeeded();
-      await page.screenshot({ path: path.join(output, `rendering-${scenario.name}-${theme}.png`), scale: 'css' });
+      await captureScreenshot(page, { path: path.join(output, `rendering-${scenario.name}-${theme}.png`), scale: 'css' });
     }
     assert.equal((await client.call({ type: 'marao_dashboard/config/get' })).config, saved, 'Local rendering wrote saved source');
   } catch (error) {
-    await page.screenshot({ path: path.join(output, `rendering-${scenario.name}-${theme}-failure.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `rendering-${scenario.name}-${theme}-failure.png`), scale: 'css' });
     throw error;
   } finally {
     await panel.evaluate(async (p, source) => { await p._switchTab('json'); p._monaco.setValue(source); await p._switchTab('visual'); delete p.__renderingCheck; delete p.__monaco; }, baseline);

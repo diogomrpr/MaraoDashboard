@@ -23,6 +23,7 @@ self.MonacoEnvironment = {
 };
 
 export async function createEditor(host, value, catalog, entities, workerFailure, iconFailure = 'JSON icons could not load.', options = {}) {
+  const stage = options.stage || ((_name, action) => action());
   let draft; try { draft = JSON.parse(value); } catch { draft = options.draft || {}; }
   // The installed adapter publishes responses without a document-version guard.
   // Publish the same worker diagnostics with a document-version guard.
@@ -38,11 +39,13 @@ export async function createEditor(host, value, catalog, entities, workerFailure
       const font = new FontFace('codicon', `url("${url.href}")`);
       await font.load(); document.fonts.add(font);
     })().catch(() => { iconsReady = null; throw new Error(iconFailure); });
-    await iconsReady;
-    await Promise.race([failed, (async () => {
+    await Promise.all([iconsReady, Promise.race([failed, (async () => {
       const worker = await (await getWorker())(model.uri);
       await worker.doValidation(model.uri.toString());
-    })()]);
+    })()])]);
+    return await stage('construction', () => {
+    const latest = options.source?.() ?? value;
+    if (model.getValue() !== latest) model.setValue(latest);
     messages = document.createElement('div'); host.append(messages);
     const editor = monaco.editor.create(host, {
       ariaContainerElement: messages,
@@ -54,6 +57,7 @@ export async function createEditor(host, value, catalog, entities, workerFailure
     editor.onDidDispose(() => messages.remove());
     editor.maraoSchemaKey = JSON.stringify([catalog, entities, draft?.pages?.map?.(page => page.path)]);
     return editor;
+    });
   } catch (error) { messages?.remove(); model.dispose(); throw error; }
   finally { workerError = null; }
 }

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 
-const source = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8");
+const source = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 
 test("ported sheets copy theme colors while viewport insets keep inheriting live values", async () => {
   const { MaraoPopupCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoCards.js');
@@ -82,7 +82,7 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
   };
   let timers = 0;
   const functions = new Function("window", "getComputedStyle", "setInterval", "clearInterval", "safeArea",
-    source.slice(source.indexOf("const fullscreenUsers"), source.indexOf("export class MaraoPopupCard")).replace("export function focusRestorer", "function focusRestorer")
+    source.slice(source.indexOf("const fullscreenUsers"), source.indexOf("export class MaraoControlGrid")).replace("export function focusRestorer", "function focusRestorer")
     + ";return {registerFullscreen,unregisterFullscreen,applyFullscreen};")(window,
       node => ({ getPropertyValue: property => node.style.getPropertyValue(property) || "0px" }),
       () => { timers++; return 1; }, () => { timers--; }, side => `var(--safe-${side})`);

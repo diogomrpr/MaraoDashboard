@@ -1,3 +1,4 @@
+const { capture: captureScreenshot } = require('./verification-browser');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -17,7 +18,22 @@ async function navigate(page, route) {
 async function touch(page, target, duration = 0, end) {
   await target.scrollIntoViewIfNeeded();
   await target.evaluate(element => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  // A cancelled vertical slide can leave native momentum scrolling active.
+  // Measure a settled target before starting the next independent gesture.
+  await target.evaluate(element => new Promise((resolve, reject) => {
+    const started = performance.now(); let previous, stableSince = started;
+    const inspect = () => {
+      if (!element.isConnected) return reject(new Error('Native security target was replaced before input'));
+      const bounds = element.getBoundingClientRect(), position = [bounds.left,bounds.top,bounds.width,bounds.height];
+      for (let node=element;node;node=node.parentElement||node.getRootNode()?.host) position.push(node.scrollTop||0);
+      if (!previous || position.some((value,index)=>Math.abs(value-previous[index])>.5)) stableSince=performance.now();
+      previous=position;
+      if (performance.now()-stableSince>=160) return resolve();
+      if (performance.now()-started>=5000) return reject(new Error('Native security target did not settle before input'));
+      requestAnimationFrame(inspect);
+    };
+    requestAnimationFrame(inspect);
+  }));
   const box = await target.boundingBox();
   assert.ok(box && box.width >= 48 && box.height >= 48, 'Security action must have a visible 48px target');
   const start = { x: box.x + (end ? 24 : box.width / 2), y: box.y + box.height / 2 };
@@ -85,7 +101,7 @@ async function main() {
       await page.waitForFunction(() => document.querySelector('home-assistant').hass.states['alarm_control_panel.marao_dashboard_test_alarm'].state === 'disarmed');
       assert.equal(calls.length, count + 1, 'Completed hold must dispatch once');
       assert.equal(await code.inputValue(), '');
-      await page.screenshot({ path: path.join(output, scenario.name + '-' + theme + '-alarm.png'), scale: 'css' });
+      await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-alarm.png'), scale: 'css' });
       await page.locator('.marao-popup-close').click();
       assert.equal(await page.locator('[data-alarm-code]').count(), 0, 'Closed popup retained PIN input');
 
@@ -123,15 +139,19 @@ async function main() {
         await page.waitForTimeout(300);
         const dispatched = calls.filter(call => call.target === target).length;
         if (dispatched !== before + 1) {
-          await page.screenshot({ path: path.join(output, scenario.name + '-' + theme + '-' + domain + '-failure.png'), scale: 'css' });
+          await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-' + domain + '-failure.png'), scale: 'css' });
           console.error(JSON.stringify(await track.evaluate(element => element._securityTrace)));
         }
         assert.equal(dispatched, before + 1, domain + ' completed opener must dispatch once');
       }
-      await page.screenshot({ path: path.join(output, scenario.name + '-' + theme + '-openers.png'), scale: 'css' });
+      await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-openers.png'), scale: 'css' });
       assert.deepEqual(issues, [], 'Security browser warnings/errors');
       console.log(scenario.name + ' ' + theme + ': safe alarm and opener interactions passed');
       await context.close();
+    } catch (error) {
+      const page = browser.contexts().at(-1)?.pages().at(-1);
+      if (page && !page.isClosed()) await captureScreenshot(page, { path: path.join(output, 'security-failure.png'), scale: 'css' });
+      throw error;
     } finally { await browser.close(); }
   }
 }

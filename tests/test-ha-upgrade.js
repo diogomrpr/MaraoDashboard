@@ -48,7 +48,7 @@ function scopedPlan(config, components) {
   const selected = plan(config);
   assert.ok(components.some(id => require('./verification-map').components[id]?.upgrade), 'No changed upgrade contract in selected scope');
   const baselines = components.includes('migration') ? selected.baselines
-    : components.includes('navbar-overflow') ? ['v0.5.1', 'predecessor-format-1', 'current-format-2']
+    : components.some(id => ['navbar-overflow', 'control-grid'].includes(id)) ? ['v0.5.1', 'predecessor-format-1', 'current-format-2']
     : components.includes('saved-history') ? ['v0.2.0', 'v0.5.1', 'predecessor-format-1', 'current-format-2']
     : ['v0.5.1', 'current-format-2'];
   selected.rows = selected.rows.filter(row => baselines.includes(row.baseline));
@@ -242,6 +242,8 @@ async function functionalChecks(config, format, directory, receiptPath, report, 
   // Catch focused interaction failures before the longer builder and page matrices.
   await child(process.execPath, ['tests/test-ha-card-alignment.js'], directory, 'alignment', env);
   record(['alignment'], ['iphone-normal'], coverage.themes, 'alignment.log');
+  await child(process.execPath, ['tests/test-ha-card-alignment.js', '--control-grid', '--scenario', 'iphone-normal'], directory, 'control-grid', env);
+  record(['control-grid-layout'], ['iphone-normal'], coverage.themes, 'control-grid.log');
   for (const profile of coverage.checks.sliders.profiles) {
     await child(process.execPath, ['tests/test-ha-value-sliders.js', '--scenario', profile], directory, 'sliders-' + profile, env);
     record(['sliders'], [profile], coverage.themes, 'sliders-' + profile + '.log');

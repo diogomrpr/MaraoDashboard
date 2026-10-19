@@ -15,6 +15,8 @@ from homeassistant.components.http.const import KEY_HASS
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.service import async_register_admin_service
 
+from .live import FixtureLiveView
+
 MARAO_DISPOSABLE_FIXTURE = True
 DOMAIN = "marao_test_camera"
 MEDIA = Path(__file__).parent
@@ -26,6 +28,7 @@ async def async_setup(hass, config):
         raise RuntimeError("The disposable Frigate fixture cannot replace a real provider")
     websocket_api.async_register_command(hass, events)
     hass.http.register_view(FixtureMediaView)
+    hass.http.register_view(FixtureLiveView)
 
     unit_entity = "sensor.marao_dashboard_test_energy_format_missing_live"
 

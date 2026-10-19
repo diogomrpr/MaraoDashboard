@@ -662,6 +662,8 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
 
   static styles = `
     :host { display: block; color: var(--primary-text-color); font-family: var(--primary-font-family, Montserrat, Roboto, system-ui, sans-serif); }
+    :host([data-marao-control-cell]) { display:grid; min-width:0; }
+    :host([data-marao-control-cell]) ha-card { height:100%; box-sizing:border-box; }
     ha-card { overflow: hidden; background: var(--ha-card-background, var(--card-background-color)); }
     header { display: grid; gap: 8px; padding: 14px 16px 10px; }
     h2 { margin: 0; overflow-wrap: anywhere; font-size: var(--font-size-primary, 1.125rem); font-weight: var(--font-weight-primary, 700); }

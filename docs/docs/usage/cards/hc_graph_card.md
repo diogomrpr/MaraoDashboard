@@ -52,3 +52,19 @@ For example, a W sensor with `display_unit: kW` and `display_precision: 2` shows
 [shared energy format contract](index.md#energy-reading-format) for unit choices,
 raw history handling and incompatible metadata. Nonnumeric states keep their
 normal presentation.
+
+## Inspect history
+
+Use **History** (**Histórico** in Portuguese) to open exact readings and timestamps
+in a mobile sheet. Choose 1h, 6h or 24h without another Recorder request; tap along
+the time axis or use Previous/Next reading. Minimum/maximum use full-resolution
+samples. Measurement series also show a labeled sample average; counters do not.
+Known unavailable intervals stay gaps and a single sample stays a point.
+
+Details load bundled Chart.js only when opened. A graph inside a sheet uses the
+same modal layer; Back restores its parent and scroll position. Existing card
+actions remain independent. Climate readings intentionally omit units. Empty,
+partial and failed history remain explicit, with Retry after a failure. These
+windows use retained Recorder data; no long-term statistics, consumption totals
+or pinch/zoom plugin are added. Saved graph options and generated configuration
+retain their meaning.

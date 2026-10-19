@@ -50,7 +50,7 @@ from .legacy_migration import (
     async_plan_legacy_resources,
     async_restore_legacy_resource_cache,
 )
-from .editor import EDITOR_CATALOG, page_templates
+from .editor import EDITOR_CATALOG, display_catalog, initial_entity_ids, page_templates
 from .native_storage import NativeDashboardPlan, async_find_native_dashboard, async_restore_native_cache, staged_native_dashboard
 from .generator import (
     CUSTOM_START,
@@ -279,19 +279,31 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
         return
 
     @websocket_api.require_admin
-    @websocket_api.websocket_command({"type": "marao_dashboard/config/get", vol.Optional("config"): str})
+    @websocket_api.websocket_command({"type": "marao_dashboard/config/get", vol.Optional("config"): str,
+                                      vol.Optional("scope", default="full"): vol.In(("full", "initial", "context", "history"))})
     @websocket_api.async_response
     async def websocket_get_config(
         hass: HomeAssistant,
         connection: websocket_api.ActiveConnection,
         msg: dict[str, Any],
     ) -> None:
-        registry_entities = _registry_entities(hass)
-        areas = _editor_areas(hass)
+        scope = msg.get("scope", "full")
         try:
+            if scope != "full" and "config" in msg:
+                raise ValueError("Explicit source previews require the full scope")
+            raw = None
+            if scope == "initial":
+                raw = await hass.async_add_executor_job(_management_source, hass)
+            # Current documents need no discovery context for ordered conversion.
+            full_context = scope in ("full", "context") or scope == "initial" and raw.get("config_version") != 2
+            registry_entities = _registry_entities(hass) if full_context else None
+            areas = _editor_areas(hass) if full_context else None
             payload = await hass.async_add_executor_job(
-                _management_payload, hass, registry_entities, areas, msg.get("config")
+                _management_payload, hass, registry_entities, areas, msg.get("config"), scope, raw
             )
+            if scope == "initial":
+                ids = payload["editor"]["display_entity_ids"]
+                payload["editor"]["entities"] = _registry_entities(hass, ids)
         except ValueError as err:
             connection.send_error(msg["id"], "invalid_config", str(err))
             return
@@ -411,37 +423,63 @@ async def _async_refresh_dashboard(hass: HomeAssistant, result: dict[str, Any]) 
     await dashboard.async_load(force=True)
 
 
+def _management_source(hass: HomeAssistant) -> dict[str, Any]:
+    with DASHBOARD_WRITE_LOCK:
+        _check_management_recovery(hass)
+        return load_dashboard_config(_dashboard_config_path(hass))
+
+
+def _check_management_recovery(hass: HomeAssistant) -> None:
+    if Path(hass.config.path(DASHBOARD_BASE_DIR, HISTORY_DIR_NAME, OPERATION_DIR_NAME, "operation.json")).exists():
+        raise ValueError(RECOVERY_ERROR)
+
+
 def _management_payload(
     hass: HomeAssistant,
     registry_entities: list[dict[str, Any]] | None = None,
     areas: list[dict[str, Any]] | None = None,
     source: str | None = None,
+    scope: str = "full",
+    raw: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if scope not in ("full", "initial", "context", "history"):
+        raise ValueError("Unsupported management read scope")
+    if source is not None and scope != "full":
+        raise ValueError("Explicit source previews require the full scope")
     with DASHBOARD_WRITE_LOCK:
-        if Path(hass.config.path(DASHBOARD_BASE_DIR, HISTORY_DIR_NAME, OPERATION_DIR_NAME, "operation.json")).exists():
-            raise ValueError(RECOVERY_ERROR)
+        _check_management_recovery(hass)
+        if scope == "history":
+            return {"history": list_dashboard_history(hass.config.path(DASHBOARD_BASE_DIR))}
         config_path = _dashboard_config_path(hass)
-        raw = parse_dashboard_config(source) if source is not None else load_dashboard_config(config_path)
+        if raw is None:
+            raw = parse_dashboard_config(source) if source is not None else load_dashboard_config(config_path)
         config = migrate_dashboard_config(raw, registry_entities, areas)
         conversion_pending = config != raw
         config = materialize_overview_groups(config, registry_entities, getattr(hass.config, "language", None) or "en")
+        if scope == "context":
+            return {"editor": {"catalog": EDITOR_CATALOG, "entities": registry_entities or [], "areas": areas or []},
+                    "page_templates": page_templates(config, registry_entities or [])}
         planned = dashboard_identity(config)
         key = registered_dashboard_key(hass.config.path("configuration.yaml"), planned.filename)
         if native := hass.data.get(DOMAIN, {}).get("native_dashboard"):
             key = native.url_path
-        return {
+        payload = {
             "config": json.dumps(config, indent=2, ensure_ascii=False) + "\n",
             "conversion_pending": conversion_pending,
             "config_path": f"/config/{DEFAULT_DASHBOARD_CONFIG}",
             "dashboard_url": f"/{key or planned.dashboard_key}/{config.get('landing_page', 'overview')}",
-            "page_templates": page_templates(config, registry_entities or []),
-            "history": list_dashboard_history(hass.config.path(DASHBOARD_BASE_DIR)),
             "editor": {
-                "catalog": EDITOR_CATALOG,
-                "entities": registry_entities or [],
-                "areas": areas or [],
+                "catalog": display_catalog() if scope == "initial" else EDITOR_CATALOG,
+                "entities": [] if scope == "initial" else registry_entities or [],
+                "areas": [] if scope == "initial" else areas or [],
             },
         }
+        if scope == "initial":
+            payload["editor"]["display_entity_ids"] = initial_entity_ids(config)
+        else:
+            payload["page_templates"] = page_templates(config, registry_entities or [])
+            payload["history"] = list_dashboard_history(hass.config.path(DASHBOARD_BASE_DIR))
+        return payload
 
 
 def _editor_areas(hass: HomeAssistant) -> list[dict[str, Any]]:
@@ -818,14 +856,16 @@ def _install_themes(hass: HomeAssistant, target_dir: Path | None = None, legacy_
     return changed
 
 
-def _registry_entities(hass: HomeAssistant) -> list[dict[str, Any]]:
+def _registry_entities(hass: HomeAssistant, entity_ids: list[str] | None = None) -> list[dict[str, Any]]:
     entity_registry = er.async_get(hass)
     device_registry = dr.async_get(hass)
     area_registry = ar.async_get(hass)
     entities = []
     registered_entity_ids: set[str] = set()
 
-    for entry in entity_registry.entities.values():
+    entries = (entity_registry.entities.values() if entity_ids is None else
+               (entry for entity_id in entity_ids if (entry := entity_registry.async_get(entity_id)) is not None))
+    for entry in entries:
         entity_id = entry.entity_id
         registered_entity_ids.add(entity_id)
         domain = entity_id.split(".", 1)[0]
@@ -857,7 +897,9 @@ def _registry_entities(hass: HomeAssistant) -> list[dict[str, Any]]:
             }
         )
 
-    for state in hass.states.async_all():
+    states = (hass.states.async_all() if entity_ids is None else
+              (state for entity_id in entity_ids if (state := hass.states.get(entity_id)) is not None))
+    for state in states:
         if state.entity_id in registered_entity_ids:
             continue
         entities.append(

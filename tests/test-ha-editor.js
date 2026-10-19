@@ -1,3 +1,4 @@
+const { capture: captureScreenshot } = require('./verification-browser');
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -31,13 +32,13 @@ async function ready(page, config, { navigate = true } = {}) {
   if (navigate) await page.goto(config.url + "/marao-dashboard-editor");
   const panel = page.locator("marao-dashboard-panel");
   await panel.waitFor({ state: "visible" });
-  await page.waitForFunction(p => p._loaded, await panel.elementHandle());
-  await page.waitForLoadState('networkidle');
+  await page.waitForFunction(p => p._loaded && p._visualReady && !p._busy, await panel.elementHandle());
   const expected = fingerprint(path.join(repoRoot, "custom_components/marao_dashboard/frontend"));
   const urls = await page.evaluate(() => performance.getEntriesByType("resource").map(e => e.name));
   assert.ok(urls.some(url => url.includes("/MaraoDashboardPanel.js?v=" + expected)), "Stale editor assets");
   if (process.argv.includes("--startup")) {
-    assert.ok(!urls.some(url=>/MaraoDashboardJsonEditor|MaraoDashboard.*Worker/.test(url)), "Visual requested JSON-only resources");
+    const stages = await panel.evaluate(p => ({ ready: p._visualReadyAt, stages: p._preparationStages }));
+    assert.ok(stages.stages.every(stage => stage.start >= stages.ready), 'Optional computation preceded native Visual readiness');
   }
   return panel;
 }
@@ -76,7 +77,7 @@ async function brandHeader(page, panel, theme, scenario, run) {
     return issues;
   }), []);
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  await page.screenshot({ path: path.join(output, run + '-brand-header.png'), scale: 'css' });
+  await captureScreenshot(page, { path: path.join(output, run + '-brand-header.png'), scale: 'css' });
 }
 
 async function brandSidebar(page) {
@@ -192,24 +193,54 @@ async function scrollHeader(panel, allowShort = false) {
   }, allowShort);
 }
 
+async function editorProbe(page, name, run) {
+  let phase = name + ': starting', timer;
+  if (!page.__maraoProbeBinding) {
+    await page.exposeFunction('__maraoEditorProbePhase', value => {
+      page.__maraoProbePhase?.(value);
+      fs.appendFileSync(path.join(output, 'probe-phases.jsonl'), JSON.stringify({ at: new Date().toISOString(), phase: value }) + '\n');
+    });
+    page.__maraoProbeBinding = true;
+  }
+  page.__maraoProbePhase = value => { phase = name + ': ' + value; };
+  try {
+    await Promise.race([run(), new Promise((_resolve, reject) => {
+      timer = setTimeout(async () => {
+        const state = await page.locator('marao-dashboard-panel').evaluate(p => ({
+          busy: p._busy, interacting: p._interacting, scrolling: p._scrolling, hidden: document.hidden,
+          visualReady: p._visualReady, foreground: p._jsonForeground, tab: p._tab, requested: p._requestedTab,
+          openDialog: Boolean(p.shadowRoot.querySelector('ha-dialog[open]')), stages: p._preparationStages, preparing: Boolean(p._jsonPreparing), resumeIdle: Boolean(p._resumeIdleStage),
+        })).catch(() => ({ unavailable: true }));
+        fs.writeFileSync(path.join(output, 'probe-timeout.json'), JSON.stringify({ phase, state }), { mode: 0o600 });
+        reject(new Error('Editor probe did not settle within 30 seconds at ' + phase));
+      }, 30000);
+    })]);
+  } finally { clearTimeout(timer); page.__maraoProbePhase = null; }
+}
+
 async function startupChecks(page, panel) {
   if(process.argv.includes('--surfaces'))await page.exposeFunction('captureEditorStartup', async name => {
-    await page.screenshot({path:path.join(output,'startup-'+name+'.png'),scale:'css'});
+    await captureScreenshot(page, {path:path.join(output,'startup-'+name+'.png'),scale:'css'});
   });
   await panel.evaluate(async original => {
     const assert = (condition, message) => { if (!condition) throw new Error(message); };
     const capture = async name => {
       if(window.captureEditorStartup){await new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done)));await window.captureEditorStartup(name);}
     };
+    const mark = name => window.__maraoEditorProbePhase?.('startup/' + name);
+    await mark('source');
     const parent = original.parentNode;
     const payload = await original._hass.callWS({ type: 'marao_dashboard/config/get' });
     let requests = 0, writes = 0, resolve, reject;
     const hass = { ...original._hass, callWS(message) {
       if (message.type !== 'marao_dashboard/config/get') { writes++; throw new Error('Unexpected startup write'); }
+      if (message.scope === 'context') return Promise.resolve({ editor: payload.editor, page_templates: payload.page_templates });
+      if (message.scope === 'history') return Promise.resolve({ history: payload.history });
       requests++;
       return new Promise((done, fail) => { resolve = done; reject = fail; });
     }};
-    const probe = new original.constructor(); probe.hass = hass;
+    const probe = new original.constructor(); probe._startJsonPreparation = () => {}; probe.hass = hass;
+    await mark('original-monaco');
     await original._ensureMonaco();
     const module = original._jsonModule;
     original.remove(); parent.append(probe);
@@ -221,10 +252,12 @@ async function startupChecks(page, panel) {
       assert(!probe._jsonLoading && probe._requestedTab === 'visual', 'Early JSON initialized');
       probe.hass = hass; probe._load(); assert(requests === 1, 'Duplicate config request');
       await capture('loading');
+      await mark('initial-failure');
       reject(new Error('Injected configuration failure')); await probe._loading;
       assert(probe._retryKind === 'config' && !probe.shadowRoot.getElementById('retry').hidden, 'No readable retry');
       await capture('retry');
       probe.hass = hass; await Promise.resolve(); assert(requests === 1, 'Automatic retry after failure');
+      await mark('config-retry');
       const retry = probe._load(true); await Promise.resolve(); resolve(payload); await retry;
       assert(probe._loaded && requests === 2, 'Explicit config retry failed');
       probe._model.name = 'Unsaved startup check'; probe._setDirty(); const draft = probe._source();
@@ -236,24 +269,33 @@ async function startupChecks(page, panel) {
       parent.append(probe);
       // Delay the real JSON initializer while using its installed worker/editor.
 
-      let release; const gate = new Promise(done => { release = done; }); let creates = 0;
-      probe._jsonModule = { ...module, async createEditor(...args) { creates++; await gate; return module.createEditor(...args); } };
+      await mark('delayed-json');
+      let release, started; const gate = new Promise(done => { release = done; });
+      const creating = new Promise(done => { started = done; }); let creates = 0;
+      probe._jsonModule = { ...module, async createEditor(...args) { creates++; started(); await gate; return module.createEditor(...args); } };
       const json = probe._switchTab('json'); const repeated = probe._switchTab('json');
+      await creating;
       await probe._switchTab('visual');
       probe._model.name = 'Latest unsaved startup check'; probe._setDirty(); const latest = probe._source();
       await capture('json-loading');
-      release(); await Promise.all([json, repeated]);
+      await mark('release-json');
+      release();
+      // Complete the shared attempt explicitly; background idle capacity is advisory.
+      await Promise.all([json, repeated, probe._ensureMonaco()]);
       assert(creates === 1 && probe._tab === 'visual', 'Repeated JSON load or focus/tab steal');
       await probe._switchTab('json');
       assert(probe._monaco.getValue() === latest && probe._dirty, 'JSON lost latest draft');
       const oldEditor = probe._monaco;
       probe.remove(); assert(probe._monaco === null, 'Editor not disposed');
       assert(!probe.shadowRoot.querySelector('.monaco-aria-container'), 'Detached JSON announcements not disposed'); parent.append(probe);
+      await mark('revisit-json');
       await probe._ensureMonaco(); await probe._switchTab('json');
       assert(probe._monaco !== oldEditor && probe._monaco.getValue() === latest && probe._dirty, 'Revisit lost draft');
       // Exercise the real Restore action with a local management stub only.
+      await mark('restore');
       let restores=0, reads=0;
       probe._history=[{version:'20261010T180000000000Z',created_at:'2026-10-10T18:00:00Z',name:'Restore check',reason:'fixture'}];
+      probe._historyLoaded = true;
       probe._hass={...hass, async callWS(message) {
         if(message.type==='marao_dashboard/history/restore'){restores++;return {};}
         if(message.type==='marao_dashboard/config/get'){reads++;return payload;}
@@ -261,7 +303,7 @@ async function startupChecks(page, panel) {
       }};
       const confirm=window.confirm;window.confirm=()=>true;
       try {
-        probe._openHistory();const restoreButton=probe.shadowRoot.querySelector('[data-version]');await restoreButton.updateComplete;restoreButton.click();
+        probe._openHistory();await Promise.resolve();const restoreButton=probe.shadowRoot.querySelector('[data-version]');assert(restoreButton, 'Loaded History has no Restore action');await restoreButton.updateComplete;restoreButton.click();
         await new Promise((done,fail)=>{const start=performance.now();const check=()=>{
           if(restores===1 && reads===1 && !probe._busy)return done();
           if(performance.now()-start>10000)return fail(new Error('Restore did not reload configuration'));
@@ -284,6 +326,8 @@ async function assetRetry(browser, config, scenario, file) {
   const failed = [];
   page.on('requestfailed', request => failed.push(new URL(request.url()).pathname));
   await page.route('**/' + file + '*', async route => {
+    const headers = route.request().headers();
+    if (/prefetch/.test(headers['sec-purpose'] || headers.purpose || '')) return route.continue();
     if (failures++ === 0) await route.abort('failed'); else await route.continue();
   });
   try {
@@ -292,7 +336,7 @@ async function assetRetry(browser, config, scenario, file) {
     await panel.evaluate(p => Promise.race([p._switchTab('json'), new Promise((_resolve, reject)=>setTimeout(()=>reject(new Error('Injected asset failure did not settle')),10000))]));
     assert.equal(await panel.evaluate(p => p._retryKind), 'json', 'Failed asset did not offer retry: ' + file);
     assert.equal(await panel.evaluate(p => p._source()), source);
-    if(process.argv.includes('--surfaces'))await page.screenshot({path:path.join(output,file+'-failure.png'),scale:'css'});
+    if(process.argv.includes('--surfaces'))await captureScreenshot(page, {path:path.join(output,file+'-failure.png'),scale:'css'});
     await panel.locator('#retry').click();
     await page.waitForFunction(p => p._tab === 'json', await panel.elementHandle());
     assert.equal(await panel.evaluate(p => p._monaco.getValue()), source);
@@ -389,7 +433,7 @@ async function folding(page, panel) {
   await require('./json-editor-checks').clickFold(page, panel, result.line);
   await page.waitForFunction(({p,line,expanded})=>p._monaco.getTopForLineNumber(line+2)<expanded,{p:await panel.elementHandle(),line:result.line,expanded:finalExpanded});
   await scrollHeader(panel, true);
-  await page.screenshot({path:path.join(output,'folding-'+(await page.evaluate(()=>document.documentElement.dataset.maraoAccessibilityProfile))+'-'+(await page.evaluate(()=>document.documentElement.dataset.maraoThemeMode))+'.png'),scale:'css'});
+  await captureScreenshot(page, {path:path.join(output,'folding-'+(await page.evaluate(()=>document.documentElement.dataset.maraoAccessibilityProfile))+'-'+(await page.evaluate(()=>document.documentElement.dataset.maraoThemeMode))+'.png'),scale:'css'});
   await panel.evaluate(p=>p._switchTab('visual'));
 }
 
@@ -421,7 +465,7 @@ async function weatherChecks(context, scenario, theme, config) {
           return problems;
         });
         assert.deepEqual(errors,[]);
-        await card.screenshot({path:path.join(output,`${scenario.name}-${theme}-${route}-${template}-${i}.png`),scale:'css'});
+        await captureScreenshot(card, {path:path.join(output,`${scenario.name}-${theme}-${route}-${template}-${i}.png`),scale:'css'});
       }
     }
     fs.writeFileSync(path.join(output,`${scenario.name}-${theme}-weather-diagnostics.json`),JSON.stringify(diagnostics));
@@ -444,7 +488,7 @@ async function feedbackChecks(page, panel, scenario, theme) {
       const retry=await panel.locator('#retry').boundingBox();
       assert.ok(retry.width>=48&&retry.height>=48&&retry.y>=rect.y&&retry.y+retry.height<=rect.y+rect.height+1,'Retry is not visible in the header');
     }
-    await page.screenshot({path:path.join(output,`${scenario.name}-${theme}-json-${kind}.png`),scale:'css'});
+    await captureScreenshot(page, {path:path.join(output,`${scenario.name}-${theme}-json-${kind}.png`),scale:'css'});
   }
   await panel.evaluate(p=>{p._retryKind=null;p._setStatus('','');p._updateHeader();});
   assert.equal(await panel.evaluate(p=>p._source()),source);
@@ -507,7 +551,7 @@ async function energyFormatting(page, panel, config, client, original, run, save
       assert.ok(options.includes('Wh') && options.includes('J'));
       assert.ok(!options.includes('W') && !options.includes('kW'), 'Power unit offered for an energy source');
     }
-    if (capture) await page.screenshot({ path: path.join(output, run + '-energy-options.png'), scale: 'css' });
+    if (capture) await captureScreenshot(page, { path: path.join(output, run + '-energy-options.png'), scale: 'css' });
     await item.click();
     await item.waitFor({ state: 'hidden' });
   };
@@ -549,9 +593,9 @@ async function energyFormatting(page, panel, config, client, original, run, save
       return issues;
     }), []);
     await dialog.evaluate(element => { element.shadowRoot.querySelector('.body').scrollTop = 0; });
-    await page.screenshot({ path: path.join(output, run + '-energy-dialog.png'), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, run + '-energy-dialog.png'), scale: 'css' });
     await dialog.evaluate(element => { const body = element.shadowRoot.querySelector('.body'); body.scrollTop = body.scrollHeight; });
-    await page.screenshot({ path: path.join(output, run + '-energy-dialog-bottom.png'), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, run + '-energy-dialog-bottom.png'), scale: 'css' });
     await panel.locator('ha-dialog [data-save]').click();
     await panel.locator('ha-dialog').waitFor({ state: 'detached' });
     assert.deepEqual(await panel.evaluate(p => p._container('page', window.__energyPosition).entities[0].variables), {
@@ -579,7 +623,7 @@ async function energyFormatting(page, panel, config, client, original, run, save
       return { dialogs: p.shadowRoot.querySelectorAll('ha-dialog').length, open: dialog?.open,
         actions: [...(dialog?.querySelectorAll('[data-save]') || [])].map(button => ({ box: button.getBoundingClientRect().toJSON(), display: getComputedStyle(button).display, visibility: getComputedStyle(button).visibility })) };
     }), null, 2));
-    await page.screenshot({ path: path.join(output, run + '-energy-failure.png'), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, run + '-energy-failure.png'), scale: 'css' });
     throw error;
   } finally {
     const current = await client.call({ type: 'marao_dashboard/config/get' });
@@ -618,10 +662,10 @@ async function releasedDraftPreservation(page, panel, client, scenario, theme) {
       assert.deepEqual(JSON.parse(await panel.evaluate(p => p._source())), expected, record.tag);
       await applyVisualPreferences(page, scenario, theme);
       assert.deepEqual(await emulationIssues(page, scenario, theme), [], 'Historical Visual draft profile');
-      await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-${record.tag}-preserved-visual.png`), scale: 'css' });
+      await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-${record.tag}-preserved-visual.png`), scale: 'css' });
       await panel.evaluate(p => p._switchTab('json'));
       assert.deepEqual(JSON.parse(await panel.evaluate(p => p._monaco.getValue())), expected, record.tag);
-      await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-${record.tag}-preserved-json.png`), scale: 'css' });
+      await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-${record.tag}-preserved-json.png`), scale: 'css' });
     }
   } catch (error) {
     fs.writeFileSync(path.join(output, `${scenario.name}-${theme}-preservation-failure.txt`), error.stack || error.message);
@@ -688,9 +732,9 @@ async function independentRoomChecks(page, panel, client, scenario, theme) {
       visit(element);
       return issues;
     }), []);
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-rooms-${name}.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-rooms-${name}.png`), scale: 'css' });
     await dialog.evaluate(element => { const body = element.shadowRoot.querySelector('.body'); body.scrollTop = body.scrollHeight; });
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-rooms-${name}-bottom.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-rooms-${name}-bottom.png`), scale: 'css' });
   };
   try {
     await open();
@@ -845,7 +889,7 @@ async function entityGroupEditorChecks(page, panel, client, config, originalByte
     });
     assert.deepEqual(await dialog.evaluate(element => {
       const issues = [];
-      for (const control of element.querySelectorAll('.gallery-card, #entity-search, .row-actions ha-icon-button, .dialog-actions ha-button')) {
+      for (const control of element.querySelectorAll('.gallery-card, #entity-search, .row-actions ha-icon-button, .row-actions .icon-action, .dialog-actions ha-button')) {
         const box = control.getBoundingClientRect();
         if (!box.width || !box.height) continue;
         if (box.width < 48 || box.height < 48 || box.left < -.5 || box.right > innerWidth + .5) issues.push('Group editor control is too small or overflows');
@@ -853,9 +897,9 @@ async function entityGroupEditorChecks(page, panel, client, config, originalByte
       for (const row of element.querySelectorAll('.entity-row')) if (row.scrollWidth > row.clientWidth + 1) issues.push('Group member row overflows');
       return issues;
     }), []);
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-groups-${name}.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-groups-${name}.png`), scale: 'css' });
     await dialog.evaluate(element => { const body = element.shadowRoot.querySelector('.body'); body.scrollTop = body.scrollHeight; });
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-groups-${name}-bottom.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-groups-${name}-bottom.png`), scale: 'css' });
   };
   try {
     assert.equal(original.dirty, false, 'Displayed defaults must start clean');
@@ -1000,7 +1044,7 @@ async function editablePageChecks(page, panel, client, config, originalBytes, sc
   const capture = async name => {
     await applyVisualPreferences(page, scenario, theme);
     assert.deepEqual(await emulationIssues(page, scenario, theme), []);
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-pages-${name}.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-pages-${name}.png`), scale: 'css' });
     assert.deepEqual(await panel.evaluate(p => {
       const issues = [], dialog = p.shadowRoot.querySelector('ha-dialog');
       const root = dialog || p.shadowRoot.querySelector('#page-manager');
@@ -1011,7 +1055,7 @@ async function editablePageChecks(page, panel, client, config, originalBytes, sc
       for (const row of root.querySelectorAll('.entity-row, .room-header, .card-heading')) if (row.scrollWidth > row.clientWidth + 1) issues.push('Page row overflows');
       return issues;
     }), []);
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-pages-${name}.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-pages-${name}.png`), scale: 'css' });
   };
   try {
     const pins = await panel.evaluate(p => p._navigationEntries().length);
@@ -1110,6 +1154,7 @@ async function main() {
       const context = await browser.newContext(contextOptionsForScenario(scenario,theme));
       await context.addInitScript(setBrowserToken, { hassUrl: config.url, ...accessToken(config) });
       const page = await context.newPage();
+      page.__maraoWorkers = []; page.on('worker', worker => page.__maraoWorkers.push(worker.url()));
       await configurePageEmulation(context, page, scenario);
       page.on('framenavigated',frame=>{if(frame===page.mainFrame())fs.appendFileSync(path.join(output,'navigations.jsonl'),JSON.stringify({profile:scenario.name,theme,path:new URL(frame.url()).pathname,time:Date.now()})+'\n');});
       const diagnostics = [];
@@ -1143,7 +1188,7 @@ async function main() {
             const box = element.getBoundingClientRect();
             return box.left >= -1 && box.right <= innerWidth + 1;
           }, sidebar);
-          await page.screenshot({ path: path.join(output, scenario.name + '-' + theme + '-brand-sidebar.png'), scale: 'css' });
+          await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-brand-sidebar.png'), scale: 'css' });
           await drawer.evaluate(async element => { element.open = false; await element.updateComplete; });
           await page.waitForFunction(element => element.getBoundingClientRect().right <= 1, sidebar);
         }
@@ -1169,7 +1214,8 @@ async function main() {
       if (process.argv.includes('--rendering') || process.argv.includes('--rendering-geometry')) await require('./editor-rendering-checks').editorRenderingChecks(page, panel, { client, scenario, theme, output, geometryOnly: process.argv.includes('--rendering-geometry') });
       if (process.argv.includes('--drag') || process.argv.includes('--drag-geometry')) await require('./editor-drag-checks').editorDragChecks(page, panel, { output, scenario, theme, client, config, persist: process.argv.includes('--drag-save') && scenario === runs[0] && theme === runThemes[0], geometryOnly: process.argv.includes('--drag-geometry') });
       if (process.argv.includes('--energy')) await energyFormatting(page, panel, config, client, original, scenario.name + '-' + theme, scenario === runs[0] && theme === runThemes[0]);
-      if (process.argv.includes("--startup") && scenario === runs[0] && theme === runThemes[0]) await startupChecks(page, panel);
+      if (process.argv.includes('--preload')) await editorProbe(page, 'preload', () => require('./editor-preload-checks').editorPreloadChecks(page, panel));
+      if (process.argv.includes("--startup") && scenario === runs[0] && theme === runThemes[0]) await editorProbe(page, 'startup', () => startupChecks(page, panel));
       if (process.argv.includes("--delete") && scenario === runs[0] && theme === runThemes[0]) await deletion(page, panel, config, client, original);
       if (process.argv.includes("--fold")) {
         try {await folding(page, panel);}
@@ -1246,7 +1292,7 @@ async function main() {
           return issues;
         });
         assert.deepEqual(geometry, []);
-        await page.screenshot({ path: path.join(output, scenario.name + '-' + theme + '-menu.png'), scale: 'css' });
+        await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-menu.png'), scale: 'css' });
         await panel.evaluate(p => { p.shadowRoot.querySelector('.secondary-actions').open = false; });
         const input=panel.locator('#general-form input').first();
         await input.scrollIntoViewIfNeeded(); await input.focus();
@@ -1254,7 +1300,7 @@ async function main() {
         assert.ok(field.y>=header.y+header.height-1,'Focused field is hidden behind the pinned header');
         const bounds = await scrollHeader(panel);
         fs.writeFileSync(path.join(output, scenario.name + "-" + theme + "-bounds.json"), JSON.stringify(bounds));
-        await page.screenshot({ path: path.join(output, scenario.name + "-" + theme + ".png"), scale: "css" });
+        await captureScreenshot(page, { path: path.join(output, scenario.name + "-" + theme + ".png"), scale: "css" });
         assert.ok(bounds.every(b => b.top >= b.hostTop - 1 && (b.scroll === 0 || b.top <= b.hostTop + 1) && b.bottom < b.hostBottom - 48), "Pinned header must remain visible and leave usable form space");
         await panel.locator('.secondary-actions summary').click();
         assert.equal(await panel.locator('#open-dashboard').getAttribute('target'), '_blank');
@@ -1293,22 +1339,22 @@ async function main() {
         assert.equal(await panel.evaluate(p=>p._source()),before);
         // The actual affected room rows, with the pinned controls in view.
         await panel.locator('[data-action="card-delete"]').first().scrollIntoViewIfNeeded();
-        await page.screenshot({path:path.join(output,scenario.name+'-'+theme+'-rows.png'),scale:'css'});
+        await captureScreenshot(page, {path:path.join(output,scenario.name+'-'+theme+'-rows.png'),scale:'css'});
         await panel.evaluate((p, dirty) => { p._dirty = dirty; p._updateHeader(); }, originalDirty);
       }
-      await page.screenshot({ path: path.join(output, scenario.name + "-" + theme + ".png"), scale: "css" });
+      await captureScreenshot(page, { path: path.join(output, scenario.name + "-" + theme + ".png"), scale: "css" });
       if(process.argv.includes('--surfaces')) {
         for(const id of ['general-form','page-manager','navbar-list']) {
           await panel.locator('#'+id).scrollIntoViewIfNeeded();
-          await page.screenshot({path:path.join(output,scenario.name+'-'+theme+'-'+id+'.png'),scale:'css'});
+          await captureScreenshot(page, {path:path.join(output,scenario.name+'-'+theme+'-'+id+'.png'),scale:'css'});
         }
         const custom=panel.locator('#page-manager [data-kind="page"][data-action="card-delete"]').last();
         await custom.scrollIntoViewIfNeeded();
         const customBounds=await custom.boundingBox();
         assert.ok(customBounds.width>=48&&customBounds.height>=48,'Custom-page Delete target is too small');
-        await page.screenshot({path:path.join(output,scenario.name+'-'+theme+'-custom-rows.png'),scale:'css'});
+        await captureScreenshot(page, {path:path.join(output,scenario.name+'-'+theme+'-custom-rows.png'),scale:'css'});
         await panel.locator('.secondary-actions summary').click();
-        await page.screenshot({path:path.join(output,scenario.name+'-'+theme+'-menu.png'),scale:'css'});
+        await captureScreenshot(page, {path:path.join(output,scenario.name+'-'+theme+'-menu.png'),scale:'css'});
         await panel.locator('#history').click();
         await panel.locator('ha-dialog [data-close]').waitFor({state:'visible'});
         await page.waitForFunction(p=>p.shadowRoot.querySelector('ha-dialog')?.shadowRoot.querySelector('wa-dialog')?.shadowRoot.querySelector('dialog')?.open,await panel.elementHandle());
@@ -1316,7 +1362,7 @@ async function main() {
           const modal=d.shadowRoot.querySelector('wa-dialog').shadowRoot.querySelector('dialog');
           await Promise.all(modal.getAnimations().map(a=>a.finished));
         });
-        await page.screenshot({path:path.join(output,scenario.name+'-'+theme+'-history.png'),scale:'css'});
+        await captureScreenshot(page, {path:path.join(output,scenario.name+'-'+theme+'-history.png'),scale:'css'});
         await panel.locator('ha-dialog [data-close]').click();
         await panel.locator('ha-dialog').waitFor({state:'detached'});
         await feedbackChecks(page,panel,scenario,theme);
@@ -1328,7 +1374,15 @@ async function main() {
       await context.close();
       console.log("Editor checked: " + scenario.name + " (" + theme + ")");
     }
-    if (process.argv.includes("--startup")) for (const file of ["MaraoDashboardJsonEditor.js", "MaraoDashboardJsonEditor.css", "MaraoDashboardJsonWorker.js"]) await assetRetry(browser, config, runs[0], file);
+    if (process.argv.includes("--startup")) {
+      const fonts = fs.readdirSync(path.join(repoRoot, 'custom_components/marao_dashboard/frontend/assets')).filter(file => /^codicon-[A-Z0-9]+\.ttf$/.test(file));
+      assert.equal(fonts.length, 1, 'Expected one generated Monaco codicon font');
+      for (const file of ["MaraoDashboardJsonPreparation.js", "MaraoDashboardJsonEditor.js", "MaraoDashboardJsonEditor.css", fonts[0], "MaraoDashboardJsonWorker.js"]) await assetRetry(browser, config, runs[0], file);
+    }
+  } catch (error) {
+    const page = browser.contexts().at(-1)?.pages().at(-1);
+    if (page && !page.isClosed()) await captureScreenshot(page, { path: path.join(output, 'editor-failure.png'), scale: 'css' });
+    throw error;
   } finally { client.close(); await browser.close(); }
 }
 

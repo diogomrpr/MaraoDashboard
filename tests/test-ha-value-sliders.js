@@ -1,3 +1,4 @@
+const { capture: captureScreenshot } = require('./verification-browser');
 const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright');
@@ -72,7 +73,8 @@ async function checkPointerInteraction(page, context, config, example, calls, po
     for (const confirmed of [0, 40]) {
       await api(config, 'POST', `/api/services/${example.source.split('.')[0]}/${expected}`, { entity_id: example.entity, [field]: confirmed });
       try {
-        await page.waitForFunction(({ element, value }) => element.isConnected && Math.abs(Number(element.dataset.sliderCurrent) - value) < 1, { element: original, value: confirmed }, { timeout: 5000 });
+        // HA data can update a held native range independently of animation frames.
+        await page.waitForFunction(({ element, value }) => element.isConnected && Math.abs(Number(element.dataset.sliderCurrent) - value) < 1, { element: original, value: confirmed }, { timeout: 5000, polling: 50 });
       } catch {
         const observed = await original.evaluate((element) => ({ connected: element.isConnected, current: element.dataset.sliderCurrent, target: element.value }));
         const state = await api(config, 'GET', `/api/states/${example.entity}`);
@@ -120,7 +122,7 @@ async function checkPointerInteraction(page, context, config, example, calls, po
 async function checkNativeThumbReset(page, selector) {
   const input = page.locator(selector);
   await input.scrollIntoViewIfNeeded();
-  const before = await input.screenshot({ scale: 'device' });
+  const before = await captureScreenshot(input, { scale: 'device' });
   const style = await input.evaluateHandle((element) => {
     const style = document.createElement('style');
     // Simulate iOS's lower-priority default thumb shadow in every test engine.
@@ -129,7 +131,7 @@ async function checkNativeThumbReset(page, selector) {
     return style;
   });
   try {
-    if (!before.equals(await input.screenshot({ scale: 'device' }))) throw new Error('native thumb shadow leaked into the vector slider');
+    if (!before.equals(await captureScreenshot(input, { scale: 'device' }))) throw new Error('native thumb shadow leaked into the vector slider');
   } finally { await style.evaluate((element) => element.remove()); }
 }
 
@@ -148,12 +150,12 @@ async function main() {
       const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
       await context.addInitScript(setBrowserToken, { ...tokens, hassUrl: config.url, clientId: `${config.url}/`, expires: Date.now() + tokens.expires_in * 1000 });
       const page = await context.newPage();
+      const cameraLedger = await require('./camera-request-ledger').managedCameraLedger(context, page, { output, scenario: scenario.name, theme });
       await configurePageEmulation(context, page, scenario);
       const errors = [];
       const calls = [];
       page.on('pageerror', (error) => errors.push(error.message));
       page.on('console', (message) => { if (['error', 'warning'].includes(message.type())) errors.push(message.text()); });
-      page.on('requestfailed', (request) => errors.push(`Failed ${request.resourceType()}: ${new URL(request.url()).pathname}`));
       page.on('response', (response) => { if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); });
       page.on('websocket', (socket) => socket.on('framesent', ({ payload }) => {
         let message;
@@ -172,7 +174,7 @@ async function main() {
       const readings = await sliderReadings(page);
       const failures = readings.filter(({ issues }) => issues.length);
       if (readings.length < cases.length || failures.length) {
-        await page.screenshot({ path: path.join(output, `${run}-failure.png`), scale: 'css' });
+        await captureScreenshot(page, { path: path.join(output, `${run}-failure.png`), scale: 'css' });
         throw new Error(`${run}: ${readings.length} visible sliders; expected at least ${cases.length}; ${JSON.stringify(failures)}`);
       }
       for (const example of cases) {
@@ -197,7 +199,7 @@ async function main() {
             content: card._overlay?.querySelector('.marao-popup-content')?.innerHTML,
           })));
           fs.writeFileSync(path.join(output, `${run}-popup-entry-failure.json`), JSON.stringify({ location, popups, errors }, null, 2), { mode: 0o600 });
-          await page.screenshot({ path: path.join(output, `${run}-popup-entry-failure.png`), scale: 'css' });
+          await captureScreenshot(page, { path: path.join(output, `${run}-popup-entry-failure.png`), scale: 'css' });
           throw new Error(`${run}: slider popup did not mount; private diagnostics retained. ${error.message}`);
         }
         await applyVisualPreferences(page, scenario, theme);
@@ -227,7 +229,7 @@ async function main() {
           await card.evaluate((element, block) => element.scrollIntoView({ block }), scenario.pageZoom > 1 ? 'start' : 'center');
           await card.evaluate(async (element) => { await element.shadowRoot.querySelector('ha-card')?.updateComplete; });
           // Oversized element screenshots resize Chromium and reset mobile emulation.
-          await page.screenshot({ path: path.join(output, `${run}-${index}.png`), scale: 'css' });
+          await captureScreenshot(page, { path: path.join(output, `${run}-${index}.png`), scale: 'css' });
         }
       }
       if (scenario.name === 'iphone-normal') {
@@ -251,13 +253,13 @@ async function main() {
             for (const [index, card] of (await cards.all()).entries()) {
               await card.evaluate((element) => element.scrollIntoView({ block: 'center' }));
               await card.evaluate(async (element) => { await element.shadowRoot.querySelector('ha-card')?.updateComplete; });
-              await page.screenshot({ path: path.join(output, `${run}-${view.replace('#', '-')}-${index}.png`), scale: 'css' });
+              await captureScreenshot(page, { path: path.join(output, `${run}-${view.replace('#', '-')}-${index}.png`), scale: 'css' });
             }
             if (view.endsWith('#overview-blinds')) {
               await page.setViewportSize({ width: 539, height: 816 });
               await page.locator('.marao-popup-sheet').evaluate((element) => element.scrollTo({ top: 0 }));
               await page.waitForTimeout(150);
-              await page.screenshot({ path: path.join(output, `overview-blinds-${theme}.png`), scale: 'device' });
+              await captureScreenshot(page, { path: path.join(output, `overview-blinds-${theme}.png`), scale: 'device' });
             }
           }
         } finally {
@@ -265,11 +267,16 @@ async function main() {
         }
       }
       await page.waitForLoadState('networkidle');
+      await cameraLedger.stopForClose();
       if (errors.length) throw new Error(`${run}: browser warnings/errors: ${errors.join('; ')}`);
       fs.writeFileSync(path.join(output, `${run}.json`), JSON.stringify(readings, null, 2));
       console.log(`${run}: ${readings.length} value sliders passed.`);
       await context.close();
     }
+  } catch (error) {
+    const page = browser.contexts().at(-1)?.pages().at(-1);
+    if (page && !page.isClosed()) await captureScreenshot(page, { path: path.join(output, 'value-sliders-failure.png'), scale: 'css' });
+    throw error;
   } finally { await browser.close(); }
 }
 

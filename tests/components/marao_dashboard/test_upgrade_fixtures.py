@@ -211,7 +211,8 @@ def test_manual_room_options_remain_raw_and_preview_does_not_write(tmp_path: Pat
     generated = write_dashboard(config, tmp_path / "generated")
     view = next((tmp_path / "generated" / generated.slug / "views/rooms").glob("00-*.yaml"))
     cards = yaml.load(view.read_text(), Loader=MaraoDashboardLoader)["cards"]
-    assert manual in cards
+    owned_sections = [card for card in cards if isinstance(card, dict) and card.get("type") == "custom:marao-control-grid"]
+    assert any(manual in section["cards"] for section in owned_sections)
     write_dashboard_config(config, active)
     assert active.read_text() == source
 

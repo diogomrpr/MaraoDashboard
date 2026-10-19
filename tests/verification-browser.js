@@ -1,6 +1,21 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { captureSelected } = require('./verification-policy');
+
+const captured = new WeakMap();
+async function capture(subject, options) {
+  // Pixel comparisons without a file remain assertions under every capture policy.
+  if (!options.path) return subject.screenshot(options);
+  const argv = process.argv.slice(2), value = key => argv.find(arg => arg.startsWith(key + '='))?.slice(key.length + 1) || (argv.includes(key) ? argv[argv.indexOf(key) + 1] : undefined);
+  const policy = value('--screenshots') || 'failure', profile = value('--scenario') || 'iphone-normal';
+  const owner = subject.page?.() || subject;
+  const count = captured.get(owner) || 0, failure = /failure|failed/.test(path.basename(options.path));
+  if (!captureSelected(policy, profile, { failure, representative: count < 2 })) return;
+  const result = await subject.screenshot(options);
+  if (!failure) captured.set(owner, count + 1);
+  return result;
+}
 
 function artifactDirectory(name) {
   const base = process.env.MARAO_TEST_ARTIFACT_ROOT;
@@ -30,7 +45,7 @@ function selectSamples(cards, families = []) {
 }
 
 async function inspectFocused(page, options, scenario, theme, output, runName) {
-  const { applyVisualPreferences, emulationIssues, frontendRegistrationIssues, layoutIssues, inspectPopups } = require('./test-ha-dashboard-accessibility');
+  const { readySubtree, emulationIssues, frontendRegistrationIssues, layoutIssues, inspectPopups } = require('./test-ha-dashboard-accessibility');
   const locator = page.locator('marao-card,marao-state-timeline-card,marao-energy-period-card,marao-camera-events-card,marao-frigate-events-card');
   const cards = await locator.evaluateAll(elements => elements.map((card, index) => ({ index, config: card._config, tag: card.localName,
     state: card._hass?.states?.[card._config?.entity]?.state })));
@@ -43,10 +58,11 @@ async function inspectFocused(page, options, scenario, theme, output, runName) {
       await element.shadowRoot?.querySelector('ha-card')?.updateComplete;
       element.scrollIntoView({ block: 'center', behavior: 'instant' });
     });
-    await applyVisualPreferences(page, scenario, theme);
-    const issues = [...await emulationIssues(page, scenario, theme), ...await layoutIssues(page, families)];
+    await readySubtree(page, card, scenario, theme);
+    const issues = await layoutIssues(page, families, await card.elementHandle());
     assert.deepEqual(issues, [], sample.config?.name || sample.tag);
   }
+  assert.deepEqual(await emulationIssues(page, scenario, theme), []);
   assert.deepEqual(await frontendRegistrationIssues(page), []);
   if (options.popups) assert.deepEqual(await inspectPopups(page, scenario, theme, output, runName, options.screenshots, families, !options.geometryOnlyPopups, new Set(), options.popupHash), []);
   if (options.screenshots === 'review' || options.screenshots === 'all') {
@@ -56,4 +72,4 @@ async function inspectFocused(page, options, scenario, theme, output, runName) {
   return samples.length;
 }
 
-module.exports = { artifactDirectory, inspectFocused, sampleKey, selectSamples };
+module.exports = { capture, artifactDirectory, inspectFocused, sampleKey, selectSamples };

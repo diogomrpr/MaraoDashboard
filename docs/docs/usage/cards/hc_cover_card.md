@@ -35,3 +35,15 @@ position, movement state and the slider below.
 ## More info
 
 This card uses `custom:marao-card` in `position` mode. The cover entity should expose the `current_position` attribute for the percentage label and slider to work correctly.
+
+Standard light, cover and access controls share a 174px minimum outer height,
+with title and icon in the same header. Omitted sliders remain absent; essential
+text and problems can increase the required height.
+
+Use **Edit layout → fixed columns** for one continuous mixed control grid in
+saved order. Eligible sections use equal rows throughout, an 8px gap and a
+responsive column count up to the selected maximum. The final card keeps its
+normal width. Keep full-width cameras, charts and detailed panels in separate
+explicit sections. Automatic mode retains domain grouping, and raw/non-control
+sections retain their existing layout. Manual/native cards share the minimum;
+place eligible cards inside `custom:marao-control-grid` for whole-grid equality.

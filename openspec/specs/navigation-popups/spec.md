@@ -59,6 +59,9 @@ Sheets SHALL scroll internally without background scrolling. Content clearance
 SHALL keep the close control unobstructed at enlarged text/zoom and short heights.
 Scroll containment SHALL recognize native Marao sheets and preserve value-slider
 touch defaults instead of cancelling the slider's touch movement.
+Native Marao sheets SHALL leave touch movement to the browser, including initial
+zero-vertical movement and boundary reversals, and contain overscroll through CSS.
+The backdrop SHALL remain guarded without cancelling touches inside the sheet.
 
 #### Scenario: A fixed-height popup is scrolled at 200% zoom
 - **WHEN** the last cards reach the visible area

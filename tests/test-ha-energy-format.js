@@ -83,7 +83,20 @@ async function inspectGallery(page, run, requests) {
     assert.deepEqual(await card.evaluate(element => element._graphHistory.get(element._config.entity)
       .filter(record => ['unknown', 'unavailable'].includes(record.state)).map(record => record.state).sort()), ['unavailable', 'unknown']);
     assert.equal(await card.locator('ha-card').getAttribute('data-problem'), null, 'Past unavailable readings must not reject conversion');
-    assert.equal(await card.locator('polyline').count(), 1);
+    const trace = await card.evaluate(element => {
+      const entity=element._config.entity, values=element._graphValues(entity,element._config.variables).values, end=Date.now(), start=end-86400000;
+      const gaps=values.filter(record=>record.value===null).map(record=>(record.time-start)/86400000*100);
+      return {values:values.filter(record=>Number.isFinite(record.value)).map(record=>record.value),gaps,
+        runs:element.shadowRoot.querySelectorAll('svg.graph-background polyline.line,svg.graph-background circle.line').length,
+        bridges:[...element.shadowRoot.querySelectorAll('svg.graph-background polyline.line')].flatMap(line=>{
+          const xs=line.getAttribute('points').trim().split(/\s+/).map(point=>Number(point.split(',')[0]));
+          return gaps.filter(gap=>gap>Math.min(...xs)+.02&&gap<Math.max(...xs)-.02);
+        })};
+    });
+    assert.equal(trace.gaps.length,2,'Both known nonnumeric transitions must remain explicit gaps');
+    assert.equal(trace.runs,3,'Two unavailable intervals must separate the three numeric runs');
+    assert.deepEqual(trace.bridges,[],'A compact trace bridged a known unavailable interval');
+    for(const value of label==='converted two decimals'?[1.000001,1.000002,1.000003]:[1,1.5,1.5])assert.ok(trace.values.some(actual=>Math.abs(actual-value)<1e-12),'Compact history lost a full-precision converted reading');
   }
   assert.deepEqual(await byLabel('source six decimals').locator('.state').evaluate(element => {
     const range = document.createRange();
@@ -142,11 +155,28 @@ async function inspectGallery(page, run, requests) {
     await sheet.evaluate(async element => Promise.all(element.getAnimations().map(animation => animation.finished)));
     const period = sheet.locator('marao-energy-period-card');
     await waitIdle(period);
+    const canvas=period.locator('canvas');await canvas.waitFor({state:'visible'});
+    assert.equal(await canvas.count(),1,'A period sheet must mount one retained shared chart');
     if (example.entity === 'sensor.marao_dashboard_test_energy_format_mixed') {
       assert.equal(await period.evaluate(card => card._history.filter(record => ['unknown', 'unavailable'].includes(record.state)).length), 2);
       assert.equal(await period.locator('.surface').getAttribute('data-problem'), null);
-      assert.equal(await period.locator('polyline').count(), 1);
+      const values=await period.evaluate(card=>card._detailOptions.samples.map(sample=>sample.value));
+      const expected=example.display_unit==='kWh'?[1.000001,null,1.000002,null,1.000003]:[1000.001,null,1000.002,null,1000.003];
+      assert.equal(values.length,expected.length);
+      for(let index=0;index<expected.length;index++)expected[index]===null?assert.equal(values[index],null):assert.ok(Math.abs(values[index]-expected[index])<1e-10,'Period drawing changed a full-precision source value');
+      assert.equal(await canvas.getAttribute('data-history-source-points'),'5');
+      assert.equal(await canvas.getAttribute('data-history-rendered-points'),'5','Small explicit gap series must not be decimated or expanded');
+      assert.equal(await period.locator('svg,polyline').count(),0,'Period detail still uses the retired SVG renderer');
     }
+    const previousReading=period.getByRole('button',{name:/^(Previous reading|Leitura anterior)$/});
+    await previousReading.tap();await previousReading.tap();
+    assert.equal(await previousReading.isDisabled(),true,'Previous reading must stop at the first original numeric sample');
+    const selected=await period.locator('time').getAttribute('datetime');
+    assert.equal(selected,await period.evaluate(card=>new Date(card._history[0].last_updated||card._history[0].last_changed).toISOString()),'Reading selection fabricated a timestamp');
+    if(example.display_unit==='kWh')assert.match(await period.locator('.history-reading strong').textContent(),/^1[.,]00 kWh$/);
+    else if(example.entity==='sensor.marao_dashboard_test_energy_format_mixed')assert.match(await period.locator('.history-reading strong').textContent(),/^1[.,\u202f\u00a0 ]?000[.,]001 Wh$/);
+    if(example.entity==='sensor.marao_dashboard_test_energy_format_cost')assert.match(await period.locator('.history-reading strong').textContent(),/^1[.,]23 EUR$/);
+    await period.evaluate(card=>{card.__energyChartBefore=card._detailChart;card.__energyCanvasBefore=card.shadowRoot.querySelector('canvas');});
     assert.equal(await period.locator('[data-period="next"]').isDisabled(), true);
     await capture(page, period, run + '-' + example.name.split(' · ')[1].replaceAll(' ', '-') + '-sheet');
     const before = await period.evaluate(card => ({ key: card._loadedKey, history: JSON.stringify(card._history) }));
@@ -154,6 +184,12 @@ async function inspectGallery(page, run, requests) {
     const periodRequestCount = requests.length;
     await period.evaluate(card => card.setConfig({ ...card._config, display_precision: 6 }));
     assert.deepEqual(await period.evaluate(card => ({ key: card._loadedKey, history: JSON.stringify(card._history) })), before);
+    assert.equal(await period.evaluate(card=>card._detailChart===card.__energyChartBefore&&card.shadowRoot.querySelector('canvas')===card.__energyCanvasBefore),true,'Formatting replaced the retained chart or canvas');
+    assert.equal(await period.locator('time').getAttribute('datetime'),selected,'Formatting reset the selected original reading');
+    if(example.display_unit==='kWh')assert.match(await period.locator('.history-reading strong').textContent(),/^1[.,]000001 kWh$/);
+    else if(example.entity==='sensor.marao_dashboard_test_energy_format_mixed')assert.match(await period.locator('.history-reading strong').textContent(),/^1[.,\u202f\u00a0 ]?000[.,]001000 Wh$/);
+    else assert.match(await period.locator('.history-reading strong').textContent(),/^1[.,]230010 EUR$/);
+    await period.evaluate(card=>{delete card.__energyChartBefore;delete card.__energyCanvasBefore;});
     await page.waitForLoadState('networkidle');
     assert.equal(requests.length, periodRequestCount, 'Formatting refetched period history');
     await capture(page, period, run + '-' + example.name.split(' · ')[1].replaceAll(' ', '-') + '-sheet-six-decimals');

@@ -74,6 +74,14 @@ Unknown, unavailable, missing and disconnected entities use a neutral whole-card
 
 ## Energy reading format
 
+Energy detail sheets retain their day/month navigation and use the same numeric
+history chart as [Graph Card](hc_graph_card.md#inspect-history). Tap the chart or
+use Previous/Next reading for an original timestamp and formatted value. Calendar
+boundaries follow Home Assistant's time zone, including daylight-saving days.
+Minimum and maximum use the full retained series; counter readings do not imply
+consumption totals or a sample average. Changing a reading or graph window does
+not operate the entity.
+
 Graph and toggle-graph cards, numeric sensor/base readings, switch secondary power
 and Energy period summaries/sheets accept two opt-in display settings:
 
@@ -101,7 +109,7 @@ Numbers use Home Assistant's selected number format, with its language or the
 browser language as fallback. Real zero and signed export values remain valid;
 rounding hides negative-zero text.
 
-With both settings omitted, existing displays remain unchanged. On switches,
+With both settings omitted, existing primary displays remain unchanged. On switches,
 legacy `power_unit` is a label only. Enabling either new setting uses the actual
 secondary sensor's unit; an explicit compatible `display_unit` converts from it.
 It never formats the primary on/off state or changes Home Assistant state,
@@ -114,10 +122,15 @@ It never applies a converted label to an unconverted value.
 
 Numeric energy history retains each raw record and its original unit in the
 existing bounded request/cache. Compatible records are converted without rounding
-before bounds and geometry are calculated; only visible labels are rounded.
+before bounds and geometry are calculated, including in Auto: history uses the
+current source unit unless a compatible display unit is selected. For example,
+3600 J in an earlier record becomes 1 Wh when the current source reports Wh.
+Changing precision changes the labels without changing those normalized values.
+Detail readings, bounds and summaries use the same unit. Only visible labels are rounded.
 Past `unknown`, `unavailable` and other nonnumeric states are omitted from numeric
 conversion, without becoming zero or invalidating usable readings. Missing or
-incompatible units on numeric historical readings produce an error instead of a
-misleading continuous trace. A separately selected graph sensor uses its own
+incompatible units on numeric historical readings remain gaps with a readable
+format error instead of an unconverted number under another unit. Compatible
+records remain available. A separately selected graph sensor uses its own
 metadata. Changing only format settings reuses raw history and keeps the selected
 period. Source or period changes invalidate obsolete requests.

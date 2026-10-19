@@ -1704,12 +1704,7 @@ def _security_view(config: dict[str, Any], include_root: str, language: str = "e
     access_entities = _page_entities(page, "access_entities", _access_entities(config))
     if access_entities:
         cards.append(
-            {
-                "type": "grid",
-                "columns": 2,
-                "square": False,
-                "cards": [_room_entity_card(entity) for entity in access_entities],
-            }
+            _control_grid([_room_entity_card(entity) for entity in access_entities], 2)
         )
 
     action_entities = _entities_from_values(page.get("actions"))
@@ -2220,19 +2215,74 @@ def _page_card_popups(entity, language="en"):
     return []
 
 
+def _standard_control(card):
+    if card.get("type") != "custom:marao-card":
+        return False
+    role = card.get("template")
+    service = (card.get("variables") or {}).get("action_service") or card.get("tap_action", {}).get("service") or card.get("tap_action", {}).get("perform_action")
+    if role in ("hc_light_card", "hc_fan_card", "hc_cover_card", "hc_access_card", "hc_access_slide_action_card"):
+        return True
+    if str(role).startswith("hc_access_") and service in ("lock.unlock", "cover.open_cover"):
+        return True
+    if role == "hc_access_action_card":
+        return service in ("lock.lock", "cover.close_cover")
+    return role == "hc_access_hold_action_card" and str(card.get("entity", "")).split(".", 1)[0] in ("lock", "cover")
+
+
+def _owned_content(card):
+    """Classify owned content independently of compact control composition."""
+    if not isinstance(card, dict):
+        return False
+    kind = card.get("type", "")
+    if kind == "custom:marao-card":
+        return bool(card.get("template")) and card["template"] not in ("hc_title_card", "hc_navbar_card", "hc_popup_card")
+    return kind.startswith("custom:marao-native-") and not kind.endswith(("-title-card", "-navbar-card", "-popup-card")) or kind in (
+        "custom:marao-timeline-card", "custom:marao-energy-period-card", "custom:marao-frigate-events-card", "custom:marao-slide-to-open")
+
+
+def _control_grid(cards, columns, *, raw=False, groups=None):
+    """One owner per logical section; raw siblings keep their untouched configs."""
+    if cards and any(_owned_content(card) for card in cards):
+        return {"type": "custom:marao-control-grid", "columns": columns, "cards": cards,
+                **({"groups": groups} if groups is not None else {})}
+    return {"type": "grid", "columns": columns, "square": False, "cards": cards}
+
+
+def _structural_host(card):
+    return isinstance(card, dict) and card.get("type") in ("custom:marao-navbar-card", "custom:marao-popup-card")
+
+
+def _automatic_section(groups, raw):
+    content, metadata = [], []
+    for cards, columns in groups:
+        if cards:
+            content.extend(cards)
+            metadata.append({"count": len(cards), "columns": columns})
+    for card in raw:
+        content.append(deepcopy(card))
+        metadata.append({"count": 1, "columns": 1})
+    if not content:
+        return []
+    if not any(_owned_content(card) for card in content):
+        return content
+    return [_control_grid(content, max(group["columns"] for group in metadata), groups=metadata)]
+
+
 def _page_view(page, include_root, dashboard_key, language="en"):
     cards, popups = [], []
     for section in page["_sections"]:
         entries = section["ordered_cards"]
         rendered = [_page_card(entity, dashboard_key, language) for entity in entries]
         raw = deepcopy(section.get("cards", []))
+        popups.extend(card for card in raw if _structural_host(card))
+        raw = [card for card in raw if not _structural_host(card)]
         if section.get("columns"):
             if rendered or raw:
                 content = [*rendered, *raw]
-                if section["columns"] == 1 and len(content) == 1:
+                if section["columns"] == 1 and len(content) == 1 and not _owned_content(content[0]):
                     cards.extend(content)
                 else:
-                    cards.append({"type": "grid", "columns": section["columns"], "square": False, "cards": content})
+                    cards.append(_control_grid(content, section["columns"], raw=bool(raw)))
         else:
             # Preserve the historical automatic domain layout; fixed grids keep mixed order.
             domains = ["sensor", "binary_sensor", "camera", "lock", "cover", "climate", "fan", "switch", "input_boolean", "media_player", "vacuum", "number", "input_number", "light", "navigation", "entity_group"]
@@ -2240,10 +2290,9 @@ def _page_view(page, include_root, dashboard_key, language="en"):
             for entity, card in zip(entries, rendered, strict=True):
                 domain = "navigation" if entity.get("page") else "entity_group" if entity["template"] == "hc_entity_group_card" else str(entity.get("entity_id") or "").split(".", 1)[0]
                 buckets.setdefault(domain, []).append(card)
-            for domain in [*domains, *(key for key in buckets if key not in domains)]:
-                if bucket := buckets.get(domain):
-                    cards.append({"type": "grid", "columns": 2 if domain in ("sensor", "binary_sensor", "switch", "input_boolean", "number", "input_number", "light", "navigation", "entity_group") else 1, "square": False, "cards": bucket})
-            cards.extend(raw)
+            groups = [(buckets[domain], 2 if domain in ("sensor", "binary_sensor", "switch", "input_boolean", "number", "input_number", "light", "navigation", "entity_group") else 1)
+                      for domain in [*domains, *(key for key in buckets if key not in domains)] if buckets.get(domain)]
+            cards.extend(_automatic_section(groups, raw))
         popups.extend(popup for entity in entries for popup in _page_card_popups(entity, language))
     cards.extend(popups)
     cards.append(TaggedScalar("!include", f"{include_root}/components/navigation/navbar.yaml"))
@@ -2319,62 +2368,25 @@ def _entity_container_cards(
         _title_card(container["name"]),
     ]
 
-    if container.get("columns") and (container["ordered_cards"] or container["cards"]):
-        cards.append(
-            {
-                "type": "grid",
-                "columns": container["columns"],
-                "square": False,
-                "cards": [
-                    _page_shortcut_card(item, dashboard_key)
-                    if item.get("page")
-                    else _entity_group_card(item, language)
-                    if item.get("template") == "hc_entity_group_card"
-                    else _room_entity_card(item)
-                    for item in container["ordered_cards"]
-                ]
-                + container["cards"],
-            }
-        )
-    else:
-        for domain, columns in [
-            ("sensor", 2),
-            ("binary_sensor", 2),
-            ("camera", 1),
-            ("lock", 1),
-            ("cover", 1),
-            ("climate", 1),
-            ("fan", 1),
-            ("switch", 2),
-            ("input_boolean", 2),
-            ("media_player", 1),
-            ("vacuum", 1),
-            ("number", 2),
-            ("input_number", 2),
-            ("light", 2),
-            ("navigation", 2),
-            ("entity_group", 2),
-        ]:
-            entities = container["entities_by_domain"].get(domain, [])
-            if entities:
-                cards.append(
-                    {
-                        "type": "grid",
-                        "columns": columns,
-                        "square": False,
-                        "cards": [
-                            _page_shortcut_card(entity, dashboard_key)
-                            if domain == "navigation"
-                            else _entity_group_card(entity, language)
-                            if domain == "entity_group"
-                            else _room_entity_card(entity)
-                            for entity in entities
-                        ],
-                    }
-                )
+    def render(items):
+        return [_page_shortcut_card(item, dashboard_key) if item.get("page")
+                else _entity_group_card(item, language) if item.get("template") == "hc_entity_group_card"
+                else _room_entity_card(item) for item in items]
 
-    if not container.get("columns"):
-        cards.extend(container["cards"])
+    raw = [card for card in container["cards"] if not _structural_host(card)]
+    if container.get("columns") and (container["ordered_cards"] or raw):
+        cards.append(_control_grid(render(container["ordered_cards"]) + raw,
+                                   container["columns"], raw=bool(raw)))
+    else:
+        groups = [(render(container["entities_by_domain"].get(domain, [])), columns)
+                  for domain, columns in [("sensor", 2), ("binary_sensor", 2), ("camera", 1), ("lock", 1),
+                                          ("cover", 1), ("climate", 1), ("fan", 1), ("switch", 2),
+                                          ("input_boolean", 2), ("media_player", 1), ("vacuum", 1),
+                                          ("number", 2), ("input_number", 2), ("light", 2),
+                                          ("navigation", 2), ("entity_group", 2)]]
+        cards.extend(_automatic_section(groups, raw))
+    cards.extend(card for card in container["cards"] if _structural_host(card))
+
     for group in container["entities_by_domain"].get("entity_group", []):
         cards.append(_entity_group_popup(group, language))
         cards.extend(_entity_group_secondary_popups(group, language))
@@ -2869,7 +2881,7 @@ def _access_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any
             ),
         ]
 
-    popup_cards = [{"type": "grid", "columns": 1, "square": False, "cards": actions}]
+    popup_cards = [_control_grid(actions, 1)]
     return {
         **_popup_header((entity.get("variables") or {}).get("popup_hash") or _access_popup_hash(entity["entity_id"]), entity["entity_id"], name, icon, "420px"),
         "cards": popup_cards,
@@ -2964,7 +2976,7 @@ def _entity_group_secondary_popups(group, language="en"):
 
 
 def _popup_grid(cards: list[dict[str, Any]]) -> dict[str, Any]:
-    return {"type": "grid", "columns": 1, "square": False, "cards": cards}
+    return _control_grid(cards, 1)
 
 
 def _battery_entities(config: dict[str, Any]) -> list[dict[str, Any]]:

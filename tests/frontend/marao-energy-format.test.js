@@ -4,13 +4,13 @@ import fs from 'node:fs/promises';
 globalThis.HTMLElement=class {attachShadow(){this.shadowRoot={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[]};}};
 globalThis.customElements={get:()=>true};
 globalThis.window={MaraoDashboard:{haptic(){}},location:{pathname:'/marao-dashboard/card-test',search:''}};
-const source=await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8');
+const source=(await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8')).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 const uri='data:text/javascript;base64,'+Buffer.from(source).toString('base64');
 const {energyUnits,energyValue,energyFormatting,energyHistoryValue,energyLabel,formatEnergyNumber,MaraoCard}=await import(uri);
 const dashboard=await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoDashboard.js', import.meta.url), 'utf8');
 const classes=dashboard.slice(dashboard.indexOf('function escapeHtml('),dashboard.indexOf('if (!customElements.get("marao-energy-period-card"))'));
-const {MaraoEnergyPeriodCard}=await import('data:text/javascript;base64,'+Buffer.from(`import {energyFormatting,energyValue,energyHistoryValue,energyLabel,formatEnergyNumber,binaryState,cardProblem,problemStyle,focusRestorer} from "${uri}";const localize=key=>key;${classes};export {MaraoEnergyPeriodCard};`).toString('base64'));
-const sample=(value,unit)=>({state:String(value),attributes:{unit_of_measurement:unit,friendly_name:'Reading'},last_changed:new Date(Date.now()-1000).toISOString()});
+const {MaraoEnergyPeriodCard}=await import('data:text/javascript;base64,'+Buffer.from(`import {historyPeriodRange,historySamples,loadHistoryChart,energyFormatting,energyValue,energyHistoryValue,energyLabel,formatEnergyNumber,binaryState,cardProblem,problemStyle,focusRestorer} from "${uri}";const localize=key=>key;${classes};export {MaraoEnergyPeriodCard};`).toString('base64'));
+const sample=(value,unit,time=Date.now()-1000)=>({state:String(value),attributes:{unit_of_measurement:unit,friendly_name:'Reading'},last_changed:new Date(time).toISOString()});
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function hass(states,callApi=async()=>[]){return {states,connected:true,locale:{number_format:'none',language:'en'},callApi};}
 
@@ -42,9 +42,9 @@ test('only configured primary readings and switch secondary power change',()=>{
 });
 
 test('mixed raw unit history converts before geometry and formatting changes reuse cache',async()=>{
-  const raw=[sample('1000.001','Wh'),sample('3600007.2','J')];const original=JSON.stringify(raw);let calls=0,query;
+  const end=Date.now()-10000,raw=[sample('1000.001','Wh',end-2000),sample('3600007.2','J',end-1000)];const original=JSON.stringify(raw);let calls=0,query;
   const card=new MaraoCard();const config={template:'hc_graph_card',entity:'sensor.energy',variables:{display_unit:'kWh',display_precision:0}};
-  card.setConfig(config);card.hass=hass({'sensor.energy':sample('1000.003','Wh')},async(_method,url)=>{calls++;query=url;return [raw];});await tick();
+  card.setConfig(config);card.hass=hass({'sensor.energy':sample('1000.003','Wh',end)},async(_method,url)=>{calls++;query=url;return [raw];});await tick();
   assert.equal(calls,1);assert.doesNotMatch(query,/minimal_response|no_attributes/);
   const before=card._graphValues('sensor.energy',config.variables);assert.equal(before.error,false);assert.ok(Math.abs(before.values[1].value-1.000002)<1e-12);assert.notEqual(before.values[0].value,before.values[1].value);
   const trace=card._graphMarkup('sensor.energy',config.variables).match(/<polyline[^>]+/)[0];assert.match(trace,/6.00|94.00/);
@@ -53,18 +53,63 @@ test('mixed raw unit history converts before geometry and formatting changes reu
   card._graphHistory.set('sensor.energy',[sample('1000')]);card._render();assert.match(card.shadowRoot.innerHTML,/Reading format is incompatible/);assert.doesNotMatch(card.shadowRoot.innerHTML,/<polyline/);
 });
 
+test('Auto graph history normalizes W/kW before detail and precision changes without changing primary defaults',async()=>{
+  const end=Date.now()-10000,records=[sample('1000','W',end-2000),sample('2','kW',end-1000)],original=JSON.stringify(records);
+  let calls=0;const card=new MaraoCard(),config={template:'hc_graph_card',entity:'sensor.power'};
+  card.setConfig(config);card.hass=hass({'sensor.power':sample('1500','W',end)},async()=>{calls++;return[records];});await tick();
+  const before=card._historyOptions();assert.deepEqual(before.samples.map(sample=>sample.value),[1000,2000,1500]);assert.equal(before.format(2000),'2000 W');
+  assert.match(card.shadowRoot.innerHTML,/1500 W/);assert.deepEqual(card._config,config);
+  card.setConfig({...config,variables:{display_precision:2}});await tick();const after=card._historyOptions();
+  assert.deepEqual(after.samples,before.samples);assert.equal(after.format(2000),'2000.00 W');assert.equal(calls,1);assert.equal(JSON.stringify(records),original);
+  card.hass=hass({'sensor.power':sample('1.5','kW',end)},async()=>{calls++;return[records];});
+  assert.deepEqual(card._historyOptions().samples.map(sample=>sample.value),[1,2,1.5]);assert.equal(card._historyOptions().format(2),'2.00 kW');assert.equal(calls,1,'Source unit changes must derive again from raw records');
+});
+
+test('shared fan and climate graph sources retain energy metadata while climate display overrides remain ignored',async()=>{
+  const end=Date.now()-10000,records=[sample('1000','W',end-2000),sample('2','kW',end-1000)];
+  for(const template of ['hc_fan_card','hc_climate_card']){
+    const card=new MaraoCard();let query;
+    card.setConfig({template,entity:template==='hc_fan_card'?'fan.test':'climate.room',variables:{show_graph:true,graph_entity:'sensor.power',...(template==='hc_climate_card'?{display_unit:'kW',display_precision:0}:{})}});
+    card.hass=hass({'fan.test':sample('on'),'climate.room':{state:'heat',attributes:{current_temperature:21,temperature:22}},'sensor.power':sample('1500','W',end)},async(_method,url)=>{query=url;return[records];});await tick();
+    assert.doesNotMatch(query,/no_attributes|minimal_response/);assert.deepEqual(card._historyOptions().samples.map(sample=>sample.value),[1000,2000,1500]);
+    assert.equal(card._historyOptions().format(1000.125),template==='hc_climate_card'?'1000.125':'1000.125 W');
+  }
+});
+
+test('Auto incompatible history is a null gap with its readable format error, preserving compatible records',async()=>{
+  const end=Date.now()-10000,records=[sample('1000','W',end-2000),sample('2','Wh',end-1000)],card=new MaraoCard();
+  card.setConfig({template:'hc_graph_card',entity:'sensor.power'});card.hass=hass({'sensor.power':sample('1500','W',end)},async()=>[records]);await tick();
+  const data=card._graphValues('sensor.power');assert.equal(data.error,true);assert.deepEqual(data.values.map(sample=>sample.value),[1000,null,1500]);
+  assert.match(card.shadowRoot.innerHTML,/Reading format is incompatible with its source unit/);assert.match(card._historyOptions().error,/Reading format is incompatible with its source unit/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML,/<polyline/);
+});
+
+test('Auto period history uses current Wh meaning before summaries and preserves values through precision-only updates',async()=>{
+  const end=Date.now()-10000,records=[sample('1000.001','Wh',end-2000),sample('unavailable',undefined,end-1500),sample('3600007.2','J',end-1000)],original=JSON.stringify(records);
+  let calls=0;const card=new MaraoEnergyPeriodCard(),config={entity:'sensor.energy',popup:true};
+  card.setConfig(config);card.hass=hass({'sensor.energy':sample('1234.5','Wh',end)},async()=>{calls++;return[records];});await tick();
+  const before=card._detailOptions;assert.equal(card._values().error,false);assert.ok(Math.abs(before.samples[0].value-1000.001)<1e-10);assert.equal(before.samples[1].value,null);assert.ok(Math.abs(before.samples[2].value-1000.002)<1e-10);assert.equal(before.format(1000.002),'1000.002 Wh');
+  card.setConfig({...config,display_precision:6});await tick();assert.deepEqual(card._detailOptions.samples,before.samples);assert.equal(card._detailOptions.format(1000.002),'1000.002000 Wh');
+  assert.equal(calls,1);assert.equal(JSON.stringify(records),original);
+  card._history=[sample('1000','Wh',end-2000),sample('2','W',end-1000)];card._render();
+  assert.equal(card._values().error,true);assert.deepEqual(card._values().values.map(sample=>sample.value),[1000,null]);assert.equal(card._detailOptions.error,'energy.format_error');
+});
+
 test('nonnumeric history does not reject valid graph conversion or fabricate zero readings', async () => {
-  const records = [sample('1000', 'W'), ...['unavailable', 'unknown', '', ' ', 'invalid'].map(value => sample(value)), sample('2', 'kW')];
+  const end=Date.now()-10000;
+  const records = [sample('1000', 'W',end-7000), ...['unavailable', 'unknown', '', ' ', 'invalid'].map((value,index) => sample(value,undefined,end-6000+index*1000)), sample('2', 'kW',end-1000)];
   const original = JSON.stringify(records);
   const variables = { display_unit: 'kW', display_precision: 2, show_graph: true, graph_entity: 'sensor.power', power_entity: 'sensor.power' };
   for (const template of ['hc_graph_card', 'hc_toggle_graph_card', 'hc_switch_card', 'hc_sensor_card', 'hc_base_card']) {
     const card = new MaraoCard();
     card.setConfig({ template, entity: template === 'hc_switch_card' ? 'switch.load' : 'sensor.power', variables });
-    card.hass = hass({ 'sensor.power': sample('1500', 'W'), 'switch.load': sample('on') }, async () => [records]);
+    card.hass = hass({ 'sensor.power': sample('1500', 'W',end), 'switch.load': sample('on') }, async () => [records]);
     await tick();
     const data = card._graphValues('sensor.power', variables);
     assert.equal(data.error, false, template);
-    assert.deepEqual(data.values.map(record => record.value), [1, 2, 1.5], template);
+    assert.deepEqual(data.values.map(record => record.value), [1, null, null, null, null, null, 2, 1.5], template);
+    assert.deepEqual(data.values.filter(record=>Number.isFinite(record.value)).map(record=>record.value),[1,2,1.5],template);
+    assert.deepEqual(data.values.filter(record=>record.value===null).map(record=>record.time),records.slice(1,-1).map(record=>Date.parse(record.last_changed)),template);
     assert.match(card.shadowRoot.innerHTML, /1.50 kW/);
     assert.match(card.shadowRoot.innerHTML, /<polyline/);
     assert.doesNotMatch(card.shadowRoot.innerHTML, /Reading format is incompatible/);
@@ -73,15 +118,18 @@ test('nonnumeric history does not reject valid graph conversion or fabricate zer
 });
 
 test('nonnumeric period history leaves numeric conversion and bounds usable', async () => {
-  const records = [sample('1000', 'Wh'), sample('unavailable'), sample('unknown'), sample(''), sample('2', 'kWh')];
+  const end=Date.now()-10000;
+  const records = [sample('1000', 'Wh',end-4000), sample('unavailable',undefined,end-3000), sample('unknown',undefined,end-2000), sample('',undefined,end-1000), sample('2', 'kWh',end)];
   const period = new MaraoEnergyPeriodCard();
   period.setConfig({ entity: 'sensor.energy', popup: true, display_unit: 'kWh', display_precision: 2 });
   period.hass = hass({ 'sensor.energy': sample('1500', 'Wh') }, async () => [records]);
   await tick();
   assert.equal(period._values().error, false);
-  assert.deepEqual(period._values().values.map(record => record.value), [1, 2]);
-  assert.match(period.shadowRoot.innerHTML, /1.00 kWh/);
-  assert.match(period.shadowRoot.innerHTML, /2.00 kWh/);
+  assert.deepEqual(period._values().values.map(record => record.value), [1, null, null, null, 2]);
+  assert.deepEqual(period._detailOptions.samples,period._values().values);
+  assert.deepEqual(period._detailOptions.samples.filter(record=>Number.isFinite(record.value)).map(record=>period._detailOptions.format(record.value)),['1.00 kWh','2.00 kWh']);
+  assert.equal(period._detailOptions.windows,false);
+  assert.doesNotMatch(period.shadowRoot.innerHTML, /<svg|<polyline/);
   assert.doesNotMatch(period.shadowRoot.innerHTML, /energy.format_error/);
   assert.equal(period._history, records);
 });
@@ -89,11 +137,15 @@ test('nonnumeric period history leaves numeric conversion and bounds usable', as
 test('period summaries and sheets share formatting without resetting selected history',async()=>{
   const states={'sensor.energy':sample('1234.5','Wh')};let calls=0,url;
   const config={entity:'sensor.energy',popup:true,display_unit:'kWh',display_precision:2};
-  const period=new MaraoEnergyPeriodCard();period.setConfig(config);period.hass=hass(states,async(_method,query)=>{calls++;url=query;return [[sample('1000.001','Wh'),sample('3600007.2','J')]];});await tick();
-  assert.doesNotMatch(url,/minimal_response|no_attributes/);assert.equal(calls,1);assert.match(period.shadowRoot.innerHTML,/1.00 kWh/);
+  const end=Date.now()-10000;
+  const period=new MaraoEnergyPeriodCard();period.setConfig(config);period.hass=hass(states,async(_method,query)=>{calls++;url=query;return [[sample('1000.001','Wh',end-1000),sample('3600007.2','J',end)]];});await tick();
+  assert.doesNotMatch(url,/minimal_response|no_attributes/);assert.equal(calls,1);
+  assert.deepEqual(period._detailOptions.samples.map(record=>period._detailOptions.format(record.value)),['1.00 kWh','1.00 kWh']);
+  assert.ok(Math.abs(period._detailOptions.samples[0].value-1.000001)<1e-12);
+  assert.ok(Math.abs(period._detailOptions.samples[1].value-1.000002)<1e-12);
   period._offset=-1;await period._load();const count=calls;const key=period._loadedKey;const raw=period._history;
   period.setConfig({...config,display_precision:6});await tick();assert.equal(period._offset,-1);assert.equal(period._loadedKey,key);assert.equal(period._history,raw);assert.equal(calls,count);
-  assert.match(period.shadowRoot.innerHTML,/1.000001 kWh|1.000002 kWh/);
+  assert.deepEqual(period._detailOptions.samples.map(record=>period._detailOptions.format(record.value)),['1.000001 kWh','1.000002 kWh']);
   period._history=[sample('4')];period._render();assert.match(period.shadowRoot.innerHTML,/energy.format_error/);assert.doesNotMatch(period.shadowRoot.innerHTML,/<polyline/);
   const summary=new MaraoEnergyPeriodCard();summary.setConfig({...config,popup:false});summary.hass=hass(states);assert.match(summary.shadowRoot.innerHTML,/1.23 kWh/);
   const legacy=new MaraoEnergyPeriodCard();legacy.setConfig({entity:'sensor.energy'});legacy.hass=hass(states);assert.match(legacy.shadowRoot.innerHTML,/>1234.5</);

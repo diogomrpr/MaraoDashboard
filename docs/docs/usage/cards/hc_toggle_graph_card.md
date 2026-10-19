@@ -58,6 +58,10 @@ numeric state, and does not add a native history-graph card or another frontend
 resource. If history is unavailable, the current reading and related toggle
 remain usable while the background trace stays neutral.
 
+Use the separate **History** (**Histórico**) control for
+[exact readings and timestamps](hc_graph_card.md#inspect-history). Opening or
+navigating history does not activate the card's toggle.
+
 ## Numeric reading format
 
 Set `variables.display_unit` to convert a compatible power/energy reading and

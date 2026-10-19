@@ -11,13 +11,19 @@ const check = process.argv.includes("--check");
 const generatedFiles = [
   "MaraoDashboardPanel.js",
   "MaraoDashboardPanel.css",
+  "MaraoDashboardEditorLabels.js",
   "MaraoDashboardJsonEditor.js",
+  "MaraoDashboardJsonPreparation.js",
   "MaraoDashboardJsonEditor.css",
   "MaraoDashboardEditorWorker.js",
   "MaraoDashboardJsonWorker.js",
   "MaraoNativeCatalog.js",
   "MaraoNativeCardEditor.js",
   "MaraoNativeCards.js",
+  "MaraoHistoryData.js",
+  "MaraoHistoryChart.js",
+  "ChartJS.LICENSE.txt",
+  "KurkleColor.LICENSE.txt",
   "MonacoEditor.LICENSE.txt",
 ];
 
@@ -44,9 +50,13 @@ async function build() {
     const result = await esbuild.build({
       entryPoints: {
         MaraoDashboardPanel: path.join(repoRoot, "frontend_src", "MaraoDashboardPanel.js"),
+        MaraoDashboardEditorLabels: path.join(repoRoot, "frontend_src", "editor-labels.js"),
         MaraoNativeCardEditor: path.join(repoRoot, "frontend_src", "MaraoNativeCardEditor.js"),
         MaraoNativeCards: path.join(repoRoot, "frontend_src", "MaraoNativeCards.js"),
+        MaraoHistoryData: path.join(repoRoot, "frontend_src", "history-data.js"),
+        MaraoHistoryChart: path.join(repoRoot, "frontend_src", "history-chart.js"),
         MaraoDashboardJsonEditor: path.join(repoRoot, "frontend_src", "json-editor.js"),
+        MaraoDashboardJsonPreparation: path.join(repoRoot, "frontend_src", "json-preparation.js"),
         MaraoDashboardEditorWorker: path.join(repoRoot, "node_modules", "monaco-editor", "esm", "vs", "editor", "editor.worker.js"),
         MaraoDashboardJsonWorker: path.join(repoRoot, "node_modules", "monaco-editor", "esm", "vs", "language", "json", "json.worker.js"),
       },
@@ -82,10 +92,18 @@ async function build() {
       const limit = file.endsWith(".js") ? 144 * 1024 : 32 * 1024;
       if (details.bytes > limit) throw new Error(`Eager editor asset exceeds its ${limit}-byte budget: ${path.basename(file)}`);
     }
+    for (const [file, details] of Object.entries(result.metafile.outputs)) {
+      if (!file.endsWith('MaraoHistoryChart.js') && Object.keys(details.inputs).some(input => /node_modules\/(chart\.js|@kurkle\/color)\//.test(input))) {
+        throw new Error('Chart.js must remain in the on-demand numeric detail bundle.');
+      }
+    }
     fs.copyFileSync(
       path.join(repoRoot, "node_modules", "monaco-editor", "LICENSE"),
       path.join(outputRoot, "MonacoEditor.LICENSE.txt"),
     );
+    for (const [dependency, filename] of [['chart.js', 'ChartJS.LICENSE.txt'], ['@kurkle/color', 'KurkleColor.LICENSE.txt']]) {
+      fs.copyFileSync(path.join(repoRoot, 'node_modules', dependency, 'LICENSE.md'), path.join(outputRoot, filename));
+    }
 
     const expected = [...generatedFiles, ...listFiles(path.join(outputRoot, "assets"), "assets")].sort();
     const stale = expected.filter((relative) => !sameFile(path.join(outputRoot, relative), path.join(frontendRoot, relative)));

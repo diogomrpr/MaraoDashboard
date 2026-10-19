@@ -1,3 +1,4 @@
+const { capture: captureScreenshot } = require('./verification-browser');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -40,9 +41,9 @@ async function clickFold(page, panel, line) {
 async function jsonEditorChecks(page, panel, { output, scenario, theme, client, config, persist = false, geometryOnly = false }) {
   const mac = await page.evaluate(() => /Macintosh|iPhone|iPad/.test(navigator.userAgent));
   const android = await page.evaluate(() => /Android/.test(navigator.userAgent));
-  const workers = [];
+  const workers = page.__maraoWorkers || page.workers().map(worker => worker.url());
   const workerStarted = worker => workers.push(worker.url());
-  page.on('worker', workerStarted);
+  if (!page.__maraoWorkers) page.on('worker', workerStarted);
   const source = JSON.stringify(require('../ha-test/json-editor-example.json'), null, 2) + '\n';
   await panel.locator('[data-tab="json"]').tap();
   await page.waitForFunction(p => p._tab === 'json' && p._jsonAssistance, await panel.elementHandle());
@@ -80,7 +81,10 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
     await geometry(panel);
     await clickFold(page, panel, foldLine); await folded(foldLine);
     assert.equal(await text(), source);
-    if (geometryOnly) return;
+    if (geometryOnly) {
+      await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-json-geometry.png`), scale: 'css' });
+      return;
+    }
     const sibling = await panel.evaluate(async (p, line) => {
       const editor = p._monaco, model = editor.getModel(), worker = await (await p._jsonModule.getWorker())(model.uri);
       const ranges = await worker.getFoldingRanges(model.uri.toString(), {}), region = ranges.find(range => range.startLine === line - 1);
@@ -260,7 +264,7 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
         await geometry(panel);
         await panel.locator('#save').scrollIntoViewIfNeeded();
         assert.ok(await panel.locator('#save').isVisible());
-        await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-json-keyboard-space.png`), scale: 'css' });
+        await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-json-keyboard-space.png`), scale: 'css' });
         await panel.locator('.monaco-editor .codicon-widget-close').tap();
       } finally { await page.setViewportSize(viewport); }
     }
@@ -272,14 +276,15 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
       }
       return failures;
     }), [], 'The pinned toolbar must stay above native Monaco widgets while the page scrolls');
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-json-tools.png`), scale: 'css' });
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-json-tools.png`), scale: 'css' });
     if (persist) {
       const { nativeBackup } = require('./native-backup');
       const backup = nativeBackup(config, randomUUID(), ['dashboard/MaraoDashboard', 'configuration.yaml']);
       let written = backup({ mode: 'backup' });
       try {
         const saved = JSON.parse(baseline.source);
-        const note = saved.pages.find(page => page.path === 'studio').sections.at(-1).cards[0];
+        const note = saved.pages.find(page => page.path === 'studio').sections.find(section => section.entities?.some(card => card.id === 'studio-media'))?.cards?.find(card => card.type === 'markdown');
+        assert.ok(note, 'Canonical Studio media note is missing');
         note.content += ' JSON verification.';
         await setSource(JSON.stringify(saved, null, 2) + '\n');
         await clickFold(page, panel, 1); await folded(1);
@@ -290,7 +295,7 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
         written = backup({ mode: 'snapshot', paths: ['dashboard/MaraoDashboard', 'configuration.yaml'] }).files;
         await page.reload(); await page.waitForFunction(() => document.querySelector('home-assistant')?.shadowRoot, null);
         await page.waitForFunction(p => p._loaded, await page.locator('marao-dashboard-panel').elementHandle());
-        assert.equal(await page.locator('marao-dashboard-panel').evaluate(p => p._model.pages.find(page => page.path === 'studio').sections.at(-1).cards[0].content), note.content);
+        assert.equal(await page.locator('marao-dashboard-panel').evaluate(p => p._model.pages.find(page => page.path === 'studio').sections.find(section => section.entities?.some(card => card.id === 'studio-media')).cards.find(card => card.type === 'markdown').content), note.content);
       } finally {
         backup({ mode: 'restore', expected: written }); backup({ mode: 'finish' });
         await client.call({ type: 'lovelace/config', url_path: 'marao-dashboard', force: true });
@@ -303,10 +308,10 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
       layout: p._monaco.getLayoutInfo(), position: p._monaco.getScrolledVisiblePosition({ lineNumber: 24, column: 1 }),
     })).catch(() => ({}))));
     fs.writeFileSync(path.join(output, `${scenario.name}-${theme}-json-input.json`), JSON.stringify(await page.evaluate(() => window.__jsonInputTrace || []).catch(() => [])));
-    await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-json-tools-failure.png`), scale: 'css' }).catch(() => {});
+    await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-json-tools-failure.png`), scale: 'css' }).catch(() => {});
     throw error;
   } finally {
-    page.off('worker', workerStarted);
+    if (!page.__maraoWorkers) page.off('worker', workerStarted);
     if (await panel.count() && await panel.evaluate(p => Boolean(p._monaco)).catch(() => false)) {
       await panel.evaluate(p => p._restoreJsonMonitor?.());
       await panel.evaluate((p, baseline) => { p._setEditorSource(baseline.source); p._jsonDraft = baseline.source; p._dirty = baseline.dirty; p._updateHeader(); }, baseline);

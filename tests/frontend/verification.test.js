@@ -6,9 +6,39 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { changedFiles, makePlan, parseArgs, schedule } = require('../verification');
+const { changedFiles, checkIdentity, dependencyInputs, makePlan, parseArgs, schedule } = require('../verification');
 const { selectComponents, checksFor } = require('../verification-map');
 const YAML = require('yaml');
+
+test('inferred generated staging is not a source identity, while source and explicitly declared inputs still invalidate proof', t => {
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'marao-input-scope-'));
+  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  const write=(file,body)=>{const target=path.join(directory,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,body);};
+  write('entry.js',"require('./source.js'); new URL('./ha-test/.cache/dist/package.js', import.meta.url); new URL('./tests/.artifacts/report.json', import.meta.url); require('./.github/policy.js');");
+  for(const file of ['source.js','ha-test/.cache/dist/package.js','tests/.artifacts/report.json','.github/policy.js'])write(file,'before');
+  const check={command:['node','entry.js'],inputs:['entry.js']},identity=checkIdentity(check,directory);
+  const inputs=dependencyInputs(check.inputs,directory);
+  assert.ok(inputs.includes('source.js'));assert.ok(inputs.includes('.github/policy.js'));
+  assert.ok(!inputs.some(file=>file.includes('/.cache/')||file.includes('/.artifacts/')));
+  write('ha-test/.cache/dist/package.js','rebuilt package');write('tests/.artifacts/report.json','new report');
+  assert.equal(checkIdentity(check,directory),identity,'Normal generated output must not invalidate source proof');
+  write('source.js','changed source');assert.notEqual(checkIdentity(check,directory),identity);
+  const afterSource=checkIdentity(check,directory);write('.github/policy.js','changed policy');assert.notEqual(checkIdentity(check,directory),afterSource);
+  const explicit={...check,inputs:[...check.inputs,'ha-test/.cache/dist']},before=checkIdentity(explicit,directory);
+  write('ha-test/.cache/dist/package.js','explicit input changed');assert.notEqual(checkIdentity(explicit,directory),before,'Explicit check inputs remain binding');
+});
+
+test('frontend refresh scope covers recovery, native/navbar ownership and alignment without fixture resets', () => {
+  const selection = selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js',
+    'custom_components/marao_dashboard/frontend/MaraoFrontendRefresh.js', 'tests/test-ha-card-alignment.js',
+    'ha-test/cases.json', 'ha-test/frontend-refresh-fixture.js'], ['frontend-refresh']);
+  assert.deepEqual(selection.components, ['frontend-refresh']);
+  const checks = checksFor(selection);
+  for (const name of ['frontend-refresh', 'marao-navbar-card', 'marao-native', 'gallery-cases']) assert.ok(checks.some(check => check.id.startsWith('unit:' + name)));
+  assert.ok(checks.some(check => check.command.includes('--frontend-refresh') && check.command.includes('tests/test-ha-card-alignment.js')));
+  assert.ok(checks.every(check => check.kind === 'offline'), 'Local browser fixtures must not reset the preserved HA dashboard');
+  assert.ok(!checks.some(check => /mobile-matrix|preserved-upgrade|native-reconnect|editor-assets/.test(check.id)));
+});
 
 test('focused components retain shared consumers and exclude unrelated suites', () => {
   const slider = selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js'], ['slider']);
@@ -40,9 +70,10 @@ test('slider header scope retains geometry, optional variants and safe gestures 
     'tests/test-ha-dashboard-e2e.js', 'ha-test/cases.json', 'ha-test/dashboard/views/00-card-test.yaml'], ['slider-headers']);
   assert.deepEqual(selection.components, ['slider-headers']);
   const checks = checksFor(selection);
-  assert.equal(checks.filter(check => check.command.includes('--slider-headers')).length, 9);
+  assert.equal(checks.flatMap(check => check.cases || []).filter(row => row.assertion === 'slider-headers' && row.dimensions.includes('geometry')).length, 9);
   assert.ok(checks.some(check => check.id === 'slider-headers:access'));
-  for (const id of ['sliders:iphone', 'sliders:android', 'slider-headers:iphone-page-zoom-200', 'slider-headers:iphone-bold-text-200']) assert.ok(checks.some(check => check.id === id));
+  for (const id of ['sliders:iphone', 'sliders:android']) assert.ok(checks.some(check => check.id === id));
+  for (const profile of ['iphone-page-zoom-200', 'iphone-bold-text-200']) assert.ok(checks.some(check => check.cases?.some(row => row.id === 'slider-headers:' + profile + ':light')));
   assert.ok(!checks.some(check => /camera|editor|mobile-matrix|preserved-upgrade|native-reconnect/.test(check.id)));
 });
 
@@ -150,7 +181,7 @@ test('UI batch selection keeps bounded runtime and editor consumers without hist
   assert.deepEqual(selection.components, ['access-label', 'battery-groups', 'editor-rendering']);
   const checks = checksFor(selection);
   assert.ok(checks.some(c => c.command.includes('--battery')));
-  assert.ok(checks.some(c => c.command.includes('--access-label')));
+  assert.ok(checks.some(c => c.command.includes('--access')));
   assert.ok(checks.some(c => c.command.includes('--rendering')));
   assert.ok(checks.some(c => c.command.includes('--drag-save')));
   assert.ok(!checks.some(c => /mobile-matrix|preserved-upgrade|native-reconnect|camera/.test(c.id)));

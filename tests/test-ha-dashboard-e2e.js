@@ -8,6 +8,17 @@ const { sliderReadings } = require("./value-slider-geometry");
 
 const repoRoot = path.resolve(__dirname, "..");
 
+function dashboardScenario(argv, scenarios) {
+  const index = argv.indexOf('--scenario');
+  const assigned = argv.find(argument => argument.startsWith('--scenario='))?.slice('--scenario='.length);
+  const separated = index < 0 ? undefined : argv[index + 1];
+  if (assigned !== undefined && separated !== undefined && assigned !== separated) throw new Error('Conflicting mobile scenarios');
+  const name = assigned ?? (index < 0 ? 'iphone-normal' : separated);
+  const scenario = scenarios.find(value => value.name === name);
+  if (!scenario) throw new Error('Unknown mobile scenario: ' + String(name));
+  return scenario;
+}
+
 function normalizedPathname(value) {
   const pathname = new URL(value).pathname;
   return pathname === "/" ? pathname : pathname.replace(/\/+$/, "");
@@ -100,9 +111,9 @@ function cardAction(page, title) {
   return cardByTitle(page, title).locator("[data-card-action]");
 }
 
-async function titleLayoutIssues(page, families = []) {
-  return page.locator("marao-card,marao-state-timeline-card,marao-energy-period-card,marao-camera-events-card,marao-frigate-events-card").evaluateAll((cards, families) => cards.filter(card => !families.length || families.includes(card._config?.template || card.localName)).flatMap((card) => {
-    const title = card.shadowRoot?.querySelector(".body > .title,header > h2,.surface > h2");
+async function titleLayoutIssues(page, families = [], subtree) {
+  return page.locator("marao-card,marao-state-timeline-card,marao-energy-period-card,marao-camera-events-card,marao-frigate-events-card").evaluateAll((cards, { families, subtree }) => cards.filter(card => (!subtree || card === subtree || subtree.contains(card)) && (!families.length || families.includes(card._config?.template || card.localName))).flatMap((card) => {
+    const title = card.shadowRoot?.querySelector(".body > .title,.compact-copy > .title,header > h2,.surface > h2");
     if (!title || !title.getBoundingClientRect().width) return [];
     const parent = title.parentElement;
     const style = getComputedStyle(parent);
@@ -123,8 +134,29 @@ async function titleLayoutIssues(page, families = []) {
     }
     const config = card._config || {};
     const service = config.variables?.action_service || config.tap_action?.service || config.tap_action?.perform_action;
-    const sliderHeader = ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_slide_action_card'].includes(config.template)
+    const sliderHeader = ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_card', 'hc_access_slide_action_card'].includes(config.template)
+      || config.template === 'hc_access_action_card' && ['lock.lock','cover.close_cover'].includes(service)
+      || config.template === 'hc_access_hold_action_card' && /^(lock|cover)\./.test(config.entity || '')
       || config.template?.startsWith('hc_access_') && ['lock.unlock', 'cover.open_cover'].includes(service);
+    const compact = parent.classList.contains('compact-copy'), header = compact ? parent.parentElement : null;
+    if (compact) {
+      const body = header.closest('.body'), icon = header.querySelector(':scope > .icon,:scope > .binary-cue');
+      const copy = parent.getBoundingClientRect(), head = header.getBoundingClientRect(), picture = icon?.getBoundingClientRect();
+      if (!sliderHeader || !body.classList.contains('slider-header')) issues.push(`${name}: missing compact family header marker`);
+      if (Math.abs(rect.width - copy.width) > 1 || rect.left < head.left - .5 || rect.right > head.right + .5) issues.push(`${name}: compact title does not use its text block`);
+      if (picture) {
+        const adjacent = Math.abs((copy.top + copy.bottom - picture.top - picture.bottom) / 2) <= 1 && copy.right <= picture.left - 4;
+        const primarySize = parseFloat(getComputedStyle(title).getPropertyValue?.('--font-size-primary')) || 18;
+        const constrainedWrap = head.width < primarySize * 3 + picture.width + 8 - .5 && copy.bottom <= picture.top - 4
+          && picture.left >= head.left - .5 && picture.right <= head.right + .5 && picture.bottom <= head.bottom + .5;
+        if (!adjacent && !constrainedWrap) issues.push(`${name}: compact reading block and icon overlap or misalign`);
+      }
+      for (const child of body.children) if (child !== header) {
+        const other = child.getBoundingClientRect();
+        if (other.width && other.height && other.top < head.bottom - 1) issues.push(`${name}: control appears above its compact header`);
+      }
+      return issues;
+    }
     const icon = sliderHeader ? parent.querySelector(':scope > .icon, :scope > .binary-cue') : null;
     const iconBox = icon?.getBoundingClientRect();
     const titleWidth = contentWidth - (iconBox ? iconBox.width + parseFloat(style.columnGap) : 0);
@@ -136,7 +168,7 @@ async function titleLayoutIssues(page, families = []) {
       if (child !== title && child !== icon && other.width && other.height && other.top < (iconBox ? Math.max(rect.bottom, iconBox.bottom) : rect.bottom) - 1) issues.push(`${name}: content appears alongside or above its title`);
     }
     return issues;
-  }), families);
+  }), { families, subtree });
 }
 
 async function measureCenteredIcons(locator) {
@@ -357,9 +389,48 @@ async function checkActionDispatches(page, serviceCalls) {
   } finally { await touch.detach(); }
 }
 
+function isDelayedCameraRequest(message) {
+  return message?.type === 'frigate/events/get' && message.instance_id === 'marao_test'
+    && Array.isArray(message.cameras) && message.cameras.length === 1 && message.cameras[0] === 'loading' && Number.isInteger(message.id);
+}
+
+function refreshDelayedCameraLoading(element) {
+  const config = element._config;
+  if (config?.entity !== 'camera.marao_dashboard_test_camera' || config.event_provider !== 'frigate'
+    || config.frigate_instance_id !== 'marao_test' || config.frigate_camera !== 'loading') throw Error('Only the safe delayed camera fixture may be refreshed');
+  const button = element.shadowRoot.querySelector('[data-action="refresh"]');
+  if (!button || button.disabled || ['idle', 'loading'].includes(element._status)) throw Error('Finish the existing event request before refreshing');
+  const before = element._request;
+  button.click();
+  return { status: element._status, requestAdvanced: element._request === before + 1,
+    readable: Boolean(element.shadowRoot.querySelector('[role="status"]')?.textContent?.trim()) };
+}
+
+async function waitForCameraEvents(page, card) {
+  const element = await card.elementHandle();
+  try {
+    // Keep data polling independent of the page's timer/frame scheduling.
+    await require('playwright/test').expect.poll(() => element.evaluate(element =>
+      element.isConnected && ['ready', 'error'].includes(element._status)),
+    { timeout: 10000, intervals: [50] }).toBe(true);
+  } catch (error) {
+    try {
+      const observed = await element.evaluate(element => ({ connected: element.isConnected, status: element._status,
+        request: element._request, events: element._events?.length }));
+      const current = await card.evaluate(element => ({ connected: element.isConnected, status: element._status,
+        request: element._request, events: element._events?.length }));
+      const detail = '\nCamera event state after failed wait: ' + JSON.stringify({ observed, current });
+      error.message += detail; error.stack += detail;
+    } catch (diagnosticError) { error.message += '\nCamera event diagnostic failed: ' + diagnosticError.name; }
+    throw error;
+  } finally { await element.dispose(); }
+}
+
 async function checkCameraCases(page) {
   for (const example of manifest.eventCases) {
-    await cardAction(page, example.name).tap();
+    if (page.__cameraRequestLedger) await page.__cameraRequestLedger.boundary('requested camera event navigation: ' + example.name,
+      () => cardAction(page, example.name).tap(), { terminal: false });
+    else await cardAction(page, example.name).tap();
     const card = page.locator(".marao-popup-sheet marao-camera-events-card");
     await card.waitFor({ state: "visible" });
     if (example.expectedDisabled) {
@@ -374,16 +445,17 @@ async function checkCameraCases(page) {
       await page.waitForFunction(() => !location.hash);
       continue;
     }
+    let delayedRequestsBefore;
     if (example.expectedStatus === "loading") {
-      if (!await card.evaluate((element) => element._status === "loading"
-        && Boolean(element.shadowRoot.querySelector('[role="status"]')?.textContent?.trim()))) {
+      await waitForCameraEvents(page, card);
+      delayedRequestsBefore = page.__cameraDelayedRequests.length;
+      const loading = await card.evaluate(refreshDelayedCameraLoading);
+      if (loading.status !== 'loading' || !loading.requestAdvanced || !loading.readable) {
         throw new Error("The delayed camera case did not show a readable loading state.");
       }
     }
-    await page.waitForFunction(() => {
-      const element = (document.querySelector("home-assistant")?.shadowRoot || document).querySelector(".marao-popup-sheet marao-camera-events-card");
-      return element && !["idle", "loading"].includes(element._status);
-    }, null, { timeout: 10000 });
+    await waitForCameraEvents(page, card);
+    if (delayedRequestsBefore !== undefined) assert.equal(page.__cameraDelayedRequests.length, delayedRequestsBefore + 1, 'One explicit Refresh must send one real delayed provider request');
     if (example.expectedStatus === "error") {
       if (!await card.locator('[role="alert"]').innerText()) throw new Error("Camera provider errors must be readable.");
     } else {
@@ -405,10 +477,9 @@ async function checkCameraCases(page) {
       }
       for (const { index, kind } of kinds) {
         await card.locator('[data-action="event"]').nth(index).tap();
-        await page.waitForFunction((expectedError) => {
-          const element = (document.querySelector("home-assistant")?.shadowRoot || document).querySelector(".marao-popup-sheet marao-camera-events-card");
-          return element?._selected && (expectedError ? element._selected.status === "error" : element._selected.status !== "loading");
-        }, Boolean(example.expectedDetailError));
+        await page.waitForFunction(({ element, expectedError }) => element.isConnected && element._selected
+          && (expectedError ? element._selected.status === "error" : element._selected.status !== "loading"),
+        { element: await card.elementHandle(), expectedError: Boolean(example.expectedDetailError) });
         if (example.expectedDetailError) {
           const detail = await card.evaluate((element) => ({
             status: element._selected.status,
@@ -418,11 +489,9 @@ async function checkCameraCases(page) {
         } else {
           const media = card.locator(kind === "clip" ? ".detail video" : ".detail-image");
           await media.waitFor({ state: "visible" });
-          await page.waitForFunction(({ kind }) => {
-            const root = (document.querySelector("home-assistant")?.shadowRoot || document).querySelector(".marao-popup-sheet marao-camera-events-card")?.shadowRoot;
-            const media = root?.querySelector(kind === "clip" ? ".detail video" : ".detail-image");
-            return media && (kind === "clip" ? media.readyState >= 1 && !media.error : media.complete && media.naturalWidth > 0);
-          }, { kind });
+          await page.waitForFunction(({ media, kind }) => media.isConnected
+            && (kind === "clip" ? media.readyState >= 1 && !media.error : media.complete && media.naturalWidth > 0),
+          { media: await media.elementHandle(), kind });
         }
         await card.locator('[data-action="back"]').tap();
       }
@@ -523,7 +592,10 @@ async function checkMediaRecovery(page, serviceCalls, output) {
   const assert = require('node:assert/strict');
   const helper = 'input_boolean.marao_dashboard_test_media_failure';
   const cards = ['Camera preview · failed media', 'Media artwork · failed media'].map(name => cardByTitle(page, name));
-  const waitFailure = async card => page.waitForFunction(card => Boolean(card._mediaError), await card.elementHandle());
+  const waitFailure = async card => {
+    await card.scrollIntoViewIfNeeded();
+    await page.waitForFunction(card => card._config.template === 'hc_camera_card' ? card._camera?.state === 'error' && card._camera.reason === 'poster_failed' : Boolean(card._mediaError), await card.elementHandle());
+  };
   const capture = async name => {
     if (!output) return;
     fs.mkdirSync(output, { recursive: true });
@@ -545,7 +617,7 @@ async function checkMediaRecovery(page, serviceCalls, output) {
       for (const card of cards) {
         await waitFailure(card);
         assert.equal(await card.locator('ha-card').getAttribute('data-problem'), 'error');
-        assert.equal(await card.locator('img.camera,.media-artwork img').count(), 0);
+        assert.equal(await card.locator('img.camera-poster[src]:not([hidden]),ha-camera-stream,.media-artwork img').count(), 0);
         await card.evaluate(card => {
           card.__mediaFailureCount = 0;
           if (!card.__mediaFailureListener) {
@@ -555,15 +627,21 @@ async function checkMediaRecovery(page, serviceCalls, output) {
           card.hass = { ...card.hass, states: { ...card.hass.states } };
         });
         assert.equal(await card.evaluate(card => card.__mediaFailureCount), 0, 'Unrelated updates must not retry failed media.');
-        await card.locator('[data-media-retry]').tap();
+        await card.locator('[data-media-retry],.camera-feedback button').tap();
         await waitFailure(card);
         assert.equal(await card.evaluate(card => card.__mediaFailureCount), 1, 'Explicit retry must load one current image.');
       }
       await capture(`${theme}-failed-after-explicit-retry`);
       await setFailure(false);
       for (const card of cards) {
+        await card.scrollIntoViewIfNeeded();
+        if (await card.evaluate(card => card._config.template === 'hc_camera_card')) await card.locator('.camera-feedback button').tap();
         await page.waitForFunction(card => {
-          const image = card.shadowRoot.querySelector('img.camera,.media-artwork img');
+          if (card._config.template === 'hc_camera_card') {
+            const image = card._camera?.poster;
+            return card._camera?.state === 'snapshot' && !image.hidden && image.complete && image.naturalWidth > 0;
+          }
+          const image = card.shadowRoot.querySelector('.media-artwork img');
           return !card._mediaError && !card.shadowRoot.querySelector('[data-problem]') && image?.complete && image.naturalWidth > 0;
         }, await card.elementHandle());
       }
@@ -621,31 +699,54 @@ async function checkNativeSurfaces(page) {
   assert.deepEqual(result.after, result.before, 'HA updates changed the unchanged gallery layout');
 }
 
-async function checkHistoryCases(page) {
+async function installHistoryLoadingGate(page, baseUrl) {
+  const origin = new URL(baseUrl).origin, pattern = '**/api/history/period/**';
+  let released = false, held = 0, resolve;
+  const pending = new Promise(done => { resolve = done; });
+  const handler = async route => {
+    const url = new URL(route.request().url());
+    if (!released && route.request().method() === 'GET' && url.origin === origin && url.pathname.startsWith('/api/history/period/')
+      && url.searchParams.getAll('filter_entity_id').length === 1
+      && url.searchParams.get('filter_entity_id') === 'sensor.marao_dashboard_test_history_loading') {
+      held++; await pending;
+    }
+    await route.continue();
+  };
+  await page.route(pattern, handler);
+  return {
+    release() { released = true; resolve(); },
+    get held() { return held; },
+    async dispose() { released = true; resolve(); await page.unroute(pattern, handler); },
+  };
+}
+
+async function checkHistoryCases(page, { loading = true } = {}) {
   const cards = page.locator("marao-card,marao-energy-period-card,marao-state-timeline-card");
-  await page.waitForFunction(() => {
-    const mounted = new Set();
-    const visit = (root) => {
-      root.querySelectorAll("marao-card,marao-energy-period-card,marao-state-timeline-card").forEach((card) => {
-        if (card.shadowRoot?.querySelector("[data-history-state],[data-graph-history-state]")) mounted.add(card._config.name);
-      });
-      root.querySelectorAll("*").forEach((element) => { if (element.shadowRoot) visit(element.shadowRoot); });
-    };
-    visit(document);
-    return ["Graph", "Energy", "Timeline"].every((label) => mounted.has(`${label} history · loading`));
-  });
-  for (const example of manifest.historyCases) {
-    for (const label of ["Graph", "Energy", "Timeline"]) {
-      const name = `${label} history · ${example.id}`;
-      if (example.expectedStatus === "loading") {
-        const state = await cards.evaluateAll((elements, name) => {
-          const root = elements.find((card) => card._config.name === name)?.shadowRoot;
-          return root?.querySelector("[data-history-state]")?.dataset.historyState || root?.querySelector("[data-graph-history-state]")?.dataset.graphHistoryState;
-        }, name);
-        if (state !== "loading") throw new Error(`${name}: expected a visible loading state, found ${state}.`);
+  if (loading) try {
+    await page.waitForFunction(() => {
+      const mounted = new Set();
+      const visit = (root) => {
+        root.querySelectorAll("marao-card,marao-energy-period-card,marao-state-timeline-card").forEach((card) => {
+          if (card.shadowRoot?.querySelector("[data-history-state],[data-graph-history-state]")) mounted.add(card._config.name);
+        });
+        root.querySelectorAll("*").forEach((element) => { if (element.shadowRoot) visit(element.shadowRoot); });
+      };
+      visit(document);
+      return ["Graph", "Energy", "Timeline"].every((label) => mounted.has(`${label} history · loading`));
+    });
+    for (const example of manifest.historyCases) {
+      for (const label of ["Graph", "Energy", "Timeline"]) {
+        const name = `${label} history · ${example.id}`;
+        if (example.expectedStatus === "loading") {
+          const state = await cards.evaluateAll((elements, name) => {
+            const root = elements.find((card) => card._config.name === name)?.shadowRoot;
+            return root?.querySelector("[data-history-state]")?.dataset.historyState || root?.querySelector("[data-graph-history-state]")?.dataset.graphHistoryState;
+          }, name);
+          if (state !== "loading") throw new Error(`${name}: expected a visible loading state, found ${state}.`);
+        }
       }
     }
-  }
+  } finally { page.__historyLoadingGate?.release(); }
   await page.waitForLoadState('networkidle');
   await page.waitForFunction((examples) => {
     const elements = [];
@@ -824,7 +925,7 @@ async function checkCardContent(page, serviceCalls) {
   if (!await page.locator('marao-card').filter({ has: page.locator('.body.glance-card') }).count()) throw new Error("The gallery is missing glance layouts.");
   const stalePreviews = await page.locator("marao-card").evaluateAll((cards) => cards.filter((card) => {
     const state = card._hass?.states?.[card._config.entity]?.state;
-    return card._config.template === "hc_camera_card" && (!state || ["unknown", "unavailable"].includes(state)) && card.shadowRoot.querySelector("img.camera");
+    return card._config.template === "hc_camera_card" && (!state || ["unknown", "unavailable"].includes(state)) && card.shadowRoot.querySelector("img.camera-poster[src]:not([hidden]),ha-camera-stream");
   }).length);
   if (stalePreviews) throw new Error("Unavailable camera cards displayed old previews.");
   const mediaPresentation = await page.locator("marao-card").evaluateAll((cards) => cards.filter((card) => card._config.template === "hc_media_card").map((card) => ({
@@ -863,9 +964,7 @@ async function checkCardContent(page, serviceCalls) {
 
 async function checkDisconnected(browser, config, functionalCompleted = false) {
   const { scenarios, contextOptionsForScenario, configurePageEmulation } = require('./test-ha-dashboard-accessibility');
-  const scenarioIndex = process.argv.indexOf('--scenario');
-  const scenario = scenarios.find(scenario => scenario.name === (scenarioIndex < 0 ? 'iphone-normal' : process.argv[scenarioIndex + 1]));
-  if (!scenario) throw new Error('Unknown mobile scenario.');
+  const scenario = dashboardScenario(process.argv, scenarios);
   const context = await browser.newContext(contextOptionsForScenario(scenario, 'light'));
   const token = accessToken(config);
   await context.addInitScript(setBrowserToken, {
@@ -1490,7 +1589,7 @@ async function main() {
   const screenshotRoot = require('./verification-browser').artifactDirectory('dashboard-e2e');
   if (captureScreenshots) fs.mkdirSync(screenshotRoot, { recursive: true });
   let chromium;
-  try { ({ chromium } = require("playwright")); } catch { throw new Error("Playwright is not installed."); }
+  try { ({ [process.argv.includes("--webkit") ? "webkit" : "chromium"]: chromium } = require("playwright")); } catch { throw new Error("Playwright is not installed."); }
   const config = readConfig();
   assertDisposableHaTarget(config);
   await prepare(config);
@@ -1502,12 +1601,20 @@ async function main() {
     return;
   }
   const { applyVisualPreferences, scenarios, contextOptionsForScenario, configurePageEmulation } = require('./test-ha-dashboard-accessibility');
-  const scenarioIndex = process.argv.indexOf('--scenario');
-  const scenario = scenarios.find(scenario => scenario.name === (scenarioIndex < 0 ? 'iphone-normal' : process.argv[scenarioIndex + 1]));
-  if (!scenario) throw new Error('Unknown mobile scenario.');
-  const serviceCalls = [], errors = [];
+  let scenario;
+  try { scenario = dashboardScenario(process.argv, scenarios); }
+  catch (error) {
+    try { await browser.close(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Invalid browser scenario and browser cleanup failed'); }
+    throw error;
+  }
+  const serviceCalls = [];
+  let errors;
+  const cameraSelected = process.argv.includes('--camera-only') || process.argv.includes('--camera-live-only');
   const createSession = async theme => {
     const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
+    try {
+    const sessionErrors = [];
+    const cameraLedger = cameraSelected ? await require('./camera-request-ledger').cameraRequestLedger(context, { output: screenshotRoot, scenario: scenario.name, theme }) : null;
     await context.addInitScript(setBrowserToken, {
       ...tokens, hassUrl: baseUrl, clientId: `${baseUrl}/`, expires: Date.now() + tokens.expires_in * 1000,
     });
@@ -1516,37 +1623,52 @@ async function main() {
       window.addEventListener("haptic", (event) => window.__maraoHaptics.push(event.detail));
     });
     const page = await context.newPage();
+    page.__cameraDelayedRequests = [];
+    if (process.argv.includes('--history-only')) page.__historyLoadingGate = await installHistoryLoadingGate(page, baseUrl);
+    cameraLedger?.attach(page);
     await configurePageEmulation(context, page, scenario);
     page.on("websocket", (socket) => socket.on("framesent", ({ payload }) => {
       let message;
       try { message = JSON.parse(String(payload)); } catch { return; }
+      for (const request of Array.isArray(message) ? message : [message]) if (isDelayedCameraRequest(request)) page.__cameraDelayedRequests.push({ id: request.id });
       if (message.type !== "call_service") return;
       const entities = message.target?.entity_id ?? message.service_data?.entity_id ?? [];
       serviceCalls.push({ domain: message.domain, service: message.service, entities: Array.isArray(entities) ? entities : [entities], data: message.service_data });
     }));
-    page.on("pageerror", (error) => errors.push(error.message));
-    page.on("console", (message) => { if (["error", "warning"].includes(message.type())) errors.push(message.text()); });
-    page.on("requestfailed", (request) => errors.push(`Failed ${request.resourceType()} request: ${new URL(request.url()).pathname} (${request.failure()?.errorText || "unknown error"})`));
+    page.on("pageerror", (error) => sessionErrors.push(error.message));
+    page.on("console", (message) => { if (["error", "warning"].includes(message.type())) sessionErrors.push(message.text()); });
+    if (!cameraLedger) page.on("requestfailed", (request) => sessionErrors.push(`Failed ${request.resourceType()} request: ${new URL(request.url()).pathname} (${request.failure()?.errorText || "unknown error"})`));
     page.on("response", (response) => {
       if (response.status() >= 400) {
-        errors.push(`${response.status()} ${response.request().resourceType()} response: ${new URL(response.url()).pathname}`);
+        sessionErrors.push(`${response.status()} ${response.request().resourceType()} response: ${new URL(response.url()).pathname}`);
       }
     });
-    return { context, page };
+    return { context, page, errors: sessionErrors };
+    } catch (error) {
+      try { await context.close(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Browser session setup and context cleanup failed'); }
+      throw error;
+    }
   };
   const requestedTheme = process.argv.find(arg => arg.startsWith('--theme='))?.slice(8) || 'light';
   assert.ok(['light', 'dark'].includes(requestedTheme), 'Unknown e2e theme');
-  let { context, page } = await createSession(requestedTheme);
-  const assertNoBrowserErrors = (label) => {
+  let context, page;
+  try { ({ context, page, errors } = await createSession(requestedTheme)); }
+  catch (error) {
+    try { await browser.close(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Initial browser session setup and browser cleanup failed'); }
+    throw error;
+  }
+  const assertNoBrowserErrors = async (label) => {
+    await page.__cameraRequestLedger?.assert();
     if (!errors.length) return;
     const observed = errors.splice(0);
-    throw new Error(`${label} produced browser warnings/errors:\n${observed.map((item) => `- ${item}`).join("\n")}`);
+    const nativeReports = serviceCalls.filter(call => call.domain === 'system_log' && call.service === 'write').map(call => call.data?.message);
+    throw new Error(`${label} produced browser warnings/errors:\n${observed.map((item) => `- ${item}`).join("\n")}\nNative error reports: ${JSON.stringify(nativeReports)}`);
   };
   if (process.argv.includes('--toggle-only')) {
     const entity = 'switch.marao_dashboard_test_switch';
     try {
       for (const theme of ['light', 'dark']) {
-        if (theme === 'dark') { await browser.close(); browser = await chromium.launch(); ({ context, page } = await createSession(theme)); }
+        if (theme === 'dark') { await browser.close(); browser = await chromium.launch(); ({ context, page, errors } = await createSession(theme)); }
         await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
         const action = cardAction(page, 'Switch + graph');
         assert.equal(await cardByTitle(page, 'Switch + graph').evaluate(card => card._config.entity), entity, 'Toggle must target the safe fixture');
@@ -1560,7 +1682,7 @@ async function main() {
         assert.equal(serviceCalls.length - count, 1, 'Completed toggle must dispatch once');
         assert.deepEqual(serviceCalls.at(-1).entities, [entity]);
         assert.equal(await page.evaluate(() => window.__maraoHaptics.at(-1)), 'heavy');
-        assertNoBrowserErrors('Safe toggle/' + theme);
+        await assertNoBrowserErrors('Safe toggle/' + theme);
         await page.screenshot({ path: path.join(screenshotRoot, 'toggle-' + theme + '.png'), scale: 'css' });
       }
     } catch (error) {
@@ -1568,23 +1690,69 @@ async function main() {
     } finally { await browser.close(); }
     return;
   }
-  const selectedCheck = ['actions', 'camera', 'history'].find(name => process.argv.includes('--' + name + '-only'));
-  if (selectedCheck) {
+  if (process.argv.includes('--chart-details-only')) {
+    const geometryOnly = process.argv.includes('--chart-geometry');
     try {
-      for (const theme of ['light', 'dark']) {
-        if (theme === 'dark') { await browser.close(); browser = await chromium.launch(); ({ context, page } = await createSession(theme)); }
+      let coldAssets = 0;
+      if (!geometryOnly) {
+        await page.goto(`${baseUrl}/marao-dashboard/overview`, { waitUntil: 'domcontentloaded' });
+        await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+        await assertCurrentFrontend(page); await page.waitForLoadState('networkidle');
+        coldAssets = await page.evaluate(() => performance.getEntriesByType('resource').filter(entry => entry.name.includes('/MaraoHistoryChart.js')).length);
+        assert.equal(coldAssets, 0, 'Ordinary Home load fetched the detailed Chart.js bundle');
+      }
+      await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
+      await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+      await assertCurrentFrontend(page); await applyVisualPreferences(page, scenario, requestedTheme);
+      await require('./history-detail-checks').checkHistoryDetails(page, serviceCalls, { scenario, theme: requestedTheme, geometryOnly, coldAssets });
+      await page.waitForLoadState('networkidle'); await assertNoBrowserErrors(`Chart details/${scenario.name}/${requestedTheme}`);
+      console.log(`Chart details ${scenario.name}/${requestedTheme}: exact readings, windows, retained resources, safe inspection and selected geometry passed.`);
+    } catch (error) {
+      await require('./verification-browser').capture(page, { path: path.join(screenshotRoot, `chart-details-${scenario.name}-${requestedTheme}-failure.png`), scale: 'css' });
+      throw error;
+    } finally { await browser.close(); }
+    return;
+  }
+  const cameraLiveOnly = process.argv.includes('--camera-live-only');
+  const selectedCheck = cameraLiveOnly ? 'camera' : ['actions', 'camera', 'history'].find(name => process.argv.includes('--' + name + '-only'));
+  if (selectedCheck) {
+    let completedTheme = false;
+    let selectedError;
+    try {
+      for (const theme of cameraLiveOnly ? [requestedTheme] : ['light', 'dark']) {
+        if (completedTheme) {
+          const retiredLedger = page.__cameraRequestLedger;
+          await browser.close(); await retiredLedger?.assert();
+          await assertNoBrowserErrors(selectedCheck + '/closed context');
+          browser = await chromium.launch(); ({ context, page, errors } = await createSession(theme));
+        }
         await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
         await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
+        if (selectedCheck === 'history') await checkHistoryCases(page);
         await applyVisualPreferences(page, scenario, theme);
-        await ({ actions: checkActionDispatches, camera: checkCameraCases, history: checkHistoryCases })[selectedCheck](page, serviceCalls);
-        await page.waitForLoadState('networkidle');
-        assertNoBrowserErrors(selectedCheck + '/' + theme);
+        if (selectedCheck === 'camera') await require('./camera-live-native-checks').checkNativeCameraPlayback(page, serviceCalls, { output: screenshotRoot, scenario: scenario.name, theme, geometryOnly: cameraLiveOnly });
+        if (!cameraLiveOnly && selectedCheck !== 'history') await ({ actions: checkActionDispatches, camera: checkCameraCases })[selectedCheck](page, serviceCalls);
+        if (selectedCheck === 'camera') await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        else await page.waitForLoadState('networkidle');
+        if (selectedCheck === 'camera') await page.__cameraRequestLedger.stopForClose();
+        await assertNoBrowserErrors(selectedCheck + '/' + theme);
+        completedTheme = true;
       }
     } catch (error) {
-      await page.screenshot({ path: path.join(screenshotRoot, selectedCheck + '-failure.png'), scale: 'css' });
+      selectedError = error;
+      if (!page.isClosed()) await page.screenshot({ path: path.join(screenshotRoot, selectedCheck + '-failure.png'), scale: 'css' });
       throw error;
-    } finally { await browser.close(); }
+    } finally {
+      const retiredLedger = page.__cameraRequestLedger;
+      try {
+        try { if (retiredLedger && !page.isClosed()) await retiredLedger.stopForClose(); }
+        finally { await browser.close(); await retiredLedger?.assert(); await assertNoBrowserErrors(selectedCheck + '/closed context'); }
+      } catch (cleanupError) {
+        if (selectedError) throw new AggregateError([selectedError, cleanupError], `Selected ${selectedCheck} assertion: ${selectedError.message}\nCleanup diagnostics: ${cleanupError.message}`);
+        throw cleanupError;
+      }
+    }
     return;
   }
   if (process.argv.includes('--media-only')) {
@@ -1594,21 +1762,21 @@ async function main() {
       await assertCurrentFrontend(page);
       await checkMediaRecovery(page, serviceCalls, path.join(screenshotRoot, 'media-recovery'));
       await page.waitForLoadState('networkidle');
-      assertNoBrowserErrors('Media recovery');
+      await assertNoBrowserErrors('Media recovery');
     } finally { await browser.close(); }
     return;
   }
   if (process.argv.includes('--groups-only')) {
     try {
       for (const theme of ['light','dark']) {
-        if (theme === 'dark') { await browser.close(); browser = await chromium.launch(); ({ context, page } = await createSession(theme)); }
+        if (theme === 'dark') { await browser.close(); browser = await chromium.launch(); ({ context, page, errors } = await createSession(theme)); }
         await page.goto(`${baseUrl}/marao-dashboard/card-test`);
         await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);
         await checkEntityGroups(page, serviceCalls, path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), `entity-groups-${scenario.name}-${theme}`), scenario, theme, config);
         await page.waitForLoadState('networkidle');
-        assertNoBrowserErrors(`Entity Groups (${theme})`);
+        await assertNoBrowserErrors(`Entity Groups (${theme})`);
       }
     } finally {
       await browser.close();
@@ -1623,7 +1791,7 @@ async function main() {
           // Chromium can lose touch emulation when a mobile session changes theme.
           await browser.close();
           browser = await chromium.launch();
-          ({ context, page } = await createSession(theme));
+          ({ context, page, errors } = await createSession(theme));
         }
         await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
         await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
@@ -1632,7 +1800,7 @@ async function main() {
         await checkNativeSurfaces(page);
         await checkClimateFeedback(page, serviceCalls, path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), `climate-feedback-${scenario.name}-${theme}`), { scenario, theme });
         await page.waitForLoadState('networkidle');
-        assertNoBrowserErrors(`Climate feedback (${theme})`);
+        await assertNoBrowserErrors(`Climate feedback (${theme})`);
         console.log(`Climate feedback, single dispatch and keyboard focus OK (${theme}).`);
       }
     } finally { await browser.close(); }
@@ -1663,7 +1831,7 @@ async function main() {
       await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: "domcontentloaded" });
       await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
       await checkCardContent(page, serviceCalls);
-      assertNoBrowserErrors("Popup and card content checks");
+      await assertNoBrowserErrors("Popup and card content checks");
       console.log("Generated popups and gallery content checks passed.");
       return;
     }
@@ -1678,14 +1846,14 @@ async function main() {
       }
       await checkCameraCases(page);
       await checkMediaRecovery(page, serviceCalls, captureScreenshots ? path.join(screenshotRoot, 'media-recovery') : undefined);
-      assertNoBrowserErrors("Card interactions");
+      await assertNoBrowserErrors("Card interactions");
       console.log("Gallery action checks passed.");
       return;
     }
     await page.goto(`${baseUrl}/marao-dashboard/overview`, { waitUntil: "domcontentloaded" });
     await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
     await assertCurrentFrontend(page);
-    assertNoBrowserErrors("Overview");
+    await assertNoBrowserErrors("Overview");
     const overview = await deepSnapshot();
     if (overview.errors.length || overview.warnings.length) throw new Error(`Overview rendered warnings/errors: ${JSON.stringify(overview)}`);
     if (!overview.nav) throw new Error("Overview did not render custom:marao-navbar-card.");
@@ -1729,7 +1897,7 @@ async function main() {
       await assertCurrentFrontend(page);
       await scrollDashboard(page);
       await page.waitForLoadState('networkidle');
-      assertNoBrowserErrors(view.name);
+      await assertNoBrowserErrors(view.name);
       const result = await deepSnapshot();
       if (result.errors.length || result.warnings.length) throw new Error(`${view.name} rendered warnings/errors: ${JSON.stringify(result)}`);
       if (!result.nav) throw new Error(`${view.name} did not render custom:marao-navbar-card.`);
@@ -1739,7 +1907,7 @@ async function main() {
     await assertCurrentFrontend(page);
     await scrollDashboard(page);
     await page.waitForLoadState('networkidle');
-    assertNoBrowserErrors("Energy");
+    await assertNoBrowserErrors("Energy");
     const housePowerGraph = cardByTitle(page, "House Power").locator("svg.graph-background");
     if (await housePowerGraph.count() !== 1 || !await housePowerGraph.isVisible() || await housePowerGraph.locator("polyline.line").count() !== 1) {
       throw new Error("House Power did not render Marao's visible SVG background graph.");
@@ -1752,9 +1920,11 @@ async function main() {
     await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: "domcontentloaded" });
     await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
     await assertCurrentFrontend(page);
-    await checkHistoryCases(page);
+    // The dedicated history visit holds the initial request to prove loading;
+    // this later gallery revisit checks the completed states and request counts.
+    await checkHistoryCases(page, { loading: false });
     await scrollDashboard(page);
-    assertNoBrowserErrors("Card test dashboard");
+    await assertNoBrowserErrors("Card test dashboard");
     const cardTest = await deepSnapshot();
     if (cardTest.errors.length || cardTest.warnings.length) throw new Error(`Card test dashboard rendered warnings/errors: ${JSON.stringify(cardTest)}`);
     if (!cardTest.nav || cardTest.maraoCards < 10 || cardTest.popups < 1) throw new Error(`Card test dashboard rendered too few Marao cards: ${JSON.stringify(cardTest)}`);
@@ -2083,7 +2253,7 @@ async function main() {
     await checkShowcaseActions(page, serviceCalls);
     await checkCameraCases(page);
     await checkMediaRecovery(page, serviceCalls, captureScreenshots ? path.join(screenshotRoot, 'media-recovery') : undefined);
-    assertNoBrowserErrors("Card interactions");
+    await assertNoBrowserErrors("Card interactions");
     await checkCardContent(page, serviceCalls);
     if (captureScreenshots) {
       await context.close();
@@ -2132,4 +2302,4 @@ if (require.main === module) main().catch((error) => {
   console.error(error.message || error); process.exitCode = 1;
 });
 
-module.exports = { captureClimateFeedback, climateFeedbackSnapshot, buildViewChecks, checkDisconnected, checkHistoryCases, conditionalCardIsActive, dashboardNavigationViolations, measureCenteredIcons, normalizedPathname, scrollDashboard, titleLayoutIssues };
+module.exports = { captureClimateFeedback, climateFeedbackSnapshot, buildViewChecks, checkDisconnected, checkHistoryCases, installHistoryLoadingGate, conditionalCardIsActive, dashboardNavigationViolations, dashboardScenario, isDelayedCameraRequest, refreshDelayedCameraLoading, waitForCameraEvents, measureCenteredIcons, normalizedPathname, scrollDashboard, titleLayoutIssues };

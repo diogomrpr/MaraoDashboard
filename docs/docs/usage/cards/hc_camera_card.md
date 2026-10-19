@@ -7,10 +7,32 @@ parent: Cards
 
 # Camera Card
 
-The `hc_camera_card` shows Home Assistant's current camera preview while the
-entity is available. Unknown, unavailable and disconnected cameras keep a
-neutral state without displaying an old preview. Tap an available card to open
-its generated popup containing the latest Frigate or UniFi Protect events.
+The existing `hc_camera_card` shows Home Assistant's current still while its
+native player starts muted inline live video. Playback replaces the still
+automatically once the video advances; there is no new card, setting or opt-in.
+A missing or failed still does not prevent live startup. Unknown, unavailable
+and disconnected cameras stay neutral and clear old media. Tap an available
+card to open its generated Frigate or UniFi Protect events popup.
+
+`Live` means video is advancing. Loading and an explicitly labelled `Snapshot`
+fallback are separate states; camera recording activity alone never means that
+live playback has started. Unsupported native video keeps the snapshot and
+its readable reason. Reported failures expose **Retry** without an automatic
+retry loop. If Safari or another browser rejects muted autoplay, **Start live
+view** appears as exceptional recovery; tap it once to play inline without
+opening the events popup or enabling audio.
+
+Live video requires a stream supported by Home Assistant's native camera player
+and the browser's codec capabilities. For UniFi Protect, configure the existing
+camera entity and stream integration in Home Assistant first. Event-provider
+and media-source overrides below select recorded events only. Marao does not
+change Protect settings, leave privacy mode, turn cameras on or add NVR URLs.
+
+Video stops when its card or containing sheet is hidden, the page backgrounds,
+the camera becomes unavailable or the card is removed. Visibility and
+availability recovery use the same automatic still-to-live path. Read-only
+editor previews start no stream. See the [camera lifecycle notes](../../development/camera-live.md)
+for the native bridge and verification boundary.
 
 The camera entity should come from either the
 [Frigate Home Assistant integration](https://docs.frigate.video/integrations/home-assistant/)

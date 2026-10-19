@@ -1,3 +1,4 @@
+const { capture: captureScreenshot } = require('./verification-browser');
 const { chromium } = require("playwright");
 const { accessToken, setBrowserToken, assertCurrentFrontend, assertDisposableHaTarget, readConfig } = require("../ha-test/client");
 const { prepare } = require("../ha-test/prepare");
@@ -113,6 +114,34 @@ async function checkNavbar(page) {
   if (issues.length) throw new Error(`Navbar: ${issues.join(", ")}`);
 }
 
+async function sliderHeaderChecks(page, output, scenario, theme) {
+  const assert = require('node:assert/strict'), path = require('node:path');
+  const families = ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_slide_action_card'];
+  const rendered = await page.locator('marao-card').evaluateAll(cards => cards.map(card => card._config?.template));
+  for (const family of families) assert.ok(rendered.includes(family), 'Missing gallery family: ' + family);
+  assert.deepEqual(await layoutIssues(page, families), [], 'Gallery header subjects');
+          const card = page.locator('marao-card').filter({ has: page.locator('input[data-slider-key^="hc_light_card:"]') }).first();
+          await card.evaluate(element => element.shadowRoot.querySelector('.body').classList.remove('slider-header'));
+          assert.ok((await titleLayoutIssues(page, ['hc_light_card'])).length, 'A missing header layout must fail geometry');
+          await card.evaluate(element => element.shadowRoot.querySelector('.body').classList.add('slider-header'));
+          assert.deepEqual(await titleLayoutIssues(page, families), []);
+          const width = await card.evaluate(element => { const width = element.style.width; element.style.width = '120px'; return width; });
+          assert.deepEqual(await titleLayoutIssues(page, families), [], 'Narrow 120px card container');
+          await card.evaluate((element, width) => { element.style.width = width; }, width);
+          if (scenario.name === 'iphone-normal') assert.deepEqual(await titleLayoutIssues(page, ['hc_navigation_card', 'hc_room_card', 'hc_switch_card', 'hc_climate_card', 'hc_media_card', 'hc_number_card']), []);
+          await page.evaluate(() => { location.hash = '#marao-dashboard-test-value-sliders-popup'; });
+          await page.locator('.marao-popup-sheet input[data-slider-key]').first().waitFor({ state: 'visible' });
+          await page.locator('.marao-popup-sheet').evaluate(async sheet => { await Promise.all(sheet.getAnimations().map(animation => animation.finished)); });
+          await require('./test-ha-dashboard-accessibility').readySubtree(page, page.locator('.marao-popup-sheet'), scenario, theme);
+          assert.deepEqual(await layoutIssues(page, families), [], 'Value-slider popup');
+          await page.locator('.marao-popup-close').tap();
+          await page.locator('.marao-popup-sheet').waitFor({ state: 'detached' });
+          if (['iphone-normal', 'narrow-320', 'iphone-bold-text-200'].includes(scenario.name)) {
+            await card.scrollIntoViewIfNeeded();
+            await captureScreenshot(card, { path: path.join(output, scenario.name + '-' + theme + '.png'), scale: 'device' });
+          }
+}
+
 async function checkSliderHeaders() {
   const assert = require('node:assert/strict');
   const fs = require('node:fs');
@@ -148,25 +177,7 @@ async function checkSliderHeaders() {
         for (const family of route === 'card-test' ? families : ['hc_light_card']) assert.ok(rendered.includes(family), route + ': missing ' + family);
         assert.deepEqual(await layoutIssues(page, families), [], route);
         if (route === 'card-test') {
-          const card = page.locator('marao-card').filter({ has: page.locator('input[data-slider-key^="hc_light_card:"]') }).first();
-          await card.evaluate(element => element.shadowRoot.querySelector('.body').classList.remove('slider-header'));
-          assert.ok((await titleLayoutIssues(page, ['hc_light_card'])).length, 'A missing header layout must fail geometry');
-          await card.evaluate(element => element.shadowRoot.querySelector('.body').classList.add('slider-header'));
-          assert.deepEqual(await titleLayoutIssues(page, families), []);
-          const width = await card.evaluate(element => { const width = element.style.width; element.style.width = '120px'; return width; });
-          assert.deepEqual(await titleLayoutIssues(page, families), [], 'Narrow 120px card container');
-          await card.evaluate((element, width) => { element.style.width = width; }, width);
-          if (scenario.name === 'iphone-normal') assert.deepEqual(await titleLayoutIssues(page, ['hc_navigation_card', 'hc_room_card', 'hc_switch_card', 'hc_climate_card', 'hc_media_card', 'hc_number_card']), []);
-          await page.evaluate(() => { location.hash = '#marao-dashboard-test-value-sliders-popup'; });
-          await page.locator('.marao-popup-sheet input[data-slider-key]').first().waitFor({ state: 'visible' });
-          await page.locator('.marao-popup-sheet').evaluate(async sheet => { await Promise.all(sheet.getAnimations().map(animation => animation.finished)); });
-          assert.deepEqual(await layoutIssues(page, families), [], 'Value-slider popup');
-          await page.locator('.marao-popup-close').tap();
-          await page.locator('.marao-popup-sheet').waitFor({ state: 'detached' });
-          if (['iphone-normal', 'narrow-320', 'iphone-bold-text-200'].includes(scenario.name)) {
-            await card.scrollIntoViewIfNeeded();
-            await card.screenshot({ path: path.join(output, scenario.name + '-' + theme + '.png'), scale: 'device' });
-          }
+          await sliderHeaderChecks(page, output, scenario, theme);
         }
         if (route === 'native-example') {
           await page.locator('marao-native-light-card').first().evaluate(element => { element.preview = true; });
@@ -175,7 +186,7 @@ async function checkSliderHeaders() {
         if (route !== 'card-test') {
           const card = page.locator('marao-card').filter({ has: page.locator('input[data-slider-key^="hc_light_card:"]') }).first();
           await card.scrollIntoViewIfNeeded();
-          await card.screenshot({ path: path.join(output, route + '-' + theme + '.png'), scale: 'device' });
+          await captureScreenshot(card, { path: path.join(output, route + '-' + theme + '.png'), scale: 'device' });
         }
         await page.waitForLoadState('networkidle');
         checked.push(route);
@@ -184,13 +195,19 @@ async function checkSliderHeaders() {
       fs.writeFileSync(path.join(output, scenario.name + '-' + theme + '.json'), JSON.stringify({ profile: scenario.name, theme, checked, passed: true }), { mode: 0o600 });
       console.log(`${scenario.name}/${theme}: slider headers, optional variants and popup geometry passed (${checked.join(', ')}).`);
     } catch (error) {
-      if (page) await page.screenshot({ path: path.join(output, scenario.name + '-' + theme + '-failure.png'), scale: 'device' });
+      if (page) await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-failure.png'), scale: 'device' });
       throw error;
     } finally { await browser.close(); }
   }
 }
 
 async function main() {
+  if (process.argv.includes('--frontend-refresh')) return require('./test-frontend-refresh-local').run();
+  if (process.argv.includes('--control-grid')) {
+    const result = require('node:child_process').spawnSync(process.execPath, ['tests/test-ha-ui-batch.js', ...process.argv.slice(2)], { stdio: 'inherit', env: process.env });
+    if (result.status !== 0) throw new Error('Control grid alignment failed');
+    return;
+  }
   if (process.argv.includes('--access-label')) {
     const result = require('node:child_process').spawnSync(process.execPath, ['tests/test-ha-ui-batch.js', '--access', ...process.argv.slice(2).filter(arg => arg !== '--access-label')], { stdio: 'inherit', env: process.env });
     if (result.status !== 0) throw new Error('Access label alignment failed');
@@ -358,7 +375,7 @@ async function main() {
     console.log(`Marao card alignment OK (${readings.length} controls; tolerance ${tolerance}px; ${narrowNames.length} narrow cards; 195px/180px popups).`);
   } catch (error) {
     const page = browser.contexts()[0]?.pages()[0];
-    if (page) await page.screenshot({ path: require('node:path').join(require('./verification-browser').artifactDirectory('alignment'), 'failure.png'), scale: 'css' });
+    if (page) await captureScreenshot(page, { path: require('node:path').join(require('./verification-browser').artifactDirectory('alignment'), 'failure.png'), scale: 'css' });
     throw error;
   } finally {
     await browser.close();
@@ -371,4 +388,4 @@ if (require.main === module) {
     process.exitCode = 1;
   });
 }
-module.exports = { checkRoomComposition };
+module.exports = { checkRoomComposition, sliderHeaderChecks };

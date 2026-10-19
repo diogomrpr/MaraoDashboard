@@ -36,9 +36,21 @@ async def test_open_only_door_advertises_only_safe_open_action():
 
 
 def load_fixture(relative):
+    import sys
+    from types import ModuleType
+
     path = ROOT / "ha-test/custom_components" / relative
-    spec = importlib.util.spec_from_file_location(f"fixture_{path.parent.name}_{path.stem}", path)
+    package_name = f"fixture_{path.parent.name}"
+    if path.name == "__init__.py":
+        spec = importlib.util.spec_from_file_location(package_name, path, submodule_search_locations=[str(path.parent)])
+    else:
+        if package_name not in sys.modules:
+            package = ModuleType(package_name)
+            package.__path__ = [str(path.parent)]
+            sys.modules[package_name] = package
+        spec = importlib.util.spec_from_file_location(f"{package_name}.{path.stem}", path)
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -363,3 +375,165 @@ async def test_energy_unit_fixture_changes_only_its_safe_source_and_resets(hass)
     await hass.services.async_call("marao_test_camera", "reset", {}, blocking=True)
     assert hass.states.get(entity).attributes["unit_of_measurement"] == "Wh"
     assert hass.states.get(entity).attributes["friendly_name"] == "Safe reading"
+
+
+async def test_camera_live_fixture_is_distinct_safe_local_media_with_optional_still(monkeypatch):
+    # This fixture contract does not need HA's optional native image decoders.
+    import sys
+    from enum import IntFlag
+    from types import ModuleType
+
+    class FixtureCamera:
+        pass
+
+    class FixtureCameraFeature(IntFlag):
+        STREAM = 2
+
+    camera_module = ModuleType("homeassistant.components.camera")
+    camera_module.Camera = FixtureCamera
+    camera_module.CameraEntityFeature = FixtureCameraFeature
+    monkeypatch.setitem(sys.modules, "homeassistant.components.camera", camera_module)
+    fixture = load_fixture("marao_test_camera/camera.py")
+    still = fixture.MaraoTestCamera("Safe still")
+    live = fixture.MaraoTestCamera("Safe live", live=True)
+    missing = fixture.MaraoTestCamera("Safe missing still", live=True, missing_still=True)
+    assert await still.stream_source() is None
+    live.hass = SimpleNamespace(http=SimpleNamespace(context=None, server_port=18123))
+    assert await live.stream_source() == "http://127.0.0.1:18123/api/marao_test_camera/live.ts"
+    source = Path(fixture.__file__).with_name("live.mp4")
+    assert source.read_bytes()[4:8] == b"ftyp"
+    assert source.read_bytes() != source.with_name("event.mp4").read_bytes()
+    assert await live.async_camera_image() == fixture.CAMERA_IMAGE
+    assert await missing.async_camera_image() is None
+    assert missing.entity_picture is None
+    config = yaml.safe_load((ROOT / "ha-test/marao_dashboard_card_test_helpers.yaml").read_text())
+    assert next(camera for camera in config["camera"] if camera["name"] == "Marao Dashboard Test Camera")["live"] is True
+
+
+def test_synthetic_live_remux_loops_with_clocked_monotonic_packets_and_closes(monkeypatch):
+    import sys
+    from fractions import Fraction
+    from queue import Queue
+
+    fixture = load_fixture("marao_test_camera/live.py")
+    recorded, waits, closed = [], [], []
+
+    class Stop:
+        stopped = False
+
+        def is_set(self):
+            return self.stopped
+
+        def wait(self, delay):
+            waits.append(delay)
+            return self.stopped
+
+    stop = Stop()
+    video = SimpleNamespace(time_base=Fraction(1, 20), average_rate=20)
+
+    class Input:
+        streams = SimpleNamespace(video=[video])
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            closed.append("input")
+
+        def demux(self, _video):
+            return iter([SimpleNamespace(dts=tick, pts=tick, duration=1, time_base=video.time_base, stream=video) for tick in [0, 1]])
+
+    class Output:
+        def __init__(self, sink):
+            self.sink = sink
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            closed.append("output")
+
+        def add_stream_from_template(self, template):
+            assert template is video
+            return "synthetic-output"
+
+        def mux(self, packet):
+            assert packet.stream == "synthetic-output"
+            recorded.append((packet.dts, packet.pts))
+            self.sink.write(b"x")
+            if len(recorded) == 5:
+                stop.stopped = True
+
+    def open_media(source, **options):
+        if options.get("mode") == "w":
+            assert options["format"] == "mpegts"
+            return Output(source)
+        assert Path(source) == fixture.LIVE_FILE
+        return Input()
+
+    monkeypatch.setitem(sys.modules, "av", SimpleNamespace(open=open_media))
+    monkeypatch.setattr(fixture.time, "monotonic", lambda: 0)
+    chunks = Queue(maxsize=8)
+    fixture.remux_live(stop, chunks)
+    assert recorded == [(tick, tick) for tick in range(5)]
+    assert waits == pytest.approx([0, .05, .1, .15, .2, .25])
+    assert chunks.qsize() == 5
+    assert closed.count("output") == 1 and closed.count("input") == 4
+
+
+async def test_synthetic_live_endpoint_rejects_external_and_limits_physical_loopback():
+    from aiohttp import web
+
+    fixture = load_fixture("marao_test_camera/live.py")
+    view = fixture.FixtureLiveView()
+    request = SimpleNamespace(transport=SimpleNamespace(get_extra_info=lambda _: ("192.168.0.28", 12345)))
+    with pytest.raises(web.HTTPForbidden):
+        await view.get(request)
+    assert view._active == 0
+    request.transport = SimpleNamespace(get_extra_info=lambda _: ("127.0.0.1", 12345))
+    view._active = fixture.MAX_LIVE_CONNECTIONS
+    with pytest.raises(web.HTTPTooManyRequests):
+        await view.get(request)
+    assert view._active == fixture.MAX_LIVE_CONNECTIONS
+    assert fixture.MAX_LIVE_CONNECTIONS == 4
+
+
+async def test_synthetic_live_endpoint_bounds_queue_and_joins_on_native_disconnect(monkeypatch):
+    from queue import Queue
+
+    fixture = load_fixture("marao_test_camera/live.py")
+    observed = {}
+
+    def bounded_queue(maxsize):
+        assert maxsize == 8
+        queue = Queue(maxsize=maxsize)
+        queue.put(b"synthetic-ts")
+        return queue
+
+    class Response:
+        def __init__(self, headers):
+            assert headers["Content-Type"] == "video/mp2t"
+
+        async def prepare(self, _request):
+            pass
+
+        async def write(self, _data):
+            raise ConnectionResetError("Native consumer disconnected")
+
+    def executor(_function, stop, _chunks):
+        observed["stop"] = stop
+
+        async def producer():
+            while not stop.is_set():
+                await asyncio.sleep(0)
+            observed["joined"] = True
+
+        return asyncio.create_task(producer())
+
+    monkeypatch.setattr(fixture, "Queue", bounded_queue)
+    monkeypatch.setattr(fixture.web, "StreamResponse", Response)
+    request = SimpleNamespace(transport=SimpleNamespace(get_extra_info=lambda _: ("::1", 12345)), app={fixture.KEY_HASS: SimpleNamespace(async_add_executor_job=executor)})
+    view = fixture.FixtureLiveView()
+    await view.get(request)
+    assert observed["stop"].is_set() and observed["joined"]
+    assert view._active == 0

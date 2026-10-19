@@ -12,7 +12,7 @@ const [cardsModule, cameraEventsModule] = await Promise.all([
   import(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`),
   import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`),
 ]);
-const { energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, registerMaraoCards } = cardsModule;
+const { loadHistoryChart, historyPeriodRange, historySamples, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, registerMaraoCards } = cardsModule;
 registerMaraoCards();
 cameraEventsModule.registerMaraoCameraEventCards();
 
@@ -299,6 +299,10 @@ const TRANSLATIONS = {
     "group.all_closed": "All closed",
     "group.low_count": "{count} low",
     "popup.controls_unavailable": "Controls unavailable",
+    "history.title": "History",
+    "history.back": "Back",
+    "history.load_error": "History chart could not load",
+    "grid.invalid": "Use content cards and one to six columns.",
     "common.on_count": "{count} on",
     "common.open_count": "{count} open",
     "common.need_attention_count": "{count} need attention",
@@ -306,6 +310,17 @@ const TRANSLATIONS = {
     "common.nothing_playing": "Nothing is playing",
     "room.turn_off_lights": "Turn off all lights in {name}",
     "room.lighting_summary": "Lighting: {label}",
+    "camera.loading": "Starting live video…",
+    "camera.live": "Live",
+    "camera.snapshot": "Snapshot",
+    "camera.start": "Start live view",
+    "camera.blocked": "Playback needs your permission",
+    "camera.failed": "Live video failed",
+    "camera.timeout": "Live video did not start in time",
+    "camera.registration": "Home Assistant camera player could not load",
+    "camera.compatibility": "Native camera video is unavailable or incompatible",
+    "camera.unsupported": "This camera provides a preview only",
+    "camera.poster_failed": "Snapshot unavailable",
     "camera_events.title": "Camera events",
     "camera_events.event": "Event",
     "camera_events.back": "Back to events",
@@ -380,6 +395,12 @@ const TRANSLATIONS = {
     "navigation.open": "Additional destinations",
     "navigation.close": "Close additional destinations",
     "navigation.current": "Current destination: {name}",
+    "navigation.refresh.hold": "Hold to refresh frontend",
+    "navigation.refresh.refreshing": "Refreshing frontend…",
+    "navigation.refresh.unsaved": "Save or discard changes before refreshing.",
+    "navigation.refresh.offline": "Cannot reach Home Assistant. Hold again to retry.",
+    "navigation.refresh.interrupted": "Refresh interrupted. Hold again to retry.",
+    "navigation.refresh.failed": "Refresh failed. Hold again to retry.",
     "popup.title": "Marao popup",
     "popup.close": "Close popup",
     "sensor.updated": "Updated {time}",
@@ -456,6 +477,10 @@ const TRANSLATIONS = {
     "group.all_closed": "Tudo fechado",
     "group.low_count": "{count} com bateria fraca",
     "popup.controls_unavailable": "Controlos indisponíveis",
+    "history.title": "Histórico",
+    "history.back": "Voltar",
+    "history.load_error": "Não foi possível carregar o gráfico",
+    "grid.invalid": "Use cartões de conteúdo e uma a seis colunas.",
     "common.on_count": "{count} ligados",
     "common.open_count": "{count} abertos",
     "common.need_attention_count": "{count} precisam de atenção",
@@ -463,6 +488,17 @@ const TRANSLATIONS = {
     "common.nothing_playing": "Nada em reprodução",
     "room.turn_off_lights": "Desligar todas as luzes em {name}",
     "room.lighting_summary": "Iluminação: {label}",
+    "camera.loading": "A iniciar vídeo em direto…",
+    "camera.live": "Em direto",
+    "camera.snapshot": "Imagem estática",
+    "camera.start": "Iniciar vídeo em direto",
+    "camera.blocked": "A reprodução precisa da sua permissão",
+    "camera.failed": "Falha no vídeo em direto",
+    "camera.timeout": "O vídeo em direto não iniciou a tempo",
+    "camera.registration": "Não foi possível carregar o leitor de câmara do Home Assistant",
+    "camera.compatibility": "O vídeo nativo da câmara está indisponível ou é incompatível",
+    "camera.unsupported": "Esta câmara apenas fornece uma pré-visualização",
+    "camera.poster_failed": "Imagem estática indisponível",
     "camera_events.title": "Eventos da câmara",
     "camera_events.event": "Evento",
     "camera_events.back": "Voltar aos eventos",
@@ -537,6 +573,12 @@ const TRANSLATIONS = {
     "navigation.open": "Destinos adicionais",
     "navigation.close": "Fechar destinos adicionais",
     "navigation.current": "Destino atual: {name}",
+    "navigation.refresh.hold": "Mantenha premido para atualizar a interface",
+    "navigation.refresh.refreshing": "A atualizar a interface…",
+    "navigation.refresh.unsaved": "Guarde ou descarte as alterações antes de atualizar.",
+    "navigation.refresh.offline": "Sem ligação ao Home Assistant. Mantenha premido para tentar novamente.",
+    "navigation.refresh.interrupted": "Atualização interrompida. Mantenha premido para tentar novamente.",
+    "navigation.refresh.failed": "Falha ao atualizar. Mantenha premido para tentar novamente.",
     "popup.title": "Janela Marao",
     "popup.close": "Fechar janela",
     "sensor.updated": "Atualizado {time}",
@@ -590,7 +632,7 @@ function localize(key, hassOrLanguage, placeholders = {}) {
   );
 }
 
-const POPUP_SCROLL_GUARD_VERSION = 3;
+const POPUP_SCROLL_GUARD_VERSION = 4;
 const MARAO_TEXT_SCALE_ATTRIBUTE = "data-marao-dashboard-text-scale";
 const MARAO_TAP_DRAG_THRESHOLD = 10;
 const MARAO_TAP_BLOCK_MS = 500;
@@ -728,6 +770,7 @@ class MaraoSlideToOpen extends HTMLElement {
   _fitAccessGrid() {
     // A fixed-size thumb and readable label cannot share a sub-100px grid cell.
     for (let item = this; item; item = item.parentElement || item.getRootNode?.()?.host) {
+      if (item.localName === "marao-control-grid" || item.classList?.contains("control-grid")) return;
       const grid = item.parentElement;
       if (grid?.id !== 'root' || grid.getRootNode().host?.localName !== 'hui-grid-card') continue;
       const root = grid.getRootNode(), columns = Number(root.host._config?.columns) || 3;
@@ -967,6 +1010,10 @@ class MaraoSlideToOpen extends HTMLElement {
   _move(event, point) {
     if (!point || (point.pointerId ?? point.identifier) !== this._pointerId) return;
     const track = event.currentTarget;
+    if (event.cancelable === false) {
+      this._resetGesture(track);
+      return;
+    }
     const deltaX = point.clientX - this._startX;
     const deltaY = point.clientY - this._startY;
     if (!this._horizontalIntent) {
@@ -1309,6 +1356,8 @@ class MaraoStateTimelineCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; width: 100%; }
+        :host([data-marao-control-cell]) { display:grid; min-width:0; }
+        :host([data-marao-control-cell]) ha-card { height:100%; }
         ha-card { box-sizing: border-box; min-height: 168px; padding: 13px 20px; background: var(--ha-card-background); color: var(--primary-text-color); }
         header { display: grid; gap: 12px; margin-bottom: 8px; }
         ha-card[data-binary=true] { background: var(--color-blue); color: var(--color-black); --subtext-color: var(--color-black); }
@@ -1435,6 +1484,8 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const changed = !this._config || ["entity", "period", "popup"].some(key => this._config[key] !== next[key]);
     this._config = next;
     if (changed) {
+      this._detailGeneration = (this._detailGeneration || 0) + 1;
+      this._detailChart?.destroy(); this._detailChart = null; this._detailLoading = false; this._detailFailed = false;
       this._offset = 0;
       this._loadId += 1;
       this._loading = false;
@@ -1465,27 +1516,41 @@ class MaraoEnergyPeriodCard extends HTMLElement {
 
   getCardSize() { return this._config?.popup ? 5 : 2; }
 
+  disconnectedCallback() {
+    queueMicrotask(() => { if (!this.isConnected) { this._detailGeneration = (this._detailGeneration || 0) + 1; this._detailChart?.destroy(); this._detailChart = null; this._detailLoading = false; this._loadId++; this._loading = false; this._loadedKey = ''; } });
+  }
+  async _syncDetail(host, options) {
+    this._detailOptions = options;
+    if (!host || this.preview) return;
+    if (this._detailChart) { this._detailChart.update(options); return; }
+    if (this._detailLoading || this._detailFailed) return;
+    const generation = this._detailGeneration || 0;
+    this._detailLoading = true;
+    try {
+      const module = await loadHistoryChart();
+      if (this.isConnected === false || generation !== (this._detailGeneration || 0) || this.shadowRoot.querySelector('.chart') !== host) return;
+      host.replaceChildren(); this._detailChart = module.createHistoryChart(host, this._detailOptions);
+    } catch (error) {
+      if (generation !== (this._detailGeneration || 0) || this.isConnected === false) return;
+      this._detailFailed = true;
+      host.textContent = localize('history.load_error', this._hass);
+      const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = localize('common.retry', this._hass);
+      retry.style.cssText = 'min-width:48px;min-height:48px;font:inherit';
+      retry.onclick = () => { haptic('heavy'); this._detailFailed = false; this._syncDetail(host, this._detailOptions); };
+      host.append(retry);
+    } finally { if (generation === (this._detailGeneration || 0)) this._detailLoading = false; }
+  }
+
   _range() {
-    const now = new Date();
-    let start;
-    if (this._config.period === "month") {
-      start = new Date(now.getFullYear(), now.getMonth() + this._offset, 1);
-    } else {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + this._offset);
-      start.setHours(0, 0, 0, 0);
-    }
-    const end = this._config.period === "month"
-      ? new Date(start.getFullYear(), start.getMonth() + 1, 1)
-      : new Date(start.getTime() + 24 * 60 * 60 * 1000);
-    return { start, end };
+    return historyPeriodRange(new Date(), this._offset, this._config.period, this._hass?.config?.time_zone || 'UTC');
   }
 
   _periodLabel() {
     const { start } = this._range();
     const language = this._hass?.locale?.language || this._hass?.language || navigator.language;
     return this._config.period === "month"
-      ? new Intl.DateTimeFormat(language, { month: "long", year: "numeric" }).format(start)
-      : new Intl.DateTimeFormat(language, { weekday: "short", day: "numeric", month: "short" }).format(start);
+      ? new Intl.DateTimeFormat(language, { month: "long", year: "numeric", timeZone: this._hass?.config?.time_zone || "UTC" }).format(start)
+      : new Intl.DateTimeFormat(language, { weekday: "short", day: "numeric", month: "short", timeZone: this._hass?.config?.time_zone || "UTC" }).format(start);
   }
 
   async _load() {
@@ -1522,15 +1587,14 @@ class MaraoEnergyPeriodCard extends HTMLElement {
   }
 
   _values() {
-    const formatting = energyFormatting(this._config);
     const unit = this._hass?.states?.[this._config.entity]?.attributes?.unit_of_measurement;
     let error = false;
-    const values = this._history.map(record => {
-      const reading = formatting ? energyHistoryValue(record, unit, this._config) : {value: Number(record.state)};
+    const values = historySamples(this._history, { convert: (_value, record) => {
+      const reading = energyHistoryValue(record, unit, this._config);
       if (reading?.error) error = true;
-      return {value: reading?.value, time: new Date(record.last_changed || record.last_updated).getTime()};
-    }).filter(item => Number.isFinite(item.value) && Number.isFinite(item.time));
-    return {values: error ? [] : values, error};
+      return reading?.error ? null : reading?.value;
+    } });
+    return {values, error};
   }
 
   _render() {
@@ -1544,36 +1608,48 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const history = unavailable ? {values: [], error: false} : this._values();
     const formatError = reading?.error || history.error ? localize("energy.format_error", this._hass) : "";
     const problem = cardProblem(this._config, this._hass, { contentError: formatError || (this._error ? localize("timeline.history_unavailable", this._hass) : ""), loading: this._loading });
-    const values = history.values;
+    const values = history.values.filter(record => Number.isFinite(record.value));
     const current = !this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass) : reading ? energyLabel(reading, this._config, this._hass) : entity?.state && Number.isFinite(Number(entity.state)) ? entity.state : "—";
     const period = this._periodLabel();
     const range = this._range();
-    const min = values.length ? Math.min(...values.map((item) => item.value)) : 0;
-    const max = values.length ? Math.max(...values.map((item) => item.value)) : 1;
+    const extrema = values.reduce((bounds, item) => [Math.min(bounds[0], item.value), Math.max(bounds[1], item.value)], [Infinity, -Infinity]);
+    const min = values.length ? extrema[0] : 0, max = values.length ? extrema[1] : 1;
     const unit = reading?.unit || entity?.attributes?.unit_of_measurement || "";
-    const bound = value => formatting ? `${formatEnergyNumber(value, this._config.display_precision, this._hass)} ${unit}`.trim() : String(value);
-    const spread = max - min || 1;
-    const points = values.map((item) => {
-      const x = ((item.time - range.start.getTime()) / Math.max(1, range.end - range.start)) * 100;
-      const y = 100 - ((item.value - min) / spread) * 88 - 6;
-      return `${Math.max(0, Math.min(100, x))},${Math.max(6, Math.min(94, y))}`;
-    }).join(" ");
+    const bound = value => energyLabel({value, unit}, this._config, this._hass);
     const previous = localize("energy.previous_period", this._hass);
     const next = localize("energy.next_period", this._hass);
     const disabled = unavailable || this._loading;
-    const status = !this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass)
+    const status = formatError || (!this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass)
       : this._loading ? localize("timeline.loading", this._hass)
-        : this._error ? localize("timeline.history_unavailable", this._hass) : localize("energy.no_data", this._hass);
+        : this._error ? localize("timeline.history_unavailable", this._hass) : localize("energy.no_data", this._hass));
     const historyState = !this._hass?.states ? "loading" : unavailable || (this._loading ? "loading" : this._error || formatError ? "error" : values.length || !this._config.popup ? "ready" : "empty");
     const body = this._config.popup
-      ? `<h2>${escapeHtml(title)}</h2><div class="period-nav"><button data-period="previous" aria-label="${escapeHtml(previous)}"${disabled ? " disabled" : ""}>‹</button><strong>${escapeHtml(period)}</strong><button data-period="next" aria-label="${escapeHtml(next)}"${disabled || this._offset >= 0 ? " disabled" : ""}>›</button></div><div class="chart" role="img" aria-label="${escapeHtml(`${title} ${period}${formatting && values.length ? ` ${bound(min)} – ${bound(max)}` : ""}`)}">${points ? `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${points}" /></svg><div class="scale"><span>${escapeHtml(bound(max))}</span><span>${escapeHtml(bound(min))}</span></div>` : `<span class="empty" role="${this._error && !unavailable ? "alert" : "status"}">${problem && problem.kind !== "loading" ? `<ha-icon icon="mdi:alert-circle-outline" aria-hidden="true"></ha-icon> ${escapeHtml(problem.reason)}` : escapeHtml(status)}</span>`}</div>`
+      ? `<h2>${escapeHtml(title)}</h2><div class="period-nav"><button data-period="previous" aria-label="${escapeHtml(previous)}"${disabled ? " disabled" : ""}>‹</button><strong>${escapeHtml(period)}</strong><button data-period="next" aria-label="${escapeHtml(next)}"${disabled || this._offset >= 0 ? " disabled" : ""}>›</button></div><div class="chart" role="img" aria-label="${escapeHtml(`${title} ${period}${formatting && values.length ? ` ${bound(min)} – ${bound(max)}` : ""}`)}"><span class="empty" role="status">${escapeHtml(status)}</span></div>`
       : `<span class="value">${escapeHtml(String(current))}</span><span class="period">${escapeHtml(period)}</span>`;
     const surfaceTag = this._config.popup ? "div" : "button";
     const surfaceAttributes = this._config.popup ? "" : ` type="button" aria-label="${escapeHtml(`${title}${formatting ? ` ${current}` : ""}`)}"${unavailable ? ' disabled aria-disabled="true"' : ""}`;
-    this.shadowRoot.innerHTML = `<style>
-      :host{display:block;width:100%;container:marao-energy / inline-size;} .surface{display:flex;min-height:112px;width:100%;box-sizing:border-box;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:18px 20px;border:0;border-radius:var(--ha-card-border-radius,18px);background:var(--ha-card-background);color:var(--primary-text-color);font:inherit;text-align:left;cursor:pointer;} .surface:focus{outline:none;} .surface:disabled{cursor:default;color:var(--secondary-text-color);} .surface>*{max-width:100%;overflow-wrap:anywhere;} h2{width:100%;margin:0;font-size:var(--font-size-primary,18px);font-weight:var(--font-weight-primary,700);} .value{font-size:calc(var(--font-size-primary,18px) * 1.78);font-weight:800;line-height:1.25;} .period{color:var(--secondary-text-color);font-size:var(--font-size-secondary,14px);} .period-nav{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;width:100%;gap:8px;margin-bottom:12px;text-align:center;} .period-nav strong{font-size:var(--font-size-primary,18px);text-transform:capitalize;} .surface>[data-history-retry]{min-width:48px;min-height:48px;padding:10px 12px;border:0;border-radius:12px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);overflow-wrap:anywhere;} .surface>[data-history-retry]:focus{outline:none;} .period-nav button{width:48px;height:48px;border:0;border-radius:50%;background:var(--secondary-background-color);color:var(--primary-text-color);font-size:34px;line-height:1;} .period-nav button:focus{outline:none;} .period-nav button:disabled{opacity:.35;} .chart{display:grid;position:relative;width:100%;min-height:190px;border-radius:14px;background:var(--secondary-background-color);overflow:hidden;} svg{grid-area:1/1;display:block;width:100%;height:100%;min-height:190px;} polyline{fill:none;stroke:var(--primary-color);stroke-width:2.5;vector-effect:non-scaling-stroke;} .scale{grid-area:1/1;position:relative;margin:8px;min-height:174px;display:flex;flex-direction:column;gap:8px;align-items:flex-start;justify-content:space-between;color:var(--secondary-text-color);font-size:var(--font-size-caption,14px);} .scale span{max-width:100%;overflow-wrap:anywhere;}.scale span:last-child{align-self:flex-end;} .empty{display:grid;min-height:190px;place-items:center;padding:16px;color:var(--secondary-text-color);font-size:var(--font-size-primary,18px);text-align:center;} @container marao-energy (max-width:240px){.surface{padding:12px 8px}.period-nav{grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center}.period-nav strong{grid-column:1/-1;grid-row:1}}
+    const markup = `<style>
+      :host{display:block;width:100%;container:marao-energy / inline-size;}:host([data-marao-control-cell]){display:grid;min-width:0}:host([data-marao-control-cell])>.surface{height:100%} .surface{display:flex;min-height:112px;width:100%;box-sizing:border-box;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:18px 20px;border:0;border-radius:var(--ha-card-border-radius,18px);background:var(--ha-card-background);color:var(--primary-text-color);font:inherit;text-align:left;cursor:pointer;} .surface:focus{outline:none;} .surface:disabled{cursor:default;color:var(--secondary-text-color);} .surface>*{max-width:100%;overflow-wrap:anywhere;} h2{width:100%;margin:0;font-size:var(--font-size-primary,18px);font-weight:var(--font-weight-primary,700);} .value{font-size:calc(var(--font-size-primary,18px) * 1.78);font-weight:800;line-height:1.25;} .period{color:var(--secondary-text-color);font-size:var(--font-size-secondary,14px);} .period-nav{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;width:100%;gap:8px;margin-bottom:12px;text-align:center;} .period-nav strong{font-size:var(--font-size-primary,18px);text-transform:capitalize;} .surface>[data-history-retry]{min-width:48px;min-height:48px;padding:10px 12px;border:0;border-radius:12px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);overflow-wrap:anywhere;} .surface>[data-history-retry]:focus{outline:none;} .period-nav button{width:48px;height:48px;border:0;border-radius:50%;background:var(--secondary-background-color);color:var(--primary-text-color);font-size:34px;line-height:1;} .period-nav button:focus{outline:none;} .period-nav button:disabled{opacity:.35;} .chart{display:grid;position:relative;width:100%;min-height:190px;border-radius:14px;background:var(--secondary-background-color);overflow:hidden;} svg{grid-area:1/1;display:block;width:100%;height:100%;min-height:190px;} polyline{fill:none;stroke:var(--primary-color);stroke-width:2.5;vector-effect:non-scaling-stroke;} .scale{grid-area:1/1;position:relative;margin:8px;min-height:174px;display:flex;flex-direction:column;gap:8px;align-items:flex-start;justify-content:space-between;color:var(--secondary-text-color);font-size:var(--font-size-caption,14px);} .scale span{max-width:100%;overflow-wrap:anywhere;}.scale span:last-child{align-self:flex-end;} .empty{display:grid;min-height:190px;place-items:center;padding:16px;color:var(--secondary-text-color);font-size:var(--font-size-primary,18px);text-align:center;} @container marao-energy (max-width:240px){.surface{padding:12px 8px}.period-nav{grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center}.period-nav strong{grid-column:1/-1;grid-row:1}}
       .problem{font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.25;}
     </style><${surfaceTag} class="surface"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""} data-history-state="${historyState}"${surfaceAttributes}>${this._config.popup ? body : `<h2>${escapeHtml(title)}</h2>${body}`}${this._error && !unavailable && this._config.popup ? `<button type="button" data-history-retry>${escapeHtml(localize("common.retry", this._hass))}</button>` : ""}${problem && problem.kind !== "loading" && !this._config.popup ? `<span class="problem" role="status"><ha-icon icon="mdi:help-circle-outline" aria-hidden="true"></ha-icon> <span>${escapeHtml(problem.reason)}</span></span>` : ""}</${surfaceTag}>`;
+    const retainedSurface = this.shadowRoot.querySelector('.surface');
+    const retainedChart = this.shadowRoot.querySelector('.chart');
+    if (retainedSurface && retainedChart && this._config.popup && document.createElement) {
+      const template = document.createElement('template'); template.innerHTML = markup;
+      const next = template.content.querySelector('.surface');
+      const old = [...retainedSurface.childNodes];
+      for (const attribute of [...retainedSurface.attributes]) retainedSurface.removeAttribute(attribute.name);
+      for (const attribute of [...next.attributes]) retainedSurface.setAttribute(attribute.name, attribute.value);
+      for (const child of [...next.childNodes]) if (!child.classList?.contains('chart')) retainedSurface.insertBefore(child, retainedChart);
+      for (const child of old) if (child !== retainedChart) child.remove();
+      this.shadowRoot.querySelector('style').textContent = template.content.querySelector('style').textContent;
+    } else this.shadowRoot.innerHTML = markup;
+    if (this._config.popup) this._syncDetail(this.shadowRoot.querySelector('.chart'), {
+      samples: history.values, range, windows: false, hass: this._hass, stateClass: entity?.attributes?.state_class,
+      format: bound, unavailable: unavailable ? localize(`common.${unavailable}`, this._hass) : "", loading: Boolean(this._loading), error: formatError || (this._error ? localize("timeline.history_unavailable", this._hass) : ""),
+      localize: key => localize(key, this._hass), onRetry: () => { this._loadedKey = ''; this._load(); },
+      coverageLimited: Boolean(history.values.length && history.values[0].time > range.start.getTime()),
+    });
     this.shadowRoot.querySelector('[data-history-retry]')?.addEventListener('click', () => {
       if (!this._error || historyEntityState(this._hass, this._config) || this._loading) return;
       this._loadedKey = "";
@@ -1641,7 +1717,7 @@ function installPopupScrollGuard() {
   };
 
   const block = (event) => {
-    event.preventDefault();
+    if (event.cancelable) event.preventDefault();
     event.stopPropagation();
   };
 
@@ -1656,7 +1732,10 @@ function installPopupScrollGuard() {
       return;
     }
     const popupPath = path.slice(0, popupIndex + 1);
-    // iOS moves native range thumbs in the touch event's default handler.
+    // Native sheets contain overscroll in CSS; cancelling a first touchmove can
+    // prevent WebView from starting its scroll (including zero-delta movement).
+    if (event.type === "touchmove" && path[popupIndex].classList.contains("marao-popup-sheet")) return;
+    // Legacy popup hosts still need the native range's default touch handler.
     if (event.type === "touchmove" && popupPath.some((element) => element instanceof Element && element.matches('input[type="range"][data-slider-key]'))) return;
 
     const deltaY =

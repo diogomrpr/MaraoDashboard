@@ -1,5 +1,4 @@
 import { bindCardDrag } from "./editor-drag.js";
-import { PT_LABELS, MOVE_PT_LABELS } from "./editor-labels.js";
 import "./panel.css";
 
 import {
@@ -52,6 +51,7 @@ const TEXT = {
     unknown: "Unknown", unavailable: "Unavailable",
     noArea: "Choose a suggestion area in Edit page, or search all entities.", missingArea: "This suggestion area is no longer available. Search all entities or choose another area.",
     noSuggestions: "No new compatible entities in this area.", noResults: "No compatible entities match your search.", globalSearch: "Search entities from any room.", alreadyAdded: "Already added",
+    labelsFailed: "Could not load editor translations. ", restoreConfirm: "Restore this version? Unsaved changes will be lost.", historyLoading: "Loading history…", historyEmpty: "No generated versions yet.", historyFailed: "Could not load history. ", saving: "Generating dashboard…",
     pendingConversion: "The saved dashboard is ready to convert. Save & Generate keeps the prior version in History.",
   },
   pt: {
@@ -69,6 +69,7 @@ const TEXT = {
     unknown: "Desconhecida", unavailable: "Indisponível",
     noArea: "Escolha uma área para sugestões em Editar página ou pesquise todas as entidades.", missingArea: "Esta área para sugestões já não está disponível. Pesquise todas as entidades ou escolha outra área.",
     noSuggestions: "Não existem novas entidades compatíveis nesta área.", noResults: "Nenhuma entidade compatível corresponde à pesquisa.", globalSearch: "Pesquise entidades de qualquer divisão.", alreadyAdded: "Já adicionada",
+    labelsFailed: "Não foi possível carregar as traduções do editor. ", restoreConfirm: "Restaurar esta versão? As alterações por guardar serão perdidas.", historyLoading: "A carregar o histórico…", historyEmpty: "Ainda não existem versões geradas.", historyFailed: "Não foi possível carregar o histórico. ", saving: "A gerar o dashboard…",
     pendingConversion: "O dashboard guardado está pronto para conversão. Guardar e gerar mantém a versão anterior no Histórico.",
   },
 };
@@ -88,6 +89,9 @@ class MaraoDashboardPanel extends HTMLElement {
     this._lifecycle = 0;
     this._requestedTab = "visual";
     this._jsonAttempt = 0;
+    this._documentEpoch = 0;
+    this._historyEpoch = 0;
+    this._preparationStages = [];
     this._busy = false;
     this._dirty = false;
     this._tab = "visual";
@@ -102,6 +106,9 @@ class MaraoDashboardPanel extends HTMLElement {
     const mark = this.shadowRoot.querySelector(".brand-mark");
     if (mark) mark.src = value?.themes?.darkMode ? BRAND_MARK_DARK : BRAND_MARK;
     if (this._monaco) this._setMonacoTheme();
+    if (this.isConnected && this._loaded && !this._labelModule && String(value?.language || '').toLowerCase().startsWith('pt')) {
+      this._ensureLabels().then(() => { if (this.isConnected && this._tab === 'visual') this._renderVisual(); }).catch(error => { this._retryKind = 'labels'; this._setStatus(this._t('labelsFailed') + this._error(error), 'error'); });
+    }
     if (this.isConnected && !this._loaded && !this._loadAttempted) this._load();
   }
 
@@ -113,6 +120,16 @@ class MaraoDashboardPanel extends HTMLElement {
       this.style.setProperty("--editor-header-height", `${entry.target.getBoundingClientRect().height}px`);
     });
     this._headerResize.observe(this.shadowRoot.querySelector(".editor-header"));
+    this._activityEvents = new AbortController();
+    const options = { capture: true, passive: true, signal: this._activityEvents.signal };
+    this.addEventListener('pointerdown', () => { this._interacting = true; }, options);
+    for (const event of ['pointerup', 'pointercancel', 'keyup', 'change', 'focusout']) this.addEventListener(event, () => {
+      this._interacting = false; this._resumeJsonPreparation();
+    }, options);
+    this.addEventListener('keydown', () => { this._interacting = true; }, options);
+    this.addEventListener('scroll', () => { this._scrolling = true; }, options);
+    this.addEventListener('scrollend', () => { this._scrolling = false; this._resumeJsonPreparation(); }, options);
+    document.addEventListener('visibilitychange', () => this._resumeJsonPreparation(), options);
     if (this._hass && !this._loaded && !this._loadAttempted) this._load();
     this._cardDrag = bindCardDrag(this.shadowRoot, {
       sourceFor: row => this._cardSource(row.dataset.kind, row.dataset.room, Number(row.dataset.cardDrag)),
@@ -121,13 +138,23 @@ class MaraoDashboardPanel extends HTMLElement {
       label: () => this._l("Drop here"), haptic: () => this._moveHaptic(),
     });
     if (this._loaded && !this.shadowRoot.getElementById("visual-view").firstElementChild) this._renderVisual();
-    if (this._loaded && this._requestedTab === "json") this._switchTab("json");
+    if (this._loaded) {
+      this._nativeVisualReady().then(() => {
+        if (!this.isConnected) return;
+        if (this._requestedTab === 'json') this._switchTab('json'); else this._startJsonPreparation();
+      }).catch(error => this._setStatus(this._error(error), 'error'));
+    }
   }
 
   disconnectedCallback() {
     this._cardDrag?.dispose(); this._cardDrag = null;
     this._headerResize?.disconnect();
     this._lifecycle += 1;
+    this._activityEvents?.abort();
+    this._cancelIdleStage?.();
+    this._interacting = false; this._scrolling = false;
+    this._jsonPreparing = null; this._jsonLoading = null; this._jsonForeground = false;
+    this._contextRequest = null; this._metadataLoading = null; this._historyLoading = null;
     this._jsonCancel?.();
     this._jsonEvents?.abort();
     if (this._monaco) this._jsonDraft = this._monaco.getValue();
@@ -144,7 +171,20 @@ class MaraoDashboardPanel extends HTMLElement {
 
   _l(label) {
     const language = String(this._hass?.language || "en").toLowerCase().split("-")[0];
+    const { PT_LABELS = {}, MOVE_PT_LABELS = {} } = this._labelModule || {};
     return language === "pt" ? MOVE_PT_LABELS[label] || PT_LABELS[label] || PT_LABELS[label + '.']?.replace(/\.$/, '') || label : label;
+  }
+
+  _ensureLabels(retry = false) {
+    if (!String(this._hass?.language || '').toLowerCase().startsWith('pt') || this._labelModule) return Promise.resolve();
+    if (this._labelsLoading) return this._labelsLoading;
+    if (this._labelsError && !retry) return Promise.reject(this._labelsError);
+    const url = new URL(this._jsonUrl('MaraoDashboardEditorLabels.js'));
+    if (retry) url.searchParams.set('retry', String(this._labelsAttempt = (this._labelsAttempt || 0) + 1));
+    const loading = import(url.href).then(module => { this._labelModule = module; this._labelsError = null; }).catch(error => { this._labelsError = error; throw error; });
+    this._labelsLoading = loading;
+    loading.finally(() => { if (this._labelsLoading === loading) this._labelsLoading = null; }).catch(() => {});
+    return loading;
   }
 
   _renderShell() {
@@ -195,7 +235,10 @@ class MaraoDashboardPanel extends HTMLElement {
     this.shadowRoot.querySelectorAll("[data-tab]").forEach((tab) =>
       tab.addEventListener("click", () => this._switchTab(tab.dataset.tab)));
     this.shadowRoot.getElementById("retry").addEventListener("click", () => {
-      if (this._retryKind === "json") this._switchTab("json"); else this._load(true);
+      if (this._retryKind === 'json') { this._jsonFailure = null; this._contextError = null; this._retryKind = null; this._ensureMonaco().then(() => { if (this._requestedTab === 'json') this._switchTab('json'); }).catch(() => {}); }
+      else if (this._retryKind === 'labels') { this._ensureLabels(true).then(() => { this._retryKind = null; this._renderVisual(); this._setStatus('', ''); }).catch(error => this._setStatus(this._t('labelsFailed') + this._error(error), 'error')); }
+      else if (this._retryKind === 'context') { this._contextError = null; this._retryKind = null; this._ensureEditorContext(true).then(() => { this._setStatus('', ''); this._refreshPages(new Set(this._model.pages.flatMap(pageContainers))); this._resumeJsonPreparation(); }).catch(error => this._contextFailure(error)); }
+      else this._load(true);
     });
     this.shadowRoot.getElementById("open-dashboard").addEventListener("click", (event) => {
       if (!this._loaded || this._busy) event.preventDefault();
@@ -216,6 +259,7 @@ class MaraoDashboardPanel extends HTMLElement {
     this.shadowRoot.addEventListener("keydown", (event) => {
       if (event.key === "Escape") this.shadowRoot.querySelector(".secondary-actions").open = false;
     });
+    this.shadowRoot.addEventListener('click', event => this._iconActionHaptic(event), { capture: true });
   }
 
   _load(force = false) {
@@ -224,32 +268,45 @@ class MaraoDashboardPanel extends HTMLElement {
     const lifecycle = this._lifecycle;
     const previousModel = this._model;
     const previouslyLoaded = this._loaded;
+    const retained = Object.fromEntries(['_catalog', '_entities', '_areas', '_displayEntityIds', '_contextReady', '_contextError', '_contextPayload', '_history', '_historyLoaded', '_pageTemplates', '_savedSource', '_jsonDraft', '_dirty', '_dashboardUrl', '_visualReady'].map(key => [key, this[key]]));
     this._loadAttempted = true;
     this._retryKind = null;
     this._setBusy(true); this._setStatus(this._t("loading"), "");
     this._loading = Promise.resolve().then(async () => {
       try {
-        const payload = await this._hass.callWS({ type: "marao_dashboard/config/get" });
+        const [payload] = await Promise.all([this._hass.callWS({ type: "marao_dashboard/config/get", scope: "initial" }), this._ensureLabels(force)]);
         if (!this.isConnected || lifecycle !== this._lifecycle) return;
         const model = normalizeConfig(JSON.parse(payload.config));
         this._catalog = payload.editor.catalog; this._entities = payload.editor.entities;
-        this._areas = payload.editor.areas; this._history = payload.history;
+        this._areas = payload.editor.areas || [];
+        this._displayEntityIds = new Set(payload.editor.display_entity_ids || payload.editor.entities.map(entity => entity.entity_id));
+        this._contextReady = !payload.editor.display_entity_ids;
+        this._contextError = null; this._contextRequest = null; this._contextPayload = null; this._metadataLoading = null;
+        this._documentEpoch++; this._historyEpoch++;
+        this._history = payload.history ?? this._history; this._historyLoaded = Array.isArray(this._history);
         this._model = model; this._loaded = true;
+        this._visualReady = false;
         this._renderVisual();
         this._savedSource = this._source(); this._jsonDraft = null; this._dirty = false;
         this.shadowRoot.getElementById("open-dashboard").href = payload.dashboard_url;
         this._dashboardUrl = payload.dashboard_url;
         this._pageTemplates = payload.page_templates;
         if (this._monaco) this._setEditorSource(this._savedSource);
+        await this._nativeVisualReady();
+        if (!this.isConnected || lifecycle !== this._lifecycle) return;
         this._setStatus(payload.conversion_pending ? this._t("pendingConversion") : force ? this._t("clean") : "", "success");
       } catch (error) {
         if (!this.isConnected || lifecycle !== this._lifecycle) return;
         this._model = previousModel; this._loaded = previouslyLoaded;
+        Object.assign(this, retained); this._documentEpoch++; this._historyEpoch++;
+        this._contextRequest = null; this._metadataLoading = null;
+        if (previouslyLoaded) this._renderVisual(); else this.shadowRoot.getElementById('visual-view').replaceChildren?.();
+        if (this._monaco && previousModel) this._setEditorSource(this._jsonDraft ?? this._source());
         this._retryKind = "config";
         this._setStatus(this._t("loadFailed") + this._error(error), "error");
       } finally {
         this._loading = null;
-        if (this.isConnected && lifecycle === this._lifecycle) this._setBusy(false);
+        if (this.isConnected && lifecycle === this._lifecycle) { this._setBusy(false); if (this._loaded) this._startJsonPreparation(); }
         else if (this.isConnected && !this._loaded && !this._loadAttempted) this._load();
       }
     });
@@ -268,7 +325,7 @@ class MaraoDashboardPanel extends HTMLElement {
   _updateHeader() {
     const root = this.shadowRoot;
     const feedback = root.getElementById("load-feedback");
-    const message = this._jsonLoading ? this._t("loadingJson") : this._retryKind === "json" ? this._t("jsonFailed") : this._loaded && this._retryKind === "config" ? this._t("loadFailed") : "";
+    const message = this._jsonLoading && this._requestedTab === "json" ? this._t("loadingJson") : this._retryKind === "json" ? this._t("jsonFailed") : this._loaded && this._retryKind === "config" ? this._t("loadFailed") : "";
     feedback.hidden = !message;
     feedback.querySelector("span").textContent = message.replace(/:\s*$/, "");
     const retry = root.getElementById("retry");
@@ -278,9 +335,9 @@ class MaraoDashboardPanel extends HTMLElement {
     root.querySelector(".title h1").textContent = this._t("editorTitle");
     root.querySelector(".secondary-actions summary").setAttribute("aria-label", this._t("more"));
     for (const [id, key] of [["save", "save"], ["discard", "discard"], ["history", "history"], ["open-dashboard", "open"], ["retry", "retry"]]) root.getElementById(id).textContent = this._t(key);
-    root.getElementById("save").disabled = this._busy || !this._loaded || Boolean(this._jsonLoading);
-    root.getElementById("discard").disabled = this._busy || !this._dirty || Boolean(this._jsonLoading);
-    root.getElementById("history").disabled = this._busy || !this._loaded || Boolean(this._jsonLoading);
+    root.getElementById("save").disabled = this._busy || !this._loaded;
+    root.getElementById("discard").disabled = this._busy || !this._dirty;
+    root.getElementById("history").disabled = this._busy || !this._loaded;
     root.getElementById("open-dashboard").setAttribute("aria-disabled", String(this._busy || !this._loaded));
     root.querySelectorAll("[data-tab]").forEach(button => { button.disabled = this._busy || !this._loaded; });
   }
@@ -393,6 +450,25 @@ class MaraoDashboardPanel extends HTMLElement {
 
   _renderPageBody(entry, page, index, changed) {
     const sections = pageContainers(page);
+    if (!this._contextReady && sections.some(section => (section.entities || []).some(entity => entity.entity_id && !this._displayEntityIds?.has(entity.entity_id)))) {
+      if (!entry.pending) {
+        entry.body.innerHTML = `<p role="status">${this._t('metadataLoading')}</p>`; entry.pending = true;
+        const lifecycle = this._lifecycle, model = this._model;
+        this._ensureEditorContext().then(() => {
+          if (this.isConnected && lifecycle === this._lifecycle && model === this._model && this._model.pages.includes(page) && this._openPages.has(page) && this._pageEntries.get(page) === entry) {
+            entry.body.replaceChildren(); entry.pending = false;
+            this._renderPageBody(entry, page, this._model.pages.indexOf(page), new Set(sections));
+          }
+        }).catch(error => {
+          if (!entry.body.isConnected || model !== this._model) return;
+          entry.pending = false;
+          entry.body.innerHTML = `<p role="alert">${esc(this._t('metadataFailed') + this._error(error))}</p><ha-button data-context-retry>${this._t('retry')}</ha-button>`;
+          entry.body.querySelector('[data-context-retry]').addEventListener('click', () => { this._contextError = null; this._renderPageBody(entry, page, this._model.pages.indexOf(page), new Set(sections)); });
+        });
+      }
+      return;
+    }
+    if (entry.pending) { entry.pending = false; entry.body.replaceChildren(); }
     if (!entry.add) {
       entry.add = document.createElement('ha-button'); entry.add.dataset.action = 'section-add';
       entry.add.textContent = this._l('Add section'); entry.body.append(entry.add);
@@ -489,6 +565,7 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   _pageAction(button) {
+    if (this._busy) return;
     const action = button.dataset.action;
     const [index, sectionIndex = 0] = button.dataset.room.split(':').map(Number);
     const page = this._model.pages[index];
@@ -518,7 +595,7 @@ class MaraoDashboardPanel extends HTMLElement {
   async _openPageDialog(index = null) {
     const lifecycle = this._lifecycle, revision = this._revision;
     if (index == null) {
-      try { await this._refreshEditorMetadata(); }
+      try { await this._ensureEditorContext(!this._pageTemplates); }
       catch (error) { this._setStatus(this._error(error), 'error'); return; }
       if (!this.isConnected || lifecycle !== this._lifecycle || revision !== this._revision) return;
     }
@@ -714,7 +791,7 @@ class MaraoDashboardPanel extends HTMLElement {
     const card = this._catalog.cards.find((item) => item.id === entity.template) || cardForEntity(this._catalog, metadata || entity);
     const shortcutPage = entity.page && this._availablePages().find((page) => page.path === entity.page);
     const group = entity.template === 'hc_entity_group_card';
-    const warning = group || card?.entity_optional ? '' : entity.page ? (shortcutPage ? "" : " · Missing page") : !metadata ? " · Missing" : metadata.state === "unavailable" ? " · Unavailable" : "";
+    const warning = group || card?.entity_optional ? '' : entity.page ? (shortcutPage ? "" : " · Missing page") : !metadata && (this._contextReady || this._displayEntityIds?.has(entity.entity_id)) ? " · Missing" : metadata?.state === "unavailable" ? " · Unavailable" : "";
     const title = (entity.name_key ? this._l(entity.name) : entity.name) || shortcutPage?.name || metadata?.name || entity.entity_id || entity.page || this._l(card?.label || 'Card');
     const detail = group ? `${this._l('Entity Group')} · ${this._l(({light:'Light', cover:'Cover', battery:'Battery', climate:'Climate'})[entity.entity_type] || entity.entity_type)} · ${new Set((entity.entities || []).map(member => this._entityId(member))).size} ${this._l('members')}` : entity.page ? `${entity.page} · ${this._l("Page shortcut")}` : `${entity.entity_id ? entity.entity_id + ' · ' : ''}${this._l(card?.label || entity.template || "Automatic")}`;
     return `<div class="entity-row" data-card-drag="${cardIndex}" data-room="${roomIndex}" data-kind="${kind}">
@@ -738,7 +815,12 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   _iconButton(icon, label, action, room, disabled = false, card = null, kind = "room") {
-    return `<ha-icon-button data-action="${action}" data-room="${room}" data-kind="${kind}" ${card == null ? "" : `data-card="${card}"`} label="${esc(this._l(label))}" ${disabled ? "disabled" : ""}><ha-icon icon="${icon}"></ha-icon></ha-icon-button>`;
+    return `<button type="button" class="icon-action" data-action="${action}" data-room="${room}" data-kind="${kind}" ${card == null ? "" : `data-card="${card}"`} aria-label="${esc(this._l(label))}" ${disabled ? "disabled" : ""}><ha-icon icon="${icon}"></ha-icon></button>`;
+  }
+
+  _iconActionHaptic(event) {
+    const button = event.composedPath().find(element => element.classList?.contains('icon-action'));
+    if (button && !button.disabled && !this._busy && !button.closest('[inert]')) this._moveHaptic();
   }
 
   _roomAction(element) {
@@ -772,7 +854,7 @@ class MaraoDashboardPanel extends HTMLElement {
     if (action === "card-delete") this._editableContainer(kind, roomIndex).entities.splice(cardIndex, 1);
     if (action === "card-up" || action === "card-down") {
       const source = this._cardSource(kind, roomIndex, cardIndex);
-      if (source && this._commitCardMove(source, source.section, cardIndex + (action === "card-up" ? -1 : 2))) this._moveHaptic();
+      if (source) this._commitCardMove(source, source.section, cardIndex + (action === "card-up" ? -1 : 2));
       return;
     }
     this._setDirty(); this._refreshCards(kind, roomIndex);
@@ -834,7 +916,6 @@ class MaraoDashboardPanel extends HTMLElement {
   _openMoveDialog(room, index) {
     const source = this._cardSource('page', room, index);
     if (!source || pageContainers(source.page).length < 2) return;
-    this._moveHaptic();
     const sections = pageContainers(source.page), dialog = this._dialog(this._l('Move to section'));
     const content = dialog.querySelector('.dialog-content');
     const data = { section: String(source.section === 0 ? 1 : 0), position: 'end' };
@@ -1002,9 +1083,13 @@ class MaraoDashboardPanel extends HTMLElement {
     this._cardDrag?.cancel();
     if (!this._loaded || this._busy) return;
     this._requestedTab = tab;
+    if (tab === 'visual') { this._jsonForeground = false; this._updateHeader(); }
     if (tab === this._tab && (tab === "visual" || this._monaco)) return;
     if (tab === "visual") {
       try {
+        const lifecycle = this._lifecycle, model = this._model;
+        await this._ensureEditorContext();
+        if (!this.isConnected || lifecycle !== this._lifecycle || model !== this._model || this._requestedTab !== 'visual') return;
         this._jsonViewState = this._monaco.saveViewState?.();
         const jsonSource = this._monaco.getValue();
         let parsed = JSON.parse(this._monaco.getValue());
@@ -1020,7 +1105,7 @@ class MaraoDashboardPanel extends HTMLElement {
         const next = normalizeConfig(parsed);
         const changed = JSON.stringify(serializeConfig(next)) !== JSON.stringify(serializeConfig(this._model));
         this._jsonDraft = legacy ? null : jsonSource;
-        if (changed) { this._model = next; this._renderVisual(); }
+        if (changed) { this._model = next; this._documentEpoch++; this._pageTemplates = null; this._renderVisual(); }
         this._dirty = (legacy ? this._source() : jsonSource).trim() !== this._savedSource.trim(); this._updateHeader();
       } catch (error) {
         this._setStatus(`JSON: ${this._error(error)}`, "error"); return;
@@ -1039,58 +1124,117 @@ class MaraoDashboardPanel extends HTMLElement {
     this._setStatus("", "");
   }
 
+  _jsonUrl(file, locale = false) {
+    const url = new URL(`./${file}${PANEL_ASSET_VERSION}`, import.meta.url);
+    if (locale) url.searchParams.set('language', this._hass?.language || 'en');
+    return url.href;
+  }
+
+  _warmJsonResources() {
+    if (this._jsonWarmed) return;
+    this._jsonWarmed = true;
+    for (const [file, locale] of [['MaraoDashboardJsonPreparation.js'], ['MaraoDashboardJsonEditor.js', true], ['MaraoDashboardJsonEditor.css'], ['MaraoDashboardJsonWorker.js'], ['MaraoDashboardEditorWorker.js']]) {
+      const link = document.createElement('link'); link.rel = 'prefetch'; link.href = this._jsonUrl(file, locale);
+      link.as = file.endsWith('.css') ? 'style' : 'script'; this.shadowRoot.append(link);
+    }
+  }
+
+  async _nativeVisualReady() {
+    const lifecycle = this._lifecycle;
+    const root = this.shadowRoot.getElementById('visual-view');
+    await Promise.all([
+      ...[...root.querySelectorAll('ha-form')].map(form => this._formFitting?.get(form) || this._containForm(form)),
+      ...[...root.querySelectorAll('ha-button,ha-icon-button,ha-expansion-panel')].map(async control => {
+        await customElements.whenDefined(control.localName);
+        await control.updateComplete;
+      }),
+    ]);
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    if (this.isConnected && lifecycle === this._lifecycle) {
+      this._visualReady = true; this._visualReadyAt = performance.now(); this._resumeJsonPreparation();
+    }
+  }
+
+  _resumeJsonPreparation() { this._resumeIdleStage?.(); }
+
+  _idleStage() {
+    if (this._jsonForeground && !this._busy) return Promise.resolve();
+    const lifecycle = this._lifecycle;
+    return new Promise((resolve, reject) => {
+      let handle;
+      const cleanup = () => { if (handle != null) globalThis.cancelIdleCallback?.(handle); handle = null; this._resumeIdleStage = null; this._cancelIdleStage = null; };
+      this._cancelIdleStage = () => { cleanup(); reject(new Error('Obsolete editor preparation')); };
+      const schedule = () => {
+        if (!this.isConnected || lifecycle !== this._lifecycle) return this._cancelIdleStage?.();
+        if (this._busy || this._interacting || this._scrolling || this.shadowRoot.querySelector('ha-dialog[open]') || document.hidden || !this._visualReady) return;
+        if (this._jsonForeground) { cleanup(); resolve(); return; }
+        if (!globalThis.requestIdleCallback || handle != null) return;
+        handle = requestIdleCallback(deadline => {
+          handle = null;
+          if (this._busy || this._interacting || this._scrolling || this.shadowRoot.querySelector('ha-dialog[open]') || document.hidden || !this._visualReady) return;
+          if (deadline.timeRemaining() < 8) { schedule(); return; }
+          cleanup(); resolve();
+        });
+      };
+      this._resumeIdleStage = schedule; schedule();
+    });
+  }
+
+  async _jsonStage(name, action) {
+    await this._idleStage();
+    const start = performance.now();
+    try { return await action(); }
+    finally { this._preparationStages.push({ name, start, duration: performance.now() - start, foreground: this._jsonForeground }); }
+  }
+
+  _startJsonPreparation() {
+    if (!this._loaded || !this.isConnected || !this._visualReady || this._busy) return;
+    this._warmJsonResources();
+    if (!this._contextReady) this._requestEditorContext().catch(() => {});
+    if (this._jsonFailure || this._monaco) return;
+    this._prepareJson().catch(() => {});
+  }
+
   _ensureMonaco() {
+    if (this._monaco && !this._jsonPreparing) return Promise.resolve();
+    if (this._jsonFailure) return Promise.reject(this._jsonFailure);
+    this._jsonForeground = true; this._resumeJsonPreparation();
+    const attempt = this._prepareJson();
+    this._jsonLoading = attempt; this._updateHeader();
+    attempt.finally(() => { if (this._jsonLoading === attempt) { this._jsonLoading = null; this._updateHeader(); } }).catch(() => {});
+    return attempt;
+  }
+
+  _prepareJson() {
+    if (this._jsonPreparing) return this._jsonPreparing;
     if (this._monaco) return Promise.resolve();
-    if (this._jsonLoading) return this._jsonLoading;
     if (!this._loaded || !this.isConnected) return Promise.resolve();
     const lifecycle = this._lifecycle;
+    const current = () => this.isConnected && lifecycle === this._lifecycle;
     const attempt = ++this._jsonAttempt;
-    this._retryKind = null; this._setStatus(this._t("loadingJson"), "");
-    const url = new URL(`./MaraoDashboardJsonEditor.js${PANEL_ASSET_VERSION}`, import.meta.url);
-    url.searchParams.set('language', this._hass?.language || 'en');
-    if (attempt > 1) url.searchParams.set("retry", String(attempt));
-    this._jsonLoading = Promise.resolve().then(async () => {
+    const preparation = Promise.resolve().then(async () => {
       try {
-        const module = this._jsonModule ? Promise.resolve(this._jsonModule) : import(url.href).then(value => (this._jsonModule = value));
-        if (!this._jsonStyled) {
-          const css = new URL(`./MaraoDashboardJsonEditor.css${PANEL_ASSET_VERSION}`, import.meta.url);
-          const style = document.createElement("link"); style.rel = "stylesheet"; style.href = css.href;
-          const styled = new Promise((resolve, reject) => {
-            style.onload = () => { this._jsonStyled = true; this._jsonCancel = null; resolve(); };
-            style.onerror = () => { style.remove(); reject(new Error(this._t("jsonStylesFailed"))); };
-            this._jsonCancel = () => { style.remove(); reject(new Error(this._t("jsonStylesFailed"))); };
-          });
-          this.shadowRoot.append(style);
-          await Promise.all([module, styled]);
-        }
-        else await module;
-        if (!this.isConnected || lifecycle !== this._lifecycle) return;
-        const editor = await this._jsonModule.createEditor(this.shadowRoot.getElementById("monaco"), this._jsonDraft ?? this._source(), this._catalog, this._entities, this._t("jsonWorkerFailed"), this._t('jsonIconsFailed'), { draft: serializeConfig(this._model), dashboardUrl: this._dashboardUrl });
-        if (!this.isConnected || lifecycle !== this._lifecycle) { editor.getModel()?.dispose(); editor.dispose(); return; }
-        this._monaco = editor;
-        this._jsonAssistance = this._jsonModule.installJsonAssistance(editor, this.shadowRoot.getElementById('monaco'),
-          this._catalog, this._entities, serializeConfig(this._model), this._dashboardUrl);
-        this.shadowRoot.getElementById('monaco').addEventListener('json-assistance-error', event => this._setStatus(this._error(event.detail), 'error'), { signal: (this._jsonEvents = new AbortController()).signal });
-        this._setMonacoTheme();
-        this._monaco.onDidChangeModelContent(() => {
-          if (this._settingEditor) return;
-          this._jsonDraft = this._monaco.getValue();
-          this._dirty = this._jsonDraft.trim() !== this._savedSource.trim(); this._updateHeader();
+        const module = await this._jsonStage('preparation-module', async () => {
+          if (this._jsonPreparationModule) return this._jsonPreparationModule;
+          const url = new URL(this._jsonUrl('MaraoDashboardJsonPreparation.js'));
+          if (attempt > 1) url.searchParams.set('retry', String(attempt));
+          const module = await import(url.href);
+          if (current()) this._jsonPreparationModule = module;
+          return module;
         });
-        this._setStatus("", "");
+        if (current()) await module.prepareJson.call(this, current, attempt, serializeConfig);
       } catch (error) {
-        if (!this.isConnected || lifecycle !== this._lifecycle) return;
-        this._retryKind = "json"; this._setStatus(this._t("jsonFailed") + this._error(error), "error");
+        if (!current()) return;
+        this._monaco?.getModel()?.dispose(); this._monaco?.dispose(); this._monaco = null;
+        this._jsonFailure = error; this._retryKind = 'json'; this._setStatus(this._t('jsonFailed') + this._error(error), 'error');
         throw error;
       } finally {
-        this._jsonCancel = null;
-        this._jsonLoading = null;
-        if (this.isConnected) this._updateHeader();
-        if (lifecycle !== this._lifecycle && this.isConnected && this._requestedTab === "json") this._switchTab("json");
+        if (current()) { this._jsonCancel = null; this._jsonForeground = false; this._updateHeader(); }
+        if (this._jsonPreparing === preparation) this._jsonPreparing = null;
       }
     });
-    this._updateHeader();
-    return this._jsonLoading;
+    this._jsonPreparing = preparation;
+    return preparation;
   }
 
   _setMonacoTheme() {
@@ -1103,31 +1247,35 @@ class MaraoDashboardPanel extends HTMLElement {
 
   async _save() {
     this._cardDrag?.cancel();
-    if (this._busy || !this._loaded || this._jsonLoading) return;
-    let source;
+    if (this._busy || !this._loaded) return;
+    const lifecycle = this._lifecycle, epoch = this._documentEpoch, model = this._model;
+    const current = () => this.isConnected && lifecycle === this._lifecycle && epoch === this._documentEpoch && model === this._model;
+    this._setBusy(true); this._setStatus(this._contextReady ? this._t('saving') : this._t('metadataLoading'), '');
     try {
-      source = this._tab === "json" ? this._monaco.getValue() : this._source();
+      await this._ensureEditorContext();
+      if (!current()) return;
+      const source = this._tab === 'json' ? this._monaco.getValue() : this._source();
       let parsed = JSON.parse(source);
       if (parsed && !Object.hasOwn(parsed, 'name') && Object.hasOwn(parsed, 'title') && Object.hasOwn(parsed, 'views')) {
         const preview = await this._hass.callWS({ type: 'marao_dashboard/config/get', config: source });
+        if (!current()) return;
         parsed = JSON.parse(preview.config);
       }
       const errors = validateConfig(parsed, this._catalog.config_version, this._entities, this._catalog.energy_units, this._catalog);
-      if (errors.length) throw new Error(errors.map((error) => this._l(error)).join(" "));
-      this._model = normalizeConfig(parsed);
-    } catch (error) { this._setStatus(this._error(error), "error"); return; }
-    this._setBusy(true); this._setStatus("Generating dashboard…", "");
-    try {
-      const result = await this._hass.callWS({ type: "marao_dashboard/config/generate", config: source });
-      if (result.config) this._model = normalizeConfig(JSON.parse(result.config));
-      this._jsonDraft = null;
-      this._history = result.history; this._savedSource = this._source(); this._dirty = false;
-      this.shadowRoot.getElementById("open-dashboard").href = result.dashboard_url;
+      if (errors.length) throw new Error(errors.map(error => this._l(error)).join(' '));
+      this._setStatus(this._t('saving'), '');
+      const result = await this._hass.callWS({ type: 'marao_dashboard/config/generate', config: source });
+      if (!current()) return;
+      this._model = normalizeConfig(JSON.parse(result.config || source)); this._documentEpoch++;
+      this._jsonDraft = null; this._pageTemplates = null;
+      this._historyEpoch++; this._history = result.history; this._historyLoaded = Array.isArray(result.history);
+      this._savedSource = this._source(); this._dirty = false;
+      this.shadowRoot.getElementById('open-dashboard').href = result.dashboard_url;
       this._dashboardUrl = result.dashboard_url;
       this._setEditorSource(this._savedSource); this._renderVisual(); this._updateHeader();
-      this._setStatus(result.config_changed ? "Generated. Restart Home Assistant once to load the changed dashboard registration." : "Dashboard generated successfully.", "success");
-    } catch (error) { this._setStatus(this._error(error), "error"); }
-    finally { this._setBusy(false); }
+      this._setStatus(result.config_changed ? 'Generated. Restart Home Assistant once to load the changed dashboard registration.' : 'Dashboard generated successfully.', 'success');
+    } catch (error) { if (this.isConnected && lifecycle === this._lifecycle) { if (!this._contextReady) this._contextFailure(error); else this._setStatus(this._error(error), 'error'); } }
+    finally { if (this.isConnected && lifecycle === this._lifecycle) this._setBusy(false); }
   }
 
   _discard() {
@@ -1207,6 +1355,7 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   _openCardGallery(roomIndex, kind = "room") {
+    if (!this._contextReady) return this._withEditorContext(() => this._openCardGallery(roomIndex, kind));
     if (this._galleryDialog?.open) return;
     const dialog = this._dialog(this._t('chooseCard'));
     this._galleryDialog = dialog;
@@ -1253,26 +1402,61 @@ class MaraoDashboardPanel extends HTMLElement {
         event.preventDefault(); const next = content.querySelectorAll('[role="tab"]')[event.key === 'Home' ? 0 : event.key === 'End' ? 1 : 1 - index]; next.click(); next.focus();
       });
     }
-    refresh();
+    loading = false; renderResults();
   }
 
-  _refreshEditorMetadata() {
+  _requestEditorContext() {
+    if (this._contextPayload) return Promise.resolve(this._contextPayload);
+    if (this._contextRequest) return this._contextRequest;
+    if (this._contextError) return Promise.reject(this._contextError);
+    const lifecycle = this._lifecycle, epoch = this._documentEpoch;
+    const request = Promise.resolve().then(() => this._hass.callWS({ type: 'marao_dashboard/config/get', scope: 'context' })).then(payload => {
+      if (!Array.isArray(payload.editor?.entities) || !Array.isArray(payload.editor?.areas) || !Array.isArray(payload.editor?.catalog?.cards)) throw new Error(this._t('metadataFailed'));
+      if (this.isConnected && lifecycle === this._lifecycle && epoch === this._documentEpoch) this._contextPayload = { ...payload, epoch };
+      return { ...payload, epoch };
+    }).catch(error => { if (lifecycle === this._lifecycle) this._contextError = error; throw error; });
+    this._contextRequest = request;
+    request.finally(() => { if (this._contextRequest === request) this._contextRequest = null; }).catch(() => {});
+    return request;
+  }
+
+  _ensureEditorContext(retry = false) {
+    if (this._contextReady && !retry) return Promise.resolve();
     if (this._metadataLoading) return this._metadataLoading;
-    const lifecycle = this._lifecycle;
-    this._metadataLoading = Promise.resolve().then(async () => {
-      try {
-        const { editor, page_templates } = await this._hass.callWS({ type: 'marao_dashboard/config/get' });
-        if (!Array.isArray(editor?.entities) || !Array.isArray(editor?.areas) || !Array.isArray(editor?.catalog?.cards)) throw new Error(this._t('metadataFailed'));
-        if (!this.isConnected || lifecycle !== this._lifecycle) return;
-        this._entities = editor.entities; this._areas = editor.areas; this._catalog = editor.catalog;
-        this._jsonAssistance?.updateMetadata(this._catalog, this._entities, serializeConfig(this._model));
-        if (page_templates) this._pageTemplates = page_templates;
-      } finally { this._metadataLoading = null; }
+    if (retry) { this._contextError = null; this._contextPayload = null; }
+    const lifecycle = this._lifecycle, epoch = this._documentEpoch;
+    const loading = this._requestEditorContext().then(payload => {
+      if (!this.isConnected || lifecycle !== this._lifecycle || epoch !== this._documentEpoch) return;
+      this._entities = payload.editor.entities; this._areas = payload.editor.areas; this._catalog = payload.editor.catalog;
+      this._contextReady = true;
+      if (this._retryKind === 'context') { this._retryKind = null; this._updateHeader(); }
+      // Source-dependent templates never revive an older document's projection.
+      if (payload.epoch === this._documentEpoch && payload.page_templates) this._pageTemplates = payload.page_templates;
+      this._jsonAssistance?.updateMetadata(this._catalog, this._entities, serializeConfig(this._model));
     });
-    return this._metadataLoading;
+    this._metadataLoading = loading;
+    loading.finally(() => { if (this._metadataLoading === loading) this._metadataLoading = null; }).catch(() => {});
+    return loading;
+  }
+
+  _refreshEditorMetadata() { return this._ensureEditorContext(true); }
+
+  _contextFailure(error) {
+    this._retryKind = 'context'; this._setStatus(this._t('metadataFailed') + this._error(error), 'error'); this._updateHeader();
+  }
+
+  _withEditorContext(action, current = () => true) {
+    if (this._contextReady) return action();
+    const lifecycle = this._lifecycle, model = this._model, revision = this._revision;
+    this._setStatus(this._t('metadataLoading'), '');
+    return this._ensureEditorContext().then(() => {
+      if (!this.isConnected || lifecycle !== this._lifecycle || model !== this._model || revision !== this._revision || !current() || this._busy) return;
+      this._setStatus('', ''); return action();
+    }).catch(error => this._contextFailure(error));
   }
 
   _openCardEditor(roomIndex, cardIndex = null, selectedCardId = null, kind = "room", prefilledEntity = null, memberOptions = null) {
+    if (!this._contextReady) return this._withEditorContext(() => this._openCardEditor(roomIndex, cardIndex, selectedCardId, kind, prefilledEntity, memberOptions));
     const existing = memberOptions ? memberOptions.entity : cardIndex == null ? null : this._editableContainer(kind, roomIndex).entities[cardIndex];
     if (selectedCardId === 'hc_entity_group_card' || existing?.template === 'hc_entity_group_card') return this._openEntityGroupEditor(roomIndex, cardIndex, kind);
     const metadata = entityMeta(this._entities, existing?.entity_id);
@@ -1352,6 +1536,7 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   _openEntityGroupEditor(roomIndex, cardIndex = null, kind = 'room', draft = null) {
+    if (!this._contextReady) return this._withEditorContext(() => this._openEntityGroupEditor(roomIndex, cardIndex, kind, draft));
     const existing = draft || (cardIndex == null ? null : this._container(kind, roomIndex).entities[cardIndex]);
     const group = clone(existing || { template: 'hc_entity_group_card', id: newEntityGroupId(), entities: [] });
     const data = { name: group.name || this._l('Entity Group'), icon: group.icon || '', entity_type: group.entity_type || 'light',
@@ -1425,7 +1610,7 @@ class MaraoDashboardPanel extends HTMLElement {
       if (cardIndex == null) container.entities = [...container.entities, value]; else container.entities[cardIndex] = value;
       this._closeDialog(dialog); this._setDirty(); this._refreshCards(kind, roomIndex);
     });
-    if (draft) render(); else refresh();
+    loading = false; render();
   }
 
   _renderSummary(host, target, card, roomIndex, cardIndex, kind = "room", error = "") {
@@ -1496,6 +1681,7 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   _openMediaOptions(player, save) {
+    if (!this._contextReady) return this._withEditorContext(() => this._openMediaOptions(player, save));
     const original = player.apple_tv && typeof player.apple_tv === 'object' ? clone(player.apple_tv) : {};
     const data = { enabled: player.apple_tv !== false && (Boolean(player.apple_tv) || /apple[_ ]?tv/i.test(player.entity_id || '')),
       remote_entity: original.remote_entity || '', volume_remote_entity: original.volume_remote_entity || '' };
@@ -1539,16 +1725,52 @@ class MaraoDashboardPanel extends HTMLElement {
     render();
   }
 
+  _readHistory(retry = false) {
+    if (this._historyLoaded) return Promise.resolve(this._history);
+    if (this._historyLoading) return this._historyLoading;
+    if (this._historyError && !retry) return Promise.reject(this._historyError);
+    this._historyError = null;
+    const lifecycle = this._lifecycle, epoch = this._historyEpoch;
+    const loading = Promise.resolve().then(() => this._hass.callWS({ type: 'marao_dashboard/config/get', scope: 'history' })).then(payload => {
+      if (!Array.isArray(payload.history)) throw new Error(this._t('historyFailed'));
+      if (this.isConnected && lifecycle === this._lifecycle && epoch === this._historyEpoch) { this._history = payload.history; this._historyLoaded = true; }
+      return this._history;
+    }).catch(error => { if (epoch === this._historyEpoch) this._historyError = error; throw error; });
+    this._historyLoading = loading;
+    loading.finally(() => { if (this._historyLoading === loading) this._historyLoading = null; }).catch(() => {});
+    return loading;
+  }
+
   _openHistory() {
-    const dialog = this._dialog(this._t("history")); const content = dialog.querySelector(".dialog-content");
-    content.innerHTML = `${this._history?.length ? this._history.map((item) => `<div class="history-row"><div><strong>${esc(item.name || item.slug)}</strong><br><small>${new Date(item.created_at).toLocaleString()} · ${esc(item.reason)}</small></div><ha-button data-version="${item.version}">${this._t("restore")}</ha-button></div>`).join("") : `<div class="empty">No generated versions yet.</div>`}<div class="dialog-actions"><ha-button data-close>${this._t("cancel")}</ha-button></div>`;
-    content.querySelector("[data-close]").addEventListener("click", () => this._closeDialog(dialog));
-    content.querySelectorAll("[data-version]").forEach((button) => button.addEventListener("click", async () => {
-      if (!confirm("Restore this version? The current version will be saved first.")) return;
-      try { this._setBusy(true); await this._hass.callWS({ type: "marao_dashboard/history/restore", version: button.dataset.version }); this._closeDialog(dialog); this._setBusy(false); await this._load(true); }
-      catch (error) { this._setStatus(this._error(error), "error"); }
-      finally { this._setBusy(false); }
-    }));
+    const dialog = this._dialog(this._t('history')), content = dialog.querySelector('.dialog-content');
+    const render = async (retry = false) => {
+      content.innerHTML = `<p role="status">${this._t('historyLoading')}</p><div class="dialog-actions"><ha-button data-close>${this._t('cancel')}</ha-button></div>`;
+      content.querySelector('[data-close]').addEventListener('click', () => this._closeDialog(dialog));
+      try { await this._readHistory(retry); }
+      catch (error) {
+        if (!dialog.isConnected || !dialog.open) return;
+        content.innerHTML = `<p role="alert">${esc(this._t('historyFailed') + this._error(error))}</p><ha-button data-history-retry>${this._t('retry')}</ha-button><ha-button data-close>${this._t('cancel')}</ha-button>`;
+        content.querySelector('[data-history-retry]').addEventListener('click', () => render(true));
+        content.querySelector('[data-close]').addEventListener('click', () => this._closeDialog(dialog)); return;
+      }
+      if (!dialog.isConnected || !dialog.open) return;
+      content.innerHTML = `${this._history?.length ? this._history.map(item => `<div class="history-row"><div><strong>${esc(item.name || item.slug)}</strong><br><small>${new Date(item.created_at).toLocaleString()} · ${esc(item.reason)}</small></div><ha-button data-version="${esc(item.version)}">${this._t('restore')}</ha-button></div>`).join('') : `<div class="empty">${this._t('historyEmpty')}</div>`}<div class="dialog-actions"><ha-button data-close>${this._t('cancel')}</ha-button></div>`;
+      content.querySelector('[data-close]').addEventListener('click', () => this._closeDialog(dialog));
+      content.querySelectorAll('[data-version]').forEach(button => button.addEventListener('click', async () => {
+        if (this._busy || !this._historyLoaded || !confirm(this._t('restoreConfirm'))) return;
+        const lifecycle = this._lifecycle;
+        try {
+          this._setBusy(true);
+          const result = await this._hass.callWS({ type: 'marao_dashboard/history/restore', version: button.dataset.version });
+          if (!this.isConnected || lifecycle !== this._lifecycle) return;
+          this._documentEpoch++; this._historyEpoch++;
+          this._history = result.history; this._historyLoaded = Array.isArray(result.history);
+          this._closeDialog(dialog); this._setBusy(false); await this._load(true);
+        } catch (error) { this._setStatus(this._error(error), 'error'); }
+        finally { if (this.isConnected && lifecycle === this._lifecycle) this._setBusy(false); }
+      }));
+    };
+    render();
   }
 
   _openFormDialog(title, initial, schema, save, action = this._t('update')) {
@@ -1567,7 +1789,7 @@ class MaraoDashboardPanel extends HTMLElement {
     const dialog = document.createElement("ha-dialog"); dialog.open = true; dialog.heading = this._l(title); dialog.headerTitle = this._l(title);
     const invoking = this.shadowRoot.activeElement, lifecycle = this._lifecycle, model = this._model;
     dialog.innerHTML = `<div class="dialog-content"></div>`; dialog.addEventListener("closed", () => {
-      dialog.remove();
+      dialog.remove(); this._resumeJsonPreparation();
       if (this.isConnected && lifecycle === this._lifecycle && model === this._model) {
         const target = invoking?.isConnected ? invoking : this.shadowRoot.querySelector('#page-manager');
         target?.focus({ preventScroll: true });
@@ -1583,8 +1805,13 @@ class MaraoDashboardPanel extends HTMLElement {
   _mountForm(host, data, schema, changed) {
     const form = document.createElement("ha-form"); form.hass = this._hass; form.data = data; form.schema = schema;
     form.computeLabel = (item) => item.label || item.name; form.computeHelper = (item) => item.helper || "";
-    const fit = () => this._containForm(form).catch((error) => this._setStatus(this._error(error), "error"));
-    form.addEventListener("value-changed", (event) => { changed(event.detail.value); fit(); });
+    const fit = () => {
+      const fitting = this._containForm(form);
+      (this._formFitting ||= new WeakMap()).set(form, fitting);
+      fitting.catch(error => this._setStatus(this._error(error), "error"));
+      return fitting;
+    };
+    form.addEventListener("value-changed", (event) => { if (!this._busy) changed(event.detail.value); fit(); });
     host.replaceChildren(form); fit();
   }
 
@@ -1709,7 +1936,7 @@ class MaraoDashboardPanel extends HTMLElement {
     this.shadowRoot.getElementById("visual-view").inert = busy;
     if (busy) {
       this._busyControls ||= new Map();
-      this.shadowRoot.querySelectorAll("ha-button,ha-icon-button").forEach(button => {
+      this.shadowRoot.querySelectorAll("ha-button,ha-icon-button,button.icon-action").forEach(button => {
         if (!this._busyControls.has(button)) this._busyControls.set(button, button.disabled);
         button.disabled = true;
       });
@@ -1717,7 +1944,10 @@ class MaraoDashboardPanel extends HTMLElement {
       for (const [button, disabled] of this._busyControls || []) if (button.isConnected) button.disabled = disabled;
       this._busyControls = null;
     }
+    this._monaco?.updateOptions?.({ readOnly: busy });
+    for (const dialog of this.shadowRoot.querySelectorAll('ha-dialog')) dialog.inert = busy;
     this._updateHeader();
+    if (!busy) this._resumeJsonPreparation();
   }
   _setStatus(message, kind) { const status = this.shadowRoot.getElementById("status"); status.textContent = message; status.className = `status ${kind || ""}`; this.shadowRoot.getElementById("retry").hidden = !this._retryKind; }
   _error(error) {

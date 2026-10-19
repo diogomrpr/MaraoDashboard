@@ -157,7 +157,7 @@ screenshots or an inspection made before the last edit do not satisfy it.
 
 Use impact-based scope during normal work: inspect only the affected-card set.
 Inspect the complete gallery manually only when the user explicitly requests it.
-Automated release layout checks still cover the full gallery.
+Selected automated layout checks cover the affected gallery families.
 
 ### Test timing
 
@@ -558,6 +558,9 @@ large and readable.
   behavior, and restore focus.
 - Recognize Marao's native sheet in scroll containment. Preserve native value
   slider touch defaults inside it; cancelling `touchmove` prevents iOS dragging.
+  Leave all native-sheet touch movement to the browser, including initial
+  zero-vertical movement and edge reversals. Use the sheet's CSS overscroll
+  containment and keep the backdrop guarded independently.
 - Keep each card's native `ha-card` surface connected during state updates.
   Connect replacement content before removing the previous content. Detaching
   the surface or emptying it during an update can reset WebKit's page/sheet scroll.
@@ -597,7 +600,7 @@ large and readable.
 
 ## Release verification
 
-The complete release gate covers the generated dashboard and card gallery at:
+Affected release checks select relevant profiles from the following supported layouts; the complete gallery matrix requires an explicit comprehensive request:
 
 | Profile | Viewport |
 |---|---:|
@@ -652,7 +655,7 @@ A change is done when:
 - no essential content clips under the relevant mobile/text configuration;
 - state and safety gestures are correct for affected actions, with one dispatch
   per completed interaction;
-- the full gate passes when requested, stabilizing, or publishing;
+- the affected gate passes, with comprehensive coverage only when explicitly requested;
 - no known relevant violation of this contract remains at publish time, even
   when the automated gate cannot detect it;
 - routine results are reported concisely and any known limitation is stated.
@@ -660,3 +663,43 @@ A change is done when:
 Battery-group defaults use the minimum valid member percentage for the shared battery palette: below 20 red, 20–below 80 yellow, 80–100 green. The first usable reading and existing counts keep their meaning. A critical group with partial availability retains its red surface and low/unavailable details; noncritical partial warnings, complete neutral loss and reported errors retain their existing priority.
 
 Strict-access cards in Home Assistant grids use the available grid row when the configured columns would leave less than 144px per cell. This keeps the fixed thumb and wrapping label contained at 200% zoom, including generated, popup and native card hosts, without changing saved column preferences.
+
+### Uniform control grids
+
+Light, fan, cover, access-summary and opening/closing/locking controls use compact
+content-driven surfaces. Title and useful readings form a text block beside the
+icon; supported sliders follow directly. Absent fields reserve no empty region.
+An embedding narrower than the 172px reference cell, or enlarged text in a
+constrained embedding, may wrap the header vertically when adjacency cannot
+contain readable text and the full-size icon. Keep both
+blocks contained and separate; Marao-owned sections instead reflow their columns.
+Ordinary short 50% value-slider examples fit within 140px in 172px-wide cells at
+normal typography. This reference is never a clipping limit. Strict access keeps
+its 64px track and 54px thumb; long text, errors and detailed families grow freely.
+Redundant normal On/Off rows remain absent; useful values and mandatory problems remain.
+
+Each owned logical section uses `custom:marao-control-grid`: all content rows
+share their tallest intrinsic height, with an 8px gap. Automatic domain groups
+retain their order, widths and group starts inside that same height boundary.
+Explicit sections size independently. Preferred columns reflow together before
+controls become cramped; incomplete rows keep their normal width. All Marao
+content families fill their cells, including native primary hosts and detailed
+history/event surfaces. Headings use intrinsic structural rows; navbar and popup
+definitions remain outside content sizing. Raw configurations keep their factory
+and internals; raw siblings do not disable owned surface equality. Independently
+authored Home Assistant containers keep their native ownership.
+
+Reviewed theme-independent geometry/behavior runs in light; representative
+appearance, state cues and contrast remain covered in both themes. Theme-sensitive
+contracts keep their additional combinations. Share compatible visits, preserve
+distinct native gestures and text-versus-zoom cases, and validate explicit reuse
+against current dependencies, environment and cleanup. Final inspection is current.
+
+Numeric history details use a separate visible 48px History control and the shared
+single-layer sheet. Selection/timestamps and full-resolution summaries remain
+readable outside the canvas; 1h/6h/24h filters reuse history. Known unavailable
+intervals break lines, isolated readings remain points, and rendering reduction
+preserves peaks. Only measurement series show the labeled sample average.
+Calendar energy ranges follow the HA timezone, including daylight-saving days.
+Parent sheets retain mounted content, scroll and focus through history drill-in;
+Close, browser navigation and removal release chart resources and inert state.

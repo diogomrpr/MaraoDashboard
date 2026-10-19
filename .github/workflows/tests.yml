@@ -83,4 +83,8 @@ jobs:
           if [[ -n "$MARAO_COMPONENTS" ]]; then args+=(--component "$MARAO_COMPONENTS"); fi
           if [[ "$MARAO_FULL" == "true" ]]; then args+=(--full); fi
           if [[ "$MARAO_PARALLEL" == "true" ]]; then args+=(--parallel); fi
+          node tests/verification.js "${args[@]}" --plan > "$RUNNER_TEMP/marao-affected-plan.json"
+          if node -e 'const p=require(process.argv[1]);process.exit(p.checks.some(c=>c.command.some(a=>/^tests\/test-.+-local\.js$/.test(a)))?0:1)' "$RUNNER_TEMP/marao-affected-plan.json"; then
+            npx playwright install --with-deps chromium webkit
+          fi
           node tests/verification.js "${args[@]}"

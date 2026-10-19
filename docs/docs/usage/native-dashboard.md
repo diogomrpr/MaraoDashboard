@@ -48,6 +48,12 @@ alarm controls, access actions, camera events, media controls and history.
 Duplicate instances have independent sheets. Deliberately supplied popup hashes
 remain external references: configure their matching popup separately.
 
+Graph-enabled native cards expose the same separate **History** (**Histórico**)
+control as generated cards. Inspecting readings sends no entity command. History
+inside a sheet keeps one modal layer, and Back restores its parent controls and
+scroll position. Energy sheets retain their day/month navigation in Home
+Assistant's time zone.
+
 Editor previews cannot dispatch device services or activate the fullscreen shell.
 Normal controls retain authoritative HA state, strict access slides, security holds,
 availability guards and transient masked alarm codes. Alarm codes are never card settings.
@@ -77,6 +83,20 @@ detail sheets, energy history and charging presets using disposable demo entitie
 Each view also includes a native Marao Navbar card with Home, Devices and Energy
 links. It keeps Home Assistant's standard toolbar, view tabs and dashboard editor.
 Add **Marao Navbar** from the card picker and edit its ordered routes visually.
+
+Hold the horizontal navbar or one of its icons for **three seconds** to refresh
+the frontend on this device. Progress appears during the hold. Releasing early,
+moving away, scrolling or leaving the app cancels; ordinary taps still navigate.
+The same gesture works on generated Marao dashboards and on the More toggle;
+the vertical overflow menu retains its normal scrolling and route selection.
+
+Refresh keeps sign-in, settings and the current page. Save or discard unsaved
+edits first; editor previews and modal backgrounds cannot trigger it. iOS uses
+native frontend cache reset when available, with web recovery as a fallback.
+Android, browsers and other compatible hosts use available frontend web-cache
+cleanup and a fresh reload. This does not erase all browser/OS caches or restart
+Home Assistant. If the server cannot be reached, a readable message offers retry
+by holding again without removing usable cached files.
 
 Paste the example into an ordinary storage dashboard's raw configuration editor.
 Replace its demo entities with your own bindings and update the navigation card

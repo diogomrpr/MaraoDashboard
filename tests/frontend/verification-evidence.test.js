@@ -10,12 +10,12 @@ const path = require('node:path');
 const os = require('node:os');
 const { digest } = require('../verification');
 
-test('executed plans emit reusable version-3 evidence independently of the plan schema', async () => {
+test('executed plans emit reusable version-4 evidence independently of the plan schema', async () => {
   const plan = { version: 1, base: 'baseline', head: 'candidate', mode: 'affected', components: ['docs'], checks: [] };
   const { filename, report } = await runPlan(plan);
   try {
-    assert.equal(report.version, 3);
-    assert.equal(JSON.parse(fs.readFileSync(filename)).version, 3);
+    assert.equal(report.version, 4);
+    assert.equal(JSON.parse(fs.readFileSync(filename)).version, 4);
     assert.equal(validateEvidence(report, plan, {}, { exactCommit: true }), report);
   } finally { fs.rmSync(path.dirname(filename), { recursive: true, force: true }); }
 });

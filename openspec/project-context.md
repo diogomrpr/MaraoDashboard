@@ -190,3 +190,14 @@ checks apply only to changed persistence, migration, generated ownership or
 installation paths, with affected baselines, expected data, recovery and cleanup.
 Reuse validated unchanged scoped evidence and report omitted coverage honestly.
 See [focused testing](../docs/docs/development/focused-testing.md).
+
+- Uniform controls: the `control-grid` scope covers shared 174px minimum surfaces,
+  equal rows, responsive preferred columns, native/group hosts and preserved
+  raw/automatic generation. Publication requires affected-format preserved-install
+  proof when generated container types change.
+- Factored verification retains reviewed geometry/behavior in one reference theme
+  and appearance/state coverage in both themes. Compatible visits share assertions
+  and editor alignment aliases canonical geometry. Explicit version-4 reuse
+  independently selects current requirements and validates original dependencies,
+  environment, captures and cleanup. Full/parallel execution remains explicit;
+  final inspection is current. Historical reports/fixtures remain immutable.

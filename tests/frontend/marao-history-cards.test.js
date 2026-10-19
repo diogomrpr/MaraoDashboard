@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 
 class Shadow {
+  constructor() { this.buttons = []; this.html = ''; }
   set innerHTML(value) {
     for (const button of this.buttons || []) button.isConnected = false;
     this.activeElement = null;
@@ -37,12 +38,32 @@ globalThis.window = {
 };
 globalThis.HashChangeEvent = class {};
 const source = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url), "utf8");
-const cardsSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8");
+const cardsSource = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 const cardsModule = `data:text/javascript;base64,${Buffer.from(cardsSource).toString("base64")}`;
+const { MaraoCard } = await import(cardsModule);
 const classes = source.slice(source.indexOf("function escapeHtml("), source.indexOf('if (!customElements.get("marao-energy-period-card"))'));
-const { MaraoStateTimelineCard, MaraoEnergyPeriodCard } = await import(`data:text/javascript;base64,${Buffer.from(`import { energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, focusRestorer } from "${cardsModule}";\nconst localize = (key) => key;\n${classes}\nexport { MaraoStateTimelineCard, MaraoEnergyPeriodCard };`).toString("base64")}`);
+const { MaraoStateTimelineCard, MaraoEnergyPeriodCard } = await import(`data:text/javascript;base64,${Buffer.from(`import { historyPeriodRange, historySamples, loadHistoryChart, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, focusRestorer } from "${cardsModule}";\nconst localize = (key) => key;\n${classes}\nexport { MaraoStateTimelineCard, MaraoEnergyPeriodCard };`).toString("base64")}`);
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 const state = (value = "21") => ({ state: value, attributes: { friendly_name: "History" }, last_changed: new Date().toISOString() });
+test('graph history retains replaced authoritative live readings without mutating Recorder data or refetching', () => {
+  const card = new MaraoCard(), now = Date.now();
+  card._config = { template: 'hc_graph_card', entity: 'sensor.history' };
+  card._render = () => {}; card._subscribeClimate = () => {};
+  const record = (ago, value) => ({ state: String(value), last_updated: new Date(now-ago).toISOString(), attributes: { unit_of_measurement: 'W' } });
+  const old = record(25*3600000, 99), recorded = record(10000, 1), live = record(5000, 2), next = record(0, 3);
+  const original = [old, recorded], hass = { states: { 'sensor.history': live } };
+  card.hass = hass; card._graphHistory.set('sensor.history', original);
+  const selected = card._historyOptions().samples.find(sample => sample.value === 2).time;
+  const newer = { ...hass, states: { 'sensor.history': next } }; card.hass = newer;
+  assert.deepEqual(card._historyOptions().samples.map(sample => [sample.time, sample.value]), [[now-10000,1],[selected,2],[now,3]]);
+  assert.deepEqual(original, [old,recorded], 'Recorder response remains untouched');
+  for (let index=0;index<5;index++) card.hass = { ...newer };
+  assert.equal(card._graphHistory.get('sensor.history').length, 2, 'Unrelated updates must not accumulate observations');
+  const corrected = { ...next, state: '4' }; card.hass = { ...newer, states: { 'sensor.history': corrected } };
+  card.hass = { ...newer, states: { 'sensor.history': record(-1000,5) } };
+  assert.equal(card._graphHistory.get('sensor.history').filter(item => item.last_updated === next.last_updated).length,1);
+  assert.equal(card._graphHistory.get('sensor.history').find(item => item.last_updated === next.last_updated).state,'4');
+});
 function create(Card, popup = true) {
   const card = new Card();
   card._bindTracking = () => {};
@@ -89,7 +110,8 @@ for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) {
       assert.match(card.shadowRoot.innerHTML, /data-history-state="loading"/);
       await tick();
       assert.match(card.shadowRoot.innerHTML, new RegExp(`data-history-state="${fail ? "error" : "empty"}"`));
-      assert.match(card.shadowRoot.innerHTML, fail ? /role="alert"/ : /role="status"/);
+      if (Card === MaraoEnergyPeriodCard && fail) assert.equal(card._detailOptions.error, 'timeline.history_unavailable');
+      else assert.match(card.shadowRoot.innerHTML, fail ? /role="alert"/ : /role="status"/);
       for (let i = 0; i < 5; i += 1) card.hass = { ...hass };
       assert.equal(calls, 1);
     }
@@ -212,7 +234,8 @@ for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) test(`${Card
   card.hass = hass;
   await tick();
   assert.match(card.shadowRoot.innerHTML, /data-problem="error" style="background:var\(--marao-problem-error-background/);
-  assert.match(card.shadowRoot.innerHTML, /role="alert"/);
+  if (Card === MaraoEnergyPeriodCard) assert.equal(card._detailOptions.error, 'timeline.history_unavailable');
+  else assert.match(card.shadowRoot.innerHTML, /role="alert"/);
   assert.ok(card.shadowRoot.querySelector('[data-history-retry]'));
   for (let index = 0; index < 3; index++) card.hass = { ...hass };
   assert.equal(calls, 1);

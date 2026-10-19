@@ -312,6 +312,14 @@ function safeAreaInsetsForScenario(scenario) {
 
 const pageEmulationSessions = new WeakMap();
 
+function emulationEngine(context, scenario) {
+  const engine = context.browser?.()?.browserType().name() || 'chromium';
+  if (engine === 'webkit') assert.ok(scenario.name === 'iphone-normal' && scenario.textScale === 1 && scenario.pageZoom === 1 && !scenario.bold,
+    'WebKit playback verification supports only iphone-normal at 1x text/zoom; scaled typography, bold and browser-inset emulation require Chromium');
+  else assert.equal(engine, 'chromium', 'Unsupported browser emulation engine');
+  return engine;
+}
+
 async function emulationSession(context, page) {
   let session = pageEmulationSessions.get(page);
   if (!session) {
@@ -322,6 +330,22 @@ async function emulationSession(context, page) {
 }
 
 async function configurePageEmulation(context, page, scenario, insets = safeAreaInsetsForScenario(scenario)) {
+  const engine = emulationEngine(context, scenario);
+  if (engine === 'webkit') assert.ok(arguments.length < 4 || arguments[3] === undefined, 'WebKit browser-inset overrides are unsupported');
+  page.__maraoEmulationEvidence = engine === 'webkit'
+    ? { engine, scope: 'Normal WebKit playback; not actual Safari or iPhone hardware', touch: 'native browser-context hasTouch', textScale: 1, pageZoom: 1, osTextScaleOverride: false, browserInsetOverride: false }
+    : { engine, touch: 'CDP', osTextScaleOverride: true, browserInsetOverride: true };
+  if (!page.__maraoVisitRecorder && page.on && process.env.MARAO_TEST_ARTIFACT_ROOT) {
+    page.__maraoVisitRecorder = true;
+    const visits = [], file = path.join(process.env.MARAO_TEST_ARTIFACT_ROOT, 'visits.json');
+    page.on('framenavigated', frame => {
+      if (frame !== page.mainFrame() || !frame.url().startsWith('http')) return;
+      const url = new URL(frame.url());
+      visits.push({ route: url.pathname, profile: scenario.name, engine, emulation: page.__maraoEmulationEvidence, at: new Date().toISOString() });
+      require('./verification-reuse').atomicReport(file, visits);
+    });
+  }
+  if (engine === 'webkit') return;
   const session = await emulationSession(context, page);
   await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
   await session.send("Emulation.setSafeAreaInsetsOverride", {
@@ -362,51 +386,69 @@ function visualVariablesForScenario(scenario, theme) {
   return variables;
 }
 
-async function applyVisualPreferences(page, scenario, theme) {
-  // Native card creation can outlast a fixed delay, especially in the gallery.
-  await page.waitForLoadState("networkidle");
-  await page.evaluate(async () => {
-    const visit = async (element) => {
-      await element.updateComplete;
+async function applyVisualPreferences(page, scenario, theme, subtree) {
+  const engine = emulationEngine(page.context(), scenario);
+  if (!subtree) await page.waitForLoadState("networkidle");
+  const variables = visualVariablesForScenario(scenario, theme);
+  if (engine === 'webkit') for (const key of Object.keys(variables)) if (key.startsWith('--marao-safe-area-inset-')) delete variables[key];
+  const apply = settle => page.evaluate(async ({ cssVariables, profile, mode, subtree, settle }) => {
+    const version = JSON.stringify([profile, mode, cssVariables]);
+    const apply = element => {
+      if (!element.style) return;
+      if (element === document.documentElement || element.localName === 'home-assistant'
+        || element.localName?.startsWith('marao-') || element.classList?.contains('marao-popup-overlay')) {
+        for (const [name, value] of Object.entries(cssVariables)) element.style.setProperty(name, value, 'important');
+      }
+    };
+    const visit = async element => {
+      apply(element);
+      if (settle) { await element.updateComplete; await element._ready; }
+      apply(element);
       await Promise.all([...element.children, ...(element.shadowRoot?.children || [])].map(visit));
     };
-    await visit(document.documentElement);
-  });
-  const variables = visualVariablesForScenario(scenario, theme);
-  const apply = () => page.evaluate(({ cssVariables, profile, mode }) => {
-    const apply = (element) => {
-      for (const [name, value] of Object.entries(cssVariables)) {
-        element.style.setProperty(name, value, "important");
-      }
-    };
-    apply(document.documentElement);
     document.documentElement.dataset.maraoAccessibilityProfile = profile;
     document.documentElement.dataset.maraoThemeMode = mode;
-    const visit = (root) => {
-      for (const element of root?.children || []) {
-        if (
-          element.localName === "home-assistant"
-          || element.localName?.startsWith("marao-")
-          || element.classList?.contains("marao-popup-overlay")
-        ) apply(element);
-        visit(element.shadowRoot);
-        visit(element);
+    await visit(subtree || document.documentElement);
+    await document.fonts?.ready;
+    return version;
+  }, { cssVariables: variables, profile: scenario.name, mode: theme, subtree, settle });
+  await apply(true);
+  if (engine === 'chromium') {
+    const session = await emulationSession(page.context(), page);
+    await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  }
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.evaluate(async ({ subtree }) => {
+    const elements = [], animations = new Set();
+    const visit = element => {
+      elements.push(element);
+      for (const animation of element.getAnimations?.() || []) {
+        const timing = animation.effect?.getComputedTiming();
+        if (Number.isFinite(timing?.endTime) && animation.playState !== 'finished') animations.add(animation);
       }
+      for (const child of [...element.children, ...(element.shadowRoot?.children || [])]) visit(child);
     };
-    visit(document.documentElement);
-  }, { cssVariables: variables, profile: scenario.name, mode: theme });
-  await apply();
-  await page.evaluate(async () => { await document.fonts?.ready; });
-  await page.waitForTimeout(300);
-  // HA may mount themed cards while fonts and scroll rendering settle.
-  await apply();
-  // Chromium can reset touch when its renderer changes after initial setup.
-  const session = await emulationSession(page.context(), page);
-  await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+    visit(subtree || document.documentElement);
+    await Promise.all([...animations].map(animation => animation.finished.catch(() => {})));
+    const controls = elements.filter(element => element.matches?.('button,input,a[href],dialog,ha-dialog'));
+    const snapshot = () => JSON.stringify(controls.map(element => {
+      const box = element.getBoundingClientRect(); return [box.x, box.y, box.width, box.height];
+    }));
+    let previous = snapshot(), stable = 0;
+    for (let frame = 0; frame < 60; frame++) {
+      await new Promise(requestAnimationFrame);
+      const current = snapshot(); stable = current === previous ? stable + 1 : 0; previous = current;
+      if (stable >= 2) return;
+    }
+    throw new Error('Native control geometry did not settle');
+  }, { subtree });
+  // Native frame-scheduled children still need the selected typography before inspection.
+  await apply(false);
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  // Frame-scheduled native children need the same simulation as their parents.
-  await apply();
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+async function readySubtree(page, locator, scenario, theme) {
+  await applyVisualPreferences(page, scenario, theme, await locator.elementHandle());
 }
 
 async function emulationIssues(page, scenario, theme) {
@@ -483,8 +525,8 @@ async function emulationIssues(page, scenario, theme) {
   });
 }
 
-async function layoutIssues(page, families = []) {
-  const issues = await page.evaluate((families) => {
+async function layoutIssues(page, families = [], subtree) {
+  const issues = await page.evaluate(({ families, subtree }) => {
     const issues = [];
     const intersects = (a, b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
     const context = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
@@ -641,13 +683,13 @@ async function layoutIssues(page, families = []) {
         visit(element, owned);
       }
     };
-    visit(document.documentElement);
+    visit(subtree ? { children: [subtree] } : document.documentElement);
     if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1) issues.push("dashboard has horizontal overflow");
     const sheet = (document.querySelector("home-assistant")?.shadowRoot || document).querySelector(".marao-popup-sheet");
     if (sheet && sheet.scrollWidth > sheet.clientWidth + 1) issues.push("popup has horizontal overflow");
     return [...new Set(issues)];
-  }, families);
-  return [...issues, ...await titleLayoutIssues(page, families)];
+  }, { families, subtree });
+  return [...issues, ...await titleLayoutIssues(page, families, subtree)];
 }
 
 async function frontendRegistrationIssues(page) {
@@ -1010,6 +1052,7 @@ async function main() {
         if(document.documentElement)apply();else document.addEventListener('DOMContentLoaded',apply,{once:true});
       });
       page = await context.newPage();
+      const cameraLedger = options.preview ? null : await require('./camera-request-ledger').managedCameraLedger(context, page, { output, scenario: scenario.name, theme });
       await configurePageEmulation(context, page, scenario, options.safeArea ? Object.fromEntries(insetSides.flatMap(side=>[[side,0],[side+'Max',0]])) : undefined);
       const errors = [];
       page.on("pageerror", (error) => {
@@ -1021,7 +1064,7 @@ async function main() {
         errors.push(message.text());
         if (options.preview) console.error(`[browser ${message.type()}] ${message.text()}`);
       });
-      page.on("requestfailed", (request) => {
+      if (!cameraLedger) page.on("requestfailed", (request) => {
         const message = `Failed ${request.resourceType()} request: ${new URL(request.url()).pathname} (${request.failure()?.errorText || "unknown error"})`;
         errors.push(message);
         if (options.preview) console.error(`[browser request] ${message}`);
@@ -1206,6 +1249,8 @@ async function main() {
         const found = [...await frontendRegistrationIssues(page), ...await emulationIssues(page, scenario, theme), ...await layoutIssues(page), ...await inspectPopups(page, scenario, theme, output, runName + '-page-' + view.path, captures, [], popupBehavior, checkedBehaviors)];
         if (errors.length || found.length) throw new Error(`${runName}/${view.path}: ${[...errors, ...found].join('\n')}`);
       }
+      await cameraLedger?.stopForClose();
+      if (errors.length) throw new Error(`${runName}: ${errors.join('\n')}`);
       fs.writeFileSync(path.join(output, runName + '-result.json'), JSON.stringify({ profile: scenario.name, theme,
         pages: options.pages ? dashboard.views.filter(view => view.path !== 'card-test').map(view => view.path) : [],
         gallery: !options.pagesOnly, screenshots: captures, passed: true }), { mode: 0o600 });
@@ -1231,6 +1276,7 @@ async function main() {
 if (require.main === module) main().catch((error) => { console.error(error.message || error); process.exitCode = 1; });
 
 module.exports = {
+  readySubtree,
   applySafeAreaSource,
   safeAreaCases,
   safeAreaGeometry,

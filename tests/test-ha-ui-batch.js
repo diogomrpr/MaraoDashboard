@@ -1,3 +1,4 @@
+const { capture: captureScreenshot } = require('./verification-browser');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -6,7 +7,12 @@ const { readConfig, accessToken, setBrowserToken, assertCurrentFrontend, api } =
 const { applyVisualPreferences, layoutIssues, selectedRuns, parseArgs, contextOptionsForScenario, configurePageEmulation } = require('./test-ha-dashboard-accessibility');
 const { namedCard } = require('./test-ha-room-cards');
 
-async function batteryChecks(page, config, output, scenario, theme) {
+async function batteryChecks(page, config, output, scenario, theme, geometryOnly = false) {
+  if (geometryOnly) {
+    assert.deepEqual(await layoutIssues(page, ["hc_entity_group_card", "hc_battery_card"]), []);
+    const card = namedCard(page, "Entity Group · battery all"); await card.scrollIntoViewIfNeeded();
+    await captureScreenshot(card, { path: path.join(output, `battery-${scenario.name}-${theme}.png`), scale: "css" }); return;
+  }
   const helper = 'input_number.marao_dashboard_test_battery';
   const initial = await api(config, 'GET', '/api/states/' + helper);
   const group = namedCard(page, 'Entity Group · battery live');
@@ -42,7 +48,7 @@ async function batteryChecks(page, config, output, scenario, theme) {
     await group.evaluate(e => { e.hass = document.querySelector('home-assistant').hass; });
     await set(10);
     assert.deepEqual(await layoutIssues(page, ['hc_entity_group_card', 'hc_battery_card']), []);
-    if (['iphone-normal', 'narrow-320', 'iphone-bold-text-200'].includes(scenario.name)) { await group.scrollIntoViewIfNeeded(); await group.screenshot({ path: path.join(output, `battery-${scenario.name}-${theme}.png`), scale: 'css' }); }
+    if (['iphone-normal', 'narrow-320', 'iphone-bold-text-200'].includes(scenario.name)) { await group.scrollIntoViewIfNeeded(); await captureScreenshot(group, { path: path.join(output, `battery-${scenario.name}-${theme}.png`), scale: 'css' }); }
   } finally {
     await group.evaluate((e, config) => e.setConfig(JSON.parse(config)), configBefore);
     await reference.evaluate(e => e.remove());
@@ -54,22 +60,25 @@ async function batteryChecks(page, config, output, scenario, theme) {
 async function accessChecks(page, output, scenario, theme) {
   const host = page.locator('marao-slide-to-open').first(); await host.waitFor({ state: 'attached' });
   const old = await host.evaluate(e => ({ style: e.getAttribute('style'), config: e._config }));
+  try {
   for (const language of ['en', 'pt']) for (const width of [241, 239, 144]) {
     await host.evaluate((e, { language, width }) => { e.style.cssText = `display:block;width:${width}px;max-width:100%`; e.hass = { ...document.querySelector('home-assistant').hass, language }; }, { language, width });
     await host.scrollIntoViewIfNeeded();
-    assert.deepEqual((await layoutIssues(page, ['hc_access_slide_action_card'])).filter(issue => /access (label|slide)/.test(issue)), [], `${language}/${width}`);
+    assert.deepEqual((await layoutIssues(page, ['hc_access_slide_action_card'], await host.elementHandle())).filter(issue => /access (label|slide)/.test(issue)), [], `${language}/${width}`);
     const size = await host.locator('.track').boundingBox(); assert.ok(size.width >= 48 && size.height >= 48);
     if (width === 239 && language === 'en' && scenario.name === 'iphone-normal') {
       await host.evaluate(e => { const style = document.createElement('style'); style.dataset.regression = ''; style.textContent = '.label{padding:8px 8px 72px!important}.thumb{top:auto!important;bottom:4px!important}'; e.shadowRoot.append(style); });
-      assert.ok((await layoutIssues(page, ['hc_access_slide_action_card'])).some(issue => /access label/.test(issue)), 'The former stacked layout must fail');
+      assert.ok((await layoutIssues(page, ['hc_access_slide_action_card'], await host.elementHandle())).some(issue => /access label/.test(issue)), 'The former stacked layout must fail');
       await host.evaluate(e => e.shadowRoot.querySelector('[data-regression]').remove());
     }
   }
   await host.evaluate(e => { e.hass = { ...document.querySelector('home-assistant').hass, connected: false }; });
   assert.equal(await host.locator('.track').getAttribute('aria-disabled'), 'true');
-  assert.deepEqual((await layoutIssues(page)).filter(issue => /access (label|slide)/.test(issue)), []);
-  if (['iphone-normal', 'narrow-320', 'iphone-bold-text-200'].includes(scenario.name)) await host.screenshot({ path: path.join(output, `access-${scenario.name}-${theme}.png`), scale: 'css' });
+  assert.deepEqual((await layoutIssues(page, [], await host.elementHandle())).filter(issue => /access (label|slide)/.test(issue)), []);
+  if (['iphone-normal', 'narrow-320', 'iphone-bold-text-200'].includes(scenario.name)) await captureScreenshot(host, { path: path.join(output, `access-${scenario.name}-${theme}.png`), scale: 'css' });
+  } finally {
   await host.evaluate((e, old) => { if (old.style == null) e.removeAttribute('style'); else e.setAttribute('style', old.style); e.hass = document.querySelector('home-assistant').hass; }, old);
+  }
 }
 async function main() {
   const config = readConfig(); assert.equal(new URL(config.url).hostname, '192.168.0.28');
@@ -87,14 +96,42 @@ async function main() {
       page.on('websocket', socket => socket.on('framesent', ({ payload }) => { const m = JSON.parse(payload); if (m.type === 'call_service') calls.push([m.domain, m.service]); }));
       await page.goto(config.url + '/marao-dashboard/card-test'); await page.locator('marao-card .body').first().waitFor({ state: 'attached' });
       await assertCurrentFrontend(page); await applyVisualPreferences(page, scenario, theme);
-      if (process.argv.includes('--battery')) await batteryChecks(page, config, output, scenario, theme);
-      if (process.argv.includes('--access')) await accessChecks(page, output, scenario, theme);
+      const outcomes = [];
+      const runCase = async (family, execute) => {
+        const started = Date.now();
+        try { await execute(); outcomes.push({ family, profile: scenario.name, theme, passed: true, duration_ms: Date.now() - started }); }
+        catch (error) { outcomes.push({ family, profile: scenario.name, theme, passed: false, error: error.message }); throw error; }
+        finally { require('./verification-reuse').atomicReport(path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || output, 'logical-outcomes.json'), outcomes); }
+      };
+      if (process.argv.includes('--battery')) await runCase('battery-groups', () => batteryChecks(page, config, output, scenario, theme, process.argv.includes('--geometry-only')));
+      if (process.argv.includes('--slider-headers')) await runCase('slider-headers', () => require('./test-ha-card-alignment').sliderHeaderChecks(page, output, scenario, theme));
+      if (process.argv.includes('--control-grid')) await runCase('control-grid', () => require('./control-grid-checks').controlGridChecks(page, output, scenario, theme, !process.argv.includes('--geometry-only')));
+      if (process.argv.includes('--access')) await runCase('access-label', () => accessChecks(page, output, scenario, theme));
       assert.deepEqual(calls, [], 'Read-only group/layout checks dispatched a member action');
+      const routes = new Set();
+      if (process.argv.includes('--slider-headers') && scenario.name === 'iphone-normal') { routes.add('living-room'); routes.add('native-example'); }
+      if (process.argv.includes('--control-grid') && ['iphone-normal', 'iphone-bold-text-200'].includes(scenario.name)) { routes.add('studio'); routes.add('native-example'); }
+      if (routes.size) {
+        for (const route of routes) {
+          await page.goto(config.url + '/marao-dashboard/' + route);
+          await page.locator('marao-card .body').first().waitFor({ state: 'attached' });
+          if (route === 'native-example') await page.locator('marao-native-light-card marao-card .body').first().waitFor({ state: 'attached' });
+          await applyVisualPreferences(page, scenario, theme);
+          assert.deepEqual(await layoutIssues(page, ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_card', 'hc_access_slide_action_card']), []);
+          if (route === 'native-example') {
+            if (process.argv.includes('--control-grid')) await runCase('control-grid/native', () => require('./control-grid-checks').nativeControlGridChecks(page, scenario, theme));
+            await page.locator('marao-native-light-card').first().evaluate(e => { e.preview = true; });
+            assert.deepEqual(await layoutIssues(page, ['hc_light_card']), []);
+          }
+        }
+      }
       await page.waitForLoadState('networkidle'); assert.deepEqual(errors, []);
       fs.writeFileSync(path.join(output, `${scenario.name}-${theme}.json`), JSON.stringify({ passed: true, scenario: scenario.name, theme }), { mode: 0o600 });
       console.log(`Battery/access focused checks: ${scenario.name}/${theme} passed.`);
-    } catch (error) { if (page) await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-failure.png`), scale: 'css' }); throw error; }
+    } catch (error) { if (page) await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-failure.png`), scale: 'css' }); throw error; }
     finally { await browser.close(); }
   }
 }
 if (require.main === module) main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
+
+module.exports = { main, accessChecks, batteryChecks };

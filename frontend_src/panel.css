@@ -190,8 +190,10 @@ ha-dialog { --ha-icon-button-size: 48px; }
 .page-section + .page-section { margin-top: 24px; }
 .move-guidance { overflow-wrap: anywhere; }
 .row-actions ha-icon-button { width: 48px; height: 48px; line-height: 0; --ha-icon-button-size: 48px; flex: 0 0 48px; }
+.icon-action { display: grid; place-items: center; box-sizing: border-box; width: 48px; height: 48px; flex: 0 0 48px; padding: 12px; border: 0; border-radius: 50%; outline: none; background: transparent; color: var(--primary-text-color); cursor: pointer; }
+.icon-action:disabled { color: var(--disabled-text-color); cursor: default; }
 .card-drop-cue { position: fixed; z-index: 5; background: var(--primary-text-color); pointer-events: none; border: 1px solid var(--card-background-color); }
 .card-drop-cue[hidden] { display: none; }
 .card-drop-cue span { position: fixed; display: block; padding: 4px 8px; max-width: min(240px, calc(100vw - 8px)); border: 1px solid var(--primary-text-color); border-radius: 8px; background: var(--card-background-color); color: var(--primary-text-color); font-family: var(--primary-font-family, Montserrat, sans-serif); font-size: var(--font-size-secondary, .9rem); overflow-wrap: anywhere; }
 .card-drop-cue span::before { content: '↳ '; }
-.row-actions ha-icon-button > ha-icon, .card-drag-handle > ha-icon { display: block; width: 24px; height: 24px; }
+.row-actions ha-icon-button > ha-icon, .icon-action > ha-icon, .card-drag-handle > ha-icon { display: block; width: 24px; height: 24px; }
