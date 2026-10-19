@@ -99,6 +99,7 @@ function dependencyInputs(inputs, cwd = root) {
       if (!resolved) continue;
       const dependency = path.relative(cwd, resolved);
       assert.ok(!dependency.startsWith('..') && !path.isAbsolute(dependency), 'Dependency escaped repository');
+      if (dependency.split(path.sep).some(part => ['.cache', '.artifacts'].includes(part))) continue;
       if (dependency === 'tests/verification-map.js' && !inputs.includes(dependency)) continue;
       result.add(dependency); visit(dependency);
     }

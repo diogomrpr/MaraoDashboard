@@ -6,9 +6,27 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { changedFiles, makePlan, parseArgs, schedule } = require('../verification');
+const { changedFiles, checkIdentity, dependencyInputs, makePlan, parseArgs, schedule } = require('../verification');
 const { selectComponents, checksFor } = require('../verification-map');
 const YAML = require('yaml');
+
+test('inferred generated staging is not a source identity, while source and explicitly declared inputs still invalidate proof', t => {
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'marao-input-scope-'));
+  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  const write=(file,body)=>{const target=path.join(directory,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,body);};
+  write('entry.js',"require('./source.js'); new URL('./ha-test/.cache/dist/package.js', import.meta.url); new URL('./tests/.artifacts/report.json', import.meta.url); require('./.github/policy.js');");
+  for(const file of ['source.js','ha-test/.cache/dist/package.js','tests/.artifacts/report.json','.github/policy.js'])write(file,'before');
+  const check={command:['node','entry.js'],inputs:['entry.js']},identity=checkIdentity(check,directory);
+  const inputs=dependencyInputs(check.inputs,directory);
+  assert.ok(inputs.includes('source.js'));assert.ok(inputs.includes('.github/policy.js'));
+  assert.ok(!inputs.some(file=>file.includes('/.cache/')||file.includes('/.artifacts/')));
+  write('ha-test/.cache/dist/package.js','rebuilt package');write('tests/.artifacts/report.json','new report');
+  assert.equal(checkIdentity(check,directory),identity,'Normal generated output must not invalidate source proof');
+  write('source.js','changed source');assert.notEqual(checkIdentity(check,directory),identity);
+  const afterSource=checkIdentity(check,directory);write('.github/policy.js','changed policy');assert.notEqual(checkIdentity(check,directory),afterSource);
+  const explicit={...check,inputs:[...check.inputs,'ha-test/.cache/dist']},before=checkIdentity(explicit,directory);
+  write('ha-test/.cache/dist/package.js','explicit input changed');assert.notEqual(checkIdentity(explicit,directory),before,'Explicit check inputs remain binding');
+});
 
 test('frontend refresh scope covers recovery, native/navbar ownership and alignment without fixture resets', () => {
   const selection = selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js',
