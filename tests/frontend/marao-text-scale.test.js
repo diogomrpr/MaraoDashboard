@@ -72,7 +72,7 @@ const source = await fs.readFile(
 // This harness loads only the shared shell/gesture implementation; native module
 // registration is checked by marao-native.test.js with a real module URL.
 const sourceWithoutFrontendImports = source.slice(source.indexOf("const MARAO_FONT_URL"), source.indexOf("await import(`./MaraoNativeCards.js"));
-const cardsSource = await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8');
+const cardsSource = (await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8')).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 const instrumentedSource = `
 import { cardProblem, problemStyle, serviceOutcome, serviceConnectionReady, serviceTargetReady, accessOpenerService } from "data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}";
 const haptic = (value) => globalThis.__maraoTestHaptics.push(value);

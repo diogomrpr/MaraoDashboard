@@ -176,7 +176,7 @@ export const PT_LABELS = {
   "auto": "Automático",
   "Edit room": "Editar divisão",
   "Add room": "Adicionar divisão",
-  "Live camera feed with a generated Frigate or UniFi Protect events popup.": "Imagem da câmara em direto com uma janela de eventos Frigate ou UniFi Protect.",
+  "Automatic camera preview to live video with a generated Frigate or UniFi Protect events popup.": "Pré-visualização da câmara com passagem automática a vídeo em direto e janela de eventos Frigate ou UniFi Protect.",
   "Control a light and optionally show its brightness slider.": "Controle uma luz e mostre, se desejar, o controlo de luminosidade.",
   "Open, close, and position a cover or blind.": "Abra, feche e ajuste a posição de uma persiana ou cobertura.",
   "Control temperature, modes, and an optional history graph.": "Controle a temperatura e os modos, com um gráfico de histórico opcional.",

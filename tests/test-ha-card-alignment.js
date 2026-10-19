@@ -202,6 +202,7 @@ async function checkSliderHeaders() {
 }
 
 async function main() {
+  if (process.argv.includes('--frontend-refresh')) return require('./test-frontend-refresh-local').run();
   if (process.argv.includes('--control-grid')) {
     const result = require('node:child_process').spawnSync(process.execPath, ['tests/test-ha-ui-batch.js', ...process.argv.slice(2)], { stdio: 'inherit', env: process.env });
     if (result.status !== 0) throw new Error('Control grid alignment failed');

@@ -10,6 +10,18 @@ const { changedFiles, makePlan, parseArgs, schedule } = require('../verification
 const { selectComponents, checksFor } = require('../verification-map');
 const YAML = require('yaml');
 
+test('frontend refresh scope covers recovery, native/navbar ownership and alignment without fixture resets', () => {
+  const selection = selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js',
+    'custom_components/marao_dashboard/frontend/MaraoFrontendRefresh.js', 'tests/test-ha-card-alignment.js',
+    'ha-test/cases.json', 'ha-test/frontend-refresh-fixture.js'], ['frontend-refresh']);
+  assert.deepEqual(selection.components, ['frontend-refresh']);
+  const checks = checksFor(selection);
+  for (const name of ['frontend-refresh', 'marao-navbar-card', 'marao-native', 'gallery-cases']) assert.ok(checks.some(check => check.id.startsWith('unit:' + name)));
+  assert.ok(checks.some(check => check.command.includes('--frontend-refresh') && check.command.includes('tests/test-ha-card-alignment.js')));
+  assert.ok(checks.every(check => check.kind === 'offline'), 'Local browser fixtures must not reset the preserved HA dashboard');
+  assert.ok(!checks.some(check => /mobile-matrix|preserved-upgrade|native-reconnect|editor-assets/.test(check.id)));
+});
+
 test('focused components retain shared consumers and exclude unrelated suites', () => {
   const slider = selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js'], ['slider']);
   assert.deepEqual(slider.components, ['cover', 'fan', 'light', 'slider']);

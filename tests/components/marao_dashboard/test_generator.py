@@ -24,6 +24,14 @@ from custom_components.marao_dashboard.generator import (
 
 
 
+def _walk_generated_cards(cards):
+    for card in cards:
+        if isinstance(card, dict):
+            yield card
+            if card.get("type") in ("custom:marao-control-grid", "grid", "vertical-stack", "horizontal-stack"):
+                yield from _walk_generated_cards(card.get("cards", []))
+
+
 def _room_pages(config):
     return [page for page in config["pages"] if page.get("output_path", "").startswith("views/rooms/")]
 
@@ -751,7 +759,7 @@ def test_columns_render_an_ordered_mixed_card_grid(tmp_path: Path) -> None:
     source = (
         tmp_path / generated.slug / "views/rooms/00-office.yaml"
     ).read_text(encoding="utf-8")
-    assert source.count("type: grid") == 1
+    assert source.count("type: custom:marao-control-grid") == 1
     assert "columns: 3" in source
     assert "Shared notes" in source
     assert source.index("light.desk") < source.index("climate.office") < source.index(
@@ -940,7 +948,7 @@ def test_media_page_exposes_every_configured_player_and_its_popup(tmp_path: Path
         tmp_path,
     )
     view = _load_view(tmp_path / generated.slug / "views/main/05-media.yaml")
-    controls = [card for card in view["cards"] if isinstance(card, dict) and card.get("template") == "hc_media_card"]
+    controls = [card for card in _walk_generated_cards(view["cards"]) if card.get("template") == "hc_media_card"]
     assert [card["entity"] for card in controls] == [player["entity_id"] for player in players]
     popups = {card["hash"] for card in view["cards"] if isinstance(card, dict) and card.get("type") == "custom:marao-popup-card"}
     assert {card["variables"]["popup_hash"] for card in controls} == popups
@@ -1102,7 +1110,7 @@ def test_generates_configured_julian_pages_and_derived_overview_popups(tmp_path:
     assert "lock.front_door" in (root / "views/main/01-security.yaml").read_text(encoding="utf-8")
     assert "sensor.house_power" in (root / "views/main/03-energy.yaml").read_text(encoding="utf-8")
     energy = yaml.load((root / "views/main/03-energy.yaml").read_text(encoding="utf-8"), Loader=MaraoDashboardLoader)
-    assert [card["entity"] for card in energy["cards"] if isinstance(card, dict) and card.get("type") == "custom:marao-energy-period-card"] == ["sensor.month_energy", "sensor.month_cost"]
+    assert [card["entity"] for card in _walk_generated_cards(energy["cards"]) if card.get("type") == "custom:marao-energy-period-card"] == ["sensor.month_energy", "sensor.month_cost"]
     assert (root / "components/popups/energy_house_power.yaml").exists()
     wallbox = (root / "views/main/04-wallbox.yaml").read_text(encoding="utf-8")
     assert "template: hc_wallbox_current_card" in wallbox
@@ -1111,7 +1119,7 @@ def test_generates_configured_julian_pages_and_derived_overview_popups(tmp_path:
         (root / "views/main/05-media.yaml").read_text(encoding="utf-8"),
         Loader=MaraoDashboardLoader,
     )
-    app_grid = next(card for card in media["cards"] if card.get("cards", [{}])[0].get("template") == "hc_media_app_card")
+    app_grid = next(card for card in _walk_generated_cards(media["cards"]) if card.get("cards", [{}]) and card.get("cards", [{}])[0].get("template") == "hc_media_app_card")
     assert app_grid["columns"] == 2
     assert app_grid["cards"][0]["variables"]["app_source"] == "YouTube"
     assert app_grid["cards"][0]["show_state"] is False

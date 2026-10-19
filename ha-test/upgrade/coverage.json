@@ -660,6 +660,11 @@
       "file": "tests/control-grid-checks.js",
       "assertion": "controlGridChecks",
       "scope": "shared"
+    },
+    "control-grid-sections": {
+      "file": "tests/components/marao_dashboard/test_control_grid.py",
+      "assertion": "test_sections_keep_all_owned_families_and_structural_raw_boundaries",
+      "scope": "candidate"
     }
   },
   "cases": {
@@ -1024,7 +1029,7 @@
         "Scene with four options",
         "Scene with five options",
         "Dual target climate",
-        "Room \u00b7 one light unavailable",
+        "Room · one light unavailable",
         "Reported action error",
         "Tall controls popup"
       ],
@@ -1136,18 +1141,18 @@
     },
     "binaryPresentationCases": {
       "identities": [
-        "Binary static icon \u00b7 off",
-        "Binary hidden icon \u00b7 off",
-        "Binary state prefix \u00b7 off",
-        "Binary static icon \u00b7 on",
-        "Binary hidden icon \u00b7 on",
-        "Binary state prefix \u00b7 on",
+        "Binary static icon · off",
+        "Binary hidden icon · off",
+        "Binary state prefix · off",
+        "Binary static icon · on",
+        "Binary hidden icon · on",
+        "Binary state prefix · on",
         "Binary configured label and reading",
-        "Summary \u00b7 all off",
+        "Summary · all off",
         "Numeric graph with binary toggle",
         "Binary current state and independent readings",
-        "Binary header motion \u00b7 on",
-        "Binary header motion \u00b7 off"
+        "Binary header motion · on",
+        "Binary header motion · off"
       ],
       "checks": [
         "states",
@@ -1156,16 +1161,16 @@
     },
     "problemPresentationCases": {
       "identities": [
-        "Hidden normal state \u00b7 unknown",
-        "Hidden normal state \u00b7 unavailable",
+        "Hidden normal state · unknown",
+        "Hidden normal state · unavailable",
         "Artwork with unavailable remote",
-        "Room \u00b7 usable secondary light",
-        "Ordinary selector \u00b7 error option",
+        "Room · usable secondary light",
+        "Ordinary selector · error option",
         "Configured dishwasher warning",
-        "Camera preview \u00b7 failed media",
-        "Media artwork \u00b7 failed media",
+        "Camera preview · failed media",
+        "Media artwork · failed media",
         "Simulate media failure",
-        "Dishwasher \u00b7 vendor refill confirmation"
+        "Dishwasher · vendor refill confirmation"
       ],
       "checks": [
         "states",
@@ -1174,25 +1179,25 @@
     },
     "energyFormattingCases": {
       "identities": [
-        "Energy format \u00b7 source default",
-        "Energy format \u00b7 converted zero decimals",
-        "Energy format \u00b7 converted two decimals",
-        "Energy format \u00b7 source six decimals",
-        "Energy format \u00b7 automatic decimals",
-        "Energy format \u00b7 signed export",
-        "Energy format \u00b7 real zero",
-        "Energy format \u00b7 cost precision",
-        "Energy format \u00b7 missing source unit",
-        "Energy format \u00b7 missing history unit",
-        "Energy format \u00b7 incompatible history unit",
-        "Energy format \u00b7 unavailable",
-        "Energy format \u00b7 independent graph source",
-        "Energy format \u00b7 toggle power",
-        "Energy format \u00b7 secondary conversion",
-        "Energy format \u00b7 legacy label only",
-        "Energy format \u00b7 converted period",
-        "Energy format \u00b7 source period",
-        "Energy format \u00b7 cost period"
+        "Energy format · source default",
+        "Energy format · converted zero decimals",
+        "Energy format · converted two decimals",
+        "Energy format · source six decimals",
+        "Energy format · automatic decimals",
+        "Energy format · signed export",
+        "Energy format · real zero",
+        "Energy format · cost precision",
+        "Energy format · missing source unit",
+        "Energy format · missing history unit",
+        "Energy format · incompatible history unit",
+        "Energy format · unavailable",
+        "Energy format · independent graph source",
+        "Energy format · toggle power",
+        "Energy format · secondary conversion",
+        "Energy format · legacy label only",
+        "Energy format · converted period",
+        "Energy format · source period",
+        "Energy format · cost period"
       ],
       "checks": [
         "energy",
@@ -1201,13 +1206,13 @@
     },
     "roomCompositionCases": {
       "identities": [
-        "Room \u00b7 active secondary",
-        "Room \u00b7 all lights off",
+        "Room · active secondary",
+        "Room · all lights off",
         "Empty room",
-        "Room \u00b7 all lights unavailable",
+        "Room · all lights unavailable",
         "Bedroom for guests and family with a deliberately long room name",
-        "Room \u00b7 connection loss",
-        "Room \u00b7 custom label"
+        "Room · connection loss",
+        "Room · custom label"
       ],
       "checks": [
         "room-actions",
@@ -1366,7 +1371,8 @@
       "control-grid-layout",
       "page-migration",
       "history-recovery",
-      "upgraded-pages"
+      "upgraded-pages",
+      "control-grid-sections"
     ]
   },
   "required_install_assertions": [

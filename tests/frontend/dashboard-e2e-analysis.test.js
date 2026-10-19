@@ -11,19 +11,66 @@ const {
   buildViewChecks,
   captureClimateFeedback,
   checkHistoryCases,
+  installHistoryLoadingGate,
   climateFeedbackSnapshot,
   conditionalCardIsActive,
   dashboardNavigationViolations,
+  dashboardScenario,
+  isDelayedCameraRequest,
+  refreshDelayedCameraLoading,
   normalizedPathname,
   scrollDashboard,
   titleLayoutIssues,
 } = require("../test-ha-dashboard-e2e.js");
 const { visibleBounds } = require("../test-ha-room-cards.js");
 
+test('delayed camera refresh atomically observes the real component handler while its provider promise is pending', async () => {
+  const { MaraoCameraEventsCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoFrigateEventsCard.js');
+  const card = new MaraoCameraEventsCard(), calls = []; let finish;
+  card._config = { entity: 'camera.marao_dashboard_test_camera', event_provider: 'frigate', frigate_instance_id: 'marao_test', frigate_camera: 'loading', limit: 12 };
+  card._connected = true; card._status = 'ready'; card._loadedKey = 'previous completed request';
+  card._hass = { states: { [card._config.entity]: { state: 'idle' } }, callWS: message => { calls.push(message); return new Promise(resolve => { finish = resolve; }); } };
+  let text = '';
+  card._render = () => { text = card._status === 'loading' ? 'Loading events…' : ''; };
+  const button = { disabled: false, dataset: { action: 'refresh' }, click() { card._handleClick({ target: { closest: () => button } }); } };
+  card.shadowRoot = { querySelector: selector => selector === '[data-action="refresh"]' ? button : { textContent: text } };
+  const config = JSON.stringify(card._config), observation = refreshDelayedCameraLoading(card);
+  assert.deepEqual(observation, { status: 'loading', requestAdvanced: true, readable: true });
+  assert.equal(calls.length, 1); assert.equal(isDelayedCameraRequest({ ...calls[0], id: 41 }), true);
+  assert.throws(() => refreshDelayedCameraLoading(card), /Finish the existing event request/);
+  assert.equal(calls.length, 1, 'A second refresh cannot duplicate the in-flight request');
+  finish([]); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(card._status, 'ready'); assert.deepEqual(card._events, []);
+  assert.equal(observation.status, 'loading', 'Later real completion cannot replace the same-task loading observation');
+  assert.equal(JSON.stringify(card._config), config);
+});
+test('delayed event request evidence accepts only the exact safe fixture request', () => {
+  const safe = { id: 41, type: 'frigate/events/get', instance_id: 'marao_test', cameras: ['loading'], limit: 12 };
+  assert.equal(isDelayedCameraRequest(safe), true);
+  for (const change of [{ instance_id: 'another' }, { cameras: ['front'] }, { cameras: ['loading', 'front'] }, { type: 'camera/stream' }, { id: undefined }, { id: '41' }])
+    assert.equal(isDelayedCameraRequest({ ...safe, ...change }), false);
+});
+
+test('dashboard CLI executes the actual narrow, text and zoom profiles in both scenario argument forms', () => {
+  const { scenarios, contextOptionsForScenario } = require('../test-ha-dashboard-accessibility');
+  for (const name of ['narrow-320', 'iphone-text-200', 'iphone-page-zoom-200']) {
+    const expected = scenarios.find(value => value.name === name);
+    for (const args of [['--scenario', name], ['--scenario=' + name]]) {
+      const actual = dashboardScenario(args, scenarios);
+      assert.equal(actual, expected);
+      assert.deepEqual(contextOptionsForScenario(actual).viewport, contextOptionsForScenario(expected).viewport);
+      assert.equal(actual.textScale, expected.textScale); assert.equal(actual.pageZoom, expected.pageZoom);
+    }
+  }
+  assert.equal(dashboardScenario([], scenarios).name, 'iphone-normal');
+  for (const args of [['--scenario=unknown'], ['--scenario', 'unknown'], ['--scenario'], ['--scenario=']]) assert.throws(() => dashboardScenario(args, scenarios), /Unknown mobile scenario/);
+  assert.throws(() => dashboardScenario(['--scenario=narrow-320', '--scenario', 'iphone-normal'], scenarios), /Conflicting mobile scenarios/);
+});
+
 test('title geometry rejects rounded-corner clipping while retaining narrow control space', async () => {
   let top = 0, left = 1, overflow = 'hidden';
   const surface = { getBoundingClientRect: () => ({ left: 0, right: 66, top: 0, width: 66, height: 120 }) };
-  const parent = { clientWidth: 66, children: [] };
+  const parent = { clientWidth: 66, children: [], classList: { contains: () => false } };
   const title = { parentElement: parent, closest: () => surface, getBoundingClientRect: () => ({ width: 64, top, bottom: top + 19 }) };
   parent.children = [title];
   const card = { _config: { name: 'Temperature' }, shadowRoot: { querySelector: () => title } };
@@ -42,6 +89,34 @@ test('title geometry rejects rounded-corner clipping while retaining narrow cont
   assert.deepEqual(await titleLayoutIssues(page), []);
   top = 0; overflow = 'visible';
   assert.deepEqual(await titleLayoutIssues(page), []);
+});
+
+test('compact header geometry permits contained wrapping only below the reference card width', async () => {
+  const cases = [
+    { name: 'reference adjacent', width: 172, copy: [8,14,88,34], icon: [108,0,156,48], head: [8,0,164,48], valid: true },
+    { name: 'constrained wrapped', width: 75, copy: [8,8,67,28], icon: [8,36,56,84], head: [8,8,67,84], valid: true },
+    { name: 'reference wrapped', width: 172, copy: [8,8,164,28], icon: [8,36,56,84], head: [8,8,164,84], valid: false },
+    { name: 'enlarged text wrapped', width: 172, fontSize: 36, copy: [8,8,164,28], icon: [8,36,56,84], head: [8,8,164,84], valid: true },
+    { name: 'wide enlarged text wrapped', width: 390, fontSize: 36, copy: [8,8,382,28], icon: [8,36,56,84], head: [8,8,382,84], valid: false },
+    { name: 'constrained overlap', width: 75, copy: [8,8,67,28], icon: [8,24,56,72], head: [8,8,67,72], valid: false },
+  ];
+  const bounds = ([left,top,right,bottom]) => ({ left,top,right,bottom,width:right-left,height:bottom-top });
+  for (const example of cases) {
+    const surface = { getBoundingClientRect: () => bounds([0,0,example.width,100]) };
+    const icon = { getBoundingClientRect: () => bounds(example.icon) };
+    const body = { classList: { contains: name => name === 'slider-header' }, children: [] };
+    const header = { closest: () => body, querySelector: () => icon, getBoundingClientRect: () => bounds(example.head) };
+    const copy = { parentElement: header, clientWidth: example.copy[2]-example.copy[0],
+      classList: { contains: name => name === 'compact-copy' }, getBoundingClientRect: () => bounds(example.copy) };
+    const title = { parentElement: copy, closest: () => surface, getBoundingClientRect: () => bounds(example.copy) };
+    body.children = [header];
+    const card = { _config: { name: 'Light', template: 'hc_light_card' }, shadowRoot: { querySelector: () => title } };
+    const environment = vm.createContext({ getComputedStyle: () => ({ paddingLeft: '0px',paddingRight: '0px',overflow: 'visible',getPropertyValue:()=>String(example.fontSize || 18)+'px' }) });
+    const page = { locator: () => ({ evaluateAll: async (callback, argument) => structuredClone(vm.runInContext('(' + callback.toString() + ')', environment)([card], argument)) }) };
+    const issues = await titleLayoutIssues(page);
+    if (example.valid) assert.deepEqual(issues, [], example.name);
+    else assert.deepEqual(issues, ['Light: compact reading block and icon overlap or misalign'], example.name);
+  }
 });
 
 test('climate captures ignore collapsed scroll containers and frame both ends of a tall card', async t => {
@@ -85,10 +160,33 @@ test('climate capture positions and measures the card only after its native slot
   assert.equal(captures, 1);
 });
 
-test('history checks observe loading before queued responses settle and retain the repeated-request guard', async () => {
+test('history loading gate holds only the exact safe native GET, preserves requests and becomes pass-through after release', async () => {
+  let handler, removed=false;const continued=[];
+  const page={route:async(pattern,callback)=>{assert.equal(pattern,'**/api/history/period/**');handler=callback;},
+    unroute:async(pattern,callback)=>{assert.equal(pattern,'**/api/history/period/**');assert.equal(callback,handler);removed=true;}};
+  const gate=await installHistoryLoadingGate(page,'http://192.168.0.28');
+  const safe='http://192.168.0.28/api/history/period/2026-10-18T00:00:00Z?filter_entity_id=sensor.marao_dashboard_test_history_loading';
+  const route=(name,url=safe,method='GET')=>({request:()=>({url:()=>url,method:()=>method}),continue:async(...args)=>{assert.equal(args.length,0,'The gate must not replace native request details or payload');continued.push(name);}});
+  const pending=handler(route('held'));
+  assert.equal(gate.held,1);assert.deepEqual(continued,[]);
+  for(const [name,url,method] of [
+    ['other-entity',safe.replace('history_loading','history_empty'),'GET'],
+    ['combined-entities',safe+',sensor.other','GET'],
+    ['duplicate-parameter',safe+'&filter_entity_id=sensor.other','GET'],
+    ['other-origin',safe.replace('192.168.0.28','example.invalid'),'GET'],
+    ['other-path',safe.replace('/api/history/period/','/api/states/'),'GET'],
+    ['other-method',safe,'POST'],
+  ])await handler(route(name,url,method));
+  assert.deepEqual(continued,['other-entity','combined-entities','duplicate-parameter','other-origin','other-path','other-method']);
+  gate.release();await pending;assert.equal(continued.at(-1),'held');
+  await handler(route('after-release'));assert.equal(continued.at(-1),'after-release');assert.equal(gate.held,1);
+  await gate.dispose();assert.equal(removed,true);
+});
+
+test('history checks release controlled loading before waiting for idle and retain the repeated-request guard', async () => {
   const { manifest } = require('../../ha-test/cases');
   for (const repeated of [false, true]) {
-    let settled = false, loadingReads = 0;
+    let settled = false, released = false, loadingReads = 0;
     const elements = manifest.historyCases.flatMap(example => ['Graph', 'Energy', 'Timeline'].map(label => ({
       _config: { name: `${label} history · ${example.id}` },
       shadowRoot: { querySelector: () => ({ dataset: { historyState: example.expectedStatus === 'loading' && settled ? 'ready' : example.expectedStatus } }) },
@@ -97,9 +195,10 @@ test('history checks observe loading before queued responses settle and retain t
       performance: { getEntriesByType: () => repeated ? Array.from({ length: 4 }, () => ({ name: 'http://homeassistant.test/history?filter_entity_id=' + manifest.historyCases[0].entity })) : [] } });
     const run = (callback, arg) => vm.runInContext('(' + callback.toString() + ')', environment)(arg);
     const page = {
+      __historyLoadingGate: { release() { assert.equal(loadingReads,3); assert.equal(settled,false); released=true; } },
       locator: () => ({ evaluateAll: async (callback, arg) => { assert.equal(settled, false); loadingReads++; return callback(elements, arg); } }),
       waitForFunction: async (callback, arg) => { assert.equal(run(callback, arg), true); },
-      waitForLoadState: async state => { assert.equal(state, 'networkidle'); assert.equal(loadingReads, 3); settled = true; },
+      waitForLoadState: async state => { assert.equal(state, 'networkidle'); assert.equal(loadingReads, 3); assert.equal(released,true,'Idle must never wait on the controlled pending requests'); settled = true; },
       evaluate: async (callback, arg) => run(callback, arg),
     };
     if (repeated) await assert.rejects(() => checkHistoryCases(page), /4 history requests for three cards/);

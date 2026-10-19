@@ -19,13 +19,17 @@ const walk = (value, visit) => {
 
 async function openBrowser(config, run) {
   const browser = await chromium.launch();
+  try {
   const context = await browser.newContext(contextOptionsForScenario(run.scenario, run.theme));
   await context.addInitScript(setBrowserToken, { hassUrl: config.url, ...accessToken(config) });
-  const page = await context.newPage(); await configurePageEmulation(context, page, run.scenario);
+  const page = await context.newPage();
+  const cameraLedger = await require('./camera-request-ledger').managedCameraLedger(context, page, {
+    output: path.join(output, 'sessions', crypto.randomUUID()), scenario: run.scenario.name, theme: run.theme,
+  });
+  await configurePageEmulation(context, page, run.scenario);
   const issues = [], calls = [];
   page.on('pageerror', error => issues.push(error.message));
   page.on('console', message => { if (['warning', 'error'].includes(message.type())) issues.push(message.text()); });
-  page.on('requestfailed', request => issues.push('Failed resource: ' + new URL(request.url()).pathname));
   page.on('response', response => { if (response.status() >= 400) issues.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
   page.on('websocket', socket => socket.on('framesent', ({ payload }) => {
     let message; try { message = JSON.parse(String(payload)); } catch { return; }
@@ -35,7 +39,17 @@ async function openBrowser(config, run) {
     assert.ok(entities.length && entities.every(id => typeof id === 'string' && id.includes('.marao_dashboard_test_')), 'Native proof attempted a non-fixture service');
     calls.push({ domain: message.domain, service: message.service, entity }); // Never record service data/PINs.
   }));
-  return { browser, context, page, issues, calls, close: async () => { await context.close(); await browser.close(); } };
+  return { browser, context, page, issues, calls, close: async () => {
+    const errors = [];
+    try { await context.close(); } catch (error) { errors.push(error); }
+    try { await browser.close(); } catch (error) { errors.push(error); }
+    try { await cameraLedger.assert(); assert.deepEqual(issues, [], 'Native browser warnings/errors after release'); } catch (error) { errors.push(error); }
+    if (errors.length) throw new AggregateError(errors, 'Native browser release/close diagnostics failed');
+  } };
+  } catch (error) {
+    try { await browser.close(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Native browser setup/cleanup failed'); }
+    throw error;
+  }
 }
 
 async function waitCards(page) {
@@ -228,7 +242,7 @@ async function main() {
   const report = { operation, kind: 'native-editing-scoped', themes: runs.map(run => run.theme), profiles: runs.map(run => run.scenario.name), assertions: [], verified_cleanup: false };
   const reportFile = path.join(output, operation + '.json');
   const save = () => fs.writeFileSync(reportFile, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
-  let backup, ws, active, baselineSource, stagedSource, baselineDashboards, initialHelpers, creating = false;
+  let backup, ws, active, baselineSource, stagedSource, baselineDashboards, initialHelpers, primaryError, creating = false;
   try {
     ws = await connect(config);
     const dashboards = await ws.call({ type: 'lovelace/dashboards/list' });
@@ -267,8 +281,6 @@ async function main() {
     await assert.rejects(ws.call({ type: 'marao_dashboard/history/restore', version: builder.history[0].version }));
     assert.deepEqual((await remote({ mode: 'snapshot', paths: ['dashboard/MaraoDashboard'] })).files, builderBefore.files);
     assert.deepEqual(await ws.call({ type: 'lovelace/config', url_path: rootRoute, force: true }), frozen);
-    report.assertions.push('native creation, expanded Take control, builder generation/history exclusion'); save();
-    console.log('Native creation, Take control and ownership guards passed.');
     const navbarOnly = process.argv.includes("--navbar-only");
     const fixture = fixtureDashboard(frozen, {overflow:navbarOnly});
     const vacuum = fixture.views[0].sections[0].cards.find(card => card.type === 'custom:marao-native-vacuum-card');
@@ -281,6 +293,8 @@ async function main() {
     }
     await ws.call({ type: 'lovelace/config/save', url_path: rootRoute, config: fixture });
     await active.close(); active = null;
+    report.assertions.push('native creation, expanded Take control, builder generation/history exclusion'); save();
+    console.log('Native creation, Take control and ownership guards passed.');
     for (const run of runs) {
       console.log('Checking native cards: ' + run.scenario.name + ' ' + run.theme);
       active = await openBrowser(config, run);
@@ -308,8 +322,8 @@ async function main() {
         await active.page.screenshot({ path: path.join(output, run.scenario.name + '-' + run.theme + '.png'), scale: 'css' });
       }
       const coverage = run.scenario.name === 'iphone-normal' ? 'sheets, guards, visual/YAML, layout and viewer presentation' : 'layout and viewer presentation';
-      report.assertions.push(run.scenario.name + ' ' + run.theme + ': ' + coverage); save();
       await active.close(); active = null;
+      report.assertions.push(run.scenario.name + ' ' + run.theme + ': ' + coverage); save();
     }
     const saved = await ws.call({ type: 'lovelace/config', url_path: rootRoute, force: true });
     const ordinary = structuredClone(saved); delete ordinary.marao;
@@ -342,11 +356,14 @@ async function main() {
     assert.deepEqual(remote({ mode: 'snapshot', paths: ['dashboard/MaraoDashboard'] }).files, builderBefore.files);
     report.assertions.push('saved edits/deletions/explicit emptiness survive reload and restart'); save();
   } catch (error) {
+    primaryError = error;
     report.failure = error.message; save();
     if (active?.page && !active.page.isClosed()) await active.page.screenshot({ path: path.join(output, 'failure.png'), scale: 'css' }).catch(() => {});
     throw error;
   } finally {
-    if (active) await active.close();
+    const cleanupErrors = [];
+    try { if (active) await active.close(); } catch (error) { cleanupErrors.push(error); }
+    try {
     if (ws) ws.close();
     if (backup) {
       console.log('Restoring the exact disposable builder baseline.');
@@ -385,6 +402,8 @@ async function main() {
       report.verified_cleanup = remote({ mode: 'finish' }).verified_cleanup; save();
       console.log('Exact builder source, generated output, package, theme and registration restored.');
     }
+    } catch (error) { cleanupErrors.push(error); }
+    if (cleanupErrors.length) throw new AggregateError([...(primaryError ? [primaryError] : []), ...cleanupErrors], 'Native diagnostics or exact baseline restoration failed');
   }
   console.log('Native editing acceptance passed; private scoped report: ' + reportFile);
 }

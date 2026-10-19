@@ -41,9 +41,9 @@ async function clickFold(page, panel, line) {
 async function jsonEditorChecks(page, panel, { output, scenario, theme, client, config, persist = false, geometryOnly = false }) {
   const mac = await page.evaluate(() => /Macintosh|iPhone|iPad/.test(navigator.userAgent));
   const android = await page.evaluate(() => /Android/.test(navigator.userAgent));
-  const workers = [];
+  const workers = page.__maraoWorkers || page.workers().map(worker => worker.url());
   const workerStarted = worker => workers.push(worker.url());
-  page.on('worker', workerStarted);
+  if (!page.__maraoWorkers) page.on('worker', workerStarted);
   const source = JSON.stringify(require('../ha-test/json-editor-example.json'), null, 2) + '\n';
   await panel.locator('[data-tab="json"]').tap();
   await page.waitForFunction(p => p._tab === 'json' && p._jsonAssistance, await panel.elementHandle());
@@ -283,7 +283,8 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
       let written = backup({ mode: 'backup' });
       try {
         const saved = JSON.parse(baseline.source);
-        const note = saved.pages.find(page => page.path === 'studio').sections.at(-1).cards[0];
+        const note = saved.pages.find(page => page.path === 'studio').sections.find(section => section.entities?.some(card => card.id === 'studio-media'))?.cards?.find(card => card.type === 'markdown');
+        assert.ok(note, 'Canonical Studio media note is missing');
         note.content += ' JSON verification.';
         await setSource(JSON.stringify(saved, null, 2) + '\n');
         await clickFold(page, panel, 1); await folded(1);
@@ -294,7 +295,7 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
         written = backup({ mode: 'snapshot', paths: ['dashboard/MaraoDashboard', 'configuration.yaml'] }).files;
         await page.reload(); await page.waitForFunction(() => document.querySelector('home-assistant')?.shadowRoot, null);
         await page.waitForFunction(p => p._loaded, await page.locator('marao-dashboard-panel').elementHandle());
-        assert.equal(await page.locator('marao-dashboard-panel').evaluate(p => p._model.pages.find(page => page.path === 'studio').sections.at(-1).cards[0].content), note.content);
+        assert.equal(await page.locator('marao-dashboard-panel').evaluate(p => p._model.pages.find(page => page.path === 'studio').sections.find(section => section.entities?.some(card => card.id === 'studio-media')).cards.find(card => card.type === 'markdown').content), note.content);
       } finally {
         backup({ mode: 'restore', expected: written }); backup({ mode: 'finish' });
         await client.call({ type: 'lovelace/config', url_path: 'marao-dashboard', force: true });
@@ -310,7 +311,7 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
     await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-json-tools-failure.png`), scale: 'css' }).catch(() => {});
     throw error;
   } finally {
-    page.off('worker', workerStarted);
+    if (!page.__maraoWorkers) page.off('worker', workerStarted);
     if (await panel.count() && await panel.evaluate(p => Boolean(p._monaco)).catch(() => false)) {
       await panel.evaluate(p => p._restoreJsonMonitor?.());
       await panel.evaluate((p, baseline) => { p._setEditorSource(baseline.source); p._jsonDraft = baseline.source; p._dirty = baseline.dirty; p._updateHeader(); }, baseline);

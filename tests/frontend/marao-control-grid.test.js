@@ -15,23 +15,23 @@ class Node {
 }
 globalThis.HTMLElement = Node;
 globalThis.document = { createElement: () => new Node() };
-const source = await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8');
+const source = (await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8')).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 const { MaraoControlGrid, standardControl, controlGridStyles } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 const card = (template = 'hc_light_card', extra = {}) => ({ type: 'custom:marao-card', template, entity: 'light.safe', ...extra });
 
 test('standard control membership uses configured effective roles, independent of state and hidden controls', () => {
-  for (const template of ['hc_light_card', 'hc_cover_card', 'hc_access_card', 'hc_access_slide_action_card']) {
+  for (const template of ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_card', 'hc_access_slide_action_card']) {
     for (const extra of [{}, { entity: undefined }, { show_name: false, show_icon: false, variables: { enable_slider: false } }]) assert.equal(standardControl(card(template, extra)), true);
   }
   assert.equal(standardControl(card('hc_access_action_card', { variables: { action_service: 'lock.lock' } })), true);
   assert.equal(standardControl(card('hc_access_hold_action_card', { entity: 'cover.missing' })), true);
   assert.equal(standardControl(card('hc_access_hold_action_card', { entity: 'switch.safe', variables: { action_service: 'cover.open_cover' } })), true);
   assert.equal(standardControl({ type: 'custom:marao-native-light-card' }), true);
-  for (const template of ['hc_fan_card', 'hc_climate_card', 'hc_security_card', 'hc_access_hold_action_card', 'hc_graph_card']) assert.equal(standardControl(card(template)), false);
-  assert.match(source, /ha-card\.control-surface \{ display:grid; min-width:0; min-height:var\(--marao-control-min-height,174px\)/);
+  for (const template of ['hc_climate_card', 'hc_security_card', 'hc_access_hold_action_card', 'hc_graph_card']) assert.equal(standardControl(card(template)), false);
+  assert.match(source, /ha-card\.control-surface \{ display:grid; min-width:0; min-height:0/);
   assert.match(source, /box-sizing:border-box/);
   assert.match(controlGridStyles(), /auto-fill/);
-  assert.match(controlGridStyles(), /grid-auto-rows:minmax\(var\(--marao-control-min-height,174px\),1fr\)/);
+  assert.match(controlGridStyles(), /grid-auto-rows:minmax\(0,1fr\)/);
 });
 
 test('grid validates the whole configuration before replacing working children and forwards without remounting', async () => {
@@ -39,7 +39,7 @@ test('grid validates the whole configuration before replacing working children a
   globalThis.loadCardHelpers = async () => ({ createCardElement() { creates++; return new Node(); } });
   const grid = new MaraoControlGrid(); grid.setConfig({ columns: 2, cards: [card(), card('hc_cover_card')] }); await grid._ready;
   const children = [...grid._children], range = {}; children[0].range = range;
-  for (const config of [{ columns: 0, cards: [] }, { columns: 7, cards: [] }, { cards: [card(), { type: 'markdown' }] }, { cards: [card('hc_fan_card')] }, { cards: [card('hc_light_card', { variables: [] })] }]) {
+  for (const config of [{ columns: 0, cards: [] }, { columns: 7, cards: [] }, { cards: [card(), { type: 'custom:marao-popup-card' }] }, { groups: [{count: 3, columns: 2}], cards: [card()] }, { cards: [card('hc_light_card', { variables: [] })] }]) {
     assert.throws(() => grid.setConfig(config)); assert.deepEqual(grid._children, children);
   }
   const hass = { states: {} }; grid.hass = hass; grid.preview = true; grid.hass = { ...hass };
@@ -89,4 +89,22 @@ test('independent geometry expectations reject row-only equality, missing marker
     const changed = structuredClone(good); Object.assign(changed.cells[0], patch);
     assert.ok(gridGeometryIssues(changed, expected).length);
   }
+});
+
+test('pending configuration uses committed layout until replacement children are ready', async () => {
+  const previousStyle=globalThis.getComputedStyle;globalThis.getComputedStyle=()=>({fontSize:'18px'});
+  let finish;
+  try {
+    globalThis.loadCardHelpers=async()=>({createCardElement:()=>new Node()});
+    const grid=new MaraoControlGrid();grid.getBoundingClientRect=()=>({width:360});
+    grid.setConfig({columns:2,cards:[card(),card('hc_fan_card'),card('hc_cover_card')]});await grid._ready;
+    const original=[...grid._children],committed=grid._mountedConfig,layout={style:{}};
+    const query=grid.shadowRoot.querySelector.bind(grid.shadowRoot);grid.shadowRoot.querySelector=selector=>selector==='.control-grid'?layout:query(selector);
+    globalThis.loadCardHelpers=()=>new Promise(resolve=>{finish=resolve;});
+    grid.setConfig({columns:1,cards:[card('hc_sensor_card')]});const pending=grid._ready;
+    assert.doesNotThrow(()=>{grid.hass={states:{}};grid._layout();});
+    assert.equal(grid._mountedConfig,committed);assert.deepEqual(grid._children,original);
+    assert.equal(original[0].style.gridRow,'1');assert.equal(original[1].style.gridRow,'1');assert.equal(original[2].style.gridRow,'2');
+    finish({createCardElement:()=>new Node()});await pending;assert.equal(grid._mountedConfig.cards.length,1);assert.equal(grid._children.length,1);
+  }finally{globalThis.getComputedStyle=previousStyle;}
 });

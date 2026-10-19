@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from 'node:os';
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
@@ -163,6 +164,45 @@ test('mobile emulation explicitly restores touch together with text and safe-are
   assert.deepEqual(calls.slice(3), calls.slice(0,3));
   await configurePageEmulation(context,{},scenario);
   assert.equal(sessions, 2, 'A different page needs its own emulation session');
+});
+
+test('WebKit normal playback uses native context touch and records its actual limited engine scope', async () => {
+  const context = { browser: () => ({ browserType: () => ({ name: () => 'webkit' }) }), newCDPSession: () => assert.fail('WebKit does not expose CDP') };
+  const scenario = scenarios.find(value => value.name === 'iphone-normal');
+  assert.equal(contextOptionsForScenario(scenario).hasTouch, true);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-webkit-visits-'));
+  const previous = process.env.MARAO_TEST_ARTIFACT_ROOT;
+  process.env.MARAO_TEST_ARTIFACT_ROOT = directory;
+  const frame = { url: () => 'http://192.168.0.28:8123/marao-dashboard/card-test' };
+  let record;
+  const page = { on: (type, callback) => { assert.equal(type, 'framenavigated'); record = callback; }, mainFrame: () => frame };
+  try {
+    await configurePageEmulation(context, page, scenario);
+    record(frame);
+    const [visit] = JSON.parse(fs.readFileSync(path.join(directory, 'visits.json')));
+    assert.equal(visit.engine, 'webkit'); assert.equal(visit.emulation.browserInsetOverride, false);
+    assert.equal(visit.emulation.osTextScaleOverride, false); assert.match(visit.emulation.touch, /context hasTouch/);
+    for (const profile of ['iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200']) await assert.rejects(configurePageEmulation(context, {}, scenarios.find(value => value.name === profile)), /supports only iphone-normal/);
+    await assert.rejects(configurePageEmulation(context, {}, scenario, { top: 47 }), /inset overrides are unsupported/);
+  } finally {
+    if (previous === undefined) delete process.env.MARAO_TEST_ARTIFACT_ROOT; else process.env.MARAO_TEST_ARTIFACT_ROOT = previous;
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('WebKit visual readiness applies normal shipped typography without CDP or synthetic browser insets', async () => {
+  const values = new Map(), html = { localName: 'html', children: [], dataset: {}, style: { setProperty: (key, value) => values.set(key, value) } };
+  const previous = { document: globalThis.document, requestAnimationFrame: globalThis.requestAnimationFrame };
+  globalThis.document = { documentElement: html, fonts: { ready: Promise.resolve() } };
+  globalThis.requestAnimationFrame = callback => queueMicrotask(callback);
+  const context = { browser: () => ({ browserType: () => ({ name: () => 'webkit' }) }), newCDPSession: () => assert.fail('WebKit visual readiness must not use CDP') };
+  const page = { context: () => context, evaluate: async (callback, data) => callback(data), waitForLoadState: async () => {} };
+  try {
+    await applyVisualPreferences(page, scenarios.find(value => value.name === 'iphone-normal'), 'dark');
+    assert.equal(values.get('--font-size-primary'), '18px');
+    assert.equal([...values.keys()].some(key => key.startsWith('--marao-safe-area-inset-')), false);
+    await assert.rejects(applyVisualPreferences(page, scenarios.find(value => value.name === 'iphone-bold-text-200'), 'dark'), /supports only iphone-normal/);
+  } finally { Object.assign(globalThis, previous); }
 });
 
 test('production safe-area cases keep browser and app sources independent and remove all emulation overrides', async () => {

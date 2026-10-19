@@ -4,12 +4,16 @@ import fs from "node:fs/promises";
 import vm from "node:vm";
 import * as model from "../../frontend_src/editor-model.js";
 import { PT_LABELS, MOVE_PT_LABELS } from "../../frontend_src/editor-labels.js";
+import { prepareJson } from '../../frontend_src/json-preparation.js';
 
 const source = await fs.readFile(new URL("../../frontend_src/MaraoDashboardPanel.js", import.meta.url), "utf8");
 let Panel;
 let confirmations;
 const context = vm.createContext({
   ...model,
+  performance, URL, AbortController,
+  document: { hidden: false },
+  requestAnimationFrame: callback => callback(),
   PT_LABELS, MOVE_PT_LABELS,
   HTMLElement: class { attachShadow() { this.shadowRoot = { querySelector() { return null; } }; } },
   customElements: { get() {}, define(_name, value) { Panel = value; } },
@@ -35,9 +39,11 @@ test("vacuum native command data is editable and survives sibling option changes
 function panel(config) {
   confirmations = [];
   const p = new Panel();
+  p._labelModule = { PT_LABELS, MOVE_PT_LABELS };
   p._model = model.normalizeConfig(config);
   p._savedSource = p._source();
   p._catalog = { supported_domains: ["light"] };
+  p._contextReady = true;
   p._entities = [{ entity_id: "light.test", domain: "light", area_id: "office" }];
   p._hass = { callWS() { assert.fail("A local deletion must not save or delete an HA entity"); } };
   p._updateHeader = () => {};
@@ -271,6 +277,9 @@ function loadingPanel(callWS) {
   const p=panel({name:'Draft',rooms:[],overview:{},pages:{}});
   p.isConnected=true;
   p._hass={callWS};
+  p._contextReady=false;
+  p._warmJsonResources=()=>{}; p._startJsonPreparation=()=>{};
+  p._nativeVisualReady=async()=>{p._visualReady=true;};
   p.shadowRoot={getElementById:()=>({href:''}),querySelector:()=>null};
   p._setBusy=value=>{p._busy=value;};
   p._setStatus=(message,kind)=>{p.status={message,kind};};
@@ -288,7 +297,7 @@ test('entity summaries warn for raw references and respect the effective entity 
   assert.ok(!host.innerHTML.includes('Already added to this page'));
 });
 const payload={config:JSON.stringify({name:'Saved',rooms:[],overview:{},pages:{}}),
-  editor:{catalog:{},entities:[],areas:[]},history:[],dashboard_url:'/marao-dashboard'};
+  editor:{catalog:{cards:[]},entities:[],areas:[]},history:[],dashboard_url:'/marao-dashboard'};
 
 test('the decorative header mark follows Home Assistant theme changes', () => {
   const p = panel({ name: 'Home', rooms: [] });
@@ -463,10 +472,372 @@ test('complete unopened raw, empty, nested and duplicate occurrences survive loc
   assert.equal(p._openPages.size, 1);
 });
 
-test('busy completion retains boundary-disabled controls and does not enable newly rendered boundaries', () => {
+test('native icon actions retain semantic labels, boundary state and dispatch coordinates', () => {
+  const p = panel(canonical());
+  const markup = p._iconButton('mdi:arrow-up', 'Move up', 'card-up', '0:1', true, 2, 'page');
+  assert.match(markup, /^<button type="button" class="icon-action"/);
+  for (const attribute of ['aria-label="Move up"', 'data-action="card-up"', 'data-room="0:1"', 'data-card="2"', 'data-kind="page"', ' disabled']) assert.ok(markup.includes(attribute));
+  assert.match(markup, /<ha-icon icon="mdi:arrow-up"><\/ha-icon><\/button>$/);
+  assert.ok(!p._iconButton('mdi:delete-outline', 'Delete card', 'card-delete', '0').includes(' disabled'));
+});
+
+test('native scene-order actions receive the shared standalone 48px button and icon rules', async () => {
+  const p = panel(canonical()), host = { querySelectorAll: () => [] };
+  p._renderSceneOrder(host, [{ entity_id: 'scene.safe', name: 'Safe scene' }], () => {}, () => {});
+  assert.match(host.innerHTML, /class="load-row"/);
+  assert.equal((host.innerHTML.match(/class="icon-action"/g) || []).length, 3);
+  const css = await fs.readFile(new URL('../../frontend_src/panel.css', import.meta.url), 'utf8');
+  assert.match(css, /^\.icon-action \{[^}]*box-sizing: border-box;[^}]*width: 48px; height: 48px;[^}]*padding: 12px;/m);
+  assert.match(css, /^\.icon-action:disabled \{/m);
+  assert.match(css, /(?:^|, )\.icon-action > ha-icon[^\n]*width: 24px; height: 24px;/m);
+});
+
+test('owned native clicks give one shared haptic and ignore disabled, inert and busy controls', () => {
+  const p = panel(canonical()); let haptics = 0;
+  p._moveHaptic = () => { haptics++; };
+  const button = { disabled: false, classList: { contains: name => name === 'icon-action' }, closest: () => null };
+  const event = { composedPath: () => [{}, button] };
+  p._iconActionHaptic(event); assert.equal(haptics, 1);
+  p._cardSource = () => ({ section: 0 }); p._commitCardMove = () => true;
+  p._roomAction({ dataset: { action: 'card-up', kind: 'page', room: '0:0', card: '1' } });
+  assert.equal(haptics, 1, 'The same reorder click must not dispatch a second haptic');
+  button.disabled = true; p._iconActionHaptic(event);
+  button.disabled = false; p._busy = true; p._iconActionHaptic(event);
+  p._busy = false; button.closest = () => ({}); p._iconActionHaptic(event);
+  button.closest = () => null; p._iconActionHaptic({ composedPath: () => [{}] });
+  assert.equal(haptics, 1);
+});
+
+test('busy completion includes owned native actions, retains disabled boundaries and does not enable newly rendered boundaries', () => {
   const p = panel(canonical()), first = { disabled: true, isConnected: true }, enabled = { disabled: false, isConnected: true }, replacement = { disabled: true, isConnected: true };
-  p.shadowRoot = { getElementById: () => ({}), querySelectorAll: () => [first, enabled] };
+  p.shadowRoot = { getElementById: () => ({}), querySelectorAll: selector => {
+    if (!selector.includes('button.icon-action')) return [];
+    return [first, enabled];
+  } };
   p._setBusy(true); assert.equal(enabled.disabled, true);
   p.shadowRoot.querySelectorAll = () => [first, enabled, replacement];
   p._setBusy(false); assert.equal(first.disabled, true); assert.equal(enabled.disabled, false); assert.equal(replacement.disabled, true);
+});
+
+test('initial loading makes native Visual ready independently of deferred context and History', async () => {
+  const messages = [];
+  let contextResolve, nativeResolve, nativeStarted;
+  const nativePending = new Promise(resolve => { nativeStarted = resolve; });
+  const p = loadingPanel(message => {
+    messages.push(message);
+    if (message.scope === 'context') return new Promise(resolve => { contextResolve = resolve; });
+    return Promise.resolve({ ...payload, editor: { ...payload.editor, display_entity_ids: [] } });
+  });
+  let warmed = 0, prepared = 0;
+  p._warmJsonResources = () => { assert.equal(p._busy, false); assert.equal(p._visualReady, true); warmed++; };
+  p._prepareJson = () => { prepared++; return Promise.resolve(); };
+  p._startJsonPreparation = Panel.prototype._startJsonPreparation;
+  p._nativeVisualReady = () => new Promise(resolve => {
+    nativeResolve = () => { p._visualReady = true; resolve(); };
+    nativeStarted();
+  });
+  const loading = p._load();
+  await nativePending;
+  assert.deepEqual(messages.map(message => message.scope), ['initial']);
+  assert.equal(warmed, 0); assert.equal(prepared, 0);
+  p._startJsonPreparation();
+  assert.equal(warmed, 0); assert.equal(prepared, 0);
+  nativeResolve();
+  await loading;
+  assert.equal(p._loaded, true); assert.equal(p._visualReady, true); assert.equal(p._busy, false);
+  assert.equal(warmed, 1); assert.equal(prepared, 1);
+  assert.deepEqual(messages.map(message => message.scope), ['initial', 'context']);
+  assert.equal(p._contextReady, false); assert.equal(p._historyLoaded, true);
+  contextResolve({ editor: { catalog: { cards: [] }, entities: [], areas: [] } });
+  await p._contextRequest;
+  assert.equal(p._contextReady, false, 'Transport does not apply optional metadata on its continuation');
+});
+
+test('context consumers join one read and a moved occurrence cancels awaited editing', async () => {
+  let resolve, calls = 0, edits = 0;
+  const p = loadingPanel(message => { assert.equal(message.scope, 'context'); calls++; return new Promise(done => { resolve = done; }); });
+  p._loaded = true;
+  const first = p._withEditorContext(() => { edits++; });
+  const second = p._withEditorContext(() => { edits++; });
+  await Promise.resolve(); assert.equal(calls, 1);
+  p._setDirty();
+  resolve({ editor: { catalog: { cards: [] }, entities: [], areas: [] }, page_templates: { empty: {} } });
+  await Promise.all([first, second]);
+  assert.equal(edits, 0); assert.equal(p._contextReady, true);
+  await p._withEditorContext(() => { edits++; }); assert.equal(edits, 1);
+});
+
+test('Save enters its guard before context, preserves latest edits and dispatches once without Monaco', async () => {
+  let resolveContext; const messages = [];
+  const config = canonical(); config.pages[0].sections[0].entities = []; config.pages[1].entities = [];
+  const p = loadingPanel(message => {
+    messages.push(message);
+    if (message.scope === 'context') return new Promise(done => { resolveContext = done; });
+    assert.equal(message.type, 'marao_dashboard/config/generate');
+    return Promise.resolve({ config: message.config, history: [], dashboard_url: '/marao-dashboard/home' });
+  });
+  p._model = model.normalizeConfig(config); p._loaded = true;
+  p._model.name = 'Latest before Save'; p._setDirty();
+  p._jsonPreparing = new Promise(() => {});
+  const saving = p._save(); await Promise.resolve();
+  assert.equal(p._busy, true);
+  await p._save();
+  p._roomAction({ dataset: { action: 'card-delete', kind: 'page', room: '0:0', card: '0' } });
+  resolveContext({ editor: { catalog: { cards: [], config_version: 2 }, entities: [], areas: [] } });
+  await saving;
+  assert.equal(messages.length, 2);
+  assert.equal(JSON.parse(messages[1].config).name, 'Latest before Save');
+  assert.equal(p._busy, false); assert.equal(p._dirty, false);
+  assert.equal(p._monaco, undefined);
+});
+
+test('context failure and superseded documents release Save without generation or lost drafts', async () => {
+  for (const failure of [true, false]) {
+    let resolve, reject; const messages = [];
+    const p = loadingPanel(message => { messages.push(message); return new Promise((done, fail) => { resolve = done; reject = fail; }); });
+    p._loaded = true; p._dirty = true; const before = p._source();
+    const saving = p._save(); await Promise.resolve();
+    if (failure) reject(new Error('Context unavailable'));
+    else { p._documentEpoch++; resolve({ editor: { catalog: { cards: [] }, entities: [], areas: [] } }); }
+    await saving;
+    assert.equal(messages.length, 1); assert.equal(p._source(), before);
+    assert.equal(p._dirty, true); assert.equal(p._busy, false);
+  }
+});
+
+test('Discard and Restore during real delayed JSON preparation retain the newest document without stealing Visual', async () => {
+  const oldConfirm = context.confirm, oldIdle = context.requestIdleCallback, oldCancelIdle = context.cancelIdleCallback;
+  context.confirm = () => true;
+  context.requestIdleCallback = callback => { queueMicrotask(() => callback({ timeRemaining: () => 50 })); return 1; };
+  context.cancelIdleCallback = () => {};
+  try {
+    for (const operation of ['Discard', 'Restore']) {
+      let releaseEditor, editorStarted, resolveReload, reloadStarted, restoreClick, restoreBound;
+      const editorGate = new Promise(resolve => { releaseEditor = resolve; });
+      const creating = new Promise(resolve => { editorStarted = resolve; });
+      const reloading = new Promise(resolve => { reloadStarted = resolve; });
+      const restoreReady = new Promise(resolve => { restoreBound = resolve; });
+      const messages = [], next = canonical(); next.name = `${operation} newest saved source`;
+      const response = { ...payload, config: JSON.stringify(next), editor: { catalog: { config_version: 2, cards: [] }, entities: [], areas: [] } };
+      const p = loadingPanel(message => {
+        messages.push(message);
+        if (message.type === 'marao_dashboard/history/restore') return Promise.resolve({ history: [] });
+        assert.equal(message.type, 'marao_dashboard/config/get'); assert.equal(message.scope, 'initial');
+        return new Promise(resolve => { resolveReload = resolve; reloadStarted(); });
+      });
+      p._model = model.normalizeConfig(canonical()); p._model.name = 'Stale unsaved source';
+      p._loaded = true; p._contextReady = true; p._visualReady = true; p._dirty = true;
+      p._jsonDraft = JSON.stringify(model.serializeConfig(p._model), null, 4) + '\n';
+      const nodes = new Map();
+      p.shadowRoot = { querySelector: () => null, querySelectorAll: () => [], getElementById(id) {
+        if (!nodes.has(id)) nodes.set(id, { addEventListener() {} }); return nodes.get(id);
+      } };
+      p._setBusy = Panel.prototype._setBusy;
+      p._jsonStyled = true; p._jsonPreparationModule = { prepareJson };
+      let value, creates = 0, assistanceDraft;
+      const editor = { getValue: () => value, setValue: next => { value = next; }, onDidChangeModelContent() {}, updateOptions() {}, layout() {} };
+      p._jsonModule = {
+        async createEditor(_host, _source, _catalog, _entities, _workerError, _fontError, options) {
+          creates++; editorStarted(); await editorGate; value = options.source(); return editor;
+        },
+        installJsonAssistance(_editor, _host, _catalog, _entities, draft) { assistanceDraft = draft; return { dispose() {} }; }, setTheme() {},
+      };
+      const opening = p._switchTab('json'), repeated = p._switchTab('json');
+      await creating;
+      assert.equal(creates, 1); assert.equal(p._jsonForeground, true); assert.equal(p._busy, false);
+      await p._switchTab('visual'); assert.equal(p._jsonForeground, false);
+      let restoring;
+      if (operation === 'Discard') p._discard();
+      else {
+        p._historyLoaded = true; p._history = [{ version: 'safe-version', created_at: '2026-10-18T00:00:00Z', reason: 'fixture' }];
+        const restoreButton = { dataset: { version: 'safe-version' }, addEventListener(_name, listener) { restoreClick = listener; restoreBound(); } };
+        const content = { querySelector: () => ({ addEventListener() {} }), querySelectorAll: () => [restoreButton] };
+        p._dialog = () => ({ isConnected: true, open: true, querySelector: () => content });
+        p._openHistory(); await restoreReady; restoring = restoreClick();
+      }
+      await reloading;
+      assert.equal(p._busy, true); assert.equal(nodes.get('visual-view').inert, true);
+      resolveReload(response); await p._loading; await restoring;
+      const newestModel = p._model, newestSource = p._source();
+      assert.deepEqual(JSON.parse(newestSource), next); assert.equal(p._jsonDraft, null); assert.equal(p._dirty, false);
+      releaseEditor(); await Promise.all([opening, repeated]);
+      assert.equal(p._model, newestModel); assert.equal(p._source(), newestSource); assert.equal(p._savedSource, newestSource);
+      assert.equal(p._monaco.getValue(), newestSource); assert.deepEqual(JSON.parse(JSON.stringify(assistanceDraft)), next);
+      assert.equal(p._tab, 'visual'); assert.equal(p._requestedTab, 'visual'); assert.equal(p._jsonForeground, false);
+      assert.equal(p._busy, false); assert.equal(p._dirty, false); assert.equal(p._jsonLoading, null); assert.equal(p._jsonPreparing, null);
+      assert.deepEqual(messages.map(message => message.type), operation === 'Discard' ? ['marao_dashboard/config/get'] : ['marao_dashboard/history/restore', 'marao_dashboard/config/get']);
+    }
+  } finally {
+    context.confirm = oldConfirm; context.requestIdleCallback = oldIdle; context.cancelIdleCallback = oldCancelIdle;
+  }
+});
+
+test('History is single-flight, failed reads require retry and late lists cannot replace Save history', async () => {
+  let resolve, reject, calls = 0;
+  const p = loadingPanel(message => { assert.equal(message.scope, 'history'); calls++; return new Promise((done, fail) => { resolve = done; reject = fail; }); });
+  const first = p._readHistory(); assert.equal(p._readHistory(), first);
+  await Promise.resolve(); reject(new Error('History unavailable'));
+  await assert.rejects(first, /History unavailable/);
+  await assert.rejects(p._readHistory(), /History unavailable/); assert.equal(calls, 1);
+  const retried = p._readHistory(true); await Promise.resolve();
+  p._historyEpoch++; p._history = [{ version: 'new-save' }]; p._historyLoaded = true;
+  resolve({ history: [{ version: 'stale' }] }); await retried;
+  assert.equal(p._history[0].version, 'new-save'); assert.equal(calls, 2);
+});
+
+test('idle work waits for readiness, idle budget and interaction completion, then foreground promotes it', async () => {
+  const p = loadingPanel(() => assert.fail('Idle scheduling cannot fetch'));
+  p._visualReady = false;
+  let callback, requests = 0;
+  context.requestIdleCallback = value => { callback = value; return ++requests; };
+  context.cancelIdleCallback = () => {};
+  let ran = false;
+  const waiting = p._idleStage().then(() => { ran = true; });
+  await Promise.resolve(); assert.equal(requests, 0);
+  p._visualReady = true; p._resumeJsonPreparation(); assert.equal(requests, 1);
+  callback({ timeRemaining: () => 0 }); await Promise.resolve(); assert.equal(ran, false); assert.equal(requests, 2);
+  p._interacting = true; callback({ timeRemaining: () => 50 }); await Promise.resolve(); assert.equal(ran, false);
+  p._interacting = false; p._jsonForeground = true; p._resumeJsonPreparation(); await waiting;
+  assert.equal(ran, true); assert.equal(p._resumeIdleStage, null);
+  delete context.requestIdleCallback; delete context.cancelIdleCallback;
+});
+
+test('without idle API CPU work waits for explicit selection and disconnect cancels scheduled work', async () => {
+  const p = loadingPanel(() => assert.fail('Idle scheduling cannot fetch')); p._visualReady = true;
+  let ran = false;
+  const waiting = p._idleStage().then(() => { ran = true; });
+  await Promise.resolve(); assert.equal(ran, false);
+  p._jsonForeground = true; p._resumeJsonPreparation(); await waiting; assert.equal(ran, true);
+  p._jsonForeground = false;
+  const cancelled = p._idleStage(); p._cancelIdleStage();
+  await assert.rejects(cancelled, /Obsolete editor preparation/);
+});
+
+test('disconnect clears interrupted activity, cancels idle work and reconnect prepares with the latest draft', async () => {
+  const oldIdle = context.requestIdleCallback, oldCancel = context.cancelIdleCallback, oldResize = context.ResizeObserver, oldDrag = context.bindCardDrag;
+  const oldDocumentListener = context.document.addEventListener;
+  try {
+    let idleCallback, requests = 0, resumed = false, freshPreparation;
+    context.requestIdleCallback = callback => { idleCallback = callback; return ++requests; };
+    context.cancelIdleCallback = () => {};
+    context.ResizeObserver = class { observe() {} disconnect() {} };
+    context.bindCardDrag = () => ({ dispose() {} });
+    context.document.addEventListener = () => {};
+    const p = loadingPanel(() => assert.fail('Reconnect must retain the loaded draft'));
+    p._loaded = true; p._visualReady = true; p._dirty = true;
+    p._model.name = 'Latest unsaved Visual source'; const latestSource = p._source();
+    const latestRaw = '{\n  "name": "Latest unsaved JSON draft", "future": []\n}\n';
+    p._jsonDraft = 'Older JSON draft';
+    let modelsDisposed = 0, editorsDisposed = 0;
+    p._monaco = { getValue: () => latestRaw, getModel: () => ({ dispose() { modelsDisposed++; } }), dispose() { editorsDisposed++; } };
+    p._activityEvents = new AbortController(); const priorEvents = p._activityEvents;
+    p._interacting = true; p._scrolling = true;
+    const pending = p._idleStage();
+    assert.equal(requests, 0, 'Active gestures must defer background work');
+    p.isConnected = false; p.disconnectedCallback();
+    await assert.rejects(pending, /Obsolete editor preparation/);
+    assert.equal(priorEvents.signal.aborted, true); assert.equal(p._interacting, false); assert.equal(p._scrolling, false);
+    assert.equal(p._jsonDraft, latestRaw); assert.equal(p._source(), latestSource); assert.equal(p._dirty, true);
+    assert.equal(modelsDisposed, 1); assert.equal(editorsDisposed, 1);
+    p._renderShell = () => {}; p.addEventListener = () => {}; p.style = { setProperty() {} };
+    p.shadowRoot.getElementById = () => ({ firstElementChild: {} });
+    p._startJsonPreparation = () => { freshPreparation = p._idleStage().then(() => { resumed = true; }); };
+    p.isConnected = true; p.connectedCallback(); await Promise.resolve();
+    assert.equal(requests, 1, 'The fresh connected lifecycle must schedule background idle work');
+    assert.equal(p._jsonForeground, false); assert.equal(resumed, false);
+    idleCallback({ timeRemaining: () => 50 }); await freshPreparation;
+    assert.equal(resumed, true); assert.equal(p._jsonDraft, latestRaw); assert.equal(p._source(), latestSource); assert.equal(p._dirty, true);
+    p.isConnected = false; p.disconnectedCallback();
+  } finally {
+    context.requestIdleCallback = oldIdle; context.cancelIdleCallback = oldCancel; context.ResizeObserver = oldResize; context.bindCardDrag = oldDrag;
+    context.document.addEventListener = oldDocumentListener;
+  }
+});
+
+test('native readiness failure restores the complete unsaved draft and context on reload', async () => {
+  const p = loadingPanel(() => Promise.resolve(payload));
+  p._loaded = true; p._contextReady = true; p._visualReady = true;
+  p._model.name = 'Retain unsaved'; p._savedSource = 'Retain baseline'; p._dirty = true;
+  p._jsonDraft = '{ exact retained draft }';
+  const catalog = p._catalog, entities = p._entities, model = p._model, source = p._source();
+  p._nativeVisualReady = async () => { throw new Error('Required native control failed'); };
+  await p._load(true);
+  assert.equal(p._model, model); assert.equal(p._catalog, catalog); assert.equal(p._entities, entities);
+  assert.equal(p._source(), source); assert.equal(p._jsonDraft, '{ exact retained draft }');
+  assert.equal(p._savedSource, 'Retain baseline'); assert.equal(p._dirty, true);
+  assert.equal(p._visualReady, true); assert.equal(p._retryKind, 'config'); assert.equal(p._busy, false);
+});
+
+test('native readiness reuses mounted fitting and waits independently for form and header renders and a frame', async () => {
+  const oldCreate = context.document.createElement, oldDefined = context.customElements.whenDefined, oldFrame = context.requestAnimationFrame;
+  try {
+    for (const first of ['form', 'header']) {
+      let finishForm, finishHeader, frame, frameScheduled;
+      const fitting = new Promise(resolve => { finishForm = resolve; });
+      const headerReady = new Promise(resolve => { finishHeader = resolve; });
+      const scheduled = new Promise(resolve => { frameScheduled = resolve; });
+      const p = loadingPanel(() => assert.fail('Native readiness must not fetch'));
+      p._visualReady = false;
+      const form = { addEventListener() {} };
+      context.document.createElement = name => { assert.equal(name, 'ha-form'); return form; };
+      let fits = 0;
+      p._containForm = target => { assert.equal(target, form); fits++; return fitting; };
+      p._mountForm({ replaceChildren(value) { assert.equal(value, form); } }, {}, [], () => {});
+      const controls = ['ha-button', 'ha-icon-button', 'ha-expansion-panel'].map(localName => ({ localName, updateComplete: localName === 'ha-expansion-panel' ? headerReady : Promise.resolve() }));
+      p.shadowRoot.getElementById = () => ({ querySelectorAll: selector => selector === 'ha-form' ? [form] : controls });
+      const definitions = [];
+      context.customElements.whenDefined = name => { definitions.push(name); return Promise.resolve(); };
+      context.requestAnimationFrame = callback => { frame = callback; frameScheduled(); };
+      let ready = false;
+      const pending = Panel.prototype._nativeVisualReady.call(p).then(() => { ready = true; });
+      (first === 'form' ? finishForm : finishHeader)();
+      await Promise.resolve(); await Promise.resolve();
+      assert.equal(ready, false); assert.equal(p._visualReady, false); assert.equal(frame, undefined);
+      (first === 'form' ? finishHeader : finishForm)();
+      await scheduled;
+      assert.equal(p._visualReady, false, 'Required controls still need their frame opportunity');
+      frame(); await pending;
+      assert.equal(p._visualReady, true); assert.equal(fits, 1, 'Mounted General fitting must not be repeated');
+      assert.deepEqual(definitions, ['ha-button', 'ha-icon-button', 'ha-expansion-panel']);
+    }
+  } finally {
+    context.document.createElement = oldCreate; context.customElements.whenDefined = oldDefined; context.requestAnimationFrame = oldFrame;
+  }
+});
+
+test('failed form fitting remains required, later value changes fit afresh, and header failures propagate', async () => {
+  const oldCreate = context.document.createElement, oldDefined = context.customElements.whenDefined;
+  try {
+    const p = loadingPanel(() => assert.fail('Native readiness must not fetch'));
+    p._visualReady = false;
+    let rejectFit, change, fits = 0, edits = 0;
+    const failedFit = new Promise((_resolve, reject) => { rejectFit = reject; });
+    const form = { addEventListener(name, listener) { assert.equal(name, 'value-changed'); change = listener; } };
+    context.document.createElement = () => form;
+    context.customElements.whenDefined = () => Promise.resolve();
+    p._containForm = () => { fits++; return fits === 1 ? failedFit : Promise.resolve(); };
+    p._mountForm({ replaceChildren() {} }, {}, [], () => { edits++; });
+    const header = { localName: 'ha-expansion-panel', updateComplete: Promise.resolve() };
+    p.shadowRoot.getElementById = () => ({ querySelectorAll: selector => selector === 'ha-form' ? [form] : [header] });
+    const pending = Panel.prototype._nativeVisualReady.call(p);
+    rejectFit(new Error('Native form failed'));
+    await assert.rejects(pending, /Native form failed/);
+    assert.equal(p._visualReady, false); assert.equal(p.status.kind, 'error'); assert.equal(fits, 1);
+    change({ detail: { value: { name: 'Changed' } } });
+    assert.equal(fits, 2); assert.equal(edits, 1); assert.notEqual(p._formFitting.get(form), failedFit);
+    await Panel.prototype._nativeVisualReady.call(p);
+    assert.equal(p._visualReady, true); assert.equal(fits, 2);
+    p._visualReady = false;
+    let rejectHeader;
+    header.updateComplete = new Promise((_resolve, reject) => { rejectHeader = reject; });
+    const headerPending = Panel.prototype._nativeVisualReady.call(p);
+    rejectHeader(new Error('Native header failed'));
+    await assert.rejects(headerPending, /Native header failed/);
+    assert.equal(p._visualReady, false);
+    header.updateComplete = Promise.resolve();
+    await Panel.prototype._nativeVisualReady.call(p);
+    assert.equal(p._visualReady, true); assert.equal(fits, 2);
+  } finally {
+    context.document.createElement = oldCreate; context.customElements.whenDefined = oldDefined;
+  }
 });

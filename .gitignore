@@ -36,6 +36,7 @@ yarn-error.log*
 
 # Generated build output
 ha-test/.cache/
+ha-test/.artifacts/
 tests/.artifacts/
 dist/
 _site/

@@ -9,6 +9,15 @@ const { concreteCases, expandGallery, expandHelpers, validateCoverage, popupCase
 const helpers = expandHelpers(YAML.parse(fs.readFileSync(new URL('../../ha-test/marao_dashboard_card_test_helpers.yaml', import.meta.url), 'utf8')));
 const view = expandGallery(YAML.parse(fs.readFileSync(new URL('../../ha-test/dashboard/views/00-card-test.yaml', import.meta.url), 'utf8')));
 
+test('frontend refresh gallery and realistic page describe the safe shared-navbar interaction', () => {
+  assert.ok(manifest.frontendRefreshCoverage.includes('stale-service-worker-recovery'));
+  assert.ok(manifest.frontendRefreshCoverage.includes('preserved-sign-in-settings-page'));
+  const source = require('../../ha-test/marao_dashboard_test_dashboard.json');
+  const studio = source.pages.find(page => page.path === 'studio');
+  assert.match(JSON.stringify(studio), /Hold a navbar icon for three seconds/);
+  assert.match(JSON.stringify(view), /Releasing early cancels/);
+});
+
 function roomPages(source) { return source.pages.filter(page => page.subview); }
 function roomContent(source, index) {
   const page = typeof index === 'number' ? roomPages(source)[index] : source.pages.find(page => page.path === index);
@@ -92,7 +101,7 @@ test('editable page roles are visible descriptors with safe real bindings and in
 test('a saved mixed page reuses safe entities with independent popups and an unpinned shortcut', () => {
   const source = require('../../ha-test/marao_dashboard_test_dashboard.json');
   const studio = source.pages.find(page => page.id === 'studio');
-  assert.deepEqual(studio.sections.map(section => section.columns), [1, 2, 2, undefined, 1]);
+  assert.deepEqual(studio.sections.map(section => section.columns), [1, 2, 2, undefined, 1, 2, 2]);
   const cards = studio.sections.flatMap(section => section.entities || []);
   const television = cards.find(card => card.template === 'hc_media_card');
   const energy = cards.find(card => card.template === 'hc_energy_period_card');
@@ -102,7 +111,7 @@ test('a saved mixed page reuses safe entities with independent popups and an unp
   assert.deepEqual(television.apple_tv.apps.map(app => app.source), ['YouTube']);
   assert.ok(studio.sections[4].cards.some(card => card.type === 'markdown'));
   assert.deepEqual(studio.sections[3].entities, []);
-  assert.equal(cards.filter(card => card.entity_id === 'light.marao_dashboard_test_light').length, 4);
+  assert.equal(cards.filter(card => card.entity_id === 'light.marao_dashboard_test_light').length, 5);
   assert.ok(!source.navigation.includes(studio.path));
   assert.ok(source.pages.find(page => page.id === 'overview').sections.flatMap(section => section.entities).some(card => card.tap_action?.navigation_path === '/marao-dashboard/studio'));
 });

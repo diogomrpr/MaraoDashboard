@@ -15,7 +15,7 @@ test('canonical Cases composition retains ordinary pages, is idempotent and adds
   const composed = composeDashboard(config, view);
   assert.deepEqual(composeDashboard(composed, view), composed);
   assert.deepEqual(composed.pages[0], config.pages[0]);
-  assert.deepEqual(composed.pages[1].cards, [view.cards[0]]);
+  assert.deepEqual(composed.pages[1].sections, [{entities: []}, {cards: [view.cards[0]]}]);
   assert.equal(composed.pages[1].path, 'card-test');
   assert.ok(!Object.hasOwn(composed, 'rooms') && !Object.hasOwn(composed, 'overview'));
   assert.deepEqual(config, source);

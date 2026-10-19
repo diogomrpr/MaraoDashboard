@@ -1,0 +1,30 @@
+# Tasks
+
+Implement the following as one coherent batch. Add each group's tests/documentation with its implementation, then execute the covering checks after the batch's last edit. All work remains pending; this proposal introduces no runtime behavior.
+
+## 1. Record implementation scope and preservation boundary
+
+- [x] 1.1 Record the apply-time starting commit and working-tree baseline, with affected generated/native navbar hosts, overflow and relevant shared consumers. Confirm the current source still matches the design and preserve unrelated edits; completion is a recorded scope and reviewed `test:affected --plan` with no unresolved inputs.
+- [x] 1.2 Confirm existing supported released navbar/source contracts remain unchanged and capture exact private before-state for any disposable source/generated/owned-state writes. Specify independent expected identity checks for sign-in/preferences, page URL and saved files; completion is a compatibility/preservation record with no format, default, route or API conversion.
+
+## 2. Add bounded client frontend recovery
+
+- [x] 2.1 Implement one document-scoped recovery operation using supported native WebKit reset where available and a bounded web fallback for Android, browsers and other compatible hosts. Include dirty-state blocking, bounded reachability/cache work, missing/denied APIs, one native no-op fallback, readable failure/retry and unload cleanup; verify with controlled-clock environment tests for native success/no-op/rejection, HTTP/no APIs, cleanup timeout/failure, offline preservation and duplicate calls.
+- [x] 2.2 Preserve exact origin/path/existing query/fragment and authentication/preferences, use replacement navigation without automatic retry loops, and retain content-versioned module propagation. Verify URL/storage snapshots, no entity/management dispatch, no automatic reload after failure/backgrounding, and current-versus-stale resource markers; document platform behavior and supported-version observations in update/local-development guidance, with no claims of universal cache erasure or unperformed device testing.
+
+## 3. Add the shared navbar gesture and feedback
+
+- [x] 3.1 Implement the 3000ms hold at the shared horizontal navbar, preserving short taps, keyboard activation, route order and overflow scrolling. Include armed-hold click suppression, movement/second-contact/scroll/lifecycle cancellation, preview/edit/modal guards and listener cleanup; extend navbar tests with 2999/3000ms boundaries, incomplete armed holds, More, inactive routes, later independent taps and both generated/native hosts.
+- [x] 3.2 Add localized English/Portuguese hold/progress/refresh/failure feedback and start/completion haptic requests using existing runtime catalogs, helpers and theme tokens. Verify idle/cancel cleanup, unavailable haptics, wrapping and unchanged 48px geometry in focused component/browser assertions; document the gesture and cancellation behavior in navbar/native-dashboard usage guidance.
+
+## 4. Add safe examples and focused verification coverage
+
+- [x] 4.1 Update canonical Cases metadata/examples and one realistic-page example under `/marao-dashboard` for normal/overflow and interrupted/completed holds, using no physical actions. Preserve the current disposable dashboard layout during live setup; verify fixture consistency and no shipped test-only assets, and update `openspec/feature-coverage.md` with the new source/check mapping.
+- [x] 4.2 Add focused browser checks using the real shared navbar and a controlled stale frontend/service-worker fixture, plus environment-adapted native bridge cases. Assert fresh document/assets, same page, preserved sign-in/settings, one operation, no accidental route/overflow activation, no entity services, no reload loop, cache-error diagnostics and safe retry. Separate automated browser/bridge evidence from any actual Companion-device observations in the check report.
+- [x] 4.3 Add the reviewed `frontend-refresh` verification scope to `tests/verification-map.js` with required navbar/native/popup regressions, relevant narrow/text/zoom/landscape profiles and icon-only navbar alignment. Verify its plan resolves all changed sources and selects the smallest covering serial gate; add mapping regression coverage and focused-testing documentation as needed, without implicitly selecting the full suite or historical upgrades.
+
+## 5. Run the combined gate and final inspection
+
+- [x] 5.1 After the batch's last edit, run the reviewed `npm run test:affected` plan and selected checks serially, using the apply-time base for committed work or reviewed component selection for shared files. Include relevant recovery, gesture, current asset identity, native-host, gallery and navbar `test:ha:alignment` coverage. Record actual results and omitted coverage; fix failures and repeat only the invalidated focused checks.
+- [x] 5.2 Dry-run and deploy compatible UI assets only to disposable `192.168.0.28`, retaining private exact backups and the existing sectioned dashboard. Complete one final representative inspection of generated/native navbar, hold progress/failure, overflow, modal ownership, both-theme appearance and selected 320px/phone/landscape/text/zoom layouts. Verify current fingerprint/deferred resources, same-page sign-in, no relevant console/resource defects or service calls, and exact settings/source preservation; restore temporary fixture changes and verify cleanup. Record app/device versions only where actually inspected, and explicitly state any native-device evidence limitation.
+- [x] 5.3 Validate the completed OpenSpec change and record implementation/verification evidence against its requirements. Before any separately authorized push/tag/release, run scoped `npm run verify:publish`; require live preserved-install upgrade proof only if implementation changed persistence, generated ownership or installation/upgrade behavior. Completion is passing selected gates with no unresolved relevant defects, not a claim that a proposal validation proves platform behavior.

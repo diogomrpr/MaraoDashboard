@@ -38,7 +38,7 @@ def test_raw_provenance_and_non_control_fallback_do_not_split_or_discard(raw):
             {"columns": 2, "entities": [{"entity_id": "light.safe"}, *extra], "cards": [raw]}]}]}
         before = deepcopy(source)
         view = g._page_view(g._resolve_pages(source)["pages"][0], "", "marao-dashboard")
-        assert view["cards"][0]["type"] == "grid"
+        assert view["cards"][0]["type"] == "custom:marao-control-grid"
         assert view["cards"][0]["cards"][-1] == raw
         assert len(view["cards"][0]["cards"]) == len(extra) + 2
         assert source == before
@@ -48,7 +48,9 @@ def test_automatic_empty_and_access_popup_keep_existing_boundaries_and_actions()
     source = {"config_version": 2, "name": "Automatic", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "sections": [
         {"entities": [{"entity_id": "light.safe"}, {"entity_id": "cover.safe"}]}, {"columns": 2, "entities": []}]}]}
     cards = g._page_view(g._resolve_pages(source)["pages"][0], "", "marao-dashboard")["cards"]
-    assert [(card["type"], card["columns"]) for card in cards if isinstance(card, dict)] == [("custom:marao-control-grid", 1), ("custom:marao-control-grid", 2)]
+    assert [(card["type"], card["columns"]) for card in cards if isinstance(card, dict)] == [("custom:marao-control-grid", 2)]
+    assert cards[0]["groups"] == [{"count": 1, "columns": 1}, {"count": 1, "columns": 2}]
+    assert [card["entity"] for card in cards[0]["cards"]] == ["cover.safe", "light.safe"]
     popup = g._access_popup({"entity_id": "lock.safe", "name": "Door"})
     assert popup["cards"][0]["type"] == "custom:marao-control-grid"
     assert [card["variables"]["action_service"] for card in popup["cards"][0]["cards"]] == ["lock.unlock", "lock.lock"]
@@ -89,3 +91,29 @@ def test_history_retains_exact_source_unknown_options_and_unrelated_output(tmp_p
         with pytest.raises(ValueError):
             g.write_dashboard(invalid, tmp_path)
         assert before == {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+
+
+def test_sections_keep_all_owned_families_and_structural_raw_boundaries():
+    entries = [
+        {"entity_id": "fan.safe", "template": "hc_fan_card", "name": "Ventilation"},
+        {"entity_id": "sensor.safe", "template": "hc_sensor_card", "name": "Reading"},
+        {"entity_id": "light.safe", "template": "hc_light_card", "name": "Lamp"},
+        {"entity_id": "climate.safe", "template": "hc_climate_card", "name": "Climate"},
+    ]
+    raw = {"type": "markdown", "content": "Keep exactly", "unknown": []}
+    popup = {"type": "custom:marao-popup-card", "hash": "#raw-popup", "cards": []}
+    source = {"config_version": 2, "name": "Sections", "landing_page": "home", "pages": [
+        {"name": "Home", "path": "home", "sections": [
+            {"columns": 2, "entities": entries, "cards": [raw, popup]},
+            {"entities": entries}, {"columns": 1, "entities": []},
+        ]}]}
+    before = deepcopy(source)
+    cards = g._page_view(g._resolve_pages(source)["pages"][0], "", "marao-dashboard")["cards"]
+    sections = [card for card in cards if isinstance(card, dict) and card.get("type") == "custom:marao-control-grid"]
+    assert len(sections) == 2
+    assert [card.get("entity") for card in sections[0]["cards"]] == ["fan.safe", "sensor.safe", "light.safe", "climate.safe", None]
+    assert sections[0]["cards"][-1] == raw
+    assert [card.get("entity") for card in sections[1]["cards"]] == ["sensor.safe", "climate.safe", "fan.safe", "light.safe"]
+    assert sections[1]["groups"] == [{"count": 1, "columns": 2}, {"count": 1, "columns": 1}, {"count": 1, "columns": 1}, {"count": 1, "columns": 2}]
+    assert popup in cards and popup not in sections[0]["cards"]
+    assert source == before

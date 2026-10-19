@@ -312,6 +312,14 @@ function safeAreaInsetsForScenario(scenario) {
 
 const pageEmulationSessions = new WeakMap();
 
+function emulationEngine(context, scenario) {
+  const engine = context.browser?.()?.browserType().name() || 'chromium';
+  if (engine === 'webkit') assert.ok(scenario.name === 'iphone-normal' && scenario.textScale === 1 && scenario.pageZoom === 1 && !scenario.bold,
+    'WebKit playback verification supports only iphone-normal at 1x text/zoom; scaled typography, bold and browser-inset emulation require Chromium');
+  else assert.equal(engine, 'chromium', 'Unsupported browser emulation engine');
+  return engine;
+}
+
 async function emulationSession(context, page) {
   let session = pageEmulationSessions.get(page);
   if (!session) {
@@ -322,16 +330,22 @@ async function emulationSession(context, page) {
 }
 
 async function configurePageEmulation(context, page, scenario, insets = safeAreaInsetsForScenario(scenario)) {
+  const engine = emulationEngine(context, scenario);
+  if (engine === 'webkit') assert.ok(arguments.length < 4 || arguments[3] === undefined, 'WebKit browser-inset overrides are unsupported');
+  page.__maraoEmulationEvidence = engine === 'webkit'
+    ? { engine, scope: 'Normal WebKit playback; not actual Safari or iPhone hardware', touch: 'native browser-context hasTouch', textScale: 1, pageZoom: 1, osTextScaleOverride: false, browserInsetOverride: false }
+    : { engine, touch: 'CDP', osTextScaleOverride: true, browserInsetOverride: true };
   if (!page.__maraoVisitRecorder && page.on && process.env.MARAO_TEST_ARTIFACT_ROOT) {
     page.__maraoVisitRecorder = true;
     const visits = [], file = path.join(process.env.MARAO_TEST_ARTIFACT_ROOT, 'visits.json');
     page.on('framenavigated', frame => {
       if (frame !== page.mainFrame() || !frame.url().startsWith('http')) return;
       const url = new URL(frame.url());
-      visits.push({ route: url.pathname, profile: scenario.name, engine: 'chromium', at: new Date().toISOString() });
+      visits.push({ route: url.pathname, profile: scenario.name, engine, emulation: page.__maraoEmulationEvidence, at: new Date().toISOString() });
       require('./verification-reuse').atomicReport(file, visits);
     });
   }
+  if (engine === 'webkit') return;
   const session = await emulationSession(context, page);
   await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
   await session.send("Emulation.setSafeAreaInsetsOverride", {
@@ -373,8 +387,10 @@ function visualVariablesForScenario(scenario, theme) {
 }
 
 async function applyVisualPreferences(page, scenario, theme, subtree) {
+  const engine = emulationEngine(page.context(), scenario);
   if (!subtree) await page.waitForLoadState("networkidle");
   const variables = visualVariablesForScenario(scenario, theme);
+  if (engine === 'webkit') for (const key of Object.keys(variables)) if (key.startsWith('--marao-safe-area-inset-')) delete variables[key];
   const apply = settle => page.evaluate(async ({ cssVariables, profile, mode, subtree, settle }) => {
     const version = JSON.stringify([profile, mode, cssVariables]);
     const apply = element => {
@@ -397,8 +413,10 @@ async function applyVisualPreferences(page, scenario, theme, subtree) {
     return version;
   }, { cssVariables: variables, profile: scenario.name, mode: theme, subtree, settle });
   await apply(true);
-  const session = await emulationSession(page.context(), page);
-  await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  if (engine === 'chromium') {
+    const session = await emulationSession(page.context(), page);
+    await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  }
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.evaluate(async ({ subtree }) => {
     const elements = [], animations = new Set();
@@ -1034,6 +1052,7 @@ async function main() {
         if(document.documentElement)apply();else document.addEventListener('DOMContentLoaded',apply,{once:true});
       });
       page = await context.newPage();
+      const cameraLedger = options.preview ? null : await require('./camera-request-ledger').managedCameraLedger(context, page, { output, scenario: scenario.name, theme });
       await configurePageEmulation(context, page, scenario, options.safeArea ? Object.fromEntries(insetSides.flatMap(side=>[[side,0],[side+'Max',0]])) : undefined);
       const errors = [];
       page.on("pageerror", (error) => {
@@ -1045,7 +1064,7 @@ async function main() {
         errors.push(message.text());
         if (options.preview) console.error(`[browser ${message.type()}] ${message.text()}`);
       });
-      page.on("requestfailed", (request) => {
+      if (!cameraLedger) page.on("requestfailed", (request) => {
         const message = `Failed ${request.resourceType()} request: ${new URL(request.url()).pathname} (${request.failure()?.errorText || "unknown error"})`;
         errors.push(message);
         if (options.preview) console.error(`[browser request] ${message}`);
@@ -1230,6 +1249,8 @@ async function main() {
         const found = [...await frontendRegistrationIssues(page), ...await emulationIssues(page, scenario, theme), ...await layoutIssues(page), ...await inspectPopups(page, scenario, theme, output, runName + '-page-' + view.path, captures, [], popupBehavior, checkedBehaviors)];
         if (errors.length || found.length) throw new Error(`${runName}/${view.path}: ${[...errors, ...found].join('\n')}`);
       }
+      await cameraLedger?.stopForClose();
+      if (errors.length) throw new Error(`${runName}: ${errors.join('\n')}`);
       fs.writeFileSync(path.join(output, runName + '-result.json'), JSON.stringify({ profile: scenario.name, theme,
         pages: options.pages ? dashboard.views.filter(view => view.path !== 'card-test').map(view => view.path) : [],
         gallery: !options.pagesOnly, screenshots: captures, passed: true }), { mode: 0o600 });

@@ -1,4 +1,15 @@
 {
+  "frontendRefreshCoverage": [
+    "three-second-horizontal-navbar-hold",
+    "ordinary-tap-and-overflow",
+    "cancelled-and-incomplete-hold",
+    "generated-and-native-host",
+    "dirty-and-inert-host",
+    "native-reset-and-web-fallback",
+    "http-without-cache-apis",
+    "stale-service-worker-recovery",
+    "preserved-sign-in-settings-page"
+  ],
   "nativeSurfaceCase": {
     "name": "Climate feedback \u00b7 corrected range",
     "entity": "climate.marao_dashboard_test_feedback_range_corrected"
@@ -1839,6 +1850,142 @@
     ],
     "columns": 2,
     "gap": 8,
-    "minimumHeight": 174
-  }
+    "compactReferenceMaximumHeight": 140,
+    "sectionEqualityTolerance": 0.5,
+    "coverage": [
+      "mixed-owned-families",
+      "independent-sections",
+      "automatic-group-starts",
+      "structural-raw-preservation",
+      "late-error-growth",
+      "responsive-restoration"
+    ]
+  },
+  "cameraLiveCases": [
+    {
+      "type": "custom:marao-card",
+      "template": "hc_camera_card",
+      "entity": "camera.marao_dashboard_test_camera",
+      "name": "Automatic still to live camera",
+      "variables": {
+        "popup_hash": "#marao-dashboard-test-camera-popup"
+      }
+    },
+    {
+      "type": "custom:marao-card",
+      "template": "hc_camera_card",
+      "entity": "camera.marao_dashboard_test_media_error",
+      "name": "Snapshot failure with explicit recovery",
+      "variables": {
+        "popup_hash": "#marao-dashboard-test-camera-popup"
+      }
+    }
+  ],
+  "editorDragCoverage": [
+    "stable-top-middle-bottom-pickup",
+    "partly-visible-handle",
+    "16px-post-pickup-edge-approach",
+    "8px-reversal-fresh-reapproach",
+    "stationary-armed-scroll",
+    "geometry-only-native-pickup"
+  ],
+  "sectionLayoutCases": [
+    {
+      "type": "custom:marao-control-grid",
+      "columns": 2,
+      "cards": [
+        {
+          "type": "custom:marao-card",
+          "template": "hc_light_card",
+          "entity": "light.marao_dashboard_test_onoff_light",
+          "name": "Section simple \u00b7 Lamp"
+        },
+        {
+          "type": "custom:marao-card",
+          "template": "hc_fan_card",
+          "entity": "fan.marao_dashboard_test_onoff_fan",
+          "name": "Section simple \u00b7 Fan"
+        }
+      ]
+    },
+    {
+      "type": "custom:marao-control-grid",
+      "columns": 2,
+      "cards": [
+        {
+          "type": "custom:marao-card",
+          "template": "hc_light_card",
+          "entity": "light.marao_dashboard_test_light",
+          "name": "Section sliders \u00b7 Lamp"
+        },
+        {
+          "type": "custom:marao-card",
+          "template": "hc_fan_card",
+          "entity": "fan.marao_dashboard_test_fan",
+          "name": "Section sliders \u00b7 Fan"
+        },
+        {
+          "type": "custom:marao-card",
+          "template": "hc_cover_card",
+          "entity": "cover.marao_dashboard_test_cover",
+          "name": "Section sliders \u00b7 Blind"
+        }
+      ]
+    },
+    {
+      "type": "custom:marao-control-grid",
+      "columns": 2,
+      "groups": [
+        {
+          "count": 2,
+          "columns": 1
+        },
+        {
+          "count": 3,
+          "columns": 2
+        }
+      ],
+      "cards": [
+        {
+          "type": "custom:marao-card",
+          "template": "hc_title_card",
+          "entity": "",
+          "name": "Section automatic \u00b7 structural heading"
+        },
+        {
+          "type": "custom:marao-card",
+          "template": "hc_sensor_card",
+          "entity": "sensor.marao_dashboard_test_power",
+          "name": "Section automatic \u00b7 Reading"
+        },
+        {
+          "type": "custom:marao-card",
+          "template": "hc_light_card",
+          "entity": "light.marao_dashboard_test_light",
+          "name": "Section automatic \u00b7 Lamp"
+        },
+        {
+          "type": "custom:marao-card",
+          "template": "hc_fan_card",
+          "entity": "fan.marao_dashboard_test_fan",
+          "name": "Section automatic \u00b7 Fan"
+        },
+        {
+          "type": "markdown",
+          "content": "Raw content remains untouched."
+        }
+      ]
+    }
+  ],
+  "historyDetailCoverage": [
+    "power",
+    "climate-unitless",
+    "counter-reset",
+    "known-gap",
+    "dense-narrow-peak",
+    "single-empty-error",
+    "popup-drill-in",
+    "native-preview",
+    "no-inspection-service"
+  ]
 }

@@ -9,6 +9,13 @@ nav_order: 1.3
 
 ## JSON editor
 
+Visual controls load first with your complete draft. Broader card options load
+in the background; an action that needs them shows progress while sharing that
+read. History loads when opened. Once Visual is usable, JSON prepares during
+browser idle time; opening JSON early starts it immediately. Preparation keeps
+your current tab, edits and focus, and does not save. A loading failure offers
+explicit Retry while retaining the draft and independent Visual actions.
+
 The **JSON** tab uses the standard Microsoft Monaco editor: monospace text,
 syntax highlighting, line numbers, native folding arrows, minimap, search/replace,
 suggestions and diagnostic widgets. It uses Monaco's default light/dark themes
@@ -57,8 +64,11 @@ dashboard/MaraoDashboard/dashboard.json
 ## Moving cards in Visual
 
 Drag a card's dotted handle to a position before, between or after other cards.
-Keep the pointer near the screen edge to scroll. You can move cards into another
-section of the same expanded page, including an empty section. Release to place
+Pickup and holding still keep the page steady, including near the sticky header
+or bottom edge. After pickup, move deliberately toward an edge to start scrolling;
+hold there to continue. Moving away stops scrolling, and a fresh approach starts
+it again. You can move cards into another section of the same expanded page,
+including an empty section. Release to place
 it; Escape or a cancelled gesture leaves the draft unchanged. Scrolling elsewhere
 on the row works normally.
 
@@ -459,14 +469,26 @@ override; `0` means zero decimals. Load, room and custom cards use the same
 This additive feature does not bump the configuration format or reinterpret old
 `power_unit` labels.
 
-Standard light, cover and access controls share a 174px minimum outer height,
-with title and icon in the same header. Omitted sliders remain absent; essential
-text and problems can increase the required height.
+Energy detail sheets keep day/month navigation and show exact recorded readings
+in the shared history chart. The selected period follows Home Assistant's time
+zone. Graph-enabled cards expose a separate **History** (**Histórico**) control;
+opening it preserves the card's existing action and does not send an entity
+command. See [Inspect history](../usage/cards/hc_graph_card.md#inspect-history).
 
-Use **Edit layout → fixed columns** for one continuous mixed control grid in
-saved order. Eligible sections use equal rows throughout, an 8px gap and a
-responsive column count up to the selected maximum. The final card keeps its
-normal width. Keep full-width cameras, charts and detailed panels in separate
-explicit sections. Automatic mode retains domain grouping, and raw/non-control
-sections retain their existing layout. Manual/native cards share the minimum;
-place eligible cards inside `custom:marao-control-grid` for whole-grid equality.
+Light, fan, cover and access controls use compact content-driven sizing, with
+titles and useful readings beside the icon and any slider directly below.
+In narrow embedded cards or with enlarged text, the header can wrap the icon below its text
+to preserve readable labels and full-size controls. Marao sections reflow to fewer
+columns when space is limited.
+Hidden fields reserve no empty region. Essential text, errors and the unchanged
+strict access geometry can increase height; no fixed height clips content.
+
+Use **Edit layout → fixed columns** for one continuous mixed section in saved
+order. All Marao content families share equal heights across every row within
+that section, with an 8px gap and responsive columns up to the saved maximum.
+Separate sections size independently. Automatic mode retains domain order and
+widths while sharing the section's height boundary. Raw cards retain their
+configuration and internals; structural headings, popup definitions and navbar
+keep their roles. Existing `custom:marao-control-grid` columns/cards inputs remain
+supported. Native/manual cards use the compact renderer; put them in an explicitly
+authored Marao grid when section-wide equality is wanted.

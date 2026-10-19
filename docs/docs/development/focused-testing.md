@@ -154,3 +154,54 @@ passed. Existing historical reports remain immutable.
 Use `--component battery-groups --component access-label --component editor-rendering` for the reviewed batch. Include `--component slider-headers` while the preceding header batch remains uncommitted. The selection covers aggregate/palette/problem behavior, safe gallery fixtures, strict gesture cancellation/dispatch, actual label line geometry, editor preservation, native drag and JSON continuity. Geometry compares the text glyph union with the resting thumb (4 CSS pixel center tolerance) and checks every line is contained to its right; the former stacked rule is injected to prove rejection. Access widths include 239/241px and narrow wrapped English/Portuguese labels.
 
 Editor timing uses `node tests/measure-ha-editor.js before --fixture /private/tmp/<fixture>.json --expected-editor-sha256 <installed-hash>` and the matching `after` invocation. It never deploys. Retain the same private format-2 fixture and bind each phase to the served asset hash. Three serial cold and warm samples at normal/4× CPU report native readiness, mounted controls, startup versus interaction long tasks and two-frame interaction delay (not measured paint). First expansion and reopen costs are reported separately. Saved source must remain byte-identical.
+
+### Progressive editor startup
+
+The administrator `marao_dashboard/config/get` command accepts `scope`:
+`full` is the compatible default (including explicit-source previews), `initial`
+returns the complete editable source with compact display data, `context` bundles
+catalog/entities/areas/creation templates, and `history` returns versions only.
+Other scope names and scoped explicit-source combinations are rejected. All scopes
+retain administrator/recovery guards and never write source or History.
+
+Use the reviewed editor-preload scope for changes to this boundary and JSON
+preparation. Its native-control readiness excludes optional transport. Context is
+shared across data-dependent consumers; no per-row reads or speculative History
+reads are allowed. Resource prefetch is fetch-only and advisory. Module evaluation,
+schema/model and hidden-editor construction use separate idle opportunities after
+native readiness, with no timeout forcing work while busy. Explicit JSON promotes
+the same attempt. Browsers without an idle callback keep CPU work on demand.
+
+`tests/editor-preload-checks.js` exercises actual panel Save/History methods with
+safe local management stubs; it cannot write the installed dashboard. Existing
+protected Save/Discard/Restore checks retain their independent backups/cleanup.
+Observe workers from navigation, and wait for native controls rather than network
+silence. Keep failure/Retry checks and resource/console assertions intact.
+
+`tests/measure-ha-editor.js` records per-scope response bytes/durations, browser
+response-decoding cost, native readiness, preparation stages and early/prepared
+JSON opening. Use the same private fixture, exact served asset hash and three
+serial cold/warm samples at normal and 4x CPU before/after. Frame-boundary timings
+are not paint measurements. Reports are private; preserve historical files and
+verify unchanged saved source and History. Empty, raw-only and alternate landing
+variants are independently named fixture cases rather than artificial sentinels.
+
+The eager panel excludes the JSON preparation implementation as well as Monaco.
+`MaraoDashboardJsonPreparation.js` is a separate versioned idle-loaded module.
+Portuguese labels live in `MaraoDashboardEditorLabels.js`; Portuguese startup
+loads this required locale resource alongside configuration before rendering
+native Visual controls. English startup does not request it. Locale failures
+keep the current draft and require explicit Retry; neither split changes the
+approved eager JS/CSS budgets.
+
+The `frontend-refresh` component covers the shared navbar's three-second hold,
+client recovery deadlines, platform fallbacks and unchanged auth/settings/page.
+`npm run test:ha:alignment -- --frontend-refresh` runs the selected loopback
+Chromium touch/WebKit pointer and native-wrapper cases, including deliberately
+stale service-worker HTML, actual document/resource replacement, both themes and
+narrow/text/zoom/landscape feedback geometry. The same visits check icon alignment.
+This path does not prepare or replace the disposable HA dashboard. Unit bridge
+adapters and browser engines do not establish physical Companion-app behavior or
+haptic strength; record actual app/device inspection separately when available.
+Final HA inspection verifies installed asset identities and exact preservation on
+`192.168.0.28`, with private backups and without resetting an existing demo layout.

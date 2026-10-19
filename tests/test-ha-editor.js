@@ -32,13 +32,13 @@ async function ready(page, config, { navigate = true } = {}) {
   if (navigate) await page.goto(config.url + "/marao-dashboard-editor");
   const panel = page.locator("marao-dashboard-panel");
   await panel.waitFor({ state: "visible" });
-  await page.waitForFunction(p => p._loaded, await panel.elementHandle());
-  await page.waitForLoadState('networkidle');
+  await page.waitForFunction(p => p._loaded && p._visualReady && !p._busy, await panel.elementHandle());
   const expected = fingerprint(path.join(repoRoot, "custom_components/marao_dashboard/frontend"));
   const urls = await page.evaluate(() => performance.getEntriesByType("resource").map(e => e.name));
   assert.ok(urls.some(url => url.includes("/MaraoDashboardPanel.js?v=" + expected)), "Stale editor assets");
   if (process.argv.includes("--startup")) {
-    assert.ok(!urls.some(url=>/MaraoDashboardJsonEditor|MaraoDashboard.*Worker/.test(url)), "Visual requested JSON-only resources");
+    const stages = await panel.evaluate(p => ({ ready: p._visualReadyAt, stages: p._preparationStages }));
+    assert.ok(stages.stages.every(stage => stage.start >= stages.ready), 'Optional computation preceded native Visual readiness');
   }
   return panel;
 }
@@ -193,6 +193,31 @@ async function scrollHeader(panel, allowShort = false) {
   }, allowShort);
 }
 
+async function editorProbe(page, name, run) {
+  let phase = name + ': starting', timer;
+  if (!page.__maraoProbeBinding) {
+    await page.exposeFunction('__maraoEditorProbePhase', value => {
+      page.__maraoProbePhase?.(value);
+      fs.appendFileSync(path.join(output, 'probe-phases.jsonl'), JSON.stringify({ at: new Date().toISOString(), phase: value }) + '\n');
+    });
+    page.__maraoProbeBinding = true;
+  }
+  page.__maraoProbePhase = value => { phase = name + ': ' + value; };
+  try {
+    await Promise.race([run(), new Promise((_resolve, reject) => {
+      timer = setTimeout(async () => {
+        const state = await page.locator('marao-dashboard-panel').evaluate(p => ({
+          busy: p._busy, interacting: p._interacting, scrolling: p._scrolling, hidden: document.hidden,
+          visualReady: p._visualReady, foreground: p._jsonForeground, tab: p._tab, requested: p._requestedTab,
+          openDialog: Boolean(p.shadowRoot.querySelector('ha-dialog[open]')), stages: p._preparationStages, preparing: Boolean(p._jsonPreparing), resumeIdle: Boolean(p._resumeIdleStage),
+        })).catch(() => ({ unavailable: true }));
+        fs.writeFileSync(path.join(output, 'probe-timeout.json'), JSON.stringify({ phase, state }), { mode: 0o600 });
+        reject(new Error('Editor probe did not settle within 30 seconds at ' + phase));
+      }, 30000);
+    })]);
+  } finally { clearTimeout(timer); page.__maraoProbePhase = null; }
+}
+
 async function startupChecks(page, panel) {
   if(process.argv.includes('--surfaces'))await page.exposeFunction('captureEditorStartup', async name => {
     await captureScreenshot(page, {path:path.join(output,'startup-'+name+'.png'),scale:'css'});
@@ -202,15 +227,20 @@ async function startupChecks(page, panel) {
     const capture = async name => {
       if(window.captureEditorStartup){await new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done)));await window.captureEditorStartup(name);}
     };
+    const mark = name => window.__maraoEditorProbePhase?.('startup/' + name);
+    await mark('source');
     const parent = original.parentNode;
     const payload = await original._hass.callWS({ type: 'marao_dashboard/config/get' });
     let requests = 0, writes = 0, resolve, reject;
     const hass = { ...original._hass, callWS(message) {
       if (message.type !== 'marao_dashboard/config/get') { writes++; throw new Error('Unexpected startup write'); }
+      if (message.scope === 'context') return Promise.resolve({ editor: payload.editor, page_templates: payload.page_templates });
+      if (message.scope === 'history') return Promise.resolve({ history: payload.history });
       requests++;
       return new Promise((done, fail) => { resolve = done; reject = fail; });
     }};
-    const probe = new original.constructor(); probe.hass = hass;
+    const probe = new original.constructor(); probe._startJsonPreparation = () => {}; probe.hass = hass;
+    await mark('original-monaco');
     await original._ensureMonaco();
     const module = original._jsonModule;
     original.remove(); parent.append(probe);
@@ -222,10 +252,12 @@ async function startupChecks(page, panel) {
       assert(!probe._jsonLoading && probe._requestedTab === 'visual', 'Early JSON initialized');
       probe.hass = hass; probe._load(); assert(requests === 1, 'Duplicate config request');
       await capture('loading');
+      await mark('initial-failure');
       reject(new Error('Injected configuration failure')); await probe._loading;
       assert(probe._retryKind === 'config' && !probe.shadowRoot.getElementById('retry').hidden, 'No readable retry');
       await capture('retry');
       probe.hass = hass; await Promise.resolve(); assert(requests === 1, 'Automatic retry after failure');
+      await mark('config-retry');
       const retry = probe._load(true); await Promise.resolve(); resolve(payload); await retry;
       assert(probe._loaded && requests === 2, 'Explicit config retry failed');
       probe._model.name = 'Unsaved startup check'; probe._setDirty(); const draft = probe._source();
@@ -237,24 +269,33 @@ async function startupChecks(page, panel) {
       parent.append(probe);
       // Delay the real JSON initializer while using its installed worker/editor.
 
-      let release; const gate = new Promise(done => { release = done; }); let creates = 0;
-      probe._jsonModule = { ...module, async createEditor(...args) { creates++; await gate; return module.createEditor(...args); } };
+      await mark('delayed-json');
+      let release, started; const gate = new Promise(done => { release = done; });
+      const creating = new Promise(done => { started = done; }); let creates = 0;
+      probe._jsonModule = { ...module, async createEditor(...args) { creates++; started(); await gate; return module.createEditor(...args); } };
       const json = probe._switchTab('json'); const repeated = probe._switchTab('json');
+      await creating;
       await probe._switchTab('visual');
       probe._model.name = 'Latest unsaved startup check'; probe._setDirty(); const latest = probe._source();
       await capture('json-loading');
-      release(); await Promise.all([json, repeated]);
+      await mark('release-json');
+      release();
+      // Complete the shared attempt explicitly; background idle capacity is advisory.
+      await Promise.all([json, repeated, probe._ensureMonaco()]);
       assert(creates === 1 && probe._tab === 'visual', 'Repeated JSON load or focus/tab steal');
       await probe._switchTab('json');
       assert(probe._monaco.getValue() === latest && probe._dirty, 'JSON lost latest draft');
       const oldEditor = probe._monaco;
       probe.remove(); assert(probe._monaco === null, 'Editor not disposed');
       assert(!probe.shadowRoot.querySelector('.monaco-aria-container'), 'Detached JSON announcements not disposed'); parent.append(probe);
+      await mark('revisit-json');
       await probe._ensureMonaco(); await probe._switchTab('json');
       assert(probe._monaco !== oldEditor && probe._monaco.getValue() === latest && probe._dirty, 'Revisit lost draft');
       // Exercise the real Restore action with a local management stub only.
+      await mark('restore');
       let restores=0, reads=0;
       probe._history=[{version:'20261010T180000000000Z',created_at:'2026-10-10T18:00:00Z',name:'Restore check',reason:'fixture'}];
+      probe._historyLoaded = true;
       probe._hass={...hass, async callWS(message) {
         if(message.type==='marao_dashboard/history/restore'){restores++;return {};}
         if(message.type==='marao_dashboard/config/get'){reads++;return payload;}
@@ -262,7 +303,7 @@ async function startupChecks(page, panel) {
       }};
       const confirm=window.confirm;window.confirm=()=>true;
       try {
-        probe._openHistory();const restoreButton=probe.shadowRoot.querySelector('[data-version]');await restoreButton.updateComplete;restoreButton.click();
+        probe._openHistory();await Promise.resolve();const restoreButton=probe.shadowRoot.querySelector('[data-version]');assert(restoreButton, 'Loaded History has no Restore action');await restoreButton.updateComplete;restoreButton.click();
         await new Promise((done,fail)=>{const start=performance.now();const check=()=>{
           if(restores===1 && reads===1 && !probe._busy)return done();
           if(performance.now()-start>10000)return fail(new Error('Restore did not reload configuration'));
@@ -285,6 +326,8 @@ async function assetRetry(browser, config, scenario, file) {
   const failed = [];
   page.on('requestfailed', request => failed.push(new URL(request.url()).pathname));
   await page.route('**/' + file + '*', async route => {
+    const headers = route.request().headers();
+    if (/prefetch/.test(headers['sec-purpose'] || headers.purpose || '')) return route.continue();
     if (failures++ === 0) await route.abort('failed'); else await route.continue();
   });
   try {
@@ -846,7 +889,7 @@ async function entityGroupEditorChecks(page, panel, client, config, originalByte
     });
     assert.deepEqual(await dialog.evaluate(element => {
       const issues = [];
-      for (const control of element.querySelectorAll('.gallery-card, #entity-search, .row-actions ha-icon-button, .dialog-actions ha-button')) {
+      for (const control of element.querySelectorAll('.gallery-card, #entity-search, .row-actions ha-icon-button, .row-actions .icon-action, .dialog-actions ha-button')) {
         const box = control.getBoundingClientRect();
         if (!box.width || !box.height) continue;
         if (box.width < 48 || box.height < 48 || box.left < -.5 || box.right > innerWidth + .5) issues.push('Group editor control is too small or overflows');
@@ -1111,6 +1154,7 @@ async function main() {
       const context = await browser.newContext(contextOptionsForScenario(scenario,theme));
       await context.addInitScript(setBrowserToken, { hassUrl: config.url, ...accessToken(config) });
       const page = await context.newPage();
+      page.__maraoWorkers = []; page.on('worker', worker => page.__maraoWorkers.push(worker.url()));
       await configurePageEmulation(context, page, scenario);
       page.on('framenavigated',frame=>{if(frame===page.mainFrame())fs.appendFileSync(path.join(output,'navigations.jsonl'),JSON.stringify({profile:scenario.name,theme,path:new URL(frame.url()).pathname,time:Date.now()})+'\n');});
       const diagnostics = [];
@@ -1170,7 +1214,8 @@ async function main() {
       if (process.argv.includes('--rendering') || process.argv.includes('--rendering-geometry')) await require('./editor-rendering-checks').editorRenderingChecks(page, panel, { client, scenario, theme, output, geometryOnly: process.argv.includes('--rendering-geometry') });
       if (process.argv.includes('--drag') || process.argv.includes('--drag-geometry')) await require('./editor-drag-checks').editorDragChecks(page, panel, { output, scenario, theme, client, config, persist: process.argv.includes('--drag-save') && scenario === runs[0] && theme === runThemes[0], geometryOnly: process.argv.includes('--drag-geometry') });
       if (process.argv.includes('--energy')) await energyFormatting(page, panel, config, client, original, scenario.name + '-' + theme, scenario === runs[0] && theme === runThemes[0]);
-      if (process.argv.includes("--startup") && scenario === runs[0] && theme === runThemes[0]) await startupChecks(page, panel);
+      if (process.argv.includes('--preload')) await editorProbe(page, 'preload', () => require('./editor-preload-checks').editorPreloadChecks(page, panel));
+      if (process.argv.includes("--startup") && scenario === runs[0] && theme === runThemes[0]) await editorProbe(page, 'startup', () => startupChecks(page, panel));
       if (process.argv.includes("--delete") && scenario === runs[0] && theme === runThemes[0]) await deletion(page, panel, config, client, original);
       if (process.argv.includes("--fold")) {
         try {await folding(page, panel);}
@@ -1329,7 +1374,11 @@ async function main() {
       await context.close();
       console.log("Editor checked: " + scenario.name + " (" + theme + ")");
     }
-    if (process.argv.includes("--startup")) for (const file of ["MaraoDashboardJsonEditor.js", "MaraoDashboardJsonEditor.css", "MaraoDashboardJsonWorker.js"]) await assetRetry(browser, config, runs[0], file);
+    if (process.argv.includes("--startup")) {
+      const fonts = fs.readdirSync(path.join(repoRoot, 'custom_components/marao_dashboard/frontend/assets')).filter(file => /^codicon-[A-Z0-9]+\.ttf$/.test(file));
+      assert.equal(fonts.length, 1, 'Expected one generated Monaco codicon font');
+      for (const file of ["MaraoDashboardJsonPreparation.js", "MaraoDashboardJsonEditor.js", "MaraoDashboardJsonEditor.css", fonts[0], "MaraoDashboardJsonWorker.js"]) await assetRetry(browser, config, runs[0], file);
+    }
   } catch (error) {
     const page = browser.contexts().at(-1)?.pages().at(-1);
     if (page && !page.isClosed()) await captureScreenshot(page, { path: path.join(output, 'editor-failure.png'), scale: 'css' });

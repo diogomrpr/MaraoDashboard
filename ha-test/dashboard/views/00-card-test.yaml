@@ -14,7 +14,7 @@ cards:
       - type: custom:marao-card
         template: hc_title_card
         name: Marao Dashboard Cases
-        label: All supported cards, states, and behaviors
+        label: All supported cards, states, and behaviors. Hold a navbar icon for three seconds to refresh this device. Releasing early cancels the refresh.
         variables:
           entity1: input_boolean.marao_dashboard_test_one
           entity1_name: One
@@ -92,7 +92,7 @@ cards:
       - type: custom:marao-card
         template: hc_camera_card
         entity: camera.marao_dashboard_test_camera
-        name: Camera + events
+        name: Camera · automatic live video + events
         variables:
           popup_hash: "#marao-dashboard-test-camera-popup"
           event_provider: frigate

@@ -666,19 +666,40 @@ Strict-access cards in Home Assistant grids use the available grid row when the 
 
 ### Uniform control grids
 
-Light, cover, access-summary and opening/closing/locking controls share a 174 CSS
-pixel minimum outer surface, including sliderless and hidden-field variants.
-This is a minimum, not a clipping limit. Titles and icons share their header;
-fan cards retain their header without adopting this size.
+Light, fan, cover, access-summary and opening/closing/locking controls use compact
+content-driven surfaces. Title and useful readings form a text block beside the
+icon; supported sliders follow directly. Absent fields reserve no empty region.
+An embedding narrower than the 172px reference cell, or enlarged text in a
+constrained embedding, may wrap the header vertically when adjacency cannot
+contain readable text and the full-size icon. Keep both
+blocks contained and separate; Marao-owned sections instead reflow their columns.
+Ordinary short 50% value-slider examples fit within 140px in 172px-wide cells at
+normal typography. This reference is never a clipping limit. Strict access keeps
+its 64px track and 54px thumb; long text, errors and detailed families grow freely.
+Redundant normal On/Off rows remain absent; useful values and mandatory problems remain.
 
-Wholly eligible owned sections use `custom:marao-control-grid`: all rows share
-the tallest necessary height, with an 8px gap and equal-width cells. Columns
-are a preferred maximum and reflow together before controls become cramped.
-An incomplete final row keeps its normal card width. Raw/non-control sections
-retain their composition; independent grids do not share a global maximum.
+Each owned logical section uses `custom:marao-control-grid`: all content rows
+share their tallest intrinsic height, with an 8px gap. Automatic domain groups
+retain their order, widths and group starts inside that same height boundary.
+Explicit sections size independently. Preferred columns reflow together before
+controls become cramped; incomplete rows keep their normal width. All Marao
+content families fill their cells, including native primary hosts and detailed
+history/event surfaces. Headings use intrinsic structural rows; navbar and popup
+definitions remain outside content sizing. Raw configurations keep their factory
+and internals; raw siblings do not disable owned surface equality. Independently
+authored Home Assistant containers keep their native ownership.
 
 Reviewed theme-independent geometry/behavior runs in light; representative
 appearance, state cues and contrast remain covered in both themes. Theme-sensitive
 contracts keep their additional combinations. Share compatible visits, preserve
 distinct native gestures and text-versus-zoom cases, and validate explicit reuse
 against current dependencies, environment and cleanup. Final inspection is current.
+
+Numeric history details use a separate visible 48px History control and the shared
+single-layer sheet. Selection/timestamps and full-resolution summaries remain
+readable outside the canvas; 1h/6h/24h filters reuse history. Known unavailable
+intervals break lines, isolated readings remain points, and rendering reduction
+preserves peaks. Only measurement series show the labeled sample average.
+Calendar energy ranges follow the HA timezone, including daylight-saving days.
+Parent sheets retain mounted content, scroll and focus through history drill-in;
+Close, browser navigation and removal release chart resources and inert state.

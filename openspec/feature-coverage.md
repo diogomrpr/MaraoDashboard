@@ -179,3 +179,33 @@ Navbar overflow keeps complete saved navigation lists and uses the shared render
   independently selects current requirements and validates original dependencies,
   environment, captures and cleanup. Full/parallel execution remains explicit;
   final inspection is current. Historical reports/fixtures remain immutable.
+
+## Selected implementation batch: 2026-10-18
+
+- Compact section ownership extends `control-grid` to all owned content families,
+  timeline/energy/events and native primary surfaces. Source section boundaries,
+  automatic group starts/columns, structural rows and untouched raw dictionaries
+  are covered by `test_control_grid.py` and `control-grid-checks.js`; released
+  source identity and recovery remain in the existing preservation checks.
+- Numeric history details use editable `frontend_src/history-data.js` and
+  `history-chart.js`, local generated assets and exact dependency notices.
+  `chart-details` selects independent data/renderer tests, local actual Chart.js
+  and shared-popup browser checks, energy/history/native and action regressions.
+- `editor-preload` covers scoped initial/context/History reads, shared idle JSON
+  initialization, foreground promotion, draft preservation and explicit retry.
+  `editor-drag` covers steady pickup, deliberate 16px edge approach and 8px
+  reversal/cancellation through unit and native-input geometry checks.
+- `camera` includes `MaraoCamera.js`, advancing safe media fixtures, native-loader
+  binding, per-offer native signaling ownership, early-authentication/local-ICE
+  cancellation and synthetic Chromium/WebKit lifecycle checks. Those local checks do
+  not establish actual HA transport, physical Safari or production NVR behavior.
+
+This source/check inventory describes selected work; completion and executed
+proof are recorded in each change's implementation record, not inferred here.
+
+- Navbar frontend refresh uses the shared `MaraoNavbarCard` gesture and versioned
+  `MaraoFrontendRefresh.js` recovery module. The `frontend-refresh` scope covers
+  generated/native ownership, cancellation, native no-op fallback, Android
+  current-entry reload, missing APIs, deadlines, dirty/offline preservation and
+  actual stale-service-worker recovery. Safe examples remain under the one
+  `/marao-dashboard` root; no entity actions or persisted-format changes occur.

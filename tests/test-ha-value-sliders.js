@@ -73,7 +73,8 @@ async function checkPointerInteraction(page, context, config, example, calls, po
     for (const confirmed of [0, 40]) {
       await api(config, 'POST', `/api/services/${example.source.split('.')[0]}/${expected}`, { entity_id: example.entity, [field]: confirmed });
       try {
-        await page.waitForFunction(({ element, value }) => element.isConnected && Math.abs(Number(element.dataset.sliderCurrent) - value) < 1, { element: original, value: confirmed }, { timeout: 5000 });
+        // HA data can update a held native range independently of animation frames.
+        await page.waitForFunction(({ element, value }) => element.isConnected && Math.abs(Number(element.dataset.sliderCurrent) - value) < 1, { element: original, value: confirmed }, { timeout: 5000, polling: 50 });
       } catch {
         const observed = await original.evaluate((element) => ({ connected: element.isConnected, current: element.dataset.sliderCurrent, target: element.value }));
         const state = await api(config, 'GET', `/api/states/${example.entity}`);
@@ -149,12 +150,12 @@ async function main() {
       const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
       await context.addInitScript(setBrowserToken, { ...tokens, hassUrl: config.url, clientId: `${config.url}/`, expires: Date.now() + tokens.expires_in * 1000 });
       const page = await context.newPage();
+      const cameraLedger = await require('./camera-request-ledger').managedCameraLedger(context, page, { output, scenario: scenario.name, theme });
       await configurePageEmulation(context, page, scenario);
       const errors = [];
       const calls = [];
       page.on('pageerror', (error) => errors.push(error.message));
       page.on('console', (message) => { if (['error', 'warning'].includes(message.type())) errors.push(message.text()); });
-      page.on('requestfailed', (request) => errors.push(`Failed ${request.resourceType()}: ${new URL(request.url()).pathname}`));
       page.on('response', (response) => { if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); });
       page.on('websocket', (socket) => socket.on('framesent', ({ payload }) => {
         let message;
@@ -266,6 +267,7 @@ async function main() {
         }
       }
       await page.waitForLoadState('networkidle');
+      await cameraLedger.stopForClose();
       if (errors.length) throw new Error(`${run}: browser warnings/errors: ${errors.join('; ')}`);
       fs.writeFileSync(path.join(output, `${run}.json`), JSON.stringify(readings, null, 2));
       console.log(`${run}: ${readings.length} value sliders passed.`);

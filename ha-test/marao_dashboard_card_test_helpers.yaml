@@ -265,6 +265,7 @@ camera:
     picture_error: true
   - platform: marao_test_camera
     name: Marao Dashboard Test Camera
+    live: true
 
 media_player:
   - platform: marao_test_media

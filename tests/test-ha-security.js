@@ -18,7 +18,22 @@ async function navigate(page, route) {
 async function touch(page, target, duration = 0, end) {
   await target.scrollIntoViewIfNeeded();
   await target.evaluate(element => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  // A cancelled vertical slide can leave native momentum scrolling active.
+  // Measure a settled target before starting the next independent gesture.
+  await target.evaluate(element => new Promise((resolve, reject) => {
+    const started = performance.now(); let previous, stableSince = started;
+    const inspect = () => {
+      if (!element.isConnected) return reject(new Error('Native security target was replaced before input'));
+      const bounds = element.getBoundingClientRect(), position = [bounds.left,bounds.top,bounds.width,bounds.height];
+      for (let node=element;node;node=node.parentElement||node.getRootNode()?.host) position.push(node.scrollTop||0);
+      if (!previous || position.some((value,index)=>Math.abs(value-previous[index])>.5)) stableSince=performance.now();
+      previous=position;
+      if (performance.now()-stableSince>=160) return resolve();
+      if (performance.now()-started>=5000) return reject(new Error('Native security target did not settle before input'));
+      requestAnimationFrame(inspect);
+    };
+    requestAnimationFrame(inspect);
+  }));
   const box = await target.boundingBox();
   assert.ok(box && box.width >= 48 && box.height >= 48, 'Security action must have a visible 48px target');
   const start = { x: box.x + (end ? 24 : box.width / 2), y: box.y + box.height / 2 };

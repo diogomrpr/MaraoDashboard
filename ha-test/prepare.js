@@ -45,7 +45,9 @@ function composeDashboard(config, view) {
   if (dashboard.config_version === 2 && Array.isArray(dashboard.pages)) {
     dashboard.pages = [
       ...dashboard.pages.filter(page => page.path !== 'card-test'),
-      { id: 'card-test', name: 'Cases', path: 'card-test', icon: 'mdi:test-tube', output_path: 'views/custom/01-cases.yaml', entities: view.entities || [], cards },
+      { id: 'card-test', name: 'Cases', path: 'card-test', icon: 'mdi:test-tube', output_path: 'views/custom/01-cases.yaml', sections: [
+        { entities: view.entities || [] }, ...cards.map(card => ({ cards: [card] })),
+      ] },
     ];
     return dashboard;
   }

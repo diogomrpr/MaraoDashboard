@@ -10,7 +10,7 @@ function gridGeometryIssues({ cells, gap, width, columns, order }, expectedOrder
   const height = Math.max(...cells.map(cell => cell.surface.height));
   for (const cell of cells) {
     if (!cell.marker) issues.push('missing standard family marker');
-    if (cell.surface.height < 173.5 || Math.abs(cell.surface.height - height) > .5 || Math.abs(cell.height - cell.surface.height) > .5) issues.push('unequal outer surfaces across rows');
+    if (cell.surface.height < 48 || Math.abs(cell.surface.height - height) > .5 || Math.abs(cell.height - cell.surface.height) > .5) issues.push('unequal outer surfaces across rows');
     if (Math.abs(cell.width - cells[0].width) > .5) issues.push('partial row changed card width');
     if (cell.surface.right > width + .5 || cell.surface.left < -.5) issues.push('card escaped grid');
   }
@@ -47,16 +47,28 @@ async function controlGridChecks(page, output, scenario, theme, transitions = tr
   if (transitions) {
     const before = await measure();
     for (const fault of ['marker', 'rows', 'surface']) {
-      await grid.evaluate((element, fault) => {
+      const originalRows = await grid.evaluate((element, fault) => {
         const host = element.shadowRoot.querySelector('.control-grid'), last = host.lastElementChild;
+        const originalRows = host.style.gridTemplateRows;
         if (fault === 'marker') last.removeAttribute('data-marao-standard-control');
-        if (fault === 'rows') host.style.gridAutoRows = 'auto';
+        if (fault === 'rows') {
+          // Make the last row intrinsically taller so this mutation cannot pass
+          // merely because the current labels happen to need equal heights.
+          last.shadowRoot.querySelector('ha-card').style.minHeight = `${Math.ceil(host.firstElementChild.getBoundingClientRect().height) + 64}px`;
+          // The resize observer legitimately recomputes inline row templates.
+          // Hold the deliberate regression for the measurement without disabling it.
+          const style = document.createElement('style'); style.dataset.gridRowsRegression = '';
+          style.textContent = '.control-grid{grid-template-rows:none!important;grid-auto-rows:auto!important}';
+          element.shadowRoot.append(style);
+        }
         if (fault === 'surface') last.shadowRoot.querySelector('ha-card').style.cssText = 'min-height:0;height:100px;align-self:start';
+        return originalRows;
       }, fault);
-      try { assert.ok(gridGeometryIssues(await measure(), names).length, fault + ' negative fixture must fail'); }
+      try { const mutated = await measure(); assert.ok(gridGeometryIssues(mutated, names).length, fault + ' negative fixture must fail: ' + JSON.stringify(mutated.cells.map(cell => ({height:cell.height,surface:cell.surface.height})))); }
       finally {
-        await grid.evaluate(element => { const host = element.shadowRoot.querySelector('.control-grid'), last = host.lastElementChild;
-          host.style.removeProperty('grid-auto-rows'); last.setAttribute('data-marao-standard-control', ''); last.shadowRoot.querySelector('ha-card').removeAttribute('style'); });
+        await grid.evaluate((element, rows) => { const host = element.shadowRoot.querySelector('.control-grid'), last = host.lastElementChild;
+          host.style.gridTemplateRows = rows; host.style.removeProperty('grid-auto-rows'); last.setAttribute('data-marao-standard-control', ''); last.shadowRoot.querySelector('ha-card').removeAttribute('style'); }, originalRows);
+        await grid.evaluate(element => element.shadowRoot.querySelector('[data-grid-rows-regression]')?.remove());
       }
     }
     const last = grid.locator('marao-card').last();
@@ -88,12 +100,12 @@ async function controlGridChecks(page, output, scenario, theme, transitions = tr
   await grid.scrollIntoViewIfNeeded(); await captureScreenshot(page, { path: path.join(output, `control-grid-${scenario.name}-${theme}.png`), scale: 'css' });
 }
 async function nativeControlGridChecks(page, scenario, theme) {
-  const grid = page.locator('marao-control-grid');
+  const grid = page.locator('marao-control-grid').filter({ has: page.locator('.title').filter({ hasText: /^Native grid light$/ }) });
   await page.waitForFunction(element => element._children.length === 3 && element._children.every(child => child.shadowRoot?.querySelector('marao-card')), await grid.elementHandle());
   await readySubtree(page, grid, scenario, theme);
   const issues = async () => {
     const reading = await measureGrid(grid), maximum = Math.max(...reading.cells.map(cell => cell.surface.height));
-    return reading.cells.filter(cell => cell.surface.height < 173.5 || Math.abs(cell.height - cell.surface.height) > .5 || Math.abs(cell.surface.height - maximum) > .5);
+    return reading.cells.filter(cell => cell.surface.height < 48 || Math.abs(cell.height - cell.surface.height) > .5 || Math.abs(cell.surface.height - maximum) > .5);
   };
   assert.deepEqual(await issues(), [], 'Native surfaces must fill their equal grid cells');
   const primary = grid.locator('marao-card').first(), original = await primary.evaluate(card => card._actionError);

@@ -61,7 +61,7 @@ function expandGallery(source) {
   const editable = structuredClone(manifest.editablePageCases || []);
   const view = structuredClone(source);
   view.entities = [...editable, ...structuredClone(manifest.entityGroupCases || [])];
-  view.cards.push(...structuredClone(manifest.titleLayoutCases), ...structuredClone(manifest.binaryPresentationCases), ...structuredClone(manifest.problemPresentationCases), ...structuredClone(manifest.energyFormattingCases), ...structuredClone(manifest.roomCompositionCases));
+  view.cards.push(...structuredClone(manifest.cameraLiveCases || []), ...structuredClone(manifest.sectionLayoutCases || []), ...structuredClone(manifest.titleLayoutCases), ...structuredClone(manifest.binaryPresentationCases), ...structuredClone(manifest.problemPresentationCases), ...structuredClone(manifest.energyFormattingCases), ...structuredClone(manifest.roomCompositionCases));
   view.cards.push({type: 'custom:marao-card', template: 'hc_base_card', entity: 'sensor.marao_dashboard_test_energy_format_missing_live', name: 'Simulate source unit loss', show_state: false, tap_action: {action: 'call-service', service: 'marao_test_camera.toggle_energy_unit'}});
   for (const example of manifest.energyFormattingCases.filter(card => card.popup_hash)) {
     const {popup_hash, ...reading} = example;
@@ -295,6 +295,8 @@ function validateCoverage(view) {
   const failures = [];
   const surface = manifest.nativeSurfaceCase;
   if (!cards.some(card => card.name === surface.name && card.entity === surface.entity)) failures.push('Missing native-surface retention case');
+  for (const example of manifest.cameraLiveCases || []) if (!cards.some(card => card.name === example.name && card.entity === example.entity)) failures.push(`Missing camera live case ${example.name}`);
+  for (const example of manifest.sectionLayoutCases || []) for (const child of example.cards) if (child.name && !cards.some(card => card.name === child.name)) failures.push(`Missing section case ${child.name}`);
   for (const template of manifest.requiredTemplates) if (!cards.some((card) => card.template === template)) failures.push(`Missing template ${template}`);
   for (const name of manifest.requiredOptions) if (!cards.some((card) => card.name === name)) failures.push(`Missing option example ${name}`);
   for (const group of manifest.entityGroupCases || []) if (!cards.some(card => card.template === 'hc_entity_group_card' && card.id === group.id && card.name === group.name)) failures.push(`Missing Entity Group ${group.id}`);

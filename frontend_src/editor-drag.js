@@ -60,20 +60,44 @@ export function bindCardDrag(root, { sourceFor, commit, header, label, haptic })
       s.cue.hidden = false; return;
     }
   };
+  const edgeBounds = s => {
+    const bounds = s.scroll === document.scrollingElement ? { top: 0, bottom: innerHeight } : s.scroll.getBoundingClientRect();
+    const top = Math.max(bounds.top, header().bottom), bottom = Math.min(bounds.bottom, innerHeight);
+    return { top, bottom, zone: Math.max(1, Math.min(64, (bottom - top) / 3)) };
+  };
+  const inEdge = (s, edge) => {
+    const { top, bottom, zone } = edgeBounds(s);
+    return bottom > top && s.y >= top && s.y <= bottom && (edge === 'top' ? s.y < top + zone : s.y > bottom - zone);
+  };
+  const resetIntent = s => {
+    s.edge = null; s.topReference = s.bottomReference = s.y; stopFrame();
+  };
+  const approach = (s, previousY) => {
+    if (s.edge) {
+      s.edgePeak = s.edge === 'top' ? Math.min(s.edgePeak, s.y) : Math.max(s.edgePeak, s.y);
+      const reversal = s.edge === 'top' ? s.y - s.edgePeak : s.edgePeak - s.y;
+      if (!inEdge(s, s.edge) || reversal >= 8) resetIntent(s);
+      return;
+    }
+    s.topReference = Math.max(s.topReference, s.y);
+    s.bottomReference = Math.min(s.bottomReference, s.y);
+    if (s.y < previousY && s.topReference - s.y >= 16 && inEdge(s, 'top')) s.edge = 'top';
+    else if (s.y > previousY && s.y - s.bottomReference >= 16 && inEdge(s, 'bottom')) s.edge = 'bottom';
+    if (s.edge) s.edgePeak = s.y;
+  };
   const scroll = () => {
     frame = null;
-    const s = session; if (!s?.active) return;
-    const bounds = s.scroll === document.scrollingElement ? { top: 0, bottom: innerHeight } : s.scroll.getBoundingClientRect();
-    const top = Math.max(bounds.top, header().bottom), bottom = Math.min(bounds.bottom, innerHeight), zone = Math.max(1, Math.min(64, (bottom - top) / 3));
-    let delta = 0;
-    if (s.y < top + zone) delta = -Math.ceil(14 * Math.min(1, (top + zone - s.y) / zone));
-    else if (s.y > bottom - zone) delta = Math.ceil(14 * Math.min(1, (s.y - bottom + zone) / zone));
+    const s = session; if (!s?.active || !s.edge) return;
+    if (!inEdge(s, s.edge)) { resetIntent(s); locate(); return; }
+    const { top, bottom, zone } = edgeBounds(s);
+    const delta = s.edge === 'top' ? -Math.ceil(14 * Math.min(1, (top + zone - s.y) / zone))
+      : Math.ceil(14 * Math.min(1, (s.y - bottom + zone) / zone));
     const before = s.scroll.scrollTop;
     s.scroll.scrollTop = Math.max(0, Math.min(s.scroll.scrollHeight - s.scroll.clientHeight, before + delta));
     locate();
     if (delta && s.scroll.scrollTop !== before) frame = requestAnimationFrame(scroll);
   };
-  globalThis.addEventListener('resize', () => { if (session?.active) { locate(); if (!frame) frame = requestAnimationFrame(scroll); } }, { signal: events.signal });
+  globalThis.addEventListener('resize', () => { if (session?.active) { locate(); if (session.edge && !frame) frame = requestAnimationFrame(scroll); } }, { signal: events.signal });
   root.addEventListener('pointerdown', event => {
     consumed = null;
     const handle = event.target.closest?.('[data-card-handle]');
@@ -87,6 +111,7 @@ export function bindCardDrag(root, { sourceFor, commit, header, label, haptic })
   }, { signal: events.signal });
   root.addEventListener('pointermove', event => {
     const s = session; if (!s || s.id !== event.pointerId) return;
+    const previousY = s.y;
     s.x = event.clientX; s.y = event.clientY;
     if (!s.active && Math.hypot(s.x - s.startX, s.y - s.startY) < 8) return;
     event.preventDefault();
@@ -96,8 +121,9 @@ export function bindCardDrag(root, { sourceFor, commit, header, label, haptic })
       s.cue.setAttribute('aria-hidden', 'true'); s.cue.inert = true;
       const text = document.createElement('span'); text.textContent = label(); s.cue.append(text); root.append(s.cue);
       haptic();
-    }
-    locate(); if (!frame) frame = requestAnimationFrame(scroll);
+      resetIntent(s);
+    } else approach(s, previousY);
+    locate(); if (s.edge && !frame) frame = requestAnimationFrame(scroll);
   }, { signal: events.signal, passive: false });
   root.addEventListener('pointerup', event => {
     const s = session; if (!s || s.id !== event.pointerId) return;

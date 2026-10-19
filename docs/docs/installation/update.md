@@ -169,3 +169,13 @@ register Marao-owned modules through Home Assistant's frontend API instead.
 After manually removing the entries named by the Repair, reload the Marao
 integration or restart Home Assistant. Reloading Lovelace resources alone does
 not clear the Repair.
+
+## Refresh an open device after an update
+
+Once deployment has completed and the integration has registered its current
+assets, hold the Marao navbar for three seconds. This refreshes only the current
+device's frontend, keeping sign-in, preferences, dashboard settings and the
+current page. Save or discard edits before refreshing. Android and browsers use
+web recovery; supported iOS apps use native cache reset with a bounded fallback.
+Complete browser/OS cache erasure is not guaranteed. A client refresh cannot fix
+an incomplete server deployment or an unavailable frontend file.

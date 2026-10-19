@@ -130,7 +130,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             "label": "Camera",
             "icon": "mdi:cctv",
             "domains": ["camera"],
-            "description": "Live camera feed with a generated Frigate or UniFi Protect events popup.",
+            "description": "Automatic camera preview to live video with a generated Frigate or UniFi Protect events popup.",
             "variables": [
                 _field("popup_hash", "Popup hash", "text", advanced=True),
                 _field("event_provider", "Event provider", "text", advanced=True, default="auto"),
@@ -562,3 +562,21 @@ def page_templates(config: dict[str, Any], entities: list[dict[str, Any]]) -> di
         "energy": container("mdi:lightning-bolt", energy), "wallbox": container("mdi:ev-station", wallbox),
         "media": container("mdi:television-play", players or [bound("hc_media_card", "Media player", name_key="media.player")]),
     })
+
+
+def display_catalog() -> dict[str, Any]:
+    """Project the real catalog for visible row classification, without schemas."""
+    fields = ("id", "label", "entity_optional", "domains", "device_classes")
+    return {"version": EDITOR_CATALOG["version"], "config_version": EDITOR_CATALOG["config_version"],
+            "cards": [{key: card[key] for key in fields if key in card} for card in EDITOR_CATALOG["cards"]]}
+
+
+def initial_entity_ids(config: dict[str, Any]) -> list[str]:
+    """Only primary bindings displayed in the accepted landing-page body."""
+    from .page_model import page_entries, page_sections
+    page = next((page for page in config.get("pages", []) if page.get("path") == config.get("landing_page")), None)
+    if page is None:
+        return []
+    return sorted({entity["entity_id"] for section in page_sections(page)
+                   for entity in page_entries(section.get("entities"))
+                   if entity.get("entity_id") and entity.get("template") != "hc_entity_group_card"})

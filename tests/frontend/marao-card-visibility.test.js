@@ -13,7 +13,7 @@ globalThis.HTMLElement = class {
   }
 };
 
-const source = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8");
+const source = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 const dashboardSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url), "utf8");
 const { ACCESS_HOLD_MS, MaraoCard, MaraoPopupCard, callServiceWithNotification, focusRestorer, performAction, registerMaraoCards, binaryState, cardProblem, problemStyle, serviceOutcome, stateAppearance, summaryState, entityGroupState, vacuumActions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#visibility`);
 
@@ -319,27 +319,36 @@ test("energy period cards provide calendar history navigation", () => {
 });
 
 test("graph cards keep a single recorder history request and append live data", async () => {
-  let requests = 0;
+  let requests = 0, query;
+  const end=Date.now()-1000;
+  const records=[
+    { state: "80", attributes: { unit_of_measurement: "W" }, last_updated: new Date(end-60_000).toISOString() },
+    { state: "120", attributes: { unit_of_measurement: "W" }, last_updated: new Date(end-10_000).toISOString() },
+  ];
+  const original=JSON.stringify(records);
   const card = new MaraoCard();
   card.setConfig({ entity: "sensor.power", template: "hc_graph_card", name: "House Power" });
   card.hass = {
     callService() {},
-    callApi: async () => {
+    callApi: async (_method,url) => {
       requests += 1;
-      return [[
-        { state: "80", last_updated: new Date(Date.now() - 60_000).toISOString() },
-        { state: "120", last_updated: new Date().toISOString() },
-      ]];
+      query=url;
+      return [records];
     },
-    states: { "sensor.power": { state: "125", attributes: { unit_of_measurement: "W" } } },
+    states: { "sensor.power": { state: "125", attributes: { unit_of_measurement: "W" }, last_updated:new Date(end-5_000).toISOString() } },
   };
   await new Promise((resolve) => setImmediate(resolve));
   card.hass = {
     ...card.hass,
-    states: { "sensor.power": { state: "130", attributes: { unit_of_measurement: "W" } } },
+    states: { "sensor.power": { state: "130", attributes: { unit_of_measurement: "W" }, last_updated:new Date(end).toISOString() } },
   };
 
   assert.equal(requests, 1);
+  assert.doesNotMatch(query,/no_attributes|minimal_response/,'Energy history must retain each original unit');
+  const values=card._graphValues('sensor.power');
+  assert.equal(values.error,false);assert.deepEqual(values.values.map(sample=>sample.value),[80,120,125,130]);
+  assert.deepEqual(values.values.map(sample=>sample.time),[end-60_000,end-10_000,end-5_000,end]);
+  assert.equal(values.values.at(-1).live,true);assert.equal(JSON.stringify(records),original);
   assert.match(card.shadowRoot.innerHTML, /class="graph-background"/);
   assert.match(card.shadowRoot.innerHTML, /<polyline class="line"/);
   assert.match(card.shadowRoot.innerHTML, /130 W/);
@@ -438,7 +447,7 @@ test("idle ranges and graph requests detect mutation of Home Assistant's shared 
   };
   card.hass = hass;
   // The idle-input branch is normally reached through the real shadow DOM.
-  card.shadowRoot.querySelector = (selector) => selector === 'input[data-slider-key],img.camera,.media-artwork img' ? {} : null;
+  card.shadowRoot.querySelector = (selector) => selector === 'input[data-slider-key],.camera-live,.media-artwork img' ? {} : null;
   connection.connected = false;
   card.hass = { ...hass, connected: false };
   assert.match(card.shadowRoot.innerHTML, /type="range"[^>]* disabled/);
@@ -1186,7 +1195,7 @@ test("configured weather, header, dishwasher and camera details reach the visibl
   card.setConfig({ entity: "sensor.dishwasher", template: "hc_dishwasher_card", variables: { progress_entity: "sensor.progress" } });
   assert.match(card.shadowRoot.innerHTML, /40 %/);
   card.setConfig({ entity: "camera.front", template: "hc_camera_card" });
-  assert.match(card.shadowRoot.innerHTML, /<img class="camera" src="\/synthetic-camera.svg"/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /<img class="camera"/); // Native camera is mounted only when connected; browser harness covers playback.
   for (const state of ["unknown", "unavailable"]) {
     card.hass = { states: { ...states, "camera.front": { state, attributes: states["camera.front"].attributes } } };
     assert.doesNotMatch(card.shadowRoot.innerHTML.split("</style>")[1], /<img /);
@@ -1475,7 +1484,7 @@ test("idle value sliders skip unrelated updates but refresh their state, graph, 
     const card = new MaraoCard();
     card.setConfig({ entity, template: "hc_light_card", variables: { graph_entity: graph, show_graph: true } });
     card.hass = { callService() {}, states: { [entity]: { state: "on", attributes: { brightness: 128 } }, [graph]: { state: "20" } } };
-    card.shadowRoot.querySelector = (selector) => selector === 'input[data-slider-key],img.camera,.media-artwork img' ? {} : null;
+    card.shadowRoot.querySelector = (selector) => selector === 'input[data-slider-key],.camera-live,.media-artwork img' ? {} : null;
     let renders = 0;
     card._render = () => { renders += 1; };
     const next = { ...card.hass, states: { ...card.hass.states } };
@@ -1667,10 +1676,10 @@ test('problem surfaces override custom colors and hidden normal fields without h
 
 test('failed media stays local, waits for explicit retry, and ignores old resource callbacks', () => {
   const card = new MaraoCard();
-  card.setConfig({ entity: 'camera.test', template: 'hc_camera_card' });
+  card.setConfig({ entity: 'media_player.test', template: 'hc_media_card' });
   const images = [], retries = [];
   card.shadowRoot.querySelectorAll = selector => {
-    if (selector !== 'img.camera,.media-artwork img' || !card.shadowRoot.innerHTML.includes('<img class="camera"')) return [];
+    if (selector !== 'img.camera,.media-artwork img' || !card.shadowRoot.innerHTML.includes('class="media-artwork"')) return [];
     const image = { isConnected: true, addEventListener(_event, callback) { this.error = callback; } };
     images.push(image); return [image];
   };
@@ -1679,14 +1688,14 @@ test('failed media stays local, waits for explicit retry, and ignores old resour
     const button = { addEventListener(_event, callback) { this.click = () => callback({ stopPropagation() {} }); } };
     retries.push(button); return button;
   };
-  const hass = { callService() {}, states: { 'camera.test': { state: 'idle', attributes: { entity_picture: '/safe-image' } } } };
+  const hass = { callService() {}, states: { 'media_player.test': { state: 'playing', attributes: { entity_picture: '/safe-image' } } } };
   card.hass = hass;
   assert.equal(images.length, 1);
   const firstError = images[0].error;
   firstError();
   assert.match(card.shadowRoot.innerHTML, /data-problem="error"/);
   assert.match(card.shadowRoot.innerHTML, /Media unavailable/);
-  assert.doesNotMatch(card.shadowRoot.innerHTML, /<img class="camera"/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /class="media-artwork"/);
   card.hass = { ...hass, states: { ...hass.states } };
   assert.equal(images.length, 1);
   retries.at(-1).click();
@@ -1695,7 +1704,7 @@ test('failed media stays local, waits for explicit retry, and ignores old resour
   images[0].isConnected = false;
   firstError();
   assert.equal(card._mediaError, '');
-  card.setConfig({ entity: 'camera.other', template: 'hc_camera_card' });
+  card.setConfig({ entity: 'media_player.other', template: 'hc_media_card' });
   images[1].error();
   assert.equal(card._mediaError, '');
 });

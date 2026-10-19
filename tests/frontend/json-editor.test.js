@@ -90,3 +90,18 @@ test('stock Monaco owns presentation while local assistance remains deferred and
   assert.ok(!fs.existsSync(new URL('../../frontend_src/json-tools.js', import.meta.url)));
   assert.ok(!fs.existsSync(new URL('../../frontend_src/json-editor.css', import.meta.url)));
 });
+
+
+test('JSON-only preparation is a separately built deferred resource', () => {
+  const panel = fs.readFileSync(new URL('../../frontend_src/MaraoDashboardPanel.js', import.meta.url), 'utf8');
+  const preparation = fs.readFileSync(new URL('../../frontend_src/json-preparation.js', import.meta.url), 'utf8');
+  const builder = fs.readFileSync(new URL('../../frontend_src/build-editor.cjs', import.meta.url), 'utf8');
+  assert.ok(panel.includes("this._jsonStage('preparation-module'"));
+  assert.ok(preparation.includes("this._jsonStage('schema-model'"));
+  assert.ok(preparation.includes('this._jsonModule.createEditor'));
+  assert.ok(!panel.includes('this._jsonModule.createEditor'));
+  assert.ok(builder.includes('MaraoDashboardJsonPreparation:'));
+  assert.ok(builder.includes('MaraoDashboardEditorLabels:'));
+  assert.ok(!panel.includes('import { PT_LABELS'));
+  assert.ok(panel.includes('this._ensureLabels(force)'));
+});
