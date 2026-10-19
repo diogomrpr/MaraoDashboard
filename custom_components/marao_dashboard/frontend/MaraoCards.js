@@ -2318,7 +2318,15 @@ export class MaraoControlGrid extends BaseElement {
         if (!helpers?.createCardElement) throw new Error(localize('popup.controls_unavailable', this._hass, {}, 'Controls unavailable'));
         for (const childConfig of config.cards) {
           if (request !== this._request) return;
-          const child = await helpers.createCardElement(childConfig);
+          const created = helpers.createCardElement(childConfig);
+          const child = typeof created?.then === 'function' ? await created : created;
+          // HA requests a rebuild when a custom card finishes registering.
+          child?.addEventListener('ll-rebuild', event => {
+            event.stopPropagation();
+            if (request !== this._request) return;
+            if (this.isConnected) this._ready = this._mount();
+            else this._interrupted = true;
+          }, { once: true });
           if (!child || child.localName === 'hui-error-card') throw new Error(localize('popup.controls_unavailable', this._hass, {}, 'Controls unavailable'));
           if (childConfig.template !== 'hc_title_card' && !/marao-native-title-card$/.test(childConfig.type)) child.setAttribute('data-marao-control-cell', ''); child.preview = this.preview; child.hass = this._hass;
           children.push(child);

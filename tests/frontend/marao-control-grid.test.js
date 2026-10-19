@@ -5,8 +5,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { gridGeometryIssues } = require('../control-grid-checks');
 
-class Node {
-  constructor() { this.children = []; this.childNodes = this.children; this.attributes = new Map(); this.style = { setProperty() {} }; }
+class Node extends EventTarget {
+  constructor() { super(); this.children = []; this.childNodes = this.children; this.attributes = new Map(); this.style = { setProperty() {} }; }
   attachShadow() { this.shadowRoot = new Node(); }
   append(...nodes) { for (const node of nodes) { node.parent = this; this.children.push(node); } }
   remove() { if (this.parent) this.parent.children.splice(this.parent.children.indexOf(this), 1); }
@@ -77,6 +77,49 @@ test('children created before a delayed sibling receive the latest HA context on
   await waiting; grid.hass = latest; finish(new Node()); await grid._ready;
   assert.equal(count, 2);
   for (const child of grid._children) assert.equal(child.hass, latest);
+});
+
+test('native registration rebuild recovers a failed grid and ignores retired child requests', async () => {
+  const pending = new Node(); pending.localName = 'hui-error-card';
+  let created = 0;
+  globalThis.loadCardHelpers = async () => ({ createCardElement() { return ++created === 1 ? pending : new Node(); } });
+  const grid = new MaraoControlGrid(); grid.isConnected = true;
+  grid.setConfig({ cards: [card()] }); await grid._ready;
+  assert.equal(grid._children.length, 0);
+  assert.ok(grid.shadowRoot.querySelector('[role=status]'));
+  pending.dispatchEvent(new Event('ll-rebuild')); await grid._ready;
+  assert.equal(grid._children.length, 1);
+  assert.equal(grid.shadowRoot.querySelector('[role=status]'), undefined);
+  const retired = grid._children[0];
+  grid.setConfig({ cards: [card('hc_cover_card')] }); await grid._ready;
+  const current = grid._children[0], count = created;
+  retired.dispatchEvent(new Event('ll-rebuild')); await grid._ready;
+  assert.equal(created, count); assert.equal(grid._children[0], current);
+  current.dispatchEvent(new Event('ll-rebuild')); await grid._ready;
+  assert.equal(created, count + 1);
+});
+
+test('a native rebuild received while detached waits for reconnection', async () => {
+  globalThis.loadCardHelpers = async () => ({ createCardElement: () => new Node() });
+  const grid = new MaraoControlGrid(); grid.isConnected = true;
+  grid.setConfig({ cards: [card()] }); await grid._ready;
+  const child = grid._children[0]; grid.isConnected = false; grid.disconnectedCallback();
+  child.dispatchEvent(new Event('ll-rebuild')); await grid._ready;
+  assert.equal(grid._children[0], child); assert.equal(grid._interrupted, true);
+  grid.isConnected = true; grid.connectedCallback(); await grid._ready;
+  assert.notEqual(grid._children[0], child);
+});
+
+test('the native synchronous factory gets its rebuild listener before the next microtask', async () => {
+  const pending = new Node(); pending.localName = 'hui-error-card'; let created = 0;
+  globalThis.loadCardHelpers = async () => ({ createCardElement() {
+    if (++created > 1) return new Node();
+    queueMicrotask(() => pending.dispatchEvent(new Event('ll-rebuild')));
+    return pending;
+  } });
+  const grid = new MaraoControlGrid(); grid.isConnected = true;
+  grid.setConfig({ cards: [card()] }); await grid._ready; await grid._ready;
+  assert.equal(created, 2); assert.equal(grid._children.length, 1);
 });
 
 test('independent geometry expectations reject row-only equality, missing markers and shortened surfaces', () => {

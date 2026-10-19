@@ -109,3 +109,14 @@ palettes and difficult narrow/text/zoom layouts. Typical simple controls remain
 compact; deliberately tall stress-fixture controls equalize only within their
 owned section. Existing source selections, raw cards and section boundaries were
 preserved.
+
+During 0.12.0 publication, the selected energy check exposed a cold-start
+registration race: a section retained `Controls unavailable` after Home Assistant
+returned its temporary custom-card error element. The grid now handles HA's
+`ll-rebuild` event at the child, recreates the current configuration, and ignores
+retired requests. A detached grid defers rebuilding until reconnection. Native
+synchronous factories receive the listener before the next microtask; asynchronous
+factories retain their existing support. This changes no saved or generated data.
+Focused tests cover recovery, retired requests, detachment and microtask ordering.
+The raw failure and diagnostic remain private in `run-r2jPfK` and the release
+working directory; the scoped publication gate must pass on the repaired commit.
