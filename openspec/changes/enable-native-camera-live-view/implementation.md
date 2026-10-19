@@ -233,3 +233,22 @@ instance; the existing sectioned dashboard was never regenerated or reset.
 The Marao camera release blocker and tasks 6.2/6.3 are resolved. This does not
 claim an upstream HA fix, physical-phone/actual-Safari testing, real Protect
 interoperability, the full suite, publication or preserved-install upgrade proof.
+
+## Release camera-event observation — 2026-10-19
+
+The publication gate retained one ten-second event-loading observation timeout
+in `run-tIMCj3`, after native playback passed. Its failure capture shows loaded
+events. Three focused original-assertion diagnostic runs completed, including
+the native-playback sequence and exact phone safe-area emulation; the delayed
+widget stayed connected with one initial provider request and one explicit
+Refresh. No popup remount or stuck provider was reproduced, so no popup/product
+workaround was added. The original frame-sampling failure remains in raw evidence.
+
+The event-completion observer now polls asynchronous provider state every 50 ms,
+retaining the exact element, the ten-second limit and the independent real
+request-count assertions. It accepts only connected `ready`/`error` states,
+rejects uninitialized placeholders, and disposes both handles. A real-component
+provider-promise regression and the other 20 dashboard analysis units pass.
+This changes test observation only, without a deadline extension, weaker state
+condition, request suppression or accepted browser-warning exception. The final
+scoped publication gate still has to pass.

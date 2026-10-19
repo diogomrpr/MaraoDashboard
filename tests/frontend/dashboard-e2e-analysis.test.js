@@ -18,11 +18,32 @@ const {
   dashboardScenario,
   isDelayedCameraRequest,
   refreshDelayedCameraLoading,
+  waitForCameraEvents,
   normalizedPathname,
   scrollDashboard,
   titleLayoutIssues,
 } = require("../test-ha-dashboard-e2e.js");
 const { visibleBounds } = require("../test-ha-room-cards.js");
+
+test('camera event waits observe real provider completion without frames, retain the exact element and release handles', async () => {
+  const {MaraoCameraEventsCard}=await import('../../custom_components/marao_dashboard/frontend/MaraoFrigateEventsCard.js');
+  const card=new MaraoCameraEventsCard(),calls=[];let finish,elementDisposed=false,resultDisposed=false;
+  Object.defineProperty(card,'isConnected',{get:()=>true});
+  card._connected=true;card._render=()=>{};
+  card._config={entity:'camera.marao_dashboard_test_camera',event_provider:'frigate',frigate_instance_id:'marao_test',frigate_camera:'loading',limit:12};
+  card._hass={states:{[card._config.entity]:{state:'idle'}},callWS:message=>{calls.push(message);return new Promise(resolve=>{finish=resolve;});}};
+  card._maybeLoad();
+  const element={dispose:async()=>{elementDisposed=true;}};
+  await waitForCameraEvents({waitForFunction:async(predicate,target,options)=>{
+    assert.equal(target,element);assert.deepEqual(options,{timeout:10000,polling:50});
+    assert.equal(predicate(card),false);assert.equal(predicate({isConnected:true}),false);
+    assert.equal(predicate({isConnected:false,_status:'ready'}),false);
+    finish([]);await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(predicate(card),true);assert.equal(card._status,'ready');assert.equal(calls.length,1);
+    return {dispose:async()=>{resultDisposed=true;}};
+  }},{elementHandle:async()=>element});
+  assert.equal(elementDisposed,true);assert.equal(resultDisposed,true);
+});
 
 test('delayed camera refresh atomically observes the real component handler while its provider promise is pending', async () => {
   const { MaraoCameraEventsCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoFrigateEventsCard.js');

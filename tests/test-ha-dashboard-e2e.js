@@ -406,6 +406,16 @@ function refreshDelayedCameraLoading(element) {
     readable: Boolean(element.shadowRoot.querySelector('[role="status"]')?.textContent?.trim()) };
 }
 
+async function waitForCameraEvents(page, card) {
+  const element = await card.elementHandle();
+  try {
+    // Provider completion is asynchronous data, independent of animation frames.
+    const result = await page.waitForFunction(element => element.isConnected && ['ready', 'error'].includes(element._status),
+      element, { timeout: 10000, polling: 50 });
+    await result.dispose();
+  } finally { await element.dispose(); }
+}
+
 async function checkCameraCases(page) {
   for (const example of manifest.eventCases) {
     if (page.__cameraRequestLedger) await page.__cameraRequestLedger.boundary('requested camera event navigation: ' + example.name,
@@ -427,16 +437,14 @@ async function checkCameraCases(page) {
     }
     let delayedRequestsBefore;
     if (example.expectedStatus === "loading") {
-      await page.waitForFunction(element => element.isConnected && !["idle", "loading"].includes(element._status),
-        await card.elementHandle(), { timeout: 10000 });
+      await waitForCameraEvents(page, card);
       delayedRequestsBefore = page.__cameraDelayedRequests.length;
       const loading = await card.evaluate(refreshDelayedCameraLoading);
       if (loading.status !== 'loading' || !loading.requestAdvanced || !loading.readable) {
         throw new Error("The delayed camera case did not show a readable loading state.");
       }
     }
-    await page.waitForFunction(element => element.isConnected && !["idle", "loading"].includes(element._status),
-      await card.elementHandle(), { timeout: 10000 });
+    await waitForCameraEvents(page, card);
     if (delayedRequestsBefore !== undefined) assert.equal(page.__cameraDelayedRequests.length, delayedRequestsBefore + 1, 'One explicit Refresh must send one real delayed provider request');
     if (example.expectedStatus === "error") {
       if (!await card.locator('[role="alert"]').innerText()) throw new Error("Camera provider errors must be readable.");
@@ -2283,4 +2291,4 @@ if (require.main === module) main().catch((error) => {
   console.error(error.message || error); process.exitCode = 1;
 });
 
-module.exports = { captureClimateFeedback, climateFeedbackSnapshot, buildViewChecks, checkDisconnected, checkHistoryCases, installHistoryLoadingGate, conditionalCardIsActive, dashboardNavigationViolations, dashboardScenario, isDelayedCameraRequest, refreshDelayedCameraLoading, measureCenteredIcons, normalizedPathname, scrollDashboard, titleLayoutIssues };
+module.exports = { captureClimateFeedback, climateFeedbackSnapshot, buildViewChecks, checkDisconnected, checkHistoryCases, installHistoryLoadingGate, conditionalCardIsActive, dashboardNavigationViolations, dashboardScenario, isDelayedCameraRequest, refreshDelayedCameraLoading, waitForCameraEvents, measureCenteredIcons, normalizedPathname, scrollDashboard, titleLayoutIssues };
