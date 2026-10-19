@@ -53,7 +53,8 @@ export class CameraSignaling {
     if (this.closed || this.retired.has(message.session_id)) return Promise.resolve();
     if (!session) return Promise.reject(new Error('compatibility'));
     return session.connection.sendMessagePromise(message).catch(error => {
-      if (session.closed && error?.code === 3) return; // Native ERR_CONNECTION_LOST after our explicit close.
+      const connectionLost = error?.code === 3 || error?.type === 'result' && error.success === false && error.error?.code === 3;
+      if (session.closed && connectionLost) return; // Native ERR_CONNECTION_LOST after our explicit close.
       throw error;
     });
   }

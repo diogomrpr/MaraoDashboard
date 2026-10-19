@@ -77,11 +77,14 @@ test('authentication and offer failures propagate while native construction fail
 });
 
 test('only explicit teardown cancels connection-lost ICE work; active connection loss and server errors remain failures', async () => {
-  for(const [closed,code,canceled] of [[false,3,false],[true,3,true],[true,'webrtc_candidate_failed',false]]){
+  const nativeClose = {type:'result',success:false,error:{code:3,message:'Connection lost'}};
+  for(const [closed,error,canceled] of [[false,{code:3},false],[true,{code:3},true],[false,nativeClose,false],[true,nativeClose,true],
+    [true,{code:'webrtc_candidate_failed'},false],[true,{...nativeClose,error:{code:'webrtc_candidate_failed'}},false],
+    [true,{...nativeClose,success:true},false],[true,{error:{code:3}},false]]){
     const f=signalingFixture(); const stop=await f.signaling.subscribeMessage(()=>{},f.offer); let reject;
     f.connections[0].result=new Promise((_,fail)=>{reject=fail;});
     const candidate=f.signaling.candidate({type:'camera/webrtc/candidate',entity_id:'camera.safe',session_id:'owned-session'});
-    if(closed)stop(); const error={code}; reject(error);
+    if(closed)stop(); reject(error);
     if(canceled)assert.equal(await candidate,undefined);else await assert.rejects(candidate,failure=>failure===error);
     f.signaling.close();
   }

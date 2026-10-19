@@ -252,3 +252,15 @@ provider-promise regression and the other 20 dashboard analysis units pass.
 This changes test observation only, without a deadline extension, weaker state
 condition, request suppression or accepted browser-warning exception. The final
 scoped publication gate still has to pass.
+
+## Native close-result envelope — 2026-10-19
+
+The release landscape run `run-Yfz3Nj` and a focused isolated reproduction
+retained two unhandled native `{type: "result", success: false, error: {code: 3}}
+rejections after owned-channel teardown. The existing cancellation check expected
+only `{code: 3}`. The bridge now also recognizes the native close-result envelope,
+only after that exact session is closed. Active failures, other server codes,
+success-shaped and malformed envelopes continue to reject. Focused regression
+cases cover both native shapes and those negative boundaries. Raw native errors
+and system-log calls remain in the private release evidence; no console filtering
+or warning exception is used. The scoped gate must pass on this corrected commit.
