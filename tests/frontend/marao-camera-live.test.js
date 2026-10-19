@@ -333,6 +333,22 @@ test('stopping invalidates async work and releases this host without touching du
   Object.assign(playback,{generation:1,state:'live',mediaObserver:{disconnect(){calls.push('observer');}},player:{remove(){calls.push('remove');}},video:{removeEventListener(type){calls.push(type);}},mediaHandlers:{playing(){},timeupdate(){}},attempt:true});
   playback.stop();assert.equal(playback.generation,2);assert.equal(playback.player,null);assert.equal(playback.video,null);assert.equal(playback.attempt,false);assert.deepEqual(calls,['observer','playing','timeupdate','remove']);
 });
+test('repeated idle cleanup preserves the completed release generation and cancels each later attempt once', () => {
+  const playback = Object.create(CameraPlayback.prototype);
+  let removed = 0, closed = 0;
+  Object.assign(playback, { generation: 7, state: 'live', attempt: true,
+    player: { remove() { removed++; } }, signaling: { close() { closed++; } } });
+  playback.stop();
+  const released = playback.generation;
+  playback.stop(); playback.stop();
+  assert.equal(playback.generation, released, 'Repeated ineligible notifications must retain the exact completed release');
+  assert.equal(removed, 1); assert.equal(closed, 1);
+  playback.attempt = true; // A later registration is pending before its host exists.
+  playback.stop();
+  assert.equal(playback.generation, released + 1, 'A new pending attempt must still be invalidated');
+  playback.stop();
+  assert.equal(playback.generation, released + 1);
+});
 test('camera implementation delegates transport and makes no direct device/service request', () => {
   assert.doesNotMatch(source,/callService|fetch\(|rtsp:|camera\.turn_on|camera\.play_stream/);
   assert.match(source,/player\.hass = this\.nativeHass/);

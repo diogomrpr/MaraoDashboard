@@ -344,7 +344,8 @@ export class CameraPlayback {
     this.video = null; this.mediaHandlers = null;
   }
   stop() {
-    ++this.generation; clearTimeout(this.timer); this.mediaObserver?.disconnect(); this.mediaObserver = null; this.unbind();
+    if (this.attempt || this.player) ++this.generation;
+    clearTimeout(this.timer); this.mediaObserver?.disconnect(); this.mediaObserver = null; this.unbind();
     this.signaling?.close(); this.signaling = null;
     this.stage?.removeEventListener('context-request', this.contextRequest); this.contextRequest = null; this.contexts?.clear();
     this.player?.remove(); this.player = null; this.attempt = false;

@@ -303,3 +303,16 @@ Cases and Entrance camera examples exercise these same controls; no new saved
 option, card variant or fixture entity is introduced. Raw before-fix artifacts
 are retained privately under `recovery-tap-before-artifacts`; the current local
 camera check passes. Final native scope and publication verification remain due.
+
+### Release verification: repeated idle camera stops
+
+The native-editor reproduction retained a real HLS abort from Marao navigation.
+The exact release was rejected because repeated ineligible lifecycle notifications
+incremented the completed release generation again before the proof microtask.
+Stopping now invalidates an active host or pending attempt once; subsequent idle
+cleanup still releases resources without changing the completed generation.
+A counterfactual regression fails on the previous implementation and covers both
+repeated idle cleanup and cancellation of a later pending registration. Native
+release assertions and cancellation classification remain unchanged. The native
+runner now prints nested aggregate errors so a future failure retains its cause.
+Private original failure and reproduction reports remain unchanged.

@@ -408,5 +408,5 @@ async function main() {
   console.log('Native editing acceptance passed; private scoped report: ' + reportFile);
 }
 
-if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
+if (require.main === module) main().catch(error => { console.error(require('node:util').inspect(error, { depth: null })); process.exitCode = 1; });
 module.exports = { fixtureDashboard };
