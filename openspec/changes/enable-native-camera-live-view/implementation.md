@@ -288,3 +288,18 @@ and ten-second budget. A real pending-provider regression exercises that polling
 loop and proves one request, correct completion and handle cleanup. The timeout
 regression retains the original error and old/current state diagnostics. No
 product event/popup workaround or deadline extension was added.
+
+## Recovery-control tap ownership — 2026-10-19
+
+`run-ks7whC` retained an Android recovery timeout with the camera ineligible and
+its events sheet open. Automatic media progress could remove the recovery button
+between touch start and click, passing the click into the underlying event
+button. A deterministic mobile touch regression removes recovery on pointer-down:
+it fails against the prior runtime with hash `#events`, and passes in both local
+Chromium and WebKit with the repair. The feedback row now retains pointer events
+and consumes its clicks, using the existing reserved geometry. Normal event
+navigation and explicit recovery remain independently tested. The existing safe
+Cases and Entrance camera examples exercise these same controls; no new saved
+option, card variant or fixture entity is introduced. Raw before-fix artifacts
+are retained privately under `recovery-tap-before-artifacts`; the current local
+camera check passes. Final native scope and publication verification remain due.

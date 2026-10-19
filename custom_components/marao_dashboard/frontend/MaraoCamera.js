@@ -150,10 +150,12 @@ export class CameraPlayback {
       .camera-stage{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:#000}
       .camera-stage>ha-camera-stream,.camera-poster{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
       .camera-poster{z-index:1;background:#000}.camera-poster[hidden]{display:none}
-      .camera-feedback{box-sizing:border-box;display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding-top:8px;min-height:1.25em;overflow-wrap:anywhere;font-size:var(--font-size-secondary,1rem);line-height:1.25}
+      .camera-feedback{box-sizing:border-box;display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding-top:8px;min-height:1.25em;overflow-wrap:anywhere;font-size:var(--font-size-secondary,1rem);line-height:1.25;pointer-events:auto}
       .camera-feedback span{flex:1 1 9em;min-width:0}.camera-feedback button{position:relative;z-index:3;box-sizing:border-box;min-width:48px;min-height:48px;max-width:100%;white-space:normal;overflow-wrap:anywhere;pointer-events:auto}
       </style><div class="camera-stage"><img class="camera-poster" alt="" hidden></div><div class="camera-feedback" role="status"><span></span></div>`;
     this.stage = slot.querySelector('.camera-stage'); this.poster = slot.querySelector('.camera-poster'); this.feedback = slot.querySelector('.camera-feedback');
+    // Retain a touch target if playback removes its recovery button mid-gesture.
+    this.feedback.addEventListener('click', event => { event.stopPropagation(); event.preventDefault(); });
     this.posterError = event => {
       if (event.currentTarget !== this.poster || !this.poster.hasAttribute('src') || this.state === 'live') return;
       this.posterFailed = true; this.poster.hidden = true;

@@ -81,6 +81,12 @@ retry/lifecycle recovery, inert previews, independent event action and selected
 mobile/text layouts. Representative success captures and private evidence live
 under ignored `ha-test/.artifacts/camera-live-local/`.
 
+The feedback row owns its touch area even when automatic recovery removes its
+button during a gesture. Its reserved height and pointer handling prevent that
+tap from falling through to the camera's event action. The local mobile touch
+regression removes the button on pointer-down and verifies that the page hash
+stays unchanged in Chromium and WebKit; the normal event action still works.
+
 Local contract doubles do not prove native Home Assistant transport. The selected
 native camera checks run separately against disposable `192.168.0.28` with safe
 synthetic media, including Chromium mobile profiles and Playwright WebKit.
