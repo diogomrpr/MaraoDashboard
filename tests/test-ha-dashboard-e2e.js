@@ -1661,7 +1661,8 @@ async function main() {
     await page.__cameraRequestLedger?.assert();
     if (!errors.length) return;
     const observed = errors.splice(0);
-    throw new Error(`${label} produced browser warnings/errors:\n${observed.map((item) => `- ${item}`).join("\n")}`);
+    const nativeReports = serviceCalls.filter(call => call.domain === 'system_log' && call.service === 'write').map(call => call.data?.message);
+    throw new Error(`${label} produced browser warnings/errors:\n${observed.map((item) => `- ${item}`).join("\n")}\nNative error reports: ${JSON.stringify(nativeReports)}`);
   };
   if (process.argv.includes('--toggle-only')) {
     const entity = 'switch.marao_dashboard_test_switch';

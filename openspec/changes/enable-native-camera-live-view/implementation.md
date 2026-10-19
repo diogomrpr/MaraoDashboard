@@ -264,3 +264,16 @@ success-shaped and malformed envelopes continue to reject. Focused regression
 cases cover both native shapes and those negative boundaries. Raw native errors
 and system-log calls remain in the private release evidence; no console filtering
 or warning exception is used. The scoped gate must pass on this corrected commit.
+
+## Release native playback observation
+
+The WebKit release run retained a browser-object diagnostic in `run-utsH2q`.
+Two focused WebKit repetitions were clean; a third retained a five-second native
+progress timeout whose immediate snapshot shows the same visible video advanced.
+Playback outcome/progress observations now poll every 50 ms, independently of
+animation frames, with the same 35/5-second budgets, exact owner/video identity,
+original-time advancement, transport and metadata checks. Regression coverage
+continues to reject stalled, paused, foreign and newly created media. This changes
+only observation, not the player or timeout. Browser-error failures additionally
+retain HA's native system-log report payload beside the original diagnostics.
+No browser warning is filtered or accepted. Final scoped verification is required.

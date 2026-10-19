@@ -117,7 +117,7 @@ test('native outcome captures state and feedback atomically before a transport h
     const card = { _camera: { state, feedback: { textContent: `Observed ${state}` } } };
     let disposed = false;
     const page = { async waitForFunction(predicate, target, options) {
-      assert.equal(target, card); assert.equal(options.timeout, 35000);
+      assert.equal(target, card); assert.equal(options.timeout, 35000); assert.equal(options.polling, 50);
       const observed = predicate(target);
       target._camera = { state: 'loading', feedback: { textContent: 'Native handoff' } };
       return { async jsonValue() { return observed; }, async dispose() { disposed = true; } };
@@ -153,7 +153,7 @@ function nativeProgressFixture(polls) {
   const page = {
     async evaluateHandle(create, target) { assert.equal(target, card); return { ...create(target), async dispose() { disposed.probe = true; } }; },
     async waitForFunction(predicate, argument, options) {
-      assert.equal(argument.card, card); assert.equal(options.timeout, 5000, 'One fixed overall playback budget');
+      assert.equal(argument.card, card); assert.equal(options.timeout, 5000, 'One fixed overall playback budget'); assert.equal(options.polling, 50);
       const observed = polls(predicate, argument);
       return { async jsonValue() { return observed; }, async dispose() { disposed.result = true; } };
     },

@@ -10,7 +10,7 @@ async function waitForCameraOutcome(page, card) {
     const camera = card._camera;
     return ['live', 'blocked', 'error', 'snapshot'].includes(camera?.state)
       ? { state: camera.state, feedback: camera.feedback.textContent } : false;
-  }, card, { timeout: 35000 });
+  }, card, { timeout: 35000, polling: 50 });
   try { return await observation.jsonValue(); }
   finally { await observation.dispose(); }
 }
@@ -97,7 +97,7 @@ async function waitForCameraAdvance(page, card, { captureBaseline = false, metad
     video: card._camera.video, before: card._camera.video?.currentTime }), card);
   let observation;
   try {
-    observation = await page.waitForFunction(observeNativeCamera, { card, probe, captureBaseline, metadata }, { timeout: 5000 });
+    observation = await page.waitForFunction(observeNativeCamera, { card, probe, captureBaseline, metadata }, { timeout: 5000, polling: 50 });
     return await observation.jsonValue();
   } finally {
     try { await observation?.dispose(); }
