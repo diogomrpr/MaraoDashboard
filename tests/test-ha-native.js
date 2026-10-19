@@ -17,6 +17,21 @@ const walk = (value, visit) => {
   else if (value && typeof value === 'object') { visit(value); Object.values(value).forEach(child => walk(child, visit)); }
 };
 
+function recordNativeService(message, issues, calls) {
+  if (message.type !== 'call_service') return;
+  if (message.domain === 'system_log' && message.service === 'write') {
+    issues.push('Native frontend error report: ' + String(message.service_data?.message || 'Missing diagnostic message'));
+    return;
+  }
+  const entity = message.target?.entity_id || message.service_data?.entity_id;
+  const entities = Array.isArray(entity) ? entity : [entity];
+  if (!entities.length || !entities.every(id => typeof id === 'string' && id.includes('.marao_dashboard_test_'))) {
+    issues.push('Native proof attempted a non-fixture service: ' + message.domain + '.' + message.service);
+    return;
+  }
+  calls.push({ domain: message.domain, service: message.service, entity }); // Never record service data/PINs.
+}
+
 async function openBrowser(config, run) {
   const browser = await chromium.launch();
   try {
@@ -33,11 +48,7 @@ async function openBrowser(config, run) {
   page.on('response', response => { if (response.status() >= 400) issues.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
   page.on('websocket', socket => socket.on('framesent', ({ payload }) => {
     let message; try { message = JSON.parse(String(payload)); } catch { return; }
-    if (message.type !== 'call_service') return;
-    const entity = message.target?.entity_id || message.service_data?.entity_id;
-    const entities = Array.isArray(entity) ? entity : [entity];
-    assert.ok(entities.length && entities.every(id => typeof id === 'string' && id.includes('.marao_dashboard_test_')), 'Native proof attempted a non-fixture service');
-    calls.push({ domain: message.domain, service: message.service, entity }); // Never record service data/PINs.
+    recordNativeService(message, issues, calls);
   }));
   return { browser, context, page, issues, calls, close: async () => {
     const errors = [];
@@ -409,4 +420,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(error => { console.error(require('node:util').inspect(error, { depth: null })); process.exitCode = 1; });
-module.exports = { fixtureDashboard };
+module.exports = { fixtureDashboard, recordNativeService };

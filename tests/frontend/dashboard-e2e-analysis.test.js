@@ -457,3 +457,17 @@ test("room geometry is read atomically and rejects an invisible element", async 
   assert.deepEqual(await visibleBounds(host, '[data-room-lights-off]'), { width: 48, height: 48 });
   await assert.rejects(() => visibleBounds({ evaluate: (run, selector) => run({ shadowRoot: { querySelector: () => null }, querySelector: () => null }, selector) }, 'nav'), /element is missing: nav/);
 });
+
+
+test('native service diagnostics fail through the checked issue list without bypassing fixture cleanup', () => {
+  const {recordNativeService}=require('../test-ha-native.js'),issues=[],calls=[];
+  recordNativeService({type:'call_service',domain:'light',service:'turn_on',target:{entity_id:'light.marao_dashboard_test_safe'},service_data:{secret:'not retained'}},issues,calls);
+  assert.deepEqual(issues,[]);
+  assert.deepEqual(calls,[{domain:'light',service:'turn_on',entity:'light.marao_dashboard_test_safe'}]);
+  recordNativeService({type:'call_service',domain:'system_log',service:'write',service_data:{message:'Original native failure'}},issues,calls);
+  assert.deepEqual(issues,['Native frontend error report: Original native failure']);
+  assert.equal(calls.length,1,'Diagnostics cannot count as a completed physical interaction');
+  assert.doesNotThrow(()=>recordNativeService({type:'call_service',domain:'lock',service:'unlock',target:{entity_id:'lock.private_target'}},issues,calls));
+  assert.equal(issues.at(-1),'Native proof attempted a non-fixture service: lock.unlock');
+  assert.equal(calls.length,1);assert.ok(!JSON.stringify({issues,calls}).includes('private_target'));
+});
