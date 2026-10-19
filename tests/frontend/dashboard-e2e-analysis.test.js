@@ -26,37 +26,39 @@ const {
 const { visibleBounds } = require("../test-ha-room-cards.js");
 
 test('camera event failure diagnostics retain the original timeout and release its exact handle', async () => {
+  const {expect}=require('playwright/test'),originalPoll=expect.poll;
   const timeout = new Error('Original event timeout'); let disposed = false;
   const state = {connected:false,status:'loading',request:3,events:0};
   const element = {evaluate:async read=>read({isConnected:false,_status:'loading',_request:3,_events:[]}),dispose:async()=>{disposed=true;}};
   const card = {elementHandle:async()=>element,evaluate:async read=>read({isConnected:true,_status:'ready',_request:5,_events:[{},{}]})};
-  await assert.rejects(waitForCameraEvents({waitForFunction:async()=>{throw timeout;}},card),error=>{
+  expect.poll=(_read,options)=>{assert.deepEqual(options,{timeout:10000,intervals:[50]});return{toBe:async()=>{throw timeout;}};};
+  try { await assert.rejects(waitForCameraEvents({},card),error=>{
     assert.equal(error,timeout);assert.match(error.message,/Original event timeout/);
     const report=JSON.parse(error.message.split('Camera event state after failed wait: ')[1]);
     assert.deepEqual(report.observed,state);assert.equal(report.current.status,'ready');
     assert.equal(report.current.connected,true);return true;
-  });
+  }); } finally { expect.poll=originalPoll; }
   assert.equal(disposed,true);
 });
 
 test('camera event waits observe real provider completion without frames, retain the exact element and release handles', async () => {
   const {MaraoCameraEventsCard}=await import('../../custom_components/marao_dashboard/frontend/MaraoFrigateEventsCard.js');
-  const card=new MaraoCameraEventsCard(),calls=[];let finish,elementDisposed=false,resultDisposed=false;
+  const card=new MaraoCameraEventsCard(),calls=[];let finish,elementDisposed=false,evaluations=0;
   Object.defineProperty(card,'isConnected',{get:()=>true});
   card._connected=true;card._render=()=>{};
   card._config={entity:'camera.marao_dashboard_test_camera',event_provider:'frigate',frigate_instance_id:'marao_test',frigate_camera:'loading',limit:12};
   card._hass={states:{[card._config.entity]:{state:'idle'}},callWS:message=>{calls.push(message);return new Promise(resolve=>{finish=resolve;});}};
   card._maybeLoad();
-  const element={dispose:async()=>{elementDisposed=true;}};
-  await waitForCameraEvents({waitForFunction:async(predicate,target,options)=>{
-    assert.equal(target,element);assert.deepEqual(options,{timeout:10000,polling:50});
-    assert.equal(predicate(card),false);assert.equal(predicate({isConnected:true}),false);
+  const element={dispose:async()=>{elementDisposed=true;},evaluate:async predicate=>{
+    assert.equal(predicate({isConnected:true}),false);
     assert.equal(predicate({isConnected:false,_status:'ready'}),false);
-    finish([]);await new Promise(resolve=>setImmediate(resolve));
-    assert.equal(predicate(card),true);assert.equal(card._status,'ready');assert.equal(calls.length,1);
-    return {dispose:async()=>{resultDisposed=true;}};
-  }},{elementHandle:async()=>element});
-  assert.equal(elementDisposed,true);assert.equal(resultDisposed,true);
+    const result=predicate(card);
+    if(!evaluations++){assert.equal(result,false);finish([]);}
+    return result;
+  }};
+  await waitForCameraEvents({},{elementHandle:async()=>element});
+  assert.ok(evaluations>=2);assert.equal(card._status,'ready');assert.equal(calls.length,1);
+  assert.equal(elementDisposed,true);
 });
 
 test('delayed camera refresh atomically observes the real component handler while its provider promise is pending', async () => {

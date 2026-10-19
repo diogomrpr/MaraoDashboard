@@ -409,10 +409,10 @@ function refreshDelayedCameraLoading(element) {
 async function waitForCameraEvents(page, card) {
   const element = await card.elementHandle();
   try {
-    // Provider completion is asynchronous data, independent of animation frames.
-    const result = await page.waitForFunction(element => element.isConnected && ['ready', 'error'].includes(element._status),
-      element, { timeout: 10000, polling: 50 });
-    await result.dispose();
+    // Keep data polling independent of the page's timer/frame scheduling.
+    await require('playwright/test').expect.poll(() => element.evaluate(element =>
+      element.isConnected && ['ready', 'error'].includes(element._status)),
+    { timeout: 10000, intervals: [50] }).toBe(true);
   } catch (error) {
     try {
       const observed = await element.evaluate(element => ({ connected: element.isConnected, status: element._status,

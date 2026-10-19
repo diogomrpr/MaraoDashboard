@@ -277,3 +277,14 @@ continues to reject stalled, paused, foreign and newly created media. This chang
 only observation, not the player or timeout. Browser-error failures additionally
 retain HA's native system-log report payload beside the original diagnostics.
 No browser warning is filtered or accepted. Final scoped verification is required.
+
+The failure-only diagnostic in `run-GOuQr9` records the exact original event card
+still connected and ready with two events when its browser-side wait timed out;
+the visible locator reports the same request/state. It does not establish the
+precise moment of completion before the deadline, and no remount was reproduced.
+The event observer now uses the existing Playwright runner-side polling pattern,
+with the same exact element, connected terminal-state predicate, 50 ms interval
+and ten-second budget. A real pending-provider regression exercises that polling
+loop and proves one request, correct completion and handle cleanup. The timeout
+regression retains the original error and old/current state diagnostics. No
+product event/popup workaround or deadline extension was added.
