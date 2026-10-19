@@ -413,6 +413,16 @@ async function waitForCameraEvents(page, card) {
     const result = await page.waitForFunction(element => element.isConnected && ['ready', 'error'].includes(element._status),
       element, { timeout: 10000, polling: 50 });
     await result.dispose();
+  } catch (error) {
+    try {
+      const observed = await element.evaluate(element => ({ connected: element.isConnected, status: element._status,
+        request: element._request, events: element._events?.length }));
+      const current = await card.evaluate(element => ({ connected: element.isConnected, status: element._status,
+        request: element._request, events: element._events?.length }));
+      const detail = '\nCamera event state after failed wait: ' + JSON.stringify({ observed, current });
+      error.message += detail; error.stack += detail;
+    } catch (diagnosticError) { error.message += '\nCamera event diagnostic failed: ' + diagnosticError.name; }
+    throw error;
   } finally { await element.dispose(); }
 }
 

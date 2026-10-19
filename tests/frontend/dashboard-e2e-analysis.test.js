@@ -25,6 +25,20 @@ const {
 } = require("../test-ha-dashboard-e2e.js");
 const { visibleBounds } = require("../test-ha-room-cards.js");
 
+test('camera event failure diagnostics retain the original timeout and release its exact handle', async () => {
+  const timeout = new Error('Original event timeout'); let disposed = false;
+  const state = {connected:false,status:'loading',request:3,events:0};
+  const element = {evaluate:async read=>read({isConnected:false,_status:'loading',_request:3,_events:[]}),dispose:async()=>{disposed=true;}};
+  const card = {elementHandle:async()=>element,evaluate:async read=>read({isConnected:true,_status:'ready',_request:5,_events:[{},{}]})};
+  await assert.rejects(waitForCameraEvents({waitForFunction:async()=>{throw timeout;}},card),error=>{
+    assert.equal(error,timeout);assert.match(error.message,/Original event timeout/);
+    const report=JSON.parse(error.message.split('Camera event state after failed wait: ')[1]);
+    assert.deepEqual(report.observed,state);assert.equal(report.current.status,'ready');
+    assert.equal(report.current.connected,true);return true;
+  });
+  assert.equal(disposed,true);
+});
+
 test('camera event waits observe real provider completion without frames, retain the exact element and release handles', async () => {
   const {MaraoCameraEventsCard}=await import('../../custom_components/marao_dashboard/frontend/MaraoFrigateEventsCard.js');
   const card=new MaraoCameraEventsCard(),calls=[];let finish,elementDisposed=false,resultDisposed=false;
