@@ -229,13 +229,14 @@ export class CameraPlayback {
     this.streamSupported = supported;
     if (capabilityChanged) { this.stop(); this.state = 'idle'; this.problem(''); }
     this.poster.hidden = this.state === 'live' || this.state === 'buffering' || !picture || this.posterFailed;
+    if (!this.attempt && !['error', 'snapshot', 'blocked'].includes(this.state)) this.resetStream();
     if (this.streamEntity !== entity && !lowerCameraStreams(hass, entity).includes(this.streamEntity)) { this.fail('failed'); return; }
     if (this.player) {
       this.updateNativeHass(); this.player.stateObj = hass.states[this.streamEntity];
       if (!cameraAvailable(hass, this.streamEntity)) { this.fail('failed'); return; }
       if (!clearNativeCameraPoster(this.player)) { this.fail('compatibility'); return; }
     }
-    if (!this.attempt && !['error', 'snapshot', 'blocked'].includes(this.state)) { this.resetStream(); this.start(); }
+    if (!this.attempt && !['error', 'snapshot', 'blocked'].includes(this.state)) this.start();
     this.describe();
   }
   resetStream() {

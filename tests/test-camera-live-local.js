@@ -44,7 +44,12 @@ async function run(){
  assert.equal(new URL(page.url()).hash,'','Low-first Retry must not open event history');
  await page.evaluate(()=>{card.hass={...card.hass,unrelated:1};});
  assert.deepEqual(await page.evaluate(()=>[...card._camera.triedStreams]),['camera.low'],'Metadata cannot restart high quality');
- report.push({engine:engine.name(),startup:'low-first',retry:'low-first',configuredIdentityPreserved:true});
+ for(const [unavailable,expected] of [['camera.low','camera.medium'],['camera.medium','camera.synthetic']]){
+ await page.evaluate(()=>{card.hidden=true;});await page.waitForFunction(()=>!card._camera.player);
+ await page.evaluate(id=>{card.hass={...card.hass,states:{...card.hass.states,[id]:{...card.hass.states[id],state:'unavailable'}}};card.hidden=false;},unavailable);
+ await waitState(page,'live');assert.equal(await page.evaluate(()=>card._camera.player.stateObj.entity_id),expected,'Visibility recovery must reselect the lowest currently available tier');
+ }
+ report.push({engine:engine.name(),startup:'low-first',retry:'low-first',availabilityRecovery:true,configuredIdentityPreserved:true});
  for(const mode of ['delayed','missing-still','failed-still','late-still']){
  await setup(page,base,mode);await page.waitForFunction(()=>window.card?._camera?.player);const initial=await page.evaluate(()=>{const camera=card._camera;window.native=camera.player;window.surface=card.shadowRoot.querySelector('ha-card');return {poster:!camera.poster.hidden,height:card.getBoundingClientRect().height,rect:camera.stage.getBoundingClientRect().toJSON(),button:camera.feedback.querySelector('button')?.textContent||''};});
  if(mode==='delayed')assert.equal(initial.poster,true);assert.equal(initial.button,'');await waitState(page,'live');const evidence=await page.evaluate(()=>({time:card._camera.video.currentTime,height:card.getBoundingClientRect().height,muted:card._camera.video.muted,inline:card._camera.video.playsInline,poster:card._camera.poster.hidden,rect:card._camera.stage.getBoundingClientRect().toJSON(),same:card._camera.player===native&&card.shadowRoot.querySelector('ha-card')===surface,count:native.connectedCount}));assert.equal(evidence.muted,true);assert.equal(evidence.inline,true);assert.equal(evidence.poster,true);assert.equal(evidence.same,true);assert.equal(evidence.count,1);assert.equal(evidence.rect.height,initial.rect.height);if(mode==='delayed')assert.equal(evidence.height,initial.height,'automatic handoff must not change card height');
