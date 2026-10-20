@@ -99,6 +99,11 @@ async function waitForCameraAdvance(page, card, { captureBaseline = false, metad
   try {
     observation = await page.waitForFunction(observeNativeCamera, { card, probe, captureBaseline, metadata }, { timeout: 5000, polling: 50 });
     return await observation.jsonValue();
+  } catch (error) {
+    error.cameraProgress = await page.evaluate(({ card, probe }) => ({ before: probe.before, time: card._camera?.video?.currentTime,
+      sameVideo: card._camera?.video === probe.video, state: card._camera?.state, readyState: card._camera?.video?.readyState,
+      paused: card._camera?.video?.paused, configured: card._config.entity, selected: card._camera?.streamEntity }), { card, probe });
+    throw error;
   } finally {
     try { await observation?.dispose(); }
     finally { await probe.dispose(); }
@@ -292,7 +297,7 @@ async function checkNativeCameraPlayback(page, serviceCalls, { output, scenario 
   } catch (error) {
     const phaseElapsedMs = Date.now() - began - (phases.at(-1)?.elapsedMs || 0);
     const observationBudgetMs = Math.min(Math.max(0, 30000 - phaseElapsedMs), Math.max(0, observeFailureMs));
-    const failure = { phase, elapsedMs: Date.now() - began, phaseElapsedMs, observationBudgetMs, error: { name: error.name, summary: error.name === 'TimeoutError' ? error.message.split('\n')[0] : 'Native camera assertion failed; original failure retained by runner' }, phases, observations: [] };
+    const failure = { phase, elapsedMs: Date.now() - began, phaseElapsedMs, observationBudgetMs, error: { name: error.name, progress: error.cameraProgress, summary: error.name === 'TimeoutError' ? error.message.split('\n')[0] : 'Native camera assertion failed; original failure retained by runner' }, phases, observations: [] };
     const save = () => { if (output) { fs.mkdirSync(output, { recursive: true }); fs.writeFileSync(path.join(output, `native-camera-${evidence.engine}-${scenario}-${theme}-failure.json`), JSON.stringify(failure, null, 2), { mode: 0o600 }); } };
     try {
       failure.initial = await snapshot(); save();

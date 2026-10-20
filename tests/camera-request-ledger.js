@@ -326,7 +326,12 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
       } finally { cleanupPending(); receipt.observerCleaned = true; receipt.proofFinished = Date.now(); }
     }
   };
-  window.__maraoProveCameraHandoffs = async () => { await Promise.all(state.handoffs.map(startHandoffProof)); };
+  window.__maraoProveCameraHandoffs = async () => {
+    // Another native transport can settle while an earlier proof is pending.
+    let count;
+    do { count = state.handoffs.length; await Promise.all(state.handoffs.map(startHandoffProof)); }
+    while (state.handoffs.length !== count);
+  };
 }
 
 async function cameraRequestLedger(context, { output, scenario, theme }) {
@@ -356,9 +361,8 @@ async function cameraRequestLedger(context, { output, scenario, theme }) {
     async settleHandoffs() { if (!page.isClosed()) await page.evaluate(() => window.__maraoProveCameraHandoffs?.()); },
     async boundary(label, action, { terminal = true, entities = [SAFE_ENTITY] } = {}) {
       assert.ok(entities.length && entities.every(entity => SAFE_ENTITIES.includes(entity)));
-      await ledger.settleHandoffs();
       const id = ++sequence;
-      await page.evaluate(({ id, label, entities }) => { const state = window.__maraoCameraRequestTrace; if (state.boundary) throw Error('Nested camera release boundary'); state.boundary = { id, label, entities, date: Date.now() }; }, { id, label, entities });
+      await page.evaluate(async ({ id, label, entities }) => { await window.__maraoProveCameraHandoffs?.(); const state = window.__maraoCameraRequestTrace; if (state.boundary) throw Error('Nested camera release boundary'); state.boundary = { id, label, entities, date: Date.now() }; }, { id, label, entities });
       try {
         await action();
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));

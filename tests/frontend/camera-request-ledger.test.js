@@ -385,6 +385,21 @@ test('native reorder proof starts before any explicit settle call and preserves 
   assert.equal(fixture.state.handoffs[0].proof, proof, 'Later offscreen disposal cannot replace an already completed causal receipt');
 });
 
+test('release waits for native handoffs added while an earlier proof is pending', async () => {
+  const fixture = immediateHandoffFixture();
+  let settled = false;
+  const settling = fixture.environment.window.__maraoProveCameraHandoffs().then(() => { settled = true; });
+  await fixture.tick(100);
+  const late = new fixture.DomElement('ha-hls-player', fixture.host); late.entityid = entity; late.remove();
+  await new Promise(resolve => setImmediate(resolve));
+  await fixture.tick(300);
+  assert.equal(fixture.state.handoffs[0].proof.valid, true);
+  assert.equal(settled, false, 'A release cannot overtake the later native handoff');
+  await fixture.tick(450); await settling;
+  assert.equal(fixture.state.handoffs.length, 2);
+  assert.equal(fixture.state.handoffs.every(receipt => receipt.proof.valid), true);
+});
+
 test('native selection keeps the exact sibling video that existed before retiring HLS, then proves its advancement', async () => {
   const fixture = immediateHandoffFixture({ siblingSelection: true });
   const receipt = fixture.state.handoffs[0]; assert.equal(receipt.activeTransport, 'ha-hls-player');

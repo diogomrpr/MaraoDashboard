@@ -163,6 +163,7 @@ function nativeProgressFixture(polls) {
     _camera: { hass, nativeHass:hass, signaling:hass.connection, state: 'live', generation: 3, video, player, picture: 'safe-poster', poster: { hidden: true, getAttribute: () => 'safe-poster' }, stage: { querySelectorAll: () => [player] } } };
   const disposed = { probe: false, result: false };
   const page = {
+    async evaluate(callback, argument) { return callback(argument); },
     async evaluateHandle(create, target) { assert.equal(target, card); return { ...create(target), async dispose() { disposed.probe = true; } }; },
     async waitForFunction(predicate, argument, options) {
       assert.equal(argument.card, card); assert.equal(options.timeout, 5000, 'One fixed overall playback budget'); assert.equal(options.polling, 50);
