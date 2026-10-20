@@ -50,6 +50,18 @@ test('removal during authentication closes the late socket before it can send an
   assert.equal(closes,1); assert.equal(f.connections.length,0); assert.equal(f.signaling.sessions.size,0);
 });
 
+test('a native offer arriving after disposal is inert while invalid offers still reject', async () => {
+  const f = signalingFixture();
+  f.signaling.close();
+  const unsubscribe = await f.signaling.subscribeMessage(() => assert.fail('Retired offer emitted an event'), f.offer);
+  unsubscribe(); unsubscribe();
+  assert.equal(f.sockets.length, 0);
+  assert.equal(f.connections.length, 0);
+  assert.equal(f.signaling.sessions.size, 0);
+  await assert.rejects(f.signaling.subscribeMessage(() => {}, {...f.offer, entity_id: 'camera.other'}), /compatibility/);
+  await assert.rejects(f.signaling.subscribeMessage(() => {}, {...f.offer, type: 'subscribe_entities'}), /compatibility/);
+});
+
 test('unexpected native connection loss remains a visible failure and cannot reconnect a retired offer', async () => {
   const f=signalingFixture(); await f.signaling.subscribeMessage(()=>{},f.offer);
   f.connections[0].handlers.disconnected(); f.connections[0].handlers.disconnected();
@@ -389,6 +401,31 @@ test('only HA-advertised streaming cameras initialize a native player', async ()
     assert.equal(playback.player, undefined);
   }
   for (const supported_features of [2, 3]) assert.equal(cameraSupportsStream({ attributes: { supported_features } }), true);
+});
+
+test('native image fallback remains recoverable even when the player supplies no alert', () => {
+  for (const nativeError of ['', 'Synthetic codec rejection']) {
+    const playback = Object.create(CameraPlayback.prototype), problems = [];
+    let removed = 0;
+    const player = {
+      querySelectorAll: () => [],
+      querySelector: selector => selector === 'img' ? {} : selector === 'ha-alert' && nativeError ? { textContent: nativeError } : null,
+      remove() { removed++; },
+    };
+    Object.assign(playback, {
+      generation: 1, state: 'loading', attempt: true, player, picture: 'synthetic-still', posterFailed: false, poster: { hidden: false },
+      mediaObserver: { observe() {}, disconnect() {} }, message: key => key, problem: value => problems.push(value), describe() {},
+    });
+    playback.bind(1);
+    assert.equal(playback.state, 'error', 'A failed stream must retain explicit Retry rather than latch a snapshot-only state');
+    assert.equal(playback.reason, 'failed');
+    assert.equal(playback.nativeError, nativeError);
+    assert.equal(problems.at(-1), ['failed', nativeError].filter(Boolean).join(' · '));
+    assert.equal(playback.poster.hidden, false);
+    assert.equal(playback.player, null);
+    assert.equal(playback.attempt, false);
+    assert.equal(removed, 1, 'The failed native host must be released once');
+  }
 });
 
 test('native transports leave still ownership to Marao before video creation and after metadata updates', () => {

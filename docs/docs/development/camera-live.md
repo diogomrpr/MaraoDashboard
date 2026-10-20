@@ -45,6 +45,9 @@ Recognized `NotAllowedError` exposes the 48px **Start live view** action; that
 button calls the existing video's `play()` synchronously in the user gesture.
 Other failures retain a labelled snapshot/reason and applicable **Retry**.
 Native image/MJPEG fallback is a preview, never proof of advancing video.
+When a streaming-capable camera falls back to a native image, Marao reports a
+recoverable playback failure with Retry. A native image can follow a failed
+stream, so its presence does not establish that the camera is still-only.
 Playback/retry buttons stop propagation; the configured card event action stays
 separate and dispatches once.
 

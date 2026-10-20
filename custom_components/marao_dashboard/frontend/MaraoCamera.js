@@ -25,7 +25,10 @@ export class CameraSignaling {
     session.connection?.close();
   }
   async subscribeMessage(callback, message) {
-    if (this.closed || message.type !== 'camera/webrtc/offer' || message.entity_id !== this.entity) throw new Error('compatibility');
+    if (message.type !== 'camera/webrtc/offer' || message.entity_id !== this.entity) throw new Error('compatibility');
+    // Native offer creation can finish after the owning player was removed.
+    // A retired offer must neither open a socket nor reject into native cleanup.
+    if (this.closed) return () => {};
     const NativeConnection = this.shared.constructor, options = this.shared.options;
     if (typeof options?.createSocket !== 'function' || typeof NativeConnection?.prototype?.subscribeMessage !== 'function') throw new Error('compatibility');
     const session = { closed: false }; this.sessions.add(session);
@@ -303,7 +306,8 @@ export class CameraPlayback {
     if (!video) {
       const nativeError = roots.map(root => root.querySelector('ha-alert')?.textContent?.trim()).filter(Boolean).join(' · ');
       if (nativeError) { this.nativeError = nativeError; this.problem(nativeError); this.describe(); }
-      if (roots.some(root => root.querySelector('img'))) this.fail(nativeError ? 'failed' : 'unsupported', !nativeError, nativeError);
+      // Snapshot-only entities never start a host; its image fallback means streaming failed.
+      if (roots.some(root => root.querySelector('img'))) this.fail('failed', false, nativeError);
       return;
     }
     this.video = video; this.lastTime = video.currentTime; this.advanced = false; this.playRequested = false; this.lastFrames = decodedFrames(video); this.sampleFrames = this.lastFrames; this.sampleTime = video.currentTime; this.sampleAt = performance.now(); this.slowMs = 0;
