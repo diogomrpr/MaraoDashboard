@@ -178,7 +178,14 @@ async function checkNativeCameraPlayback(page, serviceCalls, { output, scenario 
   let originalDisplay;
   try {
     await card.scrollIntoViewIfNeeded();
-    await waitStill();
+    // Late native gallery mounts can shift the target after the initial scroll.
+    // Keep the safe camera in view until its actual eligibility/still is ready.
+    await page.waitForFunction(card => {
+      const camera=card._camera;
+      if(!camera?.eligible()) {card.scrollIntoView({block:'center',behavior:'instant'});return false;}
+      return Boolean(camera.player && camera.poster.complete && camera.poster.naturalWidth>0
+        && camera.poster.getAttribute('src')===camera.picture);
+    },handle,{timeout:15000,polling:100});
     await release('initial visibility release', async () => {
       originalDisplay = await card.evaluate(card => {
         card.__retiredSignaling = card._camera.signaling;
