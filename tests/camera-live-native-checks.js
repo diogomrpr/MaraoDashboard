@@ -218,7 +218,18 @@ async function checkNativeCameraPlayback(page, serviceCalls, { output, scenario 
     await card.evaluate(card => { const camera = card._camera; camera.video.pause(); camera.playRejected({ name: 'NotAllowedError' }, camera.generation); });
     await card.locator('.camera-feedback button').waitFor({ state: 'visible' }); await layout();
     const hash = new URL(page.url()).hash;
-    await card.locator('.camera-feedback button').tap(); await waitLive();
+    // Native transport promotion can resume playback and remove this control
+    // while Playwright waits for stable geometry. Touch the visible target now;
+    // the feedback surface must retain the gesture if promotion wins the race.
+    await card.locator('.camera-feedback').scrollIntoViewIfNeeded();
+    const recovery = await card.evaluate(card => {
+      const camera=card._camera;
+      camera.video.pause(); camera.playRejected({name:'NotAllowedError'},camera.generation);
+      const bounds=camera.feedback.querySelector('button').getBoundingClientRect();
+      return {x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2,width:bounds.width,height:bounds.height};
+    });
+    assert.ok(recovery.width>=48 && recovery.height>=48);
+    await page.touchscreen.tap(recovery.x,recovery.y); await waitLive();
     assert.equal(new URL(page.url()).hash, hash, 'Playback must not open the event sheet');
     assert.equal(await card.evaluate(card => card._camera.player === card.__nativeProof.player), true, 'User gesture keeps the same native host');
     evidence.faults.push('Controlled wrapper autoplay-rejection injection on actual native media; does not prove browser policy rejection');
