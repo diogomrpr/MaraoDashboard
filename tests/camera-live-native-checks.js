@@ -232,10 +232,15 @@ async function checkNativeCameraPlayback(page, serviceCalls, { output, scenario 
     const recovery = await card.evaluate(card => {
       const camera=card._camera;
       camera.video.pause(); camera.playRejected({name:'NotAllowedError'},camera.generation);
-      const bounds=camera.feedback.querySelector('button').getBoundingClientRect();
-      return {x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2,width:bounds.width,height:bounds.height};
+      const button=camera.feedback.querySelector('button');
+      button.scrollIntoView({block:'center',behavior:'instant'});
+      const bounds=button.getBoundingClientRect(),x=bounds.x+bounds.width/2,y=bounds.y+bounds.height/2;
+      let hit=document.elementFromPoint(x,y);
+      while(hit?.shadowRoot){const next=hit.shadowRoot.elementFromPoint(x,y);if(!next||next===hit)break;hit=next;}
+      return {x,y,width:bounds.width,height:bounds.height,hit:hit===button};
     });
     assert.ok(recovery.width>=48 && recovery.height>=48);
+    assert.equal(recovery.hit,true,'Recovery touch must hit the button above the floating navbar');
     await page.touchscreen.tap(recovery.x,recovery.y); await waitLive();
     assert.equal(new URL(page.url()).hash, hash, 'Playback must not open the event sheet');
     assert.equal(await card.evaluate(card => card._camera.player === card.__nativeProof.player), true, 'User gesture keeps the same native host');
