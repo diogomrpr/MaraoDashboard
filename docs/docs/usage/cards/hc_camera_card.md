@@ -130,15 +130,16 @@ After live playback starts, brief buffering keeps the video frame visible with a
 localized buffering label instead of covering it with a snapshot. The native
 player stays mounted and resumes automatically.
 
-For UniFi Protect, sustained startup or playback stalls automatically try an
-available lower-resolution main channel of the same registered camera device.
-The alternate camera entities must already be enabled and available in Home
-Assistant, with channel and resolution metadata. Marao never enables streams,
+For UniFi Protect, the card starts immediately with the lowest enabled, available
+main stream of the same registered camera device. Keep your existing camera
+entity configured: it remains the card's identity and event target. The alternate
+entities need channel and resolution metadata. Marao never enables streams,
 changes camera settings, uses another device or selects a package-camera view.
 Missing metadata or alternate channels leave the configured stream unchanged.
 
-Each lower tier is tried once per playback session. A working lower tier is kept
-and labelled “Reduced quality”; explicit Retry returns to the configured tier.
-If no tier can play, the card reports a bounded failure. The saved camera, labels
-and event action remain unchanged. This is stream selection, not transcoding or
-a promise of seamless switching: changing tiers starts a new native stream.
+The working lower tier stays selected and is labelled “Reduced quality”. Retry
+also starts with the lowest eligible tier. If no stream can play, the card reports
+a bounded failure. Automatic upgrades to higher quality are not included yet.
+Existing downward recovery can select a newly available lower tier after sustained
+trouble; this starts a new native stream. This is stream selection, not transcoding
+or a guarantee of uninterrupted video.

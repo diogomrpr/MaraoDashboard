@@ -12,9 +12,10 @@ async function checkSlowCamera(page, serviceCalls, {output}) {
   assert.equal(await card.evaluate(c=>c._config.entity),'camera.marao_dashboard_test_camera_slow_high');
   let evidence, initial;
   try {
-    await page.waitForFunction(c=>c._camera?.streamEntity.endsWith('_slow_low'),handle,{timeout:45000,polling:100});
+    await page.waitForFunction(c=>c._camera?.attempt,handle,{timeout:10000,polling:50});
+    assert.equal(await handle.evaluate(c=>c._camera.streamEntity),'camera.marao_dashboard_test_camera_slow_low','The first attempt must already use low quality');
     await page.waitForFunction(c=>c._camera?.state==='live' && c._camera.video?.videoWidth===320,handle,{timeout:35000,polling:100});
-    initial=await handle.evaluate(c=>({time:c._camera.video.currentTime,generation:c._camera.generation,configured:c._config.entity,selected:c._camera.streamEntity,tried:[...c._camera.triedStreams],width:c._camera.video.videoWidth,poster:c._camera.poster.hidden}));
+    initial=await handle.evaluate(c=>({liveObservedAfterNavigationMs:performance.now(),time:c._camera.video.currentTime,generation:c._camera.generation,configured:c._config.entity,selected:c._camera.streamEntity,tried:[...c._camera.triedStreams],width:c._camera.video.videoWidth,poster:c._camera.poster.hidden}));
     // Native HLS/WebRTC handoff can replace the video's clock. Require three
     // seconds of small advancing samples on the same current video, not a seek
     // or a comparison against the retired transport's timestamp.
@@ -26,7 +27,11 @@ async function checkSlowCamera(page, serviceCalls, {output}) {
       c.__qualityProgress={video:v,time:v.currentTime,advanced};
       return advanced>=3;
     },handle,{timeout:30000,polling:100});
-    assert.deepEqual(initial.tried,['camera.marao_dashboard_test_camera_slow_high','camera.marao_dashboard_test_camera_slow_low']);
+    assert.deepEqual(initial.tried,['camera.marao_dashboard_test_camera_slow_low']);
+    const calls=await page.evaluate(()=>window.__maraoCameraRequestTrace.streamCalls.map(call=>({entity:call.entity,afterNavigationMs:call.date-performance.timeOrigin})));
+    const requests=calls.map(call=>call.entity);
+    assert.ok(requests.includes('camera.marao_dashboard_test_camera_slow_low'),'Native low stream was requested');
+    assert.equal(requests.includes('camera.marao_dashboard_test_camera_slow_high'),false,'Startup must not request the expensive configured stream');
     assert.equal(initial.configured,'camera.marao_dashboard_test_camera_slow_high');assert.equal(initial.poster,true);
     // A brief pause is an explicitly controlled buffering event on real media.
     await handle.evaluate(c=>{c.__qualityPlayer=c._camera.player;c._camera.video.pause();});
@@ -34,7 +39,7 @@ async function checkSlowCamera(page, serviceCalls, {output}) {
     await handle.evaluate(c=>c._camera.video.play());
     await page.waitForFunction(c=>c._camera.state==='live',handle,{timeout:5000,polling:100});
     assert.equal(await handle.evaluate(c=>c._camera.player===c.__qualityPlayer),true);
-    evidence={scope:'Native HA synthetic high/low media; both sources are capped at 24000 bytes/s. Synthetic Protect registry platform/device; no real Protect device.',initial,
+    evidence={scope:'Native HA synthetic high/low media; both sources are capped at 24000 bytes/s. Synthetic Protect registry platform/device; no real Protect device.',initial,streamRequests:calls,
       final:await handle.evaluate(c=>({time:c._camera.video.currentTime,selected:c._camera.streamEntity,width:c._camera.video.videoWidth,generation:c._camera.generation,poster:c._camera.poster.hidden})),briefBufferRetainedVideo:true};
     assert.equal(serviceCalls.length,before,'No camera/control services');
     assert.equal(await handle.evaluate(c=>c._camera.feedback.scrollWidth<=c._camera.feedback.clientWidth+1),true,'Quality feedback wraps without overflow');
@@ -49,6 +54,6 @@ async function checkSlowCamera(page, serviceCalls, {output}) {
   }
   evidence.cleanup=true;
   if(output)fs.writeFileSync(path.join(output,'camera-slow.json'),JSON.stringify(evidence,null,2),{mode:0o600});
-  console.log('Native slow-link quality fallback and brief-buffer video retention passed');
+  console.log('Native low-first startup, no high-stream request and brief-buffer video retention passed');
 }
 module.exports={checkSlowCamera};

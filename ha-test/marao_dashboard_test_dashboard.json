@@ -333,7 +333,7 @@
               "entity_id": "camera.marao_dashboard_test_camera_slow_high",
               "template": "hc_camera_card",
               "name": "Slow connection camera",
-              "id": "camera-quality"
+              "id": "camera-low-first"
             }
           ]
         },

@@ -471,6 +471,25 @@ test('quality fallback selects only enabled available lower main channels on the
   delete h.entities['camera.high'].device_id;assert.deepEqual(lowerCameraStreams(h,'camera.high'),[]);
 });
 
+test('startup selects the lowest trustworthy available tier without changing camera identity or exceeding its ceiling', () => {
+  const h={connected:true,entities:{},states:{}};
+  const add=(id,width,channel,entry={})=>{h.entities[id]={platform:'unifiprotect',device_id:'same',config_entry_id:'entry',...entry};h.states[id]={state:'recording',attributes:{supported_features:2,width,height:180,channel_id:channel}};};
+  add('camera.high',1920,0);add('camera.medium',1280,1);add('camera.low',640,2);
+  add('camera.package',160,3);add('camera.foreign',160,2,{device_id:'other'});
+  add('camera.other_entry',160,2,{config_entry_id:'other'});add('camera.disabled',160,2,{disabled_by:'user'});
+  const p=Object.create(CameraPlayback.prototype);Object.assign(p,{hass:h,entity:'camera.high'});
+  const verify=(expected)=>{p.resetStream();assert.equal(p.streamEntity,expected);assert.equal(p.entity,'camera.high');assert.deepEqual([...p.triedStreams],[expected]);};
+  verify('camera.low');
+  h.states['camera.low'].state='unavailable';verify('camera.medium');
+  h.states['camera.medium'].attributes.supported_features=0;verify('camera.high');
+  h.states['camera.low'].state='recording';h.states['camera.medium'].attributes.supported_features=2;
+  delete h.entities['camera.high'].device_id;verify('camera.high');
+  h.entities['camera.high'].device_id='same';p.entity='camera.medium';p.resetStream();assert.equal(p.streamEntity,'camera.low');
+  p.entity='camera.low';p.resetStream();assert.equal(p.streamEntity,'camera.low');
+  delete h.entities;p.entity='camera.high';p.resetStream();assert.equal(p.streamEntity,'camera.high','Missing registry preserves the configured source');
+  p.hass=undefined;p.resetStream();assert.equal(p.streamEntity,'camera.high','Initialization before HA data must remain safe');
+});
+
 test('brief buffering keeps the same video visible and recovers on clock progress without native events', () => {
   const p=Object.create(CameraPlayback.prototype);let descriptions=0;
   Object.assign(p,{state:'live',generation:1,video:{paused:false,readyState:2,currentTime:2},lastTime:1,advanced:true,poster:{hidden:true},describe(){descriptions++},problem(){},lastProgressAt:performance.now(),attempt:true,sampleAt:performance.now(),sampleTime:1,slowMs:0});

@@ -103,7 +103,7 @@ export function cameraSupportsStream(state) {
 export function lowerCameraStreams(hass, entity) {
   const registry = hass?.entities || {}, origin = registry[entity];
   const quality = id => {
-    const a = hass.states?.[id]?.attributes || {};
+    const a = hass?.states?.[id]?.attributes || {};
     return Number.isInteger(a.channel_id) && [0, 1, 2].includes(a.channel_id)
       && Number(a.width) > 0 && Number(a.height) > 0 ? Number(a.width) * Number(a.height) : 0;
   };
@@ -209,7 +209,7 @@ export class CameraPlayback {
   update(hass, entity, label) {
     const replaced = this.entity !== entity;
     this.hass = hass; this.entity = entity; this.label = label;
-    if (replaced) { this.stop(); this.streamEntity = entity; this.triedStreams = new Set([entity]); this.state = 'idle'; this.problem(''); }
+    if (replaced) { this.stop(); this.resetStream(); this.state = 'idle'; this.problem(''); }
     const eligible = this.eligible();
     if (!eligible) {
       this.stop();
@@ -235,15 +235,19 @@ export class CameraPlayback {
       if (!cameraAvailable(hass, this.streamEntity)) { this.fail('failed'); return; }
       if (!clearNativeCameraPoster(this.player)) { this.fail('compatibility'); return; }
     }
-    if (!this.attempt && !['error', 'snapshot', 'blocked'].includes(this.state)) this.start();
+    if (!this.attempt && !['error', 'snapshot', 'blocked'].includes(this.state)) { this.resetStream(); this.start(); }
     this.describe();
+  }
+  resetStream() {
+    this.streamEntity = lowerCameraStreams(this.hass, this.entity).at(-1) || this.entity;
+    this.triedStreams = new Set([this.streamEntity]);
   }
   async start() {
     // A still-only entity must not start HA's MJPEG fallback or a native session.
     if (!cameraSupportsStream(this.hass?.states?.[this.entity])) { this.fail('unsupported', true); return; }
     const generation = ++this.generation;
-    this.streamEntity ||= this.entity;
-    this.triedStreams ||= new Set([this.entity]);
+    if (!this.streamEntity) this.resetStream();
+    this.triedStreams ||= new Set([this.streamEntity]);
     this.lastProgressAt = performance.now(); this.slowMs = 0; this.sampleAt = performance.now(); this.sampleTime = 0;
     this.attempt = true; this.state = 'loading'; this.reason = ''; this.nativeError = ''; this.problem(''); this.describe();
     this.timer = setTimeout(() => {
@@ -400,7 +404,7 @@ export class CameraPlayback {
         this.state = 'loading'; this.reason = ''; this.lastProgressAt = performance.now(); this.slowMs = 0; this.problem(''); this.describe();
         this.timer = setTimeout(() => { if (generation === this.generation) this.fail('timeout', false, this.nativeError); }, CAMERA_PLAYBACK_MS);
         try { this.video.play()?.catch(error => this.playRejected(error, generation)); } catch (error) { this.playRejected(error, generation); }
-      } else if (this.state === 'error') { this.stop(); this.streamEntity = this.entity; this.triedStreams = new Set([this.entity]); this.picture = ''; this.posterFailed = false; this.state = 'idle'; this.update(this.hass, this.entity, this.label); }
+      } else if (this.state === 'error') { this.stop(); this.resetStream(); this.picture = ''; this.posterFailed = false; this.state = 'idle'; this.update(this.hass, this.entity, this.label); }
     }); }
     button.textContent = action === 'start' ? this.message('start') : this.localize('common.retry');
     button.setAttribute('aria-label', `${button.textContent} ${this.label || this.entity}`);

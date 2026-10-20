@@ -185,16 +185,24 @@ Images, modules, unrelated media and unproved cancellations remain failures.
 unsubscribe targets, result codes, native callers and lifecycle boundaries; it
 never records SDP, media payloads or authentication data. Warnings still fail.
 
-## Automatic quality fallback
+## Low-first startup and quality fallback
 
-The runtime keeps the configured entity separate from the active stream entity.
-After eight seconds without decoded progress, or an accumulated eight seconds
-of substantially slow playback, it selects an available lower-resolution main
-channel on the same registered UniFi Protect device. Registry platform/device
+The runtime keeps the configured entity as its identity and maximum quality,
+but starts and explicitly retries with the lowest eligible same-device UniFi
+Protect main channel. It requests that stream immediately once the card is
+visible and the native player is registered; it does not first spend the
+eight-second fallback budget on a higher tier. Registry platform/device/config-entry
 identity and numeric channel/resolution metadata are required. Package views,
-disabled entities and neutral states cannot be substitutes. No provider settings
-or saved configuration are changed. Each lower tier is attempted once; Retry
-returns to the configured tier. Sustained failure at the last tier remains bounded.
+disabled entities and neutral states cannot be substitutes. Missing trustworthy
+alternatives preserve the configured source. No provider settings or saved
+configuration are changed, including the event target and popup action.
+
+A working lower tier stays selected. Automatic upgrades are not part of this
+startup release; the separate adaptive-quality change remains incomplete.
+Existing downward recovery still applies if a new lower tier becomes available:
+eight seconds without decoded progress or an accumulated eight seconds of slow
+playback permits one attempt per lower tier. Sustained failure at the last tier
+remains bounded and exposes Retry, which chooses the current lowest eligible tier.
 
 Native HLS `camera/stream` continuations are generation-bound. A successful URL
 arriving after disposal does not resume its detached native caller, because HA
@@ -207,7 +215,8 @@ Protect fixture's real registry entries. Its high/low synthetic streams are each
 capped at 24,000 bytes/s on the loopback media source, exercising actual HA
 transport and decoding under a constrained upstream link. This is not WAN/ICE
 latency emulation or real Protect interoperability. Chromium/WebKit checks assert
-quality selection, advancing low-resolution video, retained buffering frames,
+low-first selection without a preceding high-stream request, advancing
+low-resolution video, retained buffering frames,
 unchanged configured entity, no control services, feedback containment and cleanup.
 Use `node ha-test/generate-camera-live.js --high` to regenerate the synthetic
 higher-bitrate file. Both generated media files remain test-only.
