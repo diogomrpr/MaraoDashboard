@@ -1727,12 +1727,12 @@ async function main() {
           await assertNoBrowserErrors(selectedCheck + '/closed context');
           browser = await chromium.launch(); ({ context, page, errors } = await createSession(theme));
         }
-        await page.goto(`${baseUrl}/marao-dashboard/${cameraSlowOnly ? 'security' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${baseUrl}/marao-dashboard/${cameraSlowOnly ? 'security' : cameraLiveOnly ? 'entrance' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
         await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         if (selectedCheck === 'history') await checkHistoryCases(page);
-        if (cameraSlowOnly) {
-          const target = await page.locator('marao-card').filter({has:page.locator('.title',{hasText:/^Slow connection camera$/})}).first().elementHandle();
+        if (cameraLiveOnly) {
+          const target = await page.locator('marao-card').filter({has:page.locator('.title',{hasText:cameraSlowOnly ? /^Slow connection camera$/ : /^Front Door Camera · automatic live video$/})}).first().elementHandle();
           try { await applyVisualPreferences(page, scenario, theme, target); } finally { await target.dispose(); }
         } else await applyVisualPreferences(page, scenario, theme);
         if (cameraSlowOnly) await require('./camera-slow-native-checks').checkSlowCamera(page, serviceCalls, {output:screenshotRoot});
@@ -1798,7 +1798,7 @@ async function main() {
           browser = await chromium.launch();
           ({ context, page, errors } = await createSession(theme));
         }
-        await page.goto(`${baseUrl}/marao-dashboard/${cameraSlowOnly ? 'security' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${baseUrl}/marao-dashboard/${cameraSlowOnly ? 'security' : cameraLiveOnly ? 'entrance' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
         await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);
