@@ -510,3 +510,28 @@ test('background proof observation captures its own rejection for the strict led
   assert.equal(fixture.state.handoffs[0].proof.observerError, 'Error');
   assertHandoffObserverClean(fixture);
 });
+
+test('quality fallback cancellations require the exact retired host and a lower same-device stream', () => {
+  const quality = () => {
+    const value = fixture(), high = entity + '_slow_high', low = entity + '_slow_low';
+    value.trace.sessions[0].entity = high;
+    value.trace.releases = [{ id: 1, entity: high, camera: 3, generation: 4, currentHost: true, wasConnected: true, eligible: true,
+      prefix: value.trace.sessions[0].prefix,
+      stack: 'Error\n at CameraPlayback.stop (http://192.168.0.28:8123/marao_dashboard_static/MaraoCamera.js:20:1)\n at CameraPlayback.fallback (http://192.168.0.28:8123/marao_dashboard_static/MaraoCamera.js:10:1)',
+      proof: { originalCameraOrNull: true, camera: 3, generation: 5, hostDisconnected: true, playerReleased: true,
+        quality: { sameConfiguredEntity: true, sameDevice: true, lowerResolution: true, selected: low } } }];
+    value.trace.events[1].boundary = { kind: 'marao-quality-release', release: 1, entities: [high] };
+    return value;
+  };
+  const valid = quality(); assert.equal(classifyCameraCancellations(valid.failures, valid.trace).accepted.length, 1);
+  for (const mutate of [
+    r => { r.stack = stack; }, r => { r.eligible = false; }, r => { r.currentHost = false; },
+    r => { r.proof.generation++; }, r => { r.proof.camera++; }, r => { r.proof.hostDisconnected = false; },
+    r => { r.proof.quality.sameDevice = false; }, r => { r.proof.quality.lowerResolution = false; },
+    r => { r.proof.quality.sameConfiguredEntity = false; }, r => { r.proof.quality.selected = entity + '_real'; },
+    r => { r.proof.quality.selected = r.entity; },
+  ]) {
+    const value = quality(); mutate(value.trace.releases[0]);
+    assert.equal(classifyCameraCancellations(value.failures, value.trace).rejected.length, 1);
+  }
+});

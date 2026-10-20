@@ -19,7 +19,7 @@ CAMERA_IMAGE = Path(__file__).with_name("event.svg").read_bytes()
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the local visual-test camera entity."""
-    async_add_entities([MaraoTestCamera(config.get("name", "Marao Test Camera"), config.get("initial_state", "idle"), config.get("picture_error", False), config.get("live", False), config.get("live_delay", 0), config.get("missing_still", False))])
+    async_add_entities([MaraoTestCamera(config.get("name", "Marao Test Camera"), config.get("initial_state", "idle"), config.get("picture_error", False), config.get("live", False), config.get("live_delay", 0), config.get("missing_still", False), config.get("quality"))])
 
 
 class MaraoTestCamera(Camera):
@@ -27,7 +27,7 @@ class MaraoTestCamera(Camera):
 
     _attr_should_poll = False
 
-    def __init__(self, name: str, initial_state: str = "idle", picture_error: bool = False, live: bool = False, live_delay: float = 0, missing_still: bool = False) -> None:
+    def __init__(self, name: str, initial_state: str = "idle", picture_error: bool = False, live: bool = False, live_delay: float = 0, missing_still: bool = False, quality: str | None = None) -> None:
         super().__init__()
         self.content_type = "image/svg+xml"
         self._attr_name = name
@@ -35,6 +35,10 @@ class MaraoTestCamera(Camera):
         self._fixture_state = None if initial_state == "unknown" else initial_state
         self._attr_available = initial_state != "unavailable"
         self._attr_extra_state_attributes = {"client_id": "marao_test", "camera_name": "front"}
+        self._quality = quality
+        if quality:
+            self._attr_extra_state_attributes.update({"channel_id": 0 if quality == "high" else 2,
+                "fps": 20, "width": 640 if quality == "high" else 320, "height": 360 if quality == "high" else 180})
         self._picture_error = picture_error
         self._live = live
         self._live_delay = live_delay
@@ -75,4 +79,4 @@ class MaraoTestCamera(Camera):
             await asyncio.sleep(self._live_delay)
         if self.hass.http.context is not None:
             raise RuntimeError("The disposable live fixture requires its local HTTP listener")
-        return f"http://127.0.0.1:{self.hass.http.server_port}{LIVE_PATH}"
+        return f"http://127.0.0.1:{self.hass.http.server_port}{LIVE_PATH}" + (f"?quality={self._quality}&bps=24000" if self._quality else "")

@@ -403,6 +403,11 @@ async def test_camera_live_fixture_is_distinct_safe_local_media_with_optional_st
     source = Path(fixture.__file__).with_name("live.mp4")
     assert source.read_bytes()[4:8] == b"ftyp"
     assert source.read_bytes() != source.with_name("event.mp4").read_bytes()
+    for quality, width in (("high", 640), ("low", 320)):
+        tier = fixture.MaraoTestCamera("Safe tier", live=True, quality=quality)
+        tier.hass = live.hass
+        assert await tier.stream_source() == f"http://127.0.0.1:18123/api/marao_test_camera/live.ts?quality={quality}&bps=24000"
+        assert tier._attr_extra_state_attributes["width"] == width
     assert await live.async_camera_image() == fixture.CAMERA_IMAGE
     assert await missing.async_camera_image() is None
     assert missing.entity_picture is None
@@ -495,7 +500,7 @@ async def test_synthetic_live_endpoint_rejects_external_and_limits_physical_loop
     with pytest.raises(web.HTTPTooManyRequests):
         await view.get(request)
     assert view._active == fixture.MAX_LIVE_CONNECTIONS
-    assert fixture.MAX_LIVE_CONNECTIONS == 4
+    assert fixture.MAX_LIVE_CONNECTIONS == 6
 
 
 async def test_synthetic_live_endpoint_bounds_queue_and_joins_on_native_disconnect(monkeypatch):
@@ -520,7 +525,8 @@ async def test_synthetic_live_endpoint_bounds_queue_and_joins_on_native_disconne
         async def write(self, _data):
             raise ConnectionResetError("Native consumer disconnected")
 
-    def executor(_function, stop, _chunks):
+    def executor(_function, stop, _chunks, source_file):
+        assert source_file == fixture.LIVE_FILE
         observed["stop"] = stop
 
         async def producer():
@@ -532,7 +538,7 @@ async def test_synthetic_live_endpoint_bounds_queue_and_joins_on_native_disconne
 
     monkeypatch.setattr(fixture, "Queue", bounded_queue)
     monkeypatch.setattr(fixture.web, "StreamResponse", Response)
-    request = SimpleNamespace(transport=SimpleNamespace(get_extra_info=lambda _: ("::1", 12345)), app={fixture.KEY_HASS: SimpleNamespace(async_add_executor_job=executor)})
+    request = SimpleNamespace(query={}, transport=SimpleNamespace(get_extra_info=lambda _: ("::1", 12345)), app={fixture.KEY_HASS: SimpleNamespace(async_add_executor_job=executor)})
     view = fixture.FixtureLiveView()
     await view.get(request)
     assert observed["stop"].is_set() and observed["joined"]

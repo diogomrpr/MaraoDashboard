@@ -330,6 +330,17 @@
           "columns": 1,
           "entities": [
             {
+              "entity_id": "camera.marao_dashboard_test_camera_slow_high",
+              "template": "hc_camera_card",
+              "name": "Slow connection camera",
+              "id": "camera-quality"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
               "entity_id": "alarm_control_panel.marao_dashboard_test_alarm",
               "template": "hc_security_card",
               "name": "Marao Dashboard Test Alarm",

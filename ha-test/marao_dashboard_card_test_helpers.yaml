@@ -267,6 +267,15 @@ camera:
     name: Marao Dashboard Test Camera
     live: true
 
+  - platform: unifiprotect
+    name: Marao Dashboard Test Camera Slow High
+    live: true
+    quality: high
+  - platform: unifiprotect
+    name: Marao Dashboard Test Camera Slow Low
+    live: true
+    quality: low
+
 media_player:
   - platform: marao_test_media
     name: Marao Dashboard Test Media Error

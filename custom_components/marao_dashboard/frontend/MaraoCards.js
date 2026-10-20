@@ -1052,6 +1052,7 @@ export class MaraoCard extends BaseElement {
     import(new URL(`./MaraoCamera.js${new URL(import.meta.url).search}`, import.meta.url).href).then(({ CameraPlayback }) => {
       if (generation !== this._cameraGeneration || !this.isConnected || this.preview) return;
       const fallback = {
+        'camera.buffering': 'Buffering…', 'camera.lower_quality': 'Reduced quality',
         'camera.loading': 'Starting live video…', 'camera.live': 'Live', 'camera.snapshot': 'Snapshot',
         'camera.start': 'Start live view', 'camera.blocked': 'Playback needs your permission',
         'camera.failed': 'Live video failed', 'camera.timeout': 'Live video did not start in time',

@@ -4,6 +4,7 @@
 // ha-web-rtc-player}.ts on home-assistant/frontend (dev); older hass binding retained.
 export const CAMERA_REGISTRATION_MS = 10000;
 export const CAMERA_PLAYBACK_MS = 30000;
+export const CAMERA_FALLBACK_MS = 8000;
 const CAMERA_STREAM_FEATURE = 2; // HA CameraEntityFeature.STREAM, also used by its native host.
 let nativeRegistration;
 const ownedPosterInputs = new WeakSet();
@@ -95,6 +96,24 @@ export function cameraSupportsStream(state) {
   return Boolean(Number(state?.attributes?.supported_features) & CAMERA_STREAM_FEATURE);
 }
 
+// Protect main channels are 0/1/2; package-camera views must never be substitutes.
+export function lowerCameraStreams(hass, entity) {
+  const registry = hass?.entities || {}, origin = registry[entity];
+  const quality = id => {
+    const a = hass.states?.[id]?.attributes || {};
+    return Number.isInteger(a.channel_id) && [0, 1, 2].includes(a.channel_id)
+      && Number(a.width) > 0 && Number(a.height) > 0 ? Number(a.width) * Number(a.height) : 0;
+  };
+  const pixels = quality(entity);
+  if (origin?.platform !== 'unifiprotect' || !origin.device_id || !pixels) return [];
+  return Object.entries(registry).filter(([id, entry]) => id.startsWith('camera.') && id !== entity
+    && entry.platform === origin.platform && entry.device_id === origin.device_id
+    && entry.config_entry_id === origin.config_entry_id && !entry.disabled_by
+    && cameraAvailable(hass, id) && cameraSupportsStream(hass.states[id])
+    && quality(id) > 0 && quality(id) < pixels)
+    .sort(([a], [b]) => quality(b) - quality(a) || a.localeCompare(b)).map(([id]) => id);
+}
+
 function rootsWithin(host) {
   const roots = [host], seen = new Set();
   for (let i = 0; i < roots.length; i++) {
@@ -140,6 +159,11 @@ export function cameraVideo(host) {
   return null;
 }
 
+function decodedFrames(video) {
+  const quality = video?.getVideoPlaybackQuality?.();
+  return quality ? quality.totalVideoFrames - quality.droppedVideoFrames : undefined;
+}
+
 export class CameraPlayback {
   constructor(card, slot, { localize, haptic, problem }) {
     this.card = card; this.slot = slot; this.localize = localize; this.haptic = haptic; this.problem = problem;
@@ -182,7 +206,7 @@ export class CameraPlayback {
   update(hass, entity, label) {
     const replaced = this.entity !== entity;
     this.hass = hass; this.entity = entity; this.label = label;
-    if (replaced) { this.stop(); this.state = 'idle'; this.problem(''); }
+    if (replaced) { this.stop(); this.streamEntity = entity; this.triedStreams = new Set([entity]); this.state = 'idle'; this.problem(''); }
     const eligible = this.eligible();
     if (!eligible) {
       this.stop();
@@ -201,9 +225,11 @@ export class CameraPlayback {
     const capabilityChanged = this.streamSupported !== undefined && this.streamSupported !== supported;
     this.streamSupported = supported;
     if (capabilityChanged) { this.stop(); this.state = 'idle'; this.problem(''); }
-    this.poster.hidden = this.state === 'live' || !picture || this.posterFailed;
+    this.poster.hidden = this.state === 'live' || this.state === 'buffering' || !picture || this.posterFailed;
+    if (this.streamEntity !== entity && !lowerCameraStreams(hass, entity).includes(this.streamEntity)) { this.fail('failed'); return; }
     if (this.player) {
-      this.updateNativeHass(); this.player.stateObj = hass.states[entity];
+      this.updateNativeHass(); this.player.stateObj = hass.states[this.streamEntity];
+      if (!cameraAvailable(hass, this.streamEntity)) { this.fail('failed'); return; }
       if (!clearNativeCameraPoster(this.player)) { this.fail('compatibility'); return; }
     }
     if (!this.attempt && !['error', 'snapshot', 'blocked'].includes(this.state)) this.start();
@@ -213,16 +239,20 @@ export class CameraPlayback {
     // A still-only entity must not start HA's MJPEG fallback or a native session.
     if (!cameraSupportsStream(this.hass?.states?.[this.entity])) { this.fail('unsupported', true); return; }
     const generation = ++this.generation;
+    this.streamEntity ||= this.entity;
+    this.triedStreams ||= new Set([this.entity]);
+    this.lastProgressAt = performance.now(); this.slowMs = 0; this.sampleAt = performance.now(); this.sampleTime = 0;
     this.attempt = true; this.state = 'loading'; this.reason = ''; this.nativeError = ''; this.problem(''); this.describe();
     this.timer = setTimeout(() => {
       if (generation !== this.generation) return;
       this.fail(this.nativeError ? 'failed' : this.video ? 'timeout' : 'compatibility', false, this.nativeError);
     }, CAMERA_PLAYBACK_MS);
+    this.monitor = setInterval(() => this.observeProgress(generation), 500);
     try {
       await loadNativeCamera();
       if (generation !== this.generation || !this.eligible()) return;
       const player = document.createElement('ha-camera-stream');
-      this.signaling = new CameraSignaling(this.hass.connection, this.entity, () => {
+      this.signaling = new CameraSignaling(this.hass.connection, this.streamEntity, () => {
         if (generation === this.generation) this.fail('failed');
       });
       this.player = player; this.contexts = new Set(); this.updateNativeHass();
@@ -235,7 +265,7 @@ export class CameraPlayback {
         notify();
       };
       this.stage.addEventListener('context-request', this.contextRequest);
-      player.stateObj = this.hass.states[this.entity];
+      player.stateObj = this.hass.states[this.streamEntity];
       player.muted = true; player.controls = false; player.autoPlay = true; player.playsInline = true; player.aspectRatio = 16 / 9; player.fitMode = 'cover';
       player.setAttribute('muted', ''); player.setAttribute('autoplay', ''); player.setAttribute('playsinline', '');
       this.mediaObserver = new MutationObserver(() => this.bind(generation));
@@ -243,9 +273,17 @@ export class CameraPlayback {
     } catch (error) { if (generation === this.generation) this.fail(error.message === 'registration' ? 'registration' : 'failed'); }
   }
   updateNativeHass() {
-    const signaling = this.signaling, hass = this.hass;
+    const signaling = this.signaling, hass = this.hass, generation = this.generation;
     this.nativeHass = { ...hass, connection: signaling,
-      callWS: message => message.type === 'camera/webrtc/candidate' ? signaling.candidate(message) : hass.callWS(message) };
+      callWS: message => {
+        if (message.type === 'camera/webrtc/candidate') return signaling.candidate(message);
+        if (message.type !== 'camera/stream') return hass.callWS(message);
+        // HA starts a playlist fetch before checking whether its host survived.
+        // Abandon a retired continuation (no timer or retained global promise),
+        // rather than waking the detached player with an obsolete stream URL.
+        if (generation !== this.generation) return new Promise(() => {});
+        return hass.callWS(message).then(result => generation === this.generation ? result : new Promise(() => {}));
+      } };
     this.player.hass = this.nativeHass;
     for (const notify of this.contexts || []) notify();
   }
@@ -256,7 +294,11 @@ export class CameraPlayback {
     if (!clearNativeCameraPoster(this.player, roots)) { this.fail('compatibility'); return; }
     const video = cameraVideo(this.player);
     if (video && video === this.video) return;
-    if (this.video) this.waiting();
+    if (this.video) {
+      this.waiting();
+      // A replaced native transport has no retained frame; it is a fresh startup.
+      this.state = 'loading'; this.poster.hidden = !this.picture || this.posterFailed; this.describe();
+    }
     this.unbind();
     if (!video) {
       const nativeError = roots.map(root => root.querySelector('ha-alert')?.textContent?.trim()).filter(Boolean).join(' · ');
@@ -264,7 +306,7 @@ export class CameraPlayback {
       if (roots.some(root => root.querySelector('img'))) this.fail(nativeError ? 'failed' : 'unsupported', !nativeError, nativeError);
       return;
     }
-    this.video = video; this.lastTime = video.currentTime; this.advanced = false; this.playRequested = false;
+    this.video = video; this.lastTime = video.currentTime; this.advanced = false; this.playRequested = false; this.lastFrames = decodedFrames(video); this.sampleFrames = this.lastFrames; this.sampleTime = video.currentTime; this.sampleAt = performance.now(); this.slowMs = 0;
     video.muted = true; video.defaultMuted = true; video.playsInline = true; video.controls = false;
     this.mediaHandlers = {
       timeupdate: () => this.progress(generation), playing: () => this.progress(generation),
@@ -290,14 +332,39 @@ export class CameraPlayback {
   progress(generation) {
     const video = this.video;
     if (generation !== this.generation || !video || video.paused || video.readyState < 2) return;
-    if (video.currentTime > this.lastTime) {
-      this.advanced = true; this.state = 'live'; this.reason = ''; this.nativeError = ''; clearTimeout(this.timer); this.poster.hidden = true; this.problem(''); this.describe();
+    const frames = decodedFrames(video);
+    if (video.currentTime > this.lastTime && (frames === undefined || frames > this.lastFrames)) {
+      this.lastFrames = frames;
+      this.advanced = true; this.state = 'live'; this.lastProgressAt = performance.now(); this.reason = ''; this.nativeError = ''; clearTimeout(this.timer); this.poster.hidden = true; this.problem(''); this.describe();
     }
     this.lastTime = video.currentTime;
   }
+  observeProgress(generation) {
+    if (generation !== this.generation || !this.attempt || this.state === 'blocked') return;
+    const now = performance.now();
+    const elapsed = Math.min(1000, now - this.sampleAt), time = this.video?.currentTime || 0;
+    const frames = decodedFrames(this.video), fps = Number(this.hass?.states?.[this.streamEntity]?.attributes?.fps);
+    const slowFrames = frames !== undefined && this.sampleFrames !== undefined && fps > 0 && frames - this.sampleFrames < fps * elapsed / 2000;
+    if (this.advanced && (slowFrames || (time >= this.sampleTime && time - this.sampleTime < elapsed / 2000))) this.slowMs += elapsed;
+    else this.slowMs = Math.max(0, this.slowMs - elapsed / 4);
+    this.sampleAt = now; this.sampleTime = time; this.sampleFrames = frames;
+    this.progress(generation);
+    if (now - this.lastProgressAt > 1000) this.waiting();
+    if ((now - this.lastProgressAt >= CAMERA_FALLBACK_MS || this.slowMs >= CAMERA_FALLBACK_MS) && this.eligible()) {
+      if (!this.fallback()) this.slowMs = Math.min(this.slowMs, CAMERA_FALLBACK_MS);
+    }
+  }
+  fallback() {
+    const next = lowerCameraStreams(this.hass, this.streamEntity || this.entity).find(id => !this.triedStreams.has(id));
+    if (!next) return false;
+    this.stop(); this.streamEntity = next; this.triedStreams.add(next);
+    this.poster.hidden = !this.picture || this.posterFailed;
+    this.start();
+    return true;
+  }
   waiting() {
     if (this.state !== 'live') return;
-    this.state = 'loading'; this.reason = ''; this.poster.hidden = !this.picture || this.posterFailed; this.describe();
+    this.state = 'buffering'; this.reason = ''; this.poster.hidden = true; this.describe();
     clearTimeout(this.timer);
     const generation = this.generation;
     this.timer = setTimeout(() => { if (generation === this.generation) this.fail('timeout', false, this.nativeError); }, CAMERA_PLAYBACK_MS);
@@ -312,8 +379,8 @@ export class CameraPlayback {
   message(key) { return this.localize(`camera.${key}`); }
   describe() {
     this.slot.dataset.cameraState = this.state;
-    const snapshot = this.picture && !this.posterFailed && this.state !== 'live';
-    const status = this.state === 'live' ? this.message('live') : this.state === 'loading' ? [this.message('loading'), this.nativeError].filter(Boolean).join(' · ')
+    const snapshot = this.picture && !this.posterFailed && !this.poster.hidden;
+    const status = this.state === 'buffering' ? [this.message('buffering'), this.nativeError].filter(Boolean).join(' · ') : this.state === 'live' ? [this.message('live'), this.streamEntity !== this.entity ? this.message('lower_quality') : ''].filter(Boolean).join(' · ') : this.state === 'loading' ? [this.message('loading'), this.nativeError].filter(Boolean).join(' · ')
       : ['error', 'snapshot', 'blocked'].includes(this.state) ? [this.message(this.reason), this.nativeError].filter(Boolean).join(' · ') : '';
     this.feedback.querySelector('span').textContent = [snapshot ? this.message('snapshot') : '', status, this.posterFailed && this.state === 'loading' ? this.message('poster_failed') : ''].filter(Boolean).join(' · ');
     const action = this.state === 'blocked' ? 'start' : this.state === 'error' ? 'retry' : '';
@@ -326,10 +393,10 @@ export class CameraPlayback {
       if (this.state === 'blocked' && this.video) {
         const generation = this.generation;
         // Keep play() synchronous with the user's gesture (Safari activation).
-        this.state = 'loading'; this.reason = ''; this.problem(''); this.describe();
+        this.state = 'loading'; this.reason = ''; this.lastProgressAt = performance.now(); this.slowMs = 0; this.problem(''); this.describe();
         this.timer = setTimeout(() => { if (generation === this.generation) this.fail('timeout', false, this.nativeError); }, CAMERA_PLAYBACK_MS);
         try { this.video.play()?.catch(error => this.playRejected(error, generation)); } catch (error) { this.playRejected(error, generation); }
-      } else if (this.state === 'error') { this.stop(); this.picture = ''; this.posterFailed = false; this.state = 'idle'; this.update(this.hass, this.entity, this.label); }
+      } else if (this.state === 'error') { this.stop(); this.streamEntity = this.entity; this.triedStreams = new Set([this.entity]); this.picture = ''; this.posterFailed = false; this.state = 'idle'; this.update(this.hass, this.entity, this.label); }
     }); }
     button.textContent = action === 'start' ? this.message('start') : this.localize('common.retry');
     button.setAttribute('aria-label', `${button.textContent} ${this.label || this.entity}`);
@@ -345,11 +412,11 @@ export class CameraPlayback {
   }
   stop() {
     if (this.attempt || this.player) ++this.generation;
-    clearTimeout(this.timer); this.mediaObserver?.disconnect(); this.mediaObserver = null; this.unbind();
+    clearTimeout(this.timer); clearInterval(this.monitor); this.monitor = null; this.mediaObserver?.disconnect(); this.mediaObserver = null; this.unbind();
     this.signaling?.close(); this.signaling = null;
     this.stage?.removeEventListener('context-request', this.contextRequest); this.contextRequest = null; this.contexts?.clear();
     this.player?.remove(); this.player = null; this.attempt = false;
-    if (['loading', 'live', 'blocked'].includes(this.state)) this.state = 'idle';
+    if (['loading', 'live', 'buffering', 'blocked'].includes(this.state)) this.state = 'idle';
   }
   dispose() {
     this.stop(); this.intersection?.disconnect(); this.ancestry.disconnect();

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import nativeChecks from '../camera-live-native-checks.js';
 const source = fs.readFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoCamera.js', import.meta.url),'utf8');
-const {loadNativeCamera,cameraAvailable,cameraSupportsStream,clearNativeCameraPoster,CameraPlayback,CameraSignaling,CAMERA_PLAYBACK_MS,CAMERA_REGISTRATION_MS} = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+const {lowerCameraStreams,loadNativeCamera,cameraAvailable,cameraSupportsStream,clearNativeCameraPoster,CameraPlayback,CameraSignaling,CAMERA_PLAYBACK_MS,CAMERA_REGISTRATION_MS} = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 
 function signalingFixture(createSocket) {
   const connections = [], sockets = [], settings = [];
@@ -420,4 +420,61 @@ test('incompatible native public poster inputs fail compatibility without observ
       mediaObserver: { observe() {} }, fail: reason => failures.push(reason) });
     assert.doesNotThrow(() => playback.bind(1)); assert.deepEqual(failures, ['compatibility']);
   }
+});
+
+test('quality fallback selects only enabled available lower main channels on the same Protect device', () => {
+  const h={connected:true,entities:{},states:{}};
+  const add=(id,width,channel=0,entry={})=>{h.entities[id]={platform:'unifiprotect',device_id:'safe-device',config_entry_id:'safe-entry',...entry};h.states[id]={state:'recording',attributes:{supported_features:2,width,height:180,channel_id:channel}};};
+  add('camera.high',1920);add('camera.medium',640,1);add('camera.low',320,2);
+  add('camera.package',160,3);add('camera.foreign',320,2,{device_id:'other'});add('camera.disabled',320,2,{disabled_by:'user'});
+  add('camera.offline',320,2);h.states['camera.offline'].state='unavailable';
+  add('camera.other_provider',320,2,{platform:'other'});add('camera.no_metadata',0,2);
+  assert.deepEqual(lowerCameraStreams(h,'camera.high'),['camera.medium','camera.low']);
+  assert.deepEqual(lowerCameraStreams(h,'camera.low'),[]);
+  delete h.entities['camera.high'].device_id;assert.deepEqual(lowerCameraStreams(h,'camera.high'),[]);
+});
+
+test('brief buffering keeps the same video visible and recovers on clock progress without native events', () => {
+  const p=Object.create(CameraPlayback.prototype);let descriptions=0;
+  Object.assign(p,{state:'live',generation:1,video:{paused:false,readyState:2,currentTime:2},lastTime:1,advanced:true,poster:{hidden:true},describe(){descriptions++},problem(){},lastProgressAt:performance.now(),attempt:true,sampleAt:performance.now(),sampleTime:1,slowMs:0});
+  p.waiting();assert.equal(p.state,'buffering');assert.equal(p.poster.hidden,true);
+  p.observeProgress(1);assert.equal(p.state,'live');assert.equal(p.poster.hidden,true);assert.ok(descriptions>=2);clearTimeout(p.timer);
+});
+
+test('fallback releases the old host and tries each lower tier only once while preserving the configured entity', () => {
+  const p=Object.create(CameraPlayback.prototype);const h={connected:true,states:{},entities:{}};
+  for(const [id,w,c] of [['high',1920,0],['low',320,2]]){h.states['camera.'+id]={state:'idle',attributes:{supported_features:2,width:w,height:180,channel_id:c}};h.entities['camera.'+id]={platform:'unifiprotect',device_id:'one'};}
+  const actions=[];Object.assign(p,{hass:h,entity:'camera.high',streamEntity:'camera.high',triedStreams:new Set(['camera.high']),picture:'still',poster:{},stop(){actions.push('stop')},start(){actions.push(this.streamEntity)}});
+  assert.equal(p.fallback(),true);assert.deepEqual(actions,['stop','camera.low']);assert.equal(p.entity,'camera.high');
+  assert.equal(p.fallback(),false);assert.equal(actions.length,2);
+});
+
+test('repeated slow advancement spends a bounded budget rather than resetting fallback forever', () => {
+  const p=Object.create(CameraPlayback.prototype);let fallbacks=0;
+  Object.assign(p,{generation:1,attempt:true,state:'live',advanced:true,slowMs:7900,sampleAt:performance.now()-500,sampleTime:2,lastTime:2,lastProgressAt:performance.now(),video:{currentTime:2.01,paused:false,readyState:2},poster:{},describe(){},problem(){},eligible:()=>true,fallback(){fallbacks++}});
+  p.observeProgress(1);assert.equal(fallbacks,1);
+});
+
+test('an advancing native clock without newly decoded frames cannot claim live playback', () => {
+  const p=Object.create(CameraPlayback.prototype);let frames=10;
+  Object.assign(p,{generation:1,state:'buffering',lastTime:1,lastFrames:10,video:{paused:false,readyState:2,currentTime:2,getVideoPlaybackQuality:()=>({totalVideoFrames:frames,droppedVideoFrames:0})},poster:{hidden:true},describe(){},problem(){}});
+  p.progress(1);assert.equal(p.state,'buffering');assert.equal(p.poster.hidden,true);
+  frames++;p.video.currentTime=3;p.progress(1);assert.equal(p.state,'live');assert.equal(p.poster.hidden,true);
+});
+
+test('retired native HLS requests cannot wake a detached host with a late playlist URL', async () => {
+  const p=Object.create(CameraPlayback.prototype);let resolve,calls=0,delivered=false;
+  Object.assign(p,{generation:1,player:{},signaling:{},hass:{callWS(){calls++;return new Promise(done=>{resolve=done;});}}});
+  p.updateNativeHass();const api=p.nativeHass;
+  api.callWS({type:'camera/stream'}).then(()=>{delivered=true;});
+  p.generation++;resolve({url:'obsolete-synthetic-playlist'});await Promise.resolve();await Promise.resolve();
+  assert.equal(delivered,false);api.callWS({type:'camera/stream'});assert.equal(calls,1);
+  p.hass={callWS:()=>Promise.reject(new Error('permission'))};p.updateNativeHass();
+  await assert.rejects(p.nativeHass.callWS({type:'camera/stream'}),/permission/,'Active failures must still propagate');
+});
+
+test('a choppy but advancing lowest-quality stream stays live instead of failing for low frame rate', () => {
+  const p=Object.create(CameraPlayback.prototype);
+  Object.assign(p,{generation:1,attempt:true,state:'live',advanced:true,slowMs:35000,sampleAt:performance.now()-500,sampleTime:2,lastTime:2,lastFrames:10,sampleFrames:10,lastProgressAt:performance.now(),streamEntity:'camera.low',hass:{states:{'camera.low':{attributes:{fps:20}}}},video:{currentTime:2.5,paused:false,readyState:2,getVideoPlaybackQuality:()=>({totalVideoFrames:11,droppedVideoFrames:0})},poster:{},describe(){},problem(){},eligible:()=>true,fallback:()=>false,fail(){assert.fail('Advancing video must remain usable even at low fps');}});
+  p.observeProgress(1);assert.equal(p.state,'live');assert.equal(p.poster.hidden,true);assert.equal(p.slowMs,8000);
 });

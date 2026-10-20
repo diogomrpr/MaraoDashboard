@@ -1879,6 +1879,15 @@
       "variables": {
         "popup_hash": "#marao-dashboard-test-camera-popup"
       }
+    },
+    {
+      "type": "custom:marao-card",
+      "template": "hc_camera_card",
+      "entity": "camera.marao_dashboard_test_camera_slow_high",
+      "name": "Slow connection \u00b7 automatic quality",
+      "variables": {
+        "popup_hash": "#marao-dashboard-test-camera-popup"
+      }
     }
   ],
   "editorDragCoverage": [

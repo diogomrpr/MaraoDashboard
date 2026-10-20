@@ -59,3 +59,11 @@ no setting, default, migration or generated ownership change. Historical camera
 provider fixture inputs and independent expected outputs remain unchanged.
 User requests all checks after the combined batch; early test instructions are
 superseded, so evidence-dependent tasks stay unchecked until those checks run.
+
+## 7. Automatic quality fallback and buffering
+
+- [x] 7.1 Implement safe same-device quality selection, bounded fallback and video-preserving buffering; preserve configuration/actions and localize feedback.
+- [x] 7.2 Add regression checks, synthetic quality fixtures and slow-connection native playback proof on the disposable instance.
+- [x] 7.3 Run scoped verification, inspect representative results and document limits and compatibility.
+
+2026-10-20 follow-up verification: scoped camera gate passed (private report `run-I7MoWE`), including actual 24,000 byte/s synthetic-source fallback in Chromium/WebKit and narrow/enlarged-text layouts. Inspected representative narrow and bold 200% captures. Brief-buffer checks retain the same video host without a poster. Native cancellation audit requires exact owned request and release/handoff proof. Saved configuration remains unchanged; no migration. Only disposable `192.168.0.28` was deployed/tested. Real Protect interoperability, WAN/ICE latency, real phones and comprehensive testing were not exercised.

@@ -123,3 +123,22 @@ added to the card configuration.
 | event_limit | `12` | No | Maximum recent events to request. |
 
 Reported media or history failures affect the whole card and keep a readable reason. Use the visible Retry or Refresh control to try again; event details also keep Back. Useful readings and actions with available targets remain usable. A failed actual control target shows a partial warning and disables that action. Problem surfaces take priority over artwork and custom colors.
+
+### Slow connections
+
+After live playback starts, brief buffering keeps the video frame visible with a
+localized buffering label instead of covering it with a snapshot. The native
+player stays mounted and resumes automatically.
+
+For UniFi Protect, sustained startup or playback stalls automatically try an
+available lower-resolution main channel of the same registered camera device.
+The alternate camera entities must already be enabled and available in Home
+Assistant, with channel and resolution metadata. Marao never enables streams,
+changes camera settings, uses another device or selects a package-camera view.
+Missing metadata or alternate channels leave the configured stream unchanged.
+
+Each lower tier is tried once per playback session. A working lower tier is kept
+and labelled “Reduced quality”; explicit Retry returns to the configured tier.
+If no tier can play, the card reports a bounded failure. The saved camera, labels
+and event action remain unchanged. This is stream selection, not transcoding or
+a promise of seamless switching: changing tiers starts a new native stream.

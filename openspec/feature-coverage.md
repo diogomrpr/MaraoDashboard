@@ -195,7 +195,9 @@ Navbar overflow keeps complete saved navigation lists and uses the shared render
   initialization, foreground promotion, draft preservation and explicit retry.
   `editor-drag` covers steady pickup, deliberate 16px edge approach and 8px
   reversal/cancellation through unit and native-input geometry checks.
-- `camera` includes `MaraoCamera.js`, advancing safe media fixtures, native-loader
+- `camera` includes same-device Protect quality fallback, decoded-frame progress,
+  retained video during buffering, native slow-link checks in Chromium/WebKit,
+  `MaraoCamera.js`, advancing safe media fixtures, native-loader
   binding, per-offer native signaling ownership, early-authentication/local-ICE
   cancellation and synthetic Chromium/WebKit lifecycle checks. Those local checks do
   not establish actual HA transport, physical Safari or production NVR behavior.

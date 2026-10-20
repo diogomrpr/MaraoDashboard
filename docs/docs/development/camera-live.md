@@ -12,8 +12,10 @@ This matches the native capability gate; stream-capability changes reconcile
 the current camera once.
 
 The HA still is independent from initialization. It stays above the connected,
-visible native host in a reserved 16:9 stage while playback loads. Only standard
-video events with advancing `currentTime` remove the poster and show `Live`.
+visible native host in a reserved 16:9 stage while playback loads. Standard video events and a lifecycle-owned 500 ms observation check require
+advancing `currentTime` and, when available, newly decoded frames before removing
+the poster and showing `Live`. Brief buffering keeps the video frame visible
+with buffering feedback; replacing the native transport starts a fresh poster handoff.
 A late/failed/missing still cannot stall or overwrite live video. Retry and
 eligible lifecycle recovery repeat this path. No pixels, credentials, transport
 URLs or private player methods are inspected.
@@ -22,7 +24,7 @@ Native registration uses `loadCardHelpers()` and `importMoreInfoControl('camera'
 where exposed, otherwise a detached picture-entity card used solely to register
 elements. It receives no HA object and is never mounted. Registration is bounded
 to 10 seconds; playback has a 30-second attempt. Failure is latched for explicit
-retry, without wrapper polling. Visibility, ancestry, document state and removal
+retry, without an automatic retry loop. Visibility, ancestry, document state and removal
 release the native host and invalidate asynchronous completions independently
 for each card. Editor previews never initialize native media.
 
@@ -72,7 +74,7 @@ clip remain dedicated to their previous tests. The disposable native camera uses
 `marao_test_camera/live.py` to remux the clip continuously as clocked MPEG-TS with
 monotonic timestamps, through Home Assistant's existing PyAV stream dependency.
 Its unauthenticated source accepts only physical loopback sockets, admits at
-most four safe source/recovery connections and bounds each output queue. Native
+most six safe source/recovery connections and bounds each output queue. Native
 client disconnection cancels the producer and closes its remux/input contexts;
 a finite MP4 is never supplied directly to HA's live stream worker.
 
@@ -179,3 +181,30 @@ Images, modules, unrelated media and unproved cancellations remain failures.
 `MARAO_CAMERA_SUBSCRIPTION_DIAGNOSTIC=1` adds sanitized command IDs/types,
 unsubscribe targets, result codes, native callers and lifecycle boundaries; it
 never records SDP, media payloads or authentication data. Warnings still fail.
+
+## Automatic quality fallback
+
+The runtime keeps the configured entity separate from the active stream entity.
+After eight seconds without decoded progress, or an accumulated eight seconds
+of substantially slow playback, it selects an available lower-resolution main
+channel on the same registered UniFi Protect device. Registry platform/device
+identity and numeric channel/resolution metadata are required. Package views,
+disabled entities and neutral states cannot be substitutes. No provider settings
+or saved configuration are changed. Each lower tier is attempted once; Retry
+returns to the configured tier. Sustained failure at the last tier remains bounded.
+
+Native HLS `camera/stream` continuations are generation-bound. A successful URL
+arriving after disposal does not resume its detached native caller, because HA
+starts fetching before checking connection state. The abandoned continuation has
+no timer or global reference; request failures still propagate.
+
+`camera-slow-native-checks.js` uses the realistic Security-page card (also represented in the canonical gallery)
+and the disposable
+Protect fixture's real registry entries. Its high/low synthetic streams are each
+capped at 24,000 bytes/s on the loopback media source, exercising actual HA
+transport and decoding under a constrained upstream link. This is not WAN/ICE
+latency emulation or real Protect interoperability. Chromium/WebKit checks assert
+quality selection, advancing low-resolution video, retained buffering frames,
+unchanged configured entity, no control services, feedback containment and cleanup.
+Use `node ha-test/generate-camera-live.js --high` to regenerate the synthetic
+higher-bitrate file. Both generated media files remain test-only.

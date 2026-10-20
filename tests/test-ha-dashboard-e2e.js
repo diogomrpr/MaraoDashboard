@@ -1609,7 +1609,7 @@ async function main() {
   }
   const serviceCalls = [];
   let errors;
-  const cameraSelected = process.argv.includes('--camera-only') || process.argv.includes('--camera-live-only');
+  const cameraSelected = process.argv.includes('--camera-only') || process.argv.includes('--camera-live-only') || process.argv.includes('--camera-slow-only');
   const createSession = async theme => {
     const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
     try {
@@ -1713,7 +1713,8 @@ async function main() {
     } finally { await browser.close(); }
     return;
   }
-  const cameraLiveOnly = process.argv.includes('--camera-live-only');
+  const cameraSlowOnly = process.argv.includes('--camera-slow-only');
+  const cameraLiveOnly = process.argv.includes('--camera-live-only') || cameraSlowOnly;
   const selectedCheck = cameraLiveOnly ? 'camera' : ['actions', 'camera', 'history'].find(name => process.argv.includes('--' + name + '-only'));
   if (selectedCheck) {
     let completedTheme = false;
@@ -1726,12 +1727,16 @@ async function main() {
           await assertNoBrowserErrors(selectedCheck + '/closed context');
           browser = await chromium.launch(); ({ context, page, errors } = await createSession(theme));
         }
-        await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${baseUrl}/marao-dashboard/${cameraSlowOnly ? 'security' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
         await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         if (selectedCheck === 'history') await checkHistoryCases(page);
-        await applyVisualPreferences(page, scenario, theme);
-        if (selectedCheck === 'camera') await require('./camera-live-native-checks').checkNativeCameraPlayback(page, serviceCalls, { output: screenshotRoot, scenario: scenario.name, theme, geometryOnly: cameraLiveOnly });
+        if (cameraSlowOnly) {
+          const target = await page.locator('marao-card').filter({has:page.locator('.title',{hasText:/^Slow connection camera$/})}).first().elementHandle();
+          try { await applyVisualPreferences(page, scenario, theme, target); } finally { await target.dispose(); }
+        } else await applyVisualPreferences(page, scenario, theme);
+        if (cameraSlowOnly) await require('./camera-slow-native-checks').checkSlowCamera(page, serviceCalls, {output:screenshotRoot});
+        else if (selectedCheck === 'camera') await require('./camera-live-native-checks').checkNativeCameraPlayback(page, serviceCalls, { output: screenshotRoot, scenario: scenario.name, theme, geometryOnly: cameraLiveOnly });
         if (!cameraLiveOnly && selectedCheck !== 'history') await ({ actions: checkActionDispatches, camera: checkCameraCases })[selectedCheck](page, serviceCalls);
         if (selectedCheck === 'camera') await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         else await page.waitForLoadState('networkidle');
@@ -1793,7 +1798,7 @@ async function main() {
           browser = await chromium.launch();
           ({ context, page, errors } = await createSession(theme));
         }
-        await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${baseUrl}/marao-dashboard/${cameraSlowOnly ? 'security' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
         await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);

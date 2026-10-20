@@ -14,7 +14,7 @@ const python = file => ({ id: 'python:' + file, kind: 'offline', command: ['pyth
   inputs: ['tests/components/marao_dashboard/' + file + '.py', backend, 'tests/conftest.py', 'pyproject.toml'], exclusive: false });
 const browser = (id, file, args = [], exclusive = true) => ({ id, kind: 'browser', command: ['node', 'tests/' + file + '.js', ...args],
   inputs: [runtime, 'tests/' + file + '.js', 'tests/test-ha-dashboard-accessibility.js', 'tests/test-ha-dashboard-e2e.js', 'ha-test',
-    ...(file === 'test-ha-dashboard-e2e' && args.some(arg => ['--camera-only', '--camera-live-only'].includes(arg)) ? ['tests/camera-live-native-checks.js', 'tests/camera-request-ledger.js'] : []),
+    ...(file === 'test-ha-dashboard-e2e' && args.some(arg => ['--camera-only', '--camera-live-only', '--camera-slow-only'].includes(arg)) ? ['tests/camera-live-native-checks.js', 'tests/camera-slow-native-checks.js', 'tests/camera-request-ledger.js'] : []),
     ...(file === 'test-ha-card-alignment' && args.includes('--access-label') ? ['tests/test-ha-ui-batch.js'] : []),
     ...(['test-ha-editor', 'test-ha-card-alignment'].includes(file) ? ['tests/test-ha-editor.js', 'tests/json-editor-checks.js', 'tests/editor-drag-checks.js', 'tests/editor-rendering-checks.js', 'tests/editor-preload-checks.js'] : [])], exclusive });
 const families = {
@@ -120,6 +120,9 @@ const components = {
     python: ['test_generator', 'test_gallery_fixtures', 'test_history', 'test_upgrade_fixtures'], editor: true, package: true,
     browser: [{id:'camera:local',kind:'offline',command:['node','tests/test-camera-live-local.js'],inputs:[runtime,'ha-test/camera-live-fixture.js','tests/test-camera-live-local.js','ha-test/custom_components/marao_test_camera/live.mp4'],exclusive:true},
       browser('camera', 'test-ha-dashboard-e2e', ['--camera-only']),
+      browser('camera:slow', 'test-ha-dashboard-e2e', ['--camera-slow-only', '--scenario=iphone-normal', '--theme=light', '--screenshots=review']),
+      browser('camera:slow:webkit', 'test-ha-dashboard-e2e', ['--camera-slow-only', '--webkit', '--scenario=iphone-normal', '--theme=light', '--screenshots=review']),
+      ...['narrow-320','iphone-bold-text-200'].map(profile => browser('camera:slow:' + profile, 'test-ha-dashboard-e2e', ['--camera-slow-only', '--scenario=' + profile, '--theme=light', '--screenshots=review'])),
       browser('camera:webkit', 'test-ha-dashboard-e2e', ['--camera-live-only', '--webkit', '--scenario=iphone-normal', '--theme=light', '--screenshots=review']),
       ...['narrow-320','android-normal','iphone-landscape','android-landscape','iphone-bold','iphone-text-200','iphone-page-zoom-200','iphone-bold-text-200'].map(profile => browser('camera:live:' + profile, 'test-ha-dashboard-e2e', ['--camera-live-only', '--scenario=' + profile, '--theme=light', '--screenshots=' + (['narrow-320','iphone-bold-text-200'].includes(profile) ? 'review' : 'failure')]))] },
   history: { units: [['marao-history-cards']], browser: [browser('history', 'test-ha-dashboard-e2e', ['--history-only'])] },
@@ -151,7 +154,7 @@ const rules = [
   [/^frontend_src\/history-(chart|data)\.js$|^custom_components\/marao_dashboard\/frontend\/(MaraoHistory|ChartJS\.LICENSE|KurkleColor\.LICENSE)/, ['chart-details']],
   [/^tests\/test-history-chart-local\.js$|^tests\/history-detail-checks\.js$|^ha-test\/history-fixture\.js$/, ['chart-details']],
   [/^tests\/editor-preload-checks\.js$/, ['editor-preload']],
-  [/^tests\/(test-camera-live-local|camera-live-native-checks|camera-request-ledger)\.js$|^custom_components\/marao_dashboard\/frontend\/MaraoCamera\.js$|^ha-test\/(camera-live-fixture|generate-camera-live)\.js$|^ha-test\/custom_components\/marao_test_camera\//, ['camera']],
+  [/^tests\/(test-camera-live-local|camera-live-native-checks|camera-slow-native-checks|camera-request-ledger)\.js$|^custom_components\/marao_dashboard\/frontend\/MaraoCamera\.js$|^ha-test\/(camera-live-fixture|generate-camera-live)\.js$|^ha-test\/custom_components\/(?:marao_test_camera|unifiprotect)\//, ['camera']],
   [/^tests\/control-grid-checks\.js$/, ['control-grid']],
   [/^tests\/verification-(policy|reuse)\.js$/, ['verification']],
   [/^tests\/(editor-rendering-checks|measure-ha-editor)\.js$/, ['editor-rendering']],
