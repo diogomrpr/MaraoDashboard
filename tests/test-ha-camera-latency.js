@@ -9,7 +9,7 @@ const {managedCameraLedger}=require('./camera-request-ledger');
 const folder=artifactDirectory('camera-native-latency');
 const redact=value=>String(value).replace(/https?:\s*\/\/?\s*[^\s]+/g,'[URL]').replace(/(?:key|token)=[^\s&]+/g,'key=[redacted]');
 (async()=>{
- const {config}=await prepareFrontend();assert.equal(new URL(config.url).hostname,'192.168.0.28');
+ const {config}=(process.env.MARAO_BATCH_RECEIPT ? await require('../ha-test/prepare').prepare() : await prepareFrontend());assert.equal(new URL(config.url).hostname,'192.168.0.28');
  const api=await connect(config);
  try {
   const native=await api.call({type:'camera/capabilities',entity_id:'camera.marao_dashboard_test_camera_adaptive_low'});

@@ -14,7 +14,7 @@ const slow = 'camera.marao_dashboard_test_camera_slow_low';
 const redact = value => String(value).replace(/https?:\S+/g, '[URL]').replace(/(?:key|token)=\S+/g, '[redacted]');
 
 (async () => {
-  const { config } = await prepareFrontend();
+  const { config } = (process.env.MARAO_BATCH_RECEIPT ? await require('../ha-test/prepare').prepare() : await prepareFrontend());
   assert.equal(new URL(config.url).hostname, '192.168.0.28');
   const browser = await engine.launch();
   const context = await browser.newContext({ viewport: engine === webkit ? { width: 390, height: 844 } : { width: 360, height: 800 }, hasTouch: true, isMobile: true });
