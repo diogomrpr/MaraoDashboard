@@ -383,29 +383,30 @@ async def test_energy_demo_history_matches_live_templates_and_period_resets(hass
     from homeassistant.helpers.template import Template
 
     fixture = load_fixture("history/__init__.py")
-    monkeypatch.setattr(fixture.dt_util, "DEFAULT_TIME_ZONE", UTC)
-    def entity(name):
-        return f"sensor.marao_dashboard_test_energy_demo_{name}"
+    with monkeypatch.context() as scoped:
+        scoped.setattr(fixture.dt_util, "DEFAULT_TIME_ZONE", UTC)
+        def entity(name):
+            return f"sensor.marao_dashboard_test_energy_demo_{name}"
 
-    first_hour = datetime(2026, 1, 1, 1, tzinfo=UTC)
-    midnight = datetime(2026, 1, 2, tzinfo=UTC)
-    assert fixture.energy_demo_value(entity("today"), first_hour) == .3
-    assert fixture.energy_demo_value(entity("kitchen"), first_hour) == .1
-    assert fixture.energy_demo_value(entity("kitchen_cost"), first_hour) == .025
-    assert fixture.energy_demo_value(entity("today"), midnight, before_reset=True) == 11.1
-    assert fixture.energy_demo_value(entity("today"), midnight) == 0
-    assert fixture.energy_demo_value(entity("month"), datetime(2026, 1, 3, tzinfo=UTC)) == 33.3
+        first_hour = datetime(2026, 1, 1, 1, tzinfo=UTC)
+        midnight = datetime(2026, 1, 2, tzinfo=UTC)
+        assert fixture.energy_demo_value(entity("today"), first_hour) == .3
+        assert fixture.energy_demo_value(entity("kitchen"), first_hour) == .1
+        assert fixture.energy_demo_value(entity("kitchen_cost"), first_hour) == .025
+        assert fixture.energy_demo_value(entity("today"), midnight, before_reset=True) == 11.1
+        assert fixture.energy_demo_value(entity("today"), midnight) == 0
+        assert fixture.energy_demo_value(entity("month"), datetime(2026, 1, 3, tzinfo=UTC)) == 33.3
 
-    config = yaml.safe_load((ROOT / "ha-test/marao_dashboard_card_test_helpers.yaml").read_text())
-    sensors = {"sensor." + sensor["unique_id"]: sensor for block in config["template"]
-               for sensor in block.get("sensor", []) if sensor.get("unique_id", "").startswith("marao_dashboard_test_energy_demo_")}
-    assert sensors.keys() == fixture.ENERGY_DEMO.keys()
-    for instant in (first_hour, midnight, datetime(2026, 1, 3, 20, 30, tzinfo=UTC)):
-        variables = {"now": lambda current=instant: current, "today_at": lambda current=instant: current.replace(hour=0, minute=0, second=0, microsecond=0)}
-        for sensor_id, sensor in sensors.items():
-            assert "state_class" not in sensor
-            rendered = Template(sensor["state"], hass).async_render(variables)
-            assert float(rendered) == pytest.approx(fixture.energy_demo_value(sensor_id, instant)), sensor_id
+        config = yaml.safe_load((ROOT / "ha-test/marao_dashboard_card_test_helpers.yaml").read_text())
+        sensors = {"sensor." + sensor["unique_id"]: sensor for block in config["template"]
+                   for sensor in block.get("sensor", []) if sensor.get("unique_id", "").startswith("marao_dashboard_test_energy_demo_")}
+        assert sensors.keys() == fixture.ENERGY_DEMO.keys()
+        for instant in (first_hour, midnight, datetime(2026, 1, 3, 20, 30, tzinfo=UTC)):
+            variables = {"now": lambda current=instant: current, "today_at": lambda current=instant: current.replace(hour=0, minute=0, second=0, microsecond=0)}
+            for sensor_id, sensor in sensors.items():
+                assert "state_class" not in sensor
+                rendered = Template(sensor["state"], hass).async_render(variables)
+                assert float(rendered) == pytest.approx(fixture.energy_demo_value(sensor_id, instant)), sensor_id
 
 
 async def test_camera_live_fixture_is_distinct_safe_local_media_with_optional_still(monkeypatch):
