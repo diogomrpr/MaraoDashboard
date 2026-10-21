@@ -312,6 +312,7 @@ const TRANSLATIONS = {
     "common.nothing_playing": "Nothing is playing",
     "room.turn_off_lights": "Turn off all lights in {name}",
     "room.lighting_summary": "Lighting: {label}",
+    "camera.invalid_preload": "Preload stream must be a boolean.",
     "camera.loading": "Starting live video…",
     "camera.fullscreen": "Open full screen",
     "camera.fullscreen_exit": "Exit full screen",
@@ -486,6 +487,7 @@ const TRANSLATIONS = {
     "common.nothing_playing": "Nada em reprodução",
     "room.turn_off_lights": "Desligar todas as luzes em {name}",
     "room.lighting_summary": "Iluminação: {label}",
+    "camera.invalid_preload": "A opção de pré-carregamento tem de ser verdadeira ou falsa.",
     "camera.loading": "A iniciar vídeo em direto…",
     "camera.fullscreen": "Abrir ecrã inteiro",
     "camera.fullscreen_exit": "Sair do ecrã inteiro",
@@ -1354,8 +1356,7 @@ class MaraoStateTimelineCard extends HTMLElement {
         ha-card { box-sizing: border-box; min-height: 168px; padding: 13px 20px; background: var(--ha-card-background); color: var(--primary-text-color); }
         header { display: grid; gap: 12px; margin-bottom: 8px; }
         ha-card[data-binary=true] { background: var(--color-blue); color: var(--color-black); --subtext-color: var(--color-black); }
-        .binary-cue { justify-self: end; box-sizing: border-box; width: 20px; height: 20px; border: 2px solid currentColor; border-radius: 50%; }
-        .binary-cue[data-active=true] { background: currentColor; }
+        .binary-state { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
         button { min-width:48px; min-height:48px; padding:10px 12px; border:0; border-radius:12px; font:inherit; font-family:var(--primary-font-family); font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-secondary,500); overflow-wrap:anywhere; color:var(--primary-text-color); background:var(--secondary-background-color); cursor:pointer; }
         button:focus { outline:none; }
         h2 { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: var(--font-size-primary, 18px); font-weight: var(--font-weight-primary, 700); letter-spacing: 0; }
@@ -1380,7 +1381,7 @@ class MaraoStateTimelineCard extends HTMLElement {
         .status { display: grid; min-height: 64px; padding: 12px; place-items: center; border: 1px solid var(--divider-color); border-radius: 8px; background: var(--marao-card-background); color: var(--subtext-color); font-size: var(--font-size-primary, 18px); font-weight: var(--font-weight-secondary, 500); text-align: center; overflow-wrap: anywhere; }
       </style>
       <ha-card${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""} data-history-state="${historyState}"${binary === null ? "" : ` data-binary="${binary}"`}>
-        <header><h2>${escapeHtml(name)}</h2>${problem?.complete ? "" : binary === null ? `<span>${escapeHtml(currentState)}</span>` : `<span class="binary-cue" data-active="${binary}" role="img" aria-label="${escapeHtml(`${name}: ${currentState}`)}"></span>`}</header>
+        <header><h2>${escapeHtml(name)}</h2>${problem?.complete ? "" : binary === null ? `<span>${escapeHtml(currentState)}</span>` : `<span class="binary-state" role="img" aria-label="${escapeHtml(`${name}: ${currentState}`)}"></span>`}</header>
         ${problem && problem.kind !== "loading" ? `<p class="status" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="mdi:alert-circle-outline" aria-hidden="true"></ha-icon> ${escapeHtml(problem.reason)}</p>` : ""}
         ${this._error && !unavailable ? `<button type="button" data-history-retry>${escapeHtml(localize("common.retry", this._hass))}</button>` : ""}
         ${segments.length ? `<div class="plot" role="img" aria-label="${escapeHtml(name)}"><div class="segments">${segmentMarkup}</div><div class="ticks">${ticks}</div><div class="cursor"></div><div class="tooltip"></div></div><div class="legend">${legend}</div>` : problem && problem.kind !== "loading" ? "" : `<div class="status" role="status">${escapeHtml(status)}</div>`}
@@ -1770,3 +1771,6 @@ window.MaraoDashboard = {
 console.info("%c Marao Dashboard loaded", "color: #d4b392; font-weight: 700;");
 
 await import(`./MaraoNativeCards.js${MARAO_RESOURCE_QUERY}`);
+const { registerCameraPreloader } = await import(`./MaraoNavigation.js${MARAO_RESOURCE_QUERY}`);
+const { syncCameraPreload } = await import(`./MaraoCameraPreload.js${MARAO_RESOURCE_QUERY}`);
+registerCameraPreloader(record => syncCameraPreload(record, {localize, haptic}));

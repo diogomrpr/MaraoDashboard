@@ -222,3 +222,11 @@ See [focused testing](../docs/docs/development/focused-testing.md).
   independently selects current requirements and validates original dependencies,
   environment, captures and cleanup. Full/parallel execution remains explicit;
   final inspection is current. Historical reports/fixtures remain immutable.
+
+## Current release policy (2026-10-21)
+
+Releases, version hooks and automatic Tests CI run affected unit tests only.
+Integration/browser/camera/mobile/upgrade testing belongs to development and is
+reused at release. Additional integration or full tests require an explicit user
+request. This supersedes earlier release-evidence requirements in this document
+and older change artifacts; historical results remain unchanged.

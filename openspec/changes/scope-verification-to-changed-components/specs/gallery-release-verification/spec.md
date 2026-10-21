@@ -15,14 +15,14 @@ Development and release verification SHALL use the smallest covering unit/static
 - **AND** unrelated camera, slider, reconnect, editor-save and historical live-upgrade checks do not execute
 
 ### Requirement: Mobile release matrix
-Default release verification SHALL select mobile profiles for affected UI contracts, preserving isolated touch/device settings, typography and native HA compatibility. Layout coverage SHALL include affected cards at 320px and relevant text/zoom, theme, portrait and landscape conditions. Theme-independent geometry SHALL use one reference theme with representative appearance/state coverage in both themes. The full matrix SHALL remain available only through explicit comprehensive verification.
+Explicitly requested integration verification SHALL select mobile profiles for affected UI contracts, preserving isolated touch/device settings, typography and native HA compatibility. Layout coverage SHALL include affected cards at 320px and relevant text/zoom, theme, portrait and landscape conditions. Theme-independent geometry SHALL use one reference theme with representative appearance/state coverage in both themes. The full matrix SHALL remain available only through explicit comprehensive verification.
 
 #### Scenario: A release mobile run inspects every view and popup
 - **WHEN** explicitly requested comprehensive checks encounter scrolling cards or opening sheets
 - **THEN** the selected typography, theme, touch and safe-area profile remains applied
 
 #### Scenario: A scoped release changes a popup layout
-- **WHEN** default release checks execute
+- **WHEN** the user explicitly requests affected popup integration checks
 - **THEN** only affected popup families and representative difficult mobile profiles are inspected
 - **AND** unchanged views and all 26 combinations are not automatically traversed
 
@@ -67,10 +67,10 @@ Selected browser checks SHALL verify the changed contract: relevant cold loads, 
 - **AND** device and engine repeats target native gesture or geometry differences
 
 ### Requirement: Publication gate and exact-commit CI
-Push, tag and release verification SHALL require successful checks for the complete affected change set and applicable exact-commit CI, including relevant packaging, asset, hassfest and HACS validation. Publication SHALL NOT implicitly require the full suite, full mobile matrix or unrelated preserved-install checks. Failed selected checks and known relevant violations SHALL block publication. Valid scoped evidence SHALL be reusable for unchanged inputs; an approved native exception SHALL remain explicit and time-limited.
+Push, tag and release verification SHALL require only affected unit tests across the complete change set and applicable exact-commit Tests/hassfest/HACS validation. Integration/browser/mobile/upgrade checks SHALL be reused from development without fresh report requirements and SHALL run at release only on explicit request. Publication SHALL NOT implicitly require the full suite, full mobile matrix or unrelated preserved-install checks. Failed selected checks and known relevant violations SHALL block publication. Valid scoped evidence SHALL be reusable for unchanged inputs; an approved native exception SHALL remain explicit and time-limited.
 
 #### Scenario: The native reconnect check still fails for a future release
-- **WHEN** changed connection behavior selects that check during publication preparation
+- **WHEN** the user explicitly requests connection integration checks during publication preparation
 - **THEN** raw assertions and native evidence are retained
 - **AND** only the explicitly approved stale-unsubscribe exception applies while its stable upstream fix remains unavailable
 
@@ -149,3 +149,21 @@ Live preserved-install checks SHALL be required only when changes affect persist
 #### Scenario: A selected historical replay fails or cleanup is incomplete
 - **WHEN** release evidence is evaluated
 - **THEN** publication fails and private backup/recovery evidence is retained
+
+### Requirement: Unit-only release default
+Release preparation, version hooks and automatic Tests CI SHALL run only affected
+Node/Python unit tests across the candidate. They SHALL reuse integration testing
+from development without requiring fresh browser, camera, geometry, mobile or
+preserved-install evidence. Additional integration or full testing SHALL require
+an explicit user request. Known failures SHALL remain reported as failures.
+Applicable exact-commit hassfest/HACS metadata checks SHALL remain available.
+
+#### Scenario: A tested camera or migration change is released
+- **WHEN** the user requests an ordinary release
+- **THEN** only affected unit tests run, without HA preparation or browser launch
+- **AND** no new integration report or historical-upgrade campaign is required
+
+#### Scenario: The user explicitly requests further changed-feature testing
+- **WHEN** additional integration testing is explicitly requested
+- **THEN** the existing affected-component commands remain available
+- **AND** the full registered suite runs only on an explicit comprehensive request

@@ -61,6 +61,13 @@ up, home; left, select, right; rewind, down, fast-forward; then volume,
 play/pause, volume. Without `volume_remote_entity`, the normal media-player
 volume services are used.
 
+YouTube, Netflix, Disney+, Prime Video, Apple TV and Plex shortcuts automatically
+use the real app icon and brand colors. Recognition uses the configured app source
+(including its bundle ID), so you can keep your own display name. Icons ship with
+Marao and do not require an external image service while using the dashboard.
+Other apps retain their configured icon and theme colors. Existing source values,
+actions and custom card colors are preserved.
+
 Rewind moves back 10 seconds and fast-forward moves ahead 30 seconds, using the
 live playback position and staying within the media duration. Direction and
 select controls support both a short press and a 1.2-second hold. A completed

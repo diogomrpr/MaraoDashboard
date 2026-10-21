@@ -321,3 +321,21 @@ def test_invalid_popup_camera_stream_is_rejected_before_output_write(tmp_path, b
         g.write_dashboard(source, tmp_path)
     assert source == before
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("preload", [None, False, True, "true", 1])
+def test_camera_preload_option_preserves_source_and_rejects_non_booleans(preload):
+    from custom_components.marao_dashboard.page_model import camera_popup_stream
+    variables = {"future": []}
+    if preload is not None:
+        variables["preload_stream"] = preload
+    original = deepcopy(variables)
+    if preload is not None and type(preload) is not bool:
+        with pytest.raises(ValueError, match="Preload stream"):
+            camera_popup_stream("camera.low", variables)
+    else:
+        item = {"entity_id": "camera.low", "template": "hc_camera_card", "variables": variables}
+        generated = g._page_card(item, "marao-dashboard")["variables"]
+        assert {key: value for key, value in generated.items() if key != "popup_hash"} == variables
+        assert "preload_stream" not in g._camera_popup(item)["cards"][0].get("variables", {})
+    assert variables == original

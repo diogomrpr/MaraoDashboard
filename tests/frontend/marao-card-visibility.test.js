@@ -16,7 +16,7 @@ globalThis.HTMLElement = class {
 const source = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
 const dashboardSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url), "utf8");
-const { ACCESS_HOLD_MS, MaraoCard, MaraoPopupCard, callServiceWithNotification, focusRestorer, performAction, registerMaraoCards, binaryState, cardProblem, problemStyle, serviceOutcome, stateAppearance, summaryState, entityGroupState, vacuumActions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#visibility`);
+const { ACCESS_HOLD_MS, MaraoCard, MaraoPopupCard, callServiceWithNotification, focusRestorer, performAction, registerMaraoCards, binaryState, cardProblem, problemStyle, serviceOutcome, stateAppearance, summaryState, entityGroupState, vacuumActions, mediaAppBrand } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#visibility`);
 
 test('rerenders never detach the native surface while replacing content and obsolete attributes', () => {
   const card = new MaraoCard();
@@ -62,6 +62,39 @@ test('rerenders never detach the native surface while replacing content and obso
     assert.equal(root.querySelector('ha-card'), surface);
     assert.match(style.textContent, /\.alarm-body/);
   } finally { globalThis.document = previousDocument; }
+});
+
+test('unrelated state updates preserve scrolling cards while their own inputs still refresh', () => {
+  const card = new MaraoCard();
+  let renders = 0;
+  card._render = () => { renders++; };
+  card.setConfig({
+    template: 'hc_dishwasher_card', entity: 'sensor.operation',
+    variables: { progress_entity: 'sensor.progress', remaining_time_entity: 'sensor.remaining', active_program_entity: 'sensor.program', salt_entity: 'binary_sensor.salt' },
+    tap_action: { action: 'call-service', service: 'switch.turn_on', target: { entity_id: ['switch.target'] } },
+  });
+  let hass = { connected: true, connection: { connected: true }, callService() {}, states: {
+    'sensor.operation': { state: 'ready' }, 'sensor.progress': { state: 'unavailable' },
+    'sensor.remaining': { state: 'unavailable' }, 'sensor.program': { state: 'unknown' },
+    'binary_sensor.salt': { state: 'off' }, 'switch.target': { state: 'off' },
+  } };
+  card.hass = hass;
+  const initial = renders;
+  for (let i = 0; i < 5; i++) {
+    hass = { ...hass, states: { ...hass.states, 'sensor.unrelated': { state: String(i) } } };
+    card.hass = hass;
+  }
+  assert.equal(renders, initial, 'An unchanged card must keep the elements under a scrolling finger');
+  for (const entity of ['sensor.operation', 'sensor.progress', 'sensor.remaining', 'sensor.program', 'binary_sensor.salt', 'switch.target']) {
+    const before = renders;
+    hass = { ...hass, states: { ...hass.states, [entity]: { state: 'unavailable' } } };
+    card.hass = hass;
+    assert.equal(renders, before + 1, entity + ' must refresh the card immediately');
+  }
+  const before = renders;
+  card.hass = { ...hass, language: 'pt' };
+  card.hass = { ...hass, connected: false };
+  assert.equal(renders, before + 2, 'Localization and disconnection must still refresh');
 });
 
 test('typed groups count complete membership independently of filtering and duplicate references', () => {
@@ -723,6 +756,29 @@ test("media app shortcuts retain a full-width title above the centered icon", ()
   assert.doesNotMatch(source, /\.body\.media-app-card \.icon \{[^}]*order:-1/);
 });
 
+test("media app branding recognizes sources, ships real icons and preserves custom shortcuts", async () => {
+  for (const [source, id] of [["NETFLIX", "netflix"], ["com.google.ios.youtube", "youtube"], ["Disney+", "disney-plus"], ["Amazon Prime Video", "prime-video"], ["com.apple.TVWatchList", "apple-tv"], ["Plex", "plex"]]) {
+    const config = { template: "hc_media_app_card", entity: "media_player.apple_tv", name: "My app", icon: "mdi:play-box-outline", show_state: false, variables: { app_source: source } };
+    const before = structuredClone(config);
+    assert.equal(mediaAppBrand(config).id, id);
+    const card = new MaraoCard();
+    card.setConfig(config);
+    card.hass = { states: { "media_player.apple_tv": { state: "idle", attributes: {} } } };
+    assert.match(card.shadowRoot.innerHTML, new RegExp(`<img class="app-icon" src="[^"]*/media-apps/${id}\\.png"`));
+    assert.match(card.shadowRoot.innerHTML, /<div class="title">My app<\/div>/);
+    const bytes = await fs.readFile(new URL(`../../custom_components/marao_dashboard/frontend/media-apps/${id}.png`, import.meta.url));
+    assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+    assert.ok(stateAppearance("hc_media_app_card", "idle", config).background);
+    assert.deepEqual(stateAppearance("hc_media_app_card", "unavailable", config), { unavailable: true });
+    assert.deepEqual(config, before);
+  }
+  const custom = { template: "hc_media_app_card", name: "Netflix", icon: "mdi:television", variables: { app_source: "My private app" } };
+  assert.equal(mediaAppBrand(custom), undefined, "The actual source takes priority over a nickname");
+  const card = new MaraoCard(); card.setConfig(custom);
+  assert.match(card.shadowRoot.innerHTML, /<ha-icon icon="mdi:television"/);
+  assert.equal(stateAppearance("hc_media_app_card", "idle", { variables: { app_source: "Netflix", active_color: "#123456" } }).background, "#123456");
+});
+
 test("wallbox current card uses a large stepper and optional shortcuts", () => {
   const calls = [];
   const card = new MaraoCard();
@@ -738,18 +794,18 @@ test("wallbox current card uses a large stepper and optional shortcuts", () => {
   };
   assert.equal((card.shadowRoot.innerHTML.match(/data-current-shortcut=/g) || []).length, 3);
   assert.match(card.shadowRoot.innerHTML, /class="number-stepper wallbox-stepper"/);
-  assert.match(card.shadowRoot.innerHTML, />22A<\/output>/);
+  assert.match(card.shadowRoot.innerHTML, />22 A<\/output>/);
   assert.match(card.shadowRoot.innerHTML, /data-current-shortcut="12"/);
   assert.deepEqual(stateAppearance("hc_wallbox_current_card", "10", {}, card.hass), {
-    background: "var(--color-green, #3F7E4B)",
-    text: "var(--active-text-color, #fff)",
-    icon: "var(--active-text-color, #fff)",
-    accent: "var(--color-green, #3F7E4B)",
+    background: "var(--ha-card-background,var(--card-background-color))",
+    text: "var(--primary-text-color)",
+    icon: "var(--primary-text-color)",
+    accent: "var(--primary-color)",
     unavailable: false,
   });
-  assert.match(source, /\.wallbox-stepper \.number-value \{[^}]*font-size:calc\(2 \* var\(--font-size-primary,1\.125rem\)\)/);
+  assert.match(card.shadowRoot.innerHTML, /<output class="number-value wallbox-value"[^>]*>22 A<\/output><div class="number-stepper wallbox-stepper"/);
   assert.match(source, /\.number-stepper \{[^}]*min-width:84px;[^}]*width:auto;/);
-  assert.doesNotMatch(source, /\.wallbox-stepper \{[^}]*min-width:/);
+  assert.match(source, /\.body\.wallbox-card \{[^}]*grid-template-areas:'value icon' 'title icon'/);
   assert.doesNotMatch(source, /\.climate-stepper \{[^}]*min-width:/);
   assert.match(source, /\.wallbox-stepper \{[^}]*background:var\(--ha-card-background,var\(--card-background-color,#fff\)\);[^}]*color:var\(--primary-text-color,#141414\);/);
   assert.match(source, /\.wallbox-shortcuts \{[^}]*pointer-events:auto;/);
@@ -1612,11 +1668,12 @@ test('binary meaning follows native domains and explicit appliance contracts',()
  for(const [value,expected] of [['running',true],['idle',false],['paused',null],['error',null]]) assert.equal(binaryState('sensor.test',{state:value},'hc_washing_machine_card'),expected);
  for(const kind of ['hc_cover_card','hc_climate_card','hc_media_card','hc_media_app_card','hc_camera_card','hc_security_card','hc_weather_card','hc_vacuum_card','hc_dishwasher_card','hc_scene_card','hc_number_card','hc_wallbox_current_card','hc_battery_card']) assert.equal(binaryState('switch.test',{state:'on'},kind),null);
 });
-test('binary cards hide only redundant state and keep visible cues for native, static and hidden icons',()=>{
+test('binary cards omit the round badge and preserve state for native, static and hidden icons',()=>{
  for(const domain of ['light','fan','switch','input_boolean','binary_sensor','lock']) for(const value of domain==='lock'?['locked','unlocked']:['on','off']) for(const variant of [{},{icon:'mdi:test'},{show_icon:false}]) {
   const entity=`${domain}.test`,html=renderBinary({entity,name:'Target',show_state:true,...variant},{[entity]:{state:value,attributes:{device_class:'motion'}}});
-  assert.doesNotMatch(html,/<div class="state">/); assert.match(html,/class="binary-cue"/); assert.match(html,/role="img" aria-label="Target:/);
-  assert.match(html,new RegExp(`data-active="${value==='on'||value==='unlocked'}"`));
+  assert.doesNotMatch(html,/<div class="state">|class="binary-cue"/); assert.match(html,/role="img" aria-label="Target:/);
+  assert.match(html,new RegExp(`data-binary-state="${value==='on'||value==='unlocked'}"`));
+  if (variant.show_icon === false) assert.match(html, /class="binary-state" role="img"/);
  }
 });
 test('binary state hiding retains configured labels, numeric readings and metadata without dangling prefixes',()=>{
@@ -1640,7 +1697,7 @@ test('summaries retain active counts and unavailable members, but omit known All
 test('toggle graphs use their actual toggle while preserving numeric state and header details',()=>{
  const entity='sensor.power',toggle='switch.test',states={[entity]:{state:'42',attributes:{unit_of_measurement:'W'}},[toggle]:{state:'on'}};
  const html=renderBinary({template:'hc_toggle_graph_card',entity,variables:{toggle_entity:toggle}},states);
- assert.match(html,/<div class="state">42 W<\/div>/);assert.match(html,/binary-cue" data-active="true"/);
+ assert.match(html,/<div class="state">42 W<\/div>/);assert.match(html,/data-binary-state="true"/);assert.doesNotMatch(html,/class="binary-cue"/);
  const binary=renderBinary({template:'hc_toggle_graph_card',entity:toggle,variables:{toggle_entity:toggle,graph_entity:entity}},states);
  assert.doesNotMatch(binary,/<div class="state">/);
  const header=renderBinary({template:'hc_header_card',entity:toggle},states);

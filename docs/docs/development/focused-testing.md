@@ -85,8 +85,7 @@ Keep the test instance on the latest applicable project changes before completio
 Successful synced assets remain installed after inspection, a preview error or
 closing the browser. Do not revert a successful package for cleanup unless the
 project itself is reverted; safe helper restoration and failed-operation recovery
-still apply. Watch updates only while running. Preview remains development evidence
-and does not replace publication or upgrade checks.
+still apply. Watch updates only while running. Preview remains development evidence reused at release; it does not claim unit-test success.
 See [local development](local-development.md#visual-browser-inspection).
 
 If agent inspection is selected, inspect the changed surface once using current
@@ -97,12 +96,28 @@ checks pass, relevant diagnostics are clear and cleanup is complete. Broaden or
 repeat only for changed inputs, a failure or a concrete unresolved concern.
 
 Existing commands without `--tier` retain `focused` behavior for compatibility.
-Publication independently selects the entire candidate since the released baseline;
-task snapshots, file subsets and visual/behavior reports cannot satisfy publication
-or evidence reuse. Broad regression remains an explicitly requested pre-release
-campaign, never the daily development default.
+Publication selects unit tests for the entire candidate since the released baseline.
+Task snapshots cannot narrow that unit scope. Development integration results are
+reused without a fresh release campaign; broader tests require an explicit request.
 
-## Focused and publication coverage
+## Releases: unit tests only
+
+`npm run verify:publish -- --base <released-ref>` and `npm run verify:release`
+run affected Node/Python unit tests only, serially, across the release candidate.
+`test:affected -- --unit` selects the same check types for an explicit range.
+Automatic Tests CI and version hooks also use `--unit`. Unlike `--offline`, this
+excludes local browser fixtures and build scripts as well as HA integration tests.
+Applicable exact-commit hassfest/HACS metadata validation remains in place.
+
+Integration, camera playback, geometry, mobile and preserved-install verification
+belongs to development. Reuse those results; release preparation does not demand
+new screenshots, installation receipts or exact-release-commit integration reports.
+Run additional changed-feature checks only when the user explicitly requests them:
+`test:affected -- --base <released-ref> --component <ids>`. The comprehensive
+`test:full` command and parallel execution also require explicit requests. Known
+failures remain failures; never claim skipped integration checks passed.
+
+## Explicitly selected integration coverage
 
 Reviewed theme-independent geometry and behavior run in light; representative
 appearance/state/contrast checks remain in both themes. Theme-sensitive and
@@ -112,7 +127,7 @@ gallery cases share visits; editor alignment aliases narrow-320 rendering/drag.
 
 `--component control-grid` selects shared sizing, generated/native/group hosts,
 preservation, alignment and safe slider/access checks. Generated container types
-change, so future release preparation requires preserved-install proof with
+change, so development may check preserved-install behavior with
 `npm run test:ha:upgrade -- --scope control-grid`.
 
 ```sh
@@ -144,9 +159,9 @@ even without saved images. Readiness waits for native mounts, fonts and frames,
 restores touch emulation and can inspect newly mounted subtrees without repeating
 whole-gallery scans for equivalent samples.
 
-The focused tier, version hooks, CI and publication use the smallest automated
-checks covering their selected contracts and shared consumers. A release request
-does not request the full suite or parallel execution.
+Explicit integration checks use the selected contracts and shared consumers.
+Version hooks, automatic CI and publication use unit tests only; a release request
+does not request integration, full-suite or parallel execution.
 
 ```sh
 npm run test:affected -- --plan

@@ -105,7 +105,10 @@ export class MaraoNativeCardEditor extends (globalThis.HTMLElement || class {}) 
     form.schema = fields.map(item => ({ name: item.path, required: Boolean(item.required), selector: this._selector(item) }));
     form.data = data;
     form.computeLabel = schema => this._label(fields.find(item => item.path === schema.name)?.label || schema.name);
-    form.computeHelper = schema => fields.find(item => item.path === schema.name)?.kind === "color" ? this._label("CSS color or theme variable") : "";
+    form.computeHelper = schema => {
+      const item = fields.find(item => item.path === schema.name);
+      return this._label(item?.kind === "color" ? "CSS color or theme variable" : item?.description || "");
+    };
     form.addEventListener("value-changed", event => {
       event.stopPropagation();
       const next = event.detail.value;

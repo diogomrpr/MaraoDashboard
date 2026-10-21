@@ -140,7 +140,7 @@ async function titleLayoutIssues(page, families = [], subtree) {
       || config.template?.startsWith('hc_access_') && ['lock.unlock', 'cover.open_cover'].includes(service);
     const compact = parent.classList.contains('compact-copy'), header = compact ? parent.parentElement : null;
     if (compact) {
-      const body = header.closest('.body'), icon = header.querySelector(':scope > .icon,:scope > .binary-cue');
+      const body = header.closest('.body'), icon = header.querySelector(':scope > .icon');
       const copy = parent.getBoundingClientRect(), head = header.getBoundingClientRect(), picture = icon?.getBoundingClientRect();
       if (!sliderHeader || !body.classList.contains('slider-header')) issues.push(`${name}: missing compact family header marker`);
       if (Math.abs(rect.width - copy.width) > 1 || rect.left < head.left - .5 || rect.right > head.right + .5) issues.push(`${name}: compact title does not use its text block`);
@@ -157,7 +157,7 @@ async function titleLayoutIssues(page, families = [], subtree) {
       }
       return issues;
     }
-    const icon = sliderHeader ? parent.querySelector(':scope > .icon, :scope > .binary-cue') : null;
+    const icon = sliderHeader ? parent.querySelector(':scope > .icon') : null;
     const iconBox = icon?.getBoundingClientRect();
     const titleWidth = contentWidth - (iconBox ? iconBox.width + parseFloat(style.columnGap) : 0);
     if (Math.abs(rect.width - titleWidth) > 1) issues.push(`${name}: title uses ${rect.width}px of ${titleWidth}px available title width`);
@@ -878,9 +878,9 @@ async function checkCardContent(page, serviceCalls) {
       const name = card._config?.name || '', root = card.shadowRoot;
       if (!name.startsWith('Binary ') && !/^Motion · (on|off)$/.test(name) && !/^Appliance running contract · (idle|running)$/.test(name) && !/^Lock · (locked|unlocked)$/.test(name)) continue;
       const entity = card._config.variables?.toggle_entity || card._config.entity, state = card._hass.states[entity];
-      const cue = root.querySelector('.binary-cue'), accessible = root.querySelector('[role="img"][aria-label]');
+      const surface = root.querySelector('ha-card'), accessible = root.querySelector('[role="img"][aria-label]');
       const active = ['on', 'running', 'unlocked'].includes(state.state);
-      if (!cue || cue.dataset.active !== String(active) || !accessible?.getAttribute('aria-label')) issues.push(`${name}: missing state cue or semantic state`);
+      if (root.querySelector('.binary-cue') || surface?.dataset.binaryState !== String(active) || !accessible?.getAttribute('aria-label')) issues.push(`${name}: unexpected badge or missing semantic state`);
       if (root.querySelector('.state') && !['Binary configured label and reading'].includes(name)) issues.push(`${name}: redundant current-state line`);
       if (['on', 'off'].includes(state.state) && entity.startsWith('binary_sensor.') && !accessible?.getAttribute('aria-label').includes(card._hass.formatEntityState(state))) issues.push(`${name}: lost localized device-class state`);
       if (name.startsWith('Binary configured')) {
@@ -895,7 +895,7 @@ async function checkCardContent(page, serviceCalls) {
     }
     for (const [pair, values] of backgrounds) if (!values.on || !values.off || values.on === values.off) issues.push(`${pair}: active/inactive backgrounds agree`);
     const graph = cards.find(card => card._config.name === 'Numeric graph with binary toggle');
-    if (!graph?.shadowRoot.querySelector('.state')?.textContent.includes('W') || graph.shadowRoot.querySelector('.binary-cue')?.dataset.active !== 'true') issues.push('Numeric toggle graph lost its reading or actual-toggle cue');
+    if (!graph?.shadowRoot.querySelector('.state')?.textContent.includes('W') || graph.shadowRoot.querySelector('ha-card')?.dataset.binaryState !== 'true') issues.push('Numeric toggle graph lost its reading or actual-toggle state');
     const summary = cards.find(card => card._config.name === 'Summary · all off');
     if (summary?.shadowRoot.querySelector('.state')) issues.push('All-off summary retained redundant state');
     return issues;
@@ -1085,7 +1085,7 @@ async function checkDisconnected(browser, config, functionalCompleted = false) {
     const authoritative = await api(config, "GET", `/api/states/${entity}`);
     const rendered = await cardByTitle(page, "Switch + graph").evaluate((card) => ({
       state: card._hass.states[card._config.entity].state,
-      active: card.shadowRoot.querySelector('.binary-cue')?.dataset.active,
+      active: card.shadowRoot.querySelector('ha-card')?.dataset.binaryState,
       semanticState: card.shadowRoot.querySelector('.icon[role="img"]')?.getAttribute('aria-label'),
       problem: card.shadowRoot.querySelector('[data-problem]')?.dataset.problem,
     }));
@@ -2084,8 +2084,8 @@ async function main() {
     const lockEntity = await page.locator('.marao-popup-sheet marao-card').first().evaluate(card => card._config.entity);
     if (lockEntity !== 'lock.marao_dashboard_test_lock') throw new Error('Lock presentation check must use the safe gallery lock.');
     const lockState = await page.evaluate(entity => document.querySelector('home-assistant').hass.states[entity].state, lockEntity);
-    const lockCues = await page.locator('.marao-popup-sheet marao-card').evaluateAll(cards => cards.map(card => card.shadowRoot.querySelector('.binary-cue')?.dataset.active));
-    if (lockCues.some(active => active !== String(lockState === 'unlocked'))) throw new Error('Access action cues do not match the authoritative lock state.');
+    const lockCues = await page.locator('.marao-popup-sheet marao-card').evaluateAll(cards => cards.map(card => card.shadowRoot.querySelector('ha-card')?.dataset.binaryState));
+    if (lockCues.some(active => active !== String(lockState === 'unlocked'))) throw new Error('Access action states do not match the authoritative lock state.');
     if (lockState === 'locked') {
       const inactive = await page.locator('.marao-popup-sheet marao-card').evaluateAll(cards => cards.map(card => card.shadowRoot.querySelector('ha-card').style.getPropertyValue('--marao-card-background')));
       if (inactive.some(background => background)) throw new Error('Inactive binary lock actions did not use their normal neutral surface.');

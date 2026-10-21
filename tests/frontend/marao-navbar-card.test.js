@@ -73,7 +73,9 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
   const root = { localName: "hui-root", shadowRoot: {
     querySelectorAll: () => [header], querySelector: () => currentView,
   } };
+  let navRect;
   const navbar = () => ({ isConnected: true, getClientRects: () => [{}], parentElement: root,
+    shadowRoot: { querySelector: () => navRect ? {getBoundingClientRect: () => navRect} : null },
     _config: { routes: [{ url: "/marao-dashboard/overview" }] },
   });
   const first = navbar(), second = navbar();
@@ -90,10 +92,18 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
   functions.registerFullscreen(first);
   assert.equal(header.style.getPropertyValue("display"), "none");
   assert.equal(view.style.getPropertyValue("padding-top"), "max(8px, var(--safe-top))");
-  assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(60px + var(--safe-bottom) + 12px))");
+  assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(max(0px, calc(60px + var(--safe-bottom) + 12px)) + 48px))");
   assert.equal(unrelated.style.getPropertyValue("display"), "grid");
   functions.registerFullscreen(second);
   assert.equal(timers, 1);
+  window.innerHeight = 844; navRect = {top: 740, height: 80};
+  functions.applyFullscreen();
+  assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(max(104px, calc(80px + var(--safe-bottom) + 12px)) + 48px))");
+  window.visualViewport = {offsetTop: 12, height: 800};
+  functions.applyFullscreen();
+  assert.ok(view.style.getPropertyValue("padding-bottom").includes("max(72px,"), "Use the current mobile viewport when browser chrome changes");
+  delete window.visualViewport; navRect = undefined;
+  delete window.innerHeight;
   currentView = { style: style() };
   functions.applyFullscreen();
   assert.deepEqual(view.style.values.get("padding-top"), ["8px", "important"]);

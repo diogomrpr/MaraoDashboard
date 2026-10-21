@@ -46,8 +46,11 @@ plan, or the coverage map into a requirement to run every available check.
    count. If blocked, report not installed / not ready for test. Instruction-only
    changes with no runtime effect need no redeployment.
 
-Full suites and parallel runs need explicit requests. Publication gates are separate
-from routine development. Report what passed and what was left to the user; never
+Full suites and parallel runs need explicit requests. Releases, version hooks and
+automatic Tests CI run affected unit tests only. Reuse integration testing from
+development; do not request new browser, camera, mobile or upgrade evidence at
+release unless the user explicitly asks. `verify:publish` and `verify:release`
+without an upgrade-report argument enforce that default. Report what passed and what was left to the user; never
 claim a manual handoff is automated coverage.
 
 ## Add an assertion where it can catch the defect

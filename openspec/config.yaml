@@ -12,7 +12,7 @@ context: |
   Use the applicable marao-ha-integration, marao-ha-frontend and marao-testing
   skills. Capture task scope and select test:affected visual, behavior or focused
   tiers. Current targeted inspection completes cosmetic work; full/parallel runs
-  require explicit requests. Publication independently covers the whole candidate.
+  require explicit requests. Publication runs only affected unit tests across the whole candidate; reuse development integration testing. Additional integration/full release tests require an explicit user request.
 rules:
   proposal:
   - State the concrete problem, scope, affected-card set (or empty), and non-goals.
@@ -28,9 +28,9 @@ rules:
   tasks:
   - Make tasks concrete and checkable; keep future or unverified work unchecked.
   - Batch related tasks; choose visual inspection for presentation-only work, smallest behavioral assertions for behavior changes, and focused coverage for sensitive contracts. Inspect current affected UI once and stop when acceptance, required checks, diagnostics and cleanup are satisfied.
-  - Include gallery and realistic-page examples when supported behavior changes; retain affected alignment checks in focused/publication coverage, not every cosmetic iteration.
-  - Require verify:publish before any push, tag, or release; do not require the full suite for ordinary small changes.
-  - Keep focused migration checks; require scoped preserved-install proof only for changed persistence, ownership or upgrade paths during explicit release preparation.
+  - Include gallery and realistic-page examples when supported behavior changes; retain affected alignment checks only in explicitly selected integration coverage.
+  - Require unit-only verify:publish before a push, tag or release; run additional integration/full tests only if explicitly requested.
+  - Keep focused migration/recovery checks in development; reuse them at release without new preserved-install reports unless explicitly requested.
   - Verify requested outcomes against implementation and evidence; artifact existence and passing tests alone are not completion.
 operations:
   apply:

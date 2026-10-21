@@ -19,6 +19,8 @@ LOCAL_ID = re.compile(r"[a-z][a-z0-9_-]{0,63}")
 
 def camera_popup_stream(entity: str, options: dict[str, Any]) -> str:
     """Resolve the optional popup binding consistently for every generation path."""
+    if "preload_stream" in options and type(options["preload_stream"]) is not bool:
+        raise ValueError("Preload stream must be a boolean.")
     stream = options.get("popup_stream_entity")
     if stream in (None, ""):
         return entity

@@ -20,7 +20,26 @@ const esc = (value) => text(value).replace(/[&<>"']/g, (char) => ({
 const stateOf = (hass, entity) => hass?.states?.[entity] || {};
 const domainOf = (entity) => text(entity).split(".", 1)[0];
 const roomLightEntities = config => [...new Set((Array.isArray(config.variables?.light_entities) ? config.variables.light_entities : []).filter(entity => typeof entity === "string" && entity.startsWith("light.")))];
+function referencedEntities(value) {
+  if (value && typeof value === "object") return Object.values(value).flatMap(referencedEntities);
+  return typeof value === "string" && /^[a-z_]+\.[a-z0-9_]+$/.test(value) ? [value] : [];
+}
 export const ACCESS_HOLD_MS = 1200;
+
+const mediaApps = [
+  { id: "netflix", sources: ["Netflix", "com.netflix.Netflix"], color: "#b20710", text: "#fff" },
+  { id: "youtube", sources: ["YouTube", "com.google.ios.youtube"], color: "#d90000", text: "#fff" },
+  { id: "disney-plus", sources: ["Disney+", "Disney Plus", "com.disney.disneyplus"], color: "#006d74", text: "#fff" },
+  { id: "prime-video", sources: ["Prime Video", "Amazon Prime Video", "com.amazon.aiv.AIVApp"], color: "#0064b5", text: "#fff" },
+  { id: "apple-tv", sources: ["TV", "Apple TV", "Apple TV+", "com.apple.tv", "com.apple.TVWatchList"], color: "#151515", text: "#fff" },
+  { id: "plex", sources: ["Plex", "com.plexapp.plex"], color: "#e5a00d", text: "#171717" },
+];
+
+export function mediaAppBrand(config) {
+  const normalize = value => text(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const source = normalize(config.variables?.app_source || config.name);
+  return mediaApps.find(app => app.sources.some(alias => normalize(alias) === source));
+}
 
 export function accessOpenerService(entity, configured) {
   const native = { lock: "lock.unlock", cover: "cover.open_cover", button: "button.press", switch: "switch.turn_on", script: "script.turn_on" }[domainOf(entity)];
@@ -177,7 +196,10 @@ function numberStepper(value, label, unit = "", className = "", disabled = false
   const increase = localize("controls.increase", hass, { name: label }, `Increase ${label}`);
   const decrease = localize("controls.decrease", hass, { name: label }, `Decrease ${label}`);
   const rangeAttribute = className === "climate-stepper" && String(value).includes("–") ? " data-number-range" : "";
-  return `<div class="number-stepper${className ? ` ${esc(className)}` : ""}" role="group" aria-label="${esc(label)}"><button type="button" data-number-step="increase" aria-label="${esc(increase)}" title="${esc(increase)}"${disabledAttribute}><ha-icon icon="mdi:chevron-up"></ha-icon></button><output class="number-value"${rangeAttribute} aria-live="polite">${esc(value)}${esc(unit)}</output><button type="button" data-number-step="decrease" aria-label="${esc(decrease)}" title="${esc(decrease)}"${disabledAttribute}><ha-icon icon="mdi:chevron-down"></ha-icon></button></div>`;
+  const wallbox = className === "wallbox-stepper";
+  const reading = `<output class="number-value${wallbox ? ' wallbox-value' : ''}"${rangeAttribute} aria-live="polite">${esc(value)}${wallbox && unit ? ' ' : ''}${esc(unit)}</output>`;
+  const control = `<div class="number-stepper${className ? ` ${esc(className)}` : ""}" role="group" aria-label="${esc(label)}"><button type="button" data-number-step="increase" aria-label="${esc(increase)}" title="${esc(increase)}"${disabledAttribute}><ha-icon icon="mdi:chevron-up"></ha-icon></button>${wallbox ? '' : reading}<button type="button" data-number-step="decrease" aria-label="${esc(decrease)}" title="${esc(decrease)}"${disabledAttribute}><ha-icon icon="mdi:chevron-down"></ha-icon></button></div>`;
+  return wallbox ? reading + control : control;
 }
 
 export function climateModeLabel(value, hass = null) {
@@ -356,13 +378,17 @@ export function stateAppearance(kind, state, config, hass) {
     accent = active || "var(--primary-color)";
   } else if (kind === "hc_media_card" && !["off", "unknown", "unavailable"].includes(value)) {
     background = variables.hc_background_color || "var(--color-purple)";
+  } else if (kind === "hc_media_app_card") {
+    const app = mediaAppBrand(config);
+    background = active || app?.color;
+    foreground = active ? undefined : app?.text;
   } else if (kind === "hc_vacuum_card") {
     background = { docked: green, cleaning: blue, returning: orange, error: red }[value];
   } else if (kind === "hc_wallbox_current_card") {
-    accent = active || "var(--color-green, #3F7E4B)";
+    accent = active || "var(--primary-color)";
     if (!["unknown", "unavailable"].includes(value)) {
-      background = accent;
-      foreground = "var(--active-text-color, #fff)";
+      background = active || "var(--ha-card-background,var(--card-background-color))";
+      foreground = active ? "var(--active-text-color, #fff)" : "var(--primary-text-color)";
     }
   } else if (kind === "hc_room_card") {
     if (value === "on") background = "var(--room-card-active-background,var(--primary-color))";
@@ -711,18 +737,17 @@ function cardStyles() {
   return `
     :host { display:block; container:marao-card / inline-size; color:var(--primary-text-color); font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif); }
     ha-icon, ha-state-icon { display:inline-flex; width:var(--mdc-icon-size,24px); height:var(--mdc-icon-size,24px); vertical-align:middle; }
-    ha-card { position:relative; box-sizing:border-box; overflow:hidden; border-radius:var(--ha-card-border-radius,20px); background:var(--marao-card-background,var(--ha-card-background,var(--card-background-color))); color:var(--marao-card-text-color,inherit); border:var(--marao-card-border,0 solid transparent); transition:transform .12s ease; }
+    ha-card { position:relative; display:flex; flex-direction:column; box-sizing:border-box; overflow:hidden; border-radius:var(--ha-card-border-radius,20px); background:var(--marao-card-background,var(--ha-card-background,var(--card-background-color))); color:var(--marao-card-text-color,inherit); border:var(--marao-card-border,0 solid transparent); transition:transform .12s ease; }
     :host([data-marao-standard-control]), :host([data-marao-control-cell]) { display:grid; min-width:0; }
     :host([data-marao-control-cell]) ha-card { height:100%; }
     ha-card.control-surface { display:grid; min-width:0; min-height:0; }
     .body.standard-control { box-sizing:border-box; min-width:0; min-height:0; display:flex; flex-direction:column; align-items:stretch; gap:8px; padding:12px; }
-    .compact-header { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
+    .compact-header { display:flex; flex-wrap:wrap; align-items:flex-start; gap:8px; min-width:0; }
     .compact-copy { flex:1; min-width:min(100%,calc(var(--font-size-primary,1.125rem) * 3)); display:grid; gap:4px; }
-    .compact-header>.icon { flex:0 0 48px; width:48px; height:48px; }
-    .compact-header>.binary-cue { flex:0 0 12px; }
+    .compact-header>.icon { flex:0 0 48px; width:48px; height:48px; align-self:flex-start; }
     .compact-copy:empty { display:none; }
     .compact-copy>.title, .compact-copy>.state, .compact-copy>.climate { grid-area:auto; }
-    .body.standard-control>.control { align-self:stretch; width:100%; }
+    .body.standard-control>.control { align-self:stretch; width:100%; margin-top:auto; }
     .body.standard-control.icon-only { justify-content:center; }
     ha-card.is-pressed { transform:scale(.985); }
     .card-action { position:absolute; inset:0; z-index:1; width:100%; height:100%; margin:0; padding:0; border:0; border-radius:inherit; background:transparent; color:transparent; cursor:pointer; }
@@ -734,40 +759,40 @@ function cardStyles() {
     .camera-preview { position:relative; aspect-ratio:16/9; width:100%; overflow:hidden; background:#000; }
     .camera-preview img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
     .camera-preview span { position:absolute; inset:auto 0 0; box-sizing:border-box; max-height:100%; overflow:auto; padding:8px; background:var(--ha-card-background); color:var(--primary-text-color); overflow-wrap:anywhere; }
-    .body { position:relative; z-index:2; display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:'title title' 'state icon' 'climate icon' 'control control'; gap:4px 12px; align-items:center; min-height:84px; padding:14px; pointer-events:none; }
+    .body { position:relative; z-index:2; flex:1; display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:auto auto 1fr auto; grid-template-areas:'title title' 'state icon' 'climate icon' 'control control'; gap:4px 12px; align-items:start; min-height:84px; padding:14px; pointer-events:none; }
     .body.formatted-reading { display:flex; flex-wrap:wrap; }
-    .body.formatted-reading > :not(.formatted-values):not(.icon):not(.binary-cue) { flex-basis:100%; }
+    .body.formatted-reading > :not(.formatted-values):not(.icon):not(.binary-state) { flex-basis:100%; }
     .formatted-values { display:flex; flex-direction:column; gap:4px; flex:1 1 max-content; min-width:0; max-width:100%; }
-    .body.formatted-reading > :is(.icon,.binary-cue) { flex:0 0 auto; margin-inline-start:auto; }
+    .body.formatted-reading > :is(.icon) { flex:0 0 auto; margin-inline-start:auto; }
     .body.with-climate-modes { grid-template-areas:'title title' 'state icon' 'climate icon' 'modes modes'; }
     .body.icon-only { display:flex; align-items:center; justify-content:center; gap:0; min-height:64px; padding:12px; }
-    .body.icon-only .icon { grid-area:auto; }
+    .body.icon-only .icon { grid-area:auto; align-self:auto; }
     .body.icon-only:has(.problem) { flex-direction:column; gap:8px; }
     .history-control { position:relative; z-index:3; grid-column:1/-1; min-width:48px; min-height:48px; border:0; border-radius:12px; padding:8px 12px; background:var(--secondary-background-color); color:var(--primary-text-color); font:inherit; font-size:var(--font-size-secondary,1rem); overflow-wrap:anywhere; pointer-events:auto; }
     .history-control:focus { outline:none; }
     .problem { grid-column:1/-1; grid-row:-1; display:flex; align-items:flex-start; gap:8px; min-width:0; max-width:100%; font-size:var(--font-size-secondary,1rem); line-height:1.25; }
+    .binary-state { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
     .problem span { min-width:0; overflow-wrap:anywhere; }
     .problem ha-icon { flex:0 0 24px; --mdc-icon-size:24px; }
 
     .body.navigation-card { grid-template-areas:'title title' 'state icon' 'control control'; }
-    .body.binary-card:not(:has(>.state)) { grid-template-areas:'title title' 'climate icon' 'control control'; }
+    .body.binary-card:not(:has(>.state)) { grid-template-rows:auto 1fr auto; grid-template-areas:'title title' 'climate icon' 'control control'; }
     .body.navigation-card .title { font-size:var(--font-size-secondary,1rem); }
     ha-card.title-surface { overflow:visible; background:transparent; box-shadow:none; }
     .body.title-card { display:block; min-height:0; padding:0 0 20px; }
     .body.title-card .title { font-size:calc(var(--font-size-primary,1.125rem) * 1.39); font-weight:800; }
     .body.media-app-card { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; }
-    .body.media-app-card .icon { flex:0 0 52px; }
+    .body.media-app-card .icon { flex:0 0 52px; align-self:center; }
     .body.media-app-card .title { display:flex; align-items:center; justify-content:center; width:100%; min-height:2.5em; }
+    .body.media-app-card .app-icon { display:block; width:64px; height:64px; max-width:100%; object-fit:contain; border-radius:14px; }
+    ha-card[data-problem] .app-icon { filter:grayscale(1); opacity:.5; }
     .title, .state, .climate { min-width:0; max-width:100%; overflow-wrap:anywhere; line-height:1.25; }
     .title { grid-area:title; width:100%; font-weight:var(--font-weight-primary,700); font-size:var(--font-size-primary,1.125rem); }
     .state { grid-area:state; color:var(--marao-state-color,var(--marao-card-text-color,var(--secondary-text-color))); font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-secondary,500); }
     .climate { grid-area:climate; color:var(--marao-card-text-color,var(--secondary-text-color)); font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-secondary,500); }
     .climate-card .state { font-size:var(--font-size-primary,1.125rem); font-weight:var(--font-weight-primary,700); }
     .climate-card .current-temperature { font-size:calc(var(--font-size-primary,1.125rem) * 1.78); font-weight:var(--font-weight-primary,700); line-height:1.25; }
-    .icon { position:relative; grid-area:icon; display:grid; place-items:center; width:52px; height:52px; border-radius:50%; background:var(--marao-icon-background,var(--opacity-contrast-100,rgba(0,0,0,.08))); color:var(--marao-icon-color,var(--icon-color)); }
-    .binary-cue { grid-area:icon; justify-self:end; display:block; box-sizing:border-box; width:20px; height:20px; border:2px solid currentColor; border-radius:50%; color:var(--marao-card-text-color,var(--primary-text-color)); }
-    .binary-cue[data-active=true] { background:currentColor; }
-    .icon .binary-cue { position:absolute; right:-2px; bottom:-2px; width:14px; height:14px; box-shadow:0 0 0 2px var(--marao-card-background,var(--ha-card-background,var(--card-background-color))); color:inherit; }
+    .icon { position:relative; grid-area:icon; align-self:end; display:grid; place-items:center; width:52px; height:52px; border-radius:50%; background:var(--marao-icon-background,var(--opacity-contrast-100,rgba(0,0,0,.08))); color:var(--marao-icon-color,var(--icon-color)); }
     .icon :is(ha-icon,ha-state-icon) { --mdc-icon-size:28px; }
     .readings { grid-column:1/-1; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,max(110px,calc(var(--font-size-caption,.9375rem) * 8))),1fr)); gap:12px; margin:8px 0 0; min-width:0; }
     .reading { display:grid; justify-items:center; align-content:start; gap:4px; min-width:0; text-align:center; overflow-wrap:anywhere; line-height:1.25; }
@@ -788,12 +813,6 @@ function cardStyles() {
     .climate-mode ha-icon { flex:0 0 auto; --mdc-icon-size:28px; }
     .climate-mode.active { background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); box-shadow:inset 0 0 0 3px var(--marao-accent-color,var(--primary-color)); }
     .control.number-control { grid-area:icon; justify-self:end; }
-    .wallbox-card { grid-template-areas:'title title' 'control control' 'wallbox wallbox'; grid-template-columns:minmax(0,1fr) auto; }
-    .wallbox-card .title { grid-area:title; align-self:center; }
-    .wallbox-card .wallbox-current-control { grid-area:control; align-self:stretch; }
-    .wallbox-stepper { padding:4px 8px; background:var(--ha-card-background,var(--card-background-color,#fff)); color:var(--primary-text-color,#141414); }
-    .wallbox-stepper .number-value { font-size:calc(2 * var(--font-size-primary,1.125rem)); line-height:1.25; opacity:1; }
-    .wallbox-stepper button { width:48px; height:48px; }
     .wallbox-shortcuts { grid-area:wallbox; z-index:2; display:grid; grid-template-columns:repeat(auto-fit,minmax(48px,1fr)); gap:8px; width:100%; margin-top:8px; pointer-events:auto; }
     .wallbox-shortcuts button { min-width:48px; min-height:48px; background:var(--ha-card-background,var(--card-background-color,#fff)); color:var(--primary-text-color,#141414); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-black,#000) 12%,transparent); font-size:var(--font-size-primary,1.125rem); font-weight:var(--font-weight-primary,700); }
     .control.climate-number-control { align-self:stretch; }
@@ -848,7 +867,7 @@ function cardStyles() {
     .vacuum-actions { grid-column:1/-1; z-index:3; display:grid; grid-template-columns:repeat(auto-fit,minmax(48px,1fr)); gap:8px; pointer-events:auto; }
     .vacuum-actions button { padding:10px 4px; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); }
     .body.room-card { display:flex; flex-direction:column; align-items:stretch; gap:8px; }
-    .room-bottom { position:relative; display:flex; align-items:flex-end; min-height:48px; }
+    .room-bottom { position:relative; display:flex; align-items:flex-end; min-height:48px; margin-top:auto; }
     .room-bottom:has(.room-artwork) { min-height:100px; }
     .room-artwork { --room-artwork-size:clamp(48px,65cqi,128px); position:absolute; right:calc(-1 * var(--room-edge-inset,14px)); bottom:calc(-1 * var(--room-edge-inset,14px)); width:calc(.8 * var(--room-artwork-size)); height:calc(.8 * var(--room-artwork-size)); overflow:hidden; color:var(--marao-icon-color,var(--icon-color)); opacity:.2; pointer-events:none; }
     .room-artwork :is(ha-icon,ha-state-icon) { display:block; width:var(--room-artwork-size); height:var(--room-artwork-size); --mdc-icon-size:var(--room-artwork-size); }
@@ -876,8 +895,19 @@ function cardStyles() {
       .wallbox-shortcuts, .scene-options, .climate-modes { grid-template-columns:minmax(0,1fr); }
     }
     .body.slider-header, .body.slider-header.binary-card:not(:has(>.state)) { grid-template-columns:minmax(0,1fr) auto; grid-template-areas:'title icon' 'state state' 'control control'; }
-    .body.slider-header:not(:has(>.icon,>.binary-cue)) .title { grid-column:1/-1; }
+    .body.slider-header:not(:has(>.icon)) .title { grid-column:1/-1; }
     .body.standard-control.slider-header { display:flex; }
+    .body.wallbox-card { grid-template-columns:minmax(0,1fr) 64px; grid-template-areas:'value icon' 'title icon' 'wallbox wallbox'; gap:12px 20px; padding:24px; min-height:160px; }
+    .body.wallbox-card .wallbox-current-control { display:contents; }
+    .body.wallbox-card .wallbox-value { grid-area:value; min-width:0; align-self:end; text-align:left; white-space:normal; overflow-wrap:anywhere; font-size:calc(3.5 * var(--font-size-primary,1.125rem)); font-weight:800; line-height:1.05; opacity:1; }
+    .body.wallbox-card .title { grid-area:title; align-self:start; font-size:var(--font-size-primary,1.125rem); font-weight:var(--font-weight-secondary,500); }
+    .body.wallbox-card .wallbox-stepper { grid-area:icon; align-self:stretch; justify-self:end; align-content:space-between; min-width:64px; width:64px; max-width:100%; padding:8px; gap:8px; background:var(--ha-card-background,var(--card-background-color,#fff)); color:var(--primary-text-color,#141414); box-shadow:0 8px 28px rgba(0,0,0,.06); }
+    .wallbox-stepper button { width:48px; height:48px; }
+    @container marao-card (max-width:240px) {
+      .body.wallbox-card { grid-template-columns:minmax(0,1fr) 56px; gap:8px; padding:12px; }
+      .body.wallbox-card .wallbox-value { font-size:calc(1.75 * var(--font-size-primary,1.125rem)); }
+      .body.wallbox-card .wallbox-stepper { min-width:56px; width:56px; padding:4px; }
+    }
     @media (prefers-reduced-motion:reduce) { ha-card,button,.slider-thumb { transition:none; } }
   `;
 }
@@ -935,8 +965,10 @@ export class MaraoCard extends BaseElement {
     if (this._authoritativeHass) this.hass = this._authoritativeHass;
   }
   setConfig(config) {
+    if (config.template === 'hc_camera_card' && Object.hasOwn(config.variables || {}, 'preload_stream') && typeof config.variables.preload_stream !== 'boolean') throw new Error(localize('camera.invalid_preload', this._hass, {}, 'Preload stream must be a boolean.'));
+    this._stateEntities = [...new Set(referencedEntities(config))];
     const previousGraph = this._graphEntity();
-    if (this._config?.entity !== config.entity || this._config?.template !== config.template) this._disposeCamera();
+    if (this._config?.entity !== config.entity || this._config?.template !== config.template || this._config?.variables?.preload_stream !== config.variables?.preload_stream) this._disposeCamera();
     const historyIdentity = value => JSON.stringify({...value, variables: {...value.variables, display_unit: undefined, display_precision: undefined}});
     this._clearAlarmPIN();
     this._alarmSignature = "";
@@ -994,21 +1026,15 @@ export class MaraoCard extends BaseElement {
     }
     this._graphAvailabilityState = graphAvailability;
     const accessSlide = this.shadowRoot?.querySelector('marao-slide-to-open');
-    if (accessSlide && previousState && previousState === value?.states?.[entity]
-      && wasServiceReady === this._serviceReady && serviceTargetReady(value, entity)
-      && ["themes", "locale", "language", "localize", "entities"].every(key => previous[key] === value?.[key])) {
-      accessSlide.hass = value;
+    // Keep the elements under a scrolling finger mounted when other entities update.
+    if (previous?.states && value?.states && this._config.template !== 'hc_header_card'
+      && wasServiceReady === this._serviceReady
+      && previous.connected === value.connected && previous.connection?.connected === value.connection?.connected
+      && ["themes", "locale", "language", "localize", "entities", "services", "config"].every(key => previous[key] === value[key])
+      && this._stateEntities?.every(id => previous.states[id] === value.states[id])) {
+      if (accessSlide) accessSlide.hass = value;
       return;
     }
-    // Unrelated updates must not tear down an idle range just before a drag.
-    if (this.shadowRoot?.querySelector('input[data-slider-key],.camera-live,.media-artwork img') && previousState && previousState === value?.states?.[entity]
-      && wasServiceReady === this._serviceReady
-      && ["themes", "locale", "language", "localize", "entities"].every((key) => previous[key] === value?.[key])
-      && (!graphEntity || previous.states?.[graphEntity] === value?.states?.[graphEntity])
-      && [this._config.tap_action, this._config.hold_action].every(action => {
-        const target = action?.target?.entity_id || action?.data?.entity_id || action?.entity_id || entity;
-        return (Array.isArray(target) ? target : [target]).every(id => previous.states?.[id] === value?.states?.[id]);
-      })) return;
     // Home Assistant updates all cards when unrelated entities change. Keep
     // the pressed control mounted until its own state or connection changes.
     if (this._holdActive && serviceConnectionReady(value)
@@ -1047,7 +1073,8 @@ export class MaraoCard extends BaseElement {
     const poster = available ? state.attributes?.entity_picture : '';
     slot.innerHTML = `<div style="position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#000">${poster ? `<img src="${esc(poster)}" alt="${esc(label)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">` : ''}<div role="status" style="position:absolute;inset:auto 0 0;box-sizing:border-box;max-height:100%;overflow:auto;padding:8px;overflow-wrap:anywhere;background:var(--ha-card-background);color:var(--primary-text-color);pointer-events:auto">${esc(available ? localize('camera.loading', this._hass, {}, 'Starting live video…') : localize(!this._hass?.states ? 'common.loading' : state.state === 'unknown' ? 'common.unknown' : 'common.unavailable', this._hass))}</div></div>`;
     surface.append(slot);
-    import(new URL(`./MaraoCamera.js${new URL(import.meta.url).search}`, import.meta.url).href).then(({ CameraPlayback }) => {
+    import(new URL(`./MaraoCamera.js${new URL(import.meta.url).search}`, import.meta.url).href).then(async ({ CameraPlayback }) => {
+      const preload = this._config.variables?.preload_stream === true ? await import(new URL(`./MaraoCameraPreload.js${new URL(import.meta.url).search}`, import.meta.url).href) : null;
       if (generation !== this._cameraGeneration || !this.isConnected || this.preview) return;
       const fallback = {
         'camera.buffering': 'Buffering…', 'camera.lower_quality': 'Reduced quality',
@@ -1058,10 +1085,11 @@ export class MaraoCard extends BaseElement {
         'camera.compatibility': 'Native camera video is unavailable or incompatible',
         'camera.unsupported': 'This camera provides a preview only', 'camera.poster_failed': 'Snapshot unavailable',
       };
-      this._camera = new CameraPlayback(this, slot, {
+      const callbacks = {
         localize: key => localize(key, this._hass, {}, fallback[key] || (key === 'common.retry' ? 'Retry' : key)), haptic,
         problem: reason => { if (this._cameraError !== reason) { this._cameraError = reason; this._render(); } },
-      });
+      };
+      this._camera = preload?.claimCameraPreload(this, slot, callbacks) || new CameraPlayback(this, slot, callbacks);
       this._cameraLoading = false;
       this._camera.update(this._hass, entity, this._label(entity, this._config, stateOf(this._hass, entity)));
     }).catch(() => {
@@ -1539,8 +1567,11 @@ export class MaraoCard extends BaseElement {
     if (action?.action === "none") action = null;
     const usesNumberStepper = ["hc_climate_card", "hc_number_card", "hc_wallbox_current_card"].includes(kind);
     const binaryLabel = binary === null ? "" : `${this._label(toggleEntity || entity, toggleEntity && toggleEntity !== entity ? {} : config, interactionState)}: ${entityStateLabel(interactionState, toggleEntity || entity, kind, this._hass)}`;
-    const binaryCue = binary === null || kind === "hc_room_card" ? "" : `<span class="binary-cue" data-active="${binary}"${showIcon ? ' aria-hidden="true"' : ` role="img" aria-label="${esc(binaryLabel)}"`}></span>`;
-    const iconElement = usesNumberStepper ? "" : kind === "hc_room_card" || !showIcon ? binaryCue : `<div class="icon"${binaryLabel ? ` role="img" aria-label="${esc(binaryLabel)}"` : ' aria-hidden="true"'}>${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>${binaryCue}` : `<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>${binaryCue}`}</div>`;
+    const hiddenBinaryState = binaryLabel && kind !== "hc_room_card" && !showIcon ? `<span class="binary-state" role="img" aria-label="${esc(binaryLabel)}"></span>` : "";
+    const app = kind === "hc_media_app_card" ? mediaAppBrand(config) : null;
+    const iconElement = usesNumberStepper ? "" : kind === "hc_room_card" || !showIcon ? hiddenBinaryState : app
+      ? `<img class="app-icon" src="${esc(new URL(`./media-apps/${app.id}.png${new URL(import.meta.url).search}`, import.meta.url).href)}" width="64" height="64" alt="" aria-hidden="true">`
+      : `<div class="icon"${binaryLabel ? ` role="img" aria-label="${esc(binaryLabel)}"` : ' aria-hidden="true"'}>${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : `<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>`}</div>`;
     const roomArtwork = kind === "hc_room_card" && showIcon ? `<div class="room-artwork" aria-hidden="true">${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : '<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>'}</div>` : "";
     const roomBottom = roomLightsControl || roomArtwork ? `<div class="room-bottom">${roomLightsControl}${roomArtwork}</div>` : "";
     const controlClass = kind === "hc_climate_card" ? "control number-control climate-number-control" : kind === "hc_wallbox_current_card" ? "control number-control wallbox-current-control" : usesNumberStepper ? "control number-control" : "control";
@@ -1576,7 +1607,7 @@ export class MaraoCard extends BaseElement {
     const formattedReading = !iconOnly && Boolean(formattedPrimary || formattedPower);
     const stateMarkup = showState && kind !== "hc_wallbox_current_card" ? `<div class="state">${esc(displayValue)}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    this._setMarkup(`<style>${cardStyles()}</style><ha-card${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem, problemAppearance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`);
+    this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem, problemAppearance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`);
     this._syncCamera();
     this.shadowRoot.querySelector('[data-history-open]')?.addEventListener('click', event => { event.stopPropagation(); this._openHistory(event.currentTarget); });
     this._activeHistoryPopup?._refreshHistory();
@@ -1682,10 +1713,9 @@ export class MaraoCard extends BaseElement {
             const label = this.shadowRoot.querySelector('.state');
             const binary = binaryState(entity, state, kind);
             if (label && binary === null) label.textContent = entityStateLabel(state, entity, kind, this._hass);
-            const cue = this.shadowRoot.querySelector('.binary-cue');
-            if (cue && binary !== null) {
-              cue.dataset.active = String(binary);
-              const accessible = this.shadowRoot.querySelector('.icon[role="img"],.binary-cue[role="img"]');
+            if (binary !== null) {
+              if (card) card.dataset.binaryState = String(binary);
+              const accessible = this.shadowRoot.querySelector('.icon[role="img"],.binary-state[role="img"]');
               accessible?.setAttribute('aria-label', `${this._label(entity, this._config, state)}: ${entityStateLabel(state, entity, kind, this._hass)}`);
             }
             const appearance = stateAppearance(kind, text(state.state), this._config, this._hass);

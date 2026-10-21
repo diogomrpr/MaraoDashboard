@@ -42,3 +42,15 @@ Full-suite plans and parallel scheduling were checked without a live comprehensi
 or parallel run. No historical live upgrade campaign, publication, physical-phone
 or Safari inspection was performed. Historical upgrade execution still requires
 the configured SSH Python runtime; its absence is rejected at preflight.
+
+## Unit-only release revision (2026-10-21)
+
+Starting commit: `9aaaed07157d62e3ee305e90425e346249defc2a`. Affected card
+consumers: none (tooling/instructions only). Acceptance: release/version/CI
+select only unit tests, never prepare HA or launch browsers; explicit changed-
+feature and comprehensive commands remain available; development integration
+results are reused without new release reports.
+
+- [x] Default release selection, version hook and automatic CI to affected unit tests.
+- [x] Supersede conflicting release instructions in the contract, skill and guides.
+- [x] Verify unit-only camera/UI/migration selection and explicit integration availability with existing selector tests (24 passed); review the diff. No HA deployment needed.

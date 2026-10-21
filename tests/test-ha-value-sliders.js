@@ -65,8 +65,8 @@ async function checkPointerInteraction(page, context, config, example, calls, po
     if (!await original.evaluate((element) => element.isConnected && Math.abs(Number(element.value) - 60) <= 1)) throw new Error(`${example.name}/${pointer}: unrelated HA update interrupted the drag`);
     // A real external update must refresh confirmed fill without replacing the held input.
     const statePresentation = () => original.evaluate((element) => {
-      const root = element.getRootNode(), cue = root.querySelector('.binary-cue');
-      return cue ? { binary: true, active: cue.dataset.active, label: root.querySelector('[role="img"][aria-label]')?.getAttribute('aria-label'), redundant: Boolean(root.querySelector('.state')) }
+      const root = element.getRootNode(), surface = root.querySelector('ha-card');
+      return surface?.hasAttribute('data-binary-state') ? { binary: true, active: surface.dataset.binaryState, label: root.querySelector('[role="img"][aria-label]')?.getAttribute('aria-label'), redundant: Boolean(root.querySelector('.state')) }
         : { binary: false, label: root.querySelector('.state')?.textContent };
     });
     const activeState = await statePresentation();

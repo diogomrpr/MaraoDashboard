@@ -542,3 +542,57 @@ test('a choppy but advancing lowest-quality stream stays live instead of failing
   Object.assign(p,{generation:1,attempt:true,state:'live',advanced:true,slowMs:35000,sampleAt:performance.now()-500,sampleTime:2,lastTime:2,lastFrames:10,sampleFrames:10,lastProgressAt:performance.now(),streamEntity:'camera.low',hass:{states:{'camera.low':{attributes:{fps:20}}}},video:{currentTime:2.5,paused:false,readyState:2,getVideoPlaybackQuality:()=>({totalVideoFrames:11,droppedVideoFrames:0})},poster:{},describe(){},problem(){},eligible:()=>true,fallback:()=>false,fail(){assert.fail('Advancing video must remain usable even at low fps');}});
   p.observeProgress(1);assert.equal(p.state,'live');assert.equal(p.poster.hidden,true);assert.equal(p.streamEntity,'camera.low');
 });
+
+
+test('background preload discovers enabled dashboard streams without popup or default-off demand', async () => {
+  const {preloadCameras} = await import('../../custom_components/marao_dashboard/frontend/MaraoCameraPreload.js');
+  const enabled = {type:'custom:marao-card',template:'hc_camera_card',entity:'camera.low',variables:{preload_stream:true,popup_stream_entity:'camera.high'}};
+  const config = {views:[{sections:[{cards:[{type:'vertical-stack',cards:[enabled,{...enabled}]}]}]},
+    {cards:[{...enabled,entity:'camera.off',variables:{}}, {type:'custom:marao-popup-card',cards:[{...enabled,entity:'camera.popup'}]}]}]};
+  const before = structuredClone(config);
+  assert.deepEqual([...preloadCameras(config).keys()], ['camera.low']);
+  assert.deepEqual(config,before);
+});
+
+test('warm playback lease retains its player across card removal and cleans the last disabled owner', async () => {
+  const {CameraPreload} = await import('../../custom_components/marao_dashboard/frontend/MaraoCameraPreload.js');
+  const oldCancel = globalThis.cancelAnimationFrame; globalThis.cancelAnimationFrame = () => {};
+  try {
+    let removed = 0;
+    const player = {}, playback = {player, state:'live',update(){},fullscreen(){}};
+    const entry = {playback,background:true,host:{style:{},setAttribute(){}}};
+    const owner = Object.assign(Object.create(CameraPreload.prototype),{configured:new Map([['camera.low',{}]]),sessions:new Map([['camera.low',entry]]),
+      position(){},remove(entity){removed++;this.sessions.delete(entity);}});
+    const card = {_config:{entity:'camera.low'}}, callbacks = {problem(){}};
+    const slot = () => ({style:{},innerHTML:''});
+    const first = owner.claim(card,slot(),callbacks);
+    assert.equal(first.player,player);
+    assert.equal(owner.claim(card,slot(),callbacks),null,'A second visible occurrence retains independent ownership');
+    first.dispose();
+    assert.equal(removed,0,'Navigation must retain an enabled background session');
+    const second = owner.claim(card,slot(),callbacks);
+    assert.equal(second.player,player,'Returning to the view must reuse the warm native player');
+    entry.background=false; second.dispose();
+    assert.equal(removed,1);
+    second.dispose(); assert.equal(removed,1,'Repeated teardown must not stop another owner');
+  } finally {globalThis.cancelAnimationFrame=oldCancel;}
+});
+
+test('background eligibility bypasses card intersection but respects dashboard, visibility and availability', async () => {
+  const {CameraPreload} = await import('../../custom_components/marao_dashboard/frontend/MaraoCameraPreload.js');
+  const {CameraPlayback} = await import('../../custom_components/marao_dashboard/frontend/MaraoCamera.js');
+  const previousDocument=globalThis.document,previousLocation=globalThis.location;
+  globalThis.document={hidden:false};globalThis.location={pathname:'/marao-dashboard/overview'};
+  try {
+    const owner=Object.assign(Object.create(CameraPreload.prototype),{root:{isConnected:true,lovelace:{}},dashboard:'marao-dashboard'});
+    const playback=Object.assign(Object.create(CameraPlayback.prototype),{card:{isConnected:true},visible:false,
+      hass:{states:{'camera.low':{state:'streaming'}},connection:{connected:true}},entity:'camera.low',backgroundEligible:()=>owner.active()});
+    assert.equal(playback.eligible(),true);
+    document.hidden=true;assert.equal(playback.eligible(),false);document.hidden=false;
+    playback.hass.connection.connected=false;assert.equal(playback.eligible(),false);playback.hass.connection.connected=true;
+    playback.hass.states['camera.low'].state='unavailable';assert.equal(playback.eligible(),false);playback.hass.states['camera.low'].state='streaming';
+    owner.root.lovelace.editMode=true;assert.equal(playback.eligible(),false);owner.root.lovelace.editMode=false;
+    location.pathname='/config/dashboard';assert.equal(playback.eligible(),false);location.pathname='/marao-dashboard/security';assert.equal(playback.eligible(),true);
+    owner.disposed=true;assert.equal(playback.eligible(),false);
+  } finally {globalThis.document=previousDocument;globalThis.location=previousLocation;}
+});

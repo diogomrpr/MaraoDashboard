@@ -102,11 +102,20 @@ test('unknown paths, ambiguous shared sources and invalid flags cannot broaden o
   assert.equal(parseArgs([]).full, false);
 });
 
-test('only persistence changes select live upgrade checks during scoped release preparation', () => {
+test('release defaults to unit tests even for camera, shared UI and persistence changes', () => {
   const comparison = { base: 'base', head: 'candidate', files: [] };
-  assert.equal(makePlan({ release: true, components: ['labels'] }, comparison).checks.some(check => check.id === 'preserved-upgrade'), false);
-  assert.equal(makePlan({ release: true, components: ['migration'] }, comparison).checks.some(check => check.id === 'preserved-upgrade'), true);
-  assert.equal(makePlan({ components: ['migration'] }, comparison).checks.some(check => check.id === 'preserved-upgrade'), false);
+  for (const component of ['camera', 'navbar-startup', 'control-grid', 'migration']) {
+    const plan = makePlan({ release: true, components: [component] }, comparison);
+    assert.equal(plan.unit, true);
+    assert.equal(plan.offline, true);
+    assert.ok(plan.checks.length);
+    assert.ok(plan.checks.every(check => /^(unit:|python:)/.test(check.id)));
+    assert.ok(plan.checks.every(check => check.command.includes('--test') || check.command.includes('pytest')));
+    assert.ok(!plan.checks.some(check => check.id === 'preserved-upgrade'));
+  }
+  const explicit = makePlan({ components: ['camera'] }, comparison);
+  assert.ok(explicit.checks.some(check => check.kind === 'browser'));
+  assert.throws(() => parseArgs(['--unit', '--full']), /cannot be combined/);
 });
 
 test('comparison includes whole committed batch, staged, unstaged, deleted and untracked files', () => {
@@ -160,6 +169,7 @@ test('automatic CI uses affected ranges and manual comprehensive/parallel option
   assert.equal(workflow.on.workflow_dispatch.inputs.parallel.default, false);
   const step = workflow.jobs.test.steps.find(step => step.name.startsWith('Run affected'));
   assert.match(step.run, /--offline --head/);
+  assert.match(step.run, /if \[\[ "\$MARAO_FULL" == "true" \]\]; then args\+=\(--full\); else args\+=\(--unit\); fi/);
   assert.match(step.run, /--base/);
   assert.match(step.env.MARAO_FULL, /workflow_dispatch/);
   assert.match(step.env.MARAO_PARALLEL, /workflow_dispatch/);

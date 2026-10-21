@@ -14,7 +14,7 @@ function parseArgs(argv = process.argv.slice(2)) {
   const options = { components: [], files: [], tier: 'focused', full: false, parallel: false, plan: false, offline: false, release: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (['--full', '--parallel', '--plan', '--offline', '--release', '--help'].includes(arg)) options[arg.slice(2)] = true;
+    if (['--full', '--parallel', '--plan', '--offline', '--unit', '--release', '--help'].includes(arg)) options[arg.slice(2)] = true;
     else if (['--base', '--head', '--component', '--report', '--upgrade-report', '--reuse', '--snapshot', '--since', '--file', '--tier'].includes(arg)) {
       assert.ok(argv[i + 1] && !argv[i + 1].startsWith('--'), arg + ' requires a value');
       const value = argv[++i];
@@ -31,13 +31,14 @@ function parseArgs(argv = process.argv.slice(2)) {
 
 function validateOptions(options) {
   const tier = options.tier || 'focused';
+  assert.ok(!(options.unit && options.full), '--unit cannot be combined with --full');
   assert.ok(['visual', 'behavior', 'focused'].includes(tier), 'Unknown verification tier: ' + tier);
   const development = tier !== 'focused' || options.since || options.files?.length;
   assert.ok(!((options.release || options.full) && (development || options.snapshot)), 'Publication and full checks cannot use development tiers, task snapshots or reviewed file subsets');
   assert.ok(!(options.since && (options.base || options.head)), '--since cannot be combined with --base or --head');
   assert.ok(!(development && (options.reuse || options.report || options.upgradeReport)), 'Development scope cannot consume publication evidence');
   if (options.snapshot) assert.ok(!development && !options.base && !options.head && !options.components?.length
-    && !options.offline && !options.plan && !options.parallel && !options.reuse && !options.report && !options.upgradeReport,
+    && !options.offline && !options.unit && !options.plan && !options.parallel && !options.reuse && !options.report && !options.upgradeReport,
   '--snapshot only records the starting workspace; use it separately from selection or execution');
 }
 
@@ -69,6 +70,8 @@ function changedFiles(options, cwd = root) {
 
 function makePlan(options = {}, comparison) {
   validateOptions(options);
+  const unit = !!options.unit || (!!options.release && !options.full);
+  options = { ...options, unit, offline: !!options.offline || unit };
   assert.ok(!options.snapshot, 'Create a task snapshot separately before selecting checks');
   comparison = reviewedFiles(comparison || changedFiles(options), options.files);
   const tier = options.tier || 'focused';
@@ -78,15 +81,11 @@ function makePlan(options = {}, comparison) {
     : selectComponents(comparison.files, options.components || [], { conservativeShared: !!options.offline && !development });
   const checks = checksFor(selection, options);
   const upgradeRequired = selection.components.some(id => components[id].upgrade);
-  if (!options.offline && !options.full && options.release && upgradeRequired) {
-    checks.push({ id: 'preserved-upgrade', kind: 'upgrade', exclusive: true,
-      command: ['node', 'tests/test-ha-upgrade.js', '--scope', selection.components.join(',')], inputs: ['custom_components/marao_dashboard', 'ha-test/upgrade', 'tests/test-ha-upgrade.js', 'tests/upgrade'] });
-  }
-  return { version: 1, mode: options.full ? 'full' : 'affected', parallel: !!options.parallel, offline: !!options.offline,
+  return { version: 1, mode: options.full ? 'full' : 'affected', unit, parallel: !!options.parallel, offline: !!options.offline,
     ...comparison, tier, development_only: development, components: selection.components, reasons: selection.reasons, checks, upgradeRequired,
     ...(development ? { inspection: { ...inspectionFor(selection), status: 'not performed by this command' } } : {}),
     excluded: tier === 'visual' ? ['automated checks', 'publication validation'] : tier === 'behavior' ? ['browser interaction and visual inspection', 'mobile matrices', 'publication validation']
-      : [...(options.offline ? ['live browser checks', 'mobile layouts', 'preserved-install upgrades'] : options.full ? [] : ['unrelated suites', 'complete mobile matrix', 'unaffected historical baselines']),
+      : [...(unit ? ['integration/browser checks', 'build checks', 'mobile layouts', 'preserved-install upgrades (reuse development testing; explicit request only)'] : options.offline ? ['live browser checks', 'mobile layouts', 'preserved-install upgrades'] : options.full ? [] : ['unrelated suites', 'complete mobile matrix', 'unaffected historical baselines']),
         ...(development ? ['publication validation'] : [])] };
 }
 
@@ -367,7 +366,8 @@ async function runPlan(plan, options = {}) {
 async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
   if (options.help) {
-    console.log('test:affected [--base ref] [--head ref] [--component id] [--plan] [--offline] [--parallel] [--reuse /absolute/private/report.json]\n' +
+    console.log('test:affected [--base ref] [--head ref] [--component id] [--plan] [--offline|--unit] [--parallel] [--reuse /absolute/private/report.json]\n' +
+      'Release/publication defaults to affected unit tests only. --unit excludes browser, integration, build and upgrade runs.\n' +
       'Development: --snapshot /absolute/private/baseline.json; then --since /absolute/private/baseline.json --tier visual|behavior|focused [--file reviewed/path]\n' +
       'Visual prints inspection scope only; behavior runs mapped unit/build checks. Task/file scope is never publication evidence.\n' +
       'test:full [--plan] [--offline] [--parallel]\nDefault: affected checks, serial. Components: ' + Object.keys(components).join(', '));
@@ -381,7 +381,7 @@ async function main(argv = process.argv.slice(2)) {
   const plan = makePlan(options);
   if (options.plan || plan.tier === 'visual') {
     console.log(JSON.stringify({ mode: plan.mode, base: plan.baseRef, head: plan.head, components: plan.components, reasons: plan.reasons,
-      tier: plan.tier, development_only: plan.development_only, files: plan.files, omitted_changed_files: plan.omitted_changed_files,
+      tier: plan.tier, unit: plan.unit, development_only: plan.development_only, files: plan.files, omitted_changed_files: plan.omitted_changed_files,
       inspection: plan.inspection, parallel: plan.parallel, checks: plan.checks.map(({ id, command, cases }) => ({ id, command, cases })), excluded: plan.excluded }, null, 2));
     return plan;
   }

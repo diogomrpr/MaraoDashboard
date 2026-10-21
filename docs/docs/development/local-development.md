@@ -299,14 +299,13 @@ writes, retain interruption/failure recovery, keep previews/dry runs read-only a
 historical archives immutable. A downgrade needs matching package and saved-data
 baselines together; see the update guide.
 
-Versioned publication requires preserved-install proof only for changed saved
-data, migration, generated ownership or installation/upgrade paths. Run
-`npm run test:ha:upgrade -- --scope <components>` for affected baselines during
-explicit release preparation. Retain exact backups, independently expected data,
-recovery and verified cleanup; fresh fixture preparation cannot replace this proof.
-UI-only releases do not automatically run historical upgrades or all mobile
-profiles. `npm run verify:release` validates scoped final-candidate evidence and
-publication checks; the optional complete suite requires an explicit request.
+Releases run affected unit tests only through `npm run verify:publish` (or
+`verify:release` without an upgrade-report argument). Reuse integration testing
+from development, including preserved-install checks where needed for concrete
+migration/recovery risk. Do not redeploy or rerun browser, camera, mobile or
+historical-upgrade checks during release unless explicitly requested. Supplied
+upgrade-report validation remains available as an opt-in; report skipped coverage
+honestly and keep known failures visible.
 
 Ordinary browser batches use a separate private preparation receipt and isolated
 job artifacts. They validate current source/assets/fixture ownership without

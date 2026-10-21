@@ -431,3 +431,16 @@ test('popup stream accepts only optional camera bindings without changing saved 
     assert.deepEqual(config,before);
   }
 });
+
+
+test('camera background preload is optional, boolean and preserved without default writes', () => {
+  for (const value of [undefined, false, true, 'true', 1, null]) {
+    const variables = {future: []};
+    if (value !== undefined) variables.preload_stream = value;
+    const config = {config_version:2,name:'Home',landing_page:'home',navigation:[],pages:[{name:'Home',path:'home',entities:[
+      {id:'camera',template:'hc_camera_card',entity_id:'camera.low',variables}]}]};
+    const before = structuredClone(config);
+    assert.equal(validateConfig(config,2).some(message=>message.includes('Preload stream')), value !== undefined && typeof value !== 'boolean');
+    assert.deepEqual(serializeConfig(normalizeConfig(config)), before);
+  }
+});

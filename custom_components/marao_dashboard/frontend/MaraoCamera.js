@@ -149,7 +149,8 @@ function decodedFrames(video) {
 }
 
 export class CameraPlayback {
-  constructor(card, slot, { localize, haptic, problem }) {
+  constructor(card, slot, { localize, haptic, problem, eligible }) {
+    this.backgroundEligible = eligible;
     this.card = card; this.slot = slot; this.localize = localize; this.haptic = haptic; this.problem = problem;
     this.generation = 0; this.streamRequests = 0; this.visible = !globalThis.IntersectionObserver; this.state = 'idle';
     slot.className = 'camera-live';
@@ -189,6 +190,7 @@ export class CameraPlayback {
     for (let node = card; node; node = node.parentNode || node.host) if (node.nodeType === 1) this.ancestry.observe(node, { attributes: true, attributeFilter: ['hidden', 'style', 'class', 'inert', 'aria-hidden'] });
   }
   eligible() {
+    if (this.backgroundEligible) return this.card.isConnected && !document.hidden && cameraAvailable(this.hass, this.entity) && this.backgroundEligible();
     if (!this.card.isConnected || this.card.preview || !this.visible || document.hidden || !cameraAvailable(this.hass, this.entity)) return false;
     for (let node = this.card; node; node = node.parentNode || node.host) if (node.nodeType === 1
       && (node.hidden || node.inert || node.getAttribute('aria-hidden') === 'true' || getComputedStyle(node).display === 'none' || getComputedStyle(node).visibility === 'hidden')) return false;

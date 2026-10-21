@@ -65,7 +65,7 @@ jobs:
       - name: Install Python test dependencies
         run: python -m pip install -r tests/requirements.txt
 
-      - name: Run affected checks (full and parallel are explicit options)
+      - name: Run affected unit tests (full and parallel are explicit options)
         env:
           GH_TOKEN: ${{ github.token }}
           MARAO_FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.full }}
@@ -81,7 +81,7 @@ jobs:
             args+=(--release)
           fi
           if [[ -n "$MARAO_COMPONENTS" ]]; then args+=(--component "$MARAO_COMPONENTS"); fi
-          if [[ "$MARAO_FULL" == "true" ]]; then args+=(--full); fi
+          if [[ "$MARAO_FULL" == "true" ]]; then args+=(--full); else args+=(--unit); fi
           if [[ "$MARAO_PARALLEL" == "true" ]]; then args+=(--parallel); fi
           node tests/verification.js "${args[@]}" --plan > "$RUNNER_TEMP/marao-affected-plan.json"
           if node -e 'const p=require(process.argv[1]);process.exit(p.checks.some(c=>c.command.some(a=>/^tests\/test-.+-local\.js$/.test(a)))?0:1)' "$RUNNER_TEMP/marao-affected-plan.json"; then

@@ -5,8 +5,9 @@ async function verifyPublish(argv = process.argv.slice(2), { release = true } = 
   const options = parseArgs(argv);
   assert.ok(!options.full, 'Use the explicitly requested test:full command for comprehensive checks');
   options.release = release;
+  options.unit = true;
   const plan = makePlan(options);
-  console.log('Scoped publication: ' + plan.checks.map(check => check.id).join(', '));
+  console.log('Unit-only publication (integration testing stays in development): ' + plan.checks.map(check => check.id).join(', '));
   if (options.plan) return plan;
   assert.equal(git(['status', '--porcelain', '--untracked-files=normal']), '', 'Final publication requires a clean commit');
   if (options.report) {
@@ -21,10 +22,6 @@ async function verifyPublish(argv = process.argv.slice(2), { release = true } = 
         const environment = await require('./verification-reuse').liveEnvironment(report.prepared_receipt);
         for (const row of report.results.filter(row => row.environment)) assert.deepEqual(row.environment, environment, 'Current prepared installation or environment changed');
       }
-    }
-    if (plan.upgradeRequired) {
-      assert.ok(options.upgradeReport, 'Changed persistence requires private preserved-install evidence');
-      await require('./verify-release').verifyRelease(options.upgradeReport, { publish: false, scope: plan });
     }
     console.log('Unchanged scoped evidence validated; applicable exact-commit CI remains required.');
     return report;

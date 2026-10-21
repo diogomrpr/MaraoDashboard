@@ -215,7 +215,8 @@ test('timeline omits only redundant binary current text and retains historical s
     ]] };
     await tick();
     const html = card.shadowRoot.innerHTML;
-    assert.match(html, /class="binary-cue"/);
+    assert.doesNotMatch(html, /class="binary-cue"/);
+    assert.match(html, /class="binary-state" role="img"/);
     assert.match(html, /role="img" aria-label="Timeline:/);
     assert.doesNotMatch(html.match(/<header>[\s\S]*?<\/header>/)[0], /<span>[^<]+<\/span>/);
     assert.match(html, new RegExp(`data-state="${previous}"`));

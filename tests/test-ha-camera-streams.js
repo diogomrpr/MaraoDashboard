@@ -55,7 +55,7 @@ const redact = value => String(value).replace(/https?:\S+/g, '[URL]').replace(/(
       return card?._camera?.state === 'live' && card._camera.video?.videoWidth === 640 && card._camera.video.getRootNode().host?.localName === 'ha-web-rtc-player';
     }, null, { timeout: 35000 });
     assert.equal(await popup.evaluate(card => card._camera.streamEntity), high);
-    assert.equal(await dashboard.evaluate(card => !card._camera.player), true, 'Inert dashboard releases its low stream');
+    assert.equal(await dashboard.evaluate(card => Boolean(card._camera.player)), true, 'Opted-in dashboard retains its warm low stream behind the popup');
     const events = sheet.locator('marao-camera-events-card');
     await events.waitFor();
     await page.waitForFunction(() => { const events = document.querySelector('home-assistant').shadowRoot.querySelector('.marao-popup-content marao-camera-events-card'); return events?._status === 'ready' && events._events.length > 0; }, null, { timeout: 10000 });

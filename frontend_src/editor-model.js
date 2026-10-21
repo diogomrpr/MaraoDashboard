@@ -583,6 +583,7 @@ export function validatePages(config, catalog) {
         }
         if (card.template === 'hc_energy_period_card' && !['day', 'month'].includes(options.period ?? 'day')) errors.push('Energy period must be day or month.');
         if (card.template === 'hc_wallbox_current_card' && Object.hasOwn(options, 'shortcuts') && (!Array.isArray(options.shortcuts) || options.shortcuts.length > 3 || options.shortcuts.some(value => typeof value !== 'number' || !Number.isFinite(value)))) errors.push('Charging shortcuts require at most three finite numbers.');
+        if (card.template === 'hc_camera_card' && Object.hasOwn(options, 'preload_stream') && typeof options.preload_stream !== 'boolean') errors.push('Preload stream must be a boolean.');
         if (card.template === 'hc_camera_card' && options.popup_stream_entity != null && options.popup_stream_entity !== '' && (!entityId(options.popup_stream_entity) || !options.popup_stream_entity.startsWith('camera.'))) errors.push('Choose a camera entity for the popup stream.');
         if (card.template === 'hc_room_card' && Object.hasOwn(options, 'light_entities') && (!Array.isArray(options.light_entities) || options.light_entities.some(value => !entityId(value) || !value.startsWith('light.')))) errors.push('Room lights must be an explicit list of light entities.');
         if (card.template === 'hc_media_app_card' && (typeof options.app_source !== 'string' || !options.app_source.trim())) errors.push('Media app requires an explicit source.');

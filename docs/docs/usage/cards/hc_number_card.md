@@ -31,3 +31,8 @@ The `hc_number_card` is the default card for writable `number` and `input_number
 The card reads the entity's `step`, `min`, `max`, and `unit_of_measurement` attributes. Each press changes the value by one configured step and never sends a value outside the entity limits.
 
 Lights, covers, and fans keep their percentage sliders because those controls separately display the current progress and requested target.
+
+The Wallbox `hc_wallbox_current_card` variant presents a large current reading
+(such as **12 A**) above its optional title, with the up/down buttons in a vertical
+pill on the right. Configured current shortcuts remain below. It uses the same
+entity limits, steps and service actions as the shared number control.

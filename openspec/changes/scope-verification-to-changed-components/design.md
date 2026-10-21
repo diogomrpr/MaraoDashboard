@@ -1,5 +1,17 @@
 # Design
 
+## Accepted revision: unit-only releases (2026-10-21)
+
+The user requires releases to run only affected Node/Python unit tests, reusing
+integration testing performed during development. This supersedes the broader
+release-gate and fresh preserved-install evidence requirements below. Apply the
+same unit-only default to verify:publish, verify:release without a report,
+version hooks and automatic Tests CI. Additional changed-feature integration or
+full testing requires an explicit user request. Keep known failures honest and
+retain applicable hassfest/HACS metadata validation. No runtime, saved data,
+card consumers or test-instance installation changes are involved.
+
+
 ## Context
 
 See [proposal.md](proposal.md) for motivation. The current npm `test` command runs all static/frontend and Python tests; `preversion` calls `verify:publish`. That publication runner either executes broad browser scripts or requires complete upgrade evidence. `verify:release`, `tests/upgrade_coverage.py` and `ha-test/upgrade/coverage.json` assume fixed comprehensive coverage. Automatic Tests CI also runs all static and Python checks.

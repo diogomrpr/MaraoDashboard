@@ -190,6 +190,8 @@ test('camera title controls are basic, default visibly on without a write, and r
   assert.equal(fields.some(field => ['icon','show_icon','show_state','show_label'].includes(field.path)), false);
   const data = formData(original, fields);
   assert.equal(data.show_name, true);
+  assert.equal(data['variables.preload_stream'], false);
+  assert.equal(patchForm(original, fields, data, {...data, 'variables.preload_stream': true}).variables.preload_stream, true);
   assert.deepEqual(patchForm(original, fields, data, {...data}), original);
   const hidden = patchForm(original, fields, data, {...data, show_name: false});
   assert.deepEqual(hidden, {...original, show_name: false});

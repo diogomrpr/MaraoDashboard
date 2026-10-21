@@ -170,3 +170,13 @@ For a slow connection, choose an enabled lower-quality camera entity as the
 Dashboard stream. Select an enabled higher-quality entity for Popup stream when
 more detail is needed. Marao does not enable camera entities, alter Protect
 settings, estimate bandwidth or switch the chosen quality automatically.
+
+## Preload the dashboard stream
+
+Enable **Preload stream in background** in the camera card settings to start its
+Dashboard stream when opening any page of the same dashboard. It is off by
+default. Enabled streams use bandwidth and device resources on other dashboard
+pages; choose a lower-quality Dashboard stream where appropriate. Popup video
+and events still load only when opened. Background playback stops when leaving
+that dashboard or hiding the browser tab, and resumes when eligible. Slow camera
+startup or browser playback restrictions can still require loading or a tap.

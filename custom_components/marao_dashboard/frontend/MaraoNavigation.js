@@ -157,6 +157,7 @@ export class MaraoNavbarCard extends BaseElement {
   }
   set hass(value) {
     this._hass = value;
+    if (this._navigationRecord) cameraPreloader?.(this._navigationRecord);
     if (!this.preview) updateFrontendClient(value);
     if (this._surface && this._hostPath === window.location.pathname) { copyNavigationTheme(this, this._surface); this._surface.hass = value; }
     this._updateCurrent();
@@ -343,6 +344,11 @@ export class MaraoNavbarCard extends BaseElement {
   getCardSize() { return 0; }
 }
 
+let cameraPreloader;
+export function registerCameraPreloader(sync) {
+  cameraPreloader = sync;
+  for (const record of navigationRecords) if (!record.released) cameraPreloader(record);
+}
 const navigationRecords = new Set();
 const navigationOwners = new WeakMap();
 function configuredNavbar(root) {
@@ -380,7 +386,7 @@ function updateNavigation(record, config, host) {
 function releaseNavigation(record) {
   if (!record || record.released) return;
   record.released = true; navigationRecords.delete(record); navigationOwners.delete(record.root);
-  record.observer?.disconnect(); record.surface.remove();
+  record.cameraPreload?.dispose(); record.observer?.disconnect(); record.surface.remove();
 }
 function syncNavigation(record) {
   if (!record || record.released) return;
@@ -500,6 +506,12 @@ function applyFullscreen() {
     for (const header of root?.shadowRoot?.querySelectorAll("app-header, ha-app-layout > header, .header") || []) owned.set(header, ["display"]);
     if (view) owned.set(view, ["padding-top", "padding-right", "padding-left", "padding-bottom"]);
   }
+  // Include the actual floating offset, including mobile viewport changes.
+  const viewportBottom = window.visualViewport ? window.visualViewport.offsetTop + window.visualViewport.height : window.innerHeight;
+  const coveredBottom = Math.max(0, ...[...activeNavbars].map(navbar => {
+    const rect = navbar.shadowRoot?.querySelector("nav")?.getBoundingClientRect();
+    return rect && Number.isFinite(viewportBottom) ? viewportBottom - rect.top : 0;
+  }));
   for (const [node, original] of fullscreenOriginals) {
     const properties = owned.get(node) || [];
     for (const [property, { value, priority }] of Object.entries(original)) {
@@ -526,7 +538,7 @@ function applyFullscreen() {
       const clearance = property === "padding-top" && nativeAdminBars.size
         ? `calc(60px + ${safeArea("top")})`
         : property === "padding-bottom"
-        ? `calc(${Math.max(60, ...[...activeNavbars].map(navbar => navbar.shadowRoot?.querySelector("nav")?.getBoundingClientRect().height || 0))}px + ${safeArea("bottom")} + 12px)`
+        ? `calc(max(${coveredBottom}px, calc(${Math.max(60, ...[...activeNavbars].map(navbar => navbar.shadowRoot?.querySelector("nav")?.getBoundingClientRect().height || 0))}px + ${safeArea("bottom")} + 12px)) + 48px)`
         : safeArea(property.slice(8));
       node.style.setProperty(property, property === "display" ? "none"
         : `max(${normal}, ${clearance})`, "important");

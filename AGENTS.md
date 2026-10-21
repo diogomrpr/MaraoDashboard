@@ -172,12 +172,12 @@ keep future work in changes and archive only completed, verified work.
 - Keep existing affected examples accurate. Add gallery cases or safe fixtures only
   when needed to demonstrate the feature or reproduce a concrete defect; do not
   expand a gallery matrix as a prerequisite for routine feature delivery.
-- In focused and publication verification, select `test:ha:alignment` for changed
+- In explicitly requested focused integration verification, select `test:ha:alignment` for changed
   icon-only/shared action geometry and relevant slider checks. A visual-only edit
   does not inherit those suites during development. Changed action, security,
   migration and recovery contracts still need assertions; visibility cannot prove
   correct dispatch or data preservation.
-- In automated focused/publication coverage, run reviewed theme-independent
+- In explicitly requested automated integration coverage, run reviewed theme-independent
   geometry and behavior in one reference theme;
   retain representative appearance/state checks in both themes and additional
   combinations where theme changes the contract. Repeat devices only for native
@@ -191,13 +191,19 @@ keep future work in changes and archive only completed, verified work.
   comprehensive testing. Do not run the full suite, 26-profile mobile matrix,
   exhaustive gallery review or all historical scenarios implicitly during normal
   implementation, hooks, automatic CI, stabilization or publication.
-- Before pushes/tags/releases, use the scoped `npm run verify:publish` gate.
-  Publication requires relevant feature/component checks and applicable exact-commit
-  Tests/hassfest/HACS validation; a release request alone does not request full tests.
-  Its scope covers the whole release candidate; task snapshots, file subsets and
-  visual/behavior reports cannot narrow or satisfy publication proof. Run broad
-  regression in the explicitly requested pre-release campaign, never daily by default.
-  Reuse unchanged validated focused evidence rather than repeating browser work.
+- Before pushes/tags/releases, use `npm run verify:publish`: affected unit tests
+  only, serially, across the whole release candidate. Automatic Tests CI and
+  version hooks also run unit tests only. Retain applicable exact-commit
+  hassfest/HACS validation as package metadata checks.
+- Integration, browser, camera playback, geometry, performance, mobile matrices
+  and preserved-install/upgrade testing belong to development. Reuse those results
+  at release; do not rerun them or require new reports, captures, deployments or
+  exact-release-commit integration evidence. A release request never authorizes
+  additional integration/full tests. Run them only when the user explicitly asks,
+  scoped to the changed features unless they request a comprehensive campaign.
+  Known failures remain failures and must be reported; do not claim skipped
+  checks passed. Existing stricter release instructions in guides, skills or
+  older OpenSpec artifacts do not override this unit-only release default.
 - Treat observed warnings, error cards, console exceptions, failed resources,
   repeated requests and duplicate service calls as defects. Fix their shared root;
   never hide, suppress or relabel failures. Known relevant violations block release.
@@ -229,24 +235,22 @@ keep future work in changes and archive only completed, verified work.
 - Keep provenance-backed historical fixtures, independently specified expected
   JSON, and upgrade feature coverage current with each relevant change. Run
   focused migration checks during development.
-- Versioned publication requires live preserved-install verification only when
-  persisted data, migration, generated-output ownership or installation/upgrade
-  behavior changes. Select affected formats/features with independent expected
-  data, relevant failure recovery and verified disposable cleanup. Changes affecting
-  every supported conversion still require every affected baseline; UI-only releases
-  do not automatically run historical upgrades or a full mobile matrix.
-- Use `npm run test:ha:upgrade -- --scope <components>` for required scoped live
-  upgrade proof during explicit release preparation. It preserves the safe existing
+- Verify persisted data, migration, generated ownership and installation/upgrade
+  changes during development using affected expected data and recovery checks.
+  Release preparation reuses that testing and runs only unit tests by default.
+- Use `npm run test:ha:upgrade -- --scope <components>` during development when
+  needed for a concrete upgrade risk, or at release only if explicitly requested.
+  It preserves the safe existing
   installation and exact backups before remote writes; fresh fixture preparation
   cannot replace preserved-install evidence. Full upgrade/browser coverage requires
-  an explicit comprehensive request. Missing, failed, incomplete or stale selected
-  proof blocks publication. Downgrades restore the matching package and saved data
+  an explicit comprehensive request. Requested proof must be valid and honestly
+  reported. Downgrades restore the matching package and saved data
   together, not package assets alone.
-- `npm run verify:release` checks scoped final-candidate evidence and relevant
-  publication checks. Revalidate private coverage, source/asset identities, cleanup
-  and the prepared installation before reuse; candidate changes recompute scope
-  and invalidate changed inputs. Bind valid proof to the clean final release commit.
-  Keep historical comprehensive reports immutable and distinct from scoped reports.
+- `npm run verify:release` without an upgrade-report argument runs the same
+  unit-only publication gate. Validating a supplied upgrade report is an explicit
+  opt-in; it must never be requested automatically for a routine release. Keep
+  historical integration reports immutable and do not relabel development testing
+  as exact-release-commit or comprehensive evidence.
 
 ## Binding UI and interaction rules
 
@@ -256,8 +260,8 @@ keep future work in changes and archive only completed, verified work.
 - Use scalable Montserrat typography supporting normal text, bold text, 200% text,
   200% browser zoom, and bold plus 200% text. Essential content wraps; secondary
   content may use ellipsis. Development selects relevant cases for the changed layout;
-  focused/publication checks retain their selected distinct profiles.
-- Selected automated mobile profiles form the focused/publication UI gate, not a
+  explicitly requested integration checks retain their selected distinct profiles.
+- Selected automated mobile profiles form an explicitly requested integration gate, not a
   requirement for presentation-only development. Real-phone inspection is
   recommended when available but is not required; do not claim it was performed
   unless it was. VoiceOver, TalkBack, and OS high-contrast modes are outside the

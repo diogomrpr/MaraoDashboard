@@ -51,10 +51,42 @@ Home Assistant's [native brand support](https://developers.home-assistant.io/doc
 serves the packaged PNGs through its authenticated integration branding API.
 The [supported filenames](https://developers.home-assistant.io/blog/2026/02/24/brands-proxy-api/)
 include light, dark and high-resolution variants. Do not add credentials or
-custom image endpoints. Older Home Assistant versions and external catalogues
-may retain their own artwork.
+custom image endpoints.
+
+HACS update entities currently construct a direct public-CDN URL for the
+integration icon (`https://brands.home-assistant.io/_/marao_dashboard/icon.png`),
+bypassing Home Assistant's packaged-brand API. A missing public catalogue entry
+therefore shows **icon not available** even when local integration branding works.
+The supported modern integration setup is the packaged `brand/` directory,
+which Marao already provides. HACS needs to consume Home Assistant's local brands
+API for installed custom integrations. A maintainer confirmed in
+[HACS issue 5402](https://github.com/hacs/integration/issues/5402)
+on 2026-10-16 that this is fixed in the Marketplace integration planned for
+Home Assistant 2026.11; this is an upstream statement, not a locally verified
+upgrade result. Do not submit
+new assets to the legacy custom-integration catalogue as the recommended fix,
+patch HACS from Marao, or silently override HACS entity state. Changing the local
+iconset or exporting the same packaged files again cannot repair that external
+lookup. See the
+[HACS image lookup](https://github.com/hacs/integration/blob/main/custom_components/hacs/update.py#L64-L72)
+and [Home Assistant brand serving](https://contributors.home-assistant.io/core/integrations/brands/).
 
 The custom icon identifier is `marao_dashboard:mountain`. It belongs only on
 owned identity surfaces and absent-icon defaults. Preserve all explicitly saved
 dashboard icons and functional navbar, room, device and action icons. A branding
 update needs no saved-configuration migration or replacement gallery entities.
+
+## Media app shortcut artwork
+
+The bundled `frontend/media-apps/*.png` files are unmodified 256-pixel PNG
+renditions of the publishers’ official App Store artwork, retrieved through
+Apple’s public Lookup API on 2026-10-21. App names and logos belong to their
+respective owners. They identify the configured app; they do not imply affiliation.
+The dashboard serves these files locally and performs no runtime App Store lookup.
+
+- [Netflix](https://apps.apple.com/pt/app/netflix/id363590051) — `com.netflix.Netflix`.
+- [YouTube](https://apps.apple.com/pt/app/youtube/id544007664) — `com.google.ios.youtube`.
+- [Disney+](https://apps.apple.com/pt/app/disney/id1446075923) — `com.disney.disneyplus`.
+- [Amazon Prime Video](https://apps.apple.com/pt/app/amazon-prime-video/id545519333) — `com.amazon.aiv.AIVApp`.
+- [Apple TV](https://apps.apple.com/pt/app/apple-tv/id1174078549) — `com.apple.tv`.
+- [Plex: Find Movies and TV Shows](https://apps.apple.com/pt/app/plex-find-movies-and-tv-shows/id383457673) — `com.plexapp.plex`.

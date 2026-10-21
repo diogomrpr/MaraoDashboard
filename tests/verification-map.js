@@ -179,7 +179,7 @@ const rules = [
   [/^frontend_src\/history-(chart|data)\.js$|^custom_components\/marao_dashboard\/frontend\/(MaraoHistory|ChartJS\.LICENSE|KurkleColor\.LICENSE)/, ['chart-details']],
   [/^tests\/test-history-chart-local\.js$|^tests\/history-detail-checks\.js$|^ha-test\/history-fixture\.js$/, ['chart-details']],
   [/^tests\/editor-preload-checks\.js$/, ['editor-preload']],
-  [/^tests\/(test-camera-live-local|test-ha-camera-latency|test-ha-camera-streams|camera-live-native-checks|camera-slow-native-checks|camera-request-ledger|camera-media-shaper)\.js$|^tests\/frontend\/(?:marao-camera-adaptive|camera-media-shaper)\.test\.js$|^tests\/components\/marao_dashboard\/test_camera_media\.py$|^custom_components\/marao_dashboard\/(?:camera_(?:sessions|media)\.py|frontend\/(?:MaraoCamera(?:Adaptive)?\.js|MaraoHls\.js|HlsJS\.LICENSE\.txt))$|^frontend_src\/camera-hls\.js$|^ha-test\/camera-live-fixture\.js$|^ha-test\/generate-camera-live\.(?:js|py)$|^ha-test\/custom_components\/(?:marao_test_camera|unifiprotect)\//, ['camera']],
+  [/^tests\/(test-camera-live-local|test-ha-camera-latency|test-ha-camera-streams|camera-live-native-checks|camera-slow-native-checks|camera-request-ledger|camera-media-shaper)\.js$|^tests\/frontend\/(?:marao-camera-adaptive|camera-media-shaper)\.test\.js$|^tests\/components\/marao_dashboard\/test_camera_media\.py$|^custom_components\/marao_dashboard\/(?:camera_(?:sessions|media)\.py|frontend\/(?:MaraoCamera(?:Adaptive|Preload)?\.js|MaraoHls\.js|HlsJS\.LICENSE\.txt))$|^frontend_src\/camera-hls\.js$|^ha-test\/camera-live-fixture\.js$|^ha-test\/generate-camera-live\.(?:js|py)$|^ha-test\/custom_components\/(?:marao_test_camera|unifiprotect)\//, ['camera']],
   [/^tests\/control-grid-checks\.js$/, ['control-grid']],
   [/^tests\/verification-(policy|reuse)\.js$/, ['verification']],
   [/^tests\/(editor-rendering-checks|measure-ha-editor)\.js$/, ['editor-rendering']],
@@ -219,6 +219,7 @@ const rules = [
   [/^custom_components\/marao_dashboard\/frontend\/MaraoDashboard\.js$/, 'shared'],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoFrigateEventsCard\.js$/, ['camera']],
   [/^custom_components\/marao_dashboard\/frontend\/themes\//, ['labels', 'slider', 'popup', 'navbar', 'rooms']],
+  [/^custom_components\/marao_dashboard\/frontend\/media-apps\//, ['labels', 'packaging']],
   [/^custom_components\/marao_dashboard\/frontend\/(brand|icons|MaraoDashboardJson)/, ['packaging', 'editor-ui']],
   [/^custom_components\/marao_dashboard\/translations\//, ['labels', 'editor-ui']],
   [/^custom_components\/marao_dashboard\/(generator|editor)\.py$/, ['generator', 'editor-model']],
@@ -295,10 +296,13 @@ function inspectionFor(selection) {
   return { components: ids, families: selectedFamilies, editor, unresolved };
 }
 
-function checksFor(selection, { full = false, offline = false, parallel = false, tier = 'focused' } = {}) {
+function checksFor(selection, { full = false, offline = false, unit: unitOnly = false, parallel = false, tier = 'focused' } = {}) {
   if (tier === 'visual') return [];
   const result = new Map();
-  const add = check => { if (!offline || check.kind === 'offline') result.set(check.id, check); };
+  const add = check => {
+    if (unitOnly && !/^(unit:|python:)/.test(check.id)) return;
+    if (!offline || check.kind === 'offline') result.set(check.id, check);
+  };
   if (full) {
     add({ id: 'all-frontend', kind: 'offline', command: ['node', '--test', '--test-concurrency=' + (parallel ? 3 : 1), ...fs.readdirSync(path.join(__dirname, 'frontend')).filter(file => file.endsWith('.test.js')).sort().map(file => 'tests/frontend/' + file)], inputs: ['tests/frontend', runtime, 'frontend_src'], exclusive: false });
     add({ id: 'all-python', kind: 'offline', command: ['python', '-m', 'pytest', '-q', 'tests/components/marao_dashboard'], inputs: [backend, 'tests/components', 'tests/conftest.py', 'pyproject.toml'], exclusive: false });

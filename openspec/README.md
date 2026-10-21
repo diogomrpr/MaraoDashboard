@@ -111,12 +111,12 @@ tier-required checks, diagnostics and cleanup are satisfied; do not repeat for
 reassurance. Documentation/skill-only work needs no application build,
 HA visit or browser checks; validate its links, skills and affected specs instead.
 
-Use the scoped `npm run verify:publish` gate before publication, with applicable
-exact-commit Tests/hassfest/HACS checks. Selected failures remain failures. A
-release request does not authorize the full suite. Publication covers the whole
-candidate and rejects development-only scope/evidence. Broad regression belongs
-in an explicitly requested pre-release campaign. Preserve raw native reconnect
-evidence and check exception expiry whenever the approved exception is applied.
+Use `npm run verify:publish` before publication: affected unit tests only,
+with applicable exact-commit Tests/hassfest/HACS validation. Version hooks and
+automatic CI also select unit tests only. Reuse development integration testing;
+additional camera, browser, geometry, mobile and upgrade checks require an explicit
+user request at release. Known failures remain failures; report skipped coverage
+honestly. This supersedes stricter release requirements in older change artifacts.
 
 ## Upgrade responsibilities
 
@@ -128,13 +128,10 @@ preflight, exact backups and recoverable writes, read-only previews/dry runs and
 immutable archives. Maintain historical provenance, independent expected JSON
 and complete feature coverage with each relevant change.
 
-Use focused migration checks during implementation. Versioned publication
-requires live preserved-install proof only when persistence, migration, generated
-ownership or installation/upgrade behavior changes. Cover affected baselines,
-independent expected data, recovery and verified cleanup. Fresh fixtures cannot
-prove an upgrade. `test:ha:upgrade -- --scope <components>` produces scoped proof;
-`verify:release` validates final-candidate evidence and affected checks. The full
-historical/feature/mobile scenario remains available only on explicit request.
+Use focused migration/recovery checks during development where needed. Releases
+reuse that testing and run only unit tests by default. `test:ha:upgrade -- --scope
+<components>` and supplied-report `verify:release` validation remain available
+for explicit integration verification; neither is an automatic release prerequisite.
 
 ## Plan or implement a substantial change
 
@@ -220,7 +217,7 @@ commands as well when keeping CLI telemetry disabled. No shell settings were cha
 
 Use `test:affected -- --since <snapshot> --tier <visual|behavior|focused>` for the
 current development task, with reviewed shared consumers. Hooks, CI and publication
-retain independent focused coverage; task subsets cannot narrow release proof.
+select affected unit tests only; task subsets cannot narrow that unit scope.
 Full-suite and parallel execution require explicit requests;
 `npm run test:full -- --parallel` is the comprehensive pre-release option. Live upgrade
 checks apply only to changed persistence, migration, generated ownership or

@@ -343,6 +343,7 @@
               "id": "camera-adaptive-quality",
               "variables": {
                 "popup_stream_entity": "camera.marao_dashboard_test_camera_adaptive_high",
+                "preload_stream": true,
                 "event_provider": "unifiprotect",
                 "unifi_protect_media_source": "media-source://unifiprotect/fixture:browse:front"
               }

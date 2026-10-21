@@ -1,6 +1,6 @@
 {
   "name": "marao-dashboard",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "private": true,
   "description": "Marao Dashboard Home Assistant dashboard development tools",
   "scripts": {
@@ -22,7 +22,7 @@
     "ha:preview:accessibility": "node tests/test-ha-dashboard-accessibility.js --preview",
     "verify:publish": "node tests/verify-publish.js",
     "verify:release": "node tests/verify-release.js",
-    "preversion": "npm run test:affected -- --offline",
+    "preversion": "npm run test:affected -- --unit",
     "ha:sync": "node ha-test/prepare.js",
     "ha:preview": "node tests/preview-frontend.js",
     "ha:sync:dry-run": "node ha-test/prepare.js --dry-run",

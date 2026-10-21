@@ -4,7 +4,7 @@
 
 ### Requirement: Concise normal binary-state presentation
 Semantically binary cards SHALL omit redundant normal-state text and use distinct
-backgrounds, a state-aware icon/shape and localized accessible state. Normal room
+backgrounds, configured or native icons and localized accessible state, without an additional round on/off badge. Normal room
 lighting alone SHALL use background and accessible state without a visible
 count/status or marker under the approved exception. Classification SHALL follow
 domain meaning. Loading, transitions, problems, actions, useful readings, other
@@ -22,7 +22,7 @@ counts, metadata and substantive custom labels SHALL remain visible.
 
 #### Scenario: A configured icon is static or hidden
 - **WHEN** a binary card other than normal room lighting uses the same configured icon in both states or hides its icon
-- **THEN** a visible non-color state cue still distinguishes the normal states and accessible state remains available
+- **THEN** no extra round on/off badge is rendered and localized accessible state remains available
 - **AND** the card does not add a redundant visible on/off sentence
 
 #### Scenario: A binary access entity has a stable state

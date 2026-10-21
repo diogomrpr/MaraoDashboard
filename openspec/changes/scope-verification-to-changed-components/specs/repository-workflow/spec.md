@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Focused checks and final visual inspection
-Iteration and publication SHALL batch related tasks and use the smallest checks covering implemented features, changed components and shared consumers. Dependent migrations and security controls SHALL be checked early. UI batches SHALL finish with representative visual and interactive inspection. Compatible checks SHALL share visits and validated evidence SHALL be reusable without omitting required coverage. Full-suite execution and parallel test jobs SHALL require explicit user requests.
+Iteration SHALL batch related tasks and use the smallest checks covering implemented features, changed components and shared consumers. Publication SHALL run only affected unit tests and reuse development integration testing unless additional tests are explicitly requested. Dependent migrations and security controls SHALL be checked early. UI batches SHALL finish with representative visual and interactive inspection. Compatible checks SHALL share visits and validated evidence SHALL be reusable without omitting required coverage. Full-suite execution and parallel test jobs SHALL require explicit user requests.
 
 #### Scenario: Related queued tasks affect the same shared component
 - **WHEN** their implementation is being completed together
@@ -22,7 +22,7 @@ Iteration and publication SHALL batch related tasks and use the smallest checks 
 
 #### Scenario: The user requests a release without comprehensive tests
 - **WHEN** the implemented changes are ready for publication
-- **THEN** only their relevant checks and component consumers are required
+- **THEN** only their relevant unit tests and applicable metadata validation are required
 - **AND** release preparation does not implicitly authorize the full suite or parallel test execution
 
 #### Scenario: A shared layout is independent of theme colors
@@ -50,3 +50,21 @@ The repository SHALL save one affected-check command and document it in the agen
 - **WHEN** changed files cannot be mapped to a reliable affected-check set
 - **THEN** the command identifies the unresolved scope and requests an explicit component mapping
 - **AND** it neither launches the full suite nor reports an untested implementation as verified
+
+### Requirement: Unit-only release default
+Release preparation, version hooks and automatic Tests CI SHALL run only affected
+Node/Python unit tests across the candidate. They SHALL reuse integration testing
+from development without requiring fresh browser, camera, geometry, mobile or
+preserved-install evidence. Additional integration or full testing SHALL require
+an explicit user request. Known failures SHALL remain reported as failures.
+Applicable exact-commit hassfest/HACS metadata checks SHALL remain available.
+
+#### Scenario: A tested camera or migration change is released
+- **WHEN** the user requests an ordinary release
+- **THEN** only affected unit tests run, without HA preparation or browser launch
+- **AND** no new integration report or historical-upgrade campaign is required
+
+#### Scenario: The user explicitly requests further changed-feature testing
+- **WHEN** additional integration testing is explicitly requested
+- **THEN** the existing affected-component commands remain available
+- **AND** the full registered suite runs only on an explicit comprehensive request

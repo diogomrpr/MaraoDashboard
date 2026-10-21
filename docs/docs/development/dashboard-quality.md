@@ -112,17 +112,13 @@ Downgrades restore matching package assets and saved data together.
 
 Maintain provenance-backed historical fixtures, independent expected JSON and
 feature-to-assertion coverage. Use focused migration checks during development.
-For a versioned release, require preserved-install proof only when changed code
-affects saved data, migration, generated ownership or installation/upgrade paths.
-Select affected baselines and features, verify expected preservation/recovery and
-cleanup, and reject failed, incomplete or stale selected evidence. Fresh fixture
-provisioning cannot establish an upgrade pass. UI-only releases need no historical
-replay. Full historical/feature/mobile coverage requires an explicit request.
-
-`npm run verify:release` validates scoped clean-candidate evidence and relevant
-publication checks. Reuse successful unchanged scoped inputs after validating
-private evidence and the prepared installation; bind proof to the final commit.
-See [focused testing](focused-testing.md) for command and evidence contracts.
+Integration and preserved-install checks belong to development when needed for
+changed data or recovery paths. Releases reuse that testing and run affected unit
+tests only. Do not require fresh browser, mobile or upgrade reports at release.
+Run additional integration/full tests only when explicitly requested by the user.
+`verify:release` without a supplied upgrade report uses the unit-only gate; report
+validation remains available as an explicit opt-in.
+See [focused testing](focused-testing.md) for commands and evidence contracts.
 
 ### During iteration
 
@@ -169,12 +165,12 @@ belongs in the explicitly requested pre-release campaign, not ordinary developme
 No normal hook or automatic CI starts the full suite or complete mobile matrix.
 See [focused testing](focused-testing.md) for commands and tier boundaries.
 
-Run the scoped `npm run verify:publish` before pushes/tags/releases, with applicable
-exact-commit CI and conditional upgrade proof. Known relevant defects and selected
-failures still block publication. Reuse validated unchanged results instead of
-repeating browser work between the push, tag and release. Publication evaluates
-the whole candidate; task snapshots, reviewed file subsets and visual/behavior
-reports cannot narrow or satisfy that proof.
+Run `npm run verify:publish` before pushes/tags/releases: affected unit tests
+only, across the whole candidate, plus applicable exact-commit Tests/hassfest/HACS
+validation. Automatic Tests CI and version hooks also select unit tests only.
+Reuse integration results from development. Browser, camera, geometry, mobile and
+preserved-install checks require an explicit user request at release. Known
+relevant failures still block publication; skipped checks must be reported honestly.
 
 ### Reporting
 
@@ -218,6 +214,9 @@ the action it affects.
   the title in one header row, including variants with disabled or unsupported
   sliders. Titles wrap in the available width; states, problems and sliders stay
   below. Hidden titles/icons and icon-only intent remain respected.
+- The Wallbox maximum-current card uses the approved large current reading above
+  its optional title, with the shared up/down buttons in a vertical pill at right.
+  Keep the default background neutral; preserve configured shortcuts and colors.
 - Give other visible Marao card titles the full content width in their first row.
   Put icons, readings and controls below them, including climate steppers, Wallbox
   shortcuts, media apps and separate history, energy and camera-event headers.
@@ -226,8 +225,14 @@ the action it affects.
 - Reflow multi-column content before controls become cramped.
 - Keep pages vertically scrollable and leave enough content space for the
   floating navbar.
+- Equal-height cards keep titles at the top and their bottom artwork and controls
+  at the bottom. Stretch the content area with the card and leave surplus height
+  between those sections; preserve intentionally centered icon-only/app layouts.
 - Retain native card surfaces across state updates and reserve icons' declared
   dimensions while they render, so updates do not collapse or clamp the page.
+- Keep card content mounted when unrelated entities update, so a refresh does
+  not replace elements under an active scrolling finger. Refresh immediately
+  when the card's own entities, action targets or connection state change.
 - Avoid nested scrolling except inside a bounded popup.
 
 Resolve each safe edge from the Marao development override, locally inherited
@@ -445,7 +450,7 @@ restoration retain their confirmations.
   must remain readable in light and dark modes.
 - The state and action cannot be ambiguous or encoded only by color.
 
-Normal binary cards omit redundant on/off, stable lock and running/idle lines, retaining substantive labels, readings, counts, metadata and historical intervals. Distinct backgrounds and filled/outlined state markers remain visible even with static or hidden icons; accessible state uses localized native domain meanings. Explicit `show_state: true` does not restore redundant text, and `show_state: false` keeps its normal-state meaning. Keep icon-only intent based on configured fields, and use the actual toggle for graph state cues.
+Normal binary cards omit redundant on/off, stable lock and running/idle lines, retaining substantive labels, readings, counts, metadata and historical intervals. Use existing active/inactive backgrounds and configured or native icons without an additional round on/off badge, as requested by the user. Preserve localized accessible state even when icons are hidden. Explicit `show_state: true` does not restore redundant text, and `show_state: false` keeps its normal-state meaning. Keep icon-only intent based on configured fields, and use the actual toggle for graph state cues.
 
 ### Room cards
 
@@ -465,7 +470,7 @@ Normal binary cards omit redundant on/off, stable lock and running/idle lines, r
   status/count row or binary cue, as the user-approved room-only exception to
   non-color normal-state cues. Keep localized accessible lighting status,
   deliberate custom labels and visible neutral availability problems. Other
-  families retain their additional state cues.
+  families also omit the redundant round on/off badge while retaining their normal icons and meaningful state content.
 - Room titles wrap across the full content width. The configured room icon is
   noninteractive decoration below the title, deliberately cropped at the right
   and bottom without clipping text, problems or real controls. Other families
