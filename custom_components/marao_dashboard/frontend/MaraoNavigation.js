@@ -112,6 +112,12 @@ export function navbarRouteCurrent(route, location = window.location) {
   } catch { return false; }
 }
 
+export function navbarMainPage(config, location = window.location) {
+  if (!config?.views?.length) return false;
+  const path = location.pathname.split('/')[2];
+  return !path || path === String(config.views[0].path ?? 0);
+}
+
 export function navbarPartition(routes, width, size = 48, gap = 4, padding = 20) {
   const slots = Math.max(1, Math.floor((Math.max(0, width - padding) + gap) / (Math.max(48, size) + gap)));
   const count = routes.length > slots ? slots - 1 : routes.length;
@@ -227,7 +233,7 @@ export class MaraoNavbarCard extends BaseElement {
       :host{display:block;height:128px;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}
       :host([data-empty]){display:none}:host([data-preview]){height:auto}
       .frontend-refresh{position:fixed;top:max(12px,${safeArea("top")});right:max(12px,${safeArea("right")});z-index:1002;pointer-events:auto;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow,0 1px 6px rgba(0,0,0,.12))}
-      .frontend-refresh:disabled{opacity:.5;cursor:default}:host([data-preview]) .frontend-refresh{display:none}
+      .frontend-refresh:disabled{opacity:.5;cursor:default}.frontend-refresh[hidden],:host([data-preview]) .frontend-refresh{display:none}
       .bounds{position:fixed;visibility:hidden;pointer-events:none;inset:${safeArea("top")} calc(12px + ${safeArea("right")}) ${safeArea("bottom")} calc(12px + ${safeArea("left")})}
       .surface{pointer-events:auto;display:flex;gap:clamp(2px,.5vw,4px);box-sizing:border-box;padding:6px 10px;border-radius:999px;background:var(--ha-card-background,var(--card-background-color));box-shadow:0 8px 30px rgba(0,0,0,.22)}
       .nav{position:fixed;z-index:1001;left:var(--marao-navbar-left,50%);bottom:${bottom};transform:translateX(-50%);flex-wrap:nowrap;justify-content:center;width:max-content;max-width:var(--marao-navbar-width,calc(100vw - 24px - ${safeArea("left")} - ${safeArea("right")}));height:60px}
@@ -242,7 +248,7 @@ export class MaraoNavbarCard extends BaseElement {
       .refresh-feedback{position:fixed;z-index:1002;left:var(--marao-navbar-left,50%);bottom:calc(${bottom} + 72px);transform:translateX(-50%);box-sizing:border-box;width:max-content;max-width:var(--marao-navbar-width,calc(100vw - 24px));padding:12px 16px;border-radius:18px;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:0 8px 30px rgba(0,0,0,.22);font-size:var(--font-size-primary,1.125rem);font-weight:var(--font-weight-primary,500);line-height:1.35;overflow-wrap:anywhere;pointer-events:none}
       .refresh-feedback[hidden],progress[hidden]{display:none}progress{display:block;box-sizing:border-box;appearance:none;-webkit-appearance:none;width:100%;height:10px;margin-top:8px;border:1px solid var(--primary-text-color);border-radius:8px;overflow:hidden;background:var(--ha-card-background,var(--card-background-color));accent-color:var(--primary-text-color)}progress::-webkit-progress-bar{background:var(--ha-card-background,var(--card-background-color))}progress::-webkit-progress-value{background:var(--primary-text-color)}progress::-moz-progress-bar{background:var(--primary-text-color)}
       @media(prefers-reduced-motion:reduce){a,button{transition:none}}
-    </style><button type="button" class="frontend-refresh"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-2.6L20 7M4 17l2.4 2.6A7 7 0 0 0 17.9 17"/></svg></button><div class="bounds" aria-hidden="true"></div><div class="refresh-feedback" role="status" hidden><span></span><progress max="1" hidden></progress></div><nav class="nav surface">${routes.slice(0, this._visibleCount).map((route, i) => this._link(route, i, true)).join('')}${overflow ? '<button type="button" data-overflow aria-expanded="false" aria-controls="marao-overflow"><ha-icon icon="mdi:dots-horizontal"></ha-icon></button>' : ''}</nav>`;
+    </style><button type="button" class="frontend-refresh" hidden><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-2.6L20 7M4 17l2.4 2.6A7 7 0 0 0 17.9 17"/></svg></button><div class="bounds" aria-hidden="true"></div><div class="refresh-feedback" role="status" hidden><span></span><progress max="1" hidden></progress></div><nav class="nav surface">${routes.slice(0, this._visibleCount).map((route, i) => this._link(route, i, true)).join('')}${overflow ? '<button type="button" data-overflow aria-expanded="false" aria-controls="marao-overflow"><ha-icon icon="mdi:dots-horizontal"></ha-icon></button>' : ''}</nav>`;
     this.shadowRoot.querySelector('.frontend-refresh').addEventListener('click', () => {
       if (!this._refreshEligible()) return;
       haptic('heavy'); this._refreshFrontend();
@@ -298,6 +304,8 @@ export class MaraoNavbarCard extends BaseElement {
     const current = route => route && navbarRouteCurrent(route);
     const refresh = this.shadowRoot.querySelector('.frontend-refresh');
     if (refresh) {
+      const lovelace = this._root()?.lovelace;
+      refresh.hidden = Boolean(disabled || !navbarMainPage(lovelace?.config || lovelace?.rawConfig));
       refresh.disabled = Boolean(disabled || this._refreshing);
       refresh.setAttribute('aria-label', localize(this._refreshing ? 'navigation.refresh.refreshing' : 'navigation.refresh.action', this._hass));
     }

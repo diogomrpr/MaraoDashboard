@@ -46,7 +46,7 @@ the editor itself stays open to show the save result.
 New page loads use an uncached network-only bootstrap that selects the installed
 release, including when the page HTML is cached. Older running sessions must
 contact the server before they can receive that loader; reopening the app may be
-needed once. The top-right refresh button and navbar hold remain fallbacks if
+needed once. The top-right refresh button on the main page and navbar hold remain fallbacks if
 automatic recovery reports a failure. A client refresh failure does not undo a
 successful generation. Cache cleanup covers frontend responses, not all browser/OS
 storage. See [updating](update.md#refresh-an-open-device-after-an-update).

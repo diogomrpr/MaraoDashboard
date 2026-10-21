@@ -186,3 +186,13 @@ test('active routes resolve path aliases, same-view hashes and origin without pr
   const location={href:'http://disposable.test/marao-dashboard/overview#details',origin:'http://disposable.test',pathname:'/marao-dashboard/overview',hash:'#details',search:''};
   for(const [route,expected] of [[{url:'#details'},true],[{path:'/marao-dashboard/overview#details'},true],[{url:'/marao-dashboard/overview'},true],[{url:'#other'},false],[{url:'/marao-dashboard/rooms'},false],[{url:'http://external.test/marao-dashboard/overview'},false]])assert.equal(navbarRouteCurrent(route,location),expected);
 });
+
+test('refresh button follows the configured main view including dashboard-root and numeric paths', async () => {
+  const { navbarMainPage } = await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
+  const config = { views: [{ path: 'home' }, { path: 'energy' }] };
+  for (const [path, expected] of [['/marao-dashboard', true], ['/marao-dashboard/', true], ['/marao-dashboard/home', true], ['/marao-dashboard/energy', false], ['/marao-dashboard/overview', false]]) {
+    assert.equal(navbarMainPage(config, { pathname: path }), expected, path);
+  }
+  assert.equal(navbarMainPage({views: [{}]}, {pathname: '/marao-dashboard/0'}), true);
+  assert.equal(navbarMainPage(undefined, {pathname: '/marao-dashboard/home'}), false);
+});

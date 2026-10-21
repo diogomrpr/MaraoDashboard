@@ -187,7 +187,7 @@ An older, completely cached running session cannot receive new loading code
 until it contacts the server; reopening the app may be needed once when moving
 from such a release. Server code cannot erase a phone's already-satisfied cache.
 
-The small top-right refresh button and a three-second navbar hold remain manual
+The small top-right refresh button on the main page and a three-second navbar hold remain manual
 fallbacks. They preserve sign-in, preferences, dashboard settings and the current
 page. Save or discard edits first. Android and browsers use web recovery;
 supported iOS apps use native cache reset with a bounded fallback. An incomplete

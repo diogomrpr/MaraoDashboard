@@ -6,13 +6,19 @@
 Once HA supplies a valid nonempty navbar configuration, Marao SHALL make navigation and its frontend-refresh hold the first usable Marao surface, independently of optional dashboard content readiness. This SHALL work for generated, native-dashboard and standalone native navbar hosts without waiting for entity data or a server-side card-compilation response.
 
 #### Scenario: Tap recovery before optional content is ready
-- **WHEN** a configured dashboard opens while optional content is delayed or fails
+- **WHEN** a configured dashboard opens on its main page while optional content is delayed or fails
 - **THEN** a top-right refresh button is available with the early navigation surface
 - **AND** its visible touch target is at least 48px square and its inline icon has no optional rendering dependency
 - **WHEN** the user taps it once
 - **THEN** the existing cache-clear/reload action runs once with the same dirty/edit/preview/inert protection and feedback as navbar hold
 - **AND** the existing navbar hold remains available
 - **AND** the button does not obscure page content or the native edit action
+
+#### Scenario: Recovery button is limited to the main page
+- **WHEN** navigation changes to a page other than the dashboard's first configured view
+- **THEN** the top-right refresh button is hidden
+- **WHEN** navigation returns to that main view or the dashboard-root URL
+- **THEN** the button is visible again without waiting for optional content
 
 #### Scenario: Cold startup with slow content
 - **WHEN** a configured dashboard opens with an empty browser cache and optional card, history, camera-event or editor resources are delayed

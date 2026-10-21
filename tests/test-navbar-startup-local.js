@@ -70,9 +70,11 @@ async function run(){
      const prevented=await nav.locator('[data-route="0"] svg').evaluate(node=>{const e=new MouseEvent('contextmenu',{bubbles:true,composed:true,cancelable:true});node.dispatchEvent(e);return e.defaultPrevented;});assert.equal(prevented,true);
      await nav.locator('[data-overflow]').tap();assert.ok(await bar.locator('.overflow a').count());await nav.locator('[data-overflow]').tap();
      await nav.locator('[data-route="1"]').press('Enter');assert.equal(new URL(page.url()).pathname,'/marao-dashboard/rooms');
+     assert.equal(await refresh.isVisible(),false,'Top-right cache refresh belongs only on the main page');
      await page.evaluate(()=>{window.originalSurface=root.shadowRoot.querySelector('[data-marao-navigation-surface]');view.remove();window.view=document.createElement('div');view.id='view';view.style='min-height:1200px;position:relative;z-index:1';root.shadowRoot.prepend(view);});
      assert.equal(await nav.isVisible(),true);assert.equal(await page.evaluate(()=>originalSurface===root.shadowRoot.querySelector('[data-marao-navigation-surface]')),true);
      await nav.locator('[data-route="0"]').tap();assert.equal(new URL(page.url()).pathname,'/marao-dashboard/overview');
+     await refresh.waitFor({state:'visible'});
      await page.evaluate(()=>{root.lovelace.editMode=true;});await page.waitForFunction(()=>root.shadowRoot.querySelector('[data-marao-navigation-surface]').hidden);await page.evaluate(()=>{root.lovelace.editMode=false;});await nav.waitFor({state:'visible'});
      await held.shift().fulfill({status:503,body:'deliberate optional module failure'});await page.getByRole('alert').waitFor();assert.ok(await nav.isVisible());
      assert.equal(await page.evaluate(()=>services),0);assert.deepEqual(errors,[]);
