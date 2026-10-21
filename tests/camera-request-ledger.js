@@ -194,7 +194,9 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
       prefixSource: publicUrls.length ? 'public owned HLS url' : 'unique owned camera/stream reply' };
   };
   const nativeOperation = (node, operation, invoke) => {
-    if (state.boundary || !node?.isConnected) return invoke();
+    const outerBoundary = state.boundary;
+    const entity = node?.stateObj?.entity_id || node?.entityid;
+    if (!node?.isConnected || outerBoundary && (!entity || outerBoundary.entities.includes(entity))) return invoke();
     if (node.localName === 'ha-camera-stream') {
       const wrapper = ancestor(node, 'marao-card'), camera = wrapper?._camera;
       if (!entities.includes(node.stateObj?.entity_id) || !camera) return invoke();
@@ -207,7 +209,7 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
       const qualityRelease = /(?:CameraPlayback\.fallback|fallback@)/.test(stack);
       state.boundary = { kind: qualityRelease ? 'marao-quality-release' : 'marao-ineligible-release', release: receipt.id, entities: [receipt.entity], date: receipt.date };
       try { return invoke(); } finally {
-        state.boundary = null;
+        state.boundary = outerBoundary;
         queueMicrotask(() => {
           const consumers = [...new Set(openRoots(document).flatMap(root => [...root.querySelectorAll('marao-card')]))]
             .map(card => ({ card, camera: card._camera })).filter(item => item.camera?.player && item.camera.player !== node && item.camera.player.isConnected
@@ -271,7 +273,7 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
     state.handoffs.push(receipt); owners.set(receipt.id, { wrapper, host, camera: wrapper._camera, retiring: transport, retiringVideo: activeTransport === transport ? active : null, candidate });
     if (!native) return invoke();
     state.boundary = { kind: 'native-handoff', handoff: receipt.id, entities: [transport.entityid], date: receipt.date };
-    try { return invoke(); } finally { state.boundary = null; queueMicrotask(() => startHandoffProof(receipt)); }
+    try { return invoke(); } finally { state.boundary = outerBoundary; queueMicrotask(() => startHandoffProof(receipt)); }
   };
   const remove = Element.prototype.remove, removeChild = Node.prototype.removeChild, insertBefore = Node.prototype.insertBefore;
   Element.prototype.remove = function () { return nativeOperation(this, 'remove', () => remove.call(this)); };

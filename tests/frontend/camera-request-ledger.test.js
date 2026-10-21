@@ -328,7 +328,7 @@ test('instrumentation handles grouped WebSocket replies and tags only same-origi
   }
 });
 
-function immediateHandoffFixture({ siblingSelection = false } = {}) {
+function immediateHandoffFixture({ siblingSelection = false, boundary = null } = {}) {
   let now = 0; const timers = [];
   class Socket { addEventListener() {} send() {} }
   class Xhr { open() {} send() {} abort() {} setRequestHeader() {} }
@@ -351,6 +351,7 @@ function immediateHandoffFixture({ siblingSelection = false } = {}) {
     clearTimeout: timer => { const index = timers.indexOf(timer); if (index >= 0) timers.splice(index, 1); } });
   vm.runInContext('(' + installTrace.toString() + ')()', environment);
   const state = environment.window.__maraoCameraRequestTrace;
+  state.boundary = boundary;
   state.sessions.push({ entity, prefix: 'http://192.168.0.28:8123/api/hls/fake-session/' });
   const wrapper = new DomElement('marao-card'), host = new DomElement('ha-camera-stream', wrapper);
   host.stateObj = { entity_id: entity };
@@ -383,6 +384,17 @@ test('native reorder proof starts before any explicit settle call and preserves 
   fixture.camera.player = null; fixture.camera.generation++;
   await fixture.environment.window.__maraoProveCameraHandoffs();
   assert.equal(fixture.state.handoffs[0].proof, proof, 'Later offscreen disposal cannot replace an already completed causal receipt');
+});
+
+test('an unrelated camera release boundary retains exact native handoff evidence and restores its outer scope', async () => {
+  const boundary = { id: 7, entities: [entity + '_slow_low'], label: 'open another stream' };
+  const fixture = immediateHandoffFixture({ boundary });
+  assert.equal(fixture.state.boundary, boundary);
+  assert.equal(fixture.state.handoffs.length, 1);
+  await new Promise(resolve => setImmediate(resolve));
+  await fixture.tick(300);
+  assert.equal(fixture.state.handoffs[0].proof.valid, true);
+  assert.equal(fixture.state.boundary, boundary);
 });
 
 test('native selection keeps the exact sibling video that existed before retiring HLS, then proves its advancement', async () => {

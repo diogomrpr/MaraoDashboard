@@ -118,7 +118,9 @@ const redact = value => String(value).replace(/https?:\S+/g, '[URL]').replace(/(
     evidence.failure = redact(error.stack || error);
     evidence.state = await page.evaluate(() => ({ dashboard: window.streamDashboard?._camera?.state, popup: window.streamPopup?._camera?.state, feedback: window.streamPopup?._camera?.feedback?.textContent })).catch(() => ({}));
   } finally {
-    try { await context.close(); await browser.close(); await ledger.assert(); } catch (error) { failure ||= error; }
+    for (const release of [() => context.close(), () => browser.close(), () => ledger.assert()]) {
+      try { await release(); } catch (error) { failure ||= error; }
+    }
     evidence.issues = issues; evidence.calls = calls; evidence.forbidden = forbidden;
     fs.writeFileSync(output + '/' + engine.name() + '.json', JSON.stringify(evidence, null, 2), { mode: 0o600 });
   }
