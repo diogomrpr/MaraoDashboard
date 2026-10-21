@@ -3,10 +3,29 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import vm from "node:vm";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { changePlan, composeDashboard, patchPackages, referencedEntities, targetKey } = require("../../ha-test/prepare.js");
-const { fingerprint, readConfig } = require("../../ha-test/client.js");
+const { assertCurrentFrontend, fingerprint, readConfig } = require("../../ha-test/client.js");
+
+test('current frontend waits for late card imports and rejects stale fingerprints within a bound', async () => {
+  let disposed = false;
+  await assertCurrentFrontend({ async waitForFunction(predicate, expected, options) {
+    assert.deepEqual(options, { timeout: 15000, polling: 50 });
+    const entries = [{ name: 'http://test/MaraoDashboard.js?v=current' }];
+    const check = vm.runInNewContext('(' + predicate.toString() + ')', { URL, performance: { getEntriesByType: () => entries } });
+    assert.equal(check(expected), false, 'the early navbar does not establish card readiness');
+    entries.push({ name: 'http://test/MaraoCards.js?v=old' }, { name: 'http://test/MaraoFrigateEventsCard.js?v=current' });
+    assert.equal(check(expected), false, 'a stale card module must not pass');
+    entries.push({ name: 'http://test/MaraoCards.js?v=current' });
+    assert.equal(check(expected), true);
+    return { async dispose() { disposed = true; } };
+  } }, 'current');
+  assert.equal(disposed, true);
+  const deadline = new Error('asset readiness deadline');
+  await assert.rejects(assertCurrentFrontend({ async waitForFunction() { throw deadline; } }, 'current'), deadline);
+});
 
 test('canonical Cases composition retains ordinary pages, is idempotent and adds no legacy storage', () => {
   const config = { config_version: 2, name: 'Safe', landing_page: 'home', pages: [{ name: 'Home', path: 'home', entities: [] }] };

@@ -128,12 +128,13 @@ function setBrowserToken(tokens) {
 }
 
 async function assertCurrentFrontend(page, expected = fingerprint(path.join(repoRoot, "custom_components/marao_dashboard/frontend"))) {
-  const urls = await page.evaluate(() => performance.getEntriesByType("resource").map((entry) => entry.name));
-  for (const file of ["MaraoDashboard.js", "MaraoCards.js", "MaraoFrigateEventsCard.js"]) {
-    if (!urls.some((value) => { const url = new URL(value); return url.pathname.endsWith("/" + file) && url.searchParams.get("v") === expected; })) {
-      throw new Error("The browser did not load the current " + file + " (" + expected + "). Run ha:sync and refresh the page.");
-    }
-  }
+  // Navbar readiness intentionally precedes optional card/runtime imports.
+  const ready = await page.waitForFunction(expected => {
+    const urls = performance.getEntriesByType("resource").map(entry => new URL(entry.name));
+    return ["MaraoDashboard.js", "MaraoCards.js", "MaraoFrigateEventsCard.js"].every(file =>
+      urls.some(url => url.pathname.endsWith("/" + file) && url.searchParams.get("v") === expected));
+  }, expected, { timeout: 15000, polling: 50 });
+  await ready.dispose();
 }
 
 module.exports = { accessToken, setBrowserToken, api, assertCurrentFrontend, assertDisposableHaTarget, configPath, connect, fingerprint, readConfig, repoRoot, sourceFiles };
