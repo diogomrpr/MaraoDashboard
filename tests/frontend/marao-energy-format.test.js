@@ -13,6 +13,13 @@ const classes=dashboard.slice(dashboard.indexOf('function escapeHtml('),dashboar
 const {MaraoEnergyPeriodCard,energyTariff}=await import('data:text/javascript;base64,'+Buffer.from(`import {energyBuckets,statisticsBuckets,energyTotal,historyPeriodRange,historySamples,loadHistoryChart,energyFormatting,energyValue,energyHistoryValue,energyLabel,formatEnergyNumber,binaryState,cardProblem,problemStyle,focusRestorer,controlGridStyles} from "${uri}";const localize=key=>key;${classes};export {MaraoEnergyPeriodCard,energyTariff};`).toString('base64'));
 const sample=(value,unit,time=Date.now()-1000)=>({state:String(value),attributes:{unit_of_measurement:unit,friendly_name:'Reading'},last_changed:new Date(time).toISOString()});
 const tick=()=>new Promise(resolve=>setTimeout(resolve, 10));
+const waitFor=async condition=>{
+  const deadline=Date.now()+3000;
+  while(!condition()){
+    assert.ok(Date.now()<deadline,'Expected asynchronous energy state did not settle');
+    await new Promise(resolve=>setTimeout(resolve,0));
+  }
+};
 function hass(states,callApi=async()=>[]){return {states,connected:true,locale:{number_format:'none',language:'en'},callApi};}
 
 test('compatible units, finite guards, signed values and fixed localized precision',()=>{
@@ -88,7 +95,7 @@ test('Auto incompatible history is a null gap with its readable format error, pr
 test('Auto period history uses current Wh meaning before summaries and preserves values through precision-only updates',async()=>{
   const end=Date.now()-10000,records=[sample('1000.001','Wh',end-2000),sample('unavailable',undefined,end-1500),sample('3600007.2','J',end-1000)],original=JSON.stringify(records);
   let calls=0;const card=new MaraoEnergyPeriodCard(),config={entity:'sensor.energy',popup:true};
-  card.setConfig(config);card.hass=hass({'sensor.energy':sample('1234.5','Wh',end)},async()=>{calls++;return[records];});await tick();
+  card.setConfig(config);card.hass=hass({'sensor.energy':sample('1234.5','Wh',end)},async()=>{calls++;return[records];});await waitFor(()=>!card._loading&&!card._prefetching);
   const before=card._detailOptions;assert.equal(card._values().error,false);assert.ok(Math.abs(card._values().values[0].value-1000.001)<1e-10);assert.equal(card._values().values[1].value,null);assert.ok(Math.abs(card._values().values[2].value-1000.002)<1e-10);assert.ok(before.samples.every(sample=>sample.value===null));assert.equal(before.coverageLimited,true);assert.equal(before.format(1000.002),'1000.002 Wh');
   card.setConfig({...config,display_precision:6});await tick();assert.deepEqual(card._detailOptions.samples,before.samples);assert.equal(card._detailOptions.format(1000.002),'1000.002000 Wh');
   assert.equal(calls,5, 'selected day and four earlier days; formatting changes reuse the cache');assert.equal(JSON.stringify(records),original);
