@@ -407,25 +407,23 @@ function refreshDelayedCameraLoading(element) {
 }
 
 async function waitForCameraEvents(page, card) {
-  let observed;
+  const element = await card.elementHandle();
   try {
-    // Resolve the currently displayed popup on each sample, independently of
-    // page timers and a previously captured element's lifetime.
-    await require('playwright/test').expect.poll(async () => {
-      observed = await card.evaluate(element => ({ connected: element.isConnected, status: element._status,
-        request: element._request, events: element._events?.length }));
-      return observed.connected && ['ready', 'error'].includes(observed.status);
-    },
+    // Keep data polling independent of the page's timer/frame scheduling.
+    await require('playwright/test').expect.poll(() => element.evaluate(element =>
+      element.isConnected && ['ready', 'error'].includes(element._status)),
     { timeout: 10000, intervals: [50] }).toBe(true);
   } catch (error) {
     try {
+      const observed = await element.evaluate(element => ({ connected: element.isConnected, status: element._status,
+        request: element._request, events: element._events?.length }));
       const current = await card.evaluate(element => ({ connected: element.isConnected, status: element._status,
         request: element._request, events: element._events?.length }));
       const detail = '\nCamera event state after failed wait: ' + JSON.stringify({ observed, current });
       error.message += detail; error.stack += detail;
     } catch (diagnosticError) { error.message += '\nCamera event diagnostic failed: ' + diagnosticError.name; }
     throw error;
-  }
+  } finally { await element.dispose(); }
 }
 
 async function checkCameraCases(page) {
