@@ -381,6 +381,34 @@ test('energy options survive independent duplicates, normalization and retained 
   assert.deepEqual(preserveEntityValue(slot,'sensor.new'),{...slot,entity_id:'sensor.new'});
 });
 
+test('energy breakdown and tariffs validate without rewriting saved rows or explicit emptiness', () => {
+  const options = { calculate_cost: true, cost_per_kwh: 0, sub_entities: [
+    { entity_id: 'sensor.heating', name: 'Heating', cost_entity: 'sensor.heating_cost', future: [] },
+    { entity_id: 'sensor.lighting', name: '' },
+  ], future: { keep: [] } };
+  const config = { config_version: 2, name: 'Energy', landing_page: 'energy', pages: [{ name: 'Energy', path: 'energy', entities: [
+    { template: 'hc_energy_period_card', entity_id: 'sensor.total', variables: options },
+  ] }] };
+  const before = structuredClone(config);
+  assert.deepEqual(validateConfig(config, 2), []);
+  const units = { W: ['power', 1], Wh: ['energy', 1], kWh: ['energy', 1000] };
+  const registry = [{ entity_id: 'sensor.total', unit_of_measurement: 'kWh' }, { entity_id: 'sensor.heating', unit_of_measurement: 'Wh' },
+    { entity_id: 'sensor.heating_cost', unit_of_measurement: 'EUR' }];
+  assert.deepEqual(validateConfig(config, 2, registry, units), []);
+  assert.match(validateConfig(config, 2, [{ entity_id: 'sensor.heating', unit_of_measurement: 'W' }], units).join(' '), /require energy sensors/);
+  assert.match(validateConfig(config, 2, [{ entity_id: 'sensor.heating_cost', unit_of_measurement: 'kWh' }], units).join(' '), /requires monetary sensors/);
+  assert.deepEqual(serializeConfig(normalizeConfig(config)), before);
+  for (const invalid of [{ sub_entities: {} }, { sub_entities: ['sensor.load'] }, { sub_entities: [{entity_id:'switch.load'}] },
+    { sub_entities: [{entity_id:'sensor.load',cost_entity:'lock.cost'}] }, { sub_entities: [{entity_id:'sensor.load',name:false}] },
+    { sub_entities: [{entity_id:'sensor.load'},{entity_id:'sensor.load'}] }, { calculate_cost: 'true' }, { cost_per_kwh: -1 }, { cost_per_kwh: Infinity }, { cost_per_kwh: true }]) {
+    const draft = structuredClone(config); Object.assign(draft.pages[0].entities[0].variables, invalid);
+    assert.ok(validateConfig(draft, 2).length, JSON.stringify(invalid));
+  }
+  assert.deepEqual(before.pages[0].entities[0].variables, options);
+  config.pages[0].entities[0].variables.sub_entities = [];
+  assert.deepEqual(serializeConfig(normalizeConfig(config)), config);
+});
+
 test('independent energy expected document survives Visual and JSON with raw content', async () => {
   const fs=await import('node:fs/promises');
   const base=new URL('../../ha-test/upgrade/fixtures/',import.meta.url);

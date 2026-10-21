@@ -37,3 +37,28 @@
 - During explicitly requested versioned release preparation, run `npm run test:ha:upgrade -- --scope control-grid` for affected supported formats/section features and relevant recovery/cleanup, then validate scoped final-candidate proof with `verify:release`. Do not substitute fresh fixture preparation or asset-only rollback for preserved-install proof.
 - Synchronize completed predecessor/header/grid contracts and this verified successor coherently before archive, retaining these requirement names and current successor text without duplicates or reintroducing the 174px rule. Preserve historical evidence; archive only after implementation and selected proof are complete.
 - Full-suite, full mobile/history coverage and parallel execution require an explicit user request. No current task implicitly requests them.
+
+## Media app sizing/artwork follow-up
+
+- [x] Record baseline `c27d3bd`, dirty snapshot
+  `/private/tmp/marao-media-compact-start.json`, affected generated/native/popup
+  media app groups and ordinary mixed-group consumers.
+- [x] Give logo-only app groups an 80px capacity floor so the configured three
+  columns fit on phone widths; retain ordinary/mixed-group font capacity and
+  allow warnings to grow beyond the 48px minimum square body.
+- [x] Replace Netflix's beveled raster frame with a flat local vector N, add
+  Spotify's official vector icon, and refresh the other demo app logos with
+  publisher-supplied 512px artwork. Keep assets local and record provenance.
+- [x] Verify the concrete sizing defect and install the current frontend batch.
+
+Selected evidence: all 11 existing control-grid tests pass, including one added
+regression covering three app columns, narrow reflow, native app roles and
+independent ordinary control reflow at large text. Both selected existing media
+app branding/availability checks pass. Strict OpenSpec, syntax and whitespace
+checks pass. `prepareFrontend()` rebuilt and installed final assets on disposable
+`192.168.0.28` and verified their served identity/readiness. One mobile WebKit
+inspection of the actual Media page at 390x844 found six 112x112px tiles arranged
+in three columns/two rows, with every local app image loaded. No helper state was
+changed by that inspection. Native iPhone appearance and service taps remain
+unchecked; broader matrices/publication were not requested. Saved configuration,
+source aliases, custom colors, dispatch and unrelated work were preserved.

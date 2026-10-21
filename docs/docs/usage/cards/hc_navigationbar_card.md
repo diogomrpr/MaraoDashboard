@@ -44,6 +44,11 @@ The bar deliberately shows icons without visible labels. The `label` is still
 required for semantics and may be exposed as an optional tooltip; navigation
 must never depend on a tooltip.
 
+A compact refresh button at the top right clears the frontend cache and reloads
+with a single tap. It loads with the navigation before optional dashboard content,
+so it also works when a content module fails. The existing navbar hold gesture
+remains available and uses the same recovery action. Save or discard edits first.
+
 ## Layout and behavior
 
 - Every control is visibly at least 48 by 48 CSS pixels.
@@ -66,8 +71,10 @@ Page and navbar side clearance follow the current insets during rotation.
 Marao sheets keep their full-screen backdrop, but their content stays inside
 the overlay's own top and side safe bounds. `height: auto` keeps short sheets
 compact; fixed `height` and `max_height` are limited to available safe height.
-The default maximum remains `80dvh`; even an explicit `100dvh` sheet keeps its
-title and close control accessible. Sheets scroll internally above the navbar.
+Generated sheets use content-driven height up to the available viewport, leaving
+at least 50px above the sheet or the top safe inset when larger. Short sheets
+stay compact. Even an explicit `100dvh` sheet keeps its title and close control
+accessible. Sheets scroll internally above the navbar.
 
 Do not add a second navbar dependency or manually register a Lovelace resource.
 The Marao integration owns and registers this component.

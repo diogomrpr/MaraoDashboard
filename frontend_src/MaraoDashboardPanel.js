@@ -1476,9 +1476,10 @@ class MaraoDashboardPanel extends HTMLElement {
     const initialData = clone(data);
     const content = dialog.querySelector(".dialog-content");
     const variables = this._expandedFields(selected.variables);
-    const basic = variables.filter((field) => !field.advanced);
-    const advanced = variables.filter((field) => field.advanced);
-    content.innerHTML = `<div id="card-form"></div><div id="summary" class="summary"></div>${selected.scene_collection ? '<div id="scene-order"></div>' : ''}${selected.id === 'hc_media_card' ? `<ha-button data-media-options>${this._l('Apple TV options')}</ha-button>` : ''}${advanced.length ? `<ha-expansion-panel id="advanced-panel" outlined><div slot="header">${this._t("advanced")}</div><div id="advanced-form" class="advanced-form"></div></ha-expansion-panel>` : ""}<div class="dialog-actions"><ha-button data-close>${this._t("cancel")}</ha-button><ha-button data-save appearance="filled">${existing ? this._t("update") : this._t("create")}</ha-button></div>`;
+    const basic = variables.filter((field) => !field.advanced && field.kind !== 'energy_sub_entities');
+    const advanced = variables.filter((field) => field.advanced && field.kind !== 'energy_sub_entities');
+    content.innerHTML = `<div id="card-form"></div><div id="summary" class="summary"></div>${selected.scene_collection ? '<div id="scene-order"></div>' : ''}${selected.id === 'hc_energy_period_card' ? '<div id="energy-breakdown"></div>' : ''}${selected.id === 'hc_media_card' ? `<ha-button data-media-options>${this._l('Apple TV options')}</ha-button>` : ''}${advanced.length ? `<ha-expansion-panel id="advanced-panel" outlined><div slot="header">${this._t("advanced")}</div><div id="advanced-form" class="advanced-form"></div></ha-expansion-panel>` : ""}<div class="dialog-actions"><ha-button data-close>${this._t("cancel")}</ha-button><ha-button data-save appearance="filled">${existing ? this._t("update") : this._t("create")}</ha-button></div>`;
+    if (selected.id === 'hc_energy_period_card') this._renderEnergySubEntities(content.querySelector('#energy-breakdown'), clone(data.var__sub_entities || []), value => { data.var__sub_entities = value; });
     const renderCollection = () => {
       if (!selected.scene_collection) return;
       this._renderSceneOrder(content.querySelector('#scene-order'), collection, next => {
@@ -1544,6 +1545,46 @@ class MaraoDashboardPanel extends HTMLElement {
         if (cardIndex == null) container.entities.push(entity); else container.entities[cardIndex] = entity;
         this._closeDialog(dialog); this._setDirty(); this._refreshCards(kind, roomIndex);
     });
+  }
+
+  _renderEnergySubEntities(host, values, changed) {
+    const render = () => {
+      host.innerHTML = `<h3>${this._l('Energy breakdown')}</h3><div data-energy-rows></div><ha-button data-energy-add>${this._t('add')}</ha-button>`;
+      const rows = host.querySelector('[data-energy-rows]');
+      if (!Array.isArray(values)) rows.textContent = this._l('Energy breakdown must be a list.');
+      else values.forEach((member, index) => {
+        const row = document.createElement('div'); row.className = 'advanced-form';
+        if (!member || typeof member !== 'object' || Array.isArray(member)) row.textContent = this._l('Energy breakdown entries must be objects.');
+        else {
+          const data = { entity_id: member.entity_id || '', name: member.name || '', cost_entity: member.cost_entity || '' };
+          this._mountForm(row, data, [
+            this._schema('entity_id', 'Energy sensor', { entity: { domain: ['sensor'] } }, true),
+            this._schema('name', 'Display name', { text: {} }),
+            this._schema('cost_entity', 'Cost sensor (optional)', { entity: { domain: ['sensor'] } }),
+          ], value => {
+            const next = { ...values[index] };
+            for (const key of ['entity_id', 'name', 'cost_entity']) {
+              if (value[key] === (next[key] || '')) continue;
+              if (value[key] || key === 'entity_id') next[key] = value[key]; else delete next[key];
+            }
+            Object.assign(data, value); values[index] = next; changed(values);
+          });
+        }
+        const controls = document.createElement('div'); controls.className = 'row-actions';
+        controls.innerHTML = `${this._iconButton('mdi:arrow-up', 'Move up', 'up', index, index === 0)}${this._iconButton('mdi:arrow-down', 'Move down', 'down', index, index === values.length - 1)}${this._iconButton('mdi:delete-outline', this._t('delete'), 'delete', index)}`;
+        controls.querySelectorAll('[data-action]').forEach(button => button.addEventListener('click', () => {
+          this._moveHaptic();
+          if (button.dataset.action === 'delete') values.splice(index, 1);
+          else values = moveItem(values, index, index + (button.dataset.action === 'up' ? -1 : 1));
+          changed(values); render();
+        }));
+        row.append(controls); rows.append(row);
+      });
+      host.querySelector('[data-energy-add]').addEventListener('click', () => {
+        this._moveHaptic(); values = [...(Array.isArray(values) ? values : []), { entity_id: '' }]; changed(values); render();
+      });
+    };
+    render();
   }
 
   _openEntityGroupEditor(roomIndex, cardIndex = null, kind = 'room', draft = null) {

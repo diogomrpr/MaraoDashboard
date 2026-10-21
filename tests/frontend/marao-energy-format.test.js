@@ -10,9 +10,9 @@ const {energyUnits,energyValue,energyFormatting,energyHistoryValue,energyLabel,f
 globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
 const dashboard=await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoRuntime.js', import.meta.url), 'utf8');
 const classes=dashboard.slice(dashboard.indexOf('function escapeHtml('),dashboard.indexOf('if (!customElements.get("marao-energy-period-card"))'));
-const {MaraoEnergyPeriodCard}=await import('data:text/javascript;base64,'+Buffer.from(`import {historyPeriodRange,historySamples,loadHistoryChart,energyFormatting,energyValue,energyHistoryValue,energyLabel,formatEnergyNumber,binaryState,cardProblem,problemStyle,focusRestorer} from "${uri}";const localize=key=>key;${classes};export {MaraoEnergyPeriodCard};`).toString('base64'));
+const {MaraoEnergyPeriodCard,energyTariff}=await import('data:text/javascript;base64,'+Buffer.from(`import {energyBuckets,statisticsBuckets,energyTotal,historyPeriodRange,historySamples,loadHistoryChart,energyFormatting,energyValue,energyHistoryValue,energyLabel,formatEnergyNumber,binaryState,cardProblem,problemStyle,focusRestorer,controlGridStyles} from "${uri}";const localize=key=>key;${classes};export {MaraoEnergyPeriodCard,energyTariff};`).toString('base64'));
 const sample=(value,unit,time=Date.now()-1000)=>({state:String(value),attributes:{unit_of_measurement:unit,friendly_name:'Reading'},last_changed:new Date(time).toISOString()});
-const tick=()=>new Promise(resolve=>setImmediate(resolve));
+const tick=()=>new Promise(resolve=>setTimeout(resolve, 10));
 function hass(states,callApi=async()=>[]){return {states,connected:true,locale:{number_format:'none',language:'en'},callApi};}
 
 test('compatible units, finite guards, signed values and fixed localized precision',()=>{
@@ -89,9 +89,9 @@ test('Auto period history uses current Wh meaning before summaries and preserves
   const end=Date.now()-10000,records=[sample('1000.001','Wh',end-2000),sample('unavailable',undefined,end-1500),sample('3600007.2','J',end-1000)],original=JSON.stringify(records);
   let calls=0;const card=new MaraoEnergyPeriodCard(),config={entity:'sensor.energy',popup:true};
   card.setConfig(config);card.hass=hass({'sensor.energy':sample('1234.5','Wh',end)},async()=>{calls++;return[records];});await tick();
-  const before=card._detailOptions;assert.equal(card._values().error,false);assert.ok(Math.abs(before.samples[0].value-1000.001)<1e-10);assert.equal(before.samples[1].value,null);assert.ok(Math.abs(before.samples[2].value-1000.002)<1e-10);assert.equal(before.format(1000.002),'1000.002 Wh');
+  const before=card._detailOptions;assert.equal(card._values().error,false);assert.ok(Math.abs(card._values().values[0].value-1000.001)<1e-10);assert.equal(card._values().values[1].value,null);assert.ok(Math.abs(card._values().values[2].value-1000.002)<1e-10);assert.ok(before.samples.every(sample=>sample.value===null));assert.equal(before.coverageLimited,true);assert.equal(before.format(1000.002),'1000.002 Wh');
   card.setConfig({...config,display_precision:6});await tick();assert.deepEqual(card._detailOptions.samples,before.samples);assert.equal(card._detailOptions.format(1000.002),'1000.002000 Wh');
-  assert.equal(calls,1);assert.equal(JSON.stringify(records),original);
+  assert.equal(calls,5, 'selected day and four earlier days; formatting changes reuse the cache');assert.equal(JSON.stringify(records),original);
   card._history=[sample('1000','Wh',end-2000),sample('2','W',end-1000)];card._render();
   assert.equal(card._values().error,true);assert.deepEqual(card._values().values.map(sample=>sample.value),[1000,null]);assert.equal(card._detailOptions.error,'energy.format_error');
 });
@@ -127,26 +127,29 @@ test('nonnumeric period history leaves numeric conversion and bounds usable', as
   await tick();
   assert.equal(period._values().error, false);
   assert.deepEqual(period._values().values.map(record => record.value), [1, null, null, null, 2]);
-  assert.deepEqual(period._detailOptions.samples,period._values().values);
-  assert.deepEqual(period._detailOptions.samples.filter(record=>Number.isFinite(record.value)).map(record=>period._detailOptions.format(record.value)),['1.00 kWh','2.00 kWh']);
+  assert.ok(period._detailOptions.samples.every(record=>record.value===null),'A missing baseline and gaps cannot become consumption');
+  assert.equal(period._detailOptions.coverageLimited,true);
+  assert.equal(period._detailOptions.format(2),'2.00 kWh');
   assert.equal(period._detailOptions.windows,false);
   assert.doesNotMatch(period.shadowRoot.innerHTML, /<svg|<polyline/);
   assert.doesNotMatch(period.shadowRoot.innerHTML, /energy.format_error/);
   assert.equal(period._history, records);
 });
 
-test('period summaries and sheets share formatting without resetting selected history',async()=>{
+test('period summaries and consumption bars share formatting without resetting selected history',async()=>{
   const states={'sensor.energy':sample('1234.5','Wh')};let calls=0,url;
   const config={entity:'sensor.energy',popup:true,display_unit:'kWh',display_precision:2};
-  const end=Date.now()-10000;
-  const period=new MaraoEnergyPeriodCard();period.setConfig(config);period.hass=hass(states,async(_method,query)=>{calls++;url=query;return [[sample('1000.001','Wh',end-1000),sample('3600007.2','J',end)]];});await tick();
+  const start=Date.parse('2026-10-18T00:00:00Z'),hour=3600000;
+  const records=[sample('0','Wh',start),sample('1000.001','Wh',start+hour),sample('3600007.2','J',start+2*hour)];
+  const period=new MaraoEnergyPeriodCard();period.setConfig(config);period._range=()=>({start:new Date(start),end:new Date(start+2*hour)});
+  period.hass=hass(states,async(_method,query)=>{calls++;url=query;return [records];});await tick();
   assert.doesNotMatch(url,/minimal_response|no_attributes/);assert.equal(calls,1);
-  assert.deepEqual(period._detailOptions.samples.map(record=>period._detailOptions.format(record.value)),['1.00 kWh','1.00 kWh']);
+  assert.deepEqual(period._detailOptions.samples.map(record=>period._detailOptions.format(record.value)),['1.00 kWh','0.00 kWh']);
   assert.ok(Math.abs(period._detailOptions.samples[0].value-1.000001)<1e-12);
-  assert.ok(Math.abs(period._detailOptions.samples[1].value-1.000002)<1e-12);
+  assert.ok(Math.abs(period._detailOptions.samples[1].value-.000001)<1e-12);
   period._offset=-1;await period._load();const count=calls;const key=period._loadedKey;const raw=period._history;
   period.setConfig({...config,display_precision:6});await tick();assert.equal(period._offset,-1);assert.equal(period._loadedKey,key);assert.equal(period._history,raw);assert.equal(calls,count);
-  assert.deepEqual(period._detailOptions.samples.map(record=>period._detailOptions.format(record.value)),['1.000001 kWh','1.000002 kWh']);
+  assert.deepEqual(period._detailOptions.samples.map(record=>period._detailOptions.format(record.value)),['1.000001 kWh','0.000001 kWh']);
   period._history=[sample('4')];period._render();assert.match(period.shadowRoot.innerHTML,/energy.format_error/);assert.doesNotMatch(period.shadowRoot.innerHTML,/<polyline/);
   const summary=new MaraoEnergyPeriodCard();summary.setConfig({...config,popup:false});summary.hass=hass(states);assert.match(summary.shadowRoot.innerHTML,/1.23 kWh/);
   const legacy=new MaraoEnergyPeriodCard();legacy.setConfig({entity:'sensor.energy'});legacy.hass=hass(states);assert.match(legacy.shadowRoot.innerHTML,/>1234.5</);
@@ -209,4 +212,69 @@ test('independent formatting does not convert authoritative state or action payl
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].slice(0, 3), ['switch', 'toggle', { entity_id: 'switch.load' }]);
   assert.equal(JSON.stringify(states), original);
+});
+
+
+test('tariffs use explicit zero, matched HA import, legacy preferences and compatible price units without guessing',()=>{
+  const connection={config:{currency:'EUR'},states:{'sensor.price':sample('.00025','EUR/Wh')}};
+  const prefs={energy_sources:[{type:'grid',stat_energy_from:'sensor.main',number_energy_price:.3},{type:'grid',stat_energy_from:'sensor.other',number_energy_price:.4}]};
+  assert.equal(energyTariff({entity:'sensor.main'},connection,prefs).value,.3);
+  assert.equal(energyTariff({entity:'sensor.unmatched'},connection,prefs).reason,'energy.price_ambiguous');
+  assert.equal(energyTariff({cost_per_kwh:0},connection,prefs).value,0);
+  assert.equal(energyTariff({},connection,{energy_sources:[{type:'grid',flow_from:[{stat_energy_from:'sensor.main',entity_energy_price:'sensor.price'}]}]}).value,.25);
+  connection.states['sensor.price']=sample('.2','USD/kWh');
+  assert.equal(energyTariff({},connection,{energy_sources:[{type:'grid',stat_energy_from:'sensor.main',entity_energy_price:'sensor.price'}]}).reason,'energy.price_unavailable');
+  assert.equal(energyTariff({},connection,{energy_sources:[]}).reason,'energy.price_missing');
+});
+
+test('statistics bars and item costs use interval changes, common units and actual costs before estimates',async()=>{
+  const card=new MaraoEnergyPeriodCard(),start=Date.parse('2026-10-18T00:00:00Z'),hour=3600000,calls=[];
+  card.setConfig({entity:'sensor.main',popup:true,calculate_cost:true,display_precision:2,sub_entities:[{entity_id:'sensor.kitchen',name:'Kitchen',cost_entity:'sensor.kitchen_cost'},{entity_id:'sensor.heat',name:'Heating'}]});
+  card._range=()=>({start:new Date(start),end:new Date(start+2*hour)});
+  const states={'sensor.main':sample(8000,'Wh'),'sensor.kitchen':sample(3,'kWh'),'sensor.kitchen_cost':sample(2,'EUR'),'sensor.heat':sample(5000,'Wh')};
+  card.hass={...hass(states,async()=>{throw Error('Statistics should be used');}),config:{currency:'EUR'},callWS:async request=>{
+    calls.push(request);
+    if(request.type==='energy/get_prefs')return {energy_sources:[{type:'grid',stat_energy_from:'sensor.main',number_energy_price:.25}]};
+    if(request.type==='recorder/get_statistics_metadata')return Object.entries(states).map(([statistic_id,state])=>({statistic_id,has_sum:true,statistics_unit_of_measurement:state.attributes.unit_of_measurement}));
+    return Object.fromEntries(Object.entries({'sensor.main':[4,4],'sensor.kitchen':[1,2],'sensor.kitchen_cost':[.8,1.2],'sensor.heat':[3,2]}).map(([id,values])=>[id,values.map((change,index)=>({start:start+index*hour,end:start+(index+1)*hour,change}))]));
+  }};await tick();
+  assert.equal(calls.filter(call=>call.type==='recorder/statistics_during_period').length,1);
+  assert.deepEqual(calls.find(call=>call.type==='recorder/statistics_during_period').units,{energy:'kWh'});
+  assert.deepEqual(card._detailOptions.samples.map(sample=>sample.value),[1,1]);
+  assert.equal(card._detailOptions.summaryLabel,'≈ 2.00 EUR');
+  assert.deepEqual(card._detailOptions.breakdown.items.map(item=>[item.name,item.energyLabel,item.costLabel,item.value]),[['Kitchen','3.00 kWh','2.00 EUR',2],['Heating','5.00 kWh','≈ 1.25 EUR',1.25]]);
+  assert.match(card._detailOptions.breakdown.note,/0.25 EUR\/kWh/);
+  assert.equal(card._detailOptions.interval,'hour');
+  for(let i=0;i<3;i++)card.hass={...card._hass};assert.equal(calls.length,3,'Unrelated updates must not refetch');
+  card._series['sensor.kitchen_cost']={error:true};card._config.calculate_cost=false;card._render();
+  assert.equal(card._detailOptions.breakdown.items[0].value,3,'A cost failure cannot erase known energy');
+  assert.equal(card._detailOptions.breakdown.items[0].problem,'timeline.history_unavailable');
+});
+
+test('monthly contributor focus uses the selected day for energy and actual or estimated costs without refetching',()=>{
+  const card=new MaraoEnergyPeriodCard(),start=Date.parse('2026-10-01T00:00:00Z'),day=86400000;
+  card.setConfig({entity:'sensor.main',period:'month',popup:true,cost_per_kwh:.25,display_precision:2,
+    sub_entities:[{entity_id:'sensor.kitchen',cost_entity:'sensor.kitchen_cost'},{entity_id:'sensor.heat'}]});
+  card._range=()=>({start:new Date(start),end:new Date(start+3*day)});
+  card._hass={...hass({'sensor.main':sample(8,'kWh'),'sensor.kitchen':sample(3,'kWh'),'sensor.kitchen_cost':sample(2,'EUR'),'sensor.heat':sample(5,'kWh')},()=>{throw Error('No refetch expected');}),config:{currency:'EUR'},callWS:()=>{throw Error('No refetch expected');}};
+  card._series=Object.fromEntries(Object.entries({'sensor.main':[4,4,0],'sensor.kitchen':[1,2,null],'sensor.kitchen_cost':[.8,1.2,null],'sensor.heat':[3,2,0]})
+    .map(([id,values])=>[id,{unit:id==='sensor.kitchen_cost'?'EUR':'kWh',statistics:values.map((change,index)=>({start:start+index*day,end:start+(index+1)*day,change}))}]));
+  card._render();
+  const rows=detail=>detail.items.map(item=>[item.energyLabel,item.costLabel,item.value]);
+  const overview=rows(card._detailOptions.breakdown);
+  assert.deepEqual(overview,[['≈ 3.00 kWh','≈ 2.00 EUR',3],['5.00 kWh','≈ 1.25 EUR',5]]);
+  assert.deepEqual(rows(card._detailOptions.breakdownForSample(card._detailOptions.samples[0])),[['1.00 kWh','0.80 EUR',1],['3.00 kWh','≈ 0.75 EUR',3]]);
+  assert.deepEqual(rows(card._detailOptions.breakdownForSample(card._detailOptions.samples[1])),[['2.00 kWh','1.20 EUR',2],['2.00 kWh','≈ 0.50 EUR',2]]);
+  assert.deepEqual(rows(card._detailOptions.breakdownForSample(card._detailOptions.samples[2])),[['—','—',null],['0.00 kWh','≈ 0.00 EUR',0]]);
+  assert.deepEqual(rows(card._detailOptions.breakdownForSample(undefined)),overview);
+  card._config.calculate_cost=true;card._render();
+  assert.deepEqual(rows(card._detailOptions.breakdownForSample(card._detailOptions.samples[0])),[['1.00 kWh','0.80 EUR',.8],['3.00 kWh','≈ 0.75 EUR',.75]]);
+});
+
+test('a derived cost summary uses the current period source without loading its history',async()=>{
+  const card=new MaraoEnergyPeriodCard();card.setConfig({entity:'sensor.energy',calculate_cost:true,cost_per_kwh:.25,display_precision:2});
+  let calls=0;card.hass={...hass({'sensor.energy':sample(8000,'Wh')},()=>calls++),config:{currency:'EUR'}};await tick();
+  assert.match(card.shadowRoot.innerHTML,/≈ 2.00 EUR/);assert.equal(calls,0);
+  card.hass={...card._hass,states:{'sensor.energy':sample('unavailable','Wh')}};
+  assert.match(card.shadowRoot.innerHTML,/common.unavailable/);assert.doesNotMatch(card.shadowRoot.innerHTML,/≈ 2.00/);
 });

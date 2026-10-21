@@ -502,6 +502,16 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
     const domain = typeof entity === "string" ? entity.split(".")[0] : undefined;
     const template = item.template || ({sensor: "hc_sensor_card", switch: "hc_switch_card", input_boolean: "hc_switch_card"})[domain];
     const options = direct ? item : item.variables;
+    if ((direct || template === 'hc_energy_period_card') && options) {
+      errors.push(...validateEnergyOptions(options));
+      const members = Array.isArray(options.sub_entities) ? options.sub_entities : [];
+      const sources = [...(options.calculate_cost ? [entity] : []), ...members.map(member => member?.entity_id)];
+      if (Object.keys(units).length && sources.some(source => metadata.get(source) && units[metadata.get(source)]?.[0] !== 'energy')) errors.push('Cost calculations and breakdowns require energy sensors.');
+      for (const member of members) {
+        const source = entities?.find(source => source.entity_id === member?.cost_entity);
+        if (source && (Object.hasOwn(units, source.unit_of_measurement) || source.device_class && source.device_class !== 'monetary')) errors.push('Cost breakdown requires monetary sensors.');
+      }
+    }
     if ((direct || ((!item.type || item.type === "custom:marao-card") && (eligible.has(template) || load))) && options) {
       if (Object.hasOwn(options, "display_precision") && (!Number.isInteger(options.display_precision) || options.display_precision < 0 || options.display_precision > 6)) errors.push("Decimal places must be an integer from 0 to 6.");
       if (Object.hasOwn(options, "display_unit")) {
@@ -520,6 +530,24 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
   };
   visit(version === 2 ? config.pages : config);
   return [...new Set(errors)];
+}
+
+export function validateEnergyOptions(options) {
+  const errors = [];
+  if (Object.hasOwn(options, 'calculate_cost') && typeof options.calculate_cost !== 'boolean') errors.push('Calculate cost must be a boolean.');
+  if (Object.hasOwn(options, 'cost_per_kwh') && (typeof options.cost_per_kwh !== 'number' || !Number.isFinite(options.cost_per_kwh) || options.cost_per_kwh < 0)) errors.push('Price per kWh must be a finite nonnegative number.');
+  if (!Object.hasOwn(options, 'sub_entities')) return errors;
+  if (!Array.isArray(options.sub_entities)) return [...errors, 'Energy breakdown must be a list.'];
+  const sources = new Set();
+  for (const member of options.sub_entities) {
+    if (!member || typeof member !== 'object' || Array.isArray(member)) { errors.push('Energy breakdown entries must be objects.'); continue; }
+    if (typeof member.entity_id !== 'string' || !/^sensor\.[a-z0-9_]+$/.test(member.entity_id)) errors.push('Choose an energy sensor for each breakdown entry.');
+    if (sources.has(member.entity_id)) errors.push('Energy breakdown sources must be unique.');
+    sources.add(member.entity_id);
+    if (Object.hasOwn(member, 'name') && typeof member.name !== 'string') errors.push('Energy breakdown names must be text.');
+    if (member.cost_entity != null && member.cost_entity !== '' && (typeof member.cost_entity !== 'string' || !/^sensor\.[a-z0-9_]+$/.test(member.cost_entity))) errors.push('Choose a cost sensor for each breakdown entry.');
+  }
+  return errors;
 }
 
 export function validatePages(config, catalog) {
@@ -582,6 +610,7 @@ export function validatePages(config, catalog) {
           if (['tap_action', 'hold_action', 'double_tap_action'].some(key => (card[key]?.action ?? 'none') !== 'none')) errors.push('Access openers use only the strict slide');
         }
         if (card.template === 'hc_energy_period_card' && !['day', 'month'].includes(options.period ?? 'day')) errors.push('Energy period must be day or month.');
+        if (card.template === 'hc_energy_period_card') errors.push(...validateEnergyOptions(options));
         if (card.template === 'hc_wallbox_current_card' && Object.hasOwn(options, 'shortcuts') && (!Array.isArray(options.shortcuts) || options.shortcuts.length > 3 || options.shortcuts.some(value => typeof value !== 'number' || !Number.isFinite(value)))) errors.push('Charging shortcuts require at most three finite numbers.');
         if (card.template === 'hc_camera_card' && Object.hasOwn(options, 'preload_stream') && typeof options.preload_stream !== 'boolean') errors.push('Preload stream must be a boolean.');
         if (card.template === 'hc_camera_card' && options.popup_stream_entity != null && options.popup_stream_entity !== '' && (!entityId(options.popup_stream_entity) || !options.popup_stream_entity.startsWith('camera.'))) errors.push('Choose a camera entity for the popup stream.');
@@ -657,8 +686,9 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
     let schema;
     if (field.kind === 'entity') schema = binding(field.domains, field.device_classes);
     else if (field.kind === 'boolean') schema = { type: 'boolean' };
-    else if (['number', 'energy_precision'].includes(field.kind)) schema = { type: 'number' };
+    else if (['number', 'energy_precision'].includes(field.kind)) schema = { type: 'number', ...(field.key === 'cost_per_kwh' ? { minimum: 0 } : {}) };
     else if (field.kind === 'number_list') return { type: 'array', items: { type: 'number' }, description: field.description || field.label };
+    else if (field.kind === 'energy_sub_entities') return { type: 'array', items: { ...object({ entity_id: binding(['sensor']), name: { type: 'string' }, cost_entity: { anyOf: [binding(['sensor']), { enum: ['', null] }] } }), required: ['entity_id'] }, description: field.label };
     else if (field.kind === 'vacuum_action') return object({ icon: { type: 'string' }, name: { type: 'string' }, segment: { type: 'number' },
       on_action: { type: 'string' }, data: { description: 'Native command data is preserved verbatim; command and params depend on the vacuum integration.' } });
     else if (field.kind === 'object') schema = {};

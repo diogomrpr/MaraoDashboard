@@ -66,6 +66,16 @@ def test_page_model_accepts_empty_page_without_reinsertion():
 
 @pytest.mark.parametrize("card,message", [
     ({"template": "hc_energy_period_card", "entity_id": "sensor.safe", "variables": {"period": "year"}}, "period"),
+    ({"template": "hc_energy_period_card", "entity_id": "sensor.safe", "variables": {"sub_entities": {}}}, "must be a list"),
+    ({"template": "hc_energy_period_card", "entity_id": "sensor.safe", "variables": {"sub_entities": ["sensor.load"]}}, "must be objects"),
+    ({"template": "hc_energy_period_card", "entity_id": "sensor.safe", "variables": {"sub_entities": [{"entity_id": "switch.load"}]}}, "energy sensor"),
+    ({"template": "hc_energy_period_card", "entity_id": "sensor.safe", "variables": {"sub_entities": [{"entity_id": "sensor.load", "cost_entity": "switch.cost"}]}}, "cost sensor"),
+    ({"template": "hc_energy_period_card", "entity_id": "sensor.safe", "variables": {"sub_entities": [{"entity_id": "sensor.load", "name": False}]}}, "names must be text"),
+    ({"template": "hc_energy_period_card", "entity_id": "sensor.safe", "variables": {"sub_entities": [{"entity_id": "sensor.load"}, {"entity_id": "sensor.load"}]}}, "must be unique"),
+    ({"template": "hc_energy_period_card", "entity_id": "sensor.safe", "variables": {"calculate_cost": "true"}}, "must be a boolean"),
+    ({"template": "hc_energy_period_card", "entity_id": "sensor.safe", "variables": {"cost_per_kwh": -1}}, "nonnegative"),
+    ({"template": "hc_energy_period_card", "entity_id": "sensor.safe", "variables": {"cost_per_kwh": True}}, "nonnegative"),
+    ({"template": "hc_energy_period_card", "entity_id": "sensor.safe", "variables": {"cost_per_kwh": float("inf")}}, "nonnegative"),
     ({"template": "hc_wallbox_current_card", "entity_id": "number.safe", "variables": {"shortcuts": [True]}}, "shortcuts"),
     ({"template": "hc_wallbox_current_card", "entity_id": "number.safe", "variables": {"shortcuts": [float("inf")]}}, "shortcuts"),
     ({"template": "hc_wallbox_current_card", "entity_id": "number.safe", "variables": {"shortcuts": [1, 2, 3, 4]}}, "shortcuts"),

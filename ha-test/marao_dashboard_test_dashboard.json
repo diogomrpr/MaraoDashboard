@@ -484,13 +484,27 @@
           "columns": 1,
           "entities": [
             {
-              "entity_id": "sensor.marao_dashboard_test_month_energy",
+              "entity_id": "sensor.marao_dashboard_test_energy_demo_month",
               "template": "hc_energy_period_card",
               "name": "Month Power",
               "icon": "mdi:flash",
               "variables": {
                 "period": "month",
-                "popup_hash": "#energy-month-power"
+                "popup_hash": "#energy-month-power",
+                "cost_per_kwh": 0.25,
+                "sub_entities": [
+                  {
+                    "entity_id": "sensor.marao_dashboard_test_energy_demo_kitchen",
+                    "name": "Kitchen",
+                    "cost_entity": "sensor.marao_dashboard_test_energy_demo_kitchen_cost"
+                  },
+                  {
+                    "entity_id": "sensor.marao_dashboard_test_energy_demo_heating",
+                    "name": "Heating"
+                  }
+                ],
+                "display_precision": 2,
+                "display_unit": "kWh"
               },
               "name_key": "energy.month_power",
               "id": "card-2"
@@ -501,13 +515,25 @@
           "columns": 1,
           "entities": [
             {
-              "entity_id": "sensor.marao_dashboard_test_energy_format_mixed",
+              "entity_id": "sensor.marao_dashboard_test_energy_demo_today",
               "name": "Today Energy",
               "variables": {
                 "period": "day",
                 "popup_hash": "#energy-today-power",
                 "display_unit": "kWh",
-                "display_precision": 2
+                "display_precision": 2,
+                "cost_per_kwh": 0.25,
+                "sub_entities": [
+                  {
+                    "entity_id": "sensor.marao_dashboard_test_energy_demo_kitchen",
+                    "name": "Kitchen",
+                    "cost_entity": "sensor.marao_dashboard_test_energy_demo_kitchen_cost"
+                  },
+                  {
+                    "entity_id": "sensor.marao_dashboard_test_energy_demo_heating",
+                    "name": "Heating"
+                  }
+                ]
               },
               "template": "hc_energy_period_card",
               "icon": "mdi:flash-outline",
@@ -519,13 +545,27 @@
           "columns": 1,
           "entities": [
             {
-              "entity_id": "sensor.marao_dashboard_test_month_cost",
+              "entity_id": "sensor.marao_dashboard_test_energy_demo_month",
               "template": "hc_energy_period_card",
               "name": "Month Cost",
               "icon": "mdi:currency-eur",
               "variables": {
                 "period": "month",
-                "popup_hash": "#energy-month-cost"
+                "popup_hash": "#energy-month-cost",
+                "cost_per_kwh": 0.25,
+                "sub_entities": [
+                  {
+                    "entity_id": "sensor.marao_dashboard_test_energy_demo_kitchen",
+                    "name": "Kitchen",
+                    "cost_entity": "sensor.marao_dashboard_test_energy_demo_kitchen_cost"
+                  },
+                  {
+                    "entity_id": "sensor.marao_dashboard_test_energy_demo_heating",
+                    "name": "Heating"
+                  }
+                ],
+                "display_precision": 2,
+                "calculate_cost": true
               },
               "name_key": "energy.month_cost",
               "id": "card-4"
@@ -536,12 +576,25 @@
           "columns": 1,
           "entities": [
             {
-              "entity_id": "sensor.marao_dashboard_test_energy_format_cost",
+              "entity_id": "sensor.marao_dashboard_test_energy_demo_today",
               "name": "Today Cost",
               "variables": {
                 "period": "day",
                 "popup_hash": "#energy-today-cost",
-                "display_precision": 2
+                "display_precision": 2,
+                "cost_per_kwh": 0.25,
+                "sub_entities": [
+                  {
+                    "entity_id": "sensor.marao_dashboard_test_energy_demo_kitchen",
+                    "name": "Kitchen",
+                    "cost_entity": "sensor.marao_dashboard_test_energy_demo_kitchen_cost"
+                  },
+                  {
+                    "entity_id": "sensor.marao_dashboard_test_energy_demo_heating",
+                    "name": "Heating"
+                  }
+                ],
+                "calculate_cost": true
               },
               "template": "hc_energy_period_card",
               "icon": "mdi:cash-clock",
@@ -700,6 +753,26 @@
                     "name": "Plex",
                     "source": "Plex",
                     "icon": "mdi:plex"
+                  },
+                  {
+                    "name": "Netflix",
+                    "source": "Netflix",
+                    "icon": "mdi:netflix"
+                  },
+                  {
+                    "name": "Disney+",
+                    "source": "Disney+",
+                    "icon": "mdi:movie-open-play"
+                  },
+                  {
+                    "name": "Prime Video",
+                    "source": "Prime Video",
+                    "icon": "mdi:play-box"
+                  },
+                  {
+                    "name": "Spotify",
+                    "source": "Spotify",
+                    "icon": "mdi:spotify"
                   }
                 ]
               },
@@ -709,7 +782,7 @@
           ]
         },
         {
-          "columns": 2,
+          "columns": 3,
           "entities": [
             {
               "name": "YouTube",
@@ -731,6 +804,50 @@
               "show_state": false,
               "variables": {
                 "app_source": "Plex"
+              }
+            },
+            {
+              "name": "Netflix",
+              "icon": "mdi:netflix",
+              "id": "app-netflix",
+              "template": "hc_media_app_card",
+              "entity_id": "media_player.marao_dashboard_test_apple_tv",
+              "show_state": false,
+              "variables": {
+                "app_source": "Netflix"
+              }
+            },
+            {
+              "name": "Disney+",
+              "icon": "mdi:movie-open-play",
+              "id": "app-disney",
+              "template": "hc_media_app_card",
+              "entity_id": "media_player.marao_dashboard_test_apple_tv",
+              "show_state": false,
+              "variables": {
+                "app_source": "Disney+"
+              }
+            },
+            {
+              "name": "Prime Video",
+              "icon": "mdi:play-box",
+              "id": "app-prime-video",
+              "template": "hc_media_app_card",
+              "entity_id": "media_player.marao_dashboard_test_apple_tv",
+              "show_state": false,
+              "variables": {
+                "app_source": "Prime Video"
+              }
+            },
+            {
+              "name": "Spotify",
+              "icon": "mdi:spotify",
+              "id": "app-spotify",
+              "template": "hc_media_app_card",
+              "entity_id": "media_player.marao_dashboard_test_apple_tv",
+              "show_state": false,
+              "variables": {
+                "app_source": "Spotify"
               }
             }
           ]
@@ -1259,7 +1376,7 @@
           "columns": 2,
           "entities": [
             {
-              "entity_id": "sensor.marao_dashboard_test_energy_format_mixed",
+              "entity_id": "sensor.marao_dashboard_test_energy_demo_today",
               "name": "Studio energy today",
               "variables": {
                 "period": "day",

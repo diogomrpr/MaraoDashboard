@@ -27,7 +27,7 @@ export function nativeFields(spec, config) {
     choices("popup_filter", "Popup filter", ["all", "active"]));
   const advanced = (camera ? [] : ["show_name", "show_icon", "show_state", "show_label"]).map(key => field(key, key.replaceAll("_", " ").replace(/^./, s => s.toUpperCase()), "boolean"));
   for (const option of spec.variables) {
-    if (["vacuum_action", "number_list"].includes(option.kind)) continue;
+    if (["vacuum_action", "number_list", "energy_sub_entities"].includes(option.kind)) continue;
     const item = field("variables." + option.key, option.label, option.kind, option);
     (option.advanced ? advanced : common).push(item);
   }
@@ -169,6 +169,9 @@ export class MaraoNativeCardEditor extends (globalThis.HTMLElement || class {}) 
       this._form(host, [variants], this._draft, next => { this._commit(next); this._spec = catalog.cards.find(card => card.id === next.template); this._render(); }, () => this._draft);
     }
     this._form(host, fields.common, this._draft, next => this._commit(next), () => this._draft);
+    if (spec.id === "hc_energy_period_card") this._repeat(host, this._draft.type === spec.legacy_type ? "sub_entities" : "variables.sub_entities", "Energy breakdown",
+      [field("entity_id", "Energy sensor", "entity", { domains: ["sensor"], required: true }), field("name", "Name"),
+        field("cost_entity", "Cost sensor (optional)", "entity", { domains: ["sensor"] })], { entity_id: "" });
     if (spec.id === "hc_media_card") this._repeat(host, "apple_tv.apps", "Apps",
       [field("source", "Source"), field("name", "Name"), field("icon", "Icon", "icon")], { source: "" });
     if (["hc_entity_group_card", "hc_scene_collection_card"].includes(spec.id)) {

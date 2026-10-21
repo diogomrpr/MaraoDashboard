@@ -99,3 +99,14 @@ Use reference-theme geometry for narrow 320, representative iPhone/Android portr
 3. Reuse existing read-only previews/dry runs, exact source/generated/owned-state backups, preflight, staged atomic replacement and recovery retention. Protect concurrent edits and report rollback failures. Deploy the compatible UI and owned output only to disposable `192.168.0.28`, exercising safe fixtures and verifying loaded identities and cleanup.
 4. During future explicit versioned release preparation, run scoped `test:ha:upgrade -- --scope control-grid` for affected supported source formats and generated-section features. Preserved-install proof, independent expected data, relevant failure recovery and disposable cleanup are required because owned output changes; fresh fixture preparation is insufficient. Require scoped `verify:publish`, applicable exact-commit CI and `verify:release` for publication. Reuse only unchanged valid evidence.
 5. Roll back the matching previous package, exact source, generated output and affected owned state together. Do not downgrade assets alone while leaving new section metadata installed. No release, commit, push, tag or live upgrade is part of creating this plan.
+
+### Compact media app groups
+
+Logo-only media app groups use an 80px capacity floor independently of ordinary
+control groups. They retain the user's preferred columns, reflow below that
+capacity, and keep the same mounted children. Generated and native media app
+roles share this rule. The square app body keeps a 48px minimum rather than
+reserving 112px for invisible title/state rows; warnings remain free to grow.
+Source values, dispatch, saved sections and unrelated control floors are intact.
+Netflix uses a clean flat local vector symbol; Spotify gains its official vector
+icon. The other Media demo logos use fresh 512px publisher artwork, stored locally.

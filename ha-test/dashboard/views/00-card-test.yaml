@@ -562,7 +562,7 @@ cards:
     name: Climate Mode
     icon: mdi:thermostat
     height: auto
-    max_height: 80dvh
+    max_height: 100%
     cards:
       - type: custom:marao-card
         template: hc_climate_card
@@ -577,7 +577,7 @@ cards:
     name: Camera events
     icon: mdi:cctv
     height: auto
-    max_height: 80dvh
+    max_height: 100%
     cards:
       - type: custom:marao-card
         template: hc_camera_card
@@ -597,7 +597,7 @@ cards:
     name: Multi Mode Climate
     icon: mdi:thermostat
     height: auto
-    max_height: 80dvh
+    max_height: 100%
     cards:
       - type: custom:marao-card
         template: hc_climate_card
@@ -612,7 +612,7 @@ cards:
     name: Marao Popup
     icon: mdi:card-account-details-outline
     height: auto
-    max_height: 80dvh
+    max_height: 100%
     cards:
       - type: grid
         columns: 1
@@ -629,7 +629,7 @@ cards:
     name: Fixed-height popup
     icon: mdi:arrow-up-bold-box-outline
     height: 420px
-    max_height: 80dvh
+    max_height: 100%
     cards:
       - type: custom:marao-card
         template: hc_sensor_card
@@ -642,7 +642,7 @@ cards:
     name: Generic media player
     icon: mdi:music
     height: auto
-    max_height: 80dvh
+    max_height: 100%
     cards:
       - type: grid
         columns: 3
@@ -947,7 +947,7 @@ cards:
     name: Month Power
     icon: mdi:flash
     height: auto
-    max_height: 80dvh
+    max_height: 100%
     cards:
       - type: custom:marao-energy-period-card
         entity: sensor.marao_dashboard_test_month_energy
@@ -960,7 +960,7 @@ cards:
     name: Today Power
     icon: mdi:flash-outline
     height: auto
-    max_height: 80dvh
+    max_height: 100%
     cards:
       - type: custom:marao-energy-period-card
         entity: sensor.marao_dashboard_test_today_energy
@@ -973,7 +973,7 @@ cards:
     name: Month Cost
     icon: mdi:currency-eur
     height: auto
-    max_height: 80dvh
+    max_height: 100%
     cards:
       - type: custom:marao-energy-period-card
         entity: sensor.marao_dashboard_test_month_cost
@@ -986,7 +986,7 @@ cards:
     name: Today Cost
     icon: mdi:cash-clock
     height: auto
-    max_height: 80dvh
+    max_height: 100%
     cards:
       - type: custom:marao-energy-period-card
         entity: sensor.marao_dashboard_test_today_cost

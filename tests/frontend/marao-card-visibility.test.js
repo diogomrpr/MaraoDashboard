@@ -18,9 +18,7 @@ globalThis.navigationTranslations = (await import('../../custom_components/marao
 const dashboardSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url), "utf8");
 const { ACCESS_HOLD_MS, MaraoCard, MaraoPopupCard, callServiceWithNotification, focusRestorer, performAction, registerMaraoCards, binaryState, cardProblem, problemStyle, serviceOutcome, stateAppearance, summaryState, entityGroupState, vacuumActions, mediaAppBrand } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#visibility`);
 
-test('rerenders never detach the native surface while replacing content and obsolete attributes', () => {
-  const card = new MaraoCard();
-  card._config = { entity: 'sensor.test', name: 'Reading' };
+function retainedCardDOM(t, card) {
   const makeSurface = attributes => ({
     attributes: Object.entries(attributes).map(([name, value]) => ({ name, value })),
     childNodes: [], shadowRoot: { slot: true }, style: { setProperty() {} }, classList: { remove() {} },
@@ -31,37 +29,106 @@ test('rerenders never detach the native surface while replacing content and obso
   const surface = makeSurface({ class: 'obsolete', role: 'group', 'aria-busy': 'true', style: 'old' });
   let replacement;
   const style = { textContent: '' };
-  const root = { querySelector: selector => selector === 'ha-card' ? surface : selector === 'style' ? style : null, querySelectorAll: () => [] };
+  const root = {
+    querySelector: selector => selector === 'ha-card' ? surface : selector === 'style' ? style : surface.childNodes[0]?.controls.get(selector) || null,
+    querySelectorAll: selector => selector === 'ha-state-icon' && surface.childNodes.length ? [surface.childNodes[0].symbol] : [],
+  };
   Object.defineProperty(root, 'innerHTML', { set() { assert.fail('Replacing the shadow root detaches the live HA surface'); } });
   const previousDocument = globalThis.document;
+  t.after(() => { globalThis.document = previousDocument; });
   globalThis.document = { createElement(tag) {
     assert.equal(tag, 'template');
     return { set innerHTML(markup) {
       const attributes = Object.fromEntries([...markup.match(/<ha-card([^>]*)>/)[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(match => [match[1], match[2]]));
       replacement = makeSurface(attributes);
-      replacement.childNodes = [{ markup, remove() { surface.childNodes = surface.childNodes.filter(node => node !== this); } }];
+      const controls = new Map(['data-card-action', 'data-history-open'].filter(name => markup.includes(` ${name}`)).map(name => [`[${name}]`, new EventTarget()]));
+      replacement.childNodes = [{ markup, controls, symbol: { dataset: {} }, remove() { surface.childNodes = surface.childNodes.filter(node => node !== this); } }];
       this.content = { querySelector: selector => selector === 'ha-card' ? replacement : { textContent: markup.match(/<style>([\s\S]*?)<\/style>/)[1] } };
     } };
   } };
   card.shadowRoot = root;
-  try { for (const state of ['unavailable', '21']) {
+  return { surface, style, get replacement() { return replacement; } };
+}
+
+test('rerenders never detach the native surface while replacing content and obsolete attributes', t => {
+  const card = new MaraoCard();
+  card._config = { entity: 'sensor.test', name: 'Reading' };
+  const dom = retainedCardDOM(t, card), { surface, style } = dom;
+  for (const state of ['unavailable', '21']) {
     card._hass = { states: { 'sensor.test': { state, attributes: {} } } };
     card._render();
-    assert.equal(root.querySelector('ha-card'), surface);
+    assert.equal(card.shadowRoot.querySelector('ha-card'), surface);
     assert.equal(surface.shadowRoot.slot, true);
-    assert.deepEqual(surface.attributes, replacement.attributes);
-    assert.equal(surface.childNodes[0], replacement.childNodes[0]);
+    assert.deepEqual(surface.attributes, dom.replacement.attributes);
+    assert.equal(surface.childNodes[0], dom.replacement.childNodes[0]);
     assert.equal(surface.childNodes.length, 1, 'Old card content must be removed after mounting the replacement');
     assert.equal(surface.attributes.some(attribute => attribute.name === 'data-problem'), state === 'unavailable');
     assert.equal(surface.attributes.some(attribute => attribute.name === 'aria-busy' || attribute.name === 'role' || attribute.name === 'class'), false);
     assert.equal(surface.attributes.some(attribute => attribute.name === 'style'), state === 'unavailable');
-  }
-    card._config = { template: 'hc_alarm_controls_card', entity: 'alarm_control_panel.test' };
-    card._hass = { states: { 'alarm_control_panel.test': { state: 'disarmed', attributes: {} } } };
+    const content = surface.childNodes[0];
+    card._hass = { ...card._hass, states: { 'sensor.test': { state, attributes: {}, last_reported: '2026-10-21T14:00:00Z' } } };
     card._render();
-    assert.equal(root.querySelector('ha-card'), surface);
-    assert.match(style.textContent, /\.alarm-body/);
-  } finally { globalThis.document = previousDocument; }
+    assert.equal(surface.childNodes[0], content, 'An equivalent report must keep the scrolling content mounted');
+  }
+  card._config = { template: 'hc_alarm_controls_card', entity: 'alarm_control_panel.test' };
+  card._hass = { states: { 'alarm_control_panel.test': { state: 'disarmed', attributes: {} } } };
+  card._render();
+  assert.equal(card.shadowRoot.querySelector('ha-card'), surface);
+  assert.match(style.textContent, /\.alarm-body/);
+});
+
+test('retained History buttons open once after equivalent state reports', t => {
+  const card = new MaraoCard();
+  card._config = { template: 'hc_graph_card', entity: 'sensor.test', name: 'Reading' };
+  retainedCardDOM(t, card);
+  const opened = [];
+  card._openHistory = opener => opened.push(opener);
+  let button;
+  for (let report = 0; report < 4; report++) {
+    card._hass = { states: { 'sensor.test': { state: '21', attributes: {}, last_reported: String(report) } } };
+    card._render();
+    button ||= card.shadowRoot.querySelector('[data-history-open]');
+    assert.equal(card.shadowRoot.querySelector('[data-history-open]'), button);
+  }
+  button.dispatchEvent(new Event('click'));
+  assert.deepEqual(opened, [button], 'One tap must open History only once');
+});
+
+test('retained card actions dispatch once with current service context and changed bindings', t => {
+  const card = new MaraoCard(), calls = [];
+  card._config = { template: 'hc_switch_card', entity: 'switch.test', name: 'Switch', tap_action: { action: 'call-service', service: 'switch.turn_on' } };
+  retainedCardDOM(t, card);
+  let button;
+  for (let report = 0; report < 4; report++) {
+    card._hass = { states: { 'switch.test': { state: 'off', attributes: {}, last_reported: String(report) } }, callService: async (...args) => calls.push([report, ...args.slice(0, 3)]) };
+    card._render();
+    button ||= card.shadowRoot.querySelector('[data-card-action]');
+    assert.equal(card.shadowRoot.querySelector('[data-card-action]'), button);
+  }
+  button.dispatchEvent(new Event('click'));
+  assert.deepEqual(calls, [[3, 'switch', 'turn_on', { entity_id: 'switch.test' }]]);
+  card._config.tap_action = { action: 'call-service', service: 'switch.turn_off' };
+  card._render();
+  const updated = card.shadowRoot.querySelector('[data-card-action]');
+  assert.notEqual(updated, button, 'Changed bindings must replace the old action');
+  updated.dispatchEvent(new Event('click'));
+  assert.deepEqual(calls, [[3, 'switch', 'turn_on', { entity_id: 'switch.test' }], [3, 'switch', 'turn_off', { entity_id: 'switch.test' }]]);
+});
+
+test('retained native icons receive fresh Home Assistant context and state', t => {
+  const card = new MaraoCard();
+  card._config = { template: 'hc_switch_card', entity: 'switch.test', name: 'Switch' };
+  const { surface } = retainedCardDOM(t, card);
+  card._hass = { states: { 'switch.test': { state: 'off', attributes: {} } } };
+  card._render();
+  const content = surface.childNodes[0], symbol = card.shadowRoot.querySelectorAll('ha-state-icon')[0];
+  const state = { state: 'off', attributes: { last_report: 'new' } };
+  card._hass = { states: { 'switch.test': state } };
+  card._render();
+  assert.equal(surface.childNodes[0], content);
+  assert.equal(card.shadowRoot.querySelectorAll('ha-state-icon')[0], symbol);
+  assert.equal(symbol.hass, card._hass);
+  assert.equal(symbol.stateObj.attributes, state.attributes);
 });
 
 test('unrelated state updates preserve scrolling cards while their own inputs still refresh', () => {
@@ -762,17 +829,18 @@ test("media app shortcuts fill the card with artwork without a visible title", (
 });
 
 test("media app branding recognizes sources, ships real icons and preserves custom shortcuts", async () => {
-  for (const [source, id] of [["NETFLIX", "netflix"], ["com.google.ios.youtube", "youtube"], ["Disney+", "disney-plus"], ["Amazon Prime Video", "prime-video"], ["com.apple.TVWatchList", "apple-tv"], ["Plex", "plex"], ["MEO", "meo"], ["meo go", "meo"], ["pt.sapo.mobile.iphone.tmn.meomobile", "meo"]]) {
+  for (const [source, id, extension = "png"] of [["NETFLIX", "netflix", "svg"], ["Spotify", "spotify", "svg"], ["com.google.ios.youtube", "youtube"], ["Disney+", "disney-plus"], ["Amazon Prime Video", "prime-video"], ["com.apple.TVWatchList", "apple-tv"], ["Plex", "plex"], ["MEO", "meo"], ["meo go", "meo"], ["pt.sapo.mobile.iphone.tmn.meomobile", "meo"]]) {
     const config = { template: "hc_media_app_card", entity: "media_player.apple_tv", name: "My app", icon: "mdi:play-box-outline", show_state: false, variables: { app_source: source } };
     const before = structuredClone(config);
     assert.equal(mediaAppBrand(config).id, id);
     const card = new MaraoCard();
     card.setConfig(config);
     card.hass = { states: { "media_player.apple_tv": { state: "idle", attributes: {} } } };
-    assert.match(card.shadowRoot.innerHTML, new RegExp(`<img class="app-icon" src="[^"]*/media-apps/${id}\\.png"`));
+    assert.match(card.shadowRoot.innerHTML, new RegExp(`<img class="app-icon(?: app-symbol)?" src="[^"]*/media-apps/${id}\\.${extension}"`));
     assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="title">/);
-    const bytes = await fs.readFile(new URL(`../../custom_components/marao_dashboard/frontend/media-apps/${id}.png`, import.meta.url));
-    assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+    const bytes = await fs.readFile(new URL(`../../custom_components/marao_dashboard/frontend/media-apps/${id}.${extension}`, import.meta.url));
+    if (extension === "svg") assert.match(bytes.toString(), /<svg\b[^>]+viewBox=/);
+    else assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
     assert.ok(stateAppearance("hc_media_app_card", "idle", config).background);
     assert.deepEqual(stateAppearance("hc_media_app_card", "unavailable", config), { unavailable: true });
     assert.deepEqual(config, before);

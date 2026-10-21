@@ -11,6 +11,7 @@ export function loadHistoryChart() {
 }
 export const historyPeriodRange = historyData.periodRange;
 export const historySamples = historyData.normalizeSamples;
+export const { energyBuckets, statisticsBuckets, energyTotal } = historyData;
 const BaseElement = globalThis.HTMLElement || class {};
 
 const text = (value, fallback = "") => String(value ?? fallback);
@@ -27,7 +28,8 @@ function referencedEntities(value) {
 export const ACCESS_HOLD_MS = 1200;
 
 const mediaApps = [
-  { id: "netflix", sources: ["Netflix", "com.netflix.Netflix"], color: "#b20710", text: "#fff" },
+  { id: "netflix", file: "netflix.svg", sources: ["Netflix", "com.netflix.Netflix"], color: "#000", text: "#fff" },
+  { id: "spotify", file: "spotify.svg", symbol: true, sources: ["Spotify", "com.spotify.client", "com.spotify.Spotify"], color: "#121212", text: "#fff" },
   { id: "youtube", sources: ["YouTube", "com.google.ios.youtube"], color: "#d90000", text: "#fff" },
   { id: "disney-plus", sources: ["Disney+", "Disney Plus", "com.disney.disneyplus"], color: "#006d74", text: "#fff" },
   { id: "prime-video", sources: ["Prime Video", "Amazon Prime Video", "com.amazon.aiv.AIVApp"], color: "#0064b5", text: "#fff" },
@@ -783,9 +785,10 @@ function cardStyles() {
     ha-card.title-surface { overflow:visible; background:transparent; box-shadow:none; }
     .body.title-card { display:block; min-height:0; padding:0 0 20px; }
     .body.title-card .title { font-size:calc(var(--font-size-primary,1.125rem) * 1.39); font-weight:800; }
-    .body.media-app-card { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:0; min-height:112px; aspect-ratio:1; text-align:center; }
+    .body.media-app-card { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:0; min-height:48px; aspect-ratio:1; text-align:center; }
     .body.media-app-card .icon { width:100%; height:100%; flex:1; border-radius:0; background:transparent; --mdc-icon-size:clamp(48px,50cqi,96px); }
     .body.media-app-card .app-icon { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:cover; }
+    .body.media-app-card .app-symbol { object-fit:contain; padding:18%; box-sizing:border-box; }
     .body.media-app-card .problem { position:relative; z-index:1; box-sizing:border-box; width:100%; margin-top:auto; padding:8px; background:var(--ha-card-background,var(--card-background-color)); }
     ha-card[data-problem] .app-icon { filter:grayscale(1); opacity:.5; }
     .title, .state, .climate { min-width:0; max-width:100%; overflow-wrap:anywhere; line-height:1.25; }
@@ -1113,9 +1116,15 @@ export class MaraoCard extends BaseElement {
     if (input) input.value = "";
   }
 
-  _setMarkup(markup) {
+  _setMarkup(markup, bindings) {
     const surface = this.shadowRoot.querySelector('ha-card');
-    if (!surface) { this.shadowRoot.innerHTML = markup; return; }
+    if (surface && bindings !== undefined && this._renderedMarkup === markup
+      && this._renderedBindings === bindings && this._renderedConfig === this._config) return false;
+    if (!surface) {
+      this.shadowRoot.innerHTML = markup;
+      this._renderedMarkup = markup; this._renderedBindings = bindings; this._renderedConfig = this._config;
+      return;
+    }
     // Removing even a retained HA surface resets its ancestor's scroll in WebKit.
     const template = document.createElement('template');
     template.innerHTML = markup;
@@ -1131,6 +1140,7 @@ export class MaraoCard extends BaseElement {
     if (cameraSlot) for (const node of [...next.childNodes]) surface.insertBefore(node, cameraSlot);
     else surface.append(...next.childNodes);
     for (const node of previous) if (node !== this._camera?.slot && node !== this._cameraSlot) node.remove();
+    this._renderedMarkup = markup; this._renderedBindings = bindings; this._renderedConfig = this._config;
   }
 
   _renderAlarm() {
@@ -1575,7 +1585,7 @@ export class MaraoCard extends BaseElement {
     const hiddenBinaryState = binaryLabel && kind !== "hc_room_card" && !showIcon ? `<span class="binary-state" role="img" aria-label="${esc(binaryLabel)}"></span>` : "";
     const app = kind === "hc_media_app_card" ? mediaAppBrand(config) : null;
     const iconElement = usesNumberStepper ? "" : kind === "hc_room_card" || !showIcon ? hiddenBinaryState : app
-      ? `<img class="app-icon" src="${esc(new URL(`./media-apps/${app.id}.png${new URL(import.meta.url).search}`, import.meta.url).href)}" width="64" height="64" alt="" aria-hidden="true">`
+      ? `<img class="app-icon${app.symbol ? " app-symbol" : ""}" src="${esc(new URL(`./media-apps/${app.file || `${app.id}.png`}${new URL(import.meta.url).search}`, import.meta.url).href)}" width="64" height="64" alt="" aria-hidden="true">`
       : `<div class="icon"${binaryLabel ? ` role="img" aria-label="${esc(binaryLabel)}"` : ' aria-hidden="true"'}>${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : `<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>`}</div>`;
     const roomArtwork = kind === "hc_room_card" && showIcon ? `<div class="room-artwork" aria-hidden="true">${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : '<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>'}</div>` : "";
     const roomBottom = roomLightsControl || roomArtwork ? `<div class="room-bottom">${roomLightsControl}${roomArtwork}</div>` : "";
@@ -1612,9 +1622,8 @@ export class MaraoCard extends BaseElement {
     const formattedReading = !iconOnly && Boolean(formattedPrimary || formattedPower);
     const stateMarkup = showState && kind !== "hc_wallbox_current_card" ? `<div class="state">${esc(displayValue)}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null && kind !== "hc_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem, problemAppearance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`);
+    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null && kind !== "hc_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem, problemAppearance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
     this._syncCamera();
-    this.shadowRoot.querySelector('[data-history-open]')?.addEventListener('click', event => { event.stopPropagation(); this._openHistory(event.currentTarget); });
     this._activeHistoryPopup?._refreshHistory();
     for (const symbol of this.shadowRoot.querySelectorAll("ha-state-icon")) {
       const readingEntity = symbol.dataset.readingEntity;
@@ -1637,6 +1646,11 @@ export class MaraoCard extends BaseElement {
       if (text(variables.graph_color).trim()) card.style.setProperty("--marao-graph-color", text(variables.graph_color).trim());
       if (text(variables.graph_background).trim()) card.style.setProperty("--marao-graph-background", text(variables.graph_background).trim());
     }
+    if (contentChanged === false) {
+      if (showsGraph) this._loadGraphHistory(graphEntity);
+      return;
+    }
+    this.shadowRoot.querySelector('[data-history-open]')?.addEventListener('click', event => { event.stopPropagation(); this._openHistory(event.currentTarget); });
     const actionButton = this.shadowRoot.querySelector("[data-card-action]");
     if (actionButton) {
       if (holdAction) this._bindHoldAction(actionButton, card, () => this._performAction(action, entity));
@@ -1973,8 +1987,14 @@ export class MaraoControlGrid extends BaseElement {
     const config = this._mountedConfig; if (!config) return;
     const groups = config.groups || [{ count: config.cards.length, columns: config.columns }];
     const width = this.getBoundingClientRect().width, font = parseFloat(getComputedStyle(this).fontSize) || 18;
-    const capacity = Math.max(1, Math.floor((width + 8) / (Math.max(CONTROL_CELL_MIN, font * CONTROL_CELL_FONT_SCALE) + 8)));
-    const columns = groups.map(group => Math.min(group.columns, capacity));
+    let groupStart = 0;
+    const columns = groups.map(group => {
+      const cards = config.cards.slice(groupStart, groupStart += group.count);
+      const apps = cards.every(card => card.template === 'hc_media_app_card' || card.type === 'custom:marao-native-media-app-card');
+      const minimum = apps ? 80 : Math.max(CONTROL_CELL_MIN, font * CONTROL_CELL_FONT_SCALE);
+      const capacity = Math.max(1, Math.floor((width + 8) / (minimum + 8)));
+      return Math.min(group.columns, capacity);
+    });
     const gcd = (a, b) => b ? gcd(b, a % b) : a;
     const tracks = columns.reduce((a, b) => a * b / gcd(a, b), 1);
     grid.style.gridTemplateColumns = `repeat(${tracks},minmax(0,1fr))`;
@@ -2045,7 +2065,7 @@ export class MaraoControlGrid extends BaseElement {
 
 export class MaraoPopupCard extends BaseElement {
   constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._hass = null; this._open = false; this._focus = null; this._childrenRenderId = 0; this._backgroundState = []; }
-  setConfig(config) { this._config = { height: "auto", max_height: "80dvh", ...config }; this._renderHost(); this._sync(); if (this._open) this._renderChildren(); }
+  setConfig(config) { this._config = { height: "auto", max_height: "100%", ...config }; this._renderHost(); this._sync(); if (this._open) this._renderChildren(); }
   get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
   set preview(value) { this._preview = Boolean(value); if (this._preview) this._close(false); }
   set hass(value) { this._hass = value; this._syncTheme(); this._updateChildrenHass(); this._refreshHistory(); }
@@ -2182,7 +2202,7 @@ export class MaraoPopupCard extends BaseElement {
     const maxWidth = columnWidth > 0 ? `${columnWidth}px` : "100%";
     const closeLabel = localize("popup.close", this._hass, {}, "Close popup");
     const overlay = document.createElement("div"); overlay.className = "marao-popup-overlay";
-    overlay.innerHTML = `<style>${controlGridStyles(".marao-popup-content.control-grid")}@keyframes marao-popup-slide-up{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}.marao-popup-overlay{position:fixed;inset:0;z-index:1100;display:flex;align-items:flex-end;box-sizing:border-box;padding:${safeArea("top")} ${safeArea("right")} 0 ${safeArea("left")};background:rgba(0,0,0,.42);font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}.marao-popup-sheet{box-sizing:border-box;width:100%;max-width:${maxWidth};height:${esc(height)};max-height:min(${esc(this._config.max_height)}, 100%);margin:0 auto;overflow:auto;padding:0 16px;border-radius:22px 22px 0 0;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);overscroll-behavior:contain;animation:marao-popup-slide-up .28s cubic-bezier(.2,.8,.2,1) both}.marao-popup-head{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;padding:12px 0 8px;background:inherit;z-index:1}.marao-popup-head h2{min-width:0;margin:0;font-size:var(--font-size-primary,1.25rem);line-height:1.2;overflow-wrap:anywhere}.marao-popup-close{flex:0 0 48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;font-size:1.5rem;background:var(--secondary-background-color);color:inherit;cursor:pointer;transition:transform .12s ease,filter .12s ease}.marao-popup-close:active{transform:scale(.92);filter:brightness(.96)}.marao-popup-close:focus,.marao-popup-sheet:focus{outline:none}.marao-popup-content>p{min-width:0;font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.4;overflow-wrap:anywhere}.marao-popup-content[hidden]{display:none}.marao-popup-content{display:grid;min-width:0;gap:12px;isolation:isolate;padding-bottom:calc(92px + ${safeArea("bottom")})}@media(max-width:240px){.marao-popup-sheet{padding-left:4px;padding-right:4px}}@media(prefers-reduced-motion:reduce){.marao-popup-sheet{animation:none}.marao-popup-close{transition:none}}</style><section class="marao-popup-sheet" role="dialog" aria-modal="true" aria-label="${esc(title || this._config.name || localize("popup.title", this._hass, {}, "Marao popup"))}" tabindex="-1"><div class="marao-popup-head"><h2>${esc(title)}</h2><button class="marao-popup-close" type="button" aria-label="${esc(closeLabel)}" title="${esc(closeLabel)}">×</button></div><div class="marao-popup-content"></div></section>`;
+    overlay.innerHTML = `<style>${controlGridStyles(".marao-popup-content.control-grid")}@keyframes marao-popup-slide-up{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}.marao-popup-overlay{position:fixed;inset:0;z-index:1100;display:flex;align-items:flex-end;box-sizing:border-box;padding:max(50px, ${safeArea("top")}) ${safeArea("right")} 0 ${safeArea("left")};background:rgba(0,0,0,.42);font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}.marao-popup-sheet{--marao-popup-card-padding:8px;--marao-popup-detail-title-display:${title && this._config.cards?.length === 1 && this._config.cards[0].name === title ? 'none' : 'block'};box-sizing:border-box;width:100%;max-width:${maxWidth};height:${esc(height)};max-height:min(${esc(this._config.max_height)}, 100%);margin:0 auto;overflow:auto;padding:0 8px;border-radius:22px 22px 0 0;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);overscroll-behavior:contain;animation:marao-popup-slide-up .28s cubic-bezier(.2,.8,.2,1) both}.marao-popup-head{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;padding:20px 0 12px;background:inherit;z-index:1}.marao-popup-head h2{min-width:0;margin:0;font-size:var(--font-size-primary,1.25rem);line-height:1.2;overflow-wrap:anywhere}.marao-popup-close{flex:0 0 48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;font-size:1.5rem;background:var(--secondary-background-color);color:inherit;cursor:pointer;transition:transform .12s ease,filter .12s ease}.marao-popup-close:active{transform:scale(.92);filter:brightness(.96)}.marao-popup-close:focus,.marao-popup-sheet:focus{outline:none}.marao-popup-content>p{min-width:0;font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.4;overflow-wrap:anywhere}.marao-popup-content[hidden]{display:none}.marao-popup-content{display:grid;min-width:0;gap:8px;isolation:isolate;padding-bottom:calc(92px + ${safeArea("bottom")})}@media(max-width:240px){.marao-popup-sheet{padding-left:4px;padding-right:4px}}@media(prefers-reduced-motion:reduce){.marao-popup-sheet{animation:none}.marao-popup-close{transition:none}}</style><section class="marao-popup-sheet" role="dialog" aria-modal="true" aria-label="${esc(title || this._config.name || localize("popup.title", this._hass, {}, "Marao popup"))}" tabindex="-1"><div class="marao-popup-head"><h2>${esc(title)}</h2><button class="marao-popup-close" type="button" aria-label="${esc(closeLabel)}" title="${esc(closeLabel)}">×</button></div><div class="marao-popup-content"></div></section>`;
     overlay.addEventListener("click", (event) => { if (event.target === overlay) this._close(true); });
     overlay.querySelector(".marao-popup-close").addEventListener("click", () => { haptic("heavy"); this._close(true); });
     overlay.addEventListener("keydown", (event) => {
@@ -2195,6 +2215,11 @@ export class MaraoPopupCard extends BaseElement {
     root.append(overlay);
     this._overlay = overlay;
     this._syncTheme();
+    const header = overlay.querySelector('.marao-popup-head');
+    const sizeHeader = () => overlay.style.setProperty('--marao-popup-header-height', `${header.getBoundingClientRect().height}px`);
+    sizeHeader();
+    this._headerObserver = new ResizeObserver(sizeHeader);
+    this._headerObserver.observe(header);
     if (this._viewOwner) {
       this._columnObserver = new ResizeObserver(() => {
         const width = this._viewOwner?.view.shadowRoot?.querySelector("#columns > div:first-child, hui-section, .section")?.getBoundingClientRect().width;
@@ -2352,6 +2377,7 @@ export class MaraoPopupCard extends BaseElement {
       const state = { ...window.history.state }; delete state.maraoHistory;
       window.history.replaceState(state, '', window.location.href);
     }
+    this._headerObserver?.disconnect(); this._headerObserver = null;
     this._columnObserver?.disconnect(); this._columnObserver = null;
     this._open = false; this._overlay?.remove(); this._overlay = null; this._restoreBackground();
     this._childrenRenderId++; this._groupChildren?.clear(); this._groupHelpers = null; this._groupEmpty = null;

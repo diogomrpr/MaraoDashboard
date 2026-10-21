@@ -708,6 +708,7 @@ def _resolve_entity_group(group, registry, used_ids, *, legacy_overview=False, c
 def _validate_energy_formatting(value: Any, registry: list[dict[str, Any]], *, validate_source_units=True) -> None:
     """Validate opt-in reading options against actual live source metadata."""
     units = {entity["entity_id"]: entity.get("unit_of_measurement") for entity in registry}
+    metadata = {entity["entity_id"]: entity for entity in registry}
 
     def visit(item: Any) -> None:
         if isinstance(item, list):
@@ -727,6 +728,17 @@ def _validate_energy_formatting(value: Any, registry: list[dict[str, Any]], *, v
             item.get("type") in (None, "custom:marao-card")
             and (template in ENERGY_FORMAT_TEMPLATES or load_source)
         )
+        if (direct or template == "hc_energy_period_card") and isinstance(options, dict):
+            from .page_model import validate_energy_options
+            validate_energy_options(options)
+            if validate_source_units:
+                sources = ([entity_id] if options.get("calculate_cost") else []) + [member["entity_id"] for member in options.get("sub_entities", [])]
+                if any(units.get(source) and ENERGY_UNITS.get(units[source], (None,))[0] != "energy" for source in sources):
+                    raise ValueError("Cost calculations and breakdowns require energy sensors.")
+                for member in options.get("sub_entities", []):
+                    source = metadata.get(member.get("cost_entity"), {})
+                    if source.get("unit_of_measurement") in ENERGY_UNITS or source.get("device_class") not in (None, "", "monetary"):
+                        raise ValueError("Cost breakdown requires monetary sensors.")
         if eligible and isinstance(options, dict) and any(key in options for key in ("display_unit", "display_precision")):
             precision = options.get("display_precision")
             if "display_precision" in options and (type(precision) is not int or not 0 <= precision <= 6):
@@ -1640,7 +1652,6 @@ def _scenes_popup(config: dict[str, Any], language: str = "en") -> dict[str, Any
             primary,
             _t(language, "overview.scenes"),
             "mdi:palette-outline",
-            "520px",
         ),
         "cards": [_scene_card(entity) for entity in entities],
     }
@@ -1849,7 +1860,7 @@ def _energy_period_card(
     return {
         "type": "custom:marao-energy-period-card",
         **{key: value for key, value in variables.items()
-           if key in ("display_unit", "display_precision")},
+           if key in ("display_unit", "display_precision", "sub_entities", "calculate_cost", "cost_per_kwh")},
         "entity": entity["entity_id"],
         "name": entity.get("name") or title,
         "period": period,
@@ -1873,7 +1884,7 @@ def _energy_popups(config: dict[str, Any], language: str = "en") -> dict[str, di
         entities = [entity for field in fields if (entity := _page_entity(page, field))]
         if entities:
             popups[name] = {
-                **_popup_header(popup_hash, entities[0]["entity_id"], entities[0].get("name") or title, entities[0].get("icon") or icon, "720px"),
+                **_popup_header(popup_hash, entities[0]["entity_id"], entities[0].get("name") or title, entities[0].get("icon") or icon),
                 "cards": [
                     _energy_period_card(
                         entity,
@@ -2198,12 +2209,12 @@ def _page_card_popups(entity, language="en"):
         return [_entity_group_popup(item, language), *_entity_group_secondary_popups(item, language)]
     if role == "hc_scene_collection_card":
         from .page_model import page_entries
-        return [{**_popup_header(variables["popup_hash"], None, item["name"], item.get("icon") or "mdi:palette-outline", "520px"),
+        return [{**_popup_header(variables["popup_hash"], None, item["name"], item.get("icon") or "mdi:palette-outline"),
                  "cards": [_scene_card(member) for member in page_entries(item["entities"])] or
                           [{"type": "markdown", "content": _t(language, "overview.scenes_empty")}]}]
     if role == "hc_energy_period_card" or role == "hc_graph_card" and variables.get("history_popup"):
         card = _energy_period_card(item, item["name"], variables.get("period", "day"), item.get("icon") or "mdi:flash", None, popup=True) if role == "hc_energy_period_card" else _energy_graph_card(item, item["name"], item.get("icon") or "mdi:flash", None)
-        return [{**_popup_header(variables["popup_hash"], item["entity_id"], item["name"], item.get("icon") or "mdi:flash", "720px"), "cards": [card]}]
+        return [{**_popup_header(variables["popup_hash"], item["entity_id"], item["name"], item.get("icon") or "mdi:flash"), "cards": [card]}]
     if role == "hc_climate_card":
         return [_climate_mode_popup(item, language)]
     if role == "hc_media_card":
@@ -2483,7 +2494,7 @@ def _domain_template(entity: dict[str, Any]) -> str:
 def _alarm_popup(entity: dict[str, Any]) -> dict[str, Any]:
     name = entity.get("name") or _friendly_name(entity["entity_id"])
     popup_hash = (entity.get("variables") or {}).get("popup_hash") or f"#alarm-{make_slug(entity['entity_id'].replace('.', '-'))}"
-    return {**_popup_header(popup_hash, entity["entity_id"], name, "mdi:shield-home", "auto"),
+    return {**_popup_header(popup_hash, entity["entity_id"], name, "mdi:shield-home"),
             "cards": [{"type": "custom:marao-card", "template": "hc_alarm_controls_card",
                        "entity": entity["entity_id"], "name": name}]}
 
@@ -2680,7 +2691,7 @@ def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
             _media_button(entity_id, icon="mdi:skip-next", name="Next", service="media_player.media_next_track"),
         ]
         return {
-            **_popup_header(popup_hash, entity_id, name, "mdi:music", "420px"),
+            **_popup_header(popup_hash, entity_id, name, "mdi:music"),
             "cards": [{"type": "grid", "columns": 3, "square": False, "cards": controls}],
         }
 
@@ -2738,7 +2749,7 @@ def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
         ]}
     )
     return {
-        **_popup_header(popup_hash, entity_id, name, "mdi:remote-tv", "780px"),
+        **_popup_header(popup_hash, entity_id, name, "mdi:remote-tv"),
         "cards": media_controls,
     }
 
@@ -2772,7 +2783,6 @@ def _camera_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any
             entity_id,
             entity.get("name") or _friendly_name(entity_id),
             entity.get("icon") or "mdi:cctv",
-            "780px",
         ),
         "cards": [{
             "type": "custom:marao-card", "template": "hc_camera_card",
@@ -2890,7 +2900,7 @@ def _access_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any
 
     popup_cards = [_control_grid(actions, 1)]
     return {
-        **_popup_header((entity.get("variables") or {}).get("popup_hash") or _access_popup_hash(entity["entity_id"]), entity["entity_id"], name, icon, "420px"),
+        **_popup_header((entity.get("variables") or {}).get("popup_hash") or _access_popup_hash(entity["entity_id"]), entity["entity_id"], name, icon),
         "cards": popup_cards,
     }
 
@@ -2902,7 +2912,6 @@ def _climate_mode_popup(entity: dict[str, Any], language: str = "en") -> dict[st
             entity["entity_id"],
             f"{entity.get('name') or _friendly_name(entity['entity_id'])} {_t(language, 'climate.mode_suffix')}",
             "mdi:thermostat",
-            "620px",
         ),
         "cards": [
             _entity_card(
@@ -2969,8 +2978,7 @@ def _entity_group_members(group):
 
 def _entity_group_popup(group, language="en"):
     name = _entity_group_name(group, language)
-    height = {"light": "920px", "cover": "820px", "climate": "760px", "battery": "680px"}[group["entity_type"]]
-    return {**_popup_header(_entity_group_hash(group), None, name, group.get("icon") or "mdi:view-list", height),
+    return {**_popup_header(_entity_group_hash(group), None, name, group.get("icon") or "mdi:view-list"),
             "entity_group": {"id": group["id"], "entity_type": group["entity_type"], "popup_filter": group["popup_filter"],
                              "entities": [member["entity_id"] for member in group["entities"]]},
             "cards": [_room_entity_card(member) for member in _entity_group_members(group)]}
@@ -3011,7 +3019,7 @@ def _overview_popups(
 
 
 def _popup_header(
-    popup_hash: str, entity_id: str, name: str, icon: str, height: str
+    popup_hash: str, entity_id: str, name: str, icon: str
 ) -> dict[str, Any]:
     return {
         "type": "custom:marao-popup-card",
@@ -3022,6 +3030,6 @@ def _popup_header(
         "show_icon": True,
         "show_name": True,
         "show_state": True,
-        "height": height,
-        "max_height": "80dvh",
+        "height": "auto",
+        "max_height": "100%",
     }

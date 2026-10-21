@@ -54,6 +54,15 @@ async function run(){
      const timing=await page.evaluate(()=>({registered:definitions['marao-native-navbar-card'],optional:performance.getEntriesByType('resource').find(r=>r.name.includes('MaraoRuntime.js'))?.startTime}));
      assert.ok(timing.registered);if(timing.optional!=null)assert.ok(timing.registered<=timing.optional);
      assert.equal(await nav.locator('a[href],[draggable=true],[title]').count(),0);
+     const refresh=bar.getByRole('button',{name:'Limpar cache e atualizar',exact:true});
+     await refresh.waitFor({state:'visible'});
+     const refreshBox=await refresh.boundingBox();assert.ok(refreshBox.width>=48&&refreshBox.height>=48);
+     assert.equal(await refresh.locator('svg').count(),1,'Recovery icon needs no optional icon renderer');
+     await refresh.tap();
+     await page.waitForFunction(()=>document.querySelector('home-assistant').shadowRoot.querySelector('hui-root').shadowRoot.querySelector('[data-marao-navigation-surface]').shadowRoot.querySelector('.refresh-feedback').textContent.includes('Sem ligação'));
+     assert.equal(refreshes,1,'A single tap runs the existing refresh preflight once with content blocked');
+     await refresh.waitFor({state:'visible'});assert.equal(new URL(page.url()).pathname,'/marao-dashboard/overview');
+
      const dimensions=await nav.locator('button').evaluateAll(nodes=>nodes.map(node=>({w:node.getBoundingClientRect().width,h:node.getBoundingClientRect().height})));
      assert.ok(dimensions.every(rect=>rect.w>=48&&rect.h>=48));
      const targets=engine===chromium?[nav.locator('[data-route="0"] svg'),nav.locator('[data-route="1"] svg'),nav.locator('[data-overflow]'),nav]:[nav.locator('[data-route="0"] svg')];
@@ -69,7 +78,7 @@ async function run(){
      assert.equal(await page.evaluate(()=>services),0);assert.deepEqual(errors,[]);
      await page.evaluate(()=>{history.pushState({},'','/marao-dashboard/empty');dispatchEvent(new Event('location-changed'));});await bar.waitFor({state:'detached'});
      assert.equal(await page.evaluate(()=>root.shadowRoot.querySelector('#view').style.getPropertyValue('padding-bottom')),'');
-     results.push({engine:engine.name(),holds:targets.length,criticalReadyWithBlockedRuntime:true,nativeCompiles:0,viewContinuity:true,emptyCleanup:true,errors});
+     results.push({engine:engine.name(),holds:targets.length,criticalReadyWithBlockedRuntime:true,tapRefresh:true,nativeCompiles:0,viewContinuity:true,emptyCleanup:true,errors});
    }finally{await context.close();await browser.close();}
  }}finally{await new Promise(resolve=>server.close(resolve));}
  fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({results},null,2));console.log(JSON.stringify({output,results}));

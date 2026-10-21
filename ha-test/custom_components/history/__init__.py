@@ -24,6 +24,34 @@ ENERGY_HISTORY = {
     "sensor.marao_dashboard_test_energy_format_incompatible_history": ((.1, "1000", "Wh"), (.5, "1500", "W"), (.9, "3456", "Wh")),
 }
 
+ENERGY_DEMO = {
+    "sensor.marao_dashboard_test_energy_demo_today": (.3, "kWh", "day"),
+    "sensor.marao_dashboard_test_energy_demo_month": (.3, "kWh", "month"),
+    "sensor.marao_dashboard_test_energy_demo_kitchen": (.1, "kWh", None),
+    "sensor.marao_dashboard_test_energy_demo_heating": (.15, "kWh", None),
+    "sensor.marao_dashboard_test_energy_demo_kitchen_cost": (.025, "EUR", None),
+}
+
+
+def energy_demo_value(entity, timestamp, before_reset=False):
+    """Match the safe templates: alternating days and breakfast/evening peaks."""
+    rate, _unit, period = ENERGY_DEMO[entity]
+
+    def cumulative(instant):
+        hours = (instant.timestamp() - 1767225600) / 3600
+        days, hour = divmod(hours, 24)
+        weighted = hour + min(max(hour - 6, 0), 3) + 2 * min(max(hour - 17, 0), 5)
+        return 37 * (days // 2 * 3 + days % 2) + (1 + days % 2) * weighted
+
+    value = cumulative(timestamp)
+    if period:
+        local = dt_util.as_local(timestamp - timedelta(milliseconds=1) if before_reset else timestamp)
+        boundary = local.replace(hour=0, minute=0, second=0, microsecond=0)
+        if period == "month":
+            boundary = boundary.replace(day=1)
+        value -= cumulative(boundary)
+    return round(value * rate, 4)
+
 
 async def async_setup(hass, config):
     """Register the fixture view before native routes; retain native UI and WS."""
@@ -49,13 +77,14 @@ class FixtureHistoryPeriodView(core_history.HistoryPeriodView):
             "sensor.marao_dashboard_test_history_error": "error",
         }.get(entity)
         energy = ENERGY_HISTORY.get(entity)
-        if case is None and energy is None:
+        demo = ENERGY_DEMO.get(entity)
+        if case is None and energy is None and demo is None:
             return await super().get(request, datetime)
         if case == "empty":
             return self.json([])
         if case == "error":
             return web.Response(text="{simulated malformed history response", content_type="application/json")
-        if energy is None:
+        if energy is None and demo is None:
             await asyncio.sleep(5)
         now = dt_util.utcnow()
         start = dt_util.parse_datetime(datetime) if datetime else now - timedelta(days=1)
@@ -64,6 +93,22 @@ class FixtureHistoryPeriodView(core_history.HistoryPeriodView):
             return await super().get(request, datetime)
         end = min(end, now)
         records = []
+        if demo:
+            cursor = start
+            previous = None
+            while cursor <= end:
+                value = energy_demo_value(entity, cursor)
+                if previous is not None and value < previous:
+                    # Preserve the last interval's consumption before the utility meter resets.
+                    stamp = (cursor - timedelta(milliseconds=1)).isoformat()
+                    records.append({"entity_id": entity, "state": str(energy_demo_value(entity, cursor, True)), "attributes": {"unit_of_measurement": demo[1]}, "last_changed": stamp, "last_updated": stamp})
+                stamp = cursor.isoformat()
+                records.append({"entity_id": entity, "state": str(value), "attributes": {"unit_of_measurement": demo[1]}, "last_changed": stamp, "last_updated": stamp})
+                if cursor == end:
+                    break
+                previous = value
+                cursor = min(cursor + timedelta(hours=1), end)
+            return self.json([records])
         for fraction, value, unit in energy or ((0.1, "21", None), (0.5, "25", None), (0.9, "22", None)):
             timestamp = (start + (end - start) * fraction).isoformat()
             records.append({"entity_id": entity, "state": value, "attributes": {"unit_of_measurement": unit} if unit is not None else {}, "last_changed": timestamp, "last_updated": timestamp})

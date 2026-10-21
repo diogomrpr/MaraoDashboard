@@ -91,3 +91,75 @@ export function periodRange(now, offset, period, timeZone = 'UTC') {
   };
   return { start: boundary(startDate), end: boundary(endDate) };
 }
+
+function consumptionPeriods(range, period, timeZone) {
+  const start = +new Date(range.start), end = +new Date(range.end);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || !['day', 'month'].includes(period)) throw new Error('Invalid energy period');
+  const samples = [];
+  for (let time = start; time < end;) {
+    const next = Math.min(end, period === 'day' ? time + 3600000 : +periodRange(time, 0, 'day', timeZone).end);
+    samples.push({ time, end: next, value: null });
+    time = next;
+  }
+  return samples;
+}
+
+export function energyBuckets(records, { range, period, timeZone = 'UTC', stateClass, convert, now = Date.now() }) {
+  const samples = consumptionPeriods(range, period, timeZone), finish = Math.min(+new Date(now), +new Date(range.end));
+  const readings = normalizeSamples(records, { convert }).filter(sample => sample.time <= finish);
+  let cursor = 0;
+  for (let index = 0; index < samples.length; index++) {
+    const sample = samples[index];
+    if (sample.time >= finish) break;
+    while (cursor < readings.length && readings[cursor].time <= sample.time) cursor++;
+    const baseline = readings[cursor - 1];
+    const previousStart = index ? samples[index - 1].time : period === 'day' ? sample.time - 3600000 : +periodRange(sample.time, -1, 'day', timeZone).start;
+    let valid = Number.isFinite(baseline?.value) && (stateClass === 'total' || baseline.value >= 0) && baseline.time >= previousStart, value = 0, count = 0, previous = baseline;
+    while (cursor < readings.length && readings[cursor].time <= sample.end) {
+      const reading = readings[cursor++];
+      if (!Number.isFinite(reading.value) || !Number.isFinite(previous?.value) || (stateClass !== 'total' && reading.value < 0)
+        || reading.time - previous.time > sample.end - sample.time) valid = false;
+      else value += stateClass !== 'total' && reading.value < previous.value ? reading.value : reading.value - previous.value;
+      previous = reading; count++;
+    }
+    if (valid && count) {
+      sample.value = value;
+      // The final recorded interval is partial; never extend it with invented zero usage.
+      if (previous.time < sample.end && cursor === readings.length) sample.coverageLimited = true;
+    }
+  }
+  return { samples, limited: samples.some(sample => sample.time < finish && (sample.value === null || sample.coverageLimited)) };
+}
+
+export function statisticsBuckets(records, { range, period, timeZone = 'UTC', convert, now = Date.now() }) {
+  const samples = consumptionPeriods(range, period, timeZone), finish = Math.min(+new Date(now), +new Date(range.end));
+  const ordered = new Map();
+  for (const record of records || []) {
+    const start = +new Date(record.start), end = +new Date(record.end);
+    if (Number.isFinite(start) && Number.isFinite(end) && end > start) ordered.set(start, { record, start, end });
+  }
+  const intervals = [...ordered.values()].sort((a, b) => a.start - b.start);
+  for (const sample of samples) {
+    if (sample.time >= finish) break;
+    const contained = intervals.filter(interval => interval.start >= sample.time && interval.start < sample.end && interval.start < finish);
+    let cursor = sample.time, value = 0, valid = !!contained.length;
+    for (const interval of contained) {
+      const raw = interval.record.change;
+      let change = ['number', 'string'].includes(typeof raw) && String(raw).trim() !== '' ? Number(raw) : null;
+      if (Number.isFinite(change) && convert) change = convert(change, interval.record);
+      if (interval.start !== cursor || interval.end > sample.end || !Number.isFinite(change)) valid = false;
+      else value += change;
+      cursor = interval.end;
+    }
+    if (valid) {
+      sample.value = value;
+      if (cursor < sample.end || finish < sample.end) sample.coverageLimited = true;
+    }
+  }
+  return { samples, limited: samples.some(sample => sample.time < finish && (sample.value === null || sample.coverageLimited)) };
+}
+
+export function energyTotal(samples) {
+  const values = samples.filter(sample => Number.isFinite(sample.value));
+  return values.length ? values.reduce((total, sample) => total + sample.value, 0) : null;
+}

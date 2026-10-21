@@ -27,7 +27,7 @@ test("ported sheets copy theme colors while viewport insets keep inheriting live
 test("navbar and sheets share the host-aware inset fallback", () => {
   assert.match(source, /var\(--marao-safe-area-inset-\$\{side\}, var\(--safe-area-inset-\$\{side\}, env\(safe-area-inset-\$\{side\}, 0px\)\)\)/);
   assert.match(source, /max\(4px, calc\(\$\{safeArea\("bottom"\)\} - 20px\)\)/);
-  assert.match(cardsSource, /padding:\$\{safeArea\("top"\)\} \$\{safeArea\("right"\)\} 0 \$\{safeArea\("left"\)\}/);
+  assert.match(cardsSource, /padding:max\(50px, \$\{safeArea\("top"\)\}\) \$\{safeArea\("right"\)\} 0 \$\{safeArea\("left"\)\}/);
   assert.match(cardsSource, /max-height:min\(\$\{esc\(this\._config\.max_height\)\}, 100%\)/);
 });
 
@@ -91,7 +91,7 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
       () => { timers++; return 1; }, () => { timers--; }, side => `var(--safe-${side})`);
   functions.registerFullscreen(first);
   assert.equal(header.style.getPropertyValue("display"), "none");
-  assert.equal(view.style.getPropertyValue("padding-top"), "max(8px, var(--safe-top))");
+  assert.equal(view.style.getPropertyValue("padding-top"), "max(8px, calc(60px + var(--safe-top)))");
   assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(max(0px, calc(60px + var(--safe-bottom) + 12px)) + 48px))");
   assert.equal(unrelated.style.getPropertyValue("display"), "grid");
   functions.registerFullscreen(second);

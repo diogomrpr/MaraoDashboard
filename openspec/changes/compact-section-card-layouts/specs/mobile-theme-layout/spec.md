@@ -136,3 +136,17 @@ Saved columns SHALL remain the preferred maximum. Each owned section SHALL reflo
 - **WHEN** rotation or text settings permit the preferred columns
 - **THEN** the section restores that composition while retaining its current necessary common height
 - **AND** source configuration and authoritative entity state do not change
+
+## ADDED Requirements
+
+### Requirement: Compact logo-only media app groups
+A group consisting only of media app shortcuts SHALL use an 80px minimum cell
+capacity, preserve its configured preferred columns, and reflow below that
+capacity. Both generated and native media-app roles SHALL participate. Each app
+control SHALL remain at least 48px square; warnings SHALL wrap and may grow.
+
+#### Scenario: Three app columns on a phone
+- **WHEN** a three-column app group has at least 256px of available width
+- **THEN** three shortcuts fit on each row without reserving space for hidden titles
+- **AND** a narrower group reflows the same mounted controls
+- **AND** ordinary or mixed control groups retain their normal width and text-size rules

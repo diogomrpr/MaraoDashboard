@@ -667,6 +667,62 @@ template:
         state: "0"
         availability: "{{ false }}"
         unit_of_measurement: Wh
+      - name: Marao Dashboard Test Energy Demo Today
+        unique_id: marao_dashboard_test_energy_demo_today
+        state: >-
+          {% macro meter(stamp) -%}
+            {% set hours = (stamp - 1767225600) / 3600 %}
+            {% set days = hours // 24 %}
+            {% set hour = hours % 24 %}
+            {% set weighted = hour + ([([hour - 6, 0] | max), 3] | min) + 2 * ([([hour - 17, 0] | max), 5] | min) %}
+            {{ 37 * (days // 2 * 3 + days % 2) + (1 + days % 2) * weighted }}
+          {%- endmacro %}
+          {{ (((meter(as_timestamp(now())) | float) - (meter(as_timestamp(today_at())) | float)) * 0.3) | round(4) }}
+        unit_of_measurement: kWh
+        device_class: energy
+      - name: Marao Dashboard Test Energy Demo Month
+        unique_id: marao_dashboard_test_energy_demo_month
+        state: >-
+          {% macro meter(stamp) -%}
+            {% set hours = (stamp - 1767225600) / 3600 %}
+            {% set days = hours // 24 %}
+            {% set hour = hours % 24 %}
+            {% set weighted = hour + ([([hour - 6, 0] | max), 3] | min) + 2 * ([([hour - 17, 0] | max), 5] | min) %}
+            {{ 37 * (days // 2 * 3 + days % 2) + (1 + days % 2) * weighted }}
+          {%- endmacro %}
+          {{ (((meter(as_timestamp(now())) | float) - (meter(as_timestamp(now().replace(day=1, hour=0, minute=0, second=0, microsecond=0))) | float)) * 0.3) | round(4) }}
+        unit_of_measurement: kWh
+        device_class: energy
+      - name: Marao Dashboard Test Energy Demo Kitchen
+        unique_id: marao_dashboard_test_energy_demo_kitchen
+        state: >-
+          {% set hours = (as_timestamp(now()) - 1767225600) / 3600 %}
+          {% set days = hours // 24 %}
+          {% set hour = hours % 24 %}
+          {% set weighted = hour + ([([hour - 6, 0] | max), 3] | min) + 2 * ([([hour - 17, 0] | max), 5] | min) %}
+          {{ ((37 * (days // 2 * 3 + days % 2) + (1 + days % 2) * weighted) * 0.1) | round(4) }}
+        unit_of_measurement: kWh
+        device_class: energy
+      - name: Marao Dashboard Test Energy Demo Heating
+        unique_id: marao_dashboard_test_energy_demo_heating
+        state: >-
+          {% set hours = (as_timestamp(now()) - 1767225600) / 3600 %}
+          {% set days = hours // 24 %}
+          {% set hour = hours % 24 %}
+          {% set weighted = hour + ([([hour - 6, 0] | max), 3] | min) + 2 * ([([hour - 17, 0] | max), 5] | min) %}
+          {{ ((37 * (days // 2 * 3 + days % 2) + (1 + days % 2) * weighted) * 0.15) | round(4) }}
+        unit_of_measurement: kWh
+        device_class: energy
+      - name: Marao Dashboard Test Energy Demo Kitchen Cost
+        unique_id: marao_dashboard_test_energy_demo_kitchen_cost
+        state: >-
+          {% set hours = (as_timestamp(now()) - 1767225600) / 3600 %}
+          {% set days = hours // 24 %}
+          {% set hour = hours % 24 %}
+          {% set weighted = hour + ([([hour - 6, 0] | max), 3] | min) + 2 * ([([hour - 17, 0] | max), 5] | min) %}
+          {{ ((37 * (days // 2 * 3 + days % 2) + (1 + days % 2) * weighted) * 0.025) | round(4) }}
+        unit_of_measurement: EUR
+        device_class: monetary
       - name: Marao Dashboard Test Month Energy
         unique_id: marao_dashboard_test_month_energy_sensor
         state: "{{ states('input_number.marao_dashboard_test_month_energy') }}"

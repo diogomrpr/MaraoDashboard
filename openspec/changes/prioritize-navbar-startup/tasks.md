@@ -35,3 +35,28 @@ Implement this as the next navbar/recovery priority, before further camera-quali
 
 - Any separately authorized push, tag or release requires scoped `npm run verify:publish` and applicable exact-commit validation. If installation, owned-resource or persisted contracts changed, include the affected preserved-install upgrade/recovery proof with verified disposable cleanup; reuse valid unchanged evidence and do not infer a comprehensive test request.
 - Synchronize/archive only after the complete change is implemented and verified. Preserve the preceding overflow/refresh deltas and do not mark unresolved Android or startup behavior complete on the basis of proposal validation.
+
+## Single-tap refresh follow-up
+
+- [x] Record baseline `c27d3bd`, dirty snapshot
+  `/private/tmp/marao-refresh-button-start.json`, and shared generated/native/
+  standalone navigation, preview/edit/modal and early-startup consumers.
+- [x] Add a top-right 48px semantic refresh button with a small inline SVG to the
+  early navigation surface; invoke the existing `_refreshFrontend()` handler,
+  retain the navbar hold, and preserve cache-clear/recovery behavior unchanged.
+- [x] Localize tap/loading labels and retry copy, disable during refresh/edit,
+  retain dirty/preview/inert checks, reserve top content space in the scoped
+  fullscreen owner, and place the native edit action beside the refresh action.
+- [x] Verify startup with blocked/failed optional content and install the batch.
+
+All 39 targeted frontend-refresh/navbar checks passed. The existing controlled
+startup test now also taps the refresh button with MaraoRuntime blocked, verifies
+one existing preflight, a 48px target and an inline icon. It passed in Chromium
+and WebKit, retaining the previous hold checks, view continuity, error reporting,
+zero native compile/service calls and cleanup on leaving the owned dashboard.
+The optional runtime failure remains observable. Strict OpenSpec, syntax and
+whitespace checks passed. `prepareFrontend()` rebuilt, installed and verified
+final assets on disposable `192.168.0.28`. Native device cache clearing was not
+retested; its implementation was left unchanged. No release/full suite or
+physical iPhone/Android testing was requested. Saved configuration and unrelated
+working-tree changes were preserved.

@@ -29,6 +29,35 @@ def camera_popup_stream(entity: str, options: dict[str, Any]) -> str:
     return stream
 
 
+def validate_energy_options(options: dict[str, Any]) -> None:
+    """Validate optional breakdown bindings without changing saved row data."""
+    if "calculate_cost" in options and type(options["calculate_cost"]) is not bool:
+        raise ValueError("Calculate cost must be a boolean.")
+    price = options.get("cost_per_kwh")
+    if "cost_per_kwh" in options and (type(price) not in (int, float) or not math.isfinite(price) or price < 0):
+        raise ValueError("Price per kWh must be a finite nonnegative number.")
+    if "sub_entities" not in options:
+        return
+    members = options["sub_entities"]
+    if not isinstance(members, list):
+        raise ValueError("Energy breakdown must be a list.")
+    sources = set()
+    for member in members:
+        if not isinstance(member, dict):
+            raise ValueError("Energy breakdown entries must be objects.")
+        entity = member.get("entity_id")
+        if not isinstance(entity, str) or not re.fullmatch(r"sensor\.[a-z0-9_]+", entity):
+            raise ValueError("Choose an energy sensor for each breakdown entry.")
+        if entity in sources:
+            raise ValueError("Energy breakdown sources must be unique.")
+        sources.add(entity)
+        if "name" in member and not isinstance(member["name"], str):
+            raise ValueError("Energy breakdown names must be text.")
+        cost = member.get("cost_entity")
+        if cost not in (None, "") and (not isinstance(cost, str) or not re.fullmatch(r"sensor\.[a-z0-9_]+", cost)):
+            raise ValueError("Choose a cost sensor for each breakdown entry.")
+
+
 def page_entries(spec: Any) -> list[dict[str, Any]]:
     """Retain mixed order and whole descriptors, including entity-free cards."""
     if spec is None:
@@ -133,6 +162,8 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                         raise ValueError("Access openers use only the strict slide")
                 if role == "hc_energy_period_card" and options.get("period", "day") not in ("day", "month"):
                     raise ValueError("Energy period must be day or month")
+                if role == "hc_energy_period_card":
+                    validate_energy_options(options)
                 if role == "hc_wallbox_current_card" and "shortcuts" in options:
                     presets = options["shortcuts"]
                     if not isinstance(presets, list) or len(presets) > 3 or any(type(value) not in (int, float) or not math.isfinite(value) for value in presets):

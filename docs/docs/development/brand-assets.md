@@ -78,9 +78,11 @@ update needs no saved-configuration migration or replacement gallery entities.
 
 ## Media app shortcut artwork
 
-The bundled `frontend/media-apps/*.png` files are unmodified 256-pixel PNG
-renditions of the publishers’ official App Store artwork, retrieved through
-Apple’s public Lookup API on 2026-10-21. App names and logos belong to their
+Bundled `frontend/media-apps/` artwork is served locally. YouTube, Disney+, Prime
+Video and Plex use 512-pixel publisher PNGs retrieved through Apple’s public Lookup
+API on 2026-10-21. Apple TV and MEO retain their existing PNGs. Netflix uses a flat
+vector rendition of its N symbol; Spotify uses its official green vector icon.
+The directory’s `SOURCES.md` records the artwork references. App names and logos belong to their
 respective owners. They identify the configured app; they do not imply affiliation.
 The dashboard serves these files locally and performs no runtime App Store lookup.
 
@@ -89,6 +91,7 @@ The dashboard serves these files locally and performs no runtime App Store looku
 - [Disney+](https://apps.apple.com/pt/app/disney/id1446075923) — `com.disney.disneyplus`.
 - [Amazon Prime Video](https://apps.apple.com/pt/app/amazon-prime-video/id545519333) — `com.amazon.aiv.AIVApp`.
 - [Apple TV](https://apps.apple.com/pt/app/apple-tv/id1174078549) — `com.apple.tv`.
+- [Spotify brand resources](https://developer.spotify.com/documentation/design) — `Spotify`, `com.spotify.client`, `com.spotify.Spotify`.
 - [Plex: Find Movies and TV Shows](https://apps.apple.com/pt/app/plex-find-movies-and-tv-shows/id383457673) — `com.plexapp.plex`.
 
 - [MEO Go](https://apps.apple.com/pt/app/meo-go/id394637480?platform=tv) — `pt.sapo.mobile.iphone.tmn.meomobile`, also recognized as `MEO` or `MEO Go`.

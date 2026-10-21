@@ -13,7 +13,7 @@ const [cardsModule, cameraEventsModule] = await Promise.all([
   import(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`),
   import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`),
 ]);
-const { loadHistoryChart, historyPeriodRange, historySamples, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, registerMaraoCards } = cardsModule;
+const { loadHistoryChart, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, registerMaraoCards } = cardsModule;
 registerMaraoCards();
 cameraEventsModule.registerMaraoCameraEventCards();
 
@@ -415,6 +415,15 @@ const TRANSLATIONS = {
     "energy.current_period": "Current period",
     "energy.no_data": "No recorded values for this period",
     "energy.format_error": "Reading format is incompatible with its source unit",
+    "energy.price_missing": "Set a price per kWh or configure an import tariff in Home Assistant Energy.",
+    "energy.price_ambiguous": "Multiple import tariffs are configured. Set a price per kWh for this card.",
+    "energy.price_unavailable": "The configured energy price is unavailable or uses an incompatible unit.",
+    "energy.price_error": "Could not load the Home Assistant energy tariff. Retry to load costs.",
+    "energy.price_override": "Configured rate; historical costs are estimates.",
+    "energy.price_home_assistant": "Home Assistant rate; historical costs are estimates.",
+    "energy.price_current": "Current tariff; historical costs are estimates.",
+    "energy.estimated_cost": "Estimated cost",
+    "energy.incomplete": "Some recorded values are missing",
     "wallbox.shortcuts": "Charging current shortcuts",
     "security.arming": "Arming...",
     "security.arm_away": "Arm away",
@@ -590,6 +599,15 @@ const TRANSLATIONS = {
     "energy.current_period": "Período atual",
     "energy.no_data": "Não existem valores registados neste período",
     "energy.format_error": "O formato da leitura é incompatível com a unidade de origem",
+    "energy.price_missing": "Defina o preço por kWh ou configure uma tarifa de consumo em Energia do Home Assistant.",
+    "energy.price_ambiguous": "Existem várias tarifas de consumo. Defina o preço por kWh neste cartão.",
+    "energy.price_unavailable": "O preço da energia está indisponível ou tem uma unidade incompatível.",
+    "energy.price_error": "Não foi possível carregar a tarifa do Home Assistant. Tente novamente para carregar os custos.",
+    "energy.price_override": "Tarifa configurada; os custos históricos são estimativas.",
+    "energy.price_home_assistant": "Tarifa do Home Assistant; os custos históricos são estimativas.",
+    "energy.price_current": "Tarifa atual; os custos históricos são estimativas.",
+    "energy.estimated_cost": "Custo estimado",
+    "energy.incomplete": "Faltam alguns valores registados",
     "wallbox.shortcuts": "Atalhos de corrente de carregamento",
     "security.arming": "A armar...",
     "security.arm_away": "Armar fora",
@@ -1460,13 +1478,39 @@ if (!customElements.get("marao-state-timeline-card")) {
   });
 }
 
+function energyTariff(config, hass, preferences) {
+  const currency = hass?.config?.currency;
+  if (!currency) return { reason: 'energy.price_missing' };
+  if (Object.hasOwn(config, 'cost_per_kwh')) {
+    return Number.isFinite(config.cost_per_kwh) && config.cost_per_kwh >= 0
+      ? { value: config.cost_per_kwh, currency, source: 'energy.price_override' }
+      : { reason: 'energy.price_missing' };
+  }
+  const imports = (preferences?.energy_sources || []).filter(source => source.type === 'grid')
+    .flatMap(source => source.flow_from || (source.stat_energy_from ? [source] : []));
+  const matches = imports.filter(source => source.stat_energy_from === config.entity);
+  const source = matches.length === 1 ? matches[0] : imports.length === 1 ? imports[0] : null;
+  if (!source) return { reason: imports.length > 1 ? 'energy.price_ambiguous' : 'energy.price_missing' };
+  if (source.entity_energy_price) {
+    const state = hass.states?.[source.entity_energy_price];
+    const [money, unit] = (state?.attributes?.unit_of_measurement || '').split('/');
+    const amount = energyValue(state?.state, '', {}), scale = energyValue(1, unit, { display_unit: 'kWh' });
+    if (!amount || amount.value < 0 || money !== currency || !scale || scale.error) return { reason: 'energy.price_unavailable' };
+    return { value: amount.value / scale.value, currency, source: 'energy.price_current' };
+  }
+  return Number.isFinite(source.number_energy_price) && source.number_energy_price >= 0
+    ? { value: source.number_energy_price, currency, source: 'energy.price_home_assistant' }
+    : { reason: 'energy.price_missing' };
+}
+
 class MaraoEnergyPeriodCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
     this._offset = 0;
-    this._history = [];
+    this._history = []; this._series = {};
     this._loadId = 0;
+    this._clearPeriodCache();
   }
 
   setConfig(config) {
@@ -1475,17 +1519,22 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     // they are regenerated, instead of producing an error card.
     const entity = config?.entity || config?.entity_id || null;
     const next = { period: "day", popup: false, ...config, entity };
-    const changed = !this._config || ["entity", "period", "popup"].some(key => this._config[key] !== next[key]);
+    if (next.sub_entities !== undefined && (!Array.isArray(next.sub_entities) || next.sub_entities.some(item => !item || !/^sensor\.[a-z0-9_]+$/.test(item.entity_id) || (item.cost_entity != null && item.cost_entity !== '' && !/^sensor\.[a-z0-9_]+$/.test(item.cost_entity)) || (item.name !== undefined && typeof item.name !== 'string')))) throw new Error('Invalid energy sub-entities');
+    if (new Set((next.sub_entities || []).map(item => item.entity_id)).size !== (next.sub_entities || []).length) throw new Error('Energy breakdown sources must be unique');
+    if (next.cost_per_kwh !== undefined && (!Number.isFinite(next.cost_per_kwh) || next.cost_per_kwh < 0)) throw new Error('Invalid price per kWh');
+    if (next.calculate_cost !== undefined && typeof next.calculate_cost !== 'boolean') throw new Error('Invalid energy cost option');
+    const changed = !this._config || ["entity", "period", "popup", "calculate_cost", "cost_per_kwh"].some(key => this._config[key] !== next[key]) || JSON.stringify(this._config.sub_entities) !== JSON.stringify(next.sub_entities);
     this._config = next;
     if (changed) {
       this._detailGeneration = (this._detailGeneration || 0) + 1;
       this._detailChart?.destroy(); this._detailChart = null; this._detailLoading = false; this._detailFailed = false;
       this._offset = 0;
+      this._clearPeriodCache();
       this._loadId += 1;
       this._loading = false;
       this._loadedKey = "";
-      this._history = [];
-      this._error = false;
+      this._history = []; this._series = {};
+      this._error = false; this._preferences = null; this._priceError = false;
     }
     this._render();
     this._load();
@@ -1493,14 +1542,18 @@ class MaraoEnergyPeriodCard extends HTMLElement {
 
   set hass(hass) {
     const wasUnavailable = this._availabilityState;
+    const previousSources = this._sourceAvailability;
+    const previousZone = this._hass?.config?.time_zone;
     this._hass = hass;
     this._availabilityState = historyEntityState(hass, this._config);
-    if (this._availabilityState !== wasUnavailable) {
+    this._sourceAvailability = JSON.stringify((this._config?.sub_entities || []).flatMap(item => [item.entity_id, item.cost_entity]).filter(Boolean).map(entity => historyEntityState(hass, { entity })));
+    if (this._availabilityState !== wasUnavailable || previousSources !== undefined && previousSources !== this._sourceAvailability || previousZone !== hass?.config?.time_zone) {
+      this._clearPeriodCache();
       this._loadId += 1;
       this._loading = false;
       this._loadedKey = "";
-      this._history = [];
-      this._error = false;
+      this._history = []; this._series = {};
+      this._error = false; this._preferences = null; this._priceError = false;
     }
     this._render();
     this._load();
@@ -1511,7 +1564,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
   getCardSize() { return this._config?.popup ? 5 : 2; }
 
   disconnectedCallback() {
-    queueMicrotask(() => { if (!this.isConnected) { this._detailGeneration = (this._detailGeneration || 0) + 1; this._detailChart?.destroy(); this._detailChart = null; this._detailLoading = false; this._loadId++; this._loading = false; this._loadedKey = ''; } });
+    queueMicrotask(() => { if (!this.isConnected) { this._detailGeneration = (this._detailGeneration || 0) + 1; this._detailChart?.destroy(); this._detailChart = null; this._detailLoading = false; this._loadId++; this._clearPeriodCache(); this._loading = false; this._loadedKey = ''; } });
   }
   async _syncDetail(host, options) {
     this._detailOptions = options;
@@ -1535,8 +1588,8 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     } finally { if (generation === (this._detailGeneration || 0)) this._detailLoading = false; }
   }
 
-  _range() {
-    return historyPeriodRange(new Date(), this._offset, this._config.period, this._hass?.config?.time_zone || 'UTC');
+  _range(offset = this._offset) {
+    return historyPeriodRange(new Date(), offset, this._config.period, this._hass?.config?.time_zone || 'UTC');
   }
 
   _periodLabel() {
@@ -1547,37 +1600,155 @@ class MaraoEnergyPeriodCard extends HTMLElement {
       : new Intl.DateTimeFormat(language, { weekday: "short", day: "numeric", month: "short", timeZone: this._hass?.config?.time_zone || "UTC" }).format(start);
   }
 
+  _clearPeriodCache() {
+    this._periodCache = new Map();
+    this._periodContext = {};
+  }
+
+  _nearbyPeriods() {
+    return [0, -1, 1, -2, 2, -3, 3, -4, 4]
+      .map(distance => this._offset + distance).filter(offset => offset <= 0)
+      .map(offset => this._range(offset));
+  }
+
+  _requestPeriod(range) {
+    const key = range.start.toISOString();
+    let entry = this._periodCache.get(key);
+    if (!entry) {
+      entry = {};
+      this._periodCache.set(key, entry);
+      entry.promise = this._fetchPeriod(range).then(result => (entry.result = { ...result, loadedAt: Date.now() }));
+    }
+    return entry;
+  }
+
+  async _prefetchPeriods() {
+    const cache = this._periodCache;
+    if (!this._config.popup || this._prefetching === cache) return;
+    this._prefetching = cache;
+    try {
+      // Yield past the selected period's paint before starting background work.
+      await new Promise(resolve => (globalThis.requestAnimationFrame || globalThis.setTimeout)(resolve));
+      await new Promise(resolve => setTimeout(resolve, 0));
+      while (cache === this._periodCache && this.isConnected !== false && !this._loading) {
+        const range = this._nearbyPeriods().find(range => !cache.has(range.start.toISOString()));
+        if (!range) break;
+        await this._requestPeriod(range).promise;
+      }
+    } finally { if (this._prefetching === cache) this._prefetching = null; }
+  }
+
+  async _fetchPeriod({ start, end }) {
+    const config = this._config, hass = this._hass, context = this._periodContext;
+    const ids = [...new Set([config.entity, ...(config.sub_entities || []).flatMap(item => [item.entity_id, item.cost_entity]).filter(Boolean)])];
+    const usable = ids.filter(entity => !historyEntityState(hass, { entity }));
+    const needsPrice = config.calculate_cost || (config.sub_entities || []).some(item => !item.cost_entity);
+    const loadPrice = async () => {
+      if (!needsPrice || config.cost_per_kwh !== undefined || !hass.callWS) return {};
+      try { return { preferences: await (context.price ||= hass.callWS({ type: 'energy/get_prefs' })) }; }
+      catch (error) { context.price = null; return { priceError: error?.code !== 'not_found' }; }
+    };
+    const loadHistory = async () => {
+      if (!config.popup) return {};
+      const metadata = hass.callWS ? await (context.metadata ||= hass.callWS({ type: 'recorder/get_statistics_metadata', statistic_ids: usable })) : [];
+      if (context !== this._periodContext || this.isConnected === false) return {};
+      const meters = metadata.filter(item => item.has_sum).map(item => item.statistic_id);
+      const statistics = meters.length ? await hass.callWS({ type: 'recorder/statistics_during_period', statistic_ids: meters,
+        start_time: start.toISOString(), end_time: end.toISOString(), period: config.period === 'month' ? 'day' : 'hour', units: { energy: 'kWh' }, types: ['change'] }) : {};
+      if (context !== this._periodContext || this.isConnected === false) return {};
+      return Object.fromEntries(await Promise.all(usable.map(async entity => {
+        if (statistics[entity]?.length) {
+          const unit = metadata.find(item => item.statistic_id === entity)?.statistics_unit_of_measurement;
+          return [entity, { statistics: statistics[entity], unit: energyValue(1, unit, { display_unit: 'kWh' })?.error ? unit : 'kWh' }];
+        }
+        const query = new URLSearchParams({ filter_entity_id: entity, end_time: end.toISOString() });
+        try {
+          const response = await hass.callApi('GET', `history/period/${start.toISOString()}?${query}`);
+          return [entity, { records: Array.isArray(response?.[0]) ? response[0] : [] }];
+        } catch { return [entity, { error: true }]; }
+      })));
+    };
+    try {
+      const [series, price] = await Promise.all([loadHistory(), loadPrice()]);
+      return { series, ...price, failed: Boolean(price.priceError || Object.values(series).some(item => item.error)) };
+    } catch {
+      context.metadata = null;
+      return { series: {}, error: true, failed: true };
+    }
+  }
+
   async _load() {
-    if (this.isConnected === false || !this._config?.popup || historyEntityState(this._hass, this._config)) return;
-    const { start, end } = this._range();
-    const key = `${this._config.entity}:${start.toISOString()}`;
+    if (this.isConnected === false || (!this._config?.popup && !this._config?.calculate_cost) || historyEntityState(this._hass, this._config)) return;
+    const range = this._range(), key = range.start.toISOString();
     if (this._loadedKey === key) return;
     this._loadedKey = key;
     const loadId = ++this._loadId;
-    this._loading = true;
-    this._error = false;
-    this._history = [];
-    this._render();
-    const query = new URLSearchParams({
-      filter_entity_id: this._config.entity,
-      end_time: end.toISOString(),
-    });
-    try {
-      const response = await this._hass.callApi("GET", `history/period/${start.toISOString()}?${query}`);
-      if (loadId !== this._loadId || this.isConnected === false) return;
-      this._history = Array.isArray(response?.[0]) ? response[0] : [];
-      this._error = false;
-    } catch (_error) {
-      if (loadId !== this._loadId || this.isConnected === false) return;
-      this._history = [];
-      this._error = true;
-    } finally {
-      if (loadId === this._loadId) {
-        this._loading = false;
-        if (this.isConnected === false) this._loadedKey = "";
-        this._render();
-      }
+    if (this._periodCache.size) {
+      const nearby = new Set(this._nearbyPeriods().map(range => range.start.toISOString()));
+      for (const cachedKey of this._periodCache.keys()) if (!nearby.has(cachedKey)) this._periodCache.delete(cachedKey);
     }
+    const cached = this._periodCache.get(key)?.result;
+    // The open period is still accumulating; refresh it on return after a minute.
+    if (cached?.failed || cached && key === this._range(0).start.toISOString() && Date.now() - cached.loadedAt > 60000) this._periodCache.delete(key);
+    const entry = this._requestPeriod(range);
+    if (!entry.result) {
+      this._loading = true;
+      this._error = false;
+      this._history = []; this._series = {};
+      this._render();
+    }
+    const result = entry.result || await entry.promise;
+    if (loadId !== this._loadId || this.isConnected === false) return;
+    this._series = result.series;
+    this._history = result.series[this._config.entity]?.records || [];
+    this._error = Boolean(result.error || result.series[this._config.entity]?.error);
+    this._preferences = result.preferences; this._priceError = result.priceError;
+    this._loading = false;
+    this._render();
+    if (!result.failed) this._prefetchPeriods();
+  }
+
+  _consumption(entityId, variables = this._config, range = this._range()) {
+    const state = this._hass?.states?.[entityId], series = this._series?.[entityId] || {};
+    const unavailable = historyEntityState(this._hass, { entity: entityId });
+    if (unavailable) return { samples: [], total: null, reason: `common.${unavailable}` };
+    if (series.error) return { samples: [], total: null, reason: 'timeline.history_unavailable' };
+    let error = false;
+    const options = { range, period: this._config.period, timeZone: this._hass?.config?.time_zone || 'UTC', stateClass: state?.attributes?.state_class,
+      convert: (value, record) => {
+        const source = series.statistics ? { state: value, attributes: { unit_of_measurement: series.unit } } : record;
+        const converted = energyHistoryValue(source, state?.attributes?.unit_of_measurement, variables);
+        if (converted?.error) error = true;
+        return converted?.error ? null : converted?.value;
+      } };
+    const data = series.statistics ? statisticsBuckets(series.statistics, options)
+      : energyBuckets(entityId === this._config.entity ? this._history : series.records || [], options);
+    const unit = energyValue(0, state?.attributes?.unit_of_measurement, variables)?.unit || '';
+    return { ...data, unit, total: error ? null : energyTotal(data.samples), reason: error ? 'energy.format_error' : null };
+  }
+
+  _breakdown(tariff, metric, range) {
+    if (!this._config.sub_entities?.length && !this._config.calculate_cost) return undefined;
+    const format = (value, unit) => energyLabel({ value, unit }, this._config, this._hass);
+    const items = (this._config.sub_entities || []).map(item => {
+      const energy = this._consumption(item.entity_id, { display_unit: 'kWh' }, range);
+      const cost = item.cost_entity ? this._consumption(item.cost_entity, {}, range) : null;
+      const currency = cost?.unit || tariff.currency;
+      const expectedCurrency = metric === 'cost' && !this._config.calculate_cost ? this._hass?.states?.[this._config.entity]?.attributes?.unit_of_measurement : this._hass?.config?.currency;
+      const compatible = !cost || !!currency && currency === expectedCurrency;
+      const costValue = !compatible ? null : cost ? cost.total : energy.total != null && tariff.value != null ? energy.total * tariff.value : null;
+      const reason = energy.reason || cost?.reason || (!compatible ? 'energy.format_error' : null);
+      return { name: item.name || this._hass?.states?.[item.entity_id]?.attributes?.friendly_name || item.entity_id,
+        energyLabel: energy.total == null ? '—' : `${energy.limited ? '≈ ' : ''}${format(energy.total, 'kWh')}`,
+        costLabel: costValue == null ? '—' : `${!cost || cost.limited ? '≈ ' : ''}${format(costValue, currency)}`,
+        value: metric === 'cost' ? cost?.reason || !compatible ? null : costValue : energy.reason ? null : energy.total,
+        problem: reason ? localize(reason, this._hass) : energy.total == null || costValue == null ? localize('energy.incomplete', this._hass) : '' };
+    });
+    const derived = this._config.calculate_cost || this._config.sub_entities.some(item => !item.cost_entity);
+    const note = derived ? this._priceError ? localize('energy.price_error', this._hass)
+      : tariff.reason ? localize(tariff.reason, this._hass)
+        : `${localize('energy.estimated_cost', this._hass)} · ${format(tariff.value, `${tariff.currency}/kWh`)}` : '';
+    return { items, metric, note };
   }
 
   _values() {
@@ -1600,32 +1771,44 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const formatting = energyFormatting(this._config);
     const reading = formatting ? energyValue(entity?.state, entity?.attributes?.unit_of_measurement, this._config) : null;
     const history = unavailable ? {values: [], error: false} : this._values();
-    const formatError = reading?.error || history.error ? localize("energy.format_error", this._hass) : "";
-    const problem = cardProblem(this._config, this._hass, { contentError: formatError || (this._error ? localize("timeline.history_unavailable", this._hass) : ""), loading: this._loading });
-    const values = history.values.filter(record => Number.isFinite(record.value));
-    const current = !this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass) : reading ? energyLabel(reading, this._config, this._hass) : entity?.state && Number.isFinite(Number(entity.state)) ? entity.state : "—";
+    const consumption = this._config.popup && !unavailable ? this._consumption(this._config.entity) : { samples: [], total: null };
+    const tariff = energyTariff(this._config, this._hass, this._preferences);
+    const costMode = this._config.calculate_cost;
+    const costValue = value => { const kwh = energyValue(value, consumption.unit || entity?.attributes?.unit_of_measurement, { display_unit: 'kWh' }); return kwh && !kwh.error && tariff.value != null ? kwh.value * tariff.value : null; };
+    const priceProblem = costMode && !this._loading ? this._priceError ? localize('energy.price_error', this._hass) : tariff.reason ? localize(tariff.reason, this._hass) : '' : '';
+    const formatError = reading?.error || history.error || consumption.reason === "energy.format_error" || costMode && energyValue(1, entity?.attributes?.unit_of_measurement, { display_unit: 'kWh' })?.error ? localize("energy.format_error", this._hass) : "";
+    const problem = cardProblem(this._config, this._hass, { contentError: formatError || priceProblem || (this._error ? localize("timeline.history_unavailable", this._hass) : ""), loading: this._loading });
+    const values = consumption.samples.filter(record => Number.isFinite(record.value));
+    let current = !this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass) : reading ? energyLabel(reading, this._config, this._hass) : entity?.state && Number.isFinite(Number(entity.state)) ? entity.state : "—";
+    if (costMode && !unavailable && this._hass?.states) {
+      const amount = energyValue(entity?.state, entity?.attributes?.unit_of_measurement, { display_unit: 'kWh' });
+      current = amount && !amount.error && tariff.value != null ? `≈ ${energyLabel({ value: amount.value * tariff.value, unit: tariff.currency }, this._config, this._hass)}` : '—';
+    }
     const period = this._periodLabel();
     const range = this._range();
-    const extrema = values.reduce((bounds, item) => [Math.min(bounds[0], item.value), Math.max(bounds[1], item.value)], [Infinity, -Infinity]);
-    const min = values.length ? extrema[0] : 0, max = values.length ? extrema[1] : 1;
     const unit = reading?.unit || entity?.attributes?.unit_of_measurement || "";
-    const bound = value => energyLabel({value, unit}, this._config, this._hass);
+    const bound = value => energyLabel({value, unit: costMode ? tariff.currency : unit}, this._config, this._hass);
+    const samples = costMode ? consumption.samples.map(sample => ({ ...sample, value: sample.value == null ? null : costValue(sample.value) })) : consumption.samples;
+    const total = costMode ? energyTotal(samples) : consumption.total;
+    const metric = costMode || entity?.attributes?.device_class === 'monetary' || unit === this._hass?.config?.currency ? 'cost' : 'energy';
     const previous = localize("energy.previous_period", this._hass);
     const next = localize("energy.next_period", this._hass);
     const disabled = unavailable || this._loading;
-    const status = formatError || (!this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass)
+    const retryable = this._error || this._priceError || Object.values(this._series || {}).some(series => series.error);
+    const status = formatError || priceProblem || (!this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass)
       : this._loading ? localize("timeline.loading", this._hass)
         : this._error ? localize("timeline.history_unavailable", this._hass) : localize("energy.no_data", this._hass));
-    const historyState = !this._hass?.states ? "loading" : unavailable || (this._loading ? "loading" : this._error || formatError ? "error" : values.length || !this._config.popup ? "ready" : "empty");
+    const historyState = !this._hass?.states ? "loading" : unavailable || (this._loading ? "loading" : this._error || formatError || priceProblem ? "error" : values.length || !this._config.popup ? "ready" : "empty");
     const body = this._config.popup
-      ? `<h2>${escapeHtml(title)}</h2><div class="period-nav"><button data-period="previous" aria-label="${escapeHtml(previous)}"${disabled ? " disabled" : ""}>‹</button><strong>${escapeHtml(period)}</strong><button data-period="next" aria-label="${escapeHtml(next)}"${disabled || this._offset >= 0 ? " disabled" : ""}>›</button></div><div class="chart" role="img" aria-label="${escapeHtml(`${title} ${period}${formatting && values.length ? ` ${bound(min)} – ${bound(max)}` : ""}`)}"><span class="empty" role="status">${escapeHtml(status)}</span></div>`
+      ? `<h2>${escapeHtml(title)}</h2><div class="period-nav"><button data-period="previous" aria-label="${escapeHtml(previous)}"${disabled ? " disabled" : ""}><ha-icon icon="mdi:chevron-left" aria-hidden="true"></ha-icon></button><strong>${escapeHtml(period)}</strong><button data-period="next" aria-label="${escapeHtml(next)}"${disabled || this._offset >= 0 ? " disabled" : ""}><ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon></button></div><div class="chart" aria-label="${escapeHtml(`${title} ${period}`)}"><span class="empty" role="status">${escapeHtml(status)}</span></div>`
       : `<span class="value">${escapeHtml(String(current))}</span><span class="period">${escapeHtml(period)}</span>`;
     const surfaceTag = this._config.popup ? "div" : "button";
     const surfaceAttributes = this._config.popup ? "" : ` type="button" aria-label="${escapeHtml(`${title}${formatting ? ` ${current}` : ""}`)}"${unavailable ? ' disabled aria-disabled="true"' : ""}`;
     const markup = `<style>
-      :host{display:block;width:100%;container:marao-energy / inline-size;}:host([data-marao-control-cell]){display:grid;min-width:0}:host([data-marao-control-cell])>.surface{height:100%} .surface{display:flex;min-height:112px;width:100%;box-sizing:border-box;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:18px 20px;border:0;border-radius:var(--ha-card-border-radius,18px);background:var(--ha-card-background);color:var(--primary-text-color);font:inherit;text-align:left;cursor:pointer;} .surface:focus{outline:none;} .surface:disabled{cursor:default;color:var(--secondary-text-color);} .surface>*{max-width:100%;overflow-wrap:anywhere;} h2{width:100%;margin:0;font-size:var(--font-size-primary,18px);font-weight:var(--font-weight-primary,700);} .value{font-size:calc(var(--font-size-primary,18px) * 1.78);font-weight:800;line-height:1.25;} .period{color:var(--secondary-text-color);font-size:var(--font-size-secondary,14px);} .period-nav{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;width:100%;gap:8px;margin-bottom:12px;text-align:center;} .period-nav strong{font-size:var(--font-size-primary,18px);text-transform:capitalize;} .surface>[data-history-retry]{min-width:48px;min-height:48px;padding:10px 12px;border:0;border-radius:12px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);overflow-wrap:anywhere;} .surface>[data-history-retry]:focus{outline:none;} .period-nav button{width:48px;height:48px;border:0;border-radius:50%;background:var(--secondary-background-color);color:var(--primary-text-color);font-size:34px;line-height:1;} .period-nav button:focus{outline:none;} .period-nav button:disabled{opacity:.35;} .chart{display:grid;position:relative;width:100%;min-height:190px;border-radius:14px;background:var(--secondary-background-color);overflow:hidden;} svg{grid-area:1/1;display:block;width:100%;height:100%;min-height:190px;} polyline{fill:none;stroke:var(--primary-color);stroke-width:2.5;vector-effect:non-scaling-stroke;} .scale{grid-area:1/1;position:relative;margin:8px;min-height:174px;display:flex;flex-direction:column;gap:8px;align-items:flex-start;justify-content:space-between;color:var(--secondary-text-color);font-size:var(--font-size-caption,14px);} .scale span{max-width:100%;overflow-wrap:anywhere;}.scale span:last-child{align-self:flex-end;} .empty{display:grid;min-height:190px;place-items:center;padding:16px;color:var(--secondary-text-color);font-size:var(--font-size-primary,18px);text-align:center;} @container marao-energy (max-width:240px){.surface{padding:12px 8px}.period-nav{grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center}.period-nav strong{grid-column:1/-1;grid-row:1}}
+      :host{display:block;width:100%;container:marao-energy / inline-size;}:host([data-marao-control-cell]){display:grid;min-width:0}:host([data-marao-control-cell])>.surface{height:100%} .surface{display:flex;min-height:112px;width:100%;box-sizing:border-box;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:18px 20px;border:0;border-radius:var(--ha-card-border-radius,18px);background:var(--ha-card-background);color:var(--primary-text-color);font:inherit;text-align:left;cursor:pointer;} .surface:focus{outline:none;} .surface:disabled{cursor:default;color:var(--secondary-text-color);} .surface>*{max-width:100%;overflow-wrap:anywhere;} h2{width:100%;margin:0;font-size:var(--font-size-primary,18px);font-weight:var(--font-weight-primary,700);} .value{font-size:calc(var(--font-size-primary,18px) * 1.78);font-weight:800;line-height:1.25;} .period{color:var(--secondary-text-color);font-size:var(--font-size-secondary,14px);} .period-nav{position:sticky;top:var(--marao-popup-header-height,0px);z-index:1;background:var(--ha-card-background,var(--card-background-color));display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;width:100%;gap:8px;padding:8px 0 12px;text-align:center;} .period-nav strong{font-size:var(--font-size-primary,18px);} .surface>[data-history-retry]{min-width:48px;min-height:48px;padding:10px 12px;border:0;border-radius:12px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);overflow-wrap:anywhere;} .surface>[data-history-retry]:focus{outline:none;} .period-nav button{display:grid;place-items:center;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:var(--secondary-background-color);color:var(--primary-text-color);} .period-nav ha-icon{--mdc-icon-size:24px;width:24px;height:24px;pointer-events:none;} .period-nav button:focus{outline:none;} .period-nav button:disabled{opacity:.35;} .chart{display:grid;position:relative;width:100%;min-height:190px;overflow:hidden;} svg{grid-area:1/1;display:block;width:100%;height:100%;min-height:190px;} polyline{fill:none;stroke:var(--primary-color);stroke-width:2.5;vector-effect:non-scaling-stroke;} .scale{grid-area:1/1;position:relative;margin:8px;min-height:174px;display:flex;flex-direction:column;gap:8px;align-items:flex-start;justify-content:space-between;color:var(--secondary-text-color);font-size:var(--font-size-caption,14px);} .scale span{max-width:100%;overflow-wrap:anywhere;}.scale span:last-child{align-self:flex-end;} .empty{display:grid;min-height:190px;place-items:center;padding:16px;color:var(--secondary-text-color);font-size:var(--font-size-primary,18px);text-align:center;} @container marao-energy (max-width:240px){.surface{padding:12px 8px}.period-nav{grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center}.period-nav strong{grid-column:1/-1;grid-row:1}}
+      div.surface{padding:var(--marao-popup-card-padding,18px 20px);padding-top:0;cursor:default} div.surface>h2{display:var(--marao-popup-detail-title-display,block)} @container marao-energy (max-width:240px){div.surface{padding:var(--marao-popup-card-padding,12px 8px);padding-top:0}}
       .problem{font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.25;}
-    </style><${surfaceTag} class="surface"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""} data-history-state="${historyState}"${surfaceAttributes}>${this._config.popup ? body : `<h2>${escapeHtml(title)}</h2>${body}`}${this._error && !unavailable && this._config.popup ? `<button type="button" data-history-retry>${escapeHtml(localize("common.retry", this._hass))}</button>` : ""}${problem && problem.kind !== "loading" && !this._config.popup ? `<span class="problem" role="status"><ha-icon icon="mdi:help-circle-outline" aria-hidden="true"></ha-icon> <span>${escapeHtml(problem.reason)}</span></span>` : ""}</${surfaceTag}>`;
+    </style><${surfaceTag} class="surface"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""} data-history-state="${historyState}"${surfaceAttributes}>${this._config.popup ? body : `<h2>${escapeHtml(title)}</h2>${body}`}${retryable && !unavailable && this._config.popup ? `<button type="button" data-history-retry>${escapeHtml(localize("common.retry", this._hass))}</button>` : ""}${problem && problem.kind !== "loading" && !this._config.popup ? `<span class="problem" role="status"><ha-icon icon="mdi:help-circle-outline" aria-hidden="true"></ha-icon> <span>${escapeHtml(problem.reason)}</span></span>` : ""}</${surfaceTag}>`;
     const retainedSurface = this.shadowRoot.querySelector('.surface');
     const retainedChart = this.shadowRoot.querySelector('.chart');
     if (retainedSurface && retainedChart && this._config.popup && document.createElement) {
@@ -1639,13 +1822,18 @@ class MaraoEnergyPeriodCard extends HTMLElement {
       this.shadowRoot.querySelector('style').textContent = template.content.querySelector('style').textContent;
     } else this.shadowRoot.innerHTML = markup;
     if (this._config.popup) this._syncDetail(this.shadowRoot.querySelector('.chart'), {
-      samples: history.values, range, windows: false, hass: this._hass, stateClass: entity?.attributes?.state_class,
-      format: bound, unavailable: unavailable ? localize(`common.${unavailable}`, this._hass) : "", loading: Boolean(this._loading), error: formatError || (this._error ? localize("timeline.history_unavailable", this._hass) : ""),
+      samples, bars: true, interval: this._config.period === 'month' ? 'day' : 'hour', range, windows: false, unit: costMode ? tariff.currency : unit,
+      summaryLabel: total == null || this._loading || unavailable ? '' : `${costMode || consumption.limited ? '≈ ' : ''}${bound(total)}`,
+      breakdownGridStyles: controlGridStyles('.history-breakdown-layout'),
+      breakdown: !this._loading && !unavailable ? this._breakdown(tariff, metric) : undefined, hass: this._hass, stateClass: entity?.attributes?.state_class,
+      breakdownForSample: this._config.period === 'month' && !this._loading && !unavailable
+        ? sample => this._breakdown(tariff, metric, sample ? { start: new Date(sample.time), end: new Date(sample.end) } : undefined) : undefined,
+      format: bound, unavailable: unavailable ? localize(`common.${unavailable}`, this._hass) : "", loading: Boolean(this._loading), error: formatError || priceProblem || (this._error ? localize("timeline.history_unavailable", this._hass) : ""),
       localize: key => localize(key, this._hass), onRetry: () => { this._loadedKey = ''; this._load(); },
-      coverageLimited: Boolean(history.values.length && history.values[0].time > range.start.getTime()),
+      coverageLimited: Boolean(consumption.limited),
     });
     this.shadowRoot.querySelector('[data-history-retry]')?.addEventListener('click', () => {
-      if (!this._error || historyEntityState(this._hass, this._config) || this._loading) return;
+      if (!retryable || historyEntityState(this._hass, this._config) || this._loading) return;
       this._loadedKey = "";
       window.MaraoDashboard?.haptic?.("heavy");
       this._load();

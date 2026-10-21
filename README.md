@@ -65,11 +65,12 @@ target a live Home Assistant instance. Configure its URL, administrator long-liv
 token, and SSH access in the ignored `ha-test/local.json`. `npm run ha:sync`
 builds and installs the current working tree, creates safe demonstration entities,
 and generates the complete test dashboard. Browser tests prepare it automatically.
-Changes to saved data, generated ownership or installation/upgrade behavior also
-require the clean final candidate’s scoped preserved-install upgrade scenario and
-`verify:release`, including affected historical data and verified disposable cleanup.
-Fresh fixture checks alone do not establish upgrade compatibility. Full-suite and
-complete mobile-matrix testing require an explicit request.
+Publication runs affected unit tests only. Install the final release candidate,
+including version metadata, on the disposable instance before publishing.
+Reuse development browser and upgrade results; additional integration, full-suite
+and complete mobile-matrix testing require an explicit request. Changes to saved
+data or generated ownership still need appropriate compatibility and recovery
+verification during development.
 
 Frontend changes need an integration reload and browser refresh; backend changes
 need a Home Assistant restart. Preparation handles both.

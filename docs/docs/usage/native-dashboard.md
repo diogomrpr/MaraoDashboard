@@ -52,7 +52,9 @@ Graph-enabled native cards expose the same separate **History** (**Histórico**)
 control as generated cards. Inspecting readings sends no entity command. History
 inside a sheet keeps one modal layer, and Back restores its parent controls and
 scroll position. Energy sheets retain their day/month navigation in Home
-Assistant's time zone.
+Assistant's time zone, with hourly/daily consumption bars and an optional ordered
+**Energy breakdown** of energy and cost sensors. The editor also accepts a
+price-per-kWh override and calculated-cost display; derived costs are estimates.
 
 Editor previews cannot dispatch device services or activate the fullscreen shell.
 Normal controls retain authoritative HA state, strict access slides, security holds,

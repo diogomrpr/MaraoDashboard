@@ -118,6 +118,9 @@ EDITOR_CATALOG: dict[str, Any] = {
             "id": "hc_energy_period_card", "label": "Energy period", "icon": "mdi:chart-bar", "domains": ["sensor"],
             "description": "A day or month reading and its independently named history popup.",
             "variables": [_field("period", "Period", "energy_period", default="day"),
+                          _field("calculate_cost", "Calculate cost from energy", "boolean"),
+                          _field("cost_per_kwh", "Price per kWh", "number", description="Leave empty to use the Home Assistant Energy tariff. Calculated costs are estimates."),
+                          _field("sub_entities", "Energy breakdown", "energy_sub_entities"),
                           _field("popup_hash", "Popup hash", "text", advanced=True)],
         },
         {

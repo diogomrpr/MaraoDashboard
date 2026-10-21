@@ -64,7 +64,10 @@ volume services are used.
 App shortcuts show the logo across the full square card, without a visible title
 or normal player-state line. The configured app name remains the accessible button
 label. Unavailable players still show a readable warning and disable launching.
-YouTube, Netflix, Disney+, Prime Video, Apple TV, Plex and MEO shortcuts automatically
+Logo-only app sections use an 80px cell minimum, so three shortcuts fit on
+ordinary phone widths while configured columns still reflow on narrower hosts.
+Unavailable messages can wrap and grow the row.
+YouTube, Netflix, Disney+, Prime Video, Apple TV, Plex, Spotify and MEO shortcuts automatically
 use their real app icons and brand colors. MEO and MEO Go use the official MEO Go artwork. Recognition uses the configured app source
 (including its bundle ID), so you can keep your own display name. Icons ship with
 Marao and do not require an external image service while using the dashboard.

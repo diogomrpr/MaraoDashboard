@@ -43,8 +43,8 @@ const cardsSource = (await fs.readFile(new URL("../../custom_components/marao_da
 const cardsModule = `data:text/javascript;base64,${Buffer.from(cardsSource).toString("base64")}`;
 const { MaraoCard } = await import(cardsModule);
 const classes = source.slice(source.indexOf("function escapeHtml("), source.indexOf('if (!customElements.get("marao-energy-period-card"))'));
-const { MaraoStateTimelineCard, MaraoEnergyPeriodCard } = await import(`data:text/javascript;base64,${Buffer.from(`import { historyPeriodRange, historySamples, loadHistoryChart, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, focusRestorer } from "${cardsModule}";\nconst localize = (key) => key;\n${classes}\nexport { MaraoStateTimelineCard, MaraoEnergyPeriodCard };`).toString("base64")}`);
-const tick = () => new Promise((resolve) => setImmediate(resolve));
+const { MaraoStateTimelineCard, MaraoEnergyPeriodCard } = await import(`data:text/javascript;base64,${Buffer.from(`import { energyBuckets, statisticsBuckets, energyTotal, historyPeriodRange, historySamples, loadHistoryChart, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, focusRestorer, controlGridStyles } from "${cardsModule}";\nconst localize = (key) => key;\n${classes}\nexport { MaraoStateTimelineCard, MaraoEnergyPeriodCard };`).toString("base64")}`);
+const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
 const state = (value = "21") => ({ state: value, attributes: { friendly_name: "History" }, last_changed: new Date().toISOString() });
 test('graph history retains replaced authoritative live readings without mutating Recorder data or refetching', () => {
   const card = new MaraoCard(), now = Date.now();
@@ -114,7 +114,7 @@ for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) {
       if (Card === MaraoEnergyPeriodCard && fail) assert.equal(card._detailOptions.error, 'timeline.history_unavailable');
       else assert.match(card.shadowRoot.innerHTML, fail ? /role="alert"/ : /role="status"/);
       for (let i = 0; i < 5; i += 1) card.hass = { ...hass };
-      assert.equal(calls, 1);
+      assert.equal(calls, Card === MaraoEnergyPeriodCard && !fail ? 5 : 1);
     }
   });
 
@@ -176,19 +176,107 @@ test("energy summary keeps the restored popup invoker focused through the next H
   assert.match(card.shadowRoot.innerHTML, /class="value">22</);
 });
 
-test("energy period navigation renders loading immediately and fetches each completed period change once", async () => {
+test('energy prefetch waits for the first period to load and paint', async () => {
   const card = create(MaraoEnergyPeriodCard);
+  let finish, paint, calls = 0;
+  const previousFrame = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = callback => { paint = callback; };
+  try {
+    card.hass = { states: { 'sensor.history': state() }, callApi: () => {
+      calls++;
+      return calls === 1 ? new Promise(resolve => { finish = resolve; }) : Promise.resolve([]);
+    } };
+    await tick();
+    assert.equal(calls, 1, 'opening requests only the selected period');
+    assert.equal(paint, undefined, 'no prefetch is scheduled while the period is loading');
+    finish([]); await tick();
+    assert.equal(card._loading, false);
+    assert.equal(calls, 1, 'selected data renders before any background request');
+    assert.equal(typeof paint, 'function');
+    paint();
+    assert.equal(calls, 1, 'prefetch also yields until after the animation frame');
+    await tick();
+    assert.equal(calls, 5);
+  } finally {
+    if (previousFrame) globalThis.requestAnimationFrame = previousFrame;
+    else delete globalThis.requestAnimationFrame;
+  }
+});
+
+for (const period of ['month', 'day']) test(`energy ${period} prefetches four periods in both directions and navigates cached data immediately`, async () => {
+  const card = create(MaraoEnergyPeriodCard);
+  card.setConfig({ ...card._config, period });
+  card._offset = -6;
   const urls = [];
-  card.hass = { states: { "sensor.history": state() }, callApi: async (_method, url) => { urls.push(url); return []; } };
+  card.hass = { config: { time_zone: 'Europe/Lisbon' }, states: { 'sensor.history': state() }, callApi: async (_method, url) => { urls.push(url); return [[state()]]; } };
   await tick();
-  const previous = card.shadowRoot.buttons.find((button) => button.dataset.period === "previous");
-  previous.click();
-  assert.match(card.shadowRoot.innerHTML, /data-history-state="loading"/);
-  previous.click();
-  assert.equal(card._offset, -1);
+  const expected = [0, -1, 1, -2, 2, -3, 3, -4, 4].map(distance => card._range(-6 + distance).start.toISOString());
+  assert.deepEqual(urls.map(url => url.split('?')[0].slice('history/period/'.length)), expected);
+  const cached = card._periodCache.get(card._range(-7).start.toISOString()).result.series;
+  card.shadowRoot.buttons.find(button => button.dataset.period === 'previous').click();
+  assert.equal(card._offset, -7);
+  assert.equal(card._loading, false, 'cached navigation has no loading frame');
+  assert.equal(card._series, cached, 'chart and breakdown use the prefetched period');
   await tick();
-  assert.equal(urls.length, 2);
-  assert.notEqual(urls[0], urls[1]);
+  assert.equal(urls.length, 10, 'only the newly adjacent period is requested');
+  assert.equal(card._periodCache.size, 9);
+  card.shadowRoot.buttons.find(button => button.dataset.period === 'next').click();
+  assert.equal(card._loading, false);
+  await tick();
+  card._offset = 0; await card._load(); await tick();
+  assert.equal(card._periodCache.size, 5, 'future periods are excluded');
+  const currentKey = card._range().start.toISOString();
+  const count = urls.filter(url => url.includes(currentKey)).length;
+  card._periodCache.get(currentKey).result.loadedAt -= 61000;
+  card._offset = -1; await card._load();
+  card._offset = 0; await card._load(); await tick();
+  assert.equal(urls.filter(url => url.includes(currentKey)).length, count + 1, 'returning to a stale current period refreshes it');
+});
+
+test('energy navigation shares pending background requests and retries failed cached periods', async () => {
+  const card = create(MaraoEnergyPeriodCard), urls = [];
+  let finish, fail = false;
+  const hass = { states: { 'sensor.history': state() }, callApi: (_method, url) => {
+    urls.push(url);
+    if (urls.length === 2) return new Promise(resolve => { finish = resolve; });
+    return fail ? Promise.reject(new Error('history failed')) : Promise.resolve([]);
+  } };
+  card.hass = hass;
+  await tick();
+  card.shadowRoot.buttons.find(button => button.dataset.period === 'previous').click();
+  assert.equal(card._loading, true);
+  assert.equal(urls.length, 2, 'foreground joins the pending prefetch');
+  fail = true; finish([]); await tick();
+  assert.equal(card._error, false, 'background failures do not replace the selected period');
+  const key = card._range(-2).start.toISOString();
+  assert.equal(card._periodCache.get(key).result.failed, true);
+  const before = urls.filter(url => url.includes(key)).length;
+  fail = false;
+  card.shadowRoot.buttons.find(button => button.dataset.period === 'previous').click();
+  await tick();
+  assert.equal(urls.filter(url => url.includes(key)).length, before + 1);
+  assert.equal(card._error, false);
+});
+
+test('energy discards pending prefetches after source changes and removal', async () => {
+  const card = create(MaraoEnergyPeriodCard);
+  let finish, calls = 0;
+  card.isConnected = true;
+  card.hass = { states: { 'sensor.history': state(), 'sensor.other': state() }, callApi: async () => {
+    calls++;
+    return calls === 2 ? new Promise(resolve => { finish = resolve; }) : [];
+  } };
+  await tick();
+  const oldCache = card._periodCache;
+  card.setConfig({ ...card._config, entity: 'sensor.other' });
+  await tick();
+  const count = calls;
+  finish([[state('999')]]); await tick();
+  assert.notEqual(card._periodCache, oldCache);
+  assert.equal(calls, count, 'invalidated worker schedules no more requests');
+  assert.deepEqual(card._history, []);
+  card.isConnected = false; card.disconnectedCallback(); await tick();
+  assert.equal(card._periodCache.size, 0);
 });
 
 test("timeline appends authoritative live changes without fetching the same history again", async () => {
@@ -244,7 +332,7 @@ for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) test(`${Card
   fail = false;
   card.shadowRoot.querySelector('[data-history-retry]').click();
   await tick();
-  assert.equal(calls, 2);
+  assert.equal(calls, Card === MaraoEnergyPeriodCard ? 6 : 2);
   assert.match(card.shadowRoot.innerHTML, /data-history-state="empty"/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /data-problem="error"/);
 });
@@ -273,7 +361,7 @@ for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) {
     card.disconnectedCallback?.();
     card.isConnected = true;
     card.connectedCallback();
-    assert.equal(calls, 1);
+    assert.equal(calls, Card === MaraoEnergyPeriodCard && !fail ? 2 : 1);
     assert.match(card.shadowRoot.innerHTML, new RegExp(`data-history-state="${fail ? 'error' : 'empty'}"`));
   });
   test(`${Card.name} discards history completed while removed`, async () => {

@@ -235,6 +235,8 @@ the action it affects.
 - Keep card content mounted when unrelated entities update, so a refresh does
   not replace elements under an active scrolling finger. Refresh immediately
   when the card's own entities, action targets or connection state change.
+  Fresh state reports that leave visible content and action bindings unchanged
+  also retain that content; they must not rebuild tall cards or duplicate listeners.
 - Avoid nested scrolling except inside a bounded popup.
 
 Resolve each safe edge from the Marao development override, locally inherited
@@ -560,7 +562,9 @@ large and readable.
 - Animate upward from the bottom.
 - Stay above the navbar and all dashboard cards.
 - Keep a visible close button and internal scrolling.
-- Support content-driven height or a configured fixed/max height.
+- Use content-driven height by default, growing to the available viewport with
+  at least 50px top clearance (or the top safe inset when larger). Explicit
+  fixed/max heights remain supported.
 - Keep the backdrop full-screen and constrain the sheet's usable area to the
   overlay's own top/side safe bounds. Short sheets retain their bottom placement;
   tall sheets clamp to available height, including while open during rotation.
@@ -705,7 +709,11 @@ Explicit sections size independently. Two-column sections fit normal/bold
 320px, 360px and 384px phone viewports, including host margins, and
 282px/322px/346px embedded sections. A shared 136px floor and
 7.5-times-primary-font policy governs capacity, requiring 280px of usable width
-for two columns at the normal 18px primary text size. This does not cap content
+for two columns at the normal 18px primary text size. Logo-only media-app groups
+use an 80px cell minimum because their labels remain accessible rather than
+visible; three app shortcuts therefore fit on phone widths. Their controls remain
+at least 48px square, and availability/error text still wraps and grows. Mixed
+groups retain the ordinary floor. This does not cap content
 height. Preferred columns reflow together before
 controls become cramped; incomplete rows keep their normal width. All Marao
 content families fill their cells, including native primary hosts and detailed

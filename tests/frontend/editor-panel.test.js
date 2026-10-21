@@ -876,3 +876,32 @@ test('builder camera title controls share defaults and preserve retired options 
   assert.deepEqual(JSON.parse(JSON.stringify(light.form.schema.map(f=>f.name))),['entity_id','name','icon','var__provider']);
   assert.equal(PT_LABELS['Show title'],'Mostrar título');
 });
+
+test('energy breakdown editing keeps a private draft and preserves ordered unknown row fields', () => {
+  const p = panel(canonical()), handlers = {}, forms = [];
+  const original = { id: 'energy', entity_id: 'sensor.total', template: 'hc_energy_period_card', variables: {
+    sub_entities: [{ entity_id: 'sensor.heating', name: 'Heating', future: [] }, { entity_id: 'sensor.lighting', cost_entity: 'sensor.cost' }], future: true,
+  } };
+  p._model.pages[0].sections[0].entities = [structuredClone(original)];
+  p._catalog = { cards: [{ id: original.template, domains: ['sensor'], label: 'Energy period', variables: [
+    { key: 'sub_entities', label: 'Energy breakdown', kind: 'energy_sub_entities' }, { key: 'cost_per_kwh', label: 'Price per kWh', kind: 'number' },
+  ] }] };
+  const nodes = new Map(), content = { querySelector(key) {
+    if (!nodes.has(key)) nodes.set(key, { addEventListener(type, handler) { handlers[key + type] = handler; } });
+    return nodes.get(key);
+  } };
+  let members, update;
+  p._dialog = () => ({ querySelector: () => content }); p._availablePages = () => [];
+  p._mountForm = (host, data, schema, changed) => forms.push({ data, schema, changed });
+  p._renderEnergySubEntities = (host, value, changed) => { members = value; update = changed; };
+  p._renderSummary = p._refreshEnergyFields = p._closeDialog = p._refreshCards = p._setDirty = () => {};
+  p._openCardEditor('0:0', 0, null, 'page');
+  assert.ok(!forms[0].schema.some(field => field.name === 'var__sub_entities'));
+  members.reverse(); members[1].name = 'Renamed'; update(members);
+  const saved = () => JSON.parse(JSON.stringify(p._model.pages[0].sections[0].entities[0]));
+  assert.deepEqual(saved(), original, 'Cancelling the dialog leaves the document untouched');
+  forms[0].changed({ ...forms[0].data, var__cost_per_kwh: 0 }); handlers['[data-save]click']();
+  assert.deepEqual(saved().variables, { future: true, cost_per_kwh: 0, sub_entities: [original.variables.sub_entities[1], { ...original.variables.sub_entities[0], name: 'Renamed' }] });
+  update([]); handlers['[data-save]click']();
+  assert.deepEqual(saved().variables.sub_entities, []);
+});

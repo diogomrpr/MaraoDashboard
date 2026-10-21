@@ -174,3 +174,30 @@ test('phone-width sections retain two columns and reflow the same mounted cards 
     assert.equal(grid._config.columns, 2);
   } finally { globalThis.getComputedStyle = previous; }
 });
+
+test('logo-only app groups fit three phone columns without shrinking ordinary control groups', async () => {
+  const previous = globalThis.getComputedStyle;
+  let width = 282, fontSize = '18px';
+  globalThis.getComputedStyle = () => ({ fontSize });
+  try {
+    globalThis.loadCardHelpers = async () => ({ createCardElement: () => new Node() });
+    const grid = new MaraoControlGrid(); grid.getBoundingClientRect = () => ({ width });
+    const apps = Array.from({ length: 6 }, () => card('hc_media_app_card', { entity: 'media_player.safe', variables: { app_source: 'Netflix' } }));
+    apps[5] = { type: 'custom:marao-native-media-app-card', entity: 'media_player.safe', variables: { app_source: 'Spotify' } };
+    grid.setConfig({ columns: 3, groups: [{ count: 6, columns: 3 }, { count: 2, columns: 2 }], cards: [...apps, card(), card('hc_cover_card')] });
+    await grid._ready;
+    const children = [...grid._children], layout = { style: {} };
+    const query = grid.shadowRoot.querySelector.bind(grid.shadowRoot);
+    grid.shadowRoot.querySelector = selector => selector === '.control-grid' ? layout : query(selector);
+    grid._layout();
+    assert.equal(children[2].style.gridRow, '1', 'third app fits on the first row');
+    assert.equal(children[5].style.gridRow, '2', 'six apps form two rows');
+    assert.equal(children[6].style.gridRow, '3'); assert.equal(children[7].style.gridRow, '3');
+    width = 255; grid._layout();
+    assert.equal(children[2].style.gridRow, '2', 'app groups reflow below their own readable icon capacity');
+    width = 282; fontSize = '36px'; grid._layout();
+    assert.equal(children[2].style.gridRow, '1', 'logo-only apps do not reserve invisible title space');
+    assert.notEqual(children[6].style.gridRow, children[7].style.gridRow, 'ordinary controls still reflow for larger text');
+    assert.deepEqual(grid._children, children);
+  } finally { globalThis.getComputedStyle = previous; }
+});

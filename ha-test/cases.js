@@ -172,7 +172,7 @@ function expandGallery(source) {
   for (const example of manifest.eventCases) {
     const hash = `#marao-dashboard-test-events-${example.id}`;
     view.cards.push({ type: 'custom:marao-card', template: 'hc_navigation_card', name: example.name, entity: 'camera.marao_dashboard_test_camera', tap_action: { action: 'navigate', navigation_path: hash } });
-    view.cards.push({ type: 'custom:marao-popup-card', hash, name: example.name, entity: 'camera.marao_dashboard_test_camera', height: 'auto', max_height: '80dvh', cards: [{
+    view.cards.push({ type: 'custom:marao-popup-card', hash, name: example.name, entity: 'camera.marao_dashboard_test_camera', height: 'auto', max_height: '100%', cards: [{
       type: 'custom:marao-camera-events-card', entity: example.entity || 'camera.marao_dashboard_test_camera', title: example.name,
       event_provider: example.provider, frigate_instance_id: 'marao_test', frigate_camera: example.camera,
       ...(example.source ? { unifi_protect_media_source: example.source } : {}),

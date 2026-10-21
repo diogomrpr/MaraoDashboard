@@ -74,13 +74,26 @@ Unknown, unavailable, missing and disconnected entities use a neutral whole-card
 
 ## Energy reading format
 
-Energy detail sheets retain their day/month navigation and use the same numeric
-history chart as [Graph Card](hc_graph_card.md#inspect-history). Tap the chart or
-use Previous/Next reading for an original timestamp and formatted value. Calendar
+Energy detail sheets keep their day/month label and period arrows pinned below
+the popup title while scrolling, and show vertical bars of
+consumption or cost: hourly for a day, daily for a month. Tap a bar or use
+the navigation arrows to inspect its interval and exact formatted value. In a
+monthly sheet, selecting a day replaces the total row with the date followed by
+its value, keeping the chart in place, and focuses the circular breakdown and
+contributor values on that day. Use **Full month** beside the day navigation to clear the
+selection and restore the monthly overview in both charts. Calendar
 boundaries follow Home Assistant's time zone, including daylight-saving days.
-Minimum and maximum use the full retained series; counter readings do not imply
-consumption totals or a sample average. Changing a reading or graph window does
-not operate the entity.
+Sheets preload four nearby periods in each direction (months or days), excluding
+future dates, so cached navigation is immediate. The current period refreshes
+on return if its cached data is over a minute old.
+Totals use Recorder statistics or supported counter changes; gaps remain empty
+and partial totals retain the approximation marker without extra coverage labels.
+Configured appliance/room energy and cost
+sensors appear beneath the chart, with a circular comparison beside the legend.
+They stack using the same width and text-size rule as two-column cards. See
+[energy breakdown and prices](../../installation/configuration.md#energy-display-choices)
+for configuration and estimated costs. Inspecting history does not operate the
+entity. Other numeric cards retain their [recorded-reading chart](hc_graph_card.md#inspect-history).
 
 Graph and toggle-graph cards, numeric sensor/base readings, switch secondary power
 and Energy period summaries/sheets accept two opt-in display settings:

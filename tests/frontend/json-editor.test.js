@@ -34,6 +34,9 @@ test('catalog options stay role-specific and nested command data remains opaque'
   assert.ok(properties('hc_dishwasher_card').variables.properties.progress_entity);
   assert.ok(properties('hc_wallbox_current_card').variables.properties.shortcuts);
   assert.ok(properties('hc_energy_period_card').variables.properties.display_precision);
+  assert.deepEqual(properties('hc_energy_period_card').variables.properties.sub_entities.items.required, ['entity_id']);
+  assert.ok(properties('hc_energy_period_card').variables.properties.sub_entities.items.properties.cost_entity);
+  assert.equal(properties('hc_energy_period_card').variables.properties.cost_per_kwh.minimum, 0);
   assert.deepEqual(resolve(properties('hc_light_card').entity_id).anyOf[0].enum, ['light.safe']);
   assert.equal(resolve(properties('hc_light_card').entity_id).anyOf[1].enum, undefined, 'Manual bindings remain valid');
 });

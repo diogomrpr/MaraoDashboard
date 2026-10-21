@@ -485,9 +485,36 @@ override; `0` means zero decimals. Load, room and custom cards use the same
 This additive feature does not bump the configuration format or reinterpret old
 `power_unit` labels.
 
-Energy detail sheets keep day/month navigation and show exact recorded readings
-in the shared history chart. The selected period follows Home Assistant's time
-zone. Graph-enabled cards expose a separate **History** (**Histórico**) control;
+Energy detail sheets keep day/month navigation and show consumption as vertical
+bars: one per hour for a day, or one per day for a month. The selected period
+follows Home Assistant's time zone, including daylight-saving changes. Missing
+history stays missing rather than becoming zero; limited coverage is identified.
+
+Use **Energy breakdown** in the visual or native editor to add energy sensors for
+appliances or rooms, with optional names and separate cost sensors. Their totals
+use the selected period and appear below the bars with a circular comparison.
+Choose non-overlapping sensors if you want a meaningful comparison with the house
+total. Direct period cards use these card-level options; generated descriptors
+put the same options under `variables`:
+
+```yaml
+sub_entities:
+  - entity_id: sensor.kitchen_energy
+    name: Kitchen
+    cost_entity: sensor.kitchen_cost
+  - entity_id: sensor.heating_energy
+    name: Heating
+```
+
+A dedicated cost sensor takes precedence. Otherwise Marao estimates cost using
+the applicable Home Assistant Energy price per kWh. To override that price, set
+`cost_per_kwh: 0.25` in Home Assistant's currency. Multiple unmatched tariffs need
+an explicit override. Set `calculate_cost: true` on an energy period card to show
+estimated cost from its energy sensor. Current tariffs applied to earlier days
+or months are labeled estimates; they do not reconstruct past price changes.
+Missing price data leaves energy usable and shows that cost is unavailable.
+
+Graph-enabled cards expose a separate **History** (**Histórico**) control;
 opening it preserves the card's existing action and does not send an entity
 command. See [Inspect history](../usage/cards/hc_graph_card.md#inspect-history).
 

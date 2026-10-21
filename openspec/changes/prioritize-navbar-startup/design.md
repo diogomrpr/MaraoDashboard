@@ -108,3 +108,16 @@ Selected evidence:
 The disposable frontend remains on these successful current assets under the current development workflow. No safe helper or saved dashboard data was changed by the interaction check; transient browser contexts were closed. The production instance was not accessed. No physical Android/Companion device, full suite, publication gate, historical upgrade campaign or release was performed. The native-menu observation is supported by removal of link targets and browser gesture evidence, not claimed as a physical Galaxy A35 test.
 
 The accompanying minimal-camera presentation remains implemented; its historical native playlist 404 is not claimed fixed, and the user permitted omitting additional presentation checks in this apply. The user separately chose native playback and explicitly left automatic camera-quality upgrades pending. Neither camera change is marked fully complete by the navbar result.
+
+## Single-tap recovery shortcut
+
+The early navigation surface also renders a top-right 48px native refresh button
+with a 20px inline SVG icon. It calls the same `_refreshFrontend()` handler as the
+navbar hold; cache clearing, dirty protection, preflight, native bridges, URL
+preservation, bounded fallback and failure handling are unchanged. Keep the hold
+shortcut. Localized labels, haptics, disabled/loading feedback and existing
+preview/edit/inert guards apply to both. No external icon rendering is needed.
+Reserve top space within the existing route-scoped fullscreen owner so the
+button cannot cover page content. The native edit action sits beside it. The
+button shares the persistent navbar surface and leaves with its owner; no new
+bootstrap dependency, saved option, backend endpoint or service call is added.

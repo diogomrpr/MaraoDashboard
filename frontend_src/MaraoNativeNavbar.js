@@ -17,7 +17,7 @@ export class MaraoNativeNavbar extends BaseElement {
     this._child = document.createElement('marao-navbar-card'); this._child.nativeOwner = this; this._child.nativeHost = true;
     this._children = [this._child]; this.shadowRoot.append(this._child);
     const style = document.createElement('style');
-    style.textContent = ':host{display:block;min-width:0}.native-edit{position:fixed;top:max(12px,' + safeArea('top') + ');right:max(12px,' + safeArea('right') + ');z-index:1002;width:48px;height:48px;border:0;border-radius:50%;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow);cursor:pointer}.native-edit:focus{outline:none}';
+    style.textContent = ':host{display:block;min-width:0}.native-edit{position:fixed;top:max(12px,' + safeArea('top') + ');right:calc(68px + ' + safeArea('right') + ');z-index:1002;width:48px;height:48px;border:0;border-radius:50%;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow);cursor:pointer}.native-edit:focus{outline:none}';
     this.shadowRoot.prepend(style);
   }
   setConfig(config) {

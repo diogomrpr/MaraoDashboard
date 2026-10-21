@@ -10,6 +10,49 @@ from custom_components.marao_dashboard import generator as g
 SOURCE = json.loads((Path(__file__).parents[2] / "frontend/canonical-pages.fixture.json").read_text())
 
 
+@pytest.mark.parametrize("members", [[], [
+    {"entity_id": "sensor.heating_energy", "name": "Heating", "cost_entity": "sensor.heating_cost", "future": []},
+    {"entity_id": "sensor.lighting_energy", "name": ""},
+]])
+def test_energy_breakdown_and_tariff_survive_page_and_native_generation(members):
+    from custom_components.marao_dashboard.native import compile_card
+
+    options = {"period": "month", "calculate_cost": True, "cost_per_kwh": 0, "sub_entities": members, "future": {"keep": []}}
+    descriptor = {"template": "hc_energy_period_card", "entity_id": "sensor.energy", "variables": options}
+    source = {"config_version": 2, "name": "Energy", "landing_page": "energy", "pages": [{"name": "Energy", "path": "energy", "entities": [descriptor]}]}
+    original = deepcopy(source)
+    registry = [{"entity_id": "sensor.energy", "unit_of_measurement": "kWh"}, {"entity_id": "sensor.heating_energy", "unit_of_measurement": "Wh"},
+                {"entity_id": "sensor.heating_cost", "unit_of_measurement": "EUR"}]
+    item = g._resolve_pages(source, registry)["pages"][0]["_sections"][0]["ordered_cards"][0]
+    native = compile_card({"type": "custom:marao-native-energy-period-card", "entity": "sensor.energy", "variables": options}, "energy", "marao-dashboard", registry)
+    for card in [g._page_card(item, "marao-dashboard"), g._page_card_popups(item)[0]["cards"][0], native["card"], native["popups"][0]["cards"][0]]:
+        assert card["sub_entities"] == members
+        assert card["calculate_cost"] is True
+        assert card["cost_per_kwh"] == 0
+    for popup in [g._page_card_popups(item)[0], native["popups"][0]]:
+        assert popup["height"] == "auto"
+        assert popup["max_height"] == "100%"
+    assert source == original
+    assert native["card"]["variables"]["future"] == {"keep": []}
+    legacy = {"entity_id": "sensor.energy"}
+    assert "sub_entities" not in g._energy_period_card(legacy, "Energy", "day", "mdi:flash", None)
+
+
+@pytest.mark.parametrize("metadata,message", [
+    ({"entity_id": "sensor.load", "unit_of_measurement": "W"}, "require energy sensors"),
+    ({"entity_id": "sensor.cost", "unit_of_measurement": "kWh"}, "requires monetary sensors"),
+])
+def test_energy_breakdown_rejects_known_incompatible_metadata_without_rewriting(metadata, message):
+    source = {"config_version": 2, "name": "Energy", "landing_page": "energy", "pages": [{"name": "Energy", "path": "energy", "entities": [
+        {"template": "hc_energy_period_card", "entity_id": "sensor.total", "variables": {"sub_entities": [{"entity_id": "sensor.load", "cost_entity": "sensor.cost"}]}},
+    ]}]}
+    original = deepcopy(source)
+    with pytest.raises(ValueError, match=message):
+        g._resolve_pages(source, [metadata])
+    g._resolve_pages(source, [metadata], validate_source_units=False)
+    assert source == original
+
+
 @pytest.mark.parametrize("role", ["hc_navigation_card", "hc_room_card"])
 def test_entity_free_shortcuts_preserve_explicit_routes_names_and_options(tmp_path, role):
     source = {"config_version": 2, "name": "Shortcuts", "landing_page": "home", "pages": [
