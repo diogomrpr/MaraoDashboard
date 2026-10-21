@@ -74,7 +74,7 @@ async function run(){
   const pathname=new URL(request.url,'http://127.0.0.1').pathname;
   if(pathname==='/'){response.setHeader('Content-Type','text/html');response.end(html);return;}
   if(pathname==='/favicon.ico'){response.statusCode=204;response.end();return;}
-  if(!['/MaraoHistoryChart.js','/MaraoHistoryData.js','/MaraoCards.js','/MaraoFrontendRefresh.js','/MaraoNavigation.js'].includes(pathname)){response.statusCode=404;response.end();return;}
+  if(!['/MaraoHistoryChart.js','/MaraoHistoryData.js','/MaraoCards.js','/MaraoFrontendRefresh.js','/MaraoFrontendUpdates.js','/MaraoNavigation.js'].includes(pathname)){response.statusCode=404;response.end();return;}
   response.setHeader('Content-Type','text/javascript');response.end(fs.readFileSync(path.join(frontend,path.basename(pathname))));
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
