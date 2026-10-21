@@ -43,8 +43,10 @@ async function batteryChecks(page, config, output, scenario, theme, geometryOnly
     await page.locator('.marao-popup-overlay').waitFor({ state: 'visible' });
     await page.locator('.marao-popup-close').tap(); await page.locator('.marao-popup-overlay').waitFor({ state: 'detached' });
     await set(50); assert.notDeepEqual(await color(group), await color(normal), 'Noncritical partial availability must retain the warning palette');
-    await group.evaluate(e => { e.hass = { ...e._hass, connected: false }; });
-    assert.equal(await group.locator('[data-card-action]').isDisabled(), true);
+    assert.equal(await group.evaluate(e => {
+      e.hass = { ...e._hass, connected: false };
+      return e.shadowRoot.querySelector('[data-card-action]').disabled;
+    }), true);
     await group.evaluate(e => { e.hass = document.querySelector('home-assistant').hass; });
     await set(10);
     assert.deepEqual(await layoutIssues(page, ['hc_entity_group_card', 'hc_battery_card']), []);
