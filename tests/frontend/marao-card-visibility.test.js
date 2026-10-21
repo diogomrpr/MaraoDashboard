@@ -13,6 +13,20 @@ globalThis.HTMLElement = class {
   }
 };
 
+globalThis.ResizeObserver = class {
+  constructor(callback) { this.callback = callback; }
+  observe() {}
+  disconnect() { this.disconnected = true; }
+};
+function popupOverlay(close) {
+  const overlay = new EventTarget(), properties = new Map();
+  overlay.style = { setProperty: (key, value) => properties.set(key, value), getPropertyValue: key => properties.get(key) || '' };
+  overlay.header = { height: 80, getBoundingClientRect() { return { height: this.height }; } };
+  overlay.querySelector = selector => selector === '.marao-popup-close' ? close : selector === '.marao-popup-head' ? overlay.header : null;
+  overlay.remove = () => {};
+  return overlay;
+}
+
 const source = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
 const dashboardSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url), "utf8");
@@ -1147,9 +1161,7 @@ test("popup headings use the configured name while respecting explicit titles an
   const previous = { document: globalThis.document, window: globalThis.window };
   const close = new EventTarget();
   close.focus = () => {};
-  const overlay = new EventTarget();
-  overlay.querySelector = (selector) => selector === ".marao-popup-close" ? close : null;
-  overlay.remove = () => {};
+  const overlay = popupOverlay(close);
   globalThis.document = { querySelectorAll: () => [], createElement: () => overlay, body: { children: [], append() {} } };
   globalThis.window = { location: { hash: "#lights" } };
   try {
@@ -1161,9 +1173,15 @@ test("popup headings use the configured name while respecting explicit titles an
     ]) {
       const popup = new MaraoPopupCard();
       popup._config = config;
+      overlay.header.height = 80;
       popup._openSheet();
       assert.ok(overlay.innerHTML.includes(`<h2>${heading}</h2>`));
+      assert.equal(overlay.style.getPropertyValue('--marao-popup-header-height'), '80px');
+      const observer = popup._headerObserver;
+      overlay.header.height = 112; observer.callback();
+      assert.equal(overlay.style.getPropertyValue('--marao-popup-header-height'), '112px', 'Pinned controls follow a wrapped header');
       popup._close(false);
+      assert.equal(observer.disconnected, true);
     }
   } finally { Object.assign(globalThis, previous); }
 });
@@ -1171,8 +1189,7 @@ test("popup headings use the configured name while respecting explicit titles an
 test("popups inherit native Home Assistant context while blocking and restoring the background", () => {
   const previous = { document: globalThis.document, window: globalThis.window };
   const close = new EventTarget(); close.focus = () => {};
-  const overlay = new EventTarget(); overlay.querySelector = (selector) => selector === ".marao-popup-close" ? close : null;
-  overlay.remove = () => {};
+  const overlay = popupOverlay(close);
   const background = { inert: false };
   const external = { inert: true };
   const app = { inert: false };
@@ -1270,8 +1287,7 @@ test("popup replacement preserves the original opener and installs inert state a
   const view = { shadowRoot: { querySelector: () => null, querySelectorAll: selector => selector === 'marao-popup-card' ? popups : [] } };
   let restored = 0;
   globalThis.document = { querySelectorAll: () => [], createElement: () => {
-    const overlay = new EventTarget();
-    overlay.querySelector = selector => selector === '.marao-popup-close' ? close : null;
+    const overlay = popupOverlay(close);
     overlay.remove = () => root.children.splice(root.children.indexOf(overlay), 1);
     return overlay;
   }, body: root };
@@ -1460,9 +1476,7 @@ test("popup restores its original control or the live replacement after HA reren
       let controls = [replacement, original];
       const close = new EventTarget();
       close.focus = () => { root.activeElement = null; document.activeElement = close; };
-      const overlay = new EventTarget();
-      overlay.querySelector = (selector) => selector === ".marao-popup-close" ? close : null;
-      overlay.remove = () => {};
+      const overlay = popupOverlay(close);
       globalThis.document = {
         activeElement: host, querySelectorAll: () => [],
         createElement: () => overlay,
