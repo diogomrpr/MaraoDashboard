@@ -73,8 +73,16 @@ async function checkPointerInteraction(page, context, config, example, calls, po
     for (const confirmed of [0, 40]) {
       await api(config, 'POST', `/api/services/${example.source.split('.')[0]}/${expected}`, { entity_id: example.entity, [field]: confirmed });
       try {
-        // HA data can update a held native range independently of animation frames.
-        await page.waitForFunction(({ element, value }) => element.isConnected && Math.abs(Number(element.dataset.sliderCurrent) - value) < 1, { element: original, value: confirmed }, { timeout: 5000, polling: 50 });
+        // Poll from the driver so inspecting a held native range does not rely
+        // on the page's timer/animation scheduling during its native gesture.
+        const deadline = Date.now() + 5000;
+        let matched = false;
+        while (Date.now() < deadline) {
+          matched = await original.evaluate((element, value) => element.isConnected && Math.abs(Number(element.dataset.sliderCurrent) - value) < 1, confirmed);
+          if (matched) break;
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        if (!matched) throw new Error('Authoritative fill did not update within five seconds');
       } catch {
         const observed = await original.evaluate((element) => ({ connected: element.isConnected, current: element.dataset.sliderCurrent, target: element.value }));
         const state = await api(config, 'GET', `/api/states/${example.entity}`);

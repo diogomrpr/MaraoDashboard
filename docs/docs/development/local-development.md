@@ -7,12 +7,37 @@ nav_order: 2
 
 # Local development
 
-Development and browser tests use a disposable Home Assistant instance. The
-preparation command installs the current working tree, creates safe entities,
-and generates one dashboard at `/marao-dashboard`. Agents working on this
+Development and browser tests use a disposable Home Assistant instance. Full
+preparation installs the current working tree, creates safe entities and generates
+one dashboard at `/marao-dashboard`. Routine frontend preview syncs current frontend
+files to an already compatible installation and leaves successful changes installed.
+Agents working on this
 repository may connect only to `192.168.0.28`; the same tools let developers
 configure their own disposable instances. Never use a household or production
 instance, or exercise a real security or safety device.
+
+## Install before handing off
+
+A completed software task includes installing all applicable current changes on
+the disposable test instance `192.168.0.28`. This is required even when the user
+will do all visual testing. Local builds and browser overrides are not deployment.
+Batch edits and normally sync once at the end; repeat only for a later change,
+a failed installation or a necessary diagnostic. Leave successful assets installed.
+If installation fails, report **not installed / not ready for test**, not done.
+Instruction/documentation/test-tool-only changes with no runtime effect need no sync.
+
+For frontend-only work on a compatible installation, reuse the lightweight helper
+without launching a preview browser:
+
+```sh
+node -e "require('./ha-test/prepare-frontend').prepareFrontend().catch(error => { console.error(error.message); process.exitCode = 1; })"
+```
+
+Use `ha:preview` instead when already inspecting the UI. Use full `npm run ha:sync`
+only for initial setup or backend/fixture/generated-configuration changes needing
+full preparation. Batch changes requiring a restart. The sync's current-asset and
+readiness checks suffice for installation confirmation; no extra browser suite is
+required. Preserve user test configuration and helper state where applicable.
 
 ## Install development dependencies
 
@@ -90,11 +115,14 @@ on success or failure. It checks the staged package against the working tree;
 synchronized workspace caches are not deployment inputs. The ordinary HACS build
 still writes its inspectable package under `ha-test/.cache/dist/`.
 
-Every `test:ha:*` command and manual mobile preview runs the same preparation
-first. Tests cannot silently use yesterday's installed code. Repeating preparation
-keeps one Marao integration and one dashboard. Fixtures and generated test
-configuration are owned by this workflow, so use the canonical files in the repo
-for lasting changes.
+Focused live test batches use compatible preparation once and verify current
+assets. The lightweight `ha:preview` synchronizes only frontend files and reloads
+Marao when changed before refreshing the real HA page. It does not reset helpers,
+explicitly generate dashboards or restart HA. Normal entry reload may update
+generated output/history. Missing or incompatible
+setup fails with an instruction to prepare explicitly; preview never silently
+falls back to full preparation. Fixtures and generated test configuration belong
+to the canonical files in the repo, so use those for lasting fixture changes.
 
 | Changed files | Preparation action |
 | --- | --- |
@@ -111,10 +139,17 @@ local edits to `themes/MaraoDashboard` can be replaced. Unrelated themes remain
 intact. Python changes require a restart because reloading an integration does not reliably
 re-import every Python module.
 
-For manual testing, run `npm run ha:sync`, then open
+For initial setup or backend/fixture changes, run `npm run ha:sync`, then open
 `http://YOUR-TEST-HOST:8123/marao-dashboard/overview` or
-`/marao-dashboard/card-test` using your configured base URL. Sync again after
-an edit; there is no background watcher.
+`/marao-dashboard/card-test` using your configured base URL. For routine frontend
+work, use the persistent preview below. It verifies backend compatibility, builds
+assets when needed, synchronizes frontend files and verifies the served versions.
+Keep the test instance current with the latest applicable project changes before
+completion. Successful assets stay installed after inspection, a preview error or
+closing the browser; package rollback is not cleanup. Revert only with a project
+revert or recovery of a genuinely failed operation, and still restore safe helpers
+mutated by checks. Full `ha:sync` remains explicit for fresh/backend/fixture setup.
+Development visual evidence does not replace required publication/upgrade proof.
 
 ### Visual browser inspection
 
@@ -124,12 +159,33 @@ shadow DOM; when an accessibility-index click cannot reach a control, use its
 semantic browser locator (role and accessible name). Read the updated page after
 navigation or opening a popup before judging its rendering.
 
-Inspect both the realistic page and the corresponding Cases examples. Open
-popups, scroll their contents, close them, and verify restored focus. Exercise
-actions only on safe fixture entities. Browser inspection complements the
-automated checks: an empty popup can be visibly broken without producing a
-console exception. Refresh after sync and confirm the resource fingerprint
-matches the workspace before attributing a problem to the current code.
+Inspect the actual changed surface on current assets. Choose the relevant Cases
+example or realistic placement; inspect both only when their different hosts
+matter. Open and inspect a popup when its contents/behavior changed. Exercise
+actions only on safe fixture entities. Presentation-only work finishes with this
+inspection; behavior changes also need their smallest covering assertion. Confirm
+the loaded asset version before attributing a problem to the current code.
+
+```sh
+npm run ha:preview -- --component slider-headers --watch --scenario iphone-normal --theme light
+```
+
+The preview stays open with only selected components in scope. For generic shared
+scopes such as actions, labels, connection or scroll, also choose a representative
+consumer with `--family <template IDs>`; the family must belong to the scope.
+Inspect editor and runtime-card scopes separately. Native card-editor changes use
+the existing focused native-editor workflow; a runtime preview cannot validate them.
+`--watch` serializes and debounces frontend edits, syncs their files to HA and
+refreshes the browser; it does not attempt to replace already registered
+custom elements in place. Use `--once` for a bounded
+headless capture of the selected examples, then inspect the private captures;
+the command does not certify visual correctness. Diagnostics remain visible.
+Normal interactive preview needs no screenshot or second final visit: stop once
+the requested result, tier-required assertions,
+relevant diagnostics and cleanup are satisfied. Add another layout/theme only
+when relevant, rather than traversing the full gallery or mobile matrix.
+Watch updates only while the preview is running; closing it leaves the last
+successful version installed but starts no continuous background service.
 
 Capture popups after their slide animation settles. The mobile matrix reapplies
 and checks typography before each scrolling screenshot so cards loaded later
@@ -143,7 +199,19 @@ authenticated browser session; never put tokens in browser URLs or reports.
 
 ## Focused checks and preview
 
-Run the smallest relevant check during normal development. For example:
+Select `visual`, `behavior` or `focused` using the
+[focused testing guide](focused-testing.md). Capture the task baseline before
+editing; then preview the current task scope:
+
+```sh
+npm run test:affected -- --snapshot /private/tmp/marao-task.json
+npm run test:affected -- --since /private/tmp/marao-task.json --tier visual --component slider-headers --plan
+```
+
+Visual work needs current inspection without an automatic suite. Behavior work
+adds selected offline checks and the exact interaction assertion when relevant;
+sensitive contracts retain focused coverage. Existing narrow check commands
+remain available for deliberate use, for example:
 
 ```sh
 node --test tests/frontend/marao-climate-card.test.js
@@ -153,13 +221,14 @@ npm run test:ha:sliders
 npm run test:ha:e2e -- --actions-only
 npm run test:ha:e2e -- --ui-only --screenshots
 npm run test:ha:e2e -- --disconnect-only
-npm run ha:preview:accessibility -- --scenario iphone-normal --theme light
+npm run ha:preview -- --component slider-headers --scenario iphone-normal --theme light
 ```
 
 The alignment check opens the Apple TV and generic media popups and verifies that
 icon-only controls are centered within 0.5 CSS pixels. It also checks the loaded resource
 fingerprint, narrow layouts, action/state-label contrast in both themes, and
-essential readings at 200% text. Use it whenever an icon-only action or its shared layout changes.
+essential readings at 200% text. Select it for affected focused/publication
+verification; a presentation-only development edit may use targeted inspection.
 The slider check covers only light, fan, and cover value sliders across the mobile
 profiles and both themes. It checks endpoint alignment, distinct surfaces,
 contrast, confirmed versus target values, and one service call per completed
@@ -196,22 +265,24 @@ minimum widths and retains 48px clear controls without replacing HA selectors.
 The broader local layers are `npm run test:static` and `npm run test:python`.
 Static checks verify the committed editor bundle without rewriting it, run
 frontend tests, stage the HACS package, and validate YAML and gallery coverage.
-`npm test` runs these local layers without contacting Home Assistant. Generated
+`npm test` uses the affected runner with existing focused defaults; inspect its
+plan before execution because selected browser work can contact HA. Generated
 reports, screenshots, pytest cache, and coverage belong in `tests/.artifacts/`.
 
-Implement related queued tasks together, run one covering focused check after
-the batch's last edit, and deploy and inspect their combined affected-card set.
+Implement related queued tasks together and complete their selected development
+tier after the final edit. Inspect representative affected components once.
 Check migrations and shared security controls early when subsequent work depends
 on them. Finish the implementation queue before the complete release
 stabilization pass; repair findings with focused checks before verifying the
 final candidate. Required publication and preserved-install gates still apply.
 
-Use `npm run test:affected` after each coherent batch. Record its starting commit
-and use `--base <ref>` when completed commits are part of the implementation.
-Shared files require reviewed `--component` scope. Default execution is serial;
-full-suite and parallel runs require explicit requests. Publication uses the same
-affected scope and applicable exact-commit CI. See [focused testing](focused-testing.md)
-for browser batching, profile selection, private evidence and comprehensive options.
+Use `--since <snapshot> --tier <visual|behavior|focused>` to exclude unchanged
+pre-existing work. Review concurrent edits and disclose any `--file` exclusions;
+shared files require reviewed `--component` scope. `--base <ref>` remains available
+for deliberate commit ranges. Default execution is serial; full-suite and parallel
+runs require explicit requests. Publication independently covers the complete
+candidate with applicable exact-commit CI; development-only scope/evidence cannot
+satisfy that gate. See [focused testing](focused-testing.md) for details.
 
 ## Upgrade compatibility and release preparation
 
@@ -243,29 +314,44 @@ repeating deployment. Preserved-install receipts retain distinct provenance and
 refuse reseeding while the remote upgrade marker exists. Existing complete reports
 stay immutable; focused and comprehensive results are never relabeled.
 
-## Add or change a feature
+## Fix or change behavior
 
 Use the repository's
 [OpenSpec guide](https://github.com/diogomrpr/MaraoDashboard/blob/main/openspec/README.md)
-to read the existing capability contracts and plan future tasks. In Codex, select
-`openspec-propose` from Skills or use `$openspec-propose` with the requested
-behavior. Review its proposal, design, requirement changes, and tasks before
-requesting `openspec-apply-change`. Archive only completed, verified work.
+for targeted capability references and the `marao-ha-integration`,
+`marao-ha-frontend` and `marao-testing` skills. Small repairs restoring documented
+behavior, refactors and documentation corrections use the short path: inspect,
+implement, complete the selected development tier and compare the result with the requested outcome.
+They do not need a new OpenSpec change when requirements stay the same.
+
+For new behavior, public/persisted contracts, migrations or substantial cross-layer
+work, reuse an applicable change or create one. An explicit `$openspec-propose`
+request produces artifacts for review; `$openspec-apply-change` implements an
+accepted change. A direct implementation request authorizes recording necessary
+artifacts and continuing through verification without another approval solely
+for that paperwork. Archive only completed, verified work.
 OpenSpec is free development tooling; it does not change the Home Assistant
 runtime or replace the repository quality contract and application checks.
 
 1. Trace its builder field, Python validation/generation, runtime card, shared
    control, theme, and translations. Fix reusable behavior in its shared source.
-2. Identify all cards affected by shared code or layout changes.
+2. Identify affected shared consumers and capture a private task snapshot,
+   preserving pre-existing dirty work and reviewing concurrent hunk ownership.
 3. Edit the source files described in the
    [architecture guide]({{ '/docs/development/index.html' | relative_url }}).
    Run `npm run build:editor` after editing the visual editor source.
-4. Add stable state examples, safe helper definitions, popup/action variants,
+4. When supported behavior changes, add stable state examples, safe helper definitions, popup/action variants,
    and coverage entries in `ha-test/`. Place a representative example on a
    realistic generated page as well as Cases. See
    [gallery coverage]({{ '/docs/development/test-gallery.html' | relative_url }}).
-5. Add the smallest regression check, run it, sync, and inspect the affected
-   cards and interactions. Use only the fake entities for actions.
+5. Preview `npm run test:affected -- --since <snapshot> --tier <tier> --plan`,
+   resolving shared-file scope with reviewed components. Visual work needs no
+   automatic suite; behavior/focused work runs its required checks after the last
+   edit. Use frontend preview for current assets and inspect representative changed
+   components once. Add only relevant difficult layouts and use safe fake entities
+   for actions. Docs-only work needs no HA visit.
+6. Compare each requested acceptance case with the implementation and evidence;
+   passing tests alone do not prove the requested outcome was delivered.
 
 ## Troubleshooting
 
@@ -279,7 +365,9 @@ runtime or replace the repository quality contract and application checks.
 - **Sync or readiness fails:** read the reported phase and fix it, then rerun.
   A failed run does not establish a successful deployment. Check the disposable
   instance's logs locally, keeping credentials and private data out of reports.
-- **Old UI appears:** rerun sync and refresh the browser. The loaded resource
+- **Old UI appears in preview:** save the edit and wait for sync/browser refresh,
+  or reopen preview; inspect its served-asset diagnostics. Watch runs only while open.
+- **Old UI appears after deployment:** rerun explicit sync and refresh the browser. The loaded resource
   fingerprint must match the prepared workspace. Clear the device's Home
   Assistant frontend cache only if a refresh still leaves an old session.
 - **Legacy resource Repair:** remove only the exact legacy resource entries
@@ -408,3 +496,17 @@ current control on the generated pages and in their popups across the mobile
 profiles and both themes. Use `-- --scenario android-text-200` for a focused
 enlarged-text check. Values must stay inside the rounded controls and numeric
 buttons must retain their 48-pixel touch targets.
+
+### Navigation startup boundary
+
+`MaraoDashboard.js` retains its public versioned entry URL. It registers
+`MaraoNavigation.js` and the lean native navbar before requesting optional
+`MaraoRuntime.js` content. Navbar state comes from existing view configuration;
+no server card compilation, entity metadata or persisted route cache is required.
+The stable HA-root surface survives view replacement and is released on exit or
+explicit removal. Moved shared helpers retain their exports and popup guards.
+
+Use the focused navbar startup fixture to hold the optional runtime unresolved
+and verify actual navigation/refresh interaction. Android desktop touch emulation
+does not prove Companion native-menu behavior; record physical host versions only
+when inspected. The horizontal hold surface contains no link URL target.

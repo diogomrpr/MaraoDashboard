@@ -8,8 +8,9 @@ let source = await fs.readFile(
 );
 const cardsSource = (await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8')).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 source = source.replace('await import(`./MaraoCards.js${new URL(import.meta.url).search}`)', `await import("data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}")`);
+globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
 const dashboardSource = await fs.readFile(
-  new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url),
+  new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url),
   "utf8",
 );
 const {

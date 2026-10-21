@@ -62,6 +62,7 @@ function assertCleanCandidate() {
 }
 
 function validateScopedUpgrade(report, config, candidate, scope) {
+  assert.ok(!scope.development_only && !scope.task_scope && (!scope.tier || scope.tier === 'focused'), 'Development-only scope cannot establish publication coverage');
   assert.equal(report.version, 3);
   assert.equal(report.kind, 'preserved-install-upgrade-scoped');
   assertDisposableHaTarget(config, { requireSsh: true });

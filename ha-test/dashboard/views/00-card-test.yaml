@@ -14,7 +14,7 @@ cards:
       - type: custom:marao-card
         template: hc_title_card
         name: Marao Dashboard Cases
-        label: All supported cards, states, and behaviors. Hold a navbar icon for three seconds to refresh this device. Releasing early cancels the refresh.
+        label: All supported cards, states, and behaviors. Hold a navbar icon for three seconds to refresh this device. The same hold works between icons. The bar stays usable while page content loads. Holding an icon does not open a link preview. Releasing early cancels the refresh. Pressed icons and overflow controls keep their rounded appearance without a square highlight.
         variables:
           entity1: input_boolean.marao_dashboard_test_one
           entity1_name: One
@@ -579,6 +579,12 @@ cards:
     height: auto
     max_height: 80dvh
     cards:
+      - type: custom:marao-card
+        template: hc_camera_card
+        entity: camera.marao_dashboard_test_camera_adaptive_high
+        show_name: false
+        tap_action:
+          action: fullscreen
       - type: custom:marao-camera-events-card
         entity: camera.marao_dashboard_test_camera
         title: Camera events

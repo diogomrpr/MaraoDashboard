@@ -7,6 +7,103 @@ nav_order: 3
 
 # Focused testing
 
+Codex uses the project `marao-testing` skill to apply this policy. See the
+[workflow and skills guide](https://github.com/diogomrpr/MaraoDashboard/blob/main/openspec/README.md#codex-workflow-and-project-skills)
+for task routing; the selector and evidence validator remain the source of check
+selection, not a duplicate list inside the skill.
+
+## Default: deliver, then hand off visual testing
+
+The repository contract's **Verification policy: minimal by default** controls
+routine AI work. The user handles visual and real-device testing. Use the smallest
+check that demonstrates the requested behavior, then stop and provide a short
+manual watch list. A stream playing satisfies ordinary playback acceptance.
+Do not automatically run all mapped checks, add browser tooling/fixtures, or
+traverse theme/device/text/zoom combinations. Broaden only for an explicit request,
+a reported/observed defect, or a concrete security/data/migration/recovery risk.
+Documentation/instruction-only changes need diff and changed-link review only.
+
+Mandatory installation is separate from optional visual verification: before a
+software task is called done, install its final applicable changes on disposable
+HA `192.168.0.28`. Batch edits and sync once at handoff using the
+[fastest compatible path](local-development.md#install-before-handing-off).
+Browser overrides are not installation. Instruction/documentation-only edits need
+no deployment. A failed sync means not ready for user testing.
+
+The tiers and coverage commands below describe deliberately selected automated
+verification and publication evidence. They do not make that coverage mandatory
+for routine implementation or override the user's manual-testing handoff.
+
+## Development loop
+
+Choose verification from the actual task diff, not from every dirty file or the
+word "frontend". Capture a private starting snapshot before editing:
+
+```sh
+npm run test:affected -- --snapshot /private/tmp/marao-task.json
+```
+
+The snapshot includes current tracked and nonignored untracked file identities,
+including already dirty content. `--since` selects subsequent additions, edits and
+deletions. Review changes made concurrently: file identities cannot attribute
+individual hunks. A reviewed `--file <path>` subset can exclude other work and
+reports those exclusions. Review shared-file hunks and declare `--component <id>`;
+shared consumers remain in scope. Unknown mappings require resolution, never a
+full-suite fallback. Do not recreate the snapshot after editing to erase scope.
+
+| Tier | Use when | Required development evidence |
+| --- | --- | --- |
+| `visual` | Presentation only: labels, colors, spacing or placement; no changed behavior | Code review and a manual watch list; agent visual inspection optional. No automatic suites or mobile matrix. |
+| `behavior` | Events, state or ordinary interaction behavior changes | Smallest existing targeted check or assertion demonstrating the result; hand off further visual checks. |
+| `focused` | Security, saved data, migration, ownership or installation changes; deliberate broader affected verification | Existing affected unit/static/browser coverage, including relevant dispatch, cancellation, preservation and recovery assertions. |
+
+```sh
+npm run test:affected -- --since /private/tmp/marao-task.json --tier visual --component slider-headers --plan
+npm run ha:preview -- --component slider-headers --watch --scenario iphone-normal --theme light
+```
+
+When deliberately running a tier, preview its selection, then run it without
+`--plan`. A visual command may report that inspection is still required;
+it cannot observe or certify the browser result. The runner cannot infer whether
+JavaScript is cosmetic: the contributor must review the diff. `behavior` does not
+prove live dispatch from offline checks; add the narrow existing assertion when
+the changed behavior requires it. Never use the cheaper tiers for security or
+data-preservation changes. Documentation-only work needs relevant link/spec checks,
+not HA deployment.
+
+The persistent preview synchronizes current frontend files to the compatible
+disposable installation and refreshes the real HA page with native controls/icons. It opens
+the smallest representative existing view containing the selected visible runtime
+families, falling back to Cases; the dashboard editor uses its fixed route.
+Generic shared scopes require a representative
+`--family <template IDs>`; inspect editor and runtime scopes separately. Native
+card-editor changes use the existing focused native-editor workflow.
+Frontend sync reloads Marao when files changed. It does not reset helpers, explicitly
+generate dashboards or restart HA; normal entry lifecycle may update generated
+output/history. Missing or incompatible setup requires explicit `npm run ha:sync`.
+Keep the test instance on the latest applicable project changes before completion.
+Successful synced assets remain installed after inspection, a preview error or
+closing the browser. Do not revert a successful package for cleanup unless the
+project itself is reverted; safe helper restoration and failed-operation recovery
+still apply. Watch updates only while running. Preview remains development evidence
+and does not replace publication or upgrade checks.
+See [local development](local-development.md#visual-browser-inspection).
+
+If agent inspection is selected, inspect the changed surface once using current
+assets. Include representative shared consumers and only layouts/themes relevant
+to the edit; do not replay every equivalent card, typography mode or state.
+Screenshots are optional. Stop when the requested result is observed, tier-required
+checks pass, relevant diagnostics are clear and cleanup is complete. Broaden or
+repeat only for changed inputs, a failure or a concrete unresolved concern.
+
+Existing commands without `--tier` retain `focused` behavior for compatibility.
+Publication independently selects the entire candidate since the released baseline;
+task snapshots, file subsets and visual/behavior reports cannot satisfy publication
+or evidence reuse. Broad regression remains an explicitly requested pre-release
+campaign, never the daily development default.
+
+## Focused and publication coverage
+
 Reviewed theme-independent geometry and behavior run in light; representative
 appearance/state/contrast checks remain in both themes. Theme-sensitive and
 unreviewed contracts retain additional combinations. Distinct text versus zoom,
@@ -35,7 +132,7 @@ recorded reason. Unsafe paths, malformed/unsupported evidence, missing artifacts
 and unverified cleanup fail preflight. Reuse chains cannot refresh original age.
 Shared visit duration is counted once. Historical reports remain immutable.
 
-Every live run prepares and validates the current installation; an old receipt
+Every focused live batch prepares and validates the current installation; an old receipt
 cannot establish current package/source/fixture identities. Cleanup, final visual
 inspection, conditional upgrades, exact-commit CI and reconnect-exception expiry
 are never cached. Version-3 reports retain their original whole-proof validator
@@ -47,17 +144,17 @@ even without saved images. Readiness waits for native mounts, fonts and frames,
 restores touch emulation and can inspect newly mounted subtrees without repeating
 whole-gallery scans for equivalent samples.
 
-Use the smallest checks covering the implementation and its shared consumers.
-This is the default during development, versioning, CI and release preparation.
-A release request does not request the full suite or parallel execution.
+The focused tier, version hooks, CI and publication use the smallest automated
+checks covering their selected contracts and shared consumers. A release request
+does not request the full suite or parallel execution.
 
 ```sh
 npm run test:affected -- --plan
 npm run test:affected
 ```
 
-Record the starting commit before an implementation batch. After its final edit,
-use `--base <starting-commit>` to include completed commits as well as staged,
+For deliberate commit-range verification, record the starting commit and use
+`--base <starting-commit>` to include completed commits as well as staged,
 unstaged, deleted and untracked files. Without a base, ordinary checks compare
 the working tree to HEAD. CI supplies its event range explicitly. Publication
 compares the whole candidate to the previous release, even on a clean checkout.
@@ -89,19 +186,19 @@ sheet, its 32-card Cases counterpart and the dashboard page. They cover both
 themes with selected phone, narrow, landscape and enlarged-text layouts.
 Playwright WebKit is additional engine coverage, not physical iPhone proof.
 
-Unit/static checks run before browser work. A compatible browser batch prepares
+In focused execution, unit/static checks run before browser work. A compatible browser batch prepares
 the safe disposable installation once. Each job receives a private artifact
 directory and validates the prepared assets, saved source and fixture ownership.
 An ordinary batch receipt is distinct from real preserved-install upgrade proof.
 Existing individual test commands remain available for focused debugging.
 
-Browser checks sample materially distinct affected families and options. Layout
+Focused/publication browser checks sample materially distinct affected families and options. Layout
 changes select relevant normal, narrow, enlarged-text/zoom and landscape cases.
 Actions still assert dispatch and cancellation; migrations still assert data
-preservation and recovery. Visibility alone cannot replace those checks. Inspect
-representative changed components after the final edit/check, without reviewing
-every equivalent card or scrolling image. Save failure screenshots; exhaustive
-success screenshots require an explicit diagnostic request.
+preservation and recovery. Visibility alone cannot replace those checks. Current
+targeted inspection can satisfy the development visual gate without a duplicate
+final visit. Save failure screenshots from automated checks; exhaustive success
+screenshots require an explicit diagnostic request.
 
 ## Explicit parallel and comprehensive runs
 

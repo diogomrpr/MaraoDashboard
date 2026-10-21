@@ -37,7 +37,8 @@ globalThis.window = {
   dispatchEvent() {},
 };
 globalThis.HashChangeEvent = class {};
-const source = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url), "utf8");
+globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
+const source = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url), "utf8");
 const cardsSource = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 const cardsModule = `data:text/javascript;base64,${Buffer.from(cardsSource).toString("base64")}`;
 const { MaraoCard } = await import(cardsModule);

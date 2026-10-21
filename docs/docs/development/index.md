@@ -78,6 +78,8 @@ upgrade orchestration remain pending in `ensure-safe-dashboard-upgrades`.
 
 ## Continue development
 
+- [Codex workflow and project skills](https://github.com/diogomrpr/MaraoDashboard/blob/main/openspec/README.md#codex-workflow-and-project-skills)
+  routes small repairs, substantial OpenSpec changes and focused verification.
 - [Brand assets]({{ '/docs/development/brand-assets.html' | relative_url }})
   documents the canonical mountain artwork, theme variants, and local export.
 - [Local development]({{ '/docs/development/local-development.html' | relative_url }})

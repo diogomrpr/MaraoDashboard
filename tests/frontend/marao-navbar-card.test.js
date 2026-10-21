@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 
-const source = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
+const cardsSource = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
+const source = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoNavigation.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js', import.meta.url).href));
 
 test("ported sheets copy theme colors while viewport insets keep inheriting live values", async () => {
   const { MaraoPopupCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoCards.js');
@@ -26,8 +27,8 @@ test("ported sheets copy theme colors while viewport insets keep inheriting live
 test("navbar and sheets share the host-aware inset fallback", () => {
   assert.match(source, /var\(--marao-safe-area-inset-\$\{side\}, var\(--safe-area-inset-\$\{side\}, env\(safe-area-inset-\$\{side\}, 0px\)\)\)/);
   assert.match(source, /max\(4px, calc\(\$\{safeArea\("bottom"\)\} - 20px\)\)/);
-  assert.match(source, /padding:\$\{safeArea\("top"\)\} \$\{safeArea\("right"\)\} 0 \$\{safeArea\("left"\)\}/);
-  assert.match(source, /max-height:min\(\$\{esc\(this\._config\.max_height\)\}, 100%\)/);
+  assert.match(cardsSource, /padding:\$\{safeArea\("top"\)\} \$\{safeArea\("right"\)\} 0 \$\{safeArea\("left"\)\}/);
+  assert.match(cardsSource, /max-height:min\(\$\{esc\(this\._config\.max_height\)\}, 100%\)/);
 });
 
 test("navbar partition preserves every route at exact fit, overflow and one-slot widths", async () => {
@@ -51,7 +52,7 @@ test("navbar retains full-size controls in one row and a separately bounded vert
 });
 
 test("fullscreen behavior starts only after the navbar is connected", () => {
-  assert.match(source, /connectedCallback\(\) \{\s+registerFullscreen\(this\);/);
+  assert.match(source, /connectedCallback\(\) \{[^]*?registerFullscreen\(this\);/);
   assert.doesNotMatch(source, /this\._render\(\); registerFullscreen\(this\);/);
 });
 
@@ -82,7 +83,7 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
   };
   let timers = 0;
   const functions = new Function("window", "getComputedStyle", "setInterval", "clearInterval", "safeArea",
-    source.slice(source.indexOf("const fullscreenUsers"), source.indexOf("export class MaraoControlGrid")).replace("export function focusRestorer", "function focusRestorer")
+    source.slice(source.indexOf("const fullscreenUsers"), source.indexOf("export function registerNavigation")).replaceAll("export ", "")
     + ";return {registerFullscreen,unregisterFullscreen,applyFullscreen};")(window,
       node => ({ getPropertyValue: property => node.style.getPropertyValue(property) || "0px" }),
       () => { timers++; return 1; }, () => { timers--; }, side => `var(--safe-${side})`);
@@ -134,7 +135,7 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
 
 test("popup cleanup distinguishes retained masonry cards from removed cards and views", () => {
   const removed = [];
-  const Popup = new Function("BaseElement", "window", source.slice(source.indexOf("export class MaraoPopupCard"), source.indexOf("export function registerMaraoCards")).replace("export class", "class") + ";return MaraoPopupCard;")(
+  const Popup = new Function("BaseElement", "window", cardsSource.slice(cardsSource.indexOf("export class MaraoPopupCard"), cardsSource.indexOf("export function registerMaraoCards")).replace("export class", "class") + ";return MaraoPopupCard;")(
     class {}, { removeEventListener: event => removed.push(event) });
   const popup = new Popup(), card = {};
   const view = { isConnected: true, cards: [card] };

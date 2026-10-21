@@ -113,7 +113,7 @@ async function run({ alignmentOnly = false } = {}) {
             }
             await card.evaluate(element => element._refreshFeedback(''));
             if (!alignmentOnly && ['iphone', 'android', 'webkit-native-pointer'].includes(profile.name)) {
-              const first = nav.locator('a').first();
+              const first = nav.locator('[data-route]').first();
               await pointer(page, first, 50); assert.equal(new URL(page.url()).pathname, '/marao-dashboard/rooms');
               await page.evaluate(url => history.replaceState({}, '', url), original);
               await pointer(page, first, 700); assert.equal(page.url(), original); assert.equal(await card.locator('.refresh-feedback').isVisible(), false);
@@ -139,7 +139,7 @@ async function run({ alignmentOnly = false } = {}) {
                 version = 2;
                 await page.reload(); await page.waitForFunction(() => window.ready); assert.equal(await page.locator('meta[name=fixture-build]').getAttribute('content'), '1');
                 const historyLength = await page.evaluate(() => history.length);
-                await pointer(page, page.locator('marao-navbar-card .nav a').first(), 3100);
+                await pointer(page, page.locator('marao-navbar-card .nav [data-route]').first(), 3100);
                 await page.waitForFunction(() => document.querySelector('meta[name=fixture-build]').content === '2' && window.ready);
                 const fresh = new URL(page.url()); assert.equal(fresh.pathname, '/marao-dashboard/rooms'); assert.equal(fresh.hash, '#detail');
                 assert.equal(fresh.searchParams.get('external_auth'), '1'); assert.equal(fresh.searchParams.get('keep'), 'a b');

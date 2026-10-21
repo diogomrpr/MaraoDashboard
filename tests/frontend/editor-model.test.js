@@ -402,3 +402,32 @@ test('independent energy expected document survives Visual and JSON with raw con
     assert.deepEqual(serializeConfig(normalizeConfig(saved)),saved,record.id);
   }
 });
+
+test('camera title visibility and retired options survive Visual/JSON, duplication, reordering and discarded drafts', () => {
+  const camera = { id: 'entrance', entity_id: 'camera.front', template: 'hc_camera_card', name: '', show_name: false,
+    icon: 'mdi:cctv', show_state: true, show_label: false, future: {keep: []}, variables: {event_provider: 'unifiprotect', popup_stream_entity:'camera.front_high',future: []} };
+  const source = {config_version: 2, name: 'Cameras', landing_page: 'home', navigation: [], pages: [
+    {name: 'Home', path: 'home', sections: [{columns: 1, entities: [camera], cards: [{type:'markdown',content:'Keep raw'}]}]}]};
+  const exact = structuredClone(source), draft = normalizeConfig(source);
+  assert.deepEqual(serializeConfig(draft), exact);
+  const section = draft.pages[0].sections[0];
+  section.entities.push({...structuredClone(section.entities[0]), id: 'second', name: 'Other entrance'});
+  section.entities = moveItem(section.entities, 1, 0);
+  const saved = serializeConfig(normalizeConfig(JSON.parse(JSON.stringify(serializeConfig(draft)))));
+  assert.deepEqual(saved.pages[0].sections[0].entities, [{...camera,id:'second',name:'Other entrance'},camera]);
+  assert.deepEqual(saved.pages[0].sections[0].cards, [{type:'markdown',content:'Keep raw'}]);
+  assert.deepEqual(serializeConfig(normalizeConfig(source)), exact, 'Discard reloads the saved source');
+  assert.deepEqual(source, exact);
+});
+
+
+test('popup stream accepts only optional camera bindings without changing saved data', () => {
+  for (const value of [undefined, null, '', 'camera.front_high', 'sensor.front', 42, [], 'camera.bad/path']) {
+    const config = {config_version:2,name:'Home',landing_page:'home',navigation:[],pages:[{name:'Home',path:'home',entities:[
+      {id:'camera',template:'hc_camera_card',entity_id:'camera.front_low',variables:{popup_stream_entity:value}}]}]};
+    const before=structuredClone(config), errors=validateConfig(config,2);
+    const valid=[undefined,null,'','camera.front_high'].includes(value);
+    assert.equal(errors.some(message=>message.includes('popup stream')), !valid, JSON.stringify(value));
+    assert.deepEqual(config,before);
+  }
+});

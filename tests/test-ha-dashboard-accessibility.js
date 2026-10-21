@@ -31,6 +31,12 @@ const scenarios = [
   { name: "android-landscape", device: "android", viewport: { width: 800, height: 360 }, textScale: 1, bold: false, pageZoom: 1 },
 ];
 
+// Extra widths are opt-in for affected grid checks, not additions to every matrix.
+const featureScenarios = [
+  { name: 'android-384', device: 'android', viewport: { width: 384, height: 832 }, textScale: 1, bold: false, pageZoom: 1 },
+  { name: 'android-384-bold', device: 'android', viewport: { width: 384, height: 832 }, textScale: 1, bold: true, pageZoom: 1 },
+];
+
 function argumentValue(argv, name) {
   const index = argv.indexOf(name);
   if (index < 0) return undefined;
@@ -255,7 +261,7 @@ async function inspectFullscreenLifecycle(page) {
 
 function selectedRuns(options) {
   const selectedScenarios = options.scenario
-    ? scenarios.filter(({ name }) => name === options.scenario)
+    ? [...scenarios, ...featureScenarios].filter(({ name }) => name === options.scenario)
     : options.safeArea
       ? scenarios.filter(({ name }) => name === "iphone-normal")
     : options.preview
@@ -354,12 +360,14 @@ async function configurePageEmulation(context, page, scenario, insets = safeArea
   await session.send("Emulation.setEmulatedOSTextScale", { scale: scenario.textScale });
 }
 
-let parsedTheme;
+let parsedTheme, parsedThemeMtime;
 function themeVariables(mode) {
   if (!themes.includes(mode)) throw new Error(`Unknown Marao theme mode "${mode}".`);
-  if (!parsedTheme) {
+  const mtime = fs.statSync(themePath).mtimeMs;
+  if (!parsedTheme || parsedThemeMtime !== mtime) {
     const source = YAML.parse(fs.readFileSync(themePath, "utf8"));
     parsedTheme = source?.["Marao Dashboard"];
+    parsedThemeMtime = mtime;
   }
   if (!parsedTheme?.modes?.[mode]) throw new Error(`Marao Dashboard theme has no ${mode} mode.`);
   const { modes, ...base } = parsedTheme;

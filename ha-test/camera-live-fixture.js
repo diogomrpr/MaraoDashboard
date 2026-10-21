@@ -2,7 +2,7 @@
 // Native HA transports and actual Safari/Protect interoperability remain separate.
 export const poster = '/ha-test/custom_components/marao_test_camera/event.svg';
 export const media = '/ha-test/custom_components/marao_test_camera/live.mp4';
-export const fixtureModes = ['normal', 'delayed', 'missing-still', 'failed-still', 'late-still', 'unsupported', 'failed', 'blocked'];
+export const fixtureModes = ['normal', 'delayed', 'missing-still', 'failed-still', 'late-still', 'unsupported', 'failed', 'silent-fallback', 'blocked'];
 export function registerSyntheticCamera() {
   customElements.define('ha-camera-stream', class extends HTMLElement {
     constructor() { super(); this.attachShadow({mode:'open'}); this.hassUpdates = 0; }
@@ -21,7 +21,7 @@ export function registerSyntheticCamera() {
       this.timer = setTimeout(() => {
         if (!this.isConnected) return;
         const mode = this.stateObj.attributes.fixture_mode;
-        if (mode === 'unsupported' || mode === 'failed') {
+        if (mode === 'unsupported' || mode === 'failed' || mode === 'silent-fallback') {
           this.shadowRoot.innerHTML = (mode === 'failed' ? '<ha-alert>Controlled synthetic stream failure</ha-alert>' : '') + `<img src="${poster}">`;
           this.dispatchEvent(new Event('load')); return;
         }

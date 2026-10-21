@@ -1,3 +1,4 @@
+await import(new URL(`./MaraoNativeNavbar.js${new URL(import.meta.url).search}`, import.meta.url));
 const catalogURL = new URL("./MaraoNativeCatalog.js", import.meta.url);
 catalogURL.search = new URL(import.meta.url).search;
 const { catalog } = await import(catalogURL.href);

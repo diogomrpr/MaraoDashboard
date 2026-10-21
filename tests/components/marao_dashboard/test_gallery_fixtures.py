@@ -403,9 +403,25 @@ async def test_camera_live_fixture_is_distinct_safe_local_media_with_optional_st
     source = Path(fixture.__file__).with_name("live.mp4")
     assert source.read_bytes()[4:8] == b"ftyp"
     assert source.read_bytes() != source.with_name("event.mp4").read_bytes()
+    for quality, width in (("high", 640), ("medium", 480), ("low", 320)):
+        tier = fixture.MaraoTestCamera("Safe tier", live=True, quality=quality)
+        tier.hass = live.hass
+        assert await tier.stream_source() == f"http://127.0.0.1:18123/api/marao_test_camera/live.ts?quality={quality}&bps=24000"
+        assert tier._attr_extra_state_attributes["width"] == width
+        assert tier._attr_extra_state_attributes["bandwidth"] > 0
+        assert tier._attr_extra_state_attributes["codec"].startswith("avc1.")
     assert await live.async_camera_image() == fixture.CAMERA_IMAGE
     assert await missing.async_camera_image() is None
     assert missing.entity_picture is None
+    FixtureCamera.entity_picture = property(lambda self: "/api/camera_proxy/camera.safe?token=synthetic")
+    error = fixture.MaraoTestCamera("Safe image failure", picture_error=True)
+    healthy = False
+    error.hass = SimpleNamespace(states=SimpleNamespace(is_state=lambda entity, state: healthy and state == "off"))
+    assert error.entity_picture == "/api/camera_proxy/camera.safe?token=synthetic&fixture_media=broken"
+    assert await error.async_camera_image() == b"<svg"
+    healthy = True
+    assert error.entity_picture.endswith("&fixture_media=good")
+    assert await error.async_camera_image() == fixture.CAMERA_IMAGE
     config = yaml.safe_load((ROOT / "ha-test/marao_dashboard_card_test_helpers.yaml").read_text())
     assert next(camera for camera in config["camera"] if camera["name"] == "Marao Dashboard Test Camera")["live"] is True
 
@@ -429,7 +445,7 @@ def test_synthetic_live_remux_loops_with_clocked_monotonic_packets_and_closes(mo
             return self.stopped
 
     stop = Stop()
-    video = SimpleNamespace(time_base=Fraction(1, 20), average_rate=20)
+    video = SimpleNamespace(time_base=Fraction(1, 20), average_rate=20, duration=2)
 
     class Input:
         streams = SimpleNamespace(video=[video])
@@ -442,6 +458,10 @@ def test_synthetic_live_remux_loops_with_clocked_monotonic_packets_and_closes(mo
 
         def demux(self, _video):
             return iter([SimpleNamespace(dts=tick, pts=tick, duration=1, time_base=video.time_base, stream=video) for tick in [0, 1]])
+
+        def seek(self, offset, **options):
+            assert offset == 0
+            assert options == {"stream": video, "backward": True, "any_frame": False}
 
     class Output:
         def __init__(self, sink):
@@ -473,12 +493,105 @@ def test_synthetic_live_remux_loops_with_clocked_monotonic_packets_and_closes(mo
 
     monkeypatch.setitem(sys.modules, "av", SimpleNamespace(open=open_media))
     monkeypatch.setattr(fixture.time, "monotonic", lambda: 0)
+    monkeypatch.setattr(fixture, "SOURCE_EPOCH", 0)
     chunks = Queue(maxsize=8)
     fixture.remux_live(stop, chunks)
     assert recorded == [(tick, tick) for tick in range(5)]
     assert waits == pytest.approx([0, .05, .1, .15, .2, .25])
     assert chunks.qsize() == 5
     assert closed.count("output") == 1 and closed.count("input") == 4
+
+
+def test_quality_media_has_matching_scene_counters_and_truthful_profiles():
+    av = pytest.importorskip("av", reason="Run media proof with HA's pinned PyAV dependency")
+    import json
+
+    root = ROOT / "ha-test/custom_components/marao_test_camera"
+    profiles = json.loads((root / "live-profiles.json").read_text())
+    previous_bandwidth = 0
+    for quality in ("low", "medium", "high"):
+        profile = profiles[quality]
+        with av.open(str(root / profile["file"])) as source:
+            video = source.streams.video[0]
+            assert (video.width, video.height) == (profile["width"], profile["height"])
+            assert "avc1." + video.codec_context.extradata[1:4].hex() == profile["codec"]
+            frames = list(source.decode(video))
+            assert len(frames) == profile["frames"] == 240
+            for tick, frame in enumerate(frames):
+                assert float(frame.pts * frame.time_base) == pytest.approx(tick / 20)
+                plane = frame.planes[0]
+                pixels = bytes(plane)
+                y = 40 * frame.height // 360
+                observed = sum((pixels[y * plane.line_size + (54 + 76 * bit) * frame.width // 640] > 128) << bit
+                               for bit in range(8))
+                assert observed == tick, (quality, tick, observed)
+                assert bool(frame.key_frame) == (tick % 20 == 0)
+        with av.open(str(root / profile["file"])) as source:
+            packets = [packet for packet in source.demux(video=0) if packet.dts is not None]
+            peak = max(sum(packet.size for packet in packets if second <= float(packet.dts * packet.time_base) < second + 1)
+                       for second in range(12)) * 8
+            assert profile["bandwidth"] == (peak * 11 + 9) // 10
+            assert profile["average_bandwidth"] == round(sum(packet.size for packet in packets) * 8 / 12)
+            assert profile["bandwidth"] > previous_bandwidth
+            previous_bandwidth = profile["bandwidth"]
+
+
+def test_independent_live_consumers_join_shared_scene_instead_of_restarting(monkeypatch):
+    av = pytest.importorskip("av", reason="Run media proof with HA's pinned PyAV dependency")
+    from io import BytesIO
+    from queue import Queue
+    from concurrent.futures import ThreadPoolExecutor
+    from time import perf_counter
+
+    fixture = load_fixture("marao_test_camera/live.py")
+    monkeypatch.setattr(fixture, "SOURCE_EPOCH", 0)
+    observed = []
+    for joined_at, quality, expected_first in ((2.2, "low", 60), (3.2, "high", 80), (11.2, "medium", 0)):
+        monkeypatch.setattr(fixture.time, "monotonic", lambda: joined_at)
+
+        class Stop:
+            calls = 0
+            stopped = False
+
+            def is_set(self):
+                return self.stopped or self.calls > 40
+
+            def wait(self, delay):
+                self.calls += 1
+                assert delay >= 0
+                return self.is_set()
+
+        chunks = Queue(maxsize=8)
+        from queue import Empty
+        content = bytearray()
+        stop = Stop()
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            worker = pool.submit(fixture.remux_live, stop, chunks, fixture.LIVE_FILE.with_name(fixture.PROFILES[quality]["file"]))
+            deadline = perf_counter() + 5
+            try:
+                while not worker.done() or not chunks.empty():
+                    assert perf_counter() < deadline, "Synthetic remux did not finish"
+                    try:
+                        content.extend(chunks.get(timeout=.1))
+                    except Empty:
+                        pass
+            finally:
+                stop.stopped = True
+                worker.result(timeout=5)
+        with av.open(BytesIO(content), format="mpegts") as source:
+            frames = list(source.decode(video=0))
+        assert len(frames) == 40
+        for index, frame in enumerate(frames):
+            plane, y = frame.planes[0], 40 * frame.height // 360
+            pixels = bytes(plane)
+            counter = sum((pixels[y * plane.line_size + (54 + 76 * bit) * frame.width // 640] > 128) << bit
+                          for bit in range(8))
+            assert counter == (expected_first + index) % 240
+        observed.append({round(float(frame.pts * frame.time_base), 2): (expected_first + index) % 240
+                         for index, frame in enumerate(frames)})
+    overlap = set(observed[0]) & set(observed[1])
+    assert len(overlap) == 20
+    assert all(observed[0][tick] == observed[1][tick] for tick in overlap)
 
 
 async def test_synthetic_live_endpoint_rejects_external_and_limits_physical_loopback():
@@ -495,7 +608,7 @@ async def test_synthetic_live_endpoint_rejects_external_and_limits_physical_loop
     with pytest.raises(web.HTTPTooManyRequests):
         await view.get(request)
     assert view._active == fixture.MAX_LIVE_CONNECTIONS
-    assert fixture.MAX_LIVE_CONNECTIONS == 4
+    assert fixture.MAX_LIVE_CONNECTIONS == 6
 
 
 async def test_synthetic_live_endpoint_bounds_queue_and_joins_on_native_disconnect(monkeypatch):
@@ -520,7 +633,8 @@ async def test_synthetic_live_endpoint_bounds_queue_and_joins_on_native_disconne
         async def write(self, _data):
             raise ConnectionResetError("Native consumer disconnected")
 
-    def executor(_function, stop, _chunks):
+    def executor(_function, stop, _chunks, source_file):
+        assert source_file == fixture.LIVE_FILE
         observed["stop"] = stop
 
         async def producer():
@@ -532,7 +646,7 @@ async def test_synthetic_live_endpoint_bounds_queue_and_joins_on_native_disconne
 
     monkeypatch.setattr(fixture, "Queue", bounded_queue)
     monkeypatch.setattr(fixture.web, "StreamResponse", Response)
-    request = SimpleNamespace(transport=SimpleNamespace(get_extra_info=lambda _: ("::1", 12345)), app={fixture.KEY_HASS: SimpleNamespace(async_add_executor_job=executor)})
+    request = SimpleNamespace(query={}, transport=SimpleNamespace(get_extra_info=lambda _: ("::1", 12345)), app={fixture.KEY_HASS: SimpleNamespace(async_add_executor_job=executor)})
     view = fixture.FixtureLiveView()
     await view.get(request)
     assert observed["stop"].is_set() and observed["joined"]

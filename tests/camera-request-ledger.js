@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const SAFE_ENTITY = 'camera.marao_dashboard_test_camera';
+const SAFE_ENTITIES = [SAFE_ENTITY, ...['slow','adaptive','adaptive_hls'].flatMap(source=>['high','medium','low'].map(quality=>SAFE_ENTITY+'_'+source+'_'+quality))];
 const nativeCaller = stack => /https?:\/\/192\.168\.0\.28(?::\d+)?\/frontend_(?:latest|es5)\/[^\s)]+\.js:\d+(?::\d+)?/.test(stack || '');
 const nativeTeardown = stack => nativeCaller(stack) && /\b(?:stopLoad|destroy|destroyInternalLoaders|_cleanUp|onMediaDetaching)\b/.test(stack);
 const maraoStopCaller = stack => /(?:CameraPlayback\.stop|(?:^|\n)stop@)[^\n]*https?:\/\/192\.168\.0\.28(?::\d+)?\/marao_dashboard_static\/MaraoCamera\.js[^\s)]*/.test(stack || '');
@@ -18,13 +19,23 @@ function provedNativeHandoff(receipt, prefix) {
     && proof.siblingVisible && proof.retiringHidden && proof.sameSiblingHost;
   return Boolean(receipt && nativeCaller(receipt.stack) && receipt.currentHost && receipt.transport && receipt.prefix === prefix && receipt.activeVideo
     && proof?.valid && proof.wrapper === receipt.wrapper && proof.host === receipt.host && proof.generation === receipt.generation
-    && (retainedWinner || selectedExistingSibling) && proof.advanced > .15 && proof.connected && proof.newStreamRequests === 0);
+    && (retainedWinner || selectedExistingSibling) && proof.advanced > .15 && proof.connected
+    && (Number.isInteger(receipt.ownStreamRequests) ? proof.ownNewStreamRequests === 0 : proof.newStreamRequests === 0));
 }
 
 function provedIneligibleRelease(receipt, prefix) {
   const proof = receipt?.proof;
   return Boolean(receipt && maraoStopCaller(receipt.stack) && receipt.currentHost && receipt.wasConnected && receipt.eligible === false && receipt.prefix === prefix
     && proof?.released && proof.ownershipUnambiguous && proof.originalCameraOrNull && proof.camera === receipt.camera && proof.generation === receipt.generation && proof.hostDisconnected && proof.playerReleased);
+}
+
+function provedQualityRelease(receipt, prefix) {
+  const p = receipt?.proof;
+  return Boolean(receipt && maraoStopCaller(receipt.stack) && /(?:CameraPlayback\.fallback|fallback@)/.test(receipt.stack)
+    && receipt.currentHost && receipt.wasConnected && receipt.eligible === true && receipt.prefix === prefix
+    && p?.originalCameraOrNull && p.camera === receipt.camera && p.generation === receipt.generation + 1
+    && p.hostDisconnected && p.playerReleased && p.quality?.sameConfiguredEntity && p.quality.sameDevice
+    && p.quality.lowerResolution && SAFE_ENTITIES.includes(p.quality.selected) && p.quality.selected !== receipt.entity);
 }
 
 function provedHandoffDisposal(receipt, prefix, trace) {
@@ -35,8 +46,9 @@ function provedHandoffDisposal(receipt, prefix, trace) {
     && provedIneligibleRelease(release, prefix) && release.wrapper === receipt.wrapper && release.host === receipt.host && release.camera === receipt.camera
     && Number.isInteger(receipt.generation) && release.generation === receipt.generation + 1
     && Number.isInteger(receipt.order) && release.order > receipt.order && release.date >= receipt.date && release.date - receipt.date <= 5000
-    && Number.isInteger(receipt.streamRequests) && release.streamRequests === receipt.streamRequests
-    && !(trace.streamCalls || []).some(call => call.order > receipt.order && call.order < release.order));
+    && (Number.isInteger(receipt.ownStreamRequests) ? release.ownStreamRequests === receipt.ownStreamRequests
+      : Number.isInteger(receipt.streamRequests) && release.streamRequests === receipt.streamRequests
+        && !(trace.streamCalls || []).some(call => call.order > receipt.order && call.order < release.order)));
 }
 
 function classifyCameraCancellations(failures, trace) {
@@ -48,17 +60,18 @@ function classifyCameraCancellations(failures, trace) {
   for (const failure of failures) {
     const sends = trace.events.filter(event => event.kind === 'send' && event.id === failure.xhr && event.url === failure.url);
     const aborts = trace.events.filter(event => event.kind === 'abort' && event.id === failure.xhr && event.url === failure.url);
-    const owned = trace.sessions.find(session => failure.url.startsWith(session.prefix) && session.entity === SAFE_ENTITY);
+    const owned = trace.sessions.find(session => failure.url.startsWith(session.prefix) && SAFE_ENTITIES.includes(session.entity));
     const valid = failure.document === trace.document && typeof trace.document === 'string' && failure.type === 'xhr' && ['net::ERR_ABORTED', 'cancelled'].includes(failure.error)
       && /^\/api\/hls\/[^/]+\/(?:(?:master_)?playlist\.m3u8|init\.mp4|segment\/\d+\.\d+\.m4s)$/.test(new URL(failure.url).pathname)
       && owned && Number.isInteger(failure.xhr) && !used.has(failure.xhr) && sends.length === 1 && nativeCaller(sends[0].stack)
       && aborts.length > 0 && aborts.every(abort => nativeTeardown(abort.stack) && abort.boundary?.entities.includes(owned.entity)
-        && [undefined, 'native-handoff', 'marao-ineligible-release'].includes(abort.boundary.kind)
+        && [undefined, 'native-handoff', 'marao-ineligible-release', 'marao-quality-release'].includes(abort.boundary.kind)
         && (abort.boundary.kind !== undefined || (Number.isInteger(abort.boundary.id) && typeof abort.boundary.label === 'string'))
         && (abort.boundary.kind !== 'native-handoff' || (() => {
           const receipt = trace.handoffs?.find(receipt => receipt.id === abort.boundary.handoff);
           return provedNativeHandoff(receipt, owned.prefix) || provedHandoffDisposal(receipt, owned.prefix, trace);
         })())
+        && (abort.boundary.kind !== 'marao-quality-release' || provedQualityRelease(trace.releases?.find(item => item.id === abort.boundary.release), owned.prefix))
         && (abort.boundary.kind !== 'marao-ineligible-release' || provedIneligibleRelease(trace.releases?.find(item => item.id === abort.boundary.release), owned.prefix)));
     if (valid) { used.add(failure.xhr); accepted.push({ failure, xhr: failure.xhr, nativeAbortReceipts: aborts }); }
     else rejected.push(failure);
@@ -69,7 +82,7 @@ function classifyCameraCancellations(failures, trace) {
   return { accepted, rejected, restarts };
 }
 
-function installTrace({ subscriptions = false } = {}) {
+function installTrace({ subscriptions = false, entities = ['camera.marao_dashboard_test_camera'] } = {}) {
   const documentId = [...crypto.getRandomValues(new Uint32Array(4))].map(value => value.toString(16)).join('-');
   const state = { document: documentId, events: [], sessions: [], stops: [], handoffs: [], releases: [], streamRequests: 0, streamCalls: [], order: 0, boundary: null, next: 0 };
   window.__maraoCameraRequestTrace = state;
@@ -79,7 +92,7 @@ function installTrace({ subscriptions = false } = {}) {
       boundary: state.boundary ? { kind: state.boundary.kind, id: state.boundary.id, label: state.boundary.label } : null };
     if (direction === 'out') {
       if (Number.isInteger(message.subscription)) item.subscription = message.subscription;
-      if (message.entity_id === 'camera.marao_dashboard_test_camera') item.entity = message.entity_id;
+      if (entities.includes(message.entity_id)) item.entity = message.entity_id;
       item.stack = new Error('native WebSocket lifecycle').stack;
     } else if (message.type === 'result') {
       item.success = message.success;
@@ -123,7 +136,7 @@ function installTrace({ subscriptions = false } = {}) {
     const requested = [];
     try { const parsed = JSON.parse(data); for (const message of Array.isArray(parsed) ? parsed : [parsed]) {
       subscriptionEvent('out', message);
-      if (message?.type === 'camera/stream' && message.entity_id === 'camera.marao_dashboard_test_camera') { const request = { entity: message.entity_id }; sockets.get(this).set(message.id, request); requested.push(request); }
+      if (message?.type === 'camera/stream' && entities.includes(message.entity_id)) { const request = { entity: message.entity_id }; sockets.get(this).set(message.id, request); requested.push(request); }
     } } catch {}
     const result = sendSocket.call(this, data);
     for (const request of requested) {
@@ -184,14 +197,15 @@ function installTrace({ subscriptions = false } = {}) {
     if (state.boundary || !node?.isConnected) return invoke();
     if (node.localName === 'ha-camera-stream') {
       const wrapper = ancestor(node, 'marao-card'), camera = wrapper?._camera;
-      if (node.stateObj?.entity_id !== 'camera.marao_dashboard_test_camera' || !camera) return invoke();
+      if (!entities.includes(node.stateObj?.entity_id) || !camera) return invoke();
       const stack = new Error('Marao native host release').stack;
       const receipt = { id: state.releases.length + 1, stack, date: Date.now(), order: ++state.order, wrapper: identity(wrapper), host: identity(node), camera: identity(camera), generation: camera.generation,
-        currentHost: camera.player === node, wasConnected: node.isConnected, eligible: camera.eligible(), streamRequests: state.streamRequests, ...currentPrefix(node) };
+        entity: node.stateObj.entity_id, configured: camera.entity, currentHost: camera.player === node, wasConnected: node.isConnected, eligible: camera.eligible(), streamRequests: state.streamRequests, ownStreamRequests: camera.streamRequests, ...currentPrefix(node) };
       state.releases.push(receipt);
       const stop = /(?:CameraPlayback\.stop|(?:^|\n)stop@)[^\n]*https?:\/\/192\.168\.0\.28(?::\d+)?\/marao_dashboard_static\/MaraoCamera\.js[^\s)]*/.test(stack);
       if (!stop) return invoke();
-      state.boundary = { kind: 'marao-ineligible-release', release: receipt.id, entities: ['camera.marao_dashboard_test_camera'], date: receipt.date };
+      const qualityRelease = /(?:CameraPlayback\.fallback|fallback@)/.test(stack);
+      state.boundary = { kind: qualityRelease ? 'marao-quality-release' : 'marao-ineligible-release', release: receipt.id, entities: [receipt.entity], date: receipt.date };
       try { return invoke(); } finally {
         state.boundary = null;
         queueMicrotask(() => {
@@ -201,12 +215,21 @@ function installTrace({ subscriptions = false } = {}) {
             .map(item => ({ wrapper: identity(item.card), host: identity(item.camera.player), ...currentPrefix(item.camera.player) }));
           receipt.proof = { originalCameraOrNull: wrapper._camera === camera || wrapper._camera == null, camera: identity(camera), generation: camera.generation, hostDisconnected: !node.isConnected, playerReleased: camera.player !== node,
             released: !node.isConnected && camera.player !== node && !camera.attempt, ownershipUnambiguous: Boolean(receipt.prefix) && consumers.every(item => item.prefix), remainingConsumers: consumers };
+          if (qualityRelease) {
+            const selected = camera.streamEntity, registry = camera.hass.entities || {}, old = camera.hass.states[receipt.entity]?.attributes || {}, next = camera.hass.states[selected]?.attributes || {};
+            receipt.proof.quality = { selected, sameConfiguredEntity: camera.entity === receipt.configured,
+              sameDevice: Boolean(registry[selected]?.device_id) && registry[selected].device_id === registry[receipt.entity]?.device_id,
+              lowerResolution: next.width * next.height > 0 && next.width * next.height < old.width * old.height };
+            if (receipt.prefix && receipt.proof.ownershipUnambiguous && receipt.proof.hostDisconnected && receipt.proof.playerReleased && !consumers.some(item => item.prefix === receipt.prefix))
+              state.stops.push({kind:'marao-quality-release',entities:[receipt.entity],prefix:receipt.prefix,date:receipt.date,order:receipt.order});
+          }
           if (receipt.eligible === false && receipt.currentHost && receipt.wasConnected && receipt.proof.released && receipt.proof.originalCameraOrNull
             && receipt.proof.generation === receipt.generation && receipt.proof.ownershipUnambiguous) {
             for (const handoff of state.handoffs) {
               const owner = owners.get(handoff.id);
               if (!handoff.proof && owner?.camera === camera && owner.wrapper === wrapper && owner.host === node
-                && receipt.generation === handoff.generation + 1 && receipt.prefix === handoff.prefix && receipt.streamRequests === handoff.streamRequests
+                && receipt.generation === handoff.generation + 1 && receipt.prefix === handoff.prefix
+                && (Number.isInteger(handoff.ownStreamRequests) ? receipt.ownStreamRequests === handoff.ownStreamRequests : receipt.streamRequests === handoff.streamRequests)
                 && receipt.order > handoff.order && receipt.date >= handoff.date && receipt.date - handoff.date <= 5000) {
                 handoff.closedByRelease = { kind: 'marao-ineligible-release', release: receipt.id, ownerRetained: true };
                 owner.wake?.('ineligible-release');
@@ -216,17 +239,17 @@ function installTrace({ subscriptions = false } = {}) {
           if (receipt.eligible === false && receipt.currentHost && receipt.proof.released && receipt.proof.originalCameraOrNull && receipt.proof.generation === receipt.generation
             && receipt.proof.ownershipUnambiguous && !consumers.some(item => item.prefix === receipt.prefix)) {
             const recovery = state.streamCalls.find(call => call.order > receipt.order && state.sessions.some(session => session.prefix === receipt.prefix && session.requestOrder === call.order));
-            state.stops.push({ kind: 'marao-ineligible-release', entities: ['camera.marao_dashboard_test_camera'], prefix: receipt.prefix, date: receipt.date, order: receipt.order, ...(recovery ? { end: recovery.date, endOrder: recovery.order } : {}) });
+            state.stops.push({ kind: 'marao-ineligible-release', entities: [receipt.entity], prefix: receipt.prefix, date: receipt.date, order: receipt.order, ...(recovery ? { end: recovery.date, endOrder: recovery.order } : {}) });
           }
         });
       }
     }
     const transports = [...(node.localName === 'ha-hls-player' ? [node] : []), ...(node.querySelectorAll?.('ha-hls-player') || [])]
-      .filter(transport => transport.entityid === 'camera.marao_dashboard_test_camera');
+      .filter(transport => entities.includes(transport.entityid));
     // Multiple descendants cannot identify a particular loader safely.
     if (transports.length !== 1) return invoke();
     const transport = transports[0], host = ancestor(transport, 'ha-camera-stream'), wrapper = ancestor(host, 'marao-card');
-    if (!wrapper || host?.stateObj?.entity_id !== 'camera.marao_dashboard_test_camera') return invoke();
+    if (!wrapper || !entities.includes(host?.stateObj?.entity_id)) return invoke();
     const stack = new Error('native HLS DOM disconnect').stack;
     const native = /https?:\/\/192\.168\.0\.28(?::\d+)?\/frontend_(?:latest|es5)\/[^\s)]+\.js:\d+(?::\d+)?/.test(stack);
     const publicUrl = typeof transport.url === 'string' ? transport.url : null;
@@ -242,12 +265,12 @@ function installTrace({ subscriptions = false } = {}) {
       camera: identity(wrapper._camera), generation: wrapper._camera?.generation, activeVideo: identity(active), activeTransport: activeTransport?.localName, activeTransportId: identity(activeTransport),
       retiringVideo: ancestor(active, 'ha-hls-player') === transport ? identity(active) : null,
       siblings: siblings.map(item => ({ transport: identity(item.sibling), video: identity(item.video), connected: item.video.isConnected && item.sibling.isConnected,
-        sameHost: ancestor(item.sibling, 'ha-camera-stream') === host, entitySafe: item.sibling.entityid === 'camera.marao_dashboard_test_camera', visibleBefore: visibleWithin(item.video, host),
+        sameHost: ancestor(item.sibling, 'ha-camera-stream') === host, entitySafe: item.sibling.entityid === transport.entityid, visibleBefore: visibleWithin(item.video, host),
         timeBefore: item.video.currentTime, pausedBefore: item.video.paused, readyBefore: item.video.readyState })),
-      currentHost: wrapper._camera?.player === host, streamRequests: state.streamRequests, selectionSamples: [] };
+      currentHost: wrapper._camera?.player === host, streamRequests: state.streamRequests, ownStreamRequests: wrapper._camera?.streamRequests, selectionSamples: [] };
     state.handoffs.push(receipt); owners.set(receipt.id, { wrapper, host, camera: wrapper._camera, retiring: transport, retiringVideo: activeTransport === transport ? active : null, candidate });
     if (!native) return invoke();
-    state.boundary = { kind: 'native-handoff', handoff: receipt.id, entities: ['camera.marao_dashboard_test_camera'], date: receipt.date };
+    state.boundary = { kind: 'native-handoff', handoff: receipt.id, entities: [transport.entityid], date: receipt.date };
     try { return invoke(); } finally { state.boundary = null; queueMicrotask(() => startHandoffProof(receipt)); }
   };
   const remove = Element.prototype.remove, removeChild = Node.prototype.removeChild, insertBefore = Node.prototype.insertBefore;
@@ -284,10 +307,12 @@ function installTrace({ subscriptions = false } = {}) {
           if (Date.now() >= deadline) break;
           const camera = wrapper._camera;
           const proof = { wrapper: identity(wrapper), host: identity(camera?.player), generation: camera?.generation,
-            connected: wrapper.isConnected && host.isConnected, newStreamRequests: state.streamRequests - receipt.streamRequests };
-          if (!proof.connected || camera?.player !== host || camera.generation !== receipt.generation || proof.newStreamRequests) { receipt.proof = { ...proof, valid: false, reason: 'Owner replaced, disconnected or new native stream requested' }; break; }
+            connected: wrapper.isConnected && host.isConnected, newStreamRequests: state.streamRequests - receipt.streamRequests,
+            ownNewStreamRequests: Number.isInteger(receipt.ownStreamRequests) && Number.isInteger(camera?.streamRequests) ? camera.streamRequests - receipt.ownStreamRequests : undefined };
+          const restarted = Number.isInteger(receipt.ownStreamRequests) ? proof.ownNewStreamRequests !== 0 : proof.newStreamRequests !== 0;
+          if (!proof.connected || camera?.player !== host || camera.generation !== receipt.generation || restarted) { receipt.proof = { ...proof, valid: false, reason: 'Owner replaced, disconnected or new native stream requested' }; break; }
           const siblingVisible = candidate && visibleWithin(candidate.video, host), retiringHidden = !retiring.isConnected || !visibleWithin(retiringVideo, host);
-          const sameSiblingHost = candidate && candidate.sibling.isConnected && candidate.sibling.entityid === 'camera.marao_dashboard_test_camera' && ancestor(candidate.sibling, 'ha-camera-stream') === host;
+          const sameSiblingHost = candidate && candidate.sibling.isConnected && candidate.sibling.entityid === host.stateObj.entity_id && ancestor(candidate.sibling, 'ha-camera-stream') === host;
           const retained = identity(camera.video) === receipt.activeVideo;
           const selected = receipt.retiringVideo === receipt.activeVideo && receipt.activeTransport === 'ha-hls-player' && candidate && camera.video === candidate.video && sameSiblingHost && siblingVisible && retiringHidden;
           receipt.selectionSamples.push({ elapsedMs: Date.now() - receipt.date, source, phase: state.boundary?.label || state.boundary?.kind || 'native handoff observation',
@@ -306,11 +331,16 @@ function installTrace({ subscriptions = false } = {}) {
       } finally { cleanupPending(); receipt.observerCleaned = true; receipt.proofFinished = Date.now(); }
     }
   };
-  window.__maraoProveCameraHandoffs = async () => { await Promise.all(state.handoffs.map(startHandoffProof)); };
+  window.__maraoProveCameraHandoffs = async () => {
+    // Another native transport can settle while an earlier proof is pending.
+    let count;
+    do { count = state.handoffs.length; await Promise.all(state.handoffs.map(startHandoffProof)); }
+    while (state.handoffs.length !== count);
+  };
 }
 
 async function cameraRequestLedger(context, { output, scenario, theme }) {
-  await context.addInitScript(installTrace, { subscriptions: process.env.MARAO_CAMERA_SUBSCRIPTION_DIAGNOSTIC === '1' });
+  await context.addInitScript(installTrace, { subscriptions: process.env.MARAO_CAMERA_SUBSCRIPTION_DIAGNOSTIC === '1', entities: SAFE_ENTITIES });
   let page, sequence = 0, lastTrace, stoppedForClose = false; const failures = [], starts = new WeakMap(), documents = new Map();
   const safe = value => {
     if (Array.isArray(value)) return value.map(safe);
@@ -332,16 +362,16 @@ async function cameraRequestLedger(context, { output, scenario, theme }) {
       if (trace) { if (lastTrace?.document !== trace.document) stoppedForClose = false; lastTrace = trace; documents.set(trace.document, trace); }
       return trace;
     },
-    async resume() { await page.evaluate(() => { const state = window.__maraoCameraRequestTrace; for (const stop of state.stops) if (!stop.end && stop.kind !== 'marao-ineligible-release') { stop.end = Date.now(); stop.endOrder = ++state.order; } }); },
+    async resume() { await page.evaluate(() => { const state = window.__maraoCameraRequestTrace; for (const stop of state.stops) if (!stop.end && !['marao-ineligible-release', 'marao-quality-release'].includes(stop.kind)) { stop.end = Date.now(); stop.endOrder = ++state.order; } }); },
     async settleHandoffs() { if (!page.isClosed()) await page.evaluate(() => window.__maraoProveCameraHandoffs?.()); },
-    async boundary(label, action, { terminal = true } = {}) {
-      await ledger.settleHandoffs();
+    async boundary(label, action, { terminal = true, entities = [SAFE_ENTITY] } = {}) {
+      assert.ok(entities.length && entities.every(entity => SAFE_ENTITIES.includes(entity)));
       const id = ++sequence;
-      await page.evaluate(({ id, label, entity }) => { const state = window.__maraoCameraRequestTrace; if (state.boundary) throw Error('Nested camera release boundary'); state.boundary = { id, label, entities: [entity], date: Date.now() }; }, { id, label, entity: SAFE_ENTITY });
+      await page.evaluate(async ({ id, label, entities }) => { await window.__maraoProveCameraHandoffs?.(); const state = window.__maraoCameraRequestTrace; if (state.boundary) throw Error('Nested camera release boundary'); state.boundary = { id, label, entities, date: Date.now() }; }, { id, label, entities });
       try {
         await action();
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-        if (terminal) await page.evaluate(entity => { const state = window.__maraoCameraRequestTrace; state.stops.push({ entities: [entity], date: Date.now(), order: ++state.order }); }, SAFE_ENTITY);
+        if (terminal) await page.evaluate(entities => { const state = window.__maraoCameraRequestTrace; state.stops.push({ entities, date: Date.now(), order: ++state.order }); }, entities);
         await page.waitForTimeout(250);
       } finally { await page.evaluate(() => { window.__maraoCameraRequestTrace.boundary = null; }); }
     },
@@ -367,7 +397,7 @@ async function cameraRequestLedger(context, { output, scenario, theme }) {
           await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
           if (cards.some(card => card._camera?.player)) throw Error('Camera session survived final context release');
         });
-      });
+      }, {entities: SAFE_ENTITIES});
       stoppedForClose = true;
       await ledger.assert();
     },

@@ -178,3 +178,38 @@ test("native assets keep content fingerprints and avoid bundling the lazy editor
   assert.ok(source.includes("import.meta.url"));
   assert.ok(!source.includes("class MaraoNativeCardEditor"));
 });
+
+test('camera title controls are basic, default visibly on without a write, and retain retired settings', () => {
+  const spec = catalog.cards.find(card => card.id === 'hc_camera_card');
+  const original = { type: spec.type, name: 'Entrance', icon: 'mdi:cctv', show_state: true, show_label: false, future: [] };
+  const { common, advanced } = nativeFields(spec, original), fields = [...common, ...advanced];
+  assert.equal(common.find(field => field.path === 'entity').label, 'Dashboard stream');
+  assert.deepEqual(common.find(field => field.path === 'variables.popup_stream_entity').domains, ['camera']);
+  assert.equal(common.find(field => field.path === 'name').label, 'Title');
+  assert.equal(common.find(field => field.path === 'show_name').label, 'Show title');
+  assert.equal(fields.some(field => ['icon','show_icon','show_state','show_label'].includes(field.path)), false);
+  const data = formData(original, fields);
+  assert.equal(data.show_name, true);
+  assert.deepEqual(patchForm(original, fields, data, {...data}), original);
+  const hidden = patchForm(original, fields, data, {...data, show_name: false});
+  assert.deepEqual(hidden, {...original, show_name: false});
+  const roundtrip = JSON.parse(JSON.stringify(hidden));
+  assert.equal(formData(roundtrip, fields).show_name, false);
+  assert.deepEqual(patchForm(roundtrip, fields, formData(roundtrip, fields), {...formData(roundtrip, fields), name: 'Front door'}), {...hidden, name: 'Front door'});
+});
+
+test('critical native navbar converts locally and preserves complete configuration without a server', async () => {
+  const { MaraoNativeNavbar } = await import('../../custom_components/marao_dashboard/frontend/MaraoNativeNavbar.js');
+  const { MaraoNavbarCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
+  assert.deepEqual(MaraoNativeNavbar.getStubConfig({language:'en'}),{name:'Navbar',routes:[],native:true});
+  assert.deepEqual(MaraoNativeNavbar.getStubConfig({language:'pt'}),{name:'Barra de navegação',routes:[],native:true});
+  const child = Object.assign(Object.create(MaraoNavbarCard.prototype), { _closeOverflow() {}, _render() {} });
+  const owner = { _child: child, _editAccess() {} };
+  const source = { type:'custom:marao-native-navbar-card', native:true, routes:[{path:'/marao-dashboard/rooms',label:'Rooms',future:[]}], future:{keep:[]} };
+  MaraoNativeNavbar.prototype.setConfig.call(owner, source);
+  assert.deepEqual(child._config, {...source,type:'custom:marao-navbar-card'});
+  assert.deepEqual(owner._config,source);assert.notEqual(owner._config,source);
+  assert.throws(()=>MaraoNativeNavbar.prototype.setConfig.call(owner,{...source,routes:[null]}));
+  assert.deepEqual(owner._config,source);
+  MaraoNativeNavbar.prototype.setConfig.call(owner,{...source,routes:[]});assert.deepEqual(child._config.routes,[]);
+});

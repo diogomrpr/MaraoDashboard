@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bindNavbarRefresh, cleanFrontendRefreshURL, clearFrontendCaches, frontendRefreshURL, refreshFrontend } from '../../custom_components/marao_dashboard/frontend/MaraoFrontendRefresh.js';
+import { createFrontendUpdates } from '../../custom_components/marao_dashboard/frontend/MaraoFrontendUpdates.js';
 
 const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 function environment(t, overrides = {}) {
@@ -21,6 +22,67 @@ function environment(t, overrides = {}) {
   return { host, doc, urls, statuses, warnings, requests, run };
 }
 const request = url => ({ url });
+
+function automatic(t, { version = 'one', storage = new Map() } = {}) {
+  const host = new EventTarget(), doc = new EventTarget();
+  doc.visibilityState = 'visible'; host.document = doc; host.navigator = { onLine: true };
+  host.setTimeout = setTimeout; host.console = { warn() {} };
+  host.sessionStorage = { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) };
+  const view = { dashboard: 'marao-dashboard', active: true, blocked: false };
+  const statuses = [], refreshes = []; let receive, removed = 0, reject;
+  const connection = { subscribeMessage: async callback => { receive = callback; return () => { removed++; }; } };
+  const hass = { connected: true, connection };
+  const controller = createFrontendUpdates({ host, loadedVersion: version,
+    context: () => ({ ...view, status: value => statuses.push(value) }),
+    refresh: async options => {
+      if (reject) throw Object.assign(Error(reject), { code: reject });
+      options.beforeClear(); refreshes.push(true); return { departed: true };
+    } });
+  controller.update(hass); t.after(() => controller.destroy());
+  return { controller, host, doc, view, storage, statuses, refreshes, hass,
+    send: (payload = {}) => receive({ dashboard: 'marao-dashboard', fingerprint: 'one', ...payload }),
+    reject: code => { reject = code; }, removed: () => removed };
+}
+
+test('automatic save refresh is unconditional, deduplicated and independent of matching versions', async t => {
+  const e = automatic(t); await flush(); e.send(); await flush(); assert.equal(e.refreshes.length, 0);
+  e.send({ request_id: 'save-a' }); await flush(); assert.equal(e.refreshes.length, 1);
+  e.send({ request_id: 'save-a' }); await flush(); assert.equal(e.refreshes.length, 1);
+  e.send({ request_id: 'save-b' }); await flush(); assert.equal(e.refreshes.length, 2);
+  e.controller.destroy(); await flush(); assert.equal(e.removed(), 1);
+});
+
+test('future version refresh needs no save and cannot loop across stale document reloads', async t => {
+  const e = automatic(t); await flush(); e.send({ fingerprint: 'two' }); await flush();
+  assert.equal(e.refreshes.length, 1); e.controller.destroy();
+  const stale = automatic(t, { storage: e.storage }); await flush(); stale.send({ fingerprint: 'two' }); await flush();
+  assert.equal(stale.refreshes.length, 0); assert.equal(stale.statuses.at(-1), 'failed');
+  const fresh = automatic(t, { version: 'two', storage: e.storage }); await flush(); fresh.send({ fingerprint: 'two' }); await flush();
+  assert.equal(fresh.refreshes.length, 0);
+  fresh.send({ fingerprint: 'three' }); await flush(); assert.equal(fresh.refreshes.length, 1);
+});
+
+test('pending saves coalesce and defer for editing, hidden state and unrelated pages', async t => {
+  const e = automatic(t); await flush(); e.view.blocked = true;
+  e.send({ request_id: 'a' }); e.send({ request_id: 'b' }); await flush(); assert.equal(e.refreshes.length, 0);
+  e.view.blocked = false; e.doc.visibilityState = 'hidden'; e.controller.update(e.hass); await flush();
+  e.doc.visibilityState = 'visible'; e.view.dashboard = 'other'; e.controller.update(e.hass); await flush();
+  assert.equal(e.refreshes.length, 0); e.view.dashboard = 'marao-dashboard'; e.controller.update(e.hass); await flush();
+  assert.equal(e.refreshes.length, 1); e.send({ request_id: 'a' }); e.send({ request_id: 'b' }); await flush();
+  assert.equal(e.refreshes.length, 1);
+});
+
+test('offline preflight keeps pending work; foreground retries once without repeated attempts', async t => {
+  const e = automatic(t); await flush(); e.reject('offline'); e.send({ request_id: 'a' }); await flush();
+  assert.equal(e.storage.size, 0); e.controller.update(e.hass); await flush(); assert.equal(e.refreshes.length, 0);
+  e.reject(null); e.host.dispatchEvent(new Event('focus')); await flush(); assert.equal(e.refreshes.length, 1);
+});
+
+test('denied coordination storage prevents an unguarded automatic reload', async t => {
+  const e = automatic(t); await flush(); e.host.sessionStorage.getItem = () => { throw Error('denied'); };
+  e.send({ fingerprint: 'two' }); await flush(); assert.equal(e.refreshes.length, 0);
+  assert.equal(e.statuses.at(-1), 'failed');
+});
 
 test('fresh URL retains origin, page, duplicate queries, app authentication and fragment', () => {
   const old = new URL('https://example.invalid/marao-dashboard/studio?external_auth=1&keep=a%20b&keep=c#popup');

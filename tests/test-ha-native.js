@@ -53,7 +53,7 @@ async function openBrowser(config, run) {
 }
 
 async function waitCards(page) {
-  await page.locator('marao-native-navbar-card marao-navbar-card').waitFor();
+  await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) .nav').waitFor();
   await page.waitForFunction(() => {
     function ready(root) {
       for (const e of root?.children || []) {

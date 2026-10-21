@@ -20,13 +20,14 @@ paid browser service or weakened sandbox is required for this workflow.
 ### Requirement: Current-workspace disposable preparation
 Ignored `ha-test/local.json` SHALL supply URL, administrator token, explicit
 disposable acknowledgement and SSH connection. `ha:sync:dry-run` SHALL report the
-plan without writes or HA contact. Real preparation SHALL build/deploy the current
-workspace, install only safe fixtures, generate one dashboard, wait for readiness
-and validate files/resources/routes/entities before recording success.
+plan without writes or HA contact. Full preparation SHALL build/deploy the current workspace, install safe fixtures, generate one dashboard and verify readiness. Frontend development preview SHALL synchronize only frontend files to an existing compatible installation, reload Marao when changed and verify served identities. It SHALL NOT reset helpers, explicitly invoke dashboard generation or restart HA. Normal entry reload SHALL retain its existing lifecycle, including applicable generated-output/history updates.
 
 #### Scenario: A frontend-only change is prepared
-- **WHEN** current assets are deployed to the allowed disposable instance
-- **THEN** integration reload/browser refresh applies the fingerprinted assets without an unnecessary backend restart
+- **WHEN** the focused development preview prepares current workspace assets on the allowed disposable instance
+- **THEN** frontend files are synchronized and Marao reloads when changed before the real HA page refreshes
+- **AND** native HA controls and icons remain real, with no helper reset, explicit generation call or HA restart
+- **AND** successful synced assets remain installed after inspection or preview closure
+- **AND** its development evidence does not replace publication or upgrade checks
 
 #### Scenario: Integration or fixture Python changes
 - **WHEN** preparation detects restart-bound code
@@ -46,19 +47,20 @@ a representative realistic-page example. Equivalent value permutations need not 
 - **AND** both Cases and its realistic product placement exercise it
 
 ### Requirement: Meaningful focused checks
-Development and release verification SHALL use the smallest covering unit/static/browser checks for implemented features, touched components and shared consumers. Icon-only controls or shared action geometry changes SHALL select relevant alignment checks; changed sliders SHALL select relevant slider checks. Test-only and documentation-only changes SHALL not trigger unrelated application suites or device actions. Visibility checks SHALL NOT replace required action, security, migration or recovery assertions.
+Development SHALL use the reviewed visual, behavior or focused tier for the changed contract and shared consumers. Presentation-only development SHALL require targeted current visual inspection, with relevant difficult layouts. Behavior SHALL add the smallest covering assertions. Publication SHALL retain affected unit/static/browser coverage, including applicable alignment and slider checks. Test-only and documentation-only changes SHALL not trigger unrelated application suites or device actions. Visibility checks SHALL NOT replace required action, security, migration or recovery assertions.
 
 #### Scenario: A shared icon-only media layout is edited
 - **WHEN** its focused verification runs
-- **THEN** alignment is checked within the runner's 0.5 CSS-pixel tolerance and representative affected components and difficult layouts are visually inspected afterward
+- **THEN** presentation-only development inspects representative affected alignment and relevant difficult layouts
+- **AND** publication retains the runner's 0.5 CSS-pixel alignment tolerance
 
 #### Scenario: A card label changes without persistence or gesture changes
 - **WHEN** the selected verification runs
-- **THEN** its relevant rendering/localization and difficult text-layout checks execute
+- **THEN** development inspects the rendered localized label and only text layouts relevant to the edit
 - **AND** unrelated camera, slider, reconnect, editor-save and historical live-upgrade checks do not execute
 
 ### Requirement: Mobile release matrix
-Default release verification SHALL select mobile profiles appropriate to the affected UI contracts and SHALL NOT automatically run all 26 profile/theme combinations. Layout changes SHALL cover representative affected cards at 320px and relevant text/zoom, theme, portrait and landscape conditions. The existing complete mobile matrix SHALL remain available through explicitly requested comprehensive verification. Selected runs SHALL preserve isolated touch/device settings, typography and native HA compatibility.
+Default release verification SHALL select mobile profiles for affected UI contracts, preserving isolated touch/device settings, typography and native HA compatibility. Layout coverage SHALL include affected cards at 320px and relevant text/zoom, theme, portrait and landscape conditions. Theme-independent geometry SHALL use one reference theme with representative appearance/state coverage in both themes. The full matrix SHALL remain available only through explicit comprehensive verification.
 
 #### Scenario: A release mobile run inspects every view and popup
 - **WHEN** explicitly requested comprehensive checks encounter scrolling cards or opening sheets
@@ -69,8 +71,23 @@ Default release verification SHALL select mobile profiles appropriate to the aff
 - **THEN** only affected popup families and representative difficult mobile profiles are inspected
 - **AND** unchanged views and all 26 combinations are not automatically traversed
 
+#### Scenario: A layout has no theme-dependent geometry
+- **WHEN** an affected family requires nine geometry profiles and independent appearance checks
+- **THEN** the plan covers those nine profiles in one reference theme and a representative appearance run in the other theme
+- **AND** it does not require all eighteen profile/theme combinations for the same geometry assertions
+
+#### Scenario: A theme changes the measured layout
+- **WHEN** theme-dependent typography, control rendering or another layout input affects an assertion
+- **THEN** the plan includes the affected theme/profile combinations and records their selection reason
+- **AND** an unreviewed dependency retains conservative coverage rather than being assumed equivalent
+
+#### Scenario: Text scaling and browser zoom are relevant
+- **WHEN** a layout change selects enlarged-text and zoom coverage
+- **THEN** 200% text and 200% browser zoom remain distinct cases
+- **AND** selected normal, bold and bold-plus-200% text cases are not removed merely because one enlarged case passes
+
 ### Requirement: Interaction and resource verification
-Selected browser checks SHALL verify the changed contract: relevant cold loads, scrolling, safe-area/navbar clearance, popup focus/scroll/close, availability/errors, external state changes, single dispatch and gesture cancellation. Connection changes SHALL retain native warning and exception assertions. Distinct interactions SHALL run once per relevant theme; device repeats SHALL target gesture or geometry differences. Failures SHALL retain screenshots and raw diagnostics; success captures SHALL be representative unless exhaustive captures were explicitly requested.
+Selected browser checks SHALL verify the changed contract: relevant cold loads, scrolling, safe-area/navbar clearance, popup focus/scroll/close, availability/errors, external state changes, single dispatch and gesture cancellation. Connection changes SHALL retain native warning and exception assertions. Failures SHALL retain screenshots and raw diagnostics; success captures SHALL be representative unless exhaustive captures were explicitly requested.
 
 #### Scenario: A browser interaction check completes without an exception
 - **WHEN** the corresponding popup is visually empty or clipped
@@ -80,6 +97,19 @@ Selected browser checks SHALL verify the changed contract: relevant cold loads, 
 - **WHEN** focused browser verification executes
 - **THEN** dispatch count and relevant cancellation paths are asserted using safe fixtures
 - **AND** a visible button alone cannot satisfy the check
+
+#### Scenario: State transitions do not depend on viewport size
+- **WHEN** threshold, preservation or dispatch checks share behavior across selected geometry profiles
+- **THEN** representative behavior runs retain all distinct assertions
+- **AND** geometry-only runs inspect appropriate fixed states without replaying the entire transition sequence
+- **AND** theme-independent behavior runs once in a reference theme while theme-dependent interactions run once per relevant theme
+- **AND** appearance, contrast and distinct state cues retain representative coverage in both themes
+
+#### Scenario: Native gestures need distinct coverage
+- **WHEN** a changed control depends on native touch handling or engine-specific geometry
+- **THEN** relevant iPhone/Android or browser-engine checks retain completion, cancellation and containment assertions
+- **AND** reducing theme duplication does not silently remove those cases
+- **AND** device and engine repeats target native gesture or geometry differences
 
 ### Requirement: Strict HACS boundary and reproducible assets
 The editor SHALL be built from `frontend_src/` into committed runtime assets and
@@ -92,7 +122,7 @@ test dependencies and secrets. Test providers SHALL never overwrite real provide
 - **THEN** packaging fails instead of shipping it
 
 ### Requirement: Publication gate and exact-commit CI
-Push, tag and release verification SHALL require successful checks for the complete affected change set and applicable exact-commit CI, including relevant packaging, asset, hassfest and HACS validation. Publication SHALL NOT implicitly require the full suite, full mobile matrix or unrelated preserved-install checks. Failed selected checks and known relevant violations SHALL block publication. Valid scoped evidence SHALL be reusable for unchanged inputs; an approved native exception SHALL remain explicit and time-limited.
+Pushes, tags and releases SHALL require successful checks for all affected changes and applicable exact-commit CI, including relevant packaging, assets, hassfest and HACS. Publication SHALL NOT implicitly require full-suite, full-matrix or unrelated preserved-install checks. Failed selected checks and known relevant violations SHALL block publication. Valid scoped evidence SHALL be reusable for unchanged inputs; approved native exceptions SHALL remain explicit and time-limited.
 
 #### Scenario: The native reconnect check still fails for a future release
 - **WHEN** changed connection behavior selects that check during publication preparation
@@ -172,3 +202,98 @@ Live preserved-install checks SHALL be required only when changes affect persist
 #### Scenario: A selected historical replay fails or cleanup is incomplete
 - **WHEN** release evidence is evaluated
 - **THEN** publication fails and private backup/recovery evidence is retained
+
+### Requirement: Compatible browser visits
+Affected verification SHALL share compatible page visits and deduplicate equivalent delegated checks while preserving every required logical assertion and relevant cold-load check. Shared visits SHALL retain diagnostics, restore mutated state between checks and remain serial by default. Incompatible saves, helper mutations or restoration SHALL keep exclusive execution and verified cleanup.
+
+#### Scenario: Two selected families use the same gallery profile
+- **WHEN** their checks share installation, route, device, theme and fixture assumptions
+- **THEN** one visit executes both sets of assertions and records coverage for each family
+- **AND** a failure in either family fails the selected verification
+
+#### Scenario: An alignment command delegates to already selected geometry
+- **WHEN** the delegated check has equivalent assertions and execution conditions
+- **THEN** one execution satisfies both logical coverage requests
+- **AND** differing options, fixtures or cold-load requirements prevent unsafe deduplication
+
+#### Scenario: A shared visit changes state
+- **WHEN** a check opens a popup or mutates a safe fixture or draft
+- **THEN** restoration completes and is verified before another dependent check starts
+- **AND** failed cleanup fails the visit and prevents reuse of its results
+
+### Requirement: Reusable completed checks
+Affected verification SHALL support explicit reuse of completed checks from private evidence after validating freshness, coverage, dependency identities, execution conditions and cleanup. The current required scope SHALL be computed independently. Failed, missing, stale, unsupported or invalidated checks SHALL execute again. Publication SHALL bind the combined validated proof to the clean current candidate without altering its source reports.
+
+#### Scenario: A batch fails after an independent successful check
+- **WHEN** reuse is requested and the source batch has verified cleanup and a matching successful result
+- **THEN** the successful check is eligible for reuse even though the source batch failed overall
+- **AND** the failed and unexecuted checks still run and determine the new batch outcome
+
+#### Scenario: Only an unrelated dependency changes
+- **WHEN** reviewed dependency mapping proves that a completed check's behavior inputs and execution conditions are unchanged
+- **THEN** that check is reused while checks affected by the edit execute again
+- **AND** unknown shared dependencies remain conservatively invalidating
+
+#### Scenario: A selected input or environment changes
+- **WHEN** relevant source, tests, coverage policy, dependencies, fixtures, target, Home Assistant frontend or browser identity changes
+- **THEN** dependent results are invalidated
+- **AND** a changed candidate receives fresh preparation or installation validation before any live result is accepted
+
+#### Scenario: Evidence or cleanup cannot be verified
+- **WHEN** evidence is malformed, tampered with, stale, unsupported, missing required artifacts or lacks verified cleanup
+- **THEN** it contributes no reused pass
+- **AND** invalid reuse inputs are reported explicitly while any new execution still requires safe preparation
+
+#### Scenario: A report attempts to reduce coverage
+- **WHEN** its declared requirements omit a case selected by the current coverage policy
+- **THEN** the current plan still requires that case and cannot be satisfied by the edited report
+
+#### Scenario: Publication includes reused checks
+- **WHEN** all current required cases pass through fresh execution or validated reuse
+- **THEN** the final report identifies each reused source result and binds all validated coverage to the clean final commit
+- **AND** applicable exact-commit CI, conditional preserved-install proof and the approved exception expiry checks remain required
+
+### Requirement: Measurable scoped execution
+Private scoped reports SHALL distinguish logical coverage from physical visits, fresh executions and reused results. They SHALL record selection and equivalence reasons, per-check durations, total wall time and capture counts. Reused results SHALL retain original execution time and provenance separately from current validation time. Reports SHALL preserve failures and representative successes without claiming unexecuted coverage or unmeasured speedups.
+
+#### Scenario: A combined visit covers two components
+- **WHEN** the report is produced
+- **THEN** both components' required cases identify the shared execution and its outcome
+- **AND** visit duration is counted once in execution totals
+
+#### Scenario: An optimization is evaluated
+- **WHEN** equivalent affected scopes are compared on the same disposable environment
+- **THEN** reports distinguish cold execution savings, reuse savings, setup and cleanup costs
+- **AND** reduced combination counts are not described as measured wall-time savings
+
+#### Scenario: Comprehensive execution is not requested
+- **WHEN** an ordinary affected batch completes
+- **THEN** its report identifies omitted combinations and the reasons for equivalent coverage
+- **AND** complete-matrix and historical suites remain explicitly unexecuted
+
+### Requirement: Persistent focused frontend preview
+Development SHALL offer persistent preview of selected components on the real disposable dashboard or supported editor, using current installed assets and native HA components. Watch SHALL serialize rebuild, frontend sync and browser refresh while preserving route and viewport. Asset, resource and console failures SHALL remain visible. Preview SHALL NOT imply automated acceptance or release readiness.
+
+#### Scenario: A presentation edit is saved
+- **WHEN** the focused preview is watching a compatible prepared installation
+- **THEN** the latest workspace frontend files are synchronized to HA and the same view refreshes
+- **AND** unrelated cards and profile matrices are not traversed
+
+#### Scenario: Preview closes
+- **WHEN** the preview browser closes
+- **THEN** watch stops and the last successfully synchronized assets remain installed
+- **AND** no continuous background synchronization or package rollback is started
+
+#### Scenario: Frontend preview cannot safely proceed
+- **WHEN** backend compatibility, ownership or an active deployment cannot be verified
+- **THEN** preview stops before synchronization and explains the required preparation
+- **AND** it never resets source, fixtures or helpers as a fallback
+
+#### Scenario: Inspection fails after a successful sync
+- **WHEN** a visual or browser check reports a defect in successfully synchronized current assets
+- **THEN** the defect remains visible and the latest assets remain installed for correction
+- **AND** routine cleanup does not restore an older package, while safe helper restoration and genuinely failed-operation recovery remain required
+
+#### Scenario: A selected component is absent
+- **WHEN** the requested preview has no matching rendered component
+- **THEN** it reports missing scope rather than claiming a successful inspection

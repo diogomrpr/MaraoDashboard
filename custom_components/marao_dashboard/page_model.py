@@ -17,6 +17,16 @@ PAGE_PATH = re.compile(r"[a-z0-9][a-z0-9_-]*")
 LOCAL_ID = re.compile(r"[a-z][a-z0-9_-]{0,63}")
 
 
+def camera_popup_stream(entity: str, options: dict[str, Any]) -> str:
+    """Resolve the optional popup binding consistently for every generation path."""
+    stream = options.get("popup_stream_entity")
+    if stream in (None, ""):
+        return entity
+    if not isinstance(stream, str) or not ENTITY_ID.fullmatch(stream) or not stream.startswith("camera."):
+        raise ValueError("Choose a camera entity for the popup stream.")
+    return stream
+
+
 def page_entries(spec: Any) -> list[dict[str, Any]]:
     """Retain mixed order and whole descriptors, including entity-free cards."""
     if spec is None:
@@ -125,6 +135,8 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                     presets = options["shortcuts"]
                     if not isinstance(presets, list) or len(presets) > 3 or any(type(value) not in (int, float) or not math.isfinite(value) for value in presets):
                         raise ValueError("Charging shortcuts require at most three finite numbers")
+                if role == "hc_camera_card":
+                    camera_popup_stream(entity, options)
                 if role == "hc_room_card" and "light_entities" in options:
                     lights = options["light_entities"]
                     if not isinstance(lights, list) or any(not isinstance(light, str) or not ENTITY_ID.fullmatch(light) or not light.startswith("light.") for light in lights):

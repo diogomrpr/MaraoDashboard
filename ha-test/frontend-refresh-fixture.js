@@ -1,8 +1,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const frontend = path.resolve(__dirname, '../custom_components/marao_dashboard/frontend');
-const source = fs.readFileSync(path.join(frontend, 'MaraoDashboard.js'), 'utf8');
-const localization = source.slice(source.indexOf('const TRANSLATIONS ='), source.indexOf('const POPUP_SCROLL_GUARD_VERSION'));
+const source = fs.readFileSync(path.join(frontend, 'MaraoRuntime.js'), 'utf8');
+const navigation = fs.readFileSync(path.join(frontend, 'MaraoNavigation.js'), 'utf8');
+const navigationTranslations = navigation.slice(navigation.indexOf('export const navigationTranslations = ') + 'export const navigationTranslations = '.length, navigation.indexOf('export function navigationLocalize')).trim().replace(/;$/, '');
+const localization = 'const navigationTranslations = ' + navigationTranslations + ';\n' + source.slice(source.indexOf('const TRANSLATIONS ='), source.indexOf('const POPUP_SCROLL_GUARD_VERSION'));
 
 function documentHTML(version) {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="fixture-build" content="${version}"><link rel="icon" href="data:,"><style>

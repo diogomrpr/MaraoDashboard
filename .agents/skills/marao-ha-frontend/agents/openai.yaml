@@ -1,0 +1,4 @@
+interface:
+  display_name: "Marao HA Frontend"
+  short_description: "Native cards, builder, and mobile UI development"
+  default_prompt: "Use $marao-ha-frontend to implement this UI change in the existing shared components and verify the affected mobile behavior."

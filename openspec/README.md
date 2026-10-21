@@ -6,13 +6,14 @@ future tasks. It was established on 2026-10-09 from published **v0.5.1**, commit
 and the available development/release history. No application behavior changes
 are introduced by this setup.
 
-## Read first
+## Read what the task needs
 
-1. [Repository contract](../AGENTS.md).
-2. [Dashboard quality guide](../docs/docs/development/dashboard-quality.md).
-3. [Project context and prior decisions](project-context.md).
-4. [Feature coverage and source/check map](feature-coverage.md), then the capability
-   specs relevant to the task below.
+Follow the [repository contract](../AGENTS.md), then read the affected capability
+specs below. Use the [project context](project-context.md) for relevant prior
+decisions and the [coverage map](feature-coverage.md) for source/check routing.
+Read applicable [quality-guide](../docs/docs/development/dashboard-quality.md)
+sections for changed controls, layouts or release behavior. These are targeted
+references, not a required full-document reading list for every task.
 
 Higher-priority instructions and the repository contract win over OpenSpec.
 Specifications record intended contracts; they do not prove the current build
@@ -35,7 +36,39 @@ Home Assistant reconnect issue remains unconfirmed.
 | [Camera and history content](specs/camera-history-content/spec.md) | Providers, graphs, timelines, energy history, async failure states |
 | [Gallery and release verification](specs/gallery-release-verification/spec.md) | Environment, safe cases, focused checks, mobile matrix, packaging and release |
 
-## Work in this repository
+## Codex workflow and project skills
+
+Start with the requested outcome and concrete acceptance cases. Small fixes
+restoring documented behavior, refactors and documentation corrections use a
+short path: inspect the affected code, make the change, complete the selected development tier,
+and compare the result with the request. They need no new OpenSpec change when
+requirements stay the same.
+
+New behavior, public or persisted contracts, migrations and substantial
+cross-layer work use an applicable existing change or a new one. Preserve the
+user's planning or implementation intent: a request to plan ends with a plan;
+an authorized implementation request continues through implementation and
+verification without an extra approval solely for creating its artifacts.
+
+| Project skill | Use for |
+| --- | --- |
+| [marao-ha-integration](../.agents/skills/marao-ha-integration/SKILL.md) | Python lifecycle, config flows, admin APIs, async work, saved-data preservation |
+| [marao-ha-frontend](../.agents/skills/marao-ha-frontend/SKILL.md) | Existing JavaScript custom elements, editor/cards, rendering, controls and mobile layouts |
+| [marao-testing](../.agents/skills/marao-testing/SKILL.md) | Check selection, meaningful assertions, browser failures and validated evidence reuse |
+
+Codex can select these skills automatically, or you can request `$marao-testing`
+and the other names directly. They are local adaptations of community guidance;
+each records sources and licenses. Load only relevant references, preserve the
+existing architecture, and consult current official APIs when the task needs it.
+The six `openspec-*` skills remain owned by the CLI. Keep custom skill names
+outside that prefix so tool updates preserve them.
+
+Before claiming completion, compare each acceptance case with the implementation
+and selected evidence. Resolve gaps even when tests pass. Report the delivered
+outcome, actual coverage and material limitations briefly; do not claim physical
+device inspection or task-time improvements that were not measured.
+
+## Select verification
 
 Use the [local development guide](../docs/docs/development/local-development.md)
 for setup, private disposable credentials and browser workflow. Node 22+ is
@@ -43,40 +76,46 @@ supported; the verified workstation uses Homebrew Node 24 LTS/npm and Python
 3.14 in `.venv`, with `npm ci`, pinned Python requirements and Playwright Chromium.
 HACS users need none of this development tooling.
 
-Before editing, read the applicable contract, context and specs; trace builder →
-validation/generator → shared runtime/theme/translations → fixtures/checks; record
-the affected-card set (empty for this baseline review); preserve unrelated work.
-Implement related queued tasks as one coherent batch. Use the source/check links
-in the coverage map to choose its smallest covering check:
+Before editing, record acceptance cases, the starting commit and affected shared
+consumers (empty for tooling-only work). Capture a private task snapshot including
+already dirty content, then select subsequent changes. Review concurrent hunks and
+disclose any `--file` exclusions; shared files need reviewed component scope:
 
-| Change | Focused starting check |
-| --- | --- |
-| Builder model, selectors or configuration preservation | `node --test tests/frontend/editor-model.test.js` |
-| Editor source/style changes | `npm run build:editor`, then `npm run check:editor` and the relevant model/UI check |
-| Generation, resolution, custom YAML or cleanup | `pytest tests/components/marao_dashboard/test_generator.py` |
-| Setup, configuration patches, history | The matching `test_init.py`, `test_config_patch.py`, `test_history.py` or `test_config_flow.py` under `tests/components/marao_dashboard/` |
-| Shared actions, climate, vacuum or holds | `node --test tests/frontend/marao-climate-card.test.js` plus affected safe interactions |
-| Camera events | `node --test tests/frontend/marao-frigate-events-card.test.js` |
-| Graph, timeline or period history | `node --test tests/frontend/marao-history-cards.test.js` |
-| Navbar or scalable text | The matching `marao-navbar-card.test.js` or `marao-text-scale.test.js` under `tests/frontend/` |
-| Canonical gallery/fixtures | `node --test tests/frontend/gallery-cases.test.js` and the relevant fixture/YAML check |
-| Icon-only actions/shared geometry | `npm run test:ha:alignment` |
-| Value sliders | `npm run test:ha:sliders` |
-| Planning/specification only | `OPENSPEC_TELEMETRY=0 openspec validate --all --strict --no-interactive` and changed links/context |
+```sh
+npm run test:affected -- --snapshot /private/tmp/marao-task.json
+npm run test:affected -- --since /private/tmp/marao-task.json --tier visual --component slider-headers --plan
+npm run ha:preview -- --component slider-headers --watch
+```
 
-Activate `.venv` before Python commands. These are starting points, not automatic
-proof of complete coverage; include the checks needed by the actual affected path.
-For UI edits, update both canonical Cases and realistic-page examples, run
-`npm run ha:sync:dry-run` before deployment, sync to `192.168.0.28`, refresh and
-confirm the loaded fingerprint. Inspect only safe entities. Existing browser
-commands also prepare the current workspace, so do not deploy repeatedly without
-a reason. After the last edit and focused check, visually and interactively
-inspect representative affected components and difficult layouts as the final
-validation step.
+Choose `visual` for presentation-only work: current targeted inspection completes
+development without automated suites. `behavior` adds selected offline checks and
+the smallest actual interaction assertion needed by changed behavior. Security,
+persistence, migration, ownership and installation use `focused`. Existing commands
+without a tier retain focused coverage. Implement related tasks as one batch and
+run only tier-required checks after the last edit. Unknown scope needs resolution.
+See [focused testing](../docs/docs/development/focused-testing.md) for component,
+reuse and publication options. Activate `.venv` before Python commands.
+
+For supported UI behavior changes, update safe Cases and realistic-page examples.
+Frontend preview syncs frontend files to compatible disposable HA, reloads Marao
+when changed and refreshes the real page. It does not reset helpers, explicitly
+generate dashboards or restart HA; normal reload lifecycle may update generated
+output/history. Keep the latest applicable project changes installed before completion
+and leave successful assets in place after inspection/error/close unless the project
+is reverted. Safe helper restoration and failed-operation recovery still apply.
+Watch runs only while open; fresh/backend/fixture setup uses explicit `ha:sync`.
+Preview does not replace publication/upgrade proof. Full focused browser batches
+prepare once; do not manually sync immediately before them. Inspect current changed
+components once, adding only relevant difficult layouts/themes. Stop when acceptance,
+tier-required checks, diagnostics and cleanup are satisfied; do not repeat for
+reassurance. Documentation/skill-only work needs no application build,
+HA visit or browser checks; validate its links, skills and affected specs instead.
 
 Use the scoped `npm run verify:publish` gate before publication, with applicable
 exact-commit Tests/hassfest/HACS checks. Selected failures remain failures. A
-release request does not authorize the full suite. Preserve raw native reconnect
+release request does not authorize the full suite. Publication covers the whole
+candidate and rejects development-only scope/evidence. Broad regression belongs
+in an explicitly requested pre-release campaign. Preserve raw native reconnect
 evidence and check exception expiry whenever the approved exception is applied.
 
 ## Upgrade responsibilities
@@ -97,7 +136,7 @@ prove an upgrade. `test:ha:upgrade -- --scope <components>` produces scoped proo
 `verify:release` validates final-candidate evidence and affected checks. The full
 historical/feature/mobile scenario remains available only on explicit request.
 
-## Add a future task
+## Plan or implement a substantial change
 
 Describe the desired result and select **openspec-propose** from Codex's Skills
 menu, or explicitly write:
@@ -106,10 +145,12 @@ menu, or explicitly write:
 $openspec-propose Add <the behavior you want>
 ```
 
-The proposal workflow creates `changes/<name>/proposal.md`, a design when needed,
-capability delta specs when requirements change, and an unchecked `tasks.md`.
-Review those files before requesting implementation. The baseline describes what
-exists; future features stay under `changes/` until completed.
+An explicit proposal request creates `changes/<name>/proposal.md`, a design when
+needed, capability deltas and unchecked tasks for review. It ends at planning.
+For an implementation request, reuse the accepted change or record the required
+artifacts and continue under that authorization. Do not auto-select a
+planning-only skill as the entire response to an implementation request.
+The baseline describes delivered behavior; future features stay in changes.
 
 Use **openspec-explore** for investigation, **openspec-update-change** to revise
 an existing plan, **openspec-apply-change** to implement it, and
@@ -129,8 +170,12 @@ For terminal inspection:
 OPENSPEC_TELEMETRY=0 openspec list
 OPENSPEC_TELEMETRY=0 openspec list --specs
 OPENSPEC_TELEMETRY=0 openspec status --change <change-name>
-OPENSPEC_TELEMETRY=0 openspec validate --all --strict --no-interactive
+OPENSPEC_TELEMETRY=0 openspec validate <change-name> --strict --no-interactive
 ```
+
+Validate affected changes/specs during ordinary iteration. Use `--all --strict
+--no-interactive --concurrency 1` for an intentional whole-spec audit, such as an
+OpenSpec tool upgrade or baseline reconciliation; it is not an application test.
 
 A change without a requirement change, such as an environment verification,
 uses `skip_specs: true` in its `.openspec.yaml`. Do not invent product requirements
@@ -149,28 +194,35 @@ See the [usage guide](../docs/docs/usage/native-dashboard.md) for creation and e
 
 ## Tool installation and ownership
 
-OpenSpec **1.14.1** was installed globally with npm; it is free, MIT-licensed
+OpenSpec **1.14.3** was verified on 2026-10-19 and installed globally with npm;
+it is free, MIT-licensed
 development tooling. Node 24 already supplies its runtime. It is not a Marao
 runtime dependency, and no application lockfile or shipped integration is changed.
 See the [official installation guide](https://openspec.dev/docs/installation).
 
 ```sh
-npm install -g @fission-ai/openspec@1.14.1
-OPENSPEC_TELEMETRY=0 openspec init --tools codex --profile core --no-animation
+npm install -g @fission-ai/openspec@1.14.3
+OPENSPEC_TELEMETRY=0 openspec update
 ```
 
-The core Codex integration generated six skills under
+For a new checkout without generated skills, initialize Codex with
+`OPENSPEC_TELEMETRY=0 openspec init --tools codex --profile core --no-animation`.
+The core Codex integration generates six skills under
 `.agents/skills/openspec-*/`. Treat those files as tool-owned; keep project-specific
 instructions in `AGENTS.md`, `openspec/config.yaml`, and these specs. Do not hand
-edit generated skills because an update can replace them. To refresh after an
-intentional CLI upgrade, run `OPENSPEC_TELEMETRY=0 openspec update`.
+edit generated skills because an update can replace them. Keep the six-workflow
+core selection (propose, explore, apply, update, sync, archive). On intentional
+upgrades, review the official release, install an exact version, run update, and
+verify generated versions and retained custom skills. Review community-source
+changes selectively; never overwrite the local Marao adaptations automatically.
 The setup and verification here used `OPENSPEC_TELEMETRY=0`; set it on subsequent
 commands as well when keeping CLI telemetry disabled. No shell settings were changed.
 
-Use `npm run test:affected` (preview with `--plan`) as the default for
-implementation, hooks, CI and publication. Include changed features and shared
-consumers only. Full-suite and parallel execution require explicit requests;
-`npm run test:full -- --parallel` is the comprehensive option. Live upgrade
+Use `test:affected -- --since <snapshot> --tier <visual|behavior|focused>` for the
+current development task, with reviewed shared consumers. Hooks, CI and publication
+retain independent focused coverage; task subsets cannot narrow release proof.
+Full-suite and parallel execution require explicit requests;
+`npm run test:full -- --parallel` is the comprehensive pre-release option. Live upgrade
 checks apply only to changed persistence, migration, generated ownership or
 installation paths, with affected baselines, expected data, recovery and cleanup.
 Reuse validated unchanged scoped evidence and report omitted coverage honestly.

@@ -1,5 +1,6 @@
 import { bindCardDrag } from "./editor-drag.js";
 import "./panel.css";
+import { cameraTitleFields, formData, patchForm, same as sameFormValue } from "./native-model.js";
 
 import {
   cardForEntity,
@@ -1462,13 +1463,17 @@ class MaraoDashboardPanel extends HTMLElement {
     const metadata = entityMeta(this._entities, existing?.entity_id);
     const selected = this._catalog.cards.find((card) => card.id === (selectedCardId || existing?.template || (existing?.page ? "hc_navigation_card" : ""))) || cardForEntity(this._catalog, metadata || existing) || this._catalog.cards[0];
     const shortcut = Boolean(selected.page_shortcut);
+    const camera = selected.id === 'hc_camera_card', titleFields = camera ? cameraTitleFields() : [];
+    const titleData = camera ? { ...formData(existing || {}, titleFields), name: existing?.name || '' } : null;
     const dialog = this._dialog(`${this._t(existing ? 'edit' : 'add')} ${this._l(selected.label)}`);
     const data = shortcut
       ? { page: existing?.page || "", entity_id: existing?.entity_id || '', name: existing?.name || "", icon: existing?.icon || selected.icon }
       : { entity_id: existing?.entity_id || prefilledEntity || "", name: existing?.name || "", icon: existing?.icon || "" };
+    if (camera) Object.assign(data, titleData);
     let collection = clone(existing?.entities || []);
     if (selected.scene_collection) data.scene_entities = this._entityIds(collection);
     for (const field of this._expandedFields(selected.variables)) data[`var__${field.key}`] = this._readVariable(existing?.variables, field);
+    const initialData = clone(data);
     const content = dialog.querySelector(".dialog-content");
     const variables = this._expandedFields(selected.variables);
     const basic = variables.filter((field) => !field.advanced);
@@ -1497,9 +1502,9 @@ class MaraoDashboardPanel extends HTMLElement {
     const pageOptions = this._availablePages().filter((page) => kind !== "custom" || page.path !== this._container(kind, roomIndex).path).map((page) => ({ value: page.path, label: page.name }));
     const schema = [
       ...(shortcut ? [this._schema("page", "Target page", { select: { mode: "dropdown", options: pageOptions } }, true)] : []),
-      ...(!selected.entity_optional && !shortcut || selected.id === 'hc_room_card' ? [this._schema("entity_id", selected.id === 'hc_room_card' ? 'Primary source' : 'Entity', { entity: { domain: selected.domains } }, !selected.entity_optional)] : []),
-      this._schema("name", "Display name", { text: {} }),
-      this._schema("icon", "Icon", { icon: {} }),
+      ...(!selected.entity_optional && !shortcut || selected.id === 'hc_room_card' ? [this._schema("entity_id", selected.id === 'hc_room_card' ? 'Primary source' : camera ? 'Dashboard stream' : 'Entity', { entity: { domain: selected.domains } }, !selected.entity_optional)] : []),
+      ...(camera ? titleFields.map(field => this._schema(field.path, field.label, { [field.kind]: {} }))
+        : [this._schema("name", "Display name", { text: {} }), this._schema("icon", "Icon", { icon: {} })]),
       ...(selected.scene_collection ? [this._schema('scene_entities', 'Scenes', { entity: { domain: ['scene', 'switch', 'input_boolean'], multiple: true } })] : []),
       ...basic.map((field) => this._variableSchema(field, selected.id === "hc_switch_card" ? data.var__power_entity : data.entity_id)),
     ];
@@ -1514,18 +1519,24 @@ class MaraoDashboardPanel extends HTMLElement {
         if (prefilledEntity && configuredEntityIds(this._container(kind, roomIndex)).has(target)) {
           this._renderSummary(content.querySelector("#summary"), target, selected, roomIndex, cardIndex, kind, this._t('alreadyAdded')); return;
         }
-        const entity = existing ? { ...existing } : { __simple: false };
+        let entity = existing ? { ...existing } : { __simple: false };
         entity.template = selected.id; entity.__simple = false;
         if (shortcut) { entity.page = data.page; if (selected.id === 'hc_room_card' && data.entity_id) entity.entity_id = data.entity_id; else delete entity.entity_id; }
         else { if (data.entity_id) entity.entity_id = data.entity_id; else delete entity.entity_id; delete entity.page; }
         if (kind === 'page' && !entity.id) entity.id = newEntityGroupId().replace('group-', 'card-');
-        if (data.name !== existing?.name) delete entity.name_key;
+        if (data.name !== (camera ? titleData.name : existing?.name)) delete entity.name_key;
         if (selected.scene_collection) entity.entities = collection;
         if (selected.id === 'hc_media_card' && appleTV !== undefined) entity.apple_tv = appleTV;
-        if (data.name) entity.name = data.name; else delete entity.name;
-        if (data.icon) entity.icon = data.icon; else delete entity.icon;
+        if (camera) entity = patchForm(entity, titleFields, titleData, data);
+        else {
+          if (data.name) entity.name = data.name; else delete entity.name;
+          if (data.icon) entity.icon = data.icon; else delete entity.icon;
+        }
         const variablesObject = { ...(existing?.variables || {}) };
-        try { for (const field of this._expandedFields(selected.variables)) this._writeVariable(variablesObject, field, data[`var__${field.key}`]); }
+        try { for (const field of this._expandedFields(selected.variables)) {
+          const key = `var__${field.key}`;
+          if (!existing || !sameFormValue(initialData[key], data[key])) this._writeVariable(variablesObject, field, data[key]);
+        } }
         catch (error) { this._renderSummary(content.querySelector('#summary'), target, selected, roomIndex, cardIndex, kind, this._error(error)); return; }
         if (Object.keys(variablesObject).length) entity.variables = variablesObject; else delete entity.variables;
         if (memberOptions) { delete entity.__simple; this._closeDialog(dialog); memberOptions.save(entity); return; }

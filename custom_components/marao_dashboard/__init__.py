@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import re
 from typing import Any
+from uuid import uuid4
 
 import voluptuous as vol
 
@@ -85,6 +86,8 @@ SERVICE_REGISTERED = "generate_dashboard_service_registered"
 WEBSOCKET_REGISTERED = "websocket_registered"
 STATIC_PATH_REGISTERED = "static_path_registered"
 FRONTEND_MODULES = "frontend_modules"
+FRONTEND_STATE = "frontend_state"
+FRONTEND_SUBSCRIBERS = "frontend_subscribers"
 GENERATE_DASHBOARD_SCHEMA = vol.Schema(
     {
         vol.Optional("config_path", default=DEFAULT_DASHBOARD_CONFIG): cv.string,
@@ -210,6 +213,8 @@ async def _async_setup_dashboard(hass: HomeAssistant, entry: ConfigEntry) -> boo
     if legacy_resources:
         async_clear_legacy_resource_issue(hass)
     await hass.async_add_executor_job(_ensure_current_history, hass)
+    dashboard_key = await hass.async_add_executor_job(_frontend_dashboard_key, hass)
+    _publish_frontend(hass, {"fingerprint": fingerprint, "dashboard": dashboard_key})
     return True
 
 
@@ -229,6 +234,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload Marao Dashboard."""
 
     async with _dashboard_operation_lock(hass):
+        _publish_frontend(hass, {"fingerprint": None, "dashboard": None})
         frontend.async_remove_panel(hass, MANAGEMENT_PANEL_PATH, warn_if_unknown=False)
         for module_url in hass.data.get(DOMAIN, {}).pop(FRONTEND_MODULES, ()):
             frontend.remove_extra_js_url(hass, module_url)
@@ -277,6 +283,19 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
 
     if hass.data[DOMAIN].get(WEBSOCKET_REGISTERED):
         return
+
+    @websocket_api.websocket_command({"type": "marao_dashboard/frontend/subscribe"})
+    @callback
+    def websocket_frontend(hass, connection, msg):
+        # Read-only identity is safe for ordinary authenticated dashboard users.
+        listeners = hass.data[DOMAIN].setdefault(FRONTEND_SUBSCRIBERS, {})
+        key = (connection, msg["id"])
+        listeners[key] = lambda payload: connection.send_event(msg["id"], payload)
+        connection.subscriptions[msg["id"]] = lambda: listeners.pop(key, None)
+        connection.send_result(msg["id"])
+        connection.send_event(msg["id"], hass.data[DOMAIN].get(FRONTEND_STATE, {}))
+
+    websocket_api.async_register_command(hass, websocket_frontend)
 
     @websocket_api.require_admin
     @websocket_api.websocket_command({"type": "marao_dashboard/config/get", vol.Optional("config"): str,
@@ -340,6 +359,8 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
                 list_dashboard_history, hass.config.path(DASHBOARD_BASE_DIR)
             )
             connection.send_result(msg["id"], generated)
+            state = hass.data[DOMAIN].get(FRONTEND_STATE, {})
+            _publish_frontend(hass, {**state, "dashboard": generated["dashboard_key"]}, uuid4().hex)
 
     @websocket_api.require_admin
     @websocket_api.websocket_command(
@@ -407,6 +428,24 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_generate_config)
     websocket_api.async_register_command(hass, websocket_restore_history)
     hass.data[DOMAIN][WEBSOCKET_REGISTERED] = True
+
+
+def _frontend_dashboard_key(hass: HomeAssistant) -> str:
+    """Resolve the owned route without exposing or changing saved configuration."""
+    planned = dashboard_identity(load_dashboard_config(_dashboard_config_path(hass)))
+    if native := hass.data[DOMAIN].get("native_dashboard"):
+        return native.url_path
+    return registered_dashboard_key(hass.config.path("configuration.yaml"), planned.filename) or planned.dashboard_key
+
+
+@callback
+def _publish_frontend(hass: HomeAssistant, state: dict[str, Any], request_id: str | None = None) -> None:
+    hass.data[DOMAIN][FRONTEND_STATE] = state
+    payload = {**state, **({"request_id": request_id} if request_id else {})}
+    # Subscriptions belong to the websocket, surviving an entry reload so it can
+    # deliver the new identity without a polling timer or reconnect race.
+    for send in tuple(hass.data[DOMAIN].get(FRONTEND_SUBSCRIBERS, {}).values()):
+        send(payload)
 
 
 async def _async_refresh_dashboard(hass: HomeAssistant, result: dict[str, Any]) -> None:

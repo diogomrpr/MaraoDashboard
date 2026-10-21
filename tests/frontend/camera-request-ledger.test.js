@@ -356,7 +356,7 @@ function immediateHandoffFixture({ siblingSelection = false } = {}) {
   host.stateObj = { entity_id: entity };
   const rtc = new DomElement('ha-web-rtc-player', host), video = new DomElement('video', rtc); rtc.entityid = entity;
   Object.defineProperty(video, 'currentTime', { get: () => now / 1000, configurable: true }); video.paused = false; video.readyState = 3;
-  const camera = { player: host, video, generation: 3, state: 'live', eligible: () => true }; wrapper._camera = camera;
+  const camera = { player: host, video, generation: 3, streamRequests: 1, state: 'live', eligible: () => true }; wrapper._camera = camera;
   const hls = new DomElement('ha-hls-player', host); hls.entityid = entity;
   if (siblingSelection) {
     const losing = new DomElement('video', hls); losing.paused = false; losing.readyState = 3;
@@ -493,13 +493,33 @@ test('immediate observation rejects genuine host, generation, winning-video and 
     fixture => { fixture.camera.player = new fixture.DomElement('ha-camera-stream'); },
     fixture => { fixture.camera.generation++; },
     fixture => { fixture.camera.video = new fixture.DomElement('video'); },
-    fixture => { fixture.state.streamRequests++; },
+    fixture => { fixture.camera.streamRequests++; },
   ]) {
     const fixture = immediateHandoffFixture(); await new Promise(resolve => setImmediate(resolve));
     mutate(fixture); await fixture.tick(300);
     await fixture.environment.window.__maraoProveCameraHandoffs();
     assert.equal(fixture.state.handoffs[0].proof.valid, false);
   }
+});
+
+test('another occurrence starting a stream cannot invalidate an unchanged native handoff owner', async () => {
+  const fixture = immediateHandoffFixture(); await new Promise(resolve => setImmediate(resolve));
+  fixture.state.streamRequests++;
+  await fixture.tick(300); await fixture.environment.window.__maraoProveCameraHandoffs();
+  assert.equal(fixture.state.handoffs[0].proof.valid, true);
+  assert.equal(fixture.state.handoffs[0].proof.newStreamRequests, 1);
+  assert.equal(fixture.state.handoffs[0].proof.ownNewStreamRequests, 0);
+});
+
+test('per-card restart proof retains raw cancellation and rejects missing or changed owned request evidence', () => {
+  const value = fixture(), prefix = value.trace.sessions[0].prefix;
+  const receipt = { id: 8, wrapper: 11, host: 12, transport: 13, generation: 3, activeVideo: 14,
+    stack, currentHost: true, prefix, ownStreamRequests: 4,
+    proof: { valid: true, wrapper: 11, host: 12, generation: 3, video: 14, advanced: .3, connected: true, newStreamRequests: 1, ownNewStreamRequests: 0 } };
+  value.trace.handoffs=[receipt];value.trace.events[1].boundary={kind:'native-handoff',handoff:8,entities:[entity]};
+  const result=classifyCameraCancellations(value.failures,value.trace);
+  assert.equal(result.accepted.length,1);assert.equal(result.accepted[0].failure,value.failures[0]);
+  for(const own of [undefined,1]) { receipt.proof.ownNewStreamRequests=own;assert.equal(classifyCameraCancellations(value.failures,value.trace).rejected.length,1); }
 });
 
 test('background proof observation captures its own rejection for the strict ledger instead of leaking a promise', async () => {
@@ -509,4 +529,29 @@ test('background proof observation captures its own rejection for the strict led
   assert.equal(fixture.state.handoffs[0].proof.valid, false);
   assert.equal(fixture.state.handoffs[0].proof.observerError, 'Error');
   assertHandoffObserverClean(fixture);
+});
+
+test('quality fallback cancellations require the exact retired host and a lower same-device stream', () => {
+  const quality = () => {
+    const value = fixture(), high = entity + '_slow_high', low = entity + '_slow_low';
+    value.trace.sessions[0].entity = high;
+    value.trace.releases = [{ id: 1, entity: high, camera: 3, generation: 4, currentHost: true, wasConnected: true, eligible: true,
+      prefix: value.trace.sessions[0].prefix,
+      stack: 'Error\n at CameraPlayback.stop (http://192.168.0.28:8123/marao_dashboard_static/MaraoCamera.js:20:1)\n at CameraPlayback.fallback (http://192.168.0.28:8123/marao_dashboard_static/MaraoCamera.js:10:1)',
+      proof: { originalCameraOrNull: true, camera: 3, generation: 5, hostDisconnected: true, playerReleased: true,
+        quality: { sameConfiguredEntity: true, sameDevice: true, lowerResolution: true, selected: low } } }];
+    value.trace.events[1].boundary = { kind: 'marao-quality-release', release: 1, entities: [high] };
+    return value;
+  };
+  const valid = quality(); assert.equal(classifyCameraCancellations(valid.failures, valid.trace).accepted.length, 1);
+  for (const mutate of [
+    r => { r.stack = stack; }, r => { r.eligible = false; }, r => { r.currentHost = false; },
+    r => { r.proof.generation++; }, r => { r.proof.camera++; }, r => { r.proof.hostDisconnected = false; },
+    r => { r.proof.quality.sameDevice = false; }, r => { r.proof.quality.lowerResolution = false; },
+    r => { r.proof.quality.sameConfiguredEntity = false; }, r => { r.proof.quality.selected = entity + '_real'; },
+    r => { r.proof.quality.selected = r.entity; },
+  ]) {
+    const value = quality(); mutate(value.trace.releases[0]);
+    assert.equal(classifyCameraCancellations(value.failures, value.trace).rejected.length, 1);
+  }
 });

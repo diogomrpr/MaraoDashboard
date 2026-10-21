@@ -13,6 +13,7 @@ from homeassistant.components import websocket_api
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.components.http.const import KEY_HASS
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.helpers.service import async_register_admin_service
 
 from .live import FixtureLiveView
@@ -29,6 +30,13 @@ async def async_setup(hass, config):
     websocket_api.async_register_command(hass, events)
     hass.http.register_view(FixtureMediaView)
     hass.http.register_view(FixtureLiveView)
+
+    async def close_rtsp(_event):
+        server = hass.data.get(DOMAIN, {}).pop("rtsp", None)
+        if server is not None:
+            await hass.async_add_executor_job(server.close)
+
+    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, close_rtsp)
 
     unit_entity = "sensor.marao_dashboard_test_energy_format_missing_live"
 

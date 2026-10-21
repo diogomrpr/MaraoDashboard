@@ -1,6 +1,10 @@
 {
   "frontendRefreshCoverage": [
     "three-second-horizontal-navbar-hold",
+    "critical-navbar-before-content",
+    "navbar-continuity-during-view-replacement",
+    "android-icon-hold-without-url-preview",
+    "navbar-press-without-rectangular-highlight",
     "ordinary-tap-and-overflow",
     "cancelled-and-incomplete-hold",
     "generated-and-native-host",
@@ -11,7 +15,7 @@
     "preserved-sign-in-settings-page"
   ],
   "nativeSurfaceCase": {
-    "name": "Climate feedback \u00b7 corrected range",
+    "name": "Climate feedback · corrected range",
     "entity": "climate.marao_dashboard_test_feedback_range_corrected"
   },
   "sliderFamilies": [
@@ -578,7 +582,7 @@
     "Scene with four options",
     "Scene with five options",
     "Dual target climate",
-    "Room \u00b7 one light unavailable",
+    "Room · one light unavailable",
     "Reported action error",
     "Tall controls popup"
   ],
@@ -604,49 +608,49 @@
     },
     {
       "id": "empty",
-      "name": "Camera events \u00b7 empty",
+      "name": "Camera events · empty",
       "provider": "frigate",
       "camera": "empty",
       "expectedEmpty": true
     },
     {
       "id": "loading",
-      "name": "Camera events \u00b7 loading",
+      "name": "Camera events · loading",
       "provider": "frigate",
       "camera": "loading",
       "expectedStatus": "loading"
     },
     {
       "id": "error",
-      "name": "Camera events \u00b7 reported error",
+      "name": "Camera events · reported error",
       "provider": "frigate",
       "camera": "error",
       "expectedStatus": "error"
     },
     {
       "id": "unifi-empty",
-      "name": "UniFi Protect \u00b7 empty",
+      "name": "UniFi Protect · empty",
       "provider": "unifi_protect",
       "source": "media-source://unifiprotect/fixture:browse:empty:all",
       "expectedEmpty": true
     },
     {
       "id": "unifi-error",
-      "name": "UniFi Protect \u00b7 reported error",
+      "name": "UniFi Protect · reported error",
       "provider": "unifi_protect",
       "source": "media-source://unifiprotect/fixture:browse:error:all",
       "expectedStatus": "error"
     },
     {
       "id": "unifi-detail-error",
-      "name": "UniFi Protect \u00b7 detail error",
+      "name": "UniFi Protect · detail error",
       "provider": "unifi_protect",
       "source": "media-source://unifiprotect/fixture:browse:detail-error:all",
       "expectedDetailError": true
     },
     {
       "id": "camera-unknown",
-      "name": "Camera events \u00b7 unknown",
+      "name": "Camera events · unknown",
       "provider": "frigate",
       "camera": "front",
       "entity": "camera.marao_dashboard_test_case_camera_unknown",
@@ -655,7 +659,7 @@
     },
     {
       "id": "camera-unavailable",
-      "name": "Camera events \u00b7 unavailable",
+      "name": "Camera events · unavailable",
       "provider": "frigate",
       "camera": "front",
       "entity": "camera.marao_dashboard_test_case_camera_unavailable",
@@ -664,7 +668,7 @@
     },
     {
       "id": "camera-missing",
-      "name": "Camera events \u00b7 missing",
+      "name": "Camera events · missing",
       "provider": "frigate",
       "camera": "front",
       "entity": "camera.marao_dashboard_test_case_camera_missing",
@@ -707,7 +711,7 @@
     "expectedError": "Simulated safe action failure"
   },
   "groupCase": {
-    "name": "Room \u00b7 one light unavailable",
+    "name": "Room · one light unavailable",
     "entity": "light.marao_dashboard_test_case_light_on",
     "entities": [
       "light.marao_dashboard_test_case_light_on",
@@ -723,7 +727,7 @@
   "climateFeedbackCases": [
     {
       "id": "delayed_ack",
-      "name": "Climate feedback \u00b7 delayed acknowledgement",
+      "name": "Climate feedback · delayed acknowledgement",
       "entity": "climate.marao_dashboard_test_feedback_delayed_ack",
       "initial_state": "off",
       "ack_delay": 4,
@@ -731,14 +735,14 @@
     },
     {
       "id": "delayed_confirmation",
-      "name": "Climate feedback \u00b7 delayed confirmation",
+      "name": "Climate feedback · delayed confirmation",
       "entity": "climate.marao_dashboard_test_feedback_delayed_confirmation",
       "initial_state": "off",
       "confirmation_delay": 4
     },
     {
       "id": "rejected",
-      "name": "Climate feedback \u00b7 rejected",
+      "name": "Climate feedback · rejected",
       "entity": "climate.marao_dashboard_test_feedback_rejected",
       "initial_state": "off",
       "ack_delay": 1,
@@ -746,14 +750,14 @@
     },
     {
       "id": "unconfirmed",
-      "name": "Climate feedback \u00b7 unconfirmed",
+      "name": "Climate feedback · unconfirmed",
       "entity": "climate.marao_dashboard_test_feedback_unconfirmed",
       "initial_state": "off",
       "behavior": "unconfirmed"
     },
     {
       "id": "corrected",
-      "name": "Climate feedback \u00b7 corrected report",
+      "name": "Climate feedback · corrected report",
       "entity": "climate.marao_dashboard_test_feedback_corrected",
       "initial_state": "off",
       "confirmation_delay": 1,
@@ -761,7 +765,7 @@
     },
     {
       "id": "range_delayed",
-      "name": "Climate feedback \u00b7 delayed range",
+      "name": "Climate feedback · delayed range",
       "entity": "climate.marao_dashboard_test_feedback_range_delayed",
       "initial_state": "heat_cool",
       "dual_target": true,
@@ -769,7 +773,7 @@
     },
     {
       "id": "range_rejected",
-      "name": "Climate feedback \u00b7 rejected range",
+      "name": "Climate feedback · rejected range",
       "entity": "climate.marao_dashboard_test_feedback_range_rejected",
       "initial_state": "heat_cool",
       "dual_target": true,
@@ -778,7 +782,7 @@
     },
     {
       "id": "range_unconfirmed",
-      "name": "Climate feedback \u00b7 unconfirmed range",
+      "name": "Climate feedback · unconfirmed range",
       "entity": "climate.marao_dashboard_test_feedback_range_unconfirmed",
       "initial_state": "heat_cool",
       "dual_target": true,
@@ -786,7 +790,7 @@
     },
     {
       "id": "range_corrected",
-      "name": "Climate feedback \u00b7 corrected range",
+      "name": "Climate feedback · corrected range",
       "entity": "climate.marao_dashboard_test_feedback_range_corrected",
       "initial_state": "heat_cool",
       "dual_target": true,
@@ -946,21 +950,21 @@
       "type": "custom:marao-card",
       "template": "hc_switch_card",
       "entity": "switch.marao_dashboard_test_case_switch_off",
-      "name": "Binary static icon \u00b7 off",
+      "name": "Binary static icon · off",
       "icon": "mdi:lamp"
     },
     {
       "type": "custom:marao-card",
       "template": "hc_switch_card",
       "entity": "switch.marao_dashboard_test_case_switch_off",
-      "name": "Binary hidden icon \u00b7 off",
+      "name": "Binary hidden icon · off",
       "show_icon": false
     },
     {
       "type": "custom:marao-card",
       "template": "hc_switch_card",
       "entity": "switch.marao_dashboard_test_case_switch_off",
-      "name": "Binary state prefix \u00b7 off",
+      "name": "Binary state prefix · off",
       "variables": {
         "custom_label": "Status: ",
         "hc_label_prefix": "Power: "
@@ -970,21 +974,21 @@
       "type": "custom:marao-card",
       "template": "hc_switch_card",
       "entity": "switch.marao_dashboard_test_case_switch_on",
-      "name": "Binary static icon \u00b7 on",
+      "name": "Binary static icon · on",
       "icon": "mdi:lamp"
     },
     {
       "type": "custom:marao-card",
       "template": "hc_switch_card",
       "entity": "switch.marao_dashboard_test_case_switch_on",
-      "name": "Binary hidden icon \u00b7 on",
+      "name": "Binary hidden icon · on",
       "show_icon": false
     },
     {
       "type": "custom:marao-card",
       "template": "hc_switch_card",
       "entity": "switch.marao_dashboard_test_case_switch_on",
-      "name": "Binary state prefix \u00b7 on",
+      "name": "Binary state prefix · on",
       "variables": {
         "custom_label": "Status: ",
         "hc_label_prefix": "Power: "
@@ -1004,7 +1008,7 @@
       "type": "custom:marao-card",
       "template": "hc_navigation_card",
       "entity": "light.marao_dashboard_test_case_light_off",
-      "name": "Summary \u00b7 all off",
+      "name": "Summary · all off",
       "variables": {
         "summary_entities": [
           "light.marao_dashboard_test_case_light_off"
@@ -1038,13 +1042,13 @@
       "type": "custom:marao-card",
       "template": "hc_header_card",
       "entity": "binary_sensor.marao_dashboard_test_case_motion_on",
-      "name": "Binary header motion \u00b7 on"
+      "name": "Binary header motion · on"
     },
     {
       "type": "custom:marao-card",
       "template": "hc_header_card",
       "entity": "binary_sensor.marao_dashboard_test_case_motion_off",
-      "name": "Binary header motion \u00b7 off"
+      "name": "Binary header motion · off"
     }
   ],
   "problemPresentationCases": [
@@ -1052,7 +1056,7 @@
       "type": "custom:marao-card",
       "template": "hc_light_card",
       "entity": "light.marao_dashboard_test_case_light_unknown",
-      "name": "Hidden normal state \u00b7 unknown",
+      "name": "Hidden normal state · unknown",
       "show_icon": false,
       "show_state": false,
       "variables": {
@@ -1063,7 +1067,7 @@
       "type": "custom:marao-card",
       "template": "hc_light_card",
       "entity": "light.marao_dashboard_test_case_light_unavailable",
-      "name": "Hidden normal state \u00b7 unavailable",
+      "name": "Hidden normal state · unavailable",
       "show_icon": false,
       "show_state": false,
       "variables": {
@@ -1093,7 +1097,7 @@
       "type": "custom:marao-card",
       "template": "hc_room_card",
       "entity": "light.marao_dashboard_test_case_light_unavailable",
-      "name": "Room \u00b7 usable secondary light",
+      "name": "Room · usable secondary light",
       "variables": {
         "light_entities": [
           "light.marao_dashboard_test_case_light_unavailable",
@@ -1109,7 +1113,7 @@
       "type": "custom:marao-card",
       "template": "hc_base_card",
       "entity": "input_select.marao_dashboard_test_case_washer_contract_error",
-      "name": "Ordinary selector \u00b7 error option"
+      "name": "Ordinary selector · error option"
     },
     {
       "type": "custom:marao-card",
@@ -1125,13 +1129,13 @@
       "type": "custom:marao-card",
       "template": "hc_camera_card",
       "entity": "camera.marao_dashboard_test_media_error",
-      "name": "Camera preview \u00b7 failed media"
+      "name": "Camera preview · failed media"
     },
     {
       "type": "custom:marao-card",
       "template": "hc_media_card",
       "entity": "media_player.marao_dashboard_test_media_error",
-      "name": "Media artwork \u00b7 failed media"
+      "name": "Media artwork · failed media"
     },
     {
       "type": "custom:marao-card",
@@ -1143,7 +1147,7 @@
       "type": "custom:marao-card",
       "template": "hc_dishwasher_card",
       "entity": "input_select.marao_dashboard_test_dishwasher_state",
-      "name": "Dishwasher \u00b7 vendor refill confirmation",
+      "name": "Dishwasher · vendor refill confirmation",
       "variables": {
         "salt_entity": "sensor.marao_dashboard_test_refill_confirmation"
       }
@@ -1154,13 +1158,13 @@
       "type": "custom:marao-card",
       "template": "hc_graph_card",
       "entity": "sensor.marao_dashboard_test_energy_format_mixed",
-      "name": "Energy format \u00b7 source default"
+      "name": "Energy format · source default"
     },
     {
       "type": "custom:marao-card",
       "template": "hc_graph_card",
       "entity": "sensor.marao_dashboard_test_energy_format_mixed",
-      "name": "Energy format \u00b7 converted zero decimals",
+      "name": "Energy format · converted zero decimals",
       "variables": {
         "display_unit": "kWh",
         "display_precision": 0
@@ -1170,7 +1174,7 @@
       "type": "custom:marao-card",
       "template": "hc_graph_card",
       "entity": "sensor.marao_dashboard_test_energy_format_mixed",
-      "name": "Energy format \u00b7 converted two decimals",
+      "name": "Energy format · converted two decimals",
       "variables": {
         "display_unit": "kWh",
         "display_precision": 2
@@ -1180,7 +1184,7 @@
       "type": "custom:marao-card",
       "template": "hc_graph_card",
       "entity": "sensor.marao_dashboard_test_energy_format_mixed",
-      "name": "Energy format \u00b7 source six decimals",
+      "name": "Energy format · source six decimals",
       "variables": {
         "display_precision": 6
       }
@@ -1189,7 +1193,7 @@
       "type": "custom:marao-card",
       "template": "hc_graph_card",
       "entity": "sensor.marao_dashboard_test_energy_format_mixed",
-      "name": "Energy format \u00b7 automatic decimals",
+      "name": "Energy format · automatic decimals",
       "variables": {
         "display_unit": "kWh"
       }
@@ -1198,7 +1202,7 @@
       "type": "custom:marao-card",
       "template": "hc_sensor_card",
       "entity": "sensor.marao_dashboard_test_energy_format_export",
-      "name": "Energy format \u00b7 signed export",
+      "name": "Energy format · signed export",
       "variables": {
         "display_unit": "kWh",
         "display_precision": 6
@@ -1208,7 +1212,7 @@
       "type": "custom:marao-card",
       "template": "hc_base_card",
       "entity": "sensor.marao_dashboard_test_energy_format_zero",
-      "name": "Energy format \u00b7 real zero",
+      "name": "Energy format · real zero",
       "variables": {
         "display_unit": "kW",
         "display_precision": 2
@@ -1218,7 +1222,7 @@
       "type": "custom:marao-card",
       "template": "hc_sensor_card",
       "entity": "sensor.marao_dashboard_test_energy_format_cost",
-      "name": "Energy format \u00b7 cost precision",
+      "name": "Energy format · cost precision",
       "variables": {
         "display_precision": 2
       }
@@ -1227,7 +1231,7 @@
       "type": "custom:marao-card",
       "template": "hc_sensor_card",
       "entity": "sensor.marao_dashboard_test_energy_format_missing_live",
-      "name": "Energy format \u00b7 missing source unit",
+      "name": "Energy format · missing source unit",
       "variables": {
         "display_unit": "kWh",
         "display_precision": 2
@@ -1237,7 +1241,7 @@
       "type": "custom:marao-card",
       "template": "hc_graph_card",
       "entity": "sensor.marao_dashboard_test_energy_format_missing_history",
-      "name": "Energy format \u00b7 missing history unit",
+      "name": "Energy format · missing history unit",
       "variables": {
         "display_unit": "kWh",
         "display_precision": 2
@@ -1247,7 +1251,7 @@
       "type": "custom:marao-card",
       "template": "hc_graph_card",
       "entity": "sensor.marao_dashboard_test_energy_format_incompatible_history",
-      "name": "Energy format \u00b7 incompatible history unit",
+      "name": "Energy format · incompatible history unit",
       "variables": {
         "display_unit": "kWh",
         "display_precision": 2
@@ -1257,7 +1261,7 @@
       "type": "custom:marao-card",
       "template": "hc_sensor_card",
       "entity": "sensor.marao_dashboard_test_energy_format_unavailable",
-      "name": "Energy format \u00b7 unavailable",
+      "name": "Energy format · unavailable",
       "variables": {
         "display_unit": "kWh",
         "display_precision": 2
@@ -1267,7 +1271,7 @@
       "type": "custom:marao-card",
       "template": "hc_graph_card",
       "entity": "sensor.marao_dashboard_test_energy_format_mixed",
-      "name": "Energy format \u00b7 independent graph source",
+      "name": "Energy format · independent graph source",
       "variables": {
         "display_unit": "kWh",
         "display_precision": 2,
@@ -1278,7 +1282,7 @@
       "type": "custom:marao-card",
       "template": "hc_toggle_graph_card",
       "entity": "sensor.marao_dashboard_test_energy_format_power",
-      "name": "Energy format \u00b7 toggle power",
+      "name": "Energy format · toggle power",
       "variables": {
         "display_unit": "kW",
         "display_precision": 6,
@@ -1289,7 +1293,7 @@
       "type": "custom:marao-card",
       "template": "hc_switch_card",
       "entity": "switch.marao_dashboard_test_switch",
-      "name": "Energy format \u00b7 secondary conversion",
+      "name": "Energy format · secondary conversion",
       "variables": {
         "power_entity": "sensor.marao_dashboard_test_energy_format_power",
         "display_unit": "kW",
@@ -1301,7 +1305,7 @@
       "type": "custom:marao-card",
       "template": "hc_switch_card",
       "entity": "switch.marao_dashboard_test_switch",
-      "name": "Energy format \u00b7 legacy label only",
+      "name": "Energy format · legacy label only",
       "variables": {
         "power_entity": "sensor.marao_dashboard_test_energy_format_power",
         "power_unit": "MW"
@@ -1310,7 +1314,7 @@
     {
       "type": "custom:marao-energy-period-card",
       "entity": "sensor.marao_dashboard_test_energy_format_mixed",
-      "name": "Energy format \u00b7 converted period",
+      "name": "Energy format · converted period",
       "period": "day",
       "popup_hash": "#marao-dashboard-test-energy-format-converted-period",
       "display_unit": "kWh",
@@ -1319,14 +1323,14 @@
     {
       "type": "custom:marao-energy-period-card",
       "entity": "sensor.marao_dashboard_test_energy_format_mixed",
-      "name": "Energy format \u00b7 source period",
+      "name": "Energy format · source period",
       "period": "day",
       "popup_hash": "#marao-dashboard-test-energy-format-source-period"
     },
     {
       "type": "custom:marao-energy-period-card",
       "entity": "sensor.marao_dashboard_test_energy_format_cost",
-      "name": "Energy format \u00b7 cost period",
+      "name": "Energy format · cost period",
       "period": "day",
       "popup_hash": "#marao-dashboard-test-energy-format-cost-period",
       "display_precision": 2
@@ -1336,7 +1340,7 @@
     {
       "type": "custom:marao-card",
       "template": "hc_room_card",
-      "name": "Room \u00b7 active secondary",
+      "name": "Room · active secondary",
       "icon": "mdi:bed",
       "entity": "light.marao_dashboard_test_case_light_off",
       "variables": {
@@ -1353,7 +1357,7 @@
     {
       "type": "custom:marao-card",
       "template": "hc_room_card",
-      "name": "Room \u00b7 all lights off",
+      "name": "Room · all lights off",
       "icon": "mdi:garage",
       "entity": "light.marao_dashboard_test_case_light_off",
       "variables": {
@@ -1384,7 +1388,7 @@
     {
       "type": "custom:marao-card",
       "template": "hc_room_card",
-      "name": "Room \u00b7 all lights unavailable",
+      "name": "Room · all lights unavailable",
       "icon": "mdi:door",
       "entity": "light.marao_dashboard_test_case_light_unknown",
       "variables": {
@@ -1418,7 +1422,7 @@
     {
       "type": "custom:marao-card",
       "template": "hc_room_card",
-      "name": "Room \u00b7 connection loss",
+      "name": "Room · connection loss",
       "icon": "mdi:garage",
       "entity": "light.marao_dashboard_test_light",
       "variables": {
@@ -1435,7 +1439,7 @@
     {
       "type": "custom:marao-card",
       "template": "hc_room_card",
-      "name": "Room \u00b7 custom label",
+      "name": "Room · custom label",
       "icon": "mdi:bed",
       "variables": {
         "light_entities": [
@@ -1485,7 +1489,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "overview-maintenance",
-      "name": "Entity Group \u00b7 legacy maintenance",
+      "name": "Entity Group · legacy maintenance",
       "entity_type": "battery",
       "popup_filter": "all",
       "entities": [
@@ -1495,7 +1499,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-light-all",
-      "name": "Entity Group \u00b7 light all",
+      "name": "Entity Group · light all",
       "entity_type": "light",
       "popup_filter": "all",
       "entities": [
@@ -1508,7 +1512,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-light-active",
-      "name": "Entity Group \u00b7 light active",
+      "name": "Entity Group · light active",
       "entity_type": "light",
       "popup_filter": "active",
       "entities": [
@@ -1521,7 +1525,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-cover-all",
-      "name": "Entity Group \u00b7 cover all",
+      "name": "Entity Group · cover all",
       "entity_type": "cover",
       "popup_filter": "all",
       "entities": [
@@ -1536,7 +1540,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-cover-active",
-      "name": "Entity Group \u00b7 cover active",
+      "name": "Entity Group · cover active",
       "entity_type": "cover",
       "popup_filter": "active",
       "entities": [
@@ -1551,7 +1555,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-climate-all",
-      "name": "Entity Group \u00b7 climate all",
+      "name": "Entity Group · climate all",
       "entity_type": "climate",
       "popup_filter": "all",
       "entities": [
@@ -1565,7 +1569,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-climate-active",
-      "name": "Entity Group \u00b7 climate active",
+      "name": "Entity Group · climate active",
       "entity_type": "climate",
       "popup_filter": "active",
       "entities": [
@@ -1579,7 +1583,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-battery-live",
-      "name": "Entity Group \u00b7 battery live",
+      "name": "Entity Group · battery live",
       "entity_type": "battery",
       "popup_filter": "all",
       "entities": [
@@ -1589,7 +1593,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-battery-medium",
-      "name": "Entity Group \u00b7 battery medium",
+      "name": "Entity Group · battery medium",
       "entity_type": "battery",
       "popup_filter": "active",
       "entities": [
@@ -1600,7 +1604,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-battery-all",
-      "name": "Entity Group \u00b7 battery all",
+      "name": "Entity Group · battery all",
       "entity_type": "battery",
       "popup_filter": "all",
       "entities": [
@@ -1618,7 +1622,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-battery-active",
-      "name": "Entity Group \u00b7 battery active",
+      "name": "Entity Group · battery active",
       "entity_type": "battery",
       "popup_filter": "active",
       "entities": [
@@ -1636,7 +1640,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-light-inactive",
-      "name": "Entity Group \u00b7 light inactive",
+      "name": "Entity Group · light inactive",
       "entity_type": "light",
       "popup_filter": "active",
       "entities": [
@@ -1646,7 +1650,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-light-empty",
-      "name": "Entity Group \u00b7 light empty",
+      "name": "Entity Group · light empty",
       "entity_type": "light",
       "popup_filter": "all",
       "entities": []
@@ -1654,7 +1658,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-light-unknown",
-      "name": "Entity Group \u00b7 light unknown",
+      "name": "Entity Group · light unknown",
       "entity_type": "light",
       "popup_filter": "all",
       "entities": [
@@ -1664,7 +1668,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-light-unavailable",
-      "name": "Entity Group \u00b7 light unavailable",
+      "name": "Entity Group · light unavailable",
       "entity_type": "light",
       "popup_filter": "all",
       "entities": [
@@ -1675,7 +1679,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-battery-unavailable",
-      "name": "Entity Group \u00b7 battery unavailable",
+      "name": "Entity Group · battery unavailable",
       "entity_type": "battery",
       "popup_filter": "all",
       "entities": [
@@ -1690,7 +1694,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-light-one",
-      "name": "Entity Group \u00b7 light one",
+      "name": "Entity Group · light one",
       "entity_type": "light",
       "popup_filter": "active",
       "entities": [
@@ -1700,7 +1704,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-cover-inactive",
-      "name": "Entity Group \u00b7 cover inactive",
+      "name": "Entity Group · cover inactive",
       "entity_type": "cover",
       "popup_filter": "active",
       "entities": [
@@ -1711,7 +1715,7 @@
     {
       "template": "hc_entity_group_card",
       "id": "gallery-climate-inactive",
-      "name": "Entity Group \u00b7 climate inactive",
+      "name": "Entity Group · climate inactive",
       "entity_type": "climate",
       "popup_filter": "active",
       "entities": [
@@ -1723,7 +1727,7 @@
     {
       "id": "native-scenes",
       "template": "hc_scene_collection_card",
-      "name": "Scenes \u00b7 native and toggle actions",
+      "name": "Scenes · native and toggle actions",
       "icon": "mdi:palette-outline",
       "entities": [
         "scene.marao_dashboard_test_native_scene",
@@ -1733,7 +1737,7 @@
     {
       "id": "empty-scenes",
       "template": "hc_scene_collection_card",
-      "name": "Scenes \u00b7 empty collection",
+      "name": "Scenes · empty collection",
       "icon": "mdi:palette-outline",
       "entities": []
     },
@@ -1741,7 +1745,7 @@
       "id": "daily-energy",
       "template": "hc_energy_period_card",
       "entity_id": "sensor.marao_dashboard_test_today_energy",
-      "name": "Energy \u00b7 local daily reading",
+      "name": "Energy · local daily reading",
       "variables": {
         "period": "day"
       }
@@ -1750,7 +1754,7 @@
       "id": "monthly-energy",
       "template": "hc_energy_period_card",
       "entity_id": "sensor.marao_dashboard_test_today_energy",
-      "name": "Energy \u00b7 independent monthly reading",
+      "name": "Energy · independent monthly reading",
       "variables": {
         "period": "month"
       }
@@ -1759,7 +1763,7 @@
       "id": "media-app",
       "template": "hc_media_app_card",
       "entity_id": "media_player.marao_dashboard_test_apple_tv",
-      "name": "Media \u00b7 YouTube app",
+      "name": "Media · YouTube app",
       "icon": "mdi:youtube",
       "show_state": false,
       "variables": {
@@ -1770,43 +1774,43 @@
       "id": "alarm-number",
       "template": "hc_security_card",
       "entity_id": "alarm_control_panel.marao_dashboard_test_alarm",
-      "name": "Alarm controls \u00b7 number"
+      "name": "Alarm controls · number"
     },
     {
       "id": "alarm-text",
       "template": "hc_security_card",
       "entity_id": "alarm_control_panel.marao_dashboard_test_alarm_text",
-      "name": "Alarm controls \u00b7 text"
+      "name": "Alarm controls · text"
     },
     {
       "id": "alarm-no_code",
       "template": "hc_security_card",
       "entity_id": "alarm_control_panel.marao_dashboard_test_alarm_no_code",
-      "name": "Alarm controls \u00b7 no_code"
+      "name": "Alarm controls · no_code"
     },
     {
       "id": "opener-button",
       "template": "hc_access_slide_action_card",
       "entity_id": "button.marao_dashboard_test_opener",
-      "name": "Access opener \u00b7 button"
+      "name": "Access opener · button"
     },
     {
       "id": "opener-switch",
       "template": "hc_access_slide_action_card",
       "entity_id": "switch.marao_dashboard_test_switch",
-      "name": "Access opener \u00b7 switch"
+      "name": "Access opener · switch"
     },
     {
       "id": "opener-script",
       "template": "hc_access_slide_action_card",
       "entity_id": "script.marao_dashboard_test_opener",
-      "name": "Access opener \u00b7 script"
+      "name": "Access opener · script"
     },
     {
       "id": "vacuum-native-command",
       "template": "hc_vacuum_card",
       "entity_id": "vacuum.marao_dashboard_test_vacuum_commands",
-      "name": "Vacuum \u00b7 original command parameters",
+      "name": "Vacuum · original command parameters",
       "variables": {
         "action_1": {
           "segment": 21,
@@ -1827,15 +1831,15 @@
   ],
   "controlGridCases": {
     "names": [
-      "Grid \u00b7 simple light",
-      "Grid \u00b7 brightness",
-      "Grid \u00b7 cover",
-      "Grid \u00b7 lock",
-      "Grid \u00b7 hidden icon",
-      "Grid \u00b7 hidden title",
-      "Grid \u00b7 guarded lock",
-      "Grid \u00b7 door summary",
-      "Grid \u00b7 front entrance opening control with a deliberately long later-row title"
+      "Grid · simple light",
+      "Grid · brightness",
+      "Grid · cover",
+      "Grid · lock",
+      "Grid · hidden icon",
+      "Grid · hidden title",
+      "Grid · guarded lock",
+      "Grid · door summary",
+      "Grid · front entrance opening control with a deliberately long later-row title"
     ],
     "templates": [
       "hc_light_card",
@@ -1865,6 +1869,25 @@
     {
       "type": "custom:marao-card",
       "template": "hc_camera_card",
+      "entity": "camera.marao_dashboard_test_camera_adaptive_low",
+      "name": "Low dashboard and high popup camera",
+      "variables": {
+        "popup_hash": "#marao-dashboard-test-camera-popup",
+        "popup_stream_entity": "camera.marao_dashboard_test_camera_adaptive_high"
+      }
+    },
+    {
+      "type": "custom:marao-card",
+      "template": "hc_camera_card",
+      "entity": "camera.marao_dashboard_test_camera_adaptive_hls_high",
+      "name": "HLS-only live camera",
+      "variables": {
+        "popup_hash": "#marao-dashboard-test-camera-popup"
+      }
+    },
+    {
+      "type": "custom:marao-card",
+      "template": "hc_camera_card",
       "entity": "camera.marao_dashboard_test_camera",
       "name": "Automatic still to live camera",
       "variables": {
@@ -1879,6 +1902,28 @@
       "variables": {
         "popup_hash": "#marao-dashboard-test-camera-popup"
       }
+    },
+    {
+      "type": "custom:marao-card",
+      "template": "hc_camera_card",
+      "entity": "camera.marao_dashboard_test_camera_slow_low",
+      "name": "Slow connection · selected low quality",
+      "variables": {
+        "popup_hash": "#marao-dashboard-test-camera-popup"
+      }
+    },
+    {
+      "type": "custom:marao-card",
+      "template": "hc_camera_card",
+      "entity": "camera.marao_dashboard_test_camera",
+      "name": "Saved entrance title hidden from the camera card",
+      "variables": {
+        "popup_hash": "#marao-dashboard-test-camera-popup"
+      },
+      "show_name": false,
+      "show_icon": true,
+      "show_state": true,
+      "show_label": true
     }
   ],
   "editorDragCoverage": [
@@ -1898,13 +1943,13 @@
           "type": "custom:marao-card",
           "template": "hc_light_card",
           "entity": "light.marao_dashboard_test_onoff_light",
-          "name": "Section simple \u00b7 Lamp"
+          "name": "Section simple · Lamp"
         },
         {
           "type": "custom:marao-card",
           "template": "hc_fan_card",
           "entity": "fan.marao_dashboard_test_onoff_fan",
-          "name": "Section simple \u00b7 Fan"
+          "name": "Section simple · Fan"
         }
       ]
     },
@@ -1916,19 +1961,19 @@
           "type": "custom:marao-card",
           "template": "hc_light_card",
           "entity": "light.marao_dashboard_test_light",
-          "name": "Section sliders \u00b7 Lamp"
+          "name": "Section sliders · Lamp"
         },
         {
           "type": "custom:marao-card",
           "template": "hc_fan_card",
           "entity": "fan.marao_dashboard_test_fan",
-          "name": "Section sliders \u00b7 Fan"
+          "name": "Section sliders · Fan"
         },
         {
           "type": "custom:marao-card",
           "template": "hc_cover_card",
           "entity": "cover.marao_dashboard_test_cover",
-          "name": "Section sliders \u00b7 Blind"
+          "name": "Section sliders · Blind"
         }
       ]
     },
@@ -1950,25 +1995,25 @@
           "type": "custom:marao-card",
           "template": "hc_title_card",
           "entity": "",
-          "name": "Section automatic \u00b7 structural heading"
+          "name": "Section automatic · structural heading"
         },
         {
           "type": "custom:marao-card",
           "template": "hc_sensor_card",
           "entity": "sensor.marao_dashboard_test_power",
-          "name": "Section automatic \u00b7 Reading"
+          "name": "Section automatic · Reading"
         },
         {
           "type": "custom:marao-card",
           "template": "hc_light_card",
           "entity": "light.marao_dashboard_test_light",
-          "name": "Section automatic \u00b7 Lamp"
+          "name": "Section automatic · Lamp"
         },
         {
           "type": "custom:marao-card",
           "template": "hc_fan_card",
           "entity": "fan.marao_dashboard_test_fan",
-          "name": "Section automatic \u00b7 Fan"
+          "name": "Section automatic · Fan"
         },
         {
           "type": "markdown",

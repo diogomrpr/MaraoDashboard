@@ -108,3 +108,19 @@ Live playback SHALL preserve existing saved camera selections, labels, options, 
 - **WHEN** the user activates playback or Retry within the camera surface
 - **THEN** only that action executes once and the event popup does not open
 - **AND** activating the separate event action still opens the configured popup once
+
+### Requirement: Bounded automatic quality fallback
+The card SHALL use available enabled lower-resolution main streams of the same UniFi Protect device after sustained startup or playback stalls. It SHALL preserve the configured entity and event actions, never change HA/provider settings, never choose package/foreign/unknown/unavailable streams, and attempt each lower tier at most once per session. Missing trustworthy identity or quality metadata SHALL leave the configured stream unchanged. Retry SHALL restore the configured tier.
+
+#### Scenario: High-quality playback cannot sustain the connection
+- **WHEN** the selected stream stalls and a lower-quality same-device stream is available
+- **THEN** the native host switches once to that stream and confirms actual advancing playback
+- **AND** exhausting available tiers produces a bounded readable failure rather than a retry loop
+
+### Requirement: Preserve video during brief buffering
+After confirmed playback, brief buffering SHALL keep the current video frame visible with localized buffering feedback. It SHALL NOT replace that frame with the snapshot or claim a stalled frame is live. Observation SHALL recover when the media clock advances even if native events are sparse.
+
+#### Scenario: A playing stream briefly buffers
+- **WHEN** media temporarily stops advancing
+- **THEN** the native player stays mounted and the snapshot stays hidden
+- **AND** resumed progress restores live status without a new stream request

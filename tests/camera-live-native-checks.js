@@ -5,6 +5,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+function cameraCardByName(page, name) {
+  // Lifecycle proof deliberately hides the card before restoring it. Retain its
+  // semantic identity through that boundary without requiring a drawn title.
+  return page.locator('marao-card').filter({has: page.getByRole('group', {name, exact: true, includeHidden: true})}).first();
+}
+
 async function waitForCameraOutcome(page, card) {
   const observation = await page.waitForFunction(card => {
     const camera = card._camera;
@@ -99,6 +105,11 @@ async function waitForCameraAdvance(page, card, { captureBaseline = false, metad
   try {
     observation = await page.waitForFunction(observeNativeCamera, { card, probe, captureBaseline, metadata }, { timeout: 5000, polling: 50 });
     return await observation.jsonValue();
+  } catch (error) {
+    error.cameraProgress = await page.evaluate(({ card, probe }) => ({ before: probe.before, time: card._camera?.video?.currentTime,
+      sameVideo: card._camera?.video === probe.video, state: card._camera?.state, readyState: card._camera?.video?.readyState,
+      paused: card._camera?.video?.paused, configured: card._config.entity, selected: card._camera?.streamEntity }), { card, probe });
+    throw error;
   } finally {
     try { await observation?.dispose(); }
     finally { await probe.dispose(); }
@@ -116,7 +127,7 @@ function removeNativeDuplicates(card) {
 async function checkNativeCameraPlayback(page, serviceCalls, { output, scenario = 'iphone-normal', theme = 'light', geometryOnly = false, observeFailureMs = 0 } = {}) {
   assert.equal(new URL(page.url()).hostname, '192.168.0.28', 'Disposable native camera proof only');
   const entity = 'camera.marao_dashboard_test_camera';
-  const card = page.locator('marao-card').filter({ has: page.locator('.title', { hasText: /^Camera · automatic live video \+ events$/ }) }).first();
+  const card = cameraCardByName(page, geometryOnly ? 'Front Door Camera · automatic live video' : 'Camera · automatic live video + events');
   assert.equal(await card.evaluate(card => card._config.entity), entity, 'Only safe synthetic camera media may be inspected');
   const handle = await card.elementHandle(), servicesBefore = serviceCalls.length;
   const began = Date.now(), phases = []; let phase = 'initial camera readiness';
@@ -178,7 +189,14 @@ async function checkNativeCameraPlayback(page, serviceCalls, { output, scenario 
   let originalDisplay;
   try {
     await card.scrollIntoViewIfNeeded();
-    await waitStill();
+    // Late native gallery mounts can shift the target after the initial scroll.
+    // Keep the safe camera in view until its actual eligibility/still is ready.
+    await page.waitForFunction(card => {
+      const camera=card._camera;
+      if(!camera?.eligible()) {card.scrollIntoView({block:'center',behavior:'instant'});return false;}
+      return Boolean(camera.player && camera.poster.complete && camera.poster.naturalWidth>0
+        && camera.poster.getAttribute('src')===camera.picture);
+    },handle,{timeout:15000,polling:100});
     await release('initial visibility release', async () => {
       originalDisplay = await card.evaluate(card => {
         card.__retiredSignaling = card._camera.signaling;
@@ -218,7 +236,23 @@ async function checkNativeCameraPlayback(page, serviceCalls, { output, scenario 
     await card.evaluate(card => { const camera = card._camera; camera.video.pause(); camera.playRejected({ name: 'NotAllowedError' }, camera.generation); });
     await card.locator('.camera-feedback button').waitFor({ state: 'visible' }); await layout();
     const hash = new URL(page.url()).hash;
-    await card.locator('.camera-feedback button').tap(); await waitLive();
+    // Native transport promotion can resume playback and remove this control
+    // while Playwright waits for stable geometry. Touch the visible target now;
+    // the feedback surface must retain the gesture if promotion wins the race.
+    await card.locator('.camera-feedback').scrollIntoViewIfNeeded();
+    const recovery = await card.evaluate(card => {
+      const camera=card._camera;
+      camera.video.pause(); camera.playRejected({name:'NotAllowedError'},camera.generation);
+      const button=camera.feedback.querySelector('button');
+      button.scrollIntoView({block:'center',behavior:'instant'});
+      const bounds=button.getBoundingClientRect(),x=bounds.x+bounds.width/2,y=bounds.y+bounds.height/2;
+      let hit=document.elementFromPoint(x,y);
+      while(hit?.shadowRoot){const next=hit.shadowRoot.elementFromPoint(x,y);if(!next||next===hit)break;hit=next;}
+      return {x,y,width:bounds.width,height:bounds.height,hit:hit===button};
+    });
+    assert.ok(recovery.width>=48 && recovery.height>=48);
+    assert.equal(recovery.hit,true,'Recovery touch must hit the button above the floating navbar');
+    await page.touchscreen.tap(recovery.x,recovery.y); await waitLive();
     assert.equal(new URL(page.url()).hash, hash, 'Playback must not open the event sheet');
     assert.equal(await card.evaluate(card => card._camera.player === card.__nativeProof.player), true, 'User gesture keeps the same native host');
     evidence.faults.push('Controlled wrapper autoplay-rejection injection on actual native media; does not prove browser policy rejection');
@@ -269,7 +303,7 @@ async function checkNativeCameraPlayback(page, serviceCalls, { output, scenario 
   } catch (error) {
     const phaseElapsedMs = Date.now() - began - (phases.at(-1)?.elapsedMs || 0);
     const observationBudgetMs = Math.min(Math.max(0, 30000 - phaseElapsedMs), Math.max(0, observeFailureMs));
-    const failure = { phase, elapsedMs: Date.now() - began, phaseElapsedMs, observationBudgetMs, error: { name: error.name, summary: error.name === 'TimeoutError' ? error.message.split('\n')[0] : 'Native camera assertion failed; original failure retained by runner' }, phases, observations: [] };
+    const failure = { phase, elapsedMs: Date.now() - began, phaseElapsedMs, observationBudgetMs, error: { name: error.name, progress: error.cameraProgress, summary: error.name === 'TimeoutError' ? error.message.split('\n')[0] : 'Native camera assertion failed; original failure retained by runner' }, phases, observations: [] };
     const save = () => { if (output) { fs.mkdirSync(output, { recursive: true }); fs.writeFileSync(path.join(output, `native-camera-${evidence.engine}-${scenario}-${theme}-failure.json`), JSON.stringify(failure, null, 2), { mode: 0o600 }); } };
     try {
       failure.initial = await snapshot(); save();
@@ -283,4 +317,4 @@ async function checkNativeCameraPlayback(page, serviceCalls, { output, scenario 
     await waitStill();
   }
 }
-module.exports = { checkNativeCameraPlayback, waitForCameraOutcome, waitForCameraAdvance, observeNativeCamera, removeNativeDuplicates };
+module.exports = { cameraCardByName, checkNativeCameraPlayback, waitForCameraOutcome, waitForCameraAdvance, observeNativeCamera, removeNativeDuplicates };

@@ -117,3 +117,32 @@ def test_sections_keep_all_owned_families_and_structural_raw_boundaries():
     assert sections[1]["groups"] == [{"count": 1, "columns": 2}, {"count": 1, "columns": 1}, {"count": 1, "columns": 1}, {"count": 1, "columns": 2}]
     assert popup in cards and popup not in sections[0]["cards"]
     assert source == before
+
+
+@pytest.mark.parametrize("visibility", [None, False, True])
+def test_camera_title_generation_preserves_visibility_and_existing_options(visibility):
+    entry = {"id": "entrance", "entity_id": "camera.front", "template": "hc_camera_card",
+             "name": "Custom entrance", "icon": "mdi:cctv", "show_state": True,
+             "show_label": False, "future": {"keep": []},
+             "variables": {"event_provider": "unifiprotect", "event_limit": 7}}
+    if visibility is not None:
+        entry["show_name"] = visibility
+    source = {"config_version": 2, "name": "Camera titles", "landing_page": "home", "pages": [
+        {"name": "Home", "path": "home", "sections": [{"columns": 1, "entities": [entry]}]}]}
+    before = deepcopy(source)
+    view = g._page_view(g._resolve_pages(source)["pages"][0], "", "marao-dashboard")
+    card = view["cards"][0]["cards"][0]
+    assert {key: card[key] for key in ("type", "template", "entity", "name", "icon", "show_state", "show_label")} == {
+        "type": "custom:marao-card", "template": "hc_camera_card", "entity": "camera.front",
+        "name": "Custom entrance", "icon": "mdi:cctv", "show_state": True, "show_label": False}
+    if visibility is None:
+        assert "show_name" not in card
+    else:
+        assert card["show_name"] is visibility
+    assert card["variables"]["popup_hash"] == "#page-home-entrance-popup"
+    popup = next(card for card in view["cards"] if isinstance(card, dict) and card.get("type") == "custom:marao-popup-card")
+    assert popup["hash"] == "#page-home-entrance-popup"
+    assert popup["cards"][0]["entity"] == "camera.front"
+    assert popup["cards"][0]["tap_action"] == {"action": "fullscreen"}
+    assert popup["cards"][1]["title"] == "Events"
+    assert source == before

@@ -151,3 +151,26 @@ test('pending configuration uses committed layout until replacement children are
     finish({createCardElement:()=>new Node()});await pending;assert.equal(grid._mountedConfig.cards.length,1);assert.equal(grid._children.length,1);
   }finally{globalThis.getComputedStyle=previousStyle;}
 });
+
+test('phone-width sections retain two columns and reflow the same mounted cards for larger text', async () => {
+  const previous = globalThis.getComputedStyle;
+  let width = 322, fontSize = '18px';
+  globalThis.getComputedStyle = () => ({ fontSize });
+  try {
+    globalThis.loadCardHelpers = async () => ({ createCardElement: () => new Node() });
+    const grid = new MaraoControlGrid();
+    grid.getBoundingClientRect = () => ({ width });
+    grid.setConfig({ columns: 2, cards: [card(), card('hc_cover_card'), card('hc_fan_card')] });
+    await grid._ready;
+    const children = [...grid._children], layout = { style: {} };
+    const query = grid.shadowRoot.querySelector.bind(grid.shadowRoot);
+    grid.shadowRoot.querySelector = selector => selector === '.control-grid' ? layout : query(selector);
+    for (const [available, font, columns] of [[279.5,18,1],[280,18,2],[280.5,18,2],[282,18,2],[320,18,2],[322,18,2],[346,18,2],[352,18,2],[307.5,20,1],[308,20,2],[322,20,2],[282,36,1],[322,36,1],[346,36,1],[282,18,2]]) {
+      width = available; fontSize = `${font}px`; grid._layout();
+      assert.equal(layout.style.gridTemplateColumns, `repeat(${columns},minmax(0,1fr))`, `${available}px with ${font}px text`);
+      assert.equal(children[1].style.gridRow, columns === 2 ? '1' : '2');
+      assert.deepEqual(grid._children, children);
+    }
+    assert.equal(grid._config.columns, 2);
+  } finally { globalThis.getComputedStyle = previous; }
+});

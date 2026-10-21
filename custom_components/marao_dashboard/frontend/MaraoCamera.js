@@ -1,5 +1,4 @@
-// HA owns transport/authentication. This bridge uses only the native hosts' open
-// shadow roots and standard video events/play(), never private player methods.
+// HA selects native WebRTC where supported, with its native transport fallback.
 // Rechecked 2026-10-18: frontend/src/components/{ha-camera-stream,ha-hls-player,
 // ha-web-rtc-player}.ts on home-assistant/frontend (dev); older hass binding retained.
 export const CAMERA_REGISTRATION_MS = 10000;
@@ -24,7 +23,10 @@ export class CameraSignaling {
     session.connection?.close();
   }
   async subscribeMessage(callback, message) {
-    if (this.closed || message.type !== 'camera/webrtc/offer' || message.entity_id !== this.entity) throw new Error('compatibility');
+    if (message.type !== 'camera/webrtc/offer' || message.entity_id !== this.entity) throw new Error('compatibility');
+    // Native offer creation can finish after the owning player was removed.
+    // A retired offer must neither open a socket nor reject into native cleanup.
+    if (this.closed) return () => {};
     const NativeConnection = this.shared.constructor, options = this.shared.options;
     if (typeof options?.createSocket !== 'function' || typeof NativeConnection?.prototype?.subscribeMessage !== 'function') throw new Error('compatibility');
     const session = { closed: false }; this.sessions.add(session);
@@ -129,6 +131,7 @@ export function clearNativeCameraPoster(host, roots = rootsWithin(host)) {
 }
 
 export function cameraVideo(host) {
+  if (host.matches?.('video')) return host;
   for (const root of rootsWithin(host)) for (const video of root.querySelectorAll('video')) {
     let node = video, visible = true;
     while (node && node !== host) {
@@ -140,22 +143,34 @@ export function cameraVideo(host) {
   return null;
 }
 
+function decodedFrames(video) {
+  const quality = video?.getVideoPlaybackQuality?.();
+  return quality ? quality.totalVideoFrames - quality.droppedVideoFrames : undefined;
+}
+
 export class CameraPlayback {
   constructor(card, slot, { localize, haptic, problem }) {
     this.card = card; this.slot = slot; this.localize = localize; this.haptic = haptic; this.problem = problem;
-    this.generation = 0; this.visible = !globalThis.IntersectionObserver; this.state = 'idle';
+    this.generation = 0; this.streamRequests = 0; this.visible = !globalThis.IntersectionObserver; this.state = 'idle';
     slot.className = 'camera-live';
     slot.innerHTML = `<style>
-      .camera-live{position:relative;z-index:2;min-width:0;margin:0 14px 14px;pointer-events:none}
-      .camera-stage{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:#000}
+      .camera-live{position:relative;z-index:2;min-width:0;margin:0;pointer-events:none}
+      .camera-stage{position:relative;box-sizing:border-box;width:100%;max-width:none;aspect-ratio:16/9;overflow:hidden;background:#000;color:#fff;border:0;padding:0;margin:0;outline:none}
+      .camera-stage:modal{--video-max-height:100%;position:fixed;inset:0;width:100dvw;height:100dvh;max-width:100dvw;max-height:100dvh;aspect-ratio:auto;pointer-events:auto}
+      .camera-fullscreen-close{display:none}.camera-stage:modal .camera-fullscreen-close{display:block;position:absolute;z-index:3;top:env(safe-area-inset-top,0px);right:env(safe-area-inset-right,0px);width:48px;height:48px;border:0;border-radius:50%;background:#222;color:#fff;font-size:24px;pointer-events:auto}
       .camera-stage>ha-camera-stream,.camera-poster{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
       .camera-poster{z-index:1;background:#000}.camera-poster[hidden]{display:none}
-      .camera-feedback{box-sizing:border-box;display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding-top:8px;min-height:1.25em;overflow-wrap:anywhere;font-size:var(--font-size-secondary,1rem);line-height:1.25;pointer-events:auto}
+      .camera-feedback{box-sizing:border-box;display:flex;align-items:center;flex-wrap:wrap;gap:8px;position:absolute;z-index:2;inset:auto 0 0;max-height:100%;overflow:auto;padding:8px;background:var(--ha-card-background,var(--card-background-color,#fff));color:var(--primary-text-color,#000);overflow-wrap:anywhere;font-size:var(--font-size-secondary,1rem);line-height:1.25;pointer-events:auto}
+      .camera-feedback[hidden]{display:none}.camera-live[data-camera-state="buffering"] .camera-feedback{inset:auto auto 8px 8px;max-width:calc(100% - 16px);border-radius:8px}
       .camera-feedback span{flex:1 1 9em;min-width:0}.camera-feedback button{position:relative;z-index:3;box-sizing:border-box;min-width:48px;min-height:48px;max-width:100%;white-space:normal;overflow-wrap:anywhere;pointer-events:auto}
-      </style><div class="camera-stage"><img class="camera-poster" alt="" hidden></div><div class="camera-feedback" role="status"><span></span></div>`;
+      </style><dialog open role="presentation" class="camera-stage"><img class="camera-poster" alt="" hidden><div class="camera-feedback" role="status"><span></span></div></dialog>`;
     this.stage = slot.querySelector('.camera-stage'); this.poster = slot.querySelector('.camera-poster'); this.feedback = slot.querySelector('.camera-feedback');
+    this.stage.addEventListener('keydown', event => { if (this.stage.matches(':modal')) event.stopPropagation(); });
     // Retain a touch target if playback removes its recovery button mid-gesture.
-    this.feedback.addEventListener('click', event => { event.stopPropagation(); event.preventDefault(); });
+    this.feedback.addEventListener('pointerdown', () => { this.feedbackPressed = true; this.feedback.style.minHeight = `${this.feedback.getBoundingClientRect().height}px`; }, true);
+    this.releaseFeedback = () => { if (!this.feedbackPressed) return; clearTimeout(this.feedbackRelease); this.feedbackRelease = setTimeout(() => { this.feedbackPressed = false; this.describe(); }, 0); };
+    for (const event of ['pointerup', 'pointercancel']) globalThis.window.addEventListener(event, this.releaseFeedback, true);
+    this.feedback.addEventListener('click', event => { event.stopPropagation(); event.preventDefault(); this.feedbackPressed = false; this.describe(); });
     this.posterError = event => {
       if (event.currentTarget !== this.poster || !this.poster.hasAttribute('src') || this.state === 'live') return;
       this.posterFailed = true; this.poster.hidden = true;
@@ -182,7 +197,7 @@ export class CameraPlayback {
   update(hass, entity, label) {
     const replaced = this.entity !== entity;
     this.hass = hass; this.entity = entity; this.label = label;
-    if (replaced) { this.stop(); this.state = 'idle'; this.problem(''); }
+    if (replaced) { this.stop(); this.resetStream(); this.state = 'idle'; this.problem(''); }
     const eligible = this.eligible();
     if (!eligible) {
       this.stop();
@@ -201,28 +216,36 @@ export class CameraPlayback {
     const capabilityChanged = this.streamSupported !== undefined && this.streamSupported !== supported;
     this.streamSupported = supported;
     if (capabilityChanged) { this.stop(); this.state = 'idle'; this.problem(''); }
-    this.poster.hidden = this.state === 'live' || !picture || this.posterFailed;
+    this.poster.hidden = this.state === 'live' || this.state === 'buffering' || !picture || this.posterFailed;
+    if (!this.attempt && !['error', 'snapshot', 'blocked'].includes(this.state)) this.resetStream();
     if (this.player) {
-      this.updateNativeHass(); this.player.stateObj = hass.states[entity];
+      this.updateNativeHass(); this.player.stateObj = hass.states[this.streamEntity];
+      if (!cameraAvailable(hass, this.streamEntity)) { this.fail('failed'); return; }
       if (!clearNativeCameraPoster(this.player)) { this.fail('compatibility'); return; }
     }
     if (!this.attempt && !['error', 'snapshot', 'blocked'].includes(this.state)) this.start();
     this.describe();
   }
+  resetStream() {
+    this.streamEntity = this.entity;
+  }
   async start() {
     // A still-only entity must not start HA's MJPEG fallback or a native session.
     if (!cameraSupportsStream(this.hass?.states?.[this.entity])) { this.fail('unsupported', true); return; }
     const generation = ++this.generation;
+    if (!this.streamEntity) this.resetStream();
+    this.lastProgressAt = performance.now();
     this.attempt = true; this.state = 'loading'; this.reason = ''; this.nativeError = ''; this.problem(''); this.describe();
     this.timer = setTimeout(() => {
       if (generation !== this.generation) return;
       this.fail(this.nativeError ? 'failed' : this.video ? 'timeout' : 'compatibility', false, this.nativeError);
     }, CAMERA_PLAYBACK_MS);
+    this.monitor = setInterval(() => this.observeProgress(generation), 500);
     try {
       await loadNativeCamera();
       if (generation !== this.generation || !this.eligible()) return;
       const player = document.createElement('ha-camera-stream');
-      this.signaling = new CameraSignaling(this.hass.connection, this.entity, () => {
+      this.signaling = new CameraSignaling(this.hass.connection, this.streamEntity, () => {
         if (generation === this.generation) this.fail('failed');
       });
       this.player = player; this.contexts = new Set(); this.updateNativeHass();
@@ -235,7 +258,7 @@ export class CameraPlayback {
         notify();
       };
       this.stage.addEventListener('context-request', this.contextRequest);
-      player.stateObj = this.hass.states[this.entity];
+      player.stateObj = this.hass.states[this.streamEntity];
       player.muted = true; player.controls = false; player.autoPlay = true; player.playsInline = true; player.aspectRatio = 16 / 9; player.fitMode = 'cover';
       player.setAttribute('muted', ''); player.setAttribute('autoplay', ''); player.setAttribute('playsinline', '');
       this.mediaObserver = new MutationObserver(() => this.bind(generation));
@@ -243,9 +266,19 @@ export class CameraPlayback {
     } catch (error) { if (generation === this.generation) this.fail(error.message === 'registration' ? 'registration' : 'failed'); }
   }
   updateNativeHass() {
-    const signaling = this.signaling, hass = this.hass;
+    const signaling = this.signaling, hass = this.hass, generation = this.generation;
     this.nativeHass = { ...hass, connection: signaling,
-      callWS: message => message.type === 'camera/webrtc/candidate' ? signaling.candidate(message) : hass.callWS(message) };
+      callWS: message => {
+        if (message.type === 'camera/webrtc/candidate') return signaling.candidate(message);
+        if (message.type !== 'camera/stream') return hass.callWS(message);
+        // HA starts a playlist fetch before checking whether its host survived.
+        // Abandon a retired continuation (no timer or retained global promise),
+        // rather than waking the detached player with an obsolete stream URL.
+        if (generation !== this.generation) return new Promise(() => {});
+        // Duplicate cards share HA but retain independent request ownership.
+        ++this.streamRequests;
+        return hass.callWS(message).then(result => generation === this.generation ? result : new Promise(() => {}));
+      } };
     this.player.hass = this.nativeHass;
     for (const notify of this.contexts || []) notify();
   }
@@ -256,15 +289,20 @@ export class CameraPlayback {
     if (!clearNativeCameraPoster(this.player, roots)) { this.fail('compatibility'); return; }
     const video = cameraVideo(this.player);
     if (video && video === this.video) return;
-    if (this.video) this.waiting();
+    if (this.video) {
+      this.waiting();
+      // A replaced native transport has no retained frame; it is a fresh startup.
+      this.state = 'loading'; this.poster.hidden = !this.picture || this.posterFailed; this.describe();
+    }
     this.unbind();
     if (!video) {
       const nativeError = roots.map(root => root.querySelector('ha-alert')?.textContent?.trim()).filter(Boolean).join(' · ');
       if (nativeError) { this.nativeError = nativeError; this.problem(nativeError); this.describe(); }
-      if (roots.some(root => root.querySelector('img'))) this.fail(nativeError ? 'failed' : 'unsupported', !nativeError, nativeError);
+      // Snapshot-only entities never start a host; its image fallback means streaming failed.
+      if (roots.some(root => root.querySelector('img'))) this.fail('failed', false, nativeError);
       return;
     }
-    this.video = video; this.lastTime = video.currentTime; this.advanced = false; this.playRequested = false;
+    this.video = video; this.lastTime = video.currentTime; this.advanced = false; this.playRequested = false; this.lastFrames = decodedFrames(video);
     video.muted = true; video.defaultMuted = true; video.playsInline = true; video.controls = false;
     this.mediaHandlers = {
       timeupdate: () => this.progress(generation), playing: () => this.progress(generation),
@@ -290,14 +328,22 @@ export class CameraPlayback {
   progress(generation) {
     const video = this.video;
     if (generation !== this.generation || !video || video.paused || video.readyState < 2) return;
-    if (video.currentTime > this.lastTime) {
-      this.advanced = true; this.state = 'live'; this.reason = ''; this.nativeError = ''; clearTimeout(this.timer); this.poster.hidden = true; this.problem(''); this.describe();
+    const frames = decodedFrames(video);
+    if (video.currentTime > this.lastTime && (frames === undefined || frames > this.lastFrames)) {
+      this.lastFrames = frames;
+      this.advanced = true; this.state = 'live'; this.lastProgressAt = performance.now(); this.reason = ''; this.nativeError = ''; clearTimeout(this.timer); this.poster.hidden = true; this.problem(''); this.describe();
     }
     this.lastTime = video.currentTime;
   }
+  observeProgress(generation) {
+    if (generation !== this.generation || !this.attempt || this.state === 'blocked') return;
+    const now = performance.now();
+    this.progress(generation);
+    if (now - this.lastProgressAt > 1000) this.waiting();
+  }
   waiting() {
     if (this.state !== 'live') return;
-    this.state = 'loading'; this.reason = ''; this.poster.hidden = !this.picture || this.posterFailed; this.describe();
+    this.state = 'buffering'; this.reason = ''; this.poster.hidden = true; this.describe();
     clearTimeout(this.timer);
     const generation = this.generation;
     this.timer = setTimeout(() => { if (generation === this.generation) this.fail('timeout', false, this.nativeError); }, CAMERA_PLAYBACK_MS);
@@ -312,13 +358,14 @@ export class CameraPlayback {
   message(key) { return this.localize(`camera.${key}`); }
   describe() {
     this.slot.dataset.cameraState = this.state;
-    const snapshot = this.picture && !this.posterFailed && this.state !== 'live';
-    const status = this.state === 'live' ? this.message('live') : this.state === 'loading' ? [this.message('loading'), this.nativeError].filter(Boolean).join(' · ')
+    const snapshot = this.picture && !this.posterFailed && !this.poster.hidden;
+    const status = this.state === 'buffering' ? [this.message('buffering'), this.nativeError].filter(Boolean).join(' · ') : this.state === 'live' ? '' : this.state === 'loading' ? [this.message('loading'), this.nativeError].filter(Boolean).join(' · ')
       : ['error', 'snapshot', 'blocked'].includes(this.state) ? [this.message(this.reason), this.nativeError].filter(Boolean).join(' · ') : '';
-    this.feedback.querySelector('span').textContent = [snapshot ? this.message('snapshot') : '', status, this.posterFailed && this.state === 'loading' ? this.message('poster_failed') : ''].filter(Boolean).join(' · ');
+    const unavailable = !this.hass?.states ? this.localize('common.loading') : !cameraAvailable(this.hass, this.entity) ? this.localize(this.hass?.connected === false || this.hass?.connection?.connected === false ? 'common.disconnected' : this.hass.states[this.entity]?.state === 'unknown' ? 'common.unknown' : 'common.unavailable') : '';
+    this.feedback.querySelector('span').textContent = [unavailable, this.fullscreenError, snapshot ? this.message('snapshot') : '', status, this.posterFailed && this.state === 'loading' ? this.message('poster_failed') : ''].filter(Boolean).join(' · ');
     const action = this.state === 'blocked' ? 'start' : this.state === 'error' ? 'retry' : '';
     let button = this.feedback.querySelector('button');
-    if (!action) { button?.remove(); this.reserveFeedback(); return; }
+    if (!action) { button?.remove(); this.updateFeedback(); return; }
     if (!button) { button = document.createElement('button'); button.type = 'button'; this.feedback.append(button); button.addEventListener('click', event => {
       event.stopPropagation(); event.preventDefault();
       if (!this.eligible()) return;
@@ -326,32 +373,101 @@ export class CameraPlayback {
       if (this.state === 'blocked' && this.video) {
         const generation = this.generation;
         // Keep play() synchronous with the user's gesture (Safari activation).
-        this.state = 'loading'; this.reason = ''; this.problem(''); this.describe();
+        this.state = 'loading'; this.reason = ''; this.lastProgressAt = performance.now(); this.problem(''); this.describe();
         this.timer = setTimeout(() => { if (generation === this.generation) this.fail('timeout', false, this.nativeError); }, CAMERA_PLAYBACK_MS);
         try { this.video.play()?.catch(error => this.playRejected(error, generation)); } catch (error) { this.playRejected(error, generation); }
-      } else if (this.state === 'error') { this.stop(); this.picture = ''; this.posterFailed = false; this.state = 'idle'; this.update(this.hass, this.entity, this.label); }
+      } else if (this.state === 'error') { this.stop(); this.resetStream(); this.picture = ''; this.posterFailed = false; this.state = 'idle'; this.update(this.hass, this.entity, this.label); }
     }); }
     button.textContent = action === 'start' ? this.message('start') : this.localize('common.retry');
     button.setAttribute('aria-label', `${button.textContent} ${this.label || this.entity}`);
-    this.reserveFeedback();
+    this.updateFeedback();
   }
-  reserveFeedback() {
-    this.feedbackMinimum = Math.max(this.feedbackMinimum || 0, this.feedback.getBoundingClientRect().height);
-    this.feedback.style.minHeight = `${this.feedbackMinimum}px`;
+  updateFeedback() {
+    const empty = !this.feedback.querySelector('span').textContent && !this.feedback.querySelector('button');
+    this.feedback.hidden = empty && !this.feedbackPressed;
+    this.feedback.style.opacity = empty ? '0' : '';
+    if (!this.feedbackPressed) this.feedback.style.minHeight = '';
   }
+  async fullscreen() {
+    const video = this.video;
+    if (!video || !video.videoWidth || !this.eligible()) { this.fullscreenError = this.message('fullscreen_wait'); this.describe(); return; }
+    this.fullscreenCleanup?.();
+    const controls = video.controls, fit = video.style?.objectFit, pointerEvents = video.style?.pointerEvents;
+    const player = this.player, presentation = player && { controls: player.controls, aspectRatio: player.aspectRatio, fitMode: player.fitMode };
+    let closeButton;
+    let finished = false;
+    const restore = () => {
+      if (finished) return;
+      finished = true;
+      video.controls = controls;
+      if (player) Object.assign(player, presentation);
+      if (video.style) { video.style.objectFit = fit; video.style.pointerEvents = pointerEvents; }
+      document.removeEventListener('fullscreenchange', changed);
+      video.removeEventListener('webkitendfullscreen', restore);
+      this.stage.removeEventListener('close', restore);
+      closeButton?.remove();
+      if (!this.stage.open) this.stage.open = true;
+      this.stage.setAttribute('role', 'presentation');
+      this.stage.removeAttribute('aria-label');
+      if (this.fullscreenCleanup === cleanup) this.fullscreenCleanup = null;
+    };
+    const ownsFullscreen = () => video.getRootNode().fullscreenElement === video;
+    const changed = () => { if (!ownsFullscreen() && !this.stage.matches(':modal')) restore(); };
+    const cleanup = this.fullscreenCleanup = () => {
+      if (ownsFullscreen()) document.exitFullscreen().catch(() => {});
+      else if (video.webkitDisplayingFullscreen) video.webkitExitFullscreen();
+      else if (this.stage.matches(':modal')) this.stage.close();
+      restore();
+    };
+    document.addEventListener('fullscreenchange', changed);
+    video.addEventListener('webkitendfullscreen', restore);
+    video.controls = true;
+    if (player) Object.assign(player, { controls: true, aspectRatio: undefined, fitMode: 'contain' });
+    if (video.style) { video.style.objectFit = 'contain'; video.style.pointerEvents = 'auto'; }
+    try {
+      try {
+        if (video.requestFullscreen && document.fullscreenEnabled !== false) await video.requestFullscreen();
+        else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
+        else throw new Error('unsupported');
+      } catch {
+        if (finished) return;
+        // A modal promotes the existing stage without detaching its native player.
+        this.stage.open = false;
+        this.stage.removeAttribute('role');
+        this.stage.setAttribute('aria-label', this.label || this.message('fullscreen'));
+        closeButton = document.createElement('button'); closeButton.type = 'button';
+        closeButton.className = 'camera-fullscreen-close'; closeButton.textContent = '×';
+        closeButton.setAttribute('aria-label', this.message('fullscreen_exit')); closeButton.autofocus = true;
+        closeButton.addEventListener('click', event => { event.stopPropagation(); this.haptic('heavy'); cleanup(); });
+        this.stage.append(closeButton);
+        this.stage.showModal();
+        this.stage.addEventListener('close', restore);
+      }
+      if (finished) return;
+      this.fullscreenError = ''; this.describe();
+    } catch {
+      if (finished) return;
+      restore(); this.fullscreenError = this.message('fullscreen_failed'); this.describe();
+    }
+  }
+
   unbind() {
     if (this.video) for (const [type, handler] of Object.entries(this.mediaHandlers || {})) this.video.removeEventListener(type, handler);
     this.video = null; this.mediaHandlers = null;
   }
   stop() {
-    ++this.generation; clearTimeout(this.timer); this.mediaObserver?.disconnect(); this.mediaObserver = null; this.unbind();
+    this.fullscreenCleanup?.(); this.fullscreenError = '';
+    clearTimeout(this.feedbackRelease); this.feedbackPressed = false;
+    if (this.attempt || this.player) ++this.generation;
+    clearTimeout(this.timer); clearInterval(this.monitor); this.monitor = null; this.mediaObserver?.disconnect(); this.mediaObserver = null; this.unbind();
     this.signaling?.close(); this.signaling = null;
     this.stage?.removeEventListener('context-request', this.contextRequest); this.contextRequest = null; this.contexts?.clear();
     this.player?.remove(); this.player = null; this.attempt = false;
-    if (['loading', 'live', 'blocked'].includes(this.state)) this.state = 'idle';
+    if (['loading', 'live', 'buffering', 'blocked'].includes(this.state)) this.state = 'idle';
   }
   dispose() {
-    this.stop(); this.intersection?.disconnect(); this.ancestry.disconnect();
+    for (const event of ['pointerup', 'pointercancel']) globalThis.window.removeEventListener(event, this.releaseFeedback, true);
+    clearTimeout(this.feedbackRelease); this.stop(); this.intersection?.disconnect(); this.ancestry.disconnect();
     document.removeEventListener('visibilitychange', this.lifecycle);
     for (const event of ['location-changed', 'popstate']) window.removeEventListener(event, this.lifecycle);
     this.slot.remove();

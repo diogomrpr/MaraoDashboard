@@ -3,30 +3,47 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync, spawn } = require('node:child_process');
-const { checksFor, selectComponents, components } = require('./verification-map');
+const { checksFor, selectComponents, components, inspectionFor } = require('./verification-map');
+const { changesSince, reviewedFiles, writeSnapshot } = require('./verification-task');
 
 const root = path.resolve(__dirname, '..');
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const git = (args, cwd = root) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
 function parseArgs(argv = process.argv.slice(2)) {
-  const options = { components: [], full: false, parallel: false, plan: false, offline: false, release: false };
+  const options = { components: [], files: [], tier: 'focused', full: false, parallel: false, plan: false, offline: false, release: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (['--full', '--parallel', '--plan', '--offline', '--release', '--help'].includes(arg)) options[arg.slice(2)] = true;
-    else if (['--base', '--head', '--component', '--report', '--upgrade-report', '--reuse'].includes(arg)) {
+    else if (['--base', '--head', '--component', '--report', '--upgrade-report', '--reuse', '--snapshot', '--since', '--file', '--tier'].includes(arg)) {
       assert.ok(argv[i + 1] && !argv[i + 1].startsWith('--'), arg + ' requires a value');
       const value = argv[++i];
       if (arg === '--component') options.components.push(...value.split(','));
+      else if (arg === '--file') options.files.push(...value.split(','));
       else options[arg.slice(2).replace('-report', 'Report')] = value;
     } else throw new Error('Unknown verification option: ' + arg);
   }
   assert.ok(!(options.reuse && options.full), 'Per-check reuse is available only in affected mode');
   assert.ok(!(options.reuse && options.report), '--reuse and --report cannot be combined');
+  validateOptions(options);
   return options;
 }
 
+function validateOptions(options) {
+  const tier = options.tier || 'focused';
+  assert.ok(['visual', 'behavior', 'focused'].includes(tier), 'Unknown verification tier: ' + tier);
+  const development = tier !== 'focused' || options.since || options.files?.length;
+  assert.ok(!((options.release || options.full) && (development || options.snapshot)), 'Publication and full checks cannot use development tiers, task snapshots or reviewed file subsets');
+  assert.ok(!(options.since && (options.base || options.head)), '--since cannot be combined with --base or --head');
+  assert.ok(!(development && (options.reuse || options.report || options.upgradeReport)), 'Development scope cannot consume publication evidence');
+  if (options.snapshot) assert.ok(!development && !options.base && !options.head && !options.components?.length
+    && !options.offline && !options.plan && !options.parallel && !options.reuse && !options.report && !options.upgradeReport,
+  '--snapshot only records the starting workspace; use it separately from selection or execution');
+}
+
 function changedFiles(options, cwd = root) {
+  validateOptions(options);
+  if (options.since) return changesSince(options.since, cwd);
   const head = git(['rev-parse', '--verify', (options.head || 'HEAD') + '^{commit}'], cwd);
   let baseRef = options.base;
   if (!baseRef && options.release) {
@@ -50,9 +67,15 @@ function changedFiles(options, cwd = root) {
   return { base, baseRef, head, files: [...new Set([...committed, ...working, ...untracked])].sort() };
 }
 
-function makePlan(options = {}, comparison = changedFiles(options)) {
+function makePlan(options = {}, comparison) {
+  validateOptions(options);
+  assert.ok(!options.snapshot, 'Create a task snapshot separately before selecting checks');
+  comparison = reviewedFiles(comparison || changedFiles(options), options.files);
+  const tier = options.tier || 'focused';
+  const development = tier !== 'focused' || !!comparison.task_scope || !!options.since;
+  assert.ok(!((options.release || options.full) && development), 'Publication and full checks cannot use task scope');
   const selection = options.full ? { components: Object.keys(components), reasons: {}, directTests: [] }
-    : selectComponents(comparison.files, options.components || [], { conservativeShared: !!options.offline });
+    : selectComponents(comparison.files, options.components || [], { conservativeShared: !!options.offline && !development });
   const checks = checksFor(selection, options);
   const upgradeRequired = selection.components.some(id => components[id].upgrade);
   if (!options.offline && !options.full && options.release && upgradeRequired) {
@@ -60,8 +83,11 @@ function makePlan(options = {}, comparison = changedFiles(options)) {
       command: ['node', 'tests/test-ha-upgrade.js', '--scope', selection.components.join(',')], inputs: ['custom_components/marao_dashboard', 'ha-test/upgrade', 'tests/test-ha-upgrade.js', 'tests/upgrade'] });
   }
   return { version: 1, mode: options.full ? 'full' : 'affected', parallel: !!options.parallel, offline: !!options.offline,
-    ...comparison, components: selection.components, reasons: selection.reasons, checks, upgradeRequired,
-    excluded: options.offline ? ['live browser checks', 'mobile layouts', 'preserved-install upgrades'] : options.full ? [] : ['unrelated suites', 'complete mobile matrix', 'unaffected historical baselines'] };
+    ...comparison, tier, development_only: development, components: selection.components, reasons: selection.reasons, checks, upgradeRequired,
+    ...(development ? { inspection: { ...inspectionFor(selection), status: 'not performed by this command' } } : {}),
+    excluded: tier === 'visual' ? ['automated checks', 'publication validation'] : tier === 'behavior' ? ['browser interaction and visual inspection', 'mobile matrices', 'publication validation']
+      : [...(options.offline ? ['live browser checks', 'mobile layouts', 'preserved-install upgrades'] : options.full ? [] : ['unrelated suites', 'complete mobile matrix', 'unaffected historical baselines']),
+        ...(development ? ['publication validation'] : [])] };
 }
 
 function inputHashes(inputs, cwd = root) {
@@ -113,6 +139,8 @@ function checkIdentity(check, cwd = root) {
 }
 
 function validateEvidence(report, plan, identities, { target, now = Date.now(), exactCommit = false } = {}) {
+  assert.ok(!report?.development_only && !report?.task_scope && (!report?.tier || report.tier === 'focused')
+    && !plan.development_only && !plan.task_scope && (!plan.tier || plan.tier === 'focused'), 'Development-only results cannot establish publication coverage');
   assert.ok([3, 4].includes(report?.version), 'Unsupported scoped verification report');
   assert.equal(report.kind, 'scoped-verification');
   assert.equal(report.passed, true, 'Scoped verification failed');
@@ -193,6 +221,8 @@ function readPrivate(filename) {
 }
 
 async function runPlan(plan, options = {}) {
+  assert.notEqual(plan.tier, 'visual', 'Visual scope requires inspection, not an automated passing report');
+  assert.ok(!(plan.development_only && (options.reuse || options.report)), 'Development scope cannot consume publication evidence');
   const overallStarted = Date.now();
   assert.ok(!(options.reuse && (plan.mode === 'full' || options.report)), 'Conflicting reuse options');
   const { readReuse, reusableResult, atomicReport, liveEnvironment, originResult, capturesValid } = require('./verification-reuse');
@@ -206,7 +236,7 @@ async function runPlan(plan, options = {}) {
   fs.chmodSync(directory, 0o700);
   const identityStarted = Date.now();
   const identities = Object.fromEntries(plan.checks.map(check => [check.id, checkIdentity(check)]));
-  const report = { ...plan, version: 4, kind: 'scoped-verification', required: plan.checks.map(check => check.id), results: [],
+  const report = { ...plan, version: 4, kind: plan.development_only ? 'development-verification' : 'scoped-verification', required: plan.checks.map(check => check.id), results: [],
     artifact_root: directory, started_at: new Date(overallStarted).toISOString(), preflight_ms: identityStarted - overallStarted, identity_ms: Date.now() - identityStarted, passed: false, verified_cleanup: false };
   const filename = path.join(directory, 'report.json');
   report.filename = filename; report.visits = []; report.reuse_reasons = {};
@@ -329,7 +359,7 @@ async function runPlan(plan, options = {}) {
       execution_ms: report.results.filter(row => !row.reused).reduce((total, row) => total + (row.execution_ms ?? row.duration_ms), 0),
       validation_ms: report.preflight_ms + report.identity_ms + report.results.reduce((total, row) => total + (row.validation_ms || 0), 0) };
     save();
-    console.log('Scoped verification report: ' + filename);
+    console.log((plan.development_only ? 'Development' : 'Scoped') + ' verification report: ' + filename);
   }
   return { filename, report };
 }
@@ -338,13 +368,21 @@ async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
   if (options.help) {
     console.log('test:affected [--base ref] [--head ref] [--component id] [--plan] [--offline] [--parallel] [--reuse /absolute/private/report.json]\n' +
+      'Development: --snapshot /absolute/private/baseline.json; then --since /absolute/private/baseline.json --tier visual|behavior|focused [--file reviewed/path]\n' +
+      'Visual prints inspection scope only; behavior runs mapped unit/build checks. Task/file scope is never publication evidence.\n' +
       'test:full [--plan] [--offline] [--parallel]\nDefault: affected checks, serial. Components: ' + Object.keys(components).join(', '));
     return;
   }
+  if (options.snapshot) {
+    const snapshot = writeSnapshot(options.snapshot, root);
+    console.log(`Task baseline saved (${Object.keys(snapshot.files).length} file identities): ${options.snapshot}`);
+    return { filename: options.snapshot, head: snapshot.head };
+  }
   const plan = makePlan(options);
-  if (options.plan) {
+  if (options.plan || plan.tier === 'visual') {
     console.log(JSON.stringify({ mode: plan.mode, base: plan.baseRef, head: plan.head, components: plan.components, reasons: plan.reasons,
-      parallel: plan.parallel, checks: plan.checks.map(({ id, command, cases }) => ({ id, command, cases })), excluded: plan.excluded }, null, 2));
+      tier: plan.tier, development_only: plan.development_only, files: plan.files, omitted_changed_files: plan.omitted_changed_files,
+      inspection: plan.inspection, parallel: plan.parallel, checks: plan.checks.map(({ id, command, cases }) => ({ id, command, cases })), excluded: plan.excluded }, null, 2));
     return plan;
   }
   console.log(`${plan.mode}: ${plan.checks.length} selected checks; ${plan.components.join(', ')}; ${plan.parallel ? 'parallel requested' : 'serial'}. Use --plan for selection reasons.`);
@@ -353,4 +391,4 @@ async function main(argv = process.argv.slice(2)) {
 }
 
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
-module.exports = { changedFiles, checkIdentity, dependencyInputs, digest, git, inputHashes, main, makePlan, parseArgs, readPrivate, root, runPlan, schedule, validateEvidence };
+module.exports = { changedFiles, checkIdentity, dependencyInputs, digest, git, inputHashes, main, makePlan, parseArgs, readPrivate, root, runPlan, schedule, validateEvidence, validateOptions };

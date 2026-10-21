@@ -428,3 +428,11 @@ test('popup content waits for nested native rendering and rejects an empty mount
     assert.equal(popupHasVisibleContent(host), false);
   } finally { globalThis.getComputedStyle = previous; }
 });
+
+test('384px grid profiles are opt-in and retain Android browser metadata', () => {
+  assert.equal(scenarios.some(scenario => scenario.name.startsWith('android-384')), false);
+  const normal = selectedRuns({scenario: 'android-384', theme: 'light'})[0].scenario;
+  const bold = selectedRuns({scenario: 'android-384-bold', theme: 'light'})[0].scenario;
+  assert.equal(normal.viewport.width, 384); assert.equal(normal.device, 'android');
+  assert.equal(bold.bold, true); assert.equal(bold.viewport.width, 384);
+});

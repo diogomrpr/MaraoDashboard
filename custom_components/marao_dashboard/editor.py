@@ -132,6 +132,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             "domains": ["camera"],
             "description": "Automatic camera preview to live video with a generated Frigate or UniFi Protect events popup.",
             "variables": [
+                _field("popup_stream_entity", "Popup stream", "entity", domains=["camera"]),
                 _field("popup_hash", "Popup hash", "text", advanced=True),
                 _field("event_provider", "Event provider", "text", advanced=True, default="auto"),
                 _field("frigate_camera", "Frigate camera name", "text", advanced=True),

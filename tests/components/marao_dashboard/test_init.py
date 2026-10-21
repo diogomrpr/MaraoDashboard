@@ -6,6 +6,7 @@ import json
 import shutil
 import textwrap
 from unittest.mock import patch
+from unittest.mock import AsyncMock
 
 import pytest
 import yaml
@@ -32,6 +33,9 @@ from custom_components.marao_dashboard import (
     _save_and_generate_dashboard,
     _generate_dashboard,
     frontend_fingerprint,
+    _register_websocket_commands,
+    _publish_frontend,
+    FRONTEND_SUBSCRIBERS,
 )
 from custom_components.marao_dashboard.const import (
     BASE_DASHBOARD_CREATED,
@@ -53,6 +57,43 @@ from custom_components.marao_dashboard.generator import migrate_dashboard_config
 
 def _room_page(config, index=0):
     return [page for page in config["pages"] if page.get("output_path", "").startswith("views/rooms/")][index]
+
+
+async def test_frontend_refresh_signals(hass, hass_ws_client, hass_read_only_access_token):
+    """Ordinary users receive updates, but only successful admin saves emit them."""
+    hass.data.setdefault(DOMAIN, {})
+    _register_websocket_commands(hass)
+    _publish_frontend(hass, {"dashboard": "marao-dashboard", "fingerprint": "first"})
+    viewer = await hass_ws_client(hass, access_token=hass_read_only_access_token)
+    await viewer.send_json({"id": 1, "type": "marao_dashboard/frontend/subscribe"})
+    assert (await viewer.receive_json())["success"]
+    initial = (await viewer.receive_json())["event"]
+    assert initial == {"dashboard": "marao-dashboard", "fingerprint": "first"}
+    await viewer.send_json({"id": 2, "type": "marao_dashboard/config/generate", "config": "{}"})
+    assert not (await viewer.receive_json())["success"]
+    admin = await hass_ws_client(hass)
+    with patch("custom_components.marao_dashboard._registry_entities", return_value=[]), \
+         patch("custom_components.marao_dashboard._editor_areas", return_value=[]), \
+         patch("custom_components.marao_dashboard._save_and_generate_dashboard", return_value={"dashboard_key": "marao-dashboard"}) as save, \
+         patch("custom_components.marao_dashboard._async_refresh_dashboard", new_callable=AsyncMock), \
+         patch("custom_components.marao_dashboard.list_dashboard_history", return_value=[]):
+        requests = []
+        for identifier in (1, 2):
+            await admin.send_json({"id": identifier, "type": "marao_dashboard/config/generate", "config": "{}"})
+            assert (await admin.receive_json())["success"]
+            requests.append((await viewer.receive_json())["event"]["request_id"])
+        assert requests[0] != requests[1]
+        save.side_effect = ValueError("invalid source")
+        await admin.send_json({"id": 3, "type": "marao_dashboard/config/generate", "config": "{}"})
+        assert not (await admin.receive_json())["success"]
+    # Failed save emitted nothing; next event is the lifecycle update, not a save.
+    _publish_frontend(hass, {"dashboard": None, "fingerprint": None})
+    assert (await viewer.receive_json())["event"] == {"dashboard": None, "fingerprint": None}
+    _publish_frontend(hass, {"dashboard": "marao-dashboard", "fingerprint": "second"})
+    assert (await viewer.receive_json())["event"] == {"dashboard": "marao-dashboard", "fingerprint": "second"}
+    await viewer.send_json({"id": 3, "type": "unsubscribe_events", "subscription": 1})
+    assert (await viewer.receive_json())["success"]
+    assert not hass.data[DOMAIN][FRONTEND_SUBSCRIBERS]
 
 
 def _room_entities(config):

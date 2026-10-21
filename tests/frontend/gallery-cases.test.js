@@ -9,9 +9,27 @@ const { concreteCases, expandGallery, expandHelpers, validateCoverage, popupCase
 const helpers = expandHelpers(YAML.parse(fs.readFileSync(new URL('../../ha-test/marao_dashboard_card_test_helpers.yaml', import.meta.url), 'utf8')));
 const view = expandGallery(YAML.parse(fs.readFileSync(new URL('../../ha-test/dashboard/views/00-card-test.yaml', import.meta.url), 'utf8')));
 
+test('camera gallery covers explicit low dashboard, high popup and native HLS fallback',()=>{
+ const native=manifest.cameraLiveCases.find(card=>card.name==='Low dashboard and high popup camera');
+ const adaptive=manifest.cameraLiveCases.find(card=>card.name==='HLS-only live camera');
+ assert.equal(native.entity,'camera.marao_dashboard_test_camera_adaptive_low');
+ assert.equal(native.variables.popup_stream_entity,'camera.marao_dashboard_test_camera_adaptive_high');
+ assert.equal(adaptive.entity,'camera.marao_dashboard_test_camera_adaptive_hls_high');
+ for(const quality of ['High','Medium','Low']) {
+  const realtime=helpers.camera.find(camera=>camera.name==='Marao Dashboard Test Camera Adaptive '+quality);
+  const hls=helpers.camera.find(camera=>camera.name==='Marao Dashboard Test Camera Adaptive HLS '+quality);
+  assert.equal(realtime.adaptive,true);assert.equal(realtime.hls_only,undefined);
+  assert.equal(hls.adaptive,true);assert.equal(hls.hls_only,true);
+ }
+ const security=require('../../ha-test/marao_dashboard_test_dashboard.json').pages.find(page=>page.path==='security');
+ assert.ok(JSON.stringify(security).includes(native.entity));
+});
+
 test('frontend refresh gallery and realistic page describe the safe shared-navbar interaction', () => {
   assert.ok(manifest.frontendRefreshCoverage.includes('stale-service-worker-recovery'));
   assert.ok(manifest.frontendRefreshCoverage.includes('preserved-sign-in-settings-page'));
+  assert.ok(manifest.frontendRefreshCoverage.includes('critical-navbar-before-content'));
+  assert.ok(manifest.frontendRefreshCoverage.includes('android-icon-hold-without-url-preview'));
   const source = require('../../ha-test/marao_dashboard_test_dashboard.json');
   const studio = source.pages.find(page => page.path === 'studio');
   assert.match(JSON.stringify(studio), /Hold a navbar icon for three seconds/);

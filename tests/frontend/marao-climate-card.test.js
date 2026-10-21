@@ -7,7 +7,8 @@ globalThis.HTMLElement = class {
 };
 
 const source = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
-const dashboardSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url), "utf8");
+globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
+const dashboardSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url), "utf8");
 const { ACCESS_HOLD_MS, MaraoCard, callServiceWithNotification, climateDefaultAction, climateModeIcon, climateModeLabel, climateTemperatureChange, haptic, numberStepValue, performAction, serviceConnectionReady, stateAppearance } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
 
 const climateEntity = "climate.test";

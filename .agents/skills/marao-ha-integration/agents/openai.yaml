@@ -1,0 +1,4 @@
+interface:
+  display_name: "Marao HA Integration"
+  short_description: "Scoped Python and Home Assistant backend work"
+  default_prompt: "Use $marao-ha-integration to implement this backend change through its affected callers and focused checks."

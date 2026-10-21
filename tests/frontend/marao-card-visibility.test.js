@@ -14,7 +14,8 @@ globalThis.HTMLElement = class {
 };
 
 const source = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
-const dashboardSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url), "utf8");
+globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
+const dashboardSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url), "utf8");
 const { ACCESS_HOLD_MS, MaraoCard, MaraoPopupCard, callServiceWithNotification, focusRestorer, performAction, registerMaraoCards, binaryState, cardProblem, problemStyle, serviceOutcome, stateAppearance, summaryState, entityGroupState, vacuumActions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#visibility`);
 
 test('rerenders never detach the native surface while replacing content and obsolete attributes', () => {
@@ -1058,6 +1059,76 @@ test("popups inherit native Home Assistant context while blocking and restoring 
     popup._close(false);
     assert.equal(background.inert, false);
     assert.equal(external.inert, true, "preserve an existing inert state");
+  } finally { Object.assign(globalThis, previous); }
+});
+
+test("popup locks dashboard scroll ancestors and restores their exact overflow settings", () => {
+  const previousDocument = globalThis.document;
+  const previousComputedStyle = globalThis.getComputedStyle;
+  const scroller = (value = '', priority = '') => ({
+    scrollHeight: 600, clientHeight: 600, overflowY: 'auto',
+    style: {
+      value, priority,
+      getPropertyValue() { return this.value; },
+      getPropertyPriority() { return this.priority; },
+      setProperty(name, next, importance) { assert.equal(name, 'overflow-y'); this.value = next; this.priority = importance; },
+      removeProperty(name) { assert.equal(name, 'overflow-y'); this.value = ''; this.priority = ''; },
+    },
+  });
+  const page = scroller('auto', 'important');
+  const dashboard = scroller('scroll');
+  const shell = scroller();
+  const layout = scroller(); layout.overflowY = 'visible'; layout.scrollHeight = 1200;
+  shell.parentElement = page;
+  const view = { getRootNode: () => ({ host: dashboard }) };
+  dashboard.getRootNode = () => ({ host: layout });
+  layout.parentElement = shell;
+  const overlay = {};
+  const root = { children: [dashboard, overlay] };
+  globalThis.document = { body: root, scrollingElement: page };
+  globalThis.getComputedStyle = element => ({ overflowY: element.overflowY });
+  try {
+    const popup = new MaraoPopupCard(); popup._viewOwner = { view };
+    popup._setBackgroundInert(overlay, root);
+    for (const element of [page, dashboard, shell]) {
+      assert.equal(element.style.value, 'hidden');
+      assert.equal(element.style.priority, 'important');
+    }
+    assert.equal(view.style, undefined, 'popup content is not part of the background scroll lock');
+    assert.equal(layout.style.value, '', 'visible-overflow layout ancestors must not be clipped or collapse the dashboard');
+    popup._restoreBackground();
+    assert.equal(dashboard.inert, false);
+    assert.deepEqual([page.style.value, page.style.priority], ['auto', 'important']);
+    assert.deepEqual([dashboard.style.value, dashboard.style.priority], ['scroll', '']);
+    assert.deepEqual([shell.style.value, shell.style.priority], ['', '']);
+    assert.equal(popup._backgroundScrollState.length, 0);
+  } finally { globalThis.document = previousDocument; globalThis.getComputedStyle = previousComputedStyle; }
+});
+
+test("popup freezes the document at its current offset and restores exact body styles on close", () => {
+  const previous = { document: globalThis.document, window: globalThis.window };
+  const values = new Map([['position', ['relative', 'important']], ['top', ['3px', '']]]);
+  const body = { children: [], style: {
+    getPropertyValue: property => values.get(property)?.[0] || '',
+    getPropertyPriority: property => values.get(property)?.[1] || '',
+    setProperty: (property, value, priority) => values.set(property, [value, priority]),
+    removeProperty: property => values.delete(property),
+  } };
+  const restored = [];
+  globalThis.document = { body };
+  globalThis.window = { scrollX: 24, scrollY: 380, scrollTo: options => restored.push(options) };
+  try {
+    const popup = new MaraoPopupCard();
+    popup._setBackgroundInert({}, body);
+    assert.deepEqual([...values], [
+      ['position', ['fixed', 'important']], ['top', ['-380px', 'important']],
+      ['left', ['-24px', 'important']], ['width', ['100%', 'important']],
+    ]);
+    popup._restoreBackground();
+    assert.deepEqual([...values], [['position', ['relative', 'important']], ['top', ['3px', '']]]);
+    assert.deepEqual(restored, [{ left: 24, top: 380, behavior: 'instant' }]);
+    popup._restoreBackground();
+    assert.equal(restored.length, 1, 'cleanup must not move the page again');
   } finally { Object.assign(globalThis, previous); }
 });
 

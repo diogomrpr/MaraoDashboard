@@ -1,0 +1,4 @@
+interface:
+  display_name: "Marao Scoped Testing"
+  short_description: "Choose and diagnose focused pytest, Node, and UI checks"
+  default_prompt: "Use $marao-testing to select the smallest covering checks for this change and diagnose any failures without expanding the suite unnecessarily."

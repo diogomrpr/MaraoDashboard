@@ -7,7 +7,7 @@ const read = relative => fs.readFileSync(new URL('../../' + relative, import.met
 const sources = 'custom_components/marao_dashboard/frontend/brand/';
 
 test('the existing iconset exposes the canonical compact mark and functional glyphs', async () => {
-  const module = read('custom_components/marao_dashboard/frontend/MaraoDashboard.js').toString();
+  const module = read('custom_components/marao_dashboard/frontend/MaraoRuntime.js').toString();
   const context = vm.createContext({ window: {} });
   vm.runInContext(module.slice(module.indexOf('const ICONS ='), module.indexOf('const TRANSLATIONS =')), context);
   const icons = context.window.customIconsets;

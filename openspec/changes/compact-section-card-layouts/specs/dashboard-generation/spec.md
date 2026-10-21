@@ -1,9 +1,5 @@
 # Spec Delta
 
-The added requirement names preserve the completed, not yet synchronized
-`standardize-control-grid` generation contract, extending its eligibility to
-logical sections while retaining source and ownership preservation.
-
 ## MODIFIED Requirements
 
 ### Requirement: Room and custom-page card layouts

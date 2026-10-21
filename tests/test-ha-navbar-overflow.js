@@ -48,19 +48,19 @@ async function exercise(page, card, run, detailed) {
     await settle(page);
     if (!count) { assert.equal(await card.isVisible(), false); continue; }
     await geometry(card);
-    assert.equal(await card.locator('.nav a').count(), await card.evaluate(element => element._visibleCount));
+    assert.equal(await card.locator('.nav [data-route]').count(), await card.evaluate(element => element._visibleCount));
   }
   const long = Array.from({length:40}, (_,i)=>({...original.routes[i % original.routes.length],label:'Destination '+(i+1),future:{keep:[]}}));
   const capacity=await card.evaluate(element=>element._slots);
   await card.evaluate((element, config)=>element.setConfig(config),{...original,routes:long.slice(0,capacity)});await settle(page);
   assert.equal(await card.locator('[data-overflow]').count(),0,'Exact-fit routes should not overflow');
-  assert.equal(await card.locator('.nav a').count(),capacity);await geometry(card);
+  assert.equal(await card.locator('.nav [data-route]').count(),capacity);await geometry(card);
   await card.evaluate((element, config)=>element.setConfig(config),{...original,routes:long.slice(0,capacity+1)});await settle(page);
-  assert.equal(await card.locator('.nav a').count(),capacity-1,'More must reserve the last full-size slot');
+  assert.equal(await card.locator('.nav [data-route]').count(),capacity-1,'More must reserve the last full-size slot');
   assert.equal(await card.locator('[data-overflow]').count(),1);
   await card.evaluate((element, config) => element.setConfig(config), {...original,routes:long}); await settle(page);
   await card.locator('[data-overflow]').tap(); await geometry(card,true);
-  assert.deepEqual(await card.locator('a[data-route]').evaluateAll(links=>links.map(link=>Number(link.dataset.route))), long.map((_,i)=>i));
+  assert.deepEqual(await card.locator('[data-route]').evaluateAll(links=>links.map(link=>Number(link.dataset.route))), long.map((_,i)=>i));
   const menu = card.locator('.overflow');
   await menu.evaluate(element=>{window.__maraoMenu=element;window.__maraoMenuScroll=element.scrollTop;});
   await card.evaluate(element=>{element.hass={...element._hass,states:{...element._hass.states}};});
@@ -118,10 +118,11 @@ async function exercise(page, card, run, detailed) {
     assert.ok((await card.locator('[data-overflow]').getAttribute('aria-label')).includes(original.routes.find(route=>route.url==='/marao-dashboard/appliances').label));
     await card.locator('[data-overflow]').tap();
     assert.equal(await card.locator('.overflow a[aria-current=page]').getAttribute('href'),'/marao-dashboard/appliances');
-    assert.equal(await card.locator('.nav a').first().getAttribute('href'),original.routes[0].url);
+    assert.equal(await card.locator('.nav [data-route]').first().getAttribute('data-route'),'0');
+    assert.equal(await card.evaluate(element=>element._config.routes[0].url),original.routes[0].url);
     await page.keyboard.press('Escape');
     await page.goBack();await page.waitForURL('**/marao-dashboard/overview');await page.waitForLoadState('networkidle');
-    await card.locator('.nav a[aria-current=page]').waitFor();
+    await card.locator('.nav [data-route][aria-current=page]').waitFor();
     await page.goForward();await page.waitForURL('**/marao-dashboard/appliances');await page.waitForLoadState('networkidle');await card.locator('[data-overflow].active').waitFor();
     await page.screenshot({path:path.join(output,run+'-active.png'),scale:'css'});
     await page.goto(new URL('/marao-dashboard/overview',page.url()).href);await card.locator('.nav').waitFor();
@@ -195,7 +196,7 @@ async function persistence(config,page) {
 }
 
 async function nativeEditor(page,calls,theme) {
-  const navbar=page.locator('marao-native-navbar-card marao-navbar-card').first();
+  const navbar=page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])').first();
   await navbar.locator('[data-overflow]').tap();await geometry(navbar,true);await page.keyboard.press('Escape');
   await page.locator('.native-edit').click();
   await page.getByRole('button',{name:/Done|Concluído|Concluir/i,exact:true}).waitFor();
@@ -246,7 +247,7 @@ async function main() {
         },await card.evaluate(element=>element._config.routes));
         const preview=page.locator('#bounded-navbar-preview');
         await page.waitForFunction(element=>element._slots===1,await preview.elementHandle());
-        assert.equal(await preview.locator('.nav a').count(),0);assert.equal(await preview.locator('[data-overflow]').isDisabled(),true);
+        assert.equal(await preview.locator('.nav [data-route]').count(),0);assert.equal(await preview.locator('[data-overflow]').isDisabled(),true);
         await preview.evaluate(element=>element._openOverflow());assert.equal(await preview.locator('.overflow').count(),0);
         await preview.evaluate(element=>{element.style.width='280px';});
         await page.waitForFunction(element=>element._slots>=2,await preview.elementHandle());

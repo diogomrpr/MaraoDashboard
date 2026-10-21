@@ -40,18 +40,57 @@ async function run(){
  if(mode==='delayed')assert.equal(initial.poster,true);assert.equal(initial.button,'');await waitState(page,'live');const evidence=await page.evaluate(()=>({time:card._camera.video.currentTime,height:card.getBoundingClientRect().height,muted:card._camera.video.muted,inline:card._camera.video.playsInline,poster:card._camera.poster.hidden,rect:card._camera.stage.getBoundingClientRect().toJSON(),same:card._camera.player===native&&card.shadowRoot.querySelector('ha-card')===surface,count:native.connectedCount}));assert.equal(evidence.muted,true);assert.equal(evidence.inline,true);assert.equal(evidence.poster,true);assert.equal(evidence.same,true);assert.equal(evidence.count,1);assert.equal(evidence.rect.height,initial.rect.height);if(mode==='delayed')assert.equal(evidence.height,initial.height,'automatic handoff must not change card height');
  await page.waitForTimeout(1100);assert.equal(await page.evaluate(()=>card._camera.poster.hidden),true);const next=await page.evaluate(()=>card._camera.video.currentTime);assert.ok(next>evidence.time,'actual media advances');report.push({engine:engine.name(),mode,time:evidence.time,next});
  }
+ assert.equal(await page.evaluate(()=>card._camera.feedback.hidden),true,'Healthy playback has no feedback footer or overlay');
+ assert.equal(await page.locator('marao-card .icon').count(),0,'Camera has no decorative icon');
+ assert.equal(await page.locator('marao-card .state').count(),0,'Camera has no entity activity row');
+ for (const show_name of [false,true]) {
+  const dimensions=await page.evaluate(show_name=>{const player=card._camera.player;card.setConfig({...card._config,show_name,name:'A long optional entrance title that remains readable',show_icon:true,show_state:true,show_label:true});const stage=card._camera.stage.getBoundingClientRect(),surface=card.shadowRoot.querySelector('ha-card').getBoundingClientRect();return{same:player===card._camera.player,title:!!card.shadowRoot.querySelector('.title'),top:stage.top-surface.top,width:stage.width-surface.width,label:card.shadowRoot.querySelector('ha-card').getAttribute('aria-label')};},show_name);
+  assert.equal(dimensions.same,true);assert.equal(dimensions.title,show_name);assert.ok(Math.abs(dimensions.width)<1);assert.ok(dimensions.label.includes('entrance'));
+  if(!show_name)assert.ok(Math.abs(dimensions.top)<1,'Hidden title leaves no header gap');
+ }
  await page.evaluate(()=>{window.previous=card._camera.player;for(let i=0;i<3;i++)card.hass={...card.hass,language:i?'pt':'en',themes:{theme:i},states:{...card.hass.states,'camera.synthetic':{...card.hass.states['camera.synthetic'],attributes:{...card.hass.states['camera.synthetic'].attributes,updated:i}}}};});assert.equal(await page.evaluate(()=>card._camera.player===previous&&previous.connectedCount===1),true);
  await page.evaluate(()=>{card.hass={...card.hass,unrelated:1};});assert.equal(await page.evaluate(()=>card._camera.player.hass===card._camera.nativeHass&&card._camera.nativeHass.states===card.hass.states&&card._camera.nativeHass.unrelated===1&&card._camera.nativeHass.connection===card._camera.signaling),true,'idle shortcut still forwards current hass with camera-owned signaling');
  assert.equal(await page.evaluate(()=>{const camera=card._camera,values=camera.player.contextValues;return values.hassConnection===camera.nativeHass&&values.hassApi===camera.nativeHass&&values.connection===camera.signaling&&values.connection!==card.hass.connection;}),true,'Both current and legacy native contexts must use the owned signaling channel');
+ await page.evaluate(()=>{window.bufferingPlayer=card._camera.player;card._camera.video.pause();});
+ assert.deepEqual(await page.evaluate(()=>({state:card._camera.state,poster:card._camera.poster.hidden,same:card._camera.player===bufferingPlayer})),{state:'buffering',poster:true,same:true});
+ await page.evaluate(()=>card._camera.video.play());await waitState(page,'live');
+ assert.equal(await page.evaluate(()=>card._camera.player===bufferingPlayer),true,'brief buffering retains the native host');
  await page.evaluate(()=>{window.previousVideo=card._camera.video;card._camera.player.replaceTransport(350);});await page.waitForFunction(()=>card._camera?.state==='loading'&&!card._camera.poster.hidden&&card._camera.video!==previousVideo);await page.waitForFunction(()=>card._camera?.state==='live'&&card._camera.video!==previousVideo);assert.equal(await page.evaluate(()=>card._camera.player===previous&&previous.connectedCount===1),true,'transport handoff keeps the same native host');
  await page.evaluate(()=>{window.originalHidden=Object.getOwnPropertyDescriptor(document,'hidden');Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));});await page.waitForFunction(()=>!card._camera.player);await page.evaluate(()=>{if(originalHidden)Object.defineProperty(document,'hidden',originalHidden);else delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));});await waitState(page,'live');
  // Release/remount follows the same poster-to-live path and keeps duplicates independent.
  await page.evaluate(()=>{window.duplicate=makeCamera();card.hidden=true;});await page.waitForFunction(()=>!card._camera.player);await page.waitForFunction(()=>duplicate._camera?.state==='live');await page.evaluate(()=>{card.hidden=false;});await waitState(page,'live');await page.evaluate(()=>duplicate.remove());assert.equal(await page.evaluate(()=>card._camera.state), 'live');
  await page.evaluate(()=>{card.hass={...card.hass,states:{'camera.synthetic':{...card.hass.states['camera.synthetic'],state:'unavailable'}}};});await page.waitForFunction(()=>!card._camera.player);assert.equal(await page.evaluate(()=>card._camera.poster.hasAttribute('src')),false);
+ assert.equal(await page.evaluate(()=>card._camera.stage.contains(card._camera.feedback)&&!card._camera.feedback.hidden&&Boolean(card._camera.feedback.textContent.trim())),true,'Unavailable feedback stays visible inside media');
+ assert.equal(await page.locator('marao-card .body .problem').count(),0,'Camera does not duplicate its in-media problem in the header');
  await setup(page,base,'blocked');await waitState(page,'blocked');await page.evaluate(()=>{window.firstBlocked=card._camera.player;card.hidden=true;});await page.waitForFunction(()=>!card._camera.player);await page.evaluate(()=>{card.hidden=false;});await waitState(page,'blocked');assert.equal(await page.evaluate(()=>card._camera.player!==firstBlocked),true,'blocked autoplay can restart after visibility disposal');const start=page.locator('marao-card .camera-feedback button');assert.match(await start.textContent(),/Start live view/);const native=await page.evaluate(()=>{window.blockedPlayer=card._camera.player;return true});await start.click();await waitState(page,'live');assert.equal(await page.evaluate(()=>card._camera.player===blockedPlayer),native);assert.equal(new URL(page.url()).hash,'');
  const touchPage=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  try{touchPage.on('pageerror',error=>errors.push(error.message));await setup(touchPage,base,'blocked');await waitState(touchPage,'blocked');const recovery=touchPage.locator('marao-card .camera-feedback button');await recovery.evaluate(button=>button.addEventListener('pointerdown',()=>{card._camera.state='live';card._camera.describe();},{once:true}));await recovery.tap();assert.equal(new URL(touchPage.url()).hash,'','Recovery disappearing during touch must never open the event popup');}finally{await touchPage.close();}
- for(const mode of ['unsupported','failed']){await setup(page,base,mode);await waitState(page,mode==='failed'?'error':'snapshot');if(mode==='unsupported')assert.equal(await page.evaluate(()=>card._camera.player),null,'still-only cameras never initialize native image/MJPEG sessions');assert.equal(await page.evaluate(()=>card._camera.poster.hidden),false);assert.equal(await page.evaluate(()=>card._camera.feedback.textContent.includes('Snapshot')),true);if(mode==='failed'){await page.evaluate(()=>{card.hass.states['camera.synthetic'].attributes.fixture_mode='normal';});await page.locator('marao-card .camera-feedback button').click();await waitState(page,'live');}}
+ await setup(page,base,'normal');await waitState(page,'live');
+ await page.evaluate(()=>{card._camera.video.pause();card._camera.state='blocked';card._camera.reason='blocked';card._camera.describe();});
+ const releaseTarget=await page.locator('marao-card .camera-feedback button').boundingBox();
+ await page.mouse.move(releaseTarget.x+releaseTarget.width/2,releaseTarget.y+releaseTarget.height/2);await page.mouse.down();
+ await page.evaluate(()=>card._camera.video.play());await waitState(page,'live');
+ await page.mouse.move(1,1);await page.mouse.up();
+ await page.waitForFunction(()=>!card._camera.feedbackPressed&&card._camera.feedback.hidden);
+ assert.equal(new URL(page.url()).hash,'','Releasing outside a disappearing recovery control leaves no invisible action blocker');
+
+ for(const mode of ['unsupported','failed','silent-fallback']){
+ await setup(page,base,mode);await waitState(page,mode==='unsupported'?'snapshot':'error');
+ assert.equal(await page.evaluate(()=>card._camera.player),null,'Still-only cameras and failed attempts release native sessions');
+ assert.equal(await page.evaluate(()=>card._camera.poster.hidden),false);
+ assert.equal(await page.evaluate(()=>card._camera.feedback.textContent.includes('Snapshot')),true);
+ if(mode!=='unsupported'){
+ await page.evaluate(()=>{card.hass={...card.hass,unrelated:1};});assert.equal(await page.evaluate(()=>card._camera.state),'error','Metadata updates cannot restart a failed stream');
+ await page.evaluate(()=>{card.hass.states['camera.synthetic'].attributes.fixture_mode='normal';});
+ await page.locator('marao-card .camera-feedback button').click();await waitState(page,'live');
+ assert.equal(new URL(page.url()).hash,'','Retry must not invoke the camera event action');
+ }
+ }
+ // Native HA can fall back to an image after previously successful playback.
+ await page.evaluate(()=>{const host=card._camera.player;for(const transport of host.shadowRoot.querySelectorAll('*'))for(const video of transport.shadowRoot?.querySelectorAll('video')||[]){video.pause();video.removeAttribute('src');video.load();}host.shadowRoot.innerHTML='<img src="/ha-test/custom_components/marao_test_camera/event.svg">';});
+ await waitState(page,'error');assert.equal(await page.evaluate(()=>card._camera.reason),'failed');
+ await page.locator('marao-card .camera-feedback button').click();await waitState(page,'live');
+ report.push({engine:engine.name(),recovery:'silent native image fallback before and after live playback'});
  await page.locator('marao-card [data-card-action]').click();assert.equal(new URL(page.url()).hash,'#events');
  await setup(page,base,'normal',true);await page.waitForTimeout(150);assert.equal(await page.evaluate(()=>Boolean(card._camera)),false);assert.equal(await page.locator('ha-camera-stream').count(),0);
  const profiles=[['normal',390,844,1,400,1],['narrow',320,700,1,400,1],['android',360,800,1,400,1],['iphone-landscape',844,390,1,400,1],['android-landscape',800,360,1,400,1],['bold',390,844,1,800,1],['text-200',390,844,2,400,1],['zoom-200',195,422,1,400,2],['bold-text-200',390,844,2,800,1]];

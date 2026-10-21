@@ -55,13 +55,7 @@ SHALL tolerate HA rendering replacing the original invoking element.
 - **THEN** focus returns to the current matching opener and the background is usable again
 
 ### Requirement: Scroll containment and close clearance
-Sheets SHALL scroll internally without background scrolling. Content clearance
-SHALL keep the close control unobstructed at enlarged text/zoom and short heights.
-Scroll containment SHALL recognize native Marao sheets and preserve value-slider
-touch defaults instead of cancelling the slider's touch movement.
-Native Marao sheets SHALL leave touch movement to the browser, including initial
-zero-vertical movement and boundary reversals, and contain overscroll through CSS.
-The backdrop SHALL remain guarded without cancelling touches inside the sheet.
+Sheets SHALL scroll internally without background scrolling and keep the close control unobstructed at enlarged text/zoom and short heights. Containment SHALL recognize native Marao sheets, preserve value-slider touch defaults and leave native sheet movement to the browser, including initial zero-vertical movement and boundary reversals. CSS SHALL contain native-sheet overscroll. The backdrop SHALL remain guarded without cancelling touches inside the sheet.
 
 #### Scenario: A fixed-height popup is scrolled at 200% zoom
 - **WHEN** the last cards reach the visible area
@@ -70,6 +64,7 @@ The backdrop SHALL remain guarded without cancelling touches inside the sheet.
 #### Scenario: A value slider is dragged inside a scrolling sheet
 - **WHEN** the gesture targets the native range
 - **THEN** popup containment does not prevent horizontal value changes
+- **AND** the browser retains native touch handling for initial zero-vertical movement and boundary reversals
 
 ### Requirement: Safe-area bounds for popup controls
 Marao sheets SHALL keep their title, close control and content within the current iPhone top and side safe boundaries, including tall sheets and landscape layouts. The overlay backdrop SHALL still cover the viewport. Existing internal scrolling, modal focus behavior, centered/column-width presentation and navbar clearance SHALL be preserved.

@@ -11,6 +11,11 @@ This guide explains the binding rules in the repository's root
 `AGENTS.md`. The root contract wins if wording here ever diverges. These
 requirements apply to both new and existing Marao behavior.
 
+Read sections relevant to the affected path rather than this entire guide for
+every task. All applicable requirements still bind. The
+[Codex workflow](https://github.com/diogomrpr/MaraoDashboard/blob/main/openspec/README.md#codex-workflow-and-project-skills)
+routes small repairs, substantial changes and project skills.
+
 ## Product boundary
 
 Marao Dashboard is a complete, mobile Home Assistant dashboard product. It
@@ -72,8 +77,8 @@ duplicates.
 
 1. Read the applicable repository instructions and the affected implementation,
    generator, template, documentation, and tests.
-2. Inspect the current affected card or flow on the disposable dashboard when
-   visual behavior matters.
+2. Establish only the visual baseline needed to understand the affected card or
+   flow; an already observed defect does not require a duplicate browser visit.
 3. Identify the shared root of the behavior, its generated consumers, and the
    safest gallery entity for interaction.
 4. Record the affected-card set: direct cards plus every consumer of a changed
@@ -81,6 +86,10 @@ duplicates.
    the change cannot affect card rendering.
 5. Group related queued tasks into one coherent implementation batch and combine
    their affected-card sets.
+6. Capture a private task snapshot before editing, including pre-existing dirty
+   content. Select subsequent changes with `--since`; review concurrent file/hunk
+   ownership and disclose any reviewed `--file` exclusions. A starting commit alone
+   does not distinguish unrelated unfinished work from this task.
 
 Do not require a full device matrix or a formal defect ledger for a small
 iteration. Establish only the baseline needed to understand the affected
@@ -117,67 +126,60 @@ See [focused testing](focused-testing.md) for command and evidence contracts.
 
 ### During iteration
 
-1. Make the smallest root-cause change.
-2. Update every relevant layer so the builder and generated result cannot drift.
-3. After the batch's last edit, run the smallest focused syntax, unit, static, or
-   card check that covers the combined change. Check data migrations and shared
-   security controls early when later work depends on them.
-4. For UI work, sync to `192.168.0.28`, refresh the affected route with the
-   required cache busting, and visually and interactively inspect the affected
-   card at the relevant mobile viewport.
-5. Check Home Assistant warning/error cards, the browser console, failed
-   resources, and repeated requests.
-6. Fix every observed warning or error at its source. Do not suppress,
-   hide, relabel, or ignore it.
+The repository contract's **Verification policy: minimal by default** takes
+precedence over detailed coverage lists in this guide. Make the smallest shared
+root change and keep the affected builder, generator and runtime aligned.
+Use the smallest check that demonstrates the requested result. Visual-only edits
+need code review and a short manual watch list; browser inspection is optional.
+For nontrivial logic, prefer one existing targeted test or assertion. A camera
+stream playing is enough for ordinary playback acceptance.
 
-Prefer a browser or dashboard/resource reload for frontend changes. Batch
-restart-bound changes and restart the disposable instance only when a reload
-cannot apply them.
+The user handles routine visual and real-device testing. Do not automatically
+create browser scripts, fixtures, screenshots, timing studies or layout/theme/text
+matrices. Expand only for an explicit request, a reported/observed defect, or a
+concrete security, data-loss, migration or recovery risk. Name that reason and
+check only the affected path.
 
-### Final affected-card visual gate
+### Development inspection and stopping condition
 
-After the batch's last edit and focused automated check, immediately before reporting
-completion, inspect changed shared components and representative affected card
-families on the disposable Home Assistant dashboard, including difficult text/zoom
-layouts. Do not manually review every equivalent card or scrolling capture. This
-inspection is the final validation action and must
-verify:
+If an agent browser check is needed, use `ha:preview -- --component <ids> --watch`
+on disposable HA `192.168.0.28`. Use one representative existing case, current
+assets and the requested interaction. Extra layouts or themes need a concrete
+reason. Do not repeat a working check for reassurance.
 
-- horizontal and vertical alignment and intended centering of every visible
-  text block, icon, button, slider, value, image, and other element;
-- consistent internal spacing and alignment between sibling cards;
-- no clipping, overlap, unintended gap, overflow, or off-center control;
-- correct light/dark and active/inactive presentation where the change affects
-  those states;
-- no warning card, console exception, failed resource, or repeated request.
-
-If the inspection finds a defect, return to implementation, run the smallest
-focused check for the correction, then repeat this final visual gate. Earlier
-screenshots or an inspection made before the last edit do not satisfy it.
-
-Use impact-based scope during normal work: inspect only the affected-card set.
-Inspect the complete gallery manually only when the user explicitly requests it.
-Selected automated layout checks cover the affected gallery families.
+Stop when the requested behavior works, essential checks pass and all applicable
+final changes are installed on disposable HA `192.168.0.28`. Installation is
+mandatory even when the user handles visual testing. Batch edits and use one final
+sync through the [fastest compatible path](local-development.md#install-before-handing-off),
+without a mandatory extra browser visit. If installation fails, say not installed
+and not ready for test; do not claim done. Instruction-only edits need no sync.
+If the user takes over testing, finish installation and cleanup, then hand off. Leave
+successful assets installed; restore temporary safe helpers and recover failed
+operations. Report observed failures honestly and fix relevant defects at their
+source; never suppress them or claim unchecked behavior passed.
 
 ### Test timing
 
-Batch related implementation before the covering focused check. Default to
-`npm run test:affected`, using the recorded starting commit and shared-component
-scope when needed. Run serially; parallel execution and `test:full` require explicit
-requests. No normal hook, automatic CI, stabilization or release implicitly runs
-the full suite or complete mobile matrix. Select relevant layouts and interactions,
-prepare once and save failures/representative successes. Repair focused failures
-before validating the final scoped candidate. See [focused testing](focused-testing.md).
+For deliberately selected automated coverage, batch related implementation and
+select `test:affected -- --since <snapshot> --tier <visual|behavior|focused>` with
+reviewed shared-component scope. Existing
+invocations without a tier retain focused coverage. Run selected checks serially;
+parallel execution and `test:full` require explicit requests. Broad regression
+belongs in the explicitly requested pre-release campaign, not ordinary development.
+No normal hook or automatic CI starts the full suite or complete mobile matrix.
+See [focused testing](focused-testing.md) for commands and tier boundaries.
 
 Run the scoped `npm run verify:publish` before pushes/tags/releases, with applicable
 exact-commit CI and conditional upgrade proof. Known relevant defects and selected
 failures still block publication. Reuse validated unchanged results instead of
-repeating browser work between the push, tag and release.
+repeating browser work between the push, tag and release. Publication evaluates
+the whole candidate; task snapshots, reviewed file subsets and visual/behavior
+reports cannot narrow or satisfy that proof.
 
 ### Reporting
 
-For routine work, report the user-visible result, focused check, and whether it
-was deployed locally. Use a detailed device/test/restart/limitation report only
+For routine work, report the user-visible result, the checks actually performed,
+whether it was deployed locally, and a short feature-specific manual watch list. Use a detailed device/test/restart/limitation report only
 for release work, final stabilization, or a material security/safety change.
 
 ## Mobile information hierarchy
@@ -251,7 +253,9 @@ The supported accessibility simulations are:
 - 200% browser zoom;
 - stronger/bold plus 200% text size.
 
-Test those configurations explicitly and separately as listed. OS Bold Text
+Focused/publication coverage tests its selected configurations explicitly and
+separately. Presentation-only development inspects the relevant layout instead
+of replaying this matrix. OS Bold Text
 does not have a reliable general web signal; the layout must tolerate its font
 metrics rather than trying to detect it. VoiceOver, TalkBack, and OS
 high-contrast modes are outside the current acceptance target.
@@ -262,7 +266,7 @@ insets, and an explicit Marao light or dark mode. It also scales the shared
 Marao typography tokens because Chromium does not resize every explicit CSS
 length from its OS-scale setting alone. Repeated scrolling retains one emulation
 session per page, and typography is reapplied after deferred cards mount. Font,
-touch and layout assertions remain mandatory. Treat it as a repeatable first-order
+touch and layout assertions remain mandatory in selected automated checks. Treat it as a repeatable first-order
 phone simulation and the automated release gate. Native iOS or Android Home
 Assistant app inspection is recommended when a device is available, but it is
 not required and must never be claimed unless it was actually performed. Its
@@ -535,6 +539,7 @@ large and readable.
 - Center the matching vertical icon menu above More, bound it to the safe viewport
   and scroll it internally. Preserve configured order and active-route feedback.
 - Active icon backgrounds remain circular.
+- Pressing navbar controls or their icons must not add a rectangular browser highlight; retain the circular active fill and short press feedback.
 - Keep button gaps compact without violating the visible 48-by-48 control rule.
 - Derive iPhone positioning from the shared host-aware bottom inset and preserve
   the accepted lowered offset. Do not add a generic extra bottom margin.
@@ -568,8 +573,13 @@ large and readable.
 ### Cameras, graphs, and media
 
 - Camera cards use Home Assistant feeds and Marao-owned Frigate/UniFi Protect
-  event presentation. Activating a camera card opens its event popup. Do not
+  event presentation. Activating a camera card opens live popup video above events.
+  Dashboard and popup streams use their explicit selected camera entities through
+  native HA playback. Tapping popup video opens that same video full screen. Do not
   autoplay audio. Show unavailable feeds and provider failures explicitly.
+  Healthy camera cards show only full-width video and an optional slim title
+  above it. Hidden titles leave no row. Loading, snapshot, buffering and recovery
+  feedback stays within the media area; no permanent icon/state/quality footer.
 - Graph cards use Marao's shared, project-owned 24-hour background trace. It
   requests Home Assistant recorder history once for the displayed graph entity,
   appends the authoritative live numeric state, and does not nest a native
@@ -649,13 +659,16 @@ A change is done when:
 - reusable behavior is fixed in its shared implementation;
 - builder, generator, runtime, theme, translations, documentation, tests, and
   gallery remain aligned where applicable;
-- the focused check passes;
-- UI work is inspected on the disposable Home Assistant and observed warnings
+- minimal verification matches the requested outcome; deeper selected checks cover
+  concrete risks rather than hypothetical cases;
+- any agent UI inspection uses disposable Home Assistant; observed relevant warnings
   are fixed at the root;
 - no essential content clips under the relevant mobile/text configuration;
 - state and safety gestures are correct for affected actions, with one dispatch
   per completed interaction;
-- the affected gate passes, with comprehensive coverage only when explicitly requested;
+- visual checks may be handed to the user with a short watch list; nontrivial logic
+  has the smallest useful check, without an automatic browser or profile matrix;
+- publication uses its independent affected gate, with comprehensive coverage only when explicitly requested;
 - no known relevant violation of this contract remains at publish time, even
   when the automated gate cannot detect it;
 - routine results are reported concisely and any known limitation is stated.
@@ -681,7 +694,12 @@ Redundant normal On/Off rows remain absent; useful values and mandatory problems
 Each owned logical section uses `custom:marao-control-grid`: all content rows
 share their tallest intrinsic height, with an 8px gap. Automatic domain groups
 retain their order, widths and group starts inside that same height boundary.
-Explicit sections size independently. Preferred columns reflow together before
+Explicit sections size independently. Two-column sections fit normal/bold
+320px, 360px and 384px phone viewports, including host margins, and
+282px/322px/346px embedded sections. A shared 136px floor and
+7.5-times-primary-font policy governs capacity, requiring 280px of usable width
+for two columns at the normal 18px primary text size. This does not cap content
+height. Preferred columns reflow together before
 controls become cramped; incomplete rows keep their normal width. All Marao
 content families fill their cells, including native primary hosts and detailed
 history/event surfaces. Headings use intrinsic structural rows; navbar and popup
@@ -689,7 +707,7 @@ definitions remain outside content sizing. Raw configurations keep their factory
 and internals; raw siblings do not disable owned surface equality. Independently
 authored Home Assistant containers keep their native ownership.
 
-Reviewed theme-independent geometry/behavior runs in light; representative
+In focused/publication coverage, reviewed theme-independent geometry/behavior runs in light; representative
 appearance, state cues and contrast remain covered in both themes. Theme-sensitive
 contracts keep their additional combinations. Share compatible visits, preserve
 distinct native gestures and text-versus-zoom cases, and validate explicit reuse

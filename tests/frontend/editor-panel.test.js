@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
 import * as model from "../../frontend_src/editor-model.js";
+import * as nativeModel from "../../frontend_src/native-model.js";
 import { PT_LABELS, MOVE_PT_LABELS } from "../../frontend_src/editor-labels.js";
 import { prepareJson } from '../../frontend_src/json-preparation.js';
 
@@ -11,6 +12,8 @@ let Panel;
 let confirmations;
 const context = vm.createContext({
   ...model,
+  cameraTitleFields: nativeModel.cameraTitleFields, formData: nativeModel.formData,
+  patchForm: nativeModel.patchForm, sameFormValue: nativeModel.same,
   performance, URL, AbortController,
   document: { hidden: false },
   requestAnimationFrame: callback => callback(),
@@ -840,4 +843,36 @@ test('failed form fitting remains required, later value changes fit afresh, and 
   } finally {
     context.document.createElement = oldCreate; context.customElements.whenDefined = oldDefined;
   }
+});
+
+test('builder camera title controls share defaults and preserve retired options and untouched values', () => {
+  const edit = existing => {
+    const p = panel(canonical()), forms = [], handlers = {};
+    p._model.pages[0].sections[0].entities = [structuredClone(existing)];
+    p._entities = [{entity_id:'camera.test',domain:'camera'}];
+    p._catalog = {cards:[{id:existing.template,domains:['camera'],label:'Camera',variables:[{key:'provider',kind:'text',label:'Provider'}]}]};
+    const nodes = new Map();
+    const content = {querySelector(key){if(!nodes.has(key))nodes.set(key,{addEventListener(type,callback){handlers[key+type]=callback;}});return nodes.get(key);}};
+    p._dialog = () => ({querySelector:()=>content});p._availablePages=()=>[];
+    p._mountForm=(host,data,schema,changed)=>forms.push({data,schema,changed});
+    p._renderSummary=()=>{};p._refreshEnergyFields=()=>{};p._closeDialog=()=>{};p._refreshCards=()=>{};
+    p._setDirty=()=>{p.changed=true;};
+    p._openCardEditor('0:0',0,null,'page');
+    return {p,form:forms[0],save:()=>handlers['[data-save]click'](),close:()=>handlers['[data-close]click'](),value:()=>JSON.parse(JSON.stringify(p._model.pages[0].sections[0].entities[0]))};
+  };
+  const original={id:'first',entity_id:'camera.test',template:'hc_camera_card',name:'',name_key:'camera.saved',icon:'',show_icon:true,show_state:false,show_label:true,variables:{provider:'',unknown:[]},tap_action:{action:'navigate',navigation_path:'#events'},future:{keep:true}};
+  for(const visible of [undefined,false,true]) {
+    const saved={...original,...(visible===undefined?{}:{show_name:visible})}, opened=edit(saved);
+    assert.deepEqual(JSON.parse(JSON.stringify(opened.form.schema.map(f=>f.name))),['entity_id','name','show_name','var__provider']);
+    assert.equal(opened.form.data.show_name,visible!==false);assert.equal(opened.p.changed,undefined);
+    opened.close();assert.deepEqual(opened.value(),saved,'Closing must not write defaults');
+    opened.form.changed({...opened.form.data,entity_id:'camera.other'});opened.save();
+    assert.deepEqual(opened.value(),{...saved,entity_id:'camera.other',__simple:false},'Unrelated edits retain empty names/icons, visibility omission, options and actions');
+    const hidden=edit(saved);hidden.form.changed({...hidden.form.data,name:'Saved entrance',show_name:false});hidden.save();
+    const expected={...saved,name:'Saved entrance',show_name:false,__simple:false};delete expected.name_key;
+    assert.deepEqual(hidden.value(),expected);
+  }
+  const light=edit({...original,template:'hc_light_card'});
+  assert.deepEqual(JSON.parse(JSON.stringify(light.form.schema.map(f=>f.name))),['entity_id','name','icon','var__provider']);
+  assert.equal(PT_LABELS['Show title'],'Mostrar título');
 });

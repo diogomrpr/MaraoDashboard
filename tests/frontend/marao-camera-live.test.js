@@ -50,6 +50,18 @@ test('removal during authentication closes the late socket before it can send an
   assert.equal(closes,1); assert.equal(f.connections.length,0); assert.equal(f.signaling.sessions.size,0);
 });
 
+test('a native offer arriving after disposal is inert while invalid offers still reject', async () => {
+  const f = signalingFixture();
+  f.signaling.close();
+  const unsubscribe = await f.signaling.subscribeMessage(() => assert.fail('Retired offer emitted an event'), f.offer);
+  unsubscribe(); unsubscribe();
+  assert.equal(f.sockets.length, 0);
+  assert.equal(f.connections.length, 0);
+  assert.equal(f.signaling.sessions.size, 0);
+  await assert.rejects(f.signaling.subscribeMessage(() => {}, {...f.offer, entity_id: 'camera.other'}), /compatibility/);
+  await assert.rejects(f.signaling.subscribeMessage(() => {}, {...f.offer, type: 'subscribe_entities'}), /compatibility/);
+});
+
 test('unexpected native connection loss remains a visible failure and cannot reconnect a retired offer', async () => {
   const f=signalingFixture(); await f.signaling.subscribeMessage(()=>{},f.offer);
   f.connections[0].handlers.disconnected(); f.connections[0].handlers.disconnected();
@@ -151,6 +163,7 @@ function nativeProgressFixture(polls) {
     _camera: { hass, nativeHass:hass, signaling:hass.connection, state: 'live', generation: 3, video, player, picture: 'safe-poster', poster: { hidden: true, getAttribute: () => 'safe-poster' }, stage: { querySelectorAll: () => [player] } } };
   const disposed = { probe: false, result: false };
   const page = {
+    async evaluate(callback, argument) { return callback(argument); },
     async evaluateHandle(create, target) { assert.equal(target, card); return { ...create(target), async dispose() { disposed.probe = true; } }; },
     async waitForFunction(predicate, argument, options) {
       assert.equal(argument.card, card); assert.equal(options.timeout, 5000, 'One fixed overall playback budget'); assert.equal(options.polling, 50);
@@ -333,6 +346,22 @@ test('stopping invalidates async work and releases this host without touching du
   Object.assign(playback,{generation:1,state:'live',mediaObserver:{disconnect(){calls.push('observer');}},player:{remove(){calls.push('remove');}},video:{removeEventListener(type){calls.push(type);}},mediaHandlers:{playing(){},timeupdate(){}},attempt:true});
   playback.stop();assert.equal(playback.generation,2);assert.equal(playback.player,null);assert.equal(playback.video,null);assert.equal(playback.attempt,false);assert.deepEqual(calls,['observer','playing','timeupdate','remove']);
 });
+test('repeated idle cleanup preserves the completed release generation and cancels each later attempt once', () => {
+  const playback = Object.create(CameraPlayback.prototype);
+  let removed = 0, closed = 0;
+  Object.assign(playback, { generation: 7, state: 'live', attempt: true,
+    player: { remove() { removed++; } }, signaling: { close() { closed++; } } });
+  playback.stop();
+  const released = playback.generation;
+  playback.stop(); playback.stop();
+  assert.equal(playback.generation, released, 'Repeated ineligible notifications must retain the exact completed release');
+  assert.equal(removed, 1); assert.equal(closed, 1);
+  playback.attempt = true; // A later registration is pending before its host exists.
+  playback.stop();
+  assert.equal(playback.generation, released + 1, 'A new pending attempt must still be invalidated');
+  playback.stop();
+  assert.equal(playback.generation, released + 1);
+});
 test('camera implementation delegates transport and makes no direct device/service request', () => {
   assert.doesNotMatch(source,/callService|fetch\(|rtsp:|camera\.turn_on|camera\.play_stream/);
   assert.match(source,/player\.hass = this\.nativeHass/);
@@ -375,6 +404,31 @@ test('only HA-advertised streaming cameras initialize a native player', async ()
   for (const supported_features of [2, 3]) assert.equal(cameraSupportsStream({ attributes: { supported_features } }), true);
 });
 
+test('native image fallback remains recoverable even when the player supplies no alert', () => {
+  for (const nativeError of ['', 'Synthetic codec rejection']) {
+    const playback = Object.create(CameraPlayback.prototype), problems = [];
+    let removed = 0;
+    const player = {
+      querySelectorAll: () => [],
+      querySelector: selector => selector === 'img' ? {} : selector === 'ha-alert' && nativeError ? { textContent: nativeError } : null,
+      remove() { removed++; },
+    };
+    Object.assign(playback, {
+      generation: 1, state: 'loading', attempt: true, player, picture: 'synthetic-still', posterFailed: false, poster: { hidden: false },
+      mediaObserver: { observe() {}, disconnect() {} }, message: key => key, problem: value => problems.push(value), describe() {},
+    });
+    playback.bind(1);
+    assert.equal(playback.state, 'error', 'A failed stream must retain explicit Retry rather than latch a snapshot-only state');
+    assert.equal(playback.reason, 'failed');
+    assert.equal(playback.nativeError, nativeError);
+    assert.equal(problems.at(-1), ['failed', nativeError].filter(Boolean).join(' · '));
+    assert.equal(playback.poster.hidden, false);
+    assert.equal(playback.player, null);
+    assert.equal(playback.attempt, false);
+    assert.equal(removed, 1, 'The failed native host must be released once');
+  }
+});
+
 test('native transports leave still ownership to Marao before video creation and after metadata updates', () => {
   const changes = [];
   class NativeTransport {
@@ -404,4 +458,87 @@ test('incompatible native public poster inputs fail compatibility without observ
       mediaObserver: { observe() {} }, fail: reason => failures.push(reason) });
     assert.doesNotThrow(() => playback.bind(1)); assert.deepEqual(failures, ['compatibility']);
   }
+});
+
+test('startup and Retry honor the configured camera exactly, without registry discovery or adaptation', async () => {
+  const previous={document:globalThis.document,customElements:globalThis.customElements,MutationObserver:globalThis.MutationObserver};
+  const players=[],calls=[];
+  const hass={states:{'camera.high':{state:'recording',attributes:{supported_features:2}}},callWS:async message=>{calls.push(message);return {frontend_stream_types:['web_rtc','hls']};}};
+  globalThis.document={createElement:tag=>({localName:tag,setAttribute(){},remove(){}})};
+  globalThis.customElements={get:()=>true};
+  globalThis.MutationObserver=class {observe(){} disconnect(){}};
+  const playback=Object.assign(Object.create(CameraPlayback.prototype),{entity:'camera.high',hass,generation:0,
+    stage:{prepend:player=>players.push(player),addEventListener(){},removeEventListener(){}},eligible:()=>true,
+    problem(){},describe(){},bind(){},fail:reason=>assert.fail(reason)});
+  try {
+    await playback.start();
+    assert.equal(playback.streamEntity,'camera.high');assert.equal(playback.player.localName,'ha-camera-stream');
+    assert.deepEqual(calls,[],'No extra discovery or speed test before native startup');
+    await playback.nativeHass.callWS({type:'camera/capabilities',entity_id:'camera.high'});
+    assert.deepEqual(calls,[{type:'camera/capabilities',entity_id:'camera.high'}]);
+    playback.stop();playback.resetStream();await playback.start();
+    assert.equal(playback.streamEntity,'camera.high');assert.equal(players.length,2);
+  } finally {playback.stop();Object.assign(globalThis,previous);}
+});
+
+test('fullscreen reuses the playing video and restores controls and listeners after exit', async () => {
+  const previous=globalThis.document,events=new Map(),videoEvents=new Map();let requests=0,failures=[];
+  const root={fullscreenElement:null};
+  globalThis.document={addEventListener:(k,f)=>events.set(k,f),removeEventListener:k=>events.delete(k),exitFullscreen:async()=>{root.fullscreenElement=null;}};
+  const video={videoWidth:640,controls:false,style:{objectFit:"cover",pointerEvents:"none"},getRootNode:()=>root,addEventListener:(k,f)=>videoEvents.set(k,f),removeEventListener:k=>videoEvents.delete(k),requestFullscreen:async()=>{requests++;root.fullscreenElement=video;}};
+  const p=Object.assign(Object.create(CameraPlayback.prototype),{video,player:{controls:false,aspectRatio:16/9,fitMode:'cover'},stage:{open:true,setAttribute(){},removeAttribute(){},removeEventListener(){},matches:()=>false},eligible:()=>true,describe(){failures.push(this.fullscreenError);},message:k=>k});
+  try {
+    await p.fullscreen();assert.equal(requests,1);assert.equal(p.video,video);assert.equal(video.controls,true);assert.equal(p.player.fitMode,'contain');assert.equal(p.player.aspectRatio,undefined);assert.equal(video.style.pointerEvents,"auto");assert.equal(video.style.objectFit,"contain");
+    root.fullscreenElement=null;events.get('fullscreenchange')();
+    assert.equal(video.controls,false);assert.deepEqual(p.player,{controls:false,aspectRatio:16/9,fitMode:'cover'});assert.equal(video.style.pointerEvents,"none");assert.equal(video.style.objectFit,"cover");assert.equal(events.size,0);assert.equal(videoEvents.size,0);
+    video.requestFullscreen=undefined;video.webkitEnterFullscreen=()=>{requests++;};
+    await p.fullscreen();assert.equal(requests,2);videoEvents.get('webkitendfullscreen')();assert.equal(video.controls,false);
+    video.webkitEnterFullscreen=undefined;await p.fullscreen();assert.equal(failures.at(-1),'fullscreen_failed');assert.equal(video.controls,false);
+    video.videoWidth=0;await p.fullscreen();assert.equal(failures.at(-1),'fullscreen_wait');
+  } finally {globalThis.document=previous;}
+});
+
+test('fullscreen completion after owner cleanup cannot restore retired UI or overwrite a newer error', async () => {
+  const previous=globalThis.document;let finish,descriptions=0;
+  globalThis.document={addEventListener(){},removeEventListener(){}};
+  const video={videoWidth:640,controls:false,getRootNode:()=>({}),addEventListener(){},removeEventListener(){},requestFullscreen:()=>new Promise(resolve=>{finish=resolve;})};
+  const p=Object.assign(Object.create(CameraPlayback.prototype),{video,stage:{open:true,setAttribute(){},removeAttribute(){},removeEventListener(){},matches:()=>false},eligible:()=>true,describe(){descriptions++;},message:k=>k});
+  try {
+    const pending=p.fullscreen();p.fullscreenCleanup();p.fullscreenError='new problem';finish();await pending;
+    assert.equal(p.fullscreenError,'new problem');assert.equal(video.controls,false);assert.equal(p.fullscreenCleanup,null);assert.equal(descriptions,0);
+  } finally {globalThis.document=previous;}
+});
+
+test('brief buffering keeps the same video visible and recovers on clock progress without native events', () => {
+  const p=Object.create(CameraPlayback.prototype);let descriptions=0;
+  Object.assign(p,{state:'live',generation:1,video:{paused:false,readyState:2,currentTime:2},lastTime:1,advanced:true,poster:{hidden:true},describe(){descriptions++},problem(){},lastProgressAt:performance.now(),attempt:true,sampleAt:performance.now(),sampleTime:1,slowMs:0});
+  p.waiting();assert.equal(p.state,'buffering');assert.equal(p.poster.hidden,true);
+  p.observeProgress(1);assert.equal(p.state,'live');assert.equal(p.poster.hidden,true);assert.ok(descriptions>=2);clearTimeout(p.timer);
+});
+
+test('an advancing native clock without newly decoded frames cannot claim live playback', () => {
+  const p=Object.create(CameraPlayback.prototype);let frames=10;
+  Object.assign(p,{generation:1,state:'buffering',lastTime:1,lastFrames:10,video:{paused:false,readyState:2,currentTime:2,getVideoPlaybackQuality:()=>({totalVideoFrames:frames,droppedVideoFrames:0})},poster:{hidden:true},describe(){},problem(){}});
+  p.progress(1);assert.equal(p.state,'buffering');assert.equal(p.poster.hidden,true);
+  frames++;p.video.currentTime=3;p.progress(1);assert.equal(p.state,'live');assert.equal(p.poster.hidden,true);
+});
+
+test('retired native HLS requests cannot wake a detached host with a late playlist URL', async () => {
+  const p=Object.create(CameraPlayback.prototype);let resolve,calls=0,delivered=false;
+  Object.assign(p,{generation:1,streamRequests:0,player:{},signaling:{},hass:{callWS(){calls++;return new Promise(done=>{resolve=done;});}}});
+  p.updateNativeHass();const api=p.nativeHass;
+  api.callWS({type:'camera/stream'}).then(()=>{delivered=true;});
+  assert.equal(p.streamRequests,1);
+  p.generation++;resolve({url:'obsolete-synthetic-playlist'});await Promise.resolve();await Promise.resolve();
+  assert.equal(delivered,false);api.callWS({type:'camera/stream'});assert.equal(calls,1);
+  assert.equal(p.streamRequests,1,'A retired owner must not count or issue another request');
+  p.hass={callWS:()=>Promise.reject(new Error('permission'))};p.updateNativeHass();
+  await assert.rejects(p.nativeHass.callWS({type:'camera/stream'}),/permission/,'Active failures must still propagate');
+  assert.equal(p.streamRequests,2);
+});
+
+test('a choppy but advancing lowest-quality stream stays live instead of failing for low frame rate', () => {
+  const p=Object.create(CameraPlayback.prototype);
+  Object.assign(p,{generation:1,attempt:true,state:'live',advanced:true,slowMs:35000,sampleAt:performance.now()-500,sampleTime:2,lastTime:2,lastFrames:10,sampleFrames:10,lastProgressAt:performance.now(),streamEntity:'camera.low',hass:{states:{'camera.low':{attributes:{fps:20}}}},video:{currentTime:2.5,paused:false,readyState:2,getVideoPlaybackQuality:()=>({totalVideoFrames:11,droppedVideoFrames:0})},poster:{},describe(){},problem(){},eligible:()=>true,fallback:()=>false,fail(){assert.fail('Advancing video must remain usable even at low fps');}});
+  p.observeProgress(1);assert.equal(p.state,'live');assert.equal(p.poster.hidden,true);assert.equal(p.streamEntity,'camera.low');
 });

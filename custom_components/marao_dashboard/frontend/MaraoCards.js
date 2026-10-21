@@ -1,5 +1,6 @@
+const { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic, navigate, fullscreenUsers, findElements, focusRestorer, focusableElements, deepActiveElement, FOCUSABLE, beginFrontendInteraction } = await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`, import.meta.url));
+export { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic, focusRestorer };
 const historyData = await import(new URL(`./MaraoHistoryData.js${new URL(import.meta.url).search}`, import.meta.url));
-const { bindNavbarRefresh, refreshFrontend } = await import(new URL(`./MaraoFrontendRefresh.js${new URL(import.meta.url).search}`, import.meta.url));
 let historyChartModule;
 let historyChartAttempt = 0;
 let historyEntryId = 0;
@@ -70,6 +71,7 @@ function isServiceAction(action) {
 }
 
 function actionControlLabel(config, state, entity, action, hass) {
+  if (config.template === 'hc_camera_card' && action?.action === 'fullscreen') return localize('camera.fullscreen', hass, {}, 'Open full screen');
   const actionLabelKey = text(config?.variables?.action_label_key).trim();
   if (actionLabelKey) {
     const fallback = text(config?.variables?.action_label || config?.name || actionLabelKey).trim();
@@ -393,12 +395,6 @@ export function stateAppearance(kind, state, config, hass) {
   return { background, text: foreground, icon: kind === "hc_navigation_card" ? variables.hc_icon_color || foreground : foreground, ...(iconBackground ? { iconBackground } : {}), accent, unavailable };
 }
 
-export function haptic(value = "heavy") {
-  if (!value) return;
-  globalThis.window?.dispatchEvent?.(new CustomEvent("haptic", { detail: value }));
-  globalThis.navigator?.vibrate?.(value === "success" ? [50, 35, 75] : value === "heavy" ? 50 : 25);
-}
-
 export function notifyActionError(hass, error) {
   const detail = text(error?.message || error?.body?.message || (typeof error === "string" ? error : "")).trim()
     || localize("common.unknown", hass, {}, "Unknown error");
@@ -544,6 +540,7 @@ export async function callServiceWithNotification(hass, domain, service, data, o
   if (!ready()) { rejectClimateRequest(requests); onOutcome?.("skipped"); return; }
   onOutcome?.("sent");
   let result;
+  const settled = beginFrontendInteraction();
   try {
     result = await hass.callService(domain, service, data, target, false);
   } catch (error) {
@@ -558,6 +555,8 @@ export async function callServiceWithNotification(hass, domain, service, data, o
     notifyActionError(hass, error);
     onOutcome?.("error", error);
     return;
+  } finally {
+    settled();
   }
   onOutcome?.("success");
   return result;
@@ -647,16 +646,6 @@ export function problemStyle(problem, appearance = null) {
   return `background:${background};color:${color};--marao-card-background:${background};--marao-card-text-color:${color};--marao-state-color:${color};--marao-icon-color:${color};--marao-icon-background:transparent;--marao-accent-color:${color};--primary-text-color:${color};--secondary-text-color:${color};--subtext-color:${color};--error-color:${color};opacity:1`;
 }
 
-function navigate(path) {
-  if (!path) return;
-  if (path.startsWith("#")) {
-    window.history.pushState({}, "", `${window.location.pathname}${window.location.search}${path}`);
-  } else {
-    window.history.pushState({}, "", path);
-  }
-  window.dispatchEvent(new Event("location-changed"));
-}
-
 export async function performAction(hass, action, entity, onOutcome) {
   if (!action || action.action === "none") return;
   if (isServiceAction(action) && !serviceConnectionReady(hass)) { onOutcome?.("skipped"); return; }
@@ -711,9 +700,11 @@ export function ownedContent(config = {}) {
     || ['custom:marao-timeline-card', 'custom:marao-energy-period-card', 'custom:marao-frigate-events-card', 'custom:marao-slide-to-open'].includes(config.type);
 }
 
+const CONTROL_CELL_MIN = 136, CONTROL_CELL_FONT_SCALE = 7.5;
+
 // Equal flexible tracks use the tallest intrinsic row, including later rows.
 export function controlGridStyles(selector = '.control-grid') {
-  return `${selector}{display:grid;min-width:0;grid-template-columns:repeat(auto-fill,minmax(min(100%,max(172px,calc(var(--font-size-primary,1.125rem) * 9.5),calc((100% - (var(--marao-control-columns,2) - 1) * var(--marao-control-gap,8px)) / var(--marao-control-columns,2)))),1fr));grid-auto-rows:minmax(0,1fr);gap:var(--marao-control-gap,8px);align-items:stretch}${selector}>*{min-width:0;align-self:stretch}`;
+  return `${selector}{display:grid;min-width:0;grid-template-columns:repeat(auto-fill,minmax(min(100%,max(${CONTROL_CELL_MIN}px,calc(var(--font-size-primary,1.125rem) * ${CONTROL_CELL_FONT_SCALE}),calc((100% - (var(--marao-control-columns,2) - 1) * var(--marao-control-gap,8px)) / var(--marao-control-columns,2)))),1fr));grid-auto-rows:minmax(0,1fr);gap:var(--marao-control-gap,8px);align-items:stretch}${selector}>*{min-width:0;align-self:stretch}`;
 }
 
 function cardStyles() {
@@ -736,6 +727,13 @@ function cardStyles() {
     ha-card.is-pressed { transform:scale(.985); }
     .card-action { position:absolute; inset:0; z-index:1; width:100%; height:100%; margin:0; padding:0; border:0; border-radius:inherit; background:transparent; color:transparent; cursor:pointer; }
     .card-action:disabled { cursor:default; }
+    ha-card[data-camera-card] { overflow:hidden; }
+    .body.camera-card { display:block; min-height:0; padding:0; }
+    .body.camera-card:empty { display:none; }
+    .body.camera-card>.title { box-sizing:border-box; padding:12px 14px; }
+    .camera-preview { position:relative; aspect-ratio:16/9; width:100%; overflow:hidden; background:#000; }
+    .camera-preview img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    .camera-preview span { position:absolute; inset:auto 0 0; box-sizing:border-box; max-height:100%; overflow:auto; padding:8px; background:var(--ha-card-background); color:var(--primary-text-color); overflow-wrap:anywhere; }
     .body { position:relative; z-index:2; display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:'title title' 'state icon' 'climate icon' 'control control'; gap:4px 12px; align-items:center; min-height:84px; padding:14px; pointer-events:none; }
     .body.formatted-reading { display:flex; flex-wrap:wrap; }
     .body.formatted-reading > :not(.formatted-values):not(.icon):not(.binary-cue) { flex-basis:100%; }
@@ -1044,14 +1042,15 @@ export class MaraoCard extends BaseElement {
     const generation = this._cameraGeneration = (this._cameraGeneration || 0) + 1;
     this._cameraLoading = true;
     const slot = this._cameraSlot = document.createElement('div');
-    slot.className = 'camera-live'; slot.style.cssText = 'position:relative;z-index:2;min-width:0;margin:0 14px 14px;pointer-events:none';
+    slot.className = 'camera-live'; slot.style.cssText = 'position:relative;z-index:2;min-width:0;margin:0;pointer-events:none';
     const available = state.state && !['unknown', 'unavailable', 'off'].includes(state.state) && this._hass?.connected !== false && this._hass?.connection?.connected !== false;
     const poster = available ? state.attributes?.entity_picture : '';
-    slot.innerHTML = `<div style="position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:#000">${poster ? `<img src="${esc(poster)}" alt="${esc(label)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">` : ''}</div><div role="status" style="padding-top:8px;min-height:1.25em;overflow-wrap:anywhere">${available ? esc(localize('camera.loading', this._hass, {}, 'Starting live video…')) : ''}</div>`;
+    slot.innerHTML = `<div style="position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#000">${poster ? `<img src="${esc(poster)}" alt="${esc(label)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">` : ''}<div role="status" style="position:absolute;inset:auto 0 0;box-sizing:border-box;max-height:100%;overflow:auto;padding:8px;overflow-wrap:anywhere;background:var(--ha-card-background);color:var(--primary-text-color);pointer-events:auto">${esc(available ? localize('camera.loading', this._hass, {}, 'Starting live video…') : localize(!this._hass?.states ? 'common.loading' : state.state === 'unknown' ? 'common.unknown' : 'common.unavailable', this._hass))}</div></div>`;
     surface.append(slot);
     import(new URL(`./MaraoCamera.js${new URL(import.meta.url).search}`, import.meta.url).href).then(({ CameraPlayback }) => {
       if (generation !== this._cameraGeneration || !this.isConnected || this.preview) return;
       const fallback = {
+        'camera.buffering': 'Buffering…', 'camera.lower_quality': 'Reduced quality',
         'camera.loading': 'Starting live video…', 'camera.live': 'Live', 'camera.snapshot': 'Snapshot',
         'camera.start': 'Start live view', 'camera.blocked': 'Playback needs your permission',
         'camera.failed': 'Live video failed', 'camera.timeout': 'Live video did not start in time',
@@ -1071,7 +1070,7 @@ export class MaraoCard extends BaseElement {
       const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = localize('common.retry', this._hass, {}, 'Retry'); retry.style.pointerEvents = 'auto';
       retry.setAttribute('aria-label', `${retry.textContent} ${label}`);
       retry.addEventListener('click', event => { event.stopPropagation(); haptic('heavy'); this._disposeCamera(); this._render(); });
-      slot.append(retry); this._render();
+      const feedback = slot.querySelector('[role="status"]'); feedback.textContent = this._cameraError; feedback.append(retry); this._render();
     });
   }
 
@@ -1397,6 +1396,7 @@ export class MaraoCard extends BaseElement {
     const accessService = variables.action_service || config.tap_action?.service || config.tap_action?.perform_action;
     const requiresSlide = configuredKind.startsWith("hc_access_") && ["lock.unlock", "cover.open_cover"].includes(accessService);
     const kind = requiresSlide ? "hc_access_slide_action_card" : entityGroup ? 'hc_navigation_card' : configuredKind;
+    const camera = kind === "hc_camera_card";
     const graphEntity = text(variables.graph_entity || variables.power_entity || (["hc_graph_card", "hc_toggle_graph_card"].includes(kind) ? entity : ""));
     const showsGraph = Boolean(graphEntity) && (["hc_graph_card", "hc_toggle_graph_card"].includes(kind) || variables.show_graph === true);
     const toggleEntity = kind === "hc_toggle_graph_card" ? text(variables.toggle_entity) : "";
@@ -1464,6 +1464,7 @@ export class MaraoCard extends BaseElement {
     const previewAvailable = !loading && !interactionUnavailable && this._hass?.connected !== false && this._hass?.connection?.connected !== false;
     const mediaAvailable = previewAvailable && value !== "off";
     let media = "";
+    if (camera && this.preview) media = `<div class="camera-preview">${!interactionUnavailable && pictureURL ? `<img src="${esc(pictureURL)}" alt="${esc(this._label(entity, config, state))}">` : ''}<span>${esc(localize(!interactionUnavailable && pictureURL ? 'camera.snapshot' : loading ? 'common.loading' : 'common.unavailable', this._hass))}</span></div>`;
 
     const range = this._range(entity, state, kind, controlsDisabled);
     const artwork = !problem && kind === "hc_media_card" && mediaAvailable && variables.hc_show_background_art !== false && state.attributes?.entity_picture
@@ -1517,10 +1518,10 @@ export class MaraoCard extends BaseElement {
     this.toggleAttribute?.('data-marao-standard-control', uniformControl);
     const sliderHeader = showName && (uniformControl || kind === 'hc_fan_card');
     const titleCard = kind === "hc_title_card";
-    const stateWanted = !titleCard && !glance && (kind === "hc_room_card" ? Boolean(displayValue) : Boolean(entity || entityGroup)) && config.show_state !== false;
+    const stateWanted = !camera && !titleCard && !glance && (kind === "hc_room_card" ? Boolean(displayValue) : Boolean(entity || entityGroup)) && config.show_state !== false;
     const showState = stateWanted && !problem?.complete && (!redundantState || Boolean(displayValue));
-    const showIcon = !titleCard && !glance && config.show_icon !== false && variables.show_icon !== false;
-    const iconOnly = !showName && !stateWanted && config.show_label === false;
+    const showIcon = !camera && !titleCard && !glance && config.show_icon !== false && variables.show_icon !== false;
+    const iconOnly = !camera && !showName && !stateWanted && config.show_label === false;
     const isAction = ["hc_switch_card", "hc_light_card", "hc_cover_card", "hc_fan_card", "hc_access_card"].includes(kind);
     const popupHash = config.variables?.popup_hash;
     let action = config.tap_action || (popupHash ? { action: "navigate", navigation_path: popupHash, haptic: "heavy" } : isAction ? { action: "toggle", haptic: "heavy" } : null);
@@ -1571,11 +1572,11 @@ export class MaraoCard extends BaseElement {
       const semanticLabel = localize("actions.for_target", this._hass, { action: label, name: this._label(entity, config, state) }, `${label} ${this._label(entity, config, state)}`);
       return `<button type="button" data-vacuum-action="${index}" aria-label="${esc(semanticLabel)}" title="${esc(label)}"${controlsDisabled ? " disabled" : ""}><ha-icon icon="${esc(entry.icon)}" aria-hidden="true"></ha-icon></button>`;
     }).join("")}</div>` : "";
-    const problemMessage = problem && (problem.kind !== "loading" || !showState) ? `<div class="problem" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="${problem.kind === "loading" ? "mdi:progress-clock" : problem.kind === "neutral" ? "mdi:help-circle-outline" : "mdi:alert-circle-outline"}" aria-hidden="true"></ha-icon><span>${esc(problem.reason)}</span></div>` : "";
+    const problemMessage = !camera && problem && (problem.kind !== "loading" || !showState) ? `<div class="problem" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="${problem.kind === "loading" ? "mdi:progress-clock" : problem.kind === "neutral" ? "mdi:help-circle-outline" : "mdi:alert-circle-outline"}" aria-hidden="true"></ha-icon><span>${esc(problem.reason)}</span></div>` : "";
     const formattedReading = !iconOnly && Boolean(formattedPrimary || formattedPower);
     const stateMarkup = showState && kind !== "hc_wallbox_current_card" ? `<div class="state">${esc(displayValue)}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    this._setMarkup(`<style>${cardStyles()}</style><ha-card${uniformControl ? ' class="control-surface"' : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem, problemAppearance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`);
+    this._setMarkup(`<style>${cardStyles()}</style><ha-card${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem, problemAppearance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`);
     this._syncCamera();
     this.shadowRoot.querySelector('[data-history-open]')?.addEventListener('click', event => { event.stopPropagation(); this._openHistory(event.currentTarget); });
     this._activeHistoryPopup?._refreshHistory();
@@ -1836,6 +1837,7 @@ export class MaraoCard extends BaseElement {
 
   _performAction(action, entity) {
     if (this.preview) return;
+    if (this._config.template === 'hc_camera_card' && action?.action === 'fullscreen') { haptic('heavy'); return this._camera?.fullscreen(); }
     return performAction(this._hass, action, entity, isServiceAction(action) ? serviceOutcome(this) : undefined);
   }
 
@@ -1906,351 +1908,6 @@ export class MaraoCard extends BaseElement {
   getCardSize() { return 2; }
 }
 
-export const safeArea = (side) => `var(--marao-safe-area-inset-${side}, var(--safe-area-inset-${side}, env(safe-area-inset-${side}, 0px)))`;
-
-export function navbarRouteCurrent(route, location = window.location) {
-  try {
-    const target = new URL(route.url || route.path, location.href);
-    return target.origin === location.origin && target.pathname === location.pathname
-      && (!target.hash || target.hash === location.hash) && (!target.search || target.search === location.search);
-  } catch { return false; }
-}
-
-export function navbarPartition(routes, width, size = 48, gap = 4, padding = 20) {
-  const slots = Math.max(1, Math.floor((Math.max(0, width - padding) + gap) / (Math.max(48, size) + gap)));
-  const count = routes.length > slots ? slots - 1 : routes.length;
-  return { slots, visible: routes.slice(0, count), overflow: routes.slice(count) };
-}
-
-export class MaraoNavbarCard extends BaseElement {
-  constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._slots = 1; }
-  setConfig(config) {
-    const routes = config?.routes === undefined ? [] : config.routes;
-    if (!Array.isArray(routes)) throw new Error("Navigation routes must be a list");
-    if (routes.some(route => !route || typeof route !== 'object' || Array.isArray(route)
-      || typeof (route.url || route.path) !== 'string' || !(route.url || route.path).trim()
-      || typeof route.label !== 'string' || !route.label.trim())) throw new Error("Navigation entries require a destination and label");
-    this._closeOverflow(false);
-    this._config = { ...config, routes }; this._render();
-  }
-  connectedCallback() {
-    registerFullscreen(this); this._render();
-    this._observer = new ResizeObserver(this._scheduleLayout);
-    for (const node of [this, this._view(), this.shadowRoot.querySelector('.bounds')]) if (node) this._observer.observe(node);
-    for (const event of ['location-changed', 'popstate', 'hashchange']) window.addEventListener(event, this._locationChanged);
-    window.addEventListener('resize', this._scheduleLayout);
-    window.visualViewport?.addEventListener('resize', this._scheduleLayout);
-    window.visualViewport?.addEventListener('scroll', this._scheduleLayout);
-    this._layout();
-  }
-  get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
-  set preview(value) {
-    this._preview = Boolean(value);
-    if (this._config && this._renderedPreview !== this.preview) { this._closeOverflow(false); this._render(); }
-    applyFullscreen();
-  }
-  disconnectedCallback() {
-    this._refreshGesture?.destroy();
-    this._closeOverflow(false); this._clearDismissGesture(); this._observer?.disconnect(); cancelAnimationFrame(this._frame);
-    for (const event of ['location-changed', 'popstate', 'hashchange']) window.removeEventListener(event, this._locationChanged);
-    window.removeEventListener('resize', this._scheduleLayout);
-    window.visualViewport?.removeEventListener('resize', this._scheduleLayout);
-    window.visualViewport?.removeEventListener('scroll', this._scheduleLayout);
-    unregisterFullscreen(this);
-  }
-  set hass(value) { this._hass = value; this._updateCurrent(); }
-  _root() {
-    let root = this;
-    while (root && root.localName !== 'hui-root') root = root.parentElement || root.getRootNode()?.host;
-    return root;
-  }
-  _view() { return this._root()?.shadowRoot?.querySelector('#view'); }
-  _syncContext() {
-    const editing = Boolean(this._root()?.lovelace?.editMode);
-    if (editing !== this._editing) { this._editing = editing; this._refreshGesture?.cancel(); this._closeOverflow(false); this._updateCurrent(); }
-  }
-  _locationChanged = () => { this._refreshGesture?.cancel(); this._closeOverflow(false); this._updateCurrent(); this._scheduleLayout(); };
-  _scheduleLayout = () => {
-    cancelAnimationFrame(this._frame);
-    this._frame = requestAnimationFrame(() => { if (this.isConnected) this._layout(); });
-  };
-  _layout() {
-    const nav = this.shadowRoot?.querySelector('.nav'), bounds = this.shadowRoot?.querySelector('.bounds');
-    if (!this.isConnected || !nav || !bounds || !this.getClientRects().length) return;
-    const safe = bounds.getBoundingClientRect(), host = (this.preview ? this : this._view())?.getBoundingClientRect();
-    const viewport = window.visualViewport;
-    const left = Math.max(safe.left, host?.left ?? safe.left, viewport?.offsetLeft || 0);
-    const right = Math.min(safe.right, host?.right ?? safe.right, (viewport?.offsetLeft || 0) + (viewport?.width || innerWidth));
-    const edit = this.nativeOwner?.shadowRoot?.querySelector('.native-edit')?.getBoundingClientRect();
-    const top = Math.max(safe.top, this.preview ? 0 : host?.top || 0, viewport?.offsetTop || 0, edit ? edit.bottom + 8 : 0);
-    const style = getComputedStyle(nav), size = nav.querySelector('a,button')?.getBoundingClientRect().width || 48;
-    const gap = parseFloat(style.columnGap) || 0, padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-    const { slots } = navbarPartition(this._config.routes || [], right - left, size, gap, padding);
-    const geometry = [left, right, top, safe.bottom, slots].map(value => Math.round(value * 2) / 2).join(':');
-    if (this._geometry !== geometry) { this._refreshGesture?.cancel(); this._closeOverflow(false); }
-    this._geometry = geometry; this._safeTop = top;
-    this.style.setProperty('--marao-navbar-left', `${(left + right) / 2}px`);
-    if (this.preview) this.style.setProperty('--marao-navbar-preview-left', `${(left + right) / 2 - host.left}px`);
-    this.style.setProperty('--marao-navbar-width', `${Math.max(68, right - left)}px`);
-    if (slots !== this._slots) { this._slots = slots; this._render(); }
-    applyFullscreen();
-  }
-  _link(route, index) {
-    return `<a data-route="${index}" href="${esc(route.url || route.path)}" aria-label="${esc(route.label)}"><ha-icon></ha-icon></a>`;
-  }
-  _render() {
-    if (!this.shadowRoot) return;
-    this._refreshGesture?.destroy();
-    this._observer?.unobserve(this.shadowRoot.querySelector('.bounds'));
-    const routes = this._config.routes || [];
-    this._visibleCount = routes.length > this._slots ? this._slots - 1 : routes.length;
-    const overflow = routes.length > this._visibleCount;
-    this.toggleAttribute?.('data-empty', !routes.length); this.toggleAttribute?.('data-preview', this.preview);
-    this._renderedPreview = this.preview;
-    const bottom = /iPhone|iPod/i.test(navigator.userAgent || '') ? `max(4px, calc(${safeArea("bottom")} - 20px))` : '12px';
-    this.shadowRoot.innerHTML = `<style>
-      :host{display:block;height:128px;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}
-      :host([data-empty]){display:none}:host([data-preview]){height:auto}
-      .bounds{position:fixed;visibility:hidden;pointer-events:none;inset:${safeArea("top")} calc(12px + ${safeArea("right")}) ${safeArea("bottom")} calc(12px + ${safeArea("left")})}
-      .surface{display:flex;gap:clamp(2px,.5vw,4px);box-sizing:border-box;padding:6px 10px;border-radius:999px;background:var(--ha-card-background,var(--card-background-color));box-shadow:0 8px 30px rgba(0,0,0,.22)}
-      .nav{position:fixed;z-index:1001;left:var(--marao-navbar-left,50%);bottom:${bottom};transform:translateX(-50%);flex-wrap:nowrap;justify-content:center;width:max-content;max-width:var(--marao-navbar-width,calc(100vw - 24px - ${safeArea("left")} - ${safeArea("right")}));height:60px}
-      :host([data-preview]) .nav{position:relative;left:var(--marao-navbar-preview-left,50%);bottom:auto;margin:12px 0}
-      a,button{display:grid;place-items:center;box-sizing:border-box;flex:0 0 48px;min-width:48px;width:48px;height:48px;aspect-ratio:1 / 1;align-self:center;justify-self:center;padding:0;border:0;color:var(--icon-color,var(--primary-text-color));background:transparent;text-decoration:none;border-radius:50%;font:inherit;cursor:pointer;transition:transform .12s ease,filter .12s ease}
-      a:active,button:active{transform:scale(.92);filter:brightness(.96)}.active{color:var(--text-primary-color,var(--active-text-color));background:var(--primary-color)}
-      a:focus,button:focus{outline:none}[aria-disabled=true]{cursor:default}ha-icon{--mdc-icon-size:26px}
-      .overflow{position:fixed;z-index:1002;transform:translateX(-50%);width:68px;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:none}
-      .nav{-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
-      .refresh-feedback{position:fixed;z-index:1002;left:var(--marao-navbar-left,50%);bottom:calc(${bottom} + 72px);transform:translateX(-50%);box-sizing:border-box;width:max-content;max-width:var(--marao-navbar-width,calc(100vw - 24px));padding:12px 16px;border-radius:18px;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:0 8px 30px rgba(0,0,0,.22);font-size:var(--font-size-primary,1.125rem);font-weight:var(--font-weight-primary,500);line-height:1.35;overflow-wrap:anywhere;pointer-events:none}
-      .refresh-feedback[hidden],progress[hidden]{display:none}progress{display:block;box-sizing:border-box;appearance:none;-webkit-appearance:none;width:100%;height:10px;margin-top:8px;border:1px solid var(--primary-text-color);border-radius:8px;overflow:hidden;background:var(--ha-card-background,var(--card-background-color));accent-color:var(--primary-text-color)}progress::-webkit-progress-bar{background:var(--ha-card-background,var(--card-background-color))}progress::-webkit-progress-value{background:var(--primary-text-color)}progress::-moz-progress-bar{background:var(--primary-text-color)}
-      @media(prefers-reduced-motion:reduce){a,button{transition:none}}
-    </style><div class="bounds" aria-hidden="true"></div><div class="refresh-feedback" role="status" hidden><span></span><progress max="1" hidden></progress></div><nav class="nav surface">${routes.slice(0, this._visibleCount).map((route, i) => this._link(route, i)).join('')}${overflow ? '<button type="button" data-overflow aria-expanded="false" aria-controls="marao-overflow"><ha-icon icon="mdi:dots-horizontal"></ha-icon></button>' : ''}</nav>`;
-    this._refreshGesture = bindNavbarRefresh(this.shadowRoot.querySelector('.nav'), {
-      eligible: () => this._refreshEligible(), haptic: () => haptic('heavy'),
-      progress: value => this._refreshFeedback(value == null ? '' : 'hold', value), complete: () => this._refreshFrontend(),
-    });
-    this._bindLinks(this.shadowRoot.querySelector('.nav'));
-    this.shadowRoot.querySelector('[data-overflow]')?.addEventListener('click', () => {
-      if (this.preview || this._editing) return;
-      haptic('heavy'); this._open ? this._closeOverflow(true) : this._openOverflow();
-    });
-    this._updateCurrent();
-    if (this._observer) this._observer.observe(this.shadowRoot.querySelector('.bounds'));
-    if (this.isConnected) this._layout();
-  }
-  _bindLinks(root) {
-    root?.querySelectorAll('a').forEach(link => link.addEventListener('click', event => {
-      event.preventDefault(); if (this.preview || this._editing) return;
-      const href = link.getAttribute('href'), target = new URL(href, window.location.href);
-      this._closeOverflow(target.pathname === window.location.pathname && Boolean(target.hash)); haptic('heavy'); navigate(href);
-    }));
-  }
-  _refreshEligible() {
-    if (!this.isConnected || this.preview || this._root()?.lovelace?.editMode || this._refreshing || !this.getClientRects().length) return false;
-    for (let node = this; node; node = node.parentElement || node.getRootNode()?.host) if (node.inert) return false;
-    return true;
-  }
-  _refreshFeedback(state, value) {
-    const feedback = this.shadowRoot?.querySelector('.refresh-feedback'); if (!feedback) return;
-    const messages = { hold: 'Hold to refresh frontend', refreshing: 'Refreshing frontend…', unsaved: 'Save or discard changes before refreshing.', offline: 'Cannot reach Home Assistant. Hold again to retry.', interrupted: 'Refresh interrupted. Hold again to retry.', failed: 'Refresh failed. Hold again to retry.' };
-    feedback.hidden = !state;
-    const key = messages[state] ? state : 'failed';
-    feedback.querySelector('span').textContent = state ? localize(`navigation.refresh.${key}`, this._hass, {}, messages[key]) : '';
-    const bar = feedback.querySelector('progress'); bar.hidden = state !== 'hold';
-    bar.setAttribute('aria-label', localize('navigation.refresh.hold', this._hass, {}, messages.hold));
-    if (value != null) bar.value = value;
-  }
-  _refreshFrontend() {
-    if (!this._refreshEligible()) { this._refreshFeedback(''); return; }
-    this._refreshing = true; this._closeOverflow(false);
-    return refreshFrontend({
-      isDirty: () => window.isDirtyState || findElements('marao-dashboard-panel').some(panel => panel._dirty),
-      onStatus: state => this._refreshFeedback(state),
-    }).catch(() => { /* The operation already renders its localized error. */ }).finally(() => { this._refreshing = false; });
-  }
-  _updateCurrent() {
-    if (!this.shadowRoot) return;
-    const routes = this._config.routes || [], disabled = this.preview || this._editing;
-    const current = route => route && navbarRouteCurrent(route);
-    this.shadowRoot.querySelector('.nav')?.setAttribute('aria-label', localize('navigation.label', this._hass, {}, 'Marao navigation'));
-    this.shadowRoot.querySelectorAll('a[data-route]').forEach(link => {
-      const route = routes[Number(link.dataset.route)], active = current(route);
-      link.classList.toggle('active', active); link.setAttribute('aria-disabled', String(Boolean(disabled))); link.tabIndex = disabled ? -1 : 0;
-      if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
-      link.querySelector('ha-icon').setAttribute('icon', active ? route.icon_selected || route.icon || 'mdi:circle' : route.icon || route.icon_selected || 'mdi:circle-outline');
-    });
-    const toggle = this.shadowRoot.querySelector('[data-overflow]');
-    if (toggle) {
-      const selected = routes.slice(this._visibleCount).find(current);
-      const label = this._open ? localize('navigation.close', this._hass, {}, 'Close additional destinations') : localize('navigation.more', this._hass, {}, 'More destinations');
-      toggle.classList.toggle('active', Boolean(selected)); toggle.setAttribute('aria-label', selected ? `${label} · ${localize('navigation.current', this._hass, {name:selected.label}, `Current destination: ${selected.label}`)}` : label);
-      toggle.disabled = Boolean(disabled); toggle.setAttribute('aria-expanded', String(Boolean(this._open)));
-    }
-  }
-  _openOverflow() {
-    if (this._open || this.preview || this._editing) return;
-    const toggle = this.shadowRoot.querySelector('[data-overflow]'); if (!toggle) return;
-    this._open = true;
-    const menu = document.createElement('nav'); menu.id = 'marao-overflow'; menu.className = 'overflow surface';
-    menu.setAttribute('aria-label', localize('navigation.open', this._hass, {}, 'Additional destinations'));
-    menu.innerHTML = this._config.routes.slice(this._visibleCount).map((route, i) => this._link(route, i + this._visibleCount)).join('');
-    this.shadowRoot.append(menu); this._bindLinks(menu); this._updateCurrent();
-    const box = toggle.getBoundingClientRect();
-    menu.style.left = `${box.left + box.width / 2}px`; menu.style.bottom = `${innerHeight - box.top + 8}px`;
-    menu.style.maxHeight = `${Math.max(0, box.top - (this._safeTop || 0) - 8)}px`;
-    const focus = menu.querySelector('[aria-current=page]') || menu.querySelector('a');
-    focus?.focus({preventScroll:true}); if (focus) menu.scrollTop = focus.offsetTop - menu.clientHeight / 2 + 24;
-    document.addEventListener('pointerdown', this._outside, true); document.addEventListener('keydown', this._key, true); document.addEventListener('focusin', this._focusOutside);
-  }
-  _closeOverflow(restore) {
-    if (!this._open) return;
-    this._open = false; this.shadowRoot.querySelector('.overflow')?.remove(); this._updateCurrent();
-    document.removeEventListener('pointerdown', this._outside, true); document.removeEventListener('keydown', this._key, true); document.removeEventListener('focusin', this._focusOutside);
-    if (restore && this.isConnected) this.shadowRoot.querySelector('[data-overflow]')?.focus({preventScroll:true});
-  }
-  _key = event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); this._closeOverflow(true); } };
-  _focusOutside = event => { if (!event.composedPath().includes(this)) this._closeOverflow(false); };
-  _outside = event => {
-    if (event.composedPath().includes(this)) return;
-    event.preventDefault(); event.stopImmediatePropagation(); this._closeOverflow(false);
-    const target = event.composedPath().find(node => node.matches?.(FOCUSABLE));
-    if (target) target.focus({preventScroll:true}); else this.shadowRoot.querySelector('[data-overflow]')?.focus({preventScroll:true});
-    this._dismissPointer = event.pointerId;
-    document.addEventListener('click', this._dismissClick, true); document.addEventListener('pointerup', this._dismissEnd, true); document.addEventListener('pointercancel', this._dismissEnd, true); document.addEventListener('pointerdown', this._nextGesture, true); window.addEventListener('blur', this._nextGesture);
-  };
-  _dismissClick = event => { if (event.pointerId === this._dismissPointer) { event.preventDefault(); event.stopImmediatePropagation(); this._clearDismissGesture(); } };
-  _nextGesture = () => this._clearDismissGesture();
-  _dismissEnd = event => { if (event.type === 'pointercancel') this._clearDismissGesture(); else this._dismissTimer = setTimeout(() => this._clearDismissGesture(), 500); };
-  _clearDismissGesture() {
-    clearTimeout(this._dismissTimer); this._dismissPointer = null;
-    document.removeEventListener('click', this._dismissClick, true); document.removeEventListener('pointerup', this._dismissEnd, true); document.removeEventListener('pointercancel', this._dismissEnd, true); document.removeEventListener('pointerdown', this._nextGesture, true); window.removeEventListener('blur', this._nextGesture);
-  }
-  getCardSize() { return 0; }
-}
-
-const fullscreenUsers = new Set();
-let fullscreenTimer;
-const fullscreenOriginals = new Map();
-function findElements(selector, root = document) {
-  const found = [];
-  const visit = (root) => {
-    root?.querySelectorAll?.(selector).forEach((item) => found.push(item));
-    root?.querySelectorAll?.("*").forEach((item) => { if (item.shadowRoot) visit(item.shadowRoot); });
-  };
-  visit(root);
-  return found;
-}
-
-const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
-function focusableElements(root) {
-  return findElements(FOCUSABLE, root).filter((element) => !element.hidden && element.getAttribute?.("aria-hidden") !== "true");
-}
-function deepActiveElement() {
-  let active = document.activeElement;
-  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
-  return active;
-}
-export function focusRestorer(element) {
-  const root = element?.getRootNode?.();
-  const attribute = element?.getAttributeNames?.().find((name) => name === "id" || name.startsWith("data-")) || "aria-label";
-  const value = element?.getAttribute?.(attribute);
-  const liveTarget = () => element?.isConnected ? element : value != null
-    ? [...(root?.querySelectorAll?.(element.localName) || [])].find((candidate) => candidate.getAttribute(attribute) === value)
-    : null;
-  return async () => {
-    // HA updates replace card contents, while the owning shadow root survives.
-    let target = liveTarget();
-    while (target?.isConnected) {
-      // A new ha-card is connected before Lit creates the slot for its controls.
-      const rendered = target.closest?.("ha-card")?.updateComplete;
-      if (rendered) await rendered;
-      const current = liveTarget();
-      if (current !== target) { target = current; continue; }
-      target.focus?.({ preventScroll: true });
-      return;
-    }
-  };
-}
-function applyFullscreen() {
-  const owned = new Map();
-  const activeNavbars = new Set();
-  const nativeAdminBars = new Set();
-  for (const navbar of fullscreenUsers) {
-    if (!navbar.isConnected || !navbar.getClientRects().length) continue;
-    navbar._syncContext?.();
-    const active = navbar._config.routes.some((route) => {
-      const path = new URL(route.url || route.path || "#", window.location.href).pathname;
-      const root = `/${path.split("/")[1]}`;
-      return root !== "/" && (window.location.pathname === root || window.location.pathname.startsWith(`${root}/`));
-    });
-    if (!active) continue;
-    let root = navbar;
-    while (root && root.localName !== "hui-root") root = root.parentElement || root.getRootNode()?.host;
-    if (navbar.preview || root?.lovelace?.editMode) continue;
-    const nativeDashboard = root?.lovelace?.config?.marao?.mode === "native" || root?.lovelace?.rawConfig?.marao?.mode === "native"
-      || root?.lovelace?.rawConfig?.strategy?.type === "custom:marao-starter";
-    activeNavbars.add(navbar);
-    const view = root?.shadowRoot?.querySelector("#view");
-    if (navbar.nativeHost && !nativeDashboard) {
-      // An individually added floating navbar needs room at the bottom while
-      // retaining the ordinary Home Assistant toolbar and view shell.
-      if (view && !owned.has(view)) owned.set(view, ["padding-bottom"]);
-      continue;
-    }
-    if (nativeDashboard && navbar._config.native && navbar._hass?.user?.is_admin) nativeAdminBars.add(navbar);
-    for (const header of root?.shadowRoot?.querySelectorAll("app-header, ha-app-layout > header, .header") || []) owned.set(header, ["display"]);
-    if (view) owned.set(view, ["padding-top", "padding-right", "padding-left", "padding-bottom"]);
-  }
-  for (const [node, original] of fullscreenOriginals) {
-    const properties = owned.get(node) || [];
-    for (const [property, { value, priority }] of Object.entries(original)) {
-      if (properties.includes(property)) continue;
-      if (value) node.style.setProperty(property, value, priority);
-      else node.style.removeProperty(property);
-      delete original[property];
-    }
-    if (!Object.keys(original).length) fullscreenOriginals.delete(node);
-  }
-  for (const [node, properties] of owned) {
-    if (!fullscreenOriginals.has(node)) fullscreenOriginals.set(node, {});
-    for (const property of properties) {
-      if (!Object.hasOwn(fullscreenOriginals.get(node), property)) {
-        fullscreenOriginals.get(node)[property] = {
-        value: node.style.getPropertyValue(property), priority: node.style.getPropertyPriority(property),
-        };
-      }
-    }
-    for (const property of properties) {
-      const original = fullscreenOriginals.get(node)[property];
-      // Native top padding includes the hidden header and inset; retain only its ordinary spacing token.
-      const normal = original.value || (["padding-top", "padding-bottom"].includes(property) ? `var(--view-container-${property}, 0px)` : "0px");
-      const clearance = property === "padding-top" && nativeAdminBars.size
-        ? `calc(60px + ${safeArea("top")})`
-        : property === "padding-bottom"
-        ? `calc(${Math.max(60, ...[...activeNavbars].map(navbar => navbar.shadowRoot?.querySelector("nav")?.getBoundingClientRect().height || 0))}px + ${safeArea("bottom")} + 12px)`
-        : safeArea(property.slice(8));
-      node.style.setProperty(property, property === "display" ? "none"
-        : `max(${normal}, ${clearance})`, "important");
-    }
-  }
-}
-function registerFullscreen(element) {
-  fullscreenUsers.add(element);
-  applyFullscreen();
-  if (fullscreenTimer !== undefined) return;
-  fullscreenTimer = setInterval(applyFullscreen, 1000);
-  window.addEventListener("location-changed", applyFullscreen);
-  window.addEventListener("popstate", applyFullscreen);
-}
-function unregisterFullscreen(element) {
-  fullscreenUsers.delete(element);
-  applyFullscreen();
-  if (fullscreenUsers.size) return;
-  clearInterval(fullscreenTimer);
-  fullscreenTimer = undefined;
-  window.removeEventListener("location-changed", applyFullscreen);
-  window.removeEventListener("popstate", applyFullscreen);
-}
-
 export class MaraoControlGrid extends BaseElement {
   constructor() {
     super(); this.attachShadow?.({ mode: 'open' }); this._request = 0; this._children = []; this._config = { columns: 2, cards: [] };
@@ -2281,7 +1938,7 @@ export class MaraoControlGrid extends BaseElement {
     const config = this._mountedConfig; if (!config) return;
     const groups = config.groups || [{ count: config.cards.length, columns: config.columns }];
     const width = this.getBoundingClientRect().width, font = parseFloat(getComputedStyle(this).fontSize) || 18;
-    const capacity = Math.max(1, Math.floor((width + 8) / (Math.max(172, font * 9.5) + 8)));
+    const capacity = Math.max(1, Math.floor((width + 8) / (Math.max(CONTROL_CELL_MIN, font * CONTROL_CELL_FONT_SCALE) + 8)));
     const columns = groups.map(group => Math.min(group.columns, capacity));
     const gcd = (a, b) => b ? gcd(b, a % b) : a;
     const tracks = columns.reduce((a, b) => a * b / gcd(a, b), 1);
@@ -2590,15 +2247,48 @@ export class MaraoPopupCard extends BaseElement {
     if (uniform) host.style?.setProperty('--marao-control-columns', '1');
   }
   _setBackgroundInert(overlay, root = document.body) {
+    const body = document.body;
+    if (body?.style) {
+      this._backgroundPageState = {
+        left: window.scrollX, top: window.scrollY,
+        styles: ['position', 'top', 'left', 'width'].map(property => ({ property, value: body.style.getPropertyValue(property), priority: body.style.getPropertyPriority(property) })),
+      };
+    }
     const outside = root === document.body ? [] : [...document.body.children].filter((element) => element !== root.host);
     this._backgroundState = [...new Set([...root.children, ...outside])]
       .filter((element) => element !== overlay)
       .map((element) => ({ element, inert: Boolean(element.inert) }));
     for (const { element } of this._backgroundState) element.inert = true;
+    // Inert blocks controls, but native media gestures can still scroll ancestors.
+    const ancestors = new Set([document.scrollingElement]);
+    for (let element = this._viewOwner?.view || this; element; element = element.parentElement || element.getRootNode?.()?.host) ancestors.add(element);
+    this._backgroundScrollState = [...ancestors]
+      .filter(element => element?.style && (element === document.scrollingElement || ['auto', 'scroll', 'overlay'].includes(globalThis.getComputedStyle?.(element)?.overflowY)))
+      .map(element => ({ element, value: element.style.getPropertyValue('overflow-y'), priority: element.style.getPropertyPriority('overflow-y') }));
+    for (const { element } of this._backgroundScrollState) element.style.setProperty('overflow-y', 'hidden', 'important');
+    // Overflow alone does not freeze the document during mobile native scrolling.
+    if (this._backgroundPageState) {
+      const { left, top } = this._backgroundPageState;
+      for (const [property, value] of Object.entries({ position: 'fixed', top: `${-top}px`, left: `${-left}px`, width: '100%' })) body.style.setProperty(property, value, 'important');
+    }
   }
   _restoreBackground() {
     for (const { element, inert } of this._backgroundState) element.inert = inert;
     this._backgroundState = [];
+    for (const { element, value, priority } of this._backgroundScrollState || []) {
+      if (value) element.style.setProperty('overflow-y', value, priority);
+      else element.style.removeProperty('overflow-y');
+    }
+    this._backgroundScrollState = [];
+    if (this._backgroundPageState) {
+      const { left, top, styles } = this._backgroundPageState;
+      this._backgroundPageState = null;
+      for (const { property, value, priority } of styles) {
+        if (value) document.body.style.setProperty(property, value, priority);
+        else document.body.style.removeProperty(property);
+      }
+      window.scrollTo({ left, top, behavior: 'instant' });
+    }
   }
   _trapFocus(event) {
     const focusable = focusableElements(this._overlay);

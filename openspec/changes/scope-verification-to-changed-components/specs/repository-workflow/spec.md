@@ -3,13 +3,14 @@
 ## MODIFIED Requirements
 
 ### Requirement: Focused checks and final visual inspection
-Ordinary iteration and publication SHALL batch related tasks and use the smallest checks covering implemented features, changed components and their shared consumers. Dependent migrations and security controls SHALL be checked early. UI batches SHALL deploy together for representative final visual and interactive inspection, including relevant difficult text/zoom layouts. Distinct interactions SHALL run once per relevant theme, with device repeats only for gesture or geometry differences. Full-suite execution and parallel test jobs SHALL require explicit user requests.
+Iteration and publication SHALL batch related tasks and use the smallest checks covering implemented features, changed components and shared consumers. Dependent migrations and security controls SHALL be checked early. UI batches SHALL finish with representative visual and interactive inspection. Compatible checks SHALL share visits and validated evidence SHALL be reusable without omitting required coverage. Full-suite execution and parallel test jobs SHALL require explicit user requests.
 
 #### Scenario: Related queued tasks affect the same shared component
 - **WHEN** their implementation is being completed together
 - **THEN** the batch receives one covering focused check and combined final visual inspection
 - **AND** the release uses the union of implemented features and affected shared consumers rather than automatically checking unrelated capabilities
 - **AND** focused repairs precede final scoped verification and applicable exact-commit CI
+- **AND** compatible UI changes deploy together before final inspection of representative components and relevant difficult text/zoom layouts
 
 #### Scenario: Final inspection finds another defect
 - **WHEN** an affected card fails visual or interaction inspection
@@ -23,6 +24,18 @@ Ordinary iteration and publication SHALL batch related tasks and use the smalles
 - **WHEN** the implemented changes are ready for publication
 - **THEN** only their relevant checks and component consumers are required
 - **AND** release preparation does not implicitly authorize the full suite or parallel test execution
+
+#### Scenario: A shared layout is independent of theme colors
+- **WHEN** an implementation batch selects difficult geometry profiles
+- **THEN** the same geometry is not replayed in both themes without a dependency reason
+- **AND** representative theme appearance and all materially distinct selected mobile/text conditions remain covered
+- **AND** theme-independent interactions and geometry run in one reference theme, appearance checks cover both themes, and theme-dependent interactions run once per relevant theme
+- **AND** device and engine repeats target native gesture or geometry differences
+
+#### Scenario: A repaired batch has valid completed coverage
+- **WHEN** the contributor explicitly supplies prior private evidence for reuse
+- **THEN** required checks are recomputed and only failed, missing or invalidated cases execute again
+- **AND** reuse never replaces required cleanup, final affected-card inspection or applicable publication validation
 
 ## ADDED Requirements
 

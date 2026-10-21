@@ -65,8 +65,9 @@ function fakeDocument(foreignMeta) {
 }
 
 globalThis.document = fakeDocument();
+globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
 const source = await fs.readFile(
-  new URL("../../custom_components/marao_dashboard/frontend/MaraoDashboard.js", import.meta.url),
+  new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url),
   "utf8",
 );
 // This harness loads only the shared shell/gesture implementation; native module

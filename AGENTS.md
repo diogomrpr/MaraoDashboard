@@ -17,9 +17,29 @@ intent cannot be preserved safely. Keep implementation, builder, generator,
 templates, documentation, and tests aligned.
 
 The [OpenSpec guide](openspec/README.md) indexes the documented baseline and
-future changes. Read the affected capability specs and project context before
-planning a task. OpenSpec does not override this contract or establish test
-success; keep future work in changes and archive only completed, verified work.
+future changes. Read affected capability specs and relevant project-context and
+quality-guide sections; do not load every guide for every task. Applicable rules
+remain binding. OpenSpec does not override this contract or establish test success;
+keep future work in changes and archive only completed, verified work.
+
+## Task routing and completion
+
+- Start with the requested outcome and concrete acceptance cases. Use the short
+  path for small fixes restoring documented behavior, refactors and documentation
+  corrections: inspect the affected path, implement, verify and report. A new
+  OpenSpec change is not required when requirements stay the same.
+- For new behavior, public/persisted contracts, migrations or substantial
+  cross-layer work, reuse an applicable OpenSpec change or create one. Honor
+  explicit planning versus implementation intent; do not turn an authorized
+  implementation request into a planning-only completion or redundant approval.
+- Use the project skills for their affected areas: `marao-ha-integration` for
+  backend/configuration work, `marao-ha-frontend` for cards/editor/browser work,
+  and `marao-testing` for selecting checks or diagnosing verification failures.
+  Load only relevant skills/references. The frontend is vanilla JavaScript custom
+  elements, not a Lit/TypeScript application; keep existing architecture and tools.
+- Before reporting completion, compare each requested outcome and acceptance
+  case with the implementation and selected evidence. Fix relevant gaps; passing
+  tests or completed OpenSpec artifacts alone do not establish task success.
 
 ## Product and architecture
 
@@ -57,28 +77,108 @@ success; keep future work in changes and archive only completed, verified work.
 - Never commit or expose credentials, tokens, alarm codes, camera data, private
   entity data, internal secrets, or secret-bearing screenshots and logs.
 
+## Verification policy: minimal by default
+
+- Prioritize delivering the requested working feature. The user handles routine
+  visual and real-device testing. Do not turn ordinary implementation into a QA
+  campaign or delay delivery for speculative edge cases.
+- Use the smallest check that demonstrates the requested result. For a stream,
+  seeing it play is sufficient for routine playback acceptance. For a visual-only
+  change, code review and a short manual watch list are sufficient; agent browser
+  inspection is optional. For nontrivial logic, use one small existing targeted
+  test or assertion where useful, rather than running every mapped suite.
+- Expand verification only when the user asks, a reported/observed defect needs
+  diagnosis, or the changed code presents a concrete security, data-loss,
+  migration or recovery risk. Name the specific risk and check only that path.
+  A shared file, hypothetical failure, or available test suite alone is not a
+  reason to expand scope.
+- Do not automatically add browser automation, test scripts, fixtures, screenshots,
+  theme/device/text/zoom matrices, performance measurements, or repeated reloads.
+  Reuse existing checks. Add a regression test when it catches a concrete defect
+  or protects nontrivial logic; do not test trivial implementation details.
+- Stop after the requested behavior works, essential checks pass, and the current
+  changes are installed on the disposable test instance. If the user takes over
+  testing, finish installation and necessary cleanup, then hand off. Report
+  known failures honestly; never suppress them or claim unchecked behavior passed.
+- End routine work with the result, what was actually checked, and a short,
+  feature-specific list of what the user should watch for manually. Detailed
+  verification reports require a request or a material safety/data issue.
+- This policy takes precedence over routine inspection, coverage and completion
+  requirements in skills, guides and OpenSpec. Product quality, privacy and safe
+  data handling still apply. Explicit publication gates below remain required
+  for pushes/tags/releases; do not start them during ordinary implementation.
+
+## Test installation is part of done
+
+- Before saying a software change is done or ready for the user to test, install
+  all applicable current changes on disposable Home Assistant `192.168.0.28`.
+  This is mandatory even when browser inspection and further testing are handed
+  to the user. Local edits, package builds and browser request overrides are not
+  installation. Never install to production.
+- Batch related changes and normally install once, after the final edit and
+  essential local checks. Install earlier only when needed to diagnose an actual
+  problem or when requested. If code changes afterward, sync the affected final
+  changes before handoff. Do not reinstall unchanged successful assets.
+- Use the fastest compatible path: frontend-only work uses the existing
+  `ha-test/prepare-frontend.js` helper's `prepareFrontend()` directly for sync
+  without opening a browser, or `ha:preview` if inspection is already needed.
+  It verifies installed compatibility and served assets, and reloads Marao only
+  when necessary. Do not start watch mode unless ongoing preview is useful.
+- Use `npm run ha:sync` for initial setup or changed backend/fixtures/generated
+  configuration that require full preparation. Batch restart-bound changes into
+  one restart; do not run full preparation for compatible frontend-only work.
+  Preserve user test configuration and safe helper state where applicable.
+- Successful installation and its current-asset/readiness checks are sufficient
+  deployment confirmation; they do not require another browser test campaign.
+  Leave the changes installed so the user can test immediately. Report the test
+  URL and any required page reload briefly.
+- If installation is blocked or fails, say **not installed / not ready for test**
+  and explain the blocker; do not call the task done. Documentation, instructions
+  and test-tool-only edits with no installed/runtime effect need no redeployment.
+
 ## Development workflow
 
-- Record the starting commit and affected-card set before editing, including all
-  consumers of changed shared components. Record an empty set for tooling-only work.
+- Record the starting commit, acceptance cases and affected shared consumers before
+  code changes. For scoped automated verification, capture the starting dirty state
+  with `npm run test:affected -- --snapshot /private/tmp/<task>.json`.
+  Documentation/instruction-only edits need only diff and changed-link review.
 - Inspect the affected end-to-end path, preserve unrelated work, and implement
   related queued tasks as one batch with the smallest coherent shared-root fix.
-- Default to `npm run test:affected`; use `--base <starting-commit>` for committed
-  batch work and `--component <id>` for reviewed shared-file changes. Preview the
-  scope with `--plan`. Keep the source/component/check map current; unresolved
-  scope is an error, never permission to skip checks or run everything.
-- Run the smallest covering check after the batch's last edit. Check dependent
-  migrations and security controls early. Deploy compatible UI changes together
-  only to the disposable instance, then inspect representative affected components
-  and difficult layouts as the final step. Fix defects and repeat focused checks
-  and inspection. Do not manually review every equivalent card or scroll capture.
-- Update the canonical gallery, safe entities and a realistic-page example when
-  supported behavior changes. Cover materially distinct states/options/layouts,
-  without duplicating equivalent labels, colors or values into a Cartesian matrix.
-- Select `test:ha:alignment` for changed icon-only actions/shared action geometry,
-  and relevant slider, action, migration and recovery checks for those contracts.
-  Visibility checks cannot establish correct dispatch or data preservation.
-- Run reviewed theme-independent geometry and behavior in one reference theme;
+- Select development scope with `test:affected -- --since <snapshot> --tier
+  <visual|behavior|focused> --component <reviewed IDs> --plan`. Review the actual
+  task diff, including hunks in shared files; a snapshot cannot attribute concurrent
+  edits. Use reviewed `--file <path>` subsets when needed and disclose exclusions.
+  Unchanged pre-existing work is outside this task's checks. Shared consumers remain
+  in scope; inspect representative equivalent consumers. Resolve unknown mappings
+  without falling back to everything. `--base` remains available for commit ranges.
+- Verification tiers are tools for deliberately selected coverage, not an automatic
+  checklist. Use the minimal policy above for routine work. Select `focused` for
+  concrete security/data/migration/installation risks; use the smallest relevant
+  checks. A selector plan is a scope aid, not an instruction to run every check.
+- When an agent browser check is needed, use `npm run ha:preview -- --component <ids> --watch`
+  on the disposable instance. It syncs current frontend files to an already
+  compatible installation, reloads Marao when needed, then refreshes the real HA
+  page. It does not reset helpers, explicitly generate dashboards or restart HA;
+  entry reload retains normal lifecycle behavior, including generated/history updates.
+  Keep the test instance on the latest applicable project changes before completion.
+  Leave successful assets installed after inspection, errors or closing preview;
+  do not revert the package for cleanup unless the project itself was reverted.
+  Safe helper cleanup and recovery of a genuinely failed operation remain required.
+  Watch updates only while running; fresh/backend/fixture setup uses explicit `ha:sync`.
+  One targeted inspection is enough when selected. Additional layouts/themes need
+  a reported defect, concrete risk or explicit request. No mandatory screenshot.
+  Stop once the requested behavior works, essential checks pass and cleanup is
+  complete; leave remaining visual checks to the user.
+- Keep existing affected examples accurate. Add gallery cases or safe fixtures only
+  when needed to demonstrate the feature or reproduce a concrete defect; do not
+  expand a gallery matrix as a prerequisite for routine feature delivery.
+- In focused and publication verification, select `test:ha:alignment` for changed
+  icon-only/shared action geometry and relevant slider checks. A visual-only edit
+  does not inherit those suites during development. Changed action, security,
+  migration and recovery contracts still need assertions; visibility cannot prove
+  correct dispatch or data preservation.
+- In automated focused/publication coverage, run reviewed theme-independent
+  geometry and behavior in one reference theme;
   retain representative appearance/state checks in both themes and additional
   combinations where theme changes the contract. Repeat devices only for native
   gestures or geometry. Share compatible visits and validate explicitly supplied
@@ -94,7 +194,10 @@ success; keep future work in changes and archive only completed, verified work.
 - Before pushes/tags/releases, use the scoped `npm run verify:publish` gate.
   Publication requires relevant feature/component checks and applicable exact-commit
   Tests/hassfest/HACS validation; a release request alone does not request full tests.
-  Reuse unchanged validated scoped evidence rather than repeating browser work.
+  Its scope covers the whole release candidate; task snapshots, file subsets and
+  visual/behavior reports cannot narrow or satisfy publication proof. Run broad
+  regression in the explicitly requested pre-release campaign, never daily by default.
+  Reuse unchanged validated focused evidence rather than repeating browser work.
 - Treat observed warnings, error cards, console exceptions, failed resources,
   repeated requests and duplicate service calls as defects. Fix their shared root;
   never hide, suppress or relabel failures. Known relevant violations block release.
@@ -147,12 +250,15 @@ success; keep future work in changes and archive only completed, verified work.
 
 ## Binding UI and interaction rules
 
-- The acceptance target is mobile only. Relevant UI checks cover 320 CSS pixels and
-  representative iPhone and Android layouts in portrait and landscape.
-- Use scalable Montserrat typography. Test normal text, bold text, 200% text,
+- The acceptance target is mobile only. Design for 320 CSS pixels and representative
+  iPhone/Android portrait and landscape layouts. These are product requirements,
+  not a mandatory agent test matrix for every change.
+- Use scalable Montserrat typography supporting normal text, bold text, 200% text,
   200% browser zoom, and bold plus 200% text. Essential content wraps; secondary
-  content may use ellipsis.
-- Selected automated mobile profiles form the scoped UI gate. Real-phone inspection is
+  content may use ellipsis. Development selects relevant cases for the changed layout;
+  focused/publication checks retain their selected distinct profiles.
+- Selected automated mobile profiles form the focused/publication UI gate, not a
+  requirement for presentation-only development. Real-phone inspection is
   recommended when available but is not required; do not claim it was performed
   unless it was. VoiceOver, TalkBack, and OS high-contrast modes are outside the
   current acceptance target.

@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
 const { capture: captureScreenshot } = require('./verification-browser');
 const { layoutIssues, readySubtree } = require('./test-ha-dashboard-accessibility');
 
@@ -123,4 +124,19 @@ async function nativeControlGridChecks(page, scenario, theme) {
     assert.deepEqual(await issues(), [], 'Native preview surfaces must remain uniform');
   } finally { await grid.evaluate(element => { element.preview = false; }); }
 }
-module.exports = { controlGridChecks, gridGeometryIssues, measureGrid, nativeControlGridChecks };
+async function phoneRoomsChecks(page, output, scenario, theme) {
+  const grid = page.locator('marao-control-grid').first();
+  await grid.waitFor({state: 'attached'}); await readySubtree(page, grid, scenario, theme);
+  const evidence = await grid.evaluate(element => {
+    const style = getComputedStyle(element.shadowRoot.querySelector('.control-grid'));
+    return { viewport: innerWidth, section: element.getBoundingClientRect().width, font: getComputedStyle(element).fontSize,
+      columns: style.gridTemplateColumns.split(' ').length, preferred: element._config.columns,
+      titles: element._children.map(child => child._config?.name) };
+  });
+  assert.equal(evidence.viewport, scenario.viewport.width);
+  assert.ok(evidence.section < evidence.viewport, 'Rooms proof must retain real host margins');
+  assert.equal(evidence.preferred, 2); assert.equal(evidence.columns, 2, JSON.stringify(evidence));
+  assert.deepEqual(await layoutIssues(page, ['hc_room_card']), []);
+  fs.writeFileSync(path.join(output, 'phone-rooms-' + scenario.name + '-' + theme + '.json'), JSON.stringify(evidence, null, 2), {mode: 0o600});
+}
+module.exports = { controlGridChecks, gridGeometryIssues, measureGrid, nativeControlGridChecks, phoneRoomsChecks };

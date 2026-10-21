@@ -267,6 +267,49 @@ camera:
     name: Marao Dashboard Test Camera
     live: true
 
+  - platform: unifiprotect
+    name: Marao Dashboard Test Camera Adaptive High
+    live: true
+    quality: high
+    adaptive: true
+  - platform: unifiprotect
+    name: Marao Dashboard Test Camera Adaptive Medium
+    live: true
+    quality: medium
+    adaptive: true
+  - platform: unifiprotect
+    name: Marao Dashboard Test Camera Adaptive Low
+    live: true
+    quality: low
+    adaptive: true
+  - platform: unifiprotect
+    name: Marao Dashboard Test Camera Adaptive HLS High
+    quality: high
+    adaptive: true
+    hls_only: true
+  - platform: unifiprotect
+    name: Marao Dashboard Test Camera Adaptive HLS Medium
+    quality: medium
+    adaptive: true
+    hls_only: true
+  - platform: unifiprotect
+    name: Marao Dashboard Test Camera Adaptive HLS Low
+    quality: low
+    adaptive: true
+    hls_only: true
+  - platform: unifiprotect
+    name: Marao Dashboard Test Camera Slow High
+    live: true
+    quality: high
+  - platform: unifiprotect
+    name: Marao Dashboard Test Camera Slow Medium
+    live: true
+    quality: medium
+  - platform: unifiprotect
+    name: Marao Dashboard Test Camera Slow Low
+    live: true
+    quality: low
+
 media_player:
   - platform: marao_test_media
     name: Marao Dashboard Test Media Error

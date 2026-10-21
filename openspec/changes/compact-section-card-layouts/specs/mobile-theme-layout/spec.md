@@ -1,9 +1,5 @@
 # Spec Delta
 
-The added requirement names carry forward the completed, not yet synchronized
-`standardize-control-grid` contract with the revisions below. Synchronization
-must retain these successor texts rather than restoring its superseded 174px rule.
-
 ## MODIFIED Requirements
 
 ### Requirement: Compact summary title width

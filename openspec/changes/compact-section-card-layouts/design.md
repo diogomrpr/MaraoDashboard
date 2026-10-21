@@ -4,6 +4,12 @@
 
 See [proposal.md](proposal.md) for motivation and scope, and the [layout](specs/mobile-theme-layout/spec.md) and [generation](specs/dashboard-generation/spec.md) deltas for acceptance.
 
+The generation delta's added requirement names preserve the completed, not yet
+synchronized `standardize-control-grid` generation contract, extending eligibility
+to logical sections while retaining source and ownership preservation. The layout
+delta carries that contract forward with its revisions. Synchronization must
+retain these successor texts rather than restoring the superseded 174px rule.
+
 The current end-to-end path already provides the necessary ownership boundaries:
 
 - `frontend_src/MaraoDashboardPanel.js`, `editor-model.js`, `canonical-page-model.js` and `page_model.py` preserve explicit sections/columns and ordinary card options. A flat canonical page represents one implicit section; automatic domain buckets are not additional source sections.

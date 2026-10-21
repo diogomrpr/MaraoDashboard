@@ -34,6 +34,16 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Version the project-maintained skills even when local excludes ignore .agents.
+# Generated OpenSpec workflows and other machine-specific agent files stay local.
+!/.agents/
+/.agents/*
+!/.agents/skills/
+/.agents/skills/*
+!/.agents/skills/marao-ha-integration/
+!/.agents/skills/marao-ha-frontend/
+!/.agents/skills/marao-testing/
+
 # Generated build output
 ha-test/.cache/
 ha-test/.artifacts/

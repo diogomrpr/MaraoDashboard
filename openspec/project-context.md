@@ -5,6 +5,17 @@ them or turn old bugs into accepted behavior. The baseline is v0.5.1 at
 `370c2c57088b0982a5059acbeab998624e0bf427`, published on 2026-10-09. Recheck mutable
 environment and upstream facts when executing a future task.
 
+## Codex workflow decision — 2026-10-19
+
+Use the [workflow guide](README.md#codex-workflow-and-project-skills) and applicable
+project skill: `marao-ha-integration`, `marao-ha-frontend` or `marao-testing`.
+Read relevant context/quality/source-map sections, not every document by default.
+Small fixes restoring documented behavior use the short path; new behavior,
+contracts, migrations and substantial cross-layer work use an existing or new
+OpenSpec change. Honor planning versus implementation intent and compare the final
+result with concrete acceptance cases, even when tests pass. OpenSpec 1.14.3 owns
+the same six core workflows; local adaptations retain reviewed community sources.
+
 ## Product and source map
 
 Marao builds a complete mobile Home Assistant dashboard from an administrator
@@ -18,7 +29,7 @@ There is no external Lovelace card installation step.
 | `custom_components/marao_dashboard/__init__.py`, `config_flow.py`, `const.py` | Integration lifecycle, admin WebSocket commands, generation service, static routes |
 | `editor.py`, `frontend_src/editor-model.js`, `frontend_src/MaraoDashboardPanel.js`, `frontend_src/panel.css` | Card catalog, visual/JSON builder and editable editor UI |
 | `generator.py`, `config_patch.py`, `history.py`, `legacy_migration.py` | Resolution, protected YAML, config patches, history and owned resource migration |
-| `frontend/MaraoDashboard.js` | Runtime startup, font/icons, strict access slide, timeline/energy cards, shell and popup scroll containment |
+| `frontend/MaraoDashboard.js`, `MaraoNavigation.js`, `MaraoRuntime.js` | Critical navigation/recovery startup, then deferred font/icons, strict access slide, timeline/energy cards and popup scroll containment |
 | `frontend/MaraoCards.js` | Shared cards, actions, value sliders, steppers, navbar, sheets and background history traces |
 | `frontend/MaraoFrigateEventsCard.js` | Project-owned Frigate/UniFi Protect events |
 | `frontend/themes/MaraoDashboard/marao-dashboard.yaml`, `translations/` | Semantic theme and integration localization |
@@ -182,10 +193,20 @@ still uses WebSocket 9.7.1; the identified fix is two commits ahead of that vers
 The fix remains undelivered and the confirmation tasks stay open. This check did
 not update Home Assistant or claim the reconnect defect is resolved.
 
-Use `npm run test:affected` (preview with `--plan`) as the default for
-implementation, hooks, CI and publication. Include changed features and shared
-consumers only. Full-suite and parallel execution require explicit requests;
-`npm run test:full -- --parallel` is the comprehensive option. Live upgrade
+For development, capture the current dirty baseline with `test:affected -- --snapshot`
+and select subsequent task edits with `--since` and an explicit `visual`, `behavior`
+or `focused` tier. Review concurrent hunks and shared consumers. Current targeted
+inspection completes presentation-only work; behavior adds covering assertions,
+while security/data/installation changes retain focused coverage. Frontend preview
+syncs current frontend files to compatible disposable HA, reloads Marao when changed
+and refreshes the real page. Keep the latest applicable project changes installed
+before completion and leave successful assets in place unless the project is reverted.
+Safe helper cleanup and failed-operation recovery still apply; watch runs only while
+open, and fresh/backend/fixture setup uses explicit `ha:sync`. Stop when
+acceptance, required checks, diagnostics and cleanup are satisfied. Publication,
+hooks and CI retain independent focused coverage; task subsets or visual/behavior
+reports cannot narrow release proof. Full-suite and parallel execution require
+explicit requests; `npm run test:full -- --parallel` is the comprehensive pre-release option. Live upgrade
 checks apply only to changed persistence, migration, generated ownership or
 installation paths, with affected baselines, expected data, recovery and cleanup.
 Reuse validated unchanged scoped evidence and report omitted coverage honestly.
@@ -195,7 +216,7 @@ See [focused testing](../docs/docs/development/focused-testing.md).
   equal rows, responsive preferred columns, native/group hosts and preserved
   raw/automatic generation. Publication requires affected-format preserved-install
   proof when generated container types change.
-- Factored verification retains reviewed geometry/behavior in one reference theme
+- Focused/publication verification retains reviewed geometry/behavior in one reference theme
   and appearance/state coverage in both themes. Compatible visits share assertions
   and editor alignment aliases canonical geometry. Explicit version-4 reuse
   independently selects current requirements and validates original dependencies,

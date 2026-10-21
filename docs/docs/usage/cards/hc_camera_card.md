@@ -12,11 +12,32 @@ native player starts muted inline live video. Playback replaces the still
 automatically once the video advances; there is no new card, setting or opt-in.
 A missing or failed still does not prevent live startup. Unknown, unavailable
 and disconnected cameras stay neutral and clear old media. Tap an available
-card to open its generated Frigate or UniFi Protect events popup.
+card to open its generated popup with live video above Frigate or UniFi Protect events.
 
-`Live` means video is advancing. Loading and an explicitly labelled `Snapshot`
-fallback are separate states; camera recording activity alone never means that
-live playback has started. Unsupported native video keeps the snapshot and
+Choose **Dashboard stream** (the existing camera entity) and **Popup stream** in
+the builder or native card editor. Select a lower-quality camera entity for the
+dashboard and a higher-quality entity for the popup. An empty Popup stream uses
+the dashboard entity. Both views use exactly the selected entity; quality does
+not change automatically. Home Assistant uses native WebRTC when supported, with
+its normal playback fallback.
+
+Tap the popup video to open that same stream full screen with native controls.
+Rotate the device for landscape viewing and exit fullscreen to return to the
+popup. Browsers that cannot enter native fullscreen use a full-window view with a close
+button. OS rotation lock still applies. Unready video or unsupported viewing shows
+a readable reason.
+
+Healthy playback shows only the video and an optional slim title row above it.
+The dashboard builder and native card editor expose **Title** and **Show title**
+together in the basic form; `name` sets the title and
+`show_name: false` removes its whole row while retaining the saved name. Titles
+are visible by default and wrap when needed. Legacy camera icon, state and label
+options stay stored but no longer add visible content.
+
+Loading, buffering, an explicitly labelled `Snapshot` fallback and recovery
+feedback appear inside the media area only when needed. Recording activity
+alone never means that live playback has started. There is no permanent Live
+or quality footer. Unsupported native video keeps the snapshot and
 its readable reason. Reported failures expose **Retry** without an automatic
 retry loop. If Safari or another browser rejects muted autoplay, **Start live
 view** appears as exceptional recovery; tap it once to play inline without
@@ -46,7 +67,15 @@ the same for both:
     entity: camera.front_door
 ```
 
-Generated dashboards create the Marao popup automatically.
+Generated dashboards create the Marao popup automatically. For example:
+
+```json
+{
+  "entity_id": "camera.front_door_low",
+  "template": "hc_camera_card",
+  "variables": {"popup_stream_entity": "camera.front_door_high"}
+}
+```
 
 ## Frigate overrides
 
@@ -102,6 +131,12 @@ uses the same hash:
     hash: "#camera-front-door"
     entity: camera.front_door
     cards:
+      - type: custom:marao-card
+        template: hc_camera_card
+        entity: camera.front_door_high
+        show_name: false
+        tap_action:
+          action: fullscreen
       - type: custom:marao-camera-events-card
         entity: camera.front_door
         limit: 12
@@ -115,6 +150,7 @@ added to the card configuration.
 
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
+| popup_stream_entity | Dashboard entity | No | Camera entity for live video above events in the generated popup. |
 | popup_hash | `#camera` | No | Marao popup hash. Generated dashboards set a unique value. |
 | event_provider | `auto` | No | Provider override: `frigate` or `unifiprotect`. |
 | frigate_camera | Camera entity metadata | No | Frigate camera name override. |
@@ -123,3 +159,14 @@ added to the card configuration.
 | event_limit | `12` | No | Maximum recent events to request. |
 
 Reported media or history failures affect the whole card and keep a readable reason. Use the visible Retry or Refresh control to try again; event details also keep Back. Useful readings and actions with available targets remain usable. A failed actual control target shows a partial warning and disables that action. Problem surfaces take priority over artwork and custom colors.
+
+### Slow connections
+
+After live playback starts, brief buffering keeps the video frame visible with a
+localized buffering label instead of covering it with a snapshot. The native
+player stays mounted and resumes automatically.
+
+For a slow connection, choose an enabled lower-quality camera entity as the
+Dashboard stream. Select an enabled higher-quality entity for Popup stream when
+more detail is needed. Marao does not enable camera entities, alter Protect
+settings, estimate bandwidth or switch the chosen quality automatically.

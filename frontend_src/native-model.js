@@ -1,6 +1,10 @@
 export const copy = value => structuredClone(value);
 export const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export const getPath = (value, path) => path.split(".").reduce((item, key) => item?.[key], value);
+export const cameraTitleFields = () => [
+  { path: "name", label: "Title", kind: "text" },
+  { path: "show_name", label: "Show title", kind: "boolean", default: true },
+];
 
 export function patchPath(config, path, value) {
   const result = copy(config);

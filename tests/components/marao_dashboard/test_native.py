@@ -231,3 +231,13 @@ def test_native_close_or_lock_is_an_explicit_safe_action_without_an_opening_shee
     assert result["card"]["variables"]["action_service"] == "lock.lock"
     assert result["card"]["variables"]["action_label_key"] == "common.lock"
     assert result["popups"] == []
+
+
+@pytest.mark.parametrize("binding", ["sensor.front", 42, [], "camera.bad/path"])
+def test_native_camera_rejects_invalid_popup_stream_even_with_external_action(binding):
+    source = {"type": native_type("hc_camera_card"), "entity": "camera.front_low",
+              "variables": {"popup_stream_entity": binding}, "tap_action": {"action": "none"}}
+    before = deepcopy(source)
+    with pytest.raises(ValueError, match="popup stream"):
+        compile_card(source, "native-camera", "marao-dashboard")
+    assert source == before

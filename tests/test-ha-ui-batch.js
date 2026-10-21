@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright');
 const { readConfig, accessToken, setBrowserToken, assertCurrentFrontend, api } = require('../ha-test/client');
-const { applyVisualPreferences, layoutIssues, selectedRuns, parseArgs, contextOptionsForScenario, configurePageEmulation } = require('./test-ha-dashboard-accessibility');
+const { applyVisualPreferences, readySubtree, layoutIssues, selectedRuns, parseArgs, contextOptionsForScenario, configurePageEmulation } = require('./test-ha-dashboard-accessibility');
 const { namedCard } = require('./test-ha-room-cards');
 
 async function batteryChecks(page, config, output, scenario, theme, geometryOnly = false) {
@@ -64,6 +64,8 @@ async function accessChecks(page, output, scenario, theme) {
   for (const language of ['en', 'pt']) for (const width of [241, 239, 144]) {
     await host.evaluate((e, { language, width }) => { e.style.cssText = `display:block;width:${width}px;max-width:100%`; e.hass = { ...document.querySelector('home-assistant').hass, language }; }, { language, width });
     await host.scrollIntoViewIfNeeded();
+    await readySubtree(page, host, scenario, theme);
+    await host.locator('.track').waitFor({ state: 'visible' });
     assert.deepEqual((await layoutIssues(page, ['hc_access_slide_action_card'], await host.elementHandle())).filter(issue => /access (label|slide)/.test(issue)), [], `${language}/${width}`);
     const size = await host.locator('.track').boundingBox(); assert.ok(size.width >= 48 && size.height >= 48);
     if (width === 239 && language === 'en' && scenario.name === 'iphone-normal') {
@@ -111,6 +113,7 @@ async function main() {
       const routes = new Set();
       if (process.argv.includes('--slider-headers') && scenario.name === 'iphone-normal') { routes.add('living-room'); routes.add('native-example'); }
       if (process.argv.includes('--control-grid') && ['iphone-normal', 'iphone-bold-text-200'].includes(scenario.name)) { routes.add('studio'); routes.add('native-example'); }
+      if (process.argv.includes('--control-grid') && ['narrow-320', 'android-normal', 'android-bold', 'android-384', 'android-384-bold'].includes(scenario.name)) routes.add('rooms');
       if (routes.size) {
         for (const route of routes) {
           await page.goto(config.url + '/marao-dashboard/' + route);
@@ -118,6 +121,7 @@ async function main() {
           if (route === 'native-example') await page.locator('marao-native-light-card marao-card .body').first().waitFor({ state: 'attached' });
           await applyVisualPreferences(page, scenario, theme);
           assert.deepEqual(await layoutIssues(page, ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_card', 'hc_access_slide_action_card']), []);
+          if (route === 'rooms') await runCase('control-grid/rooms', () => require('./control-grid-checks').phoneRoomsChecks(page, output, scenario, theme));
           if (route === 'native-example') {
             if (process.argv.includes('--control-grid')) await runCase('control-grid/native', () => require('./control-grid-checks').nativeControlGridChecks(page, scenario, theme));
             await page.locator('marao-native-light-card').first().evaluate(e => { e.preview = true; });

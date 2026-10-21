@@ -32,6 +32,22 @@ Returning through Visual without edits retains text, undo history and position.
 Only **Save & Generate** changes the saved dashboard; invalid JSON still blocks
 Visual and Save. Editor assets and workers load locally on first use.
 
+Every successful **Save & Generate** also asks connected devices viewing the
+generated dashboard to clear frontend caches and reload their current page—even
+when you save unchanged content. Failed saves do not trigger this refresh. Regular
+signed-in users receive it too; generation remains administrator-only.
+
+After the automatic-update handler has loaded once, future Marao frontend updates
+also trigger recovery without a save. Opening an already-current dashboard does
+not clear its cache. Refresh waits while the app is hidden/offline or you are
+editing or using controls. It preserves sign-in, preferences and the current page;
+the editor itself stays open to show the save result.
+
+Older app sessions may need one manual three-second navbar hold to load this
+handler for the first time. Keep that gesture as a fallback if automatic recovery
+reports a failure. A client refresh failure does not undo a successful generation.
+Cache cleanup covers frontend responses, not all browser/OS storage.
+
 After installing Marao Dashboard with HACS, add the **Marao Dashboard**
 integration from Home Assistant's integrations page. On first setup, the
 integration creates a base dashboard JSON from your current area-assigned
@@ -479,7 +495,10 @@ Light, fan, cover and access controls use compact content-driven sizing, with
 titles and useful readings beside the icon and any slider directly below.
 In narrow embedded cards or with enlarged text, the header can wrap the icon below its text
 to preserve readable labels and full-size controls. Marao sections reflow to fewer
-columns when space is limited.
+columns when space is limited. A selected two-column section fits ordinary
+320px, 360px and 384px phone layouts at normal or bold text size, including page
+margins. Enlarged text or narrower space can use one column, and the selected
+count returns when space permits. An explicit one-column choice stays one column.
 Hidden fields reserve no empty region. Essential text, errors and the unchanged
 strict access geometry can increase height; no fixed height clips content.
 

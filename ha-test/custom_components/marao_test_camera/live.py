@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import math
 from ipaddress import ip_address
 from pathlib import Path
 from queue import Empty, Full, Queue
@@ -15,11 +17,13 @@ from homeassistant.components.http.const import KEY_HASS
 
 LIVE_PATH = "/api/marao_test_camera/live.ts"
 LIVE_FILE = Path(__file__).with_name("live.mp4")
-# Normal, delayed and missing-still sources plus one bounded recovery overlap.
-MAX_LIVE_CONNECTIONS = 4
+PROFILES = json.loads(LIVE_FILE.with_name("live-profiles.json").read_text())
+SOURCE_EPOCH = time.monotonic()
+# One three-tier ladder plus three ordinary/recovery consumers, bounded together.
+MAX_LIVE_CONNECTIONS = 6
 
 
-def remux_live(stop: Event, chunks: Queue) -> None:
+def remux_live(stop: Event, chunks: Queue, source_file: Path = LIVE_FILE) -> None:
     """Reuse HA stream's PyAV to loop encoded packets with advancing timestamps."""
     import av  # HA's stream dependency; no fixture-only installation.
 
@@ -40,26 +44,33 @@ def remux_live(stop: Event, chunks: Queue) -> None:
             return True
 
     try:
-        with av.open(str(LIVE_FILE)) as template:
+        with av.open(str(source_file)) as template:
             with av.open(Sink(), mode="w", format="mpegts", options={"flush_packets": "1", "mpegts_flags": "resend_headers"}) as output:
                 target = output.add_stream_from_template(template.streams.video[0])
-                timeline = 0
-                started = time.monotonic()
+                video = template.streams.video[0]
+                ticks_per_second = int(1 / video.time_base)
+                # Every source joins the next shared one-second random-access boundary.
+                timeline = math.ceil(time.monotonic() - SOURCE_EPOCH) * ticks_per_second
+                clip_duration = video.duration
                 while not stop.is_set():
                     first_dts = None
                     end = timeline
-                    with av.open(str(LIVE_FILE)) as source:
+                    with av.open(str(source_file)) as source:
                         video = source.streams.video[0]
+                        phase = timeline % clip_duration
+                        source.seek(phase, stream=video, backward=True, any_frame=False)
                         for packet in source.demux(video):
                             if packet.dts is None:
                                 continue
+                            if packet.dts < phase:
+                                continue
                             if first_dts is None:
-                                first_dts = packet.dts
+                                first_dts = phase
                             duration = max(1, packet.duration or int(1 / float(video.average_rate or 20) / video.time_base))
                             packet.pts = (packet.pts if packet.pts is not None else packet.dts) - first_dts + timeline
                             packet.dts = packet.dts - first_dts + timeline
                             end = max(end, packet.dts + duration, packet.pts + duration)
-                            if stop.wait(max(0, float(packet.dts * packet.time_base) - (time.monotonic() - started))):
+                            if stop.wait(max(0, float(packet.dts * packet.time_base) - (time.monotonic() - SOURCE_EPOCH))):
                                 return
                             packet.stream = target
                             output.mux(packet)
@@ -94,7 +105,11 @@ class FixtureLiveView(HomeAssistantView):
         response = web.StreamResponse(headers={"Content-Type": "video/mp2t", "Cache-Control": "no-store"})
         try:
             await response.prepare(request)
-            worker = request.app[KEY_HASS].async_add_executor_job(remux_live, stop, chunks)
+            quality = request.query.get("quality")
+            source_file = LIVE_FILE.with_name(PROFILES.get(quality, PROFILES["low"])["file"])
+            # Same 192 kbit/s link for both tiers: throttle actual encoded media bytes.
+            bps = 24000 if request.query.get("bps") == "24000" else 0
+            worker = request.app[KEY_HASS].async_add_executor_job(remux_live, stop, chunks, source_file)
             while True:
                 try:
                     data = await asyncio.to_thread(chunks.get, True, 0.25)
@@ -103,6 +118,8 @@ class FixtureLiveView(HomeAssistantView):
                         await worker  # Preserve actual source failures.
                         break
                     continue
+                if bps:
+                    await asyncio.sleep(len(data) / bps)
                 await response.write(data)
         except (ConnectionResetError, BrokenPipeError):
             # Normal native-client disposal ends its loopback source.

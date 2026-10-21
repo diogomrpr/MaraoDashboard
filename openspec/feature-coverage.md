@@ -195,7 +195,9 @@ Navbar overflow keeps complete saved navigation lists and uses the shared render
   initialization, foreground promotion, draft preservation and explicit retry.
   `editor-drag` covers steady pickup, deliberate 16px edge approach and 8px
   reversal/cancellation through unit and native-input geometry checks.
-- `camera` includes `MaraoCamera.js`, advancing safe media fixtures, native-loader
+- `camera` includes explicit dashboard/popup stream selection and native fullscreen, decoded-frame progress,
+  retained video during buffering, native slow-link checks in Chromium/WebKit,
+  `MaraoCamera.js`, advancing safe media fixtures, native-loader
   binding, per-offer native signaling ownership, early-authentication/local-ICE
   cancellation and synthetic Chromium/WebKit lifecycle checks. Those local checks do
   not establish actual HA transport, physical Safari or production NVR behavior.
@@ -204,8 +206,20 @@ This source/check inventory describes selected work; completion and executed
 proof are recorded in each change's implementation record, not inferred here.
 
 - Navbar frontend refresh uses the shared `MaraoNavbarCard` gesture and versioned
-  `MaraoFrontendRefresh.js` recovery module. The `frontend-refresh` scope covers
+  `MaraoFrontendRefresh.js` recovery module. The early `MaraoNavigation.js` and
+  lean native navbar register before the deferred `MaraoRuntime.js` content graph.
+  `test-navbar-startup-local.js` checks blocked/failed content, zero native navbar
+  compilation, all horizontal hold target families, view continuity and teardown.
+  The `frontend-refresh` scope covers
   generated/native ownership, cancellation, native no-op fallback, Android
   current-entry reload, missing APIs, deadlines, dirty/offline preservation and
   actual stale-service-worker recovery. Safe examples remain under the one
   `/marao-dashboard` root; no entity actions or persisted-format changes occur.
+
+- Narrow-phone section sizing: `control-grid` checks explicitly require two
+  columns at 282px/322px/346px section widths and actual 320px/360px/384px
+  normal/bold Rooms pages. Opt-in 384px profiles do not expand unrelated matrices. Existing narrow,
+  enlarged-text, zoom, landscape, alignment and safe-gesture checks remain.
+- Minimal camera presentation: `camera` plus shared native/model checks cover
+  the optional wrapping top title, exact `show_name` preservation, quiet healthy
+  playback and conditional in-media recovery without replacing the native player.

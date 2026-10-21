@@ -2,14 +2,14 @@ const catalogURL = new URL("./MaraoNativeCatalog.js", import.meta.url);
 catalogURL.search = new URL(import.meta.url).search;
 const { catalog } = await import(catalogURL.href);
 import { editorLabel } from "./native-labels.js";
-import { copy, same, patchPath, patchForm, formData, entityMetadata, dashboardRoot } from "./native-model.js";
+import { copy, same, patchPath, patchForm, formData, cameraTitleFields, entityMetadata, dashboardRoot } from "./native-model.js";
 
 const field = (path, label, kind = "text", extra = {}) => ({ path, label, kind, ...extra });
 const choices = (path, label, options) => field(path, label, "select", { options });
 const rowObject = value => typeof value === "string" ? { entity_id: value } : typeof value === "number" ? { value } : value;
 const actionFields = (key, config) => [
   choices(key + ".action", { tap_action: "Tap action", hold_action: "Hold action", double_tap_action: "Double tap action" }[key],
-    ["none", "toggle", "more-info", "navigate", "url", "perform-action", ...(config[key]?.action === "call-service" ? ["call-service"] : [])]),
+    ["none", "toggle", "more-info", "navigate", "url", "perform-action", ...(config.template === "hc_camera_card" || config.type === "custom:marao-native-camera-card" ? ["fullscreen"] : []), ...(config[key]?.action === "call-service" ? ["call-service"] : [])]),
   field(key + ".navigation_path", "Page"), field(key + ".url_path", "URL"),
   field(key + (config[key]?.service !== undefined && config[key]?.perform_action === undefined ? ".service" : ".perform_action"), "Action service"),
   field(key + (config[key]?.entity_id !== undefined && config[key]?.target?.entity_id === undefined ? ".entity_id" : ".target.entity_id"), "Entity", "entity", { multiple: true }),
@@ -17,13 +17,15 @@ const actionFields = (key, config) => [
 ];
 
 export function nativeFields(spec, config) {
-  const common = [field("name", "Name"), field("icon", "Icon", "icon")];
-  if (spec.domains.length) common.unshift(field("entity", "Entity", "entity", { domains: spec.domains, device_classes: spec.device_classes, required: !spec.entity_optional }));
+  const camera = spec.id === "hc_camera_card";
+  const common = camera ? cameraTitleFields()
+    : [field("name", "Name"), field("icon", "Icon", "icon")];
+  if (spec.domains.length) common.unshift(field("entity", camera ? "Dashboard stream" : "Entity", "entity", { domains: spec.domains, device_classes: spec.device_classes, required: !spec.entity_optional }));
   if (["hc_navigation_card", "hc_room_card"].includes(spec.id)) common.push(field("page", "Page"));
   if (spec.id === "hc_entity_group_card") common.push(
     choices("entity_type", "Group type", ["light", "cover", "battery", "climate"]),
     choices("popup_filter", "Popup filter", ["all", "active"]));
-  const advanced = ["show_name", "show_icon", "show_state", "show_label"].map(key => field(key, key.replaceAll("_", " ").replace(/^./, s => s.toUpperCase()), "boolean"));
+  const advanced = (camera ? [] : ["show_name", "show_icon", "show_state", "show_label"]).map(key => field(key, key.replaceAll("_", " ").replace(/^./, s => s.toUpperCase()), "boolean"));
   for (const option of spec.variables) {
     if (["vacuum_action", "number_list"].includes(option.kind)) continue;
     const item = field("variables." + option.key, option.label, option.kind, option);
@@ -87,7 +89,7 @@ export class MaraoNativeCardEditor extends (globalThis.HTMLElement || class {}) 
         const selected = item.path.split(".").reduce((value, key) => value?.[key], this._draft);
         if (selected && !options.includes(selected)) options.push(selected);
       }
-      const labels = { none: "No action", toggle: "Toggle", "more-info": "More information", navigate: "Navigate", url: "Open URL", "perform-action": "Service action", "call-service": "Service action", unifi_protect: "UniFi Protect", frigate: "Frigate", all: "All entities", active: "Active only", light: "Lights", cover: "Covers", battery: "Batteries", climate: "Thermostats", day: "Day", month: "Month", auto: "Auto" };
+      const labels = { fullscreen: "Full screen", none: "No action", toggle: "Toggle", "more-info": "More information", navigate: "Navigate", url: "Open URL", "perform-action": "Service action", "call-service": "Service action", unifi_protect: "UniFi Protect", frigate: "Frigate", all: "All entities", active: "Active only", light: "Lights", cover: "Covers", battery: "Batteries", climate: "Thermostats", day: "Day", month: "Month", auto: "Auto" };
       return { select: { options: options.map(value => ({ value, label: this._label(labels[value] || catalog.cards.find(card => card.type === value || card.id === value)?.label || value) })) } };
     }
     if (["boolean", "icon", "object"].includes(item.kind)) return { [item.kind]: {} };

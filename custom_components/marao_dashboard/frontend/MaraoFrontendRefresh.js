@@ -57,7 +57,9 @@ export async function clearFrontendCaches(host, signal) {
   }
 }
 
-export function refreshFrontend({ host = window, isDirty = () => host.isDirtyState, onStatus = () => {} } = {}) {
+export const frontendRefreshInProgress = (host = window) => operations.has(host);
+
+export function refreshFrontend({ host = window, isDirty = () => host.isDirtyState, onStatus = () => {}, beforeClear = () => {} } = {}) {
   if (operations.has(host)) return operations.get(host);
   const controller = new AbortController(), { signal } = controller;
   const originalURL = host.location.href;
@@ -85,6 +87,7 @@ export function refreshFrontend({ host = window, isDirty = () => host.isDirtySta
     } catch (error) { if (signal.aborted) throw error; throw failure('offline'); }
     if (!response.ok) throw failure('offline');
     active();
+    beforeClear();
     const bridge = host.webkit?.messageHandlers?.externalBus;
     if (bridge?.postMessage) {
       try { bridge.postMessage({ id: Date.now(), type: 'frontend/reload_and_clear_cache' }); }
@@ -188,9 +191,10 @@ export function bindNavbarRefresh(nav, { eligible, progress, complete, haptic })
   const context = event => { if (eligible()) event.preventDefault(); };
   nav.addEventListener('pointerdown', down);
   nav.addEventListener('click', click, true);
-  nav.addEventListener('contextmenu', context);
+  nav.addEventListener('contextmenu', context, true);
+  nav.addEventListener('dragstart', context, true);
   return { cancel, destroy() {
     cancel(); clearSuppression(); stopTracking();
-    nav.removeEventListener('pointerdown', down); nav.removeEventListener('click', click, true); nav.removeEventListener('contextmenu', context);
+    nav.removeEventListener('pointerdown', down); nav.removeEventListener('click', click, true); nav.removeEventListener('contextmenu', context, true); nav.removeEventListener('dragstart', context, true);
   } };
 }

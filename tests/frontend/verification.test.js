@@ -187,3 +187,13 @@ test('UI batch selection keeps bounded runtime and editor consumers without hist
   assert.ok(!checks.some(c => /mobile-matrix|preserved-upgrade|native-reconnect|camera/.test(c.id)));
   for (const c of checks.filter(c => c.command.includes('tests/test-ha-editor.js'))) assert.ok(c.inputs.includes('tests/editor-rendering-checks.js'));
 });
+
+test('reviewed camera title forms retain native acceptance without unrelated native-card geometry or JSON preload matrices', () => {
+  const files=['frontend_src/native-model.js','frontend_src/MaraoNativeCardEditor.js','frontend_src/editor-labels.js','custom_components/marao_dashboard/frontend/MaraoDashboardEditorLabels.js'];
+  const scope=selectComponents(files,['camera','editor-ui']);
+  assert.ok(scope.components.includes('camera-editor'));assert.ok(!scope.components.includes('native'));assert.ok(!scope.components.includes('editor-preload'));
+  const checks=checksFor(scope);assert.ok(checks.some(c=>c.id==='native-editor'));assert.ok(checks.some(c=>c.id==='unit:marao-native'));assert.ok(checks.some(c=>c.id==='python:test_native'));
+  assert.ok(!checks.some(c=>c.id.startsWith('layout:')||c.id.startsWith('editor-preload:')));
+  assert.ok(selectComponents(['frontend_src/native-model.js']).components.includes('native'),'Unreviewed shared edits retain conservative native scope');
+  assert.ok(checksFor(selectComponents(['frontend_src/native-model.js'],['native'])).some(c=>c.id==='layout:android-normal'));
+});

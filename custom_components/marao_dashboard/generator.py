@@ -2744,6 +2744,8 @@ def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
 
 
 def _camera_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any]:
+    from .page_model import camera_popup_stream
+
     entity_id = entity["entity_id"]
     variables = entity.get("variables") if isinstance(entity.get("variables"), dict) else {}
     events_card: dict[str, Any] = {
@@ -2772,7 +2774,12 @@ def _camera_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any
             entity.get("icon") or "mdi:cctv",
             "780px",
         ),
-        "cards": [events_card],
+        "cards": [{
+            "type": "custom:marao-card", "template": "hc_camera_card",
+            "entity": camera_popup_stream(entity_id, variables),
+            "name": entity.get("name") or _friendly_name(entity_id), "show_name": False,
+            "tap_action": {"action": "fullscreen"},
+        }, events_card],
     }
 
 

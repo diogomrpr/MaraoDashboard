@@ -306,7 +306,7 @@
             {
               "id": "card-4",
               "template": "hc_room_card",
-              "name": "Empty Room",
+              "name": "Empty room with a longer wrapping name",
               "icon": "mdi:bed",
               "page": "empty-room",
               "variables": {
@@ -326,6 +326,29 @@
       "icon": "mdi:shield-home",
       "output_path": "views/main/01-security.yaml",
       "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "entity_id": "camera.marao_dashboard_test_camera_slow_low",
+              "template": "hc_camera_card",
+              "name": "Slow connection camera",
+              "id": "camera-quality",
+              "show_name": false
+            },
+            {
+              "entity_id": "camera.marao_dashboard_test_camera_adaptive_low",
+              "template": "hc_camera_card",
+              "name": "Entrance camera",
+              "id": "camera-adaptive-quality",
+              "variables": {
+                "popup_stream_entity": "camera.marao_dashboard_test_camera_adaptive_high",
+                "event_provider": "unifiprotect",
+                "unifi_protect_media_source": "media-source://unifiprotect/fixture:browse:front"
+              }
+            }
+          ]
+        },
         {
           "columns": 1,
           "entities": [
@@ -1225,7 +1248,7 @@
               "id": "studio-title",
               "template": "hc_title_card",
               "name": "Studio controls",
-              "label": "Hold a navbar icon for three seconds to refresh this device. Sign-in, settings and the current page are kept.",
+              "label": "Hold a navbar icon for three seconds to refresh this device. The same hold works between icons. Sign-in, settings and the current page are kept. Pressed icons and overflow controls stay rounded without a square highlight.",
               "show_icon": false,
               "show_state": false
             }

@@ -1,41 +1,18 @@
 schema: spec-driven
 context: |
-  Marao is a complete mobile Home Assistant dashboard, including its integration,
-  administrator builder, generator, cards, popups, navbar, theme, and Cases gallery.
-  Read AGENTS.md and docs/docs/development/dashboard-quality.md first. They take
-  precedence over OpenSpec; OpenSpec records the baseline and proposed changes.
-  Read openspec/README.md, openspec/project-context.md, openspec/feature-coverage.md,
-  and the affected capability specs. The baseline describes published v0.5.1,
-  not a new feature backlog. Use the source/check map to trace the complete path.
-  Agents may access, test, or modify only disposable Home Assistant 192.168.0.28.
-  All physical-action tests use safe fixtures. Never expose credentials or private
-  entity/media data; local configuration and diagnostic artifacts remain ignored.
-  Keep the runtime self-contained without third-party Lovelace cards. Preserve
-  Marao identity and the README's single approved attribution.
-  Mobile is the acceptance target: 320px, iPhone/Android portrait and landscape,
-  light/dark, normal/bold/200% text/200% zoom/bold plus 200% text. Automated mobile
-  profiles are the gate; never claim physical-phone or Safari inspection without it.
-  The user allows the diagnosed native Home Assistant stale-unsubscribe reconnect
-  failure until its upstream fix reaches a stable frontend. Keep raw assertions and
-  exact native evidence; all other publication and upgrade gates remain required.
-  The current user-approved policy defaults to npm run test:affected during
-  implementation, hooks, automatic CI and publication. Select changed features,
-  shared consumers and relevant mobile/action/migration checks only. Full-suite
-  and parallel execution require explicit requests; no release request implicitly
-  authorizes either. Batch related work, prepare once and inspect representative
-  changed components. Keep private per-job evidence and serialize shared mutations.
-  OpenSpec is development tooling only. Preserve unrelated work and use the smallest
-  coherent shared-root change; do not add a framework or abstraction for speculation.
-  Assess saved-release compatibility before changing JSON, defaults, generated
-  contracts or APIs. Preserve explicit intent, unknown/raw/custom content and
-  unrelated ownership. Reuse ordered conversions with preflight, private backups
-  and recovery; previews/dry runs stay read-only and archives stay immutable.
-  Keep historical fixtures, independent expected JSON and feature coverage current.
-  Versioned publication uses scoped exact-candidate evidence and applicable CI.
-  Live preserved-install checks are conditional on changed persistence, migration,
-  generated ownership or installation/upgrade paths, covering affected baselines,
-  independent expected data, recovery and cleanup. Full historical/mobile checks
-  remain an explicit option. Preserve old comprehensive evidence without relabeling.
+  Marao is a complete mobile HA dashboard: Python integration/generator, vanilla
+  JavaScript custom elements, visual/JSON editor, theme and safe Cases gallery.
+  AGENTS.md controls this workflow. Use openspec/README.md to route to affected
+  capability specs and relevant project-context, quality and source/check sections;
+  do not reread all documentation or copy its policies into every artifact.
+  Small repairs restoring documented behavior use the short path; new behavior,
+  contracts, migrations and substantial cross-layer work use OpenSpec changes.
+  Agents may operate only disposable 192.168.0.28 with safe fixtures; keep secrets
+  and private evidence ignored. Preserve the self-contained runtime and saved data.
+  Use the applicable marao-ha-integration, marao-ha-frontend and marao-testing
+  skills. Capture task scope and select test:affected visual, behavior or focused
+  tiers. Current targeted inspection completes cosmetic work; full/parallel runs
+  require explicit requests. Publication independently covers the whole candidate.
 rules:
   proposal:
   - State the concrete problem, scope, affected-card set (or empty), and non-goals.
@@ -47,20 +24,21 @@ rules:
   design:
   - Trace relevant builder, validation, generator, shared runtime, theme, translations, documentation, tests, and fixtures.
   - Reuse existing components and state any migration, data-preservation, privacy, and action-safety implications.
-  - Describe historical inputs and independent expected transformations, backup/preflight/recovery, read-only paths and complete package-plus-data rollback.
+  - For persistence, ownership or upgrade changes, describe historical inputs, independent expected transformations, backup/preflight/recovery and package-plus-data rollback.
   tasks:
   - Make tasks concrete and checkable; keep future or unverified work unchecked.
-  - Batch related queued implementation tasks; use one covering focused check and final combined affected-card visual inspection, with early checks for dependent migrations and shared security controls.
-  - Include gallery and realistic-page examples when supported behavior changes, and alignment checks for icon-only layouts.
+  - Batch related tasks; choose visual inspection for presentation-only work, smallest behavioral assertions for behavior changes, and focused coverage for sensitive contracts. Inspect current affected UI once and stop when acceptance, required checks, diagnostics and cleanup are satisfied.
+  - Include gallery and realistic-page examples when supported behavior changes; retain affected alignment checks in focused/publication coverage, not every cosmetic iteration.
   - Require verify:publish before any push, tag, or release; do not require the full suite for ordinary small changes.
   - Keep focused migration checks; require scoped preserved-install proof only for changed persistence, ownership or upgrade paths during explicit release preparation.
+  - Verify requested outcomes against implementation and evidence; artifact existence and passing tests alone are not completion.
 operations:
   apply:
     guidance:
-    - Follow AGENTS.md; inspect the end-to-end path and record every affected card before editing.
-    - Record upgrade impact and preserve supported saved configurations; maintain historical expected fixtures when formats or generated contracts change.
-    - Implement related queued tasks together; run a covering focused check per batch and early checks for dependent migrations and shared security controls. Deploy UI changes only to 192.168.0.28 with safe fixture actions.
-    - After the focused batch check, inspect representative affected components. Use affected checks for publication; full-suite and parallel runs require explicit user requests.
+    - Follow AGENTS.md; record acceptance cases and affected shared consumers, capture the task baseline before editing, and preserve unrelated dirty/concurrent work.
+    - Assess upgrade impact when formats, generated contracts or persistence change; preserve supported saved configurations and expected fixtures.
+    - "Implement related queued tasks together and complete the selected development tier. Retain early checks for dependent migrations/security. Keep disposable 192.168.0.28 current before completion: preview syncs frontend files to compatible HA and refreshes the browser; fresh/backend/fixture setup uses explicit ha:sync. Leave successful assets installed unless the project is reverted. Preserve safe helper cleanup and failed-operation recovery; watch runs only while open."
+    - Compare implementation and evidence with requested outcomes. One current targeted UI inspection is sufficient; do not broaden or repeat without changed inputs, a failure or a concrete concern. Tooling-only work needs no HA visit; development scope cannot narrow publication.
   archive:
     guidance:
     - Archive only completed and verified work; never archive unresolved upstream follow-ups as complete.

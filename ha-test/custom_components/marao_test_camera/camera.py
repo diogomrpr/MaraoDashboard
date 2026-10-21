@@ -5,21 +5,20 @@ from __future__ import annotations
 from homeassistant.components.camera import Camera, CameraEntityFeature
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_state_change_event
-import base64
 import asyncio
 
 
 from pathlib import Path
 from homeassistant.util import slugify
 
-from .live import LIVE_PATH
+from .live import LIVE_PATH, PROFILES
 
 CAMERA_IMAGE = Path(__file__).with_name("event.svg").read_bytes()
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the local visual-test camera entity."""
-    async_add_entities([MaraoTestCamera(config.get("name", "Marao Test Camera"), config.get("initial_state", "idle"), config.get("picture_error", False), config.get("live", False), config.get("live_delay", 0), config.get("missing_still", False))])
+    async_add_entities([MaraoTestCamera(config.get("name", "Marao Test Camera"), config.get("initial_state", "idle"), config.get("picture_error", False), config.get("live", False), config.get("live_delay", 0), config.get("missing_still", False), config.get("quality"), config.get("adaptive", False))])
 
 
 class MaraoTestCamera(Camera):
@@ -27,7 +26,7 @@ class MaraoTestCamera(Camera):
 
     _attr_should_poll = False
 
-    def __init__(self, name: str, initial_state: str = "idle", picture_error: bool = False, live: bool = False, live_delay: float = 0, missing_still: bool = False) -> None:
+    def __init__(self, name: str, initial_state: str = "idle", picture_error: bool = False, live: bool = False, live_delay: float = 0, missing_still: bool = False, quality: str | None = None, adaptive: bool = False) -> None:
         super().__init__()
         self.content_type = "image/svg+xml"
         self._attr_name = name
@@ -35,6 +34,13 @@ class MaraoTestCamera(Camera):
         self._fixture_state = None if initial_state == "unknown" else initial_state
         self._attr_available = initial_state != "unavailable"
         self._attr_extra_state_attributes = {"client_id": "marao_test", "camera_name": "front"}
+        self._quality = quality
+        self._adaptive = adaptive
+        if quality:
+            profile = PROFILES[quality]
+            self._attr_extra_state_attributes.update({"channel_id": {"high": 0, "medium": 1, "low": 2}[quality],
+                "bitrate": profile["bandwidth"],
+                **{key: profile[key] for key in ("fps", "width", "height", "bandwidth", "average_bandwidth", "codec")}})
         self._picture_error = picture_error
         self._live = live
         self._live_delay = live_delay
@@ -54,10 +60,12 @@ class MaraoTestCamera(Camera):
     def entity_picture(self):
         if self._missing_still:
             return None
-        if not self._picture_error:
-            return super().entity_picture
-        data = CAMERA_IMAGE if self.hass.states.is_state("input_boolean.marao_dashboard_test_media_failure", "off") else b"<svg"
-        return "data:image/svg+xml;base64," + base64.b64encode(data).decode()
+        picture = super().entity_picture
+        if not self._picture_error or not picture:
+            return picture
+        # Native HA pickers append dimensions; data URLs cannot carry that query.
+        mode = "good" if self.hass.states.is_state("input_boolean.marao_dashboard_test_media_failure", "off") else "broken"
+        return f"{picture}&fixture_media={mode}"
 
     @property
     def state(self):
@@ -65,7 +73,11 @@ class MaraoTestCamera(Camera):
 
     async def async_camera_image(self, width=None, height=None) -> bytes:
         """Return the static test frame."""
-        return None if self._missing_still else CAMERA_IMAGE
+        if self._missing_still:
+            return None
+        if self._picture_error and not self.hass.states.is_state("input_boolean.marao_dashboard_test_media_failure", "off"):
+            return b"<svg"
+        return CAMERA_IMAGE
 
     async def stream_source(self):
         """Advancing synthetic local media; never a real camera or remote feed."""
@@ -73,6 +85,9 @@ class MaraoTestCamera(Camera):
             return None
         if self._live_delay:
             await asyncio.sleep(self._live_delay)
+        if self._adaptive:
+            from .rtsp import async_rtsp_source
+            return await async_rtsp_source(self.hass, self._quality)
         if self.hass.http.context is not None:
             raise RuntimeError("The disposable live fixture requires its local HTTP listener")
-        return f"http://127.0.0.1:{self.hass.http.server_port}{LIVE_PATH}"
+        return f"http://127.0.0.1:{self.hass.http.server_port}{LIVE_PATH}" + (f"?quality={self._quality}&bps=24000" if self._quality else "")

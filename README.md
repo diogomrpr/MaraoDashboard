@@ -42,9 +42,10 @@ configuration, camera-provider requirements, updates, and troubleshooting.
 
 ## Development
 
-The [OpenSpec guide](openspec/README.md) records the existing product contracts,
-development context, and workflow for proposing and implementing future tasks.
-Read it alongside `AGENTS.md` before changing behavior.
+The [Codex workflow and project skills](openspec/README.md#codex-workflow-and-project-skills)
+cover HA integration, frontend development and scoped testing. Follow `AGENTS.md`
+and the affected capability specs: small existing-behavior repairs use the short
+path; new behavior and substantial changes use OpenSpec.
 
 Install the locked Node and Python test dependencies:
 

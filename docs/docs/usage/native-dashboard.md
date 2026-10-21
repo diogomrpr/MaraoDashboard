@@ -89,6 +89,18 @@ the frontend on this device. Progress appears during the hold. Releasing early,
 moving away, scrolling or leaving the app cancels; ordinary taps still navigate.
 The same gesture works on generated Marao dashboards and on the More toggle;
 the vertical overflow menu retains its normal scrolling and route selection.
+The hold covers the entire horizontal pill, including gaps, padding and nested
+icons. Horizontal destinations use buttons so holding them does not invoke a
+link URL preview. Ordinary short taps still navigate immediately.
+Pressed icons and overflow controls retain their rounded appearance without an
+extra rectangular browser highlight; the selected route keeps its circular fill.
+
+Navigation and reload initialize before optional card modules and do not wait
+for native-card compilation. The configured bar stays available during
+same-dashboard page replacement or content failure. Leaving its context, deleting
+it or explicitly emptying navigation removes it; editor and modal protections
+still apply. Availability starts after Home Assistant supplies its shell and
+saved configuration.
 
 Refresh keeps sign-in, settings and the current page. Save or discard unsaved
 edits first; editor previews and modal backgrounds cannot trigger it. iOS uses

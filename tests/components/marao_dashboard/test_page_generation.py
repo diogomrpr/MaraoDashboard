@@ -292,3 +292,32 @@ def test_editor_section_moves_preserve_generated_identities_sheets_and_protected
     assert (root / "views/pages/home.yaml").read_bytes() == first_view
     # Destination remains automatic; changing membership does not force fixed columns.
     assert "columns" not in moved["pages"][0]["sections"][1]
+
+
+@pytest.mark.parametrize("popup_stream", [None, "", "camera.front_high"])
+def test_camera_popup_stream_preserves_dashboard_identity_and_event_options(popup_stream):
+    item = {"entity_id": "camera.front_low", "template": "hc_camera_card", "name": "Entrance",
+            "show_name": False, "future": [], "variables": {"popup_stream_entity": popup_stream,
+            "event_provider": "unifiprotect", "unifi_protect_media_source": "media-source://unifiprotect/test", "event_limit": 7}}
+    original = deepcopy(item)
+    card, popup = g._page_card(item, "marao-dashboard"), g._camera_popup(item)
+    assert card["entity"] == "camera.front_low"
+    live, events = popup["cards"]
+    assert live == {"type": "custom:marao-card", "template": "hc_camera_card", "entity": popup_stream or "camera.front_low",
+                    "name": "Entrance", "show_name": False, "tap_action": {"action": "fullscreen"}}
+    assert events["entity"] == "camera.front_low"
+    assert events["event_provider"] == "unifiprotect" and events["limit"] == 7
+    assert events["unifi_protect_media_source"] == "media-source://unifiprotect/test"
+    assert item == original
+
+
+@pytest.mark.parametrize("binding", ["sensor.front", 42, [], "camera.bad/path"])
+def test_invalid_popup_camera_stream_is_rejected_before_output_write(tmp_path, binding):
+    source = {"config_version": 2, "name": "Camera streams", "landing_page": "home", "pages": [
+        {"name": "Home", "path": "home", "entities": [{"id": "camera", "entity_id": "camera.low", "template": "hc_camera_card",
+         "variables": {"popup_stream_entity": binding}}]}]}
+    before = deepcopy(source)
+    with pytest.raises(ValueError, match="popup stream"):
+        g.write_dashboard(source, tmp_path)
+    assert source == before
+    assert not list(tmp_path.iterdir())

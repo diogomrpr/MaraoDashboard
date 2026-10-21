@@ -96,6 +96,9 @@ def compile_card(config, instance, url_path, entities=None, language="en", valid
     if not isinstance(variables, dict):
         raise ValueError("Native card variables must be an object")
     role = spec["id"]
+    if role == "hc_camera_card":
+        from .page_model import camera_popup_stream
+        camera_popup_stream(config.get("entity"), variables)
     registry = _registry(entities or [])
     entry = {**deepcopy(config), "template": role, "id": instance}
     entry.pop("type", None)
