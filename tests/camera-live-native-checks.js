@@ -103,7 +103,8 @@ async function waitForCameraAdvance(page, card, { captureBaseline = false, metad
     video: card._camera.video, before: card._camera.video?.currentTime }), card);
   let observation;
   try {
-    observation = await page.waitForFunction(observeNativeCamera, { card, probe, captureBaseline, metadata }, { timeout: 5000, polling: 50 });
+    // HA can promote HLS to WebRTC after first playback; retain its startup budget.
+    observation = await page.waitForFunction(observeNativeCamera, { card, probe, captureBaseline, metadata }, { timeout: 35000, polling: 50 });
     return await observation.jsonValue();
   } catch (error) {
     error.cameraProgress = await page.evaluate(({ card, probe }) => ({ before: probe.before, time: card._camera?.video?.currentTime,

@@ -166,7 +166,7 @@ function nativeProgressFixture(polls) {
     async evaluate(callback, argument) { return callback(argument); },
     async evaluateHandle(create, target) { assert.equal(target, card); return { ...create(target), async dispose() { disposed.probe = true; } }; },
     async waitForFunction(predicate, argument, options) {
-      assert.equal(argument.card, card); assert.equal(options.timeout, 5000, 'One fixed overall playback budget'); assert.equal(options.polling, 50);
+      assert.equal(argument.card, card); assert.equal(options.timeout, 35000, 'One fixed native startup and playback budget'); assert.equal(options.polling, 50);
       const observed = polls(predicate, argument);
       return { async jsonValue() { return observed; }, async dispose() { disposed.result = true; } };
     },
@@ -180,7 +180,7 @@ function nativeProgressFixture(polls) {
     },
   };
 }
-const timeout = () => Object.assign(new Error('Five second playback deadline'), { name: 'TimeoutError' });
+const timeout = () => Object.assign(new Error('Native playback deadline'), { name: 'TimeoutError' });
 test('native progress resets the clock only per actual owned selected video and captures one atomic snapshot', async () => {
   const fixture = nativeProgressFixture((predicate, argument) => {
     assert.equal(predicate(argument), false);
