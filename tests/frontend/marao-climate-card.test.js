@@ -412,7 +412,9 @@ test("light state palette colors share a dark foreground across card families", 
   for (const [kind, state] of [["hc_access_card", "locked"], ["hc_switch_card", "on"], ["hc_climate_card", "fan_only"]]) {
     assert.equal(stateAppearance(kind, state, {}, {}).text, "var(--active-text-color)", `${kind}: green keeps white text`);
   }
-  assert.equal(stateAppearance("hc_wallbox_current_card", "16", {}, {}).text, "var(--active-text-color, #fff)");
+  const current = stateAppearance("hc_wallbox_current_card", "16", {}, {});
+  assert.equal(current.text, "var(--primary-text-color)");
+  assert.equal(current.background, "var(--ha-card-background,var(--card-background-color))");
   for (const [kind, state] of [["hc_sensor_card", "on"], ["hc_room_card", "on"]]) {
     const appearance = stateAppearance(kind, state, {}, {});
     assert.equal(appearance.text, "var(--text-primary-color,var(--active-text-color))");
