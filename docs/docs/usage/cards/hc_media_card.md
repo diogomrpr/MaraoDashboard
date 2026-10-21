@@ -61,8 +61,11 @@ up, home; left, select, right; rewind, down, fast-forward; then volume,
 play/pause, volume. Without `volume_remote_entity`, the normal media-player
 volume services are used.
 
-YouTube, Netflix, Disney+, Prime Video, Apple TV and Plex shortcuts automatically
-use the real app icon and brand colors. Recognition uses the configured app source
+App shortcuts show the logo across the full square card, without a visible title
+or normal player-state line. The configured app name remains the accessible button
+label. Unavailable players still show a readable warning and disable launching.
+YouTube, Netflix, Disney+, Prime Video, Apple TV, Plex and MEO shortcuts automatically
+use their real app icons and brand colors. MEO and MEO Go use the official MEO Go artwork. Recognition uses the configured app source
 (including its bundle ID), so you can keep your own display name. Icons ship with
 Marao and do not require an external image service while using the dashboard.
 Other apps retain their configured icon and theme colors. Existing source values,

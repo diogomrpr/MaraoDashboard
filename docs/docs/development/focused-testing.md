@@ -162,6 +162,11 @@ whole-gallery scans for equivalent samples.
 Explicit integration checks use the selected contracts and shared consumers.
 Version hooks, automatic CI and publication use unit tests only; a release request
 does not request integration, full-suite or parallel execution.
+Every release still requires installing its final candidate, including version
+metadata, on disposable `192.168.0.28` before publication. Preserve test settings
+and helper state, reuse an exact matching installation, and confirm it through
+normal asset/readiness checks. A failed installation blocks publication; it does
+not trigger an integration-test campaign.
 
 ```sh
 npm run test:affected -- --plan

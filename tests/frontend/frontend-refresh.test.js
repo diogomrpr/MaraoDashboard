@@ -72,6 +72,19 @@ test('pending saves coalesce and defer for editing, hidden state and unrelated p
   assert.equal(e.refreshes.length, 1);
 });
 
+test('Android suspension without pointer release does not block an update on return', async t => {
+  const e = automatic(t); await flush();
+  e.doc.dispatchEvent(pointer('pointerdown'));
+  e.send({ fingerprint: 'two' }); await flush();
+  assert.equal(e.refreshes.length, 0, 'An active touch still defers refresh');
+  e.doc.visibilityState = 'hidden'; e.doc.dispatchEvent(new Event('visibilitychange'));
+  await flush(); assert.equal(e.refreshes.length, 0, 'A suspended app must not refresh');
+  e.doc.visibilityState = 'visible'; e.doc.dispatchEvent(new Event('visibilitychange'));
+  await flush(); assert.equal(e.refreshes.length, 1, 'A missing pointerup cannot strand the pending update');
+  e.host.dispatchEvent(new Event('focus')); await flush();
+  assert.equal(e.refreshes.length, 1, 'Repeated foreground events do not reload again');
+});
+
 test('offline preflight keeps pending work; foreground retries once without repeated attempts', async t => {
   const e = automatic(t); await flush(); e.reject('offline'); e.send({ request_id: 'a' }); await flush();
   assert.equal(e.storage.size, 0); e.controller.update(e.hass); await flush(); assert.equal(e.refreshes.length, 0);

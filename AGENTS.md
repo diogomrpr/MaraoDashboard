@@ -195,9 +195,16 @@ keep future work in changes and archive only completed, verified work.
   only, serially, across the whole release candidate. Automatic Tests CI and
   version hooks also run unit tests only. Retain applicable exact-commit
   hassfest/HACS validation as package metadata checks.
+- Before publishing every release, install the final release candidate, including
+  its version metadata, on disposable Home Assistant `192.168.0.28`. A release
+  request authorizes this installation. Batch it once after final code and version
+  edits; if the exact candidate is already installed, verify and reuse that
+  installation. Preserve test configuration and helper state. Installation failure
+  blocks publication. Served-asset/readiness checks confirm installation without
+  adding integration tests; use the fastest compatible installation path above.
 - Integration, browser, camera playback, geometry, performance, mobile matrices
   and preserved-install/upgrade testing belong to development. Reuse those results
-  at release; do not rerun them or require new reports, captures, deployments or
+  at release; do not rerun them or require new reports, captures or
   exact-release-commit integration evidence. A release request never authorizes
   additional integration/full tests. Run them only when the user explicitly asks,
   scoped to the changed features unless they request a comprehensive campaign.

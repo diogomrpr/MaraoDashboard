@@ -90,3 +90,5 @@ The dashboard serves these files locally and performs no runtime App Store looku
 - [Amazon Prime Video](https://apps.apple.com/pt/app/amazon-prime-video/id545519333) — `com.amazon.aiv.AIVApp`.
 - [Apple TV](https://apps.apple.com/pt/app/apple-tv/id1174078549) — `com.apple.tv`.
 - [Plex: Find Movies and TV Shows](https://apps.apple.com/pt/app/plex-find-movies-and-tv-shows/id383457673) — `com.plexapp.plex`.
+
+- [MEO Go](https://apps.apple.com/pt/app/meo-go/id394637480?platform=tv) — `pt.sapo.mobile.iphone.tmn.meomobile`, also recognized as `MEO` or `MEO Go`.

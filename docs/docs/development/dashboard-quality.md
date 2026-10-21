@@ -219,7 +219,9 @@ the action it affects.
   Keep the default background neutral; preserve configured shortcuts and colors.
 - Give other visible Marao card titles the full content width in their first row.
   Put icons, readings and controls below them, including climate steppers, Wallbox
-  shortcuts, media apps and separate history, energy and camera-event headers.
+  shortcuts and separate history, energy and camera-event headers.
+  Media app shortcuts use full-card square logos without a visible title; keep
+  the configured app name as the button’s semantic label and show problem reasons.
   Preserve intentionally hidden titles and centered icon-only controls.
 - Secondary, nonessential metadata may use an ellipsis.
 - Reflow multi-column content before controls become cramped.

@@ -230,3 +230,9 @@ Integration/browser/camera/mobile/upgrade testing belongs to development and is
 reused at release. Additional integration or full tests require an explicit user
 request. This supersedes earlier release-evidence requirements in this document
 and older change artifacts; historical results remain unchanged.
+
+Before publishing every release, install its final candidate and version metadata
+on disposable Home Assistant `192.168.0.28`, preserving test configuration and
+helper state. Reuse an exact matching installation; otherwise batch one install
+after final edits. Installation failure blocks publication. Normal asset/readiness
+confirmation is sufficient and does not add integration tests to the release.

@@ -33,6 +33,7 @@ const mediaApps = [
   { id: "prime-video", sources: ["Prime Video", "Amazon Prime Video", "com.amazon.aiv.AIVApp"], color: "#0064b5", text: "#fff" },
   { id: "apple-tv", sources: ["TV", "Apple TV", "Apple TV+", "com.apple.tv", "com.apple.TVWatchList"], color: "#151515", text: "#fff" },
   { id: "plex", sources: ["Plex", "com.plexapp.plex"], color: "#e5a00d", text: "#171717" },
+  { id: "meo", sources: ["MEO", "MEO Go", "pt.sapo.mobile.iphone.tmn.meomobile"], color: "#3525ff", text: "#fff" },
 ];
 
 export function mediaAppBrand(config) {
@@ -98,6 +99,7 @@ function actionControlLabel(config, state, entity, action, hass) {
   }
   const configured = text(config?.name).trim();
   if (configured) return configured;
+  if (config.template === "hc_media_app_card" && config.variables?.app_source) return text(config.variables.app_source);
   const command = text(action?.data?.command).trim();
   if (command) return localize(`controls.command.${command.toLowerCase()}`, hass, {}, climateModeLabel(command, hass));
   const service = text(action?.service || action?.perform_action).split(".").pop();
@@ -781,10 +783,10 @@ function cardStyles() {
     ha-card.title-surface { overflow:visible; background:transparent; box-shadow:none; }
     .body.title-card { display:block; min-height:0; padding:0 0 20px; }
     .body.title-card .title { font-size:calc(var(--font-size-primary,1.125rem) * 1.39); font-weight:800; }
-    .body.media-app-card { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; }
-    .body.media-app-card .icon { flex:0 0 52px; align-self:center; }
-    .body.media-app-card .title { display:flex; align-items:center; justify-content:center; width:100%; min-height:2.5em; }
-    .body.media-app-card .app-icon { display:block; width:64px; height:64px; max-width:100%; object-fit:contain; border-radius:14px; }
+    .body.media-app-card { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:0; min-height:112px; aspect-ratio:1; text-align:center; }
+    .body.media-app-card .icon { width:100%; height:100%; flex:1; border-radius:0; background:transparent; --mdc-icon-size:clamp(48px,50cqi,96px); }
+    .body.media-app-card .app-icon { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:cover; }
+    .body.media-app-card .problem { position:relative; z-index:1; box-sizing:border-box; width:100%; margin-top:auto; padding:8px; background:var(--ha-card-background,var(--card-background-color)); }
     ha-card[data-problem] .app-icon { filter:grayscale(1); opacity:.5; }
     .title, .state, .climate { min-width:0; max-width:100%; overflow-wrap:anywhere; line-height:1.25; }
     .title { grid-area:title; width:100%; font-weight:var(--font-weight-primary,700); font-size:var(--font-size-primary,1.125rem); }
@@ -851,7 +853,6 @@ function cardStyles() {
       .body.formatted-reading .state { font-size:var(--font-size-caption,.9375rem); }
       .icon { width:40px; height:40px; }
       .icon :is(ha-icon,ha-state-icon) { --mdc-icon-size:24px; }
-      .body.media-app-card .icon { flex-basis:40px; }
       .body:has(>.number-control) { grid-template-columns:minmax(0,1fr); grid-template-areas:'title' 'state' 'climate' 'control' 'modes' 'wallbox'; }
       .body:has(>.number-control)>.number-control { grid-area:control; justify-self:stretch; justify-content:center; }
       .body.climate-card:has(.climate-pending) { grid-template-areas:'title' 'state' 'climate' 'pending' 'control' 'modes'; }
@@ -1545,12 +1546,12 @@ export class MaraoCard extends BaseElement {
         if (dishwasherWarning(stateOf(this._hass, variables[key]))) readings += readingMarkup(variables[key], localize(`dishwasher.${label}`, this._hass, {}, label.replaceAll('_',' ')), "mdi:alert-circle-outline", this._hass);
       }
     }
-    const showName = config.show_name !== false && (!glance || Boolean(config.name));
+    const showName = kind !== "hc_media_app_card" && config.show_name !== false && (!glance || Boolean(config.name));
     const uniformControl = standardControl(config);
     this.toggleAttribute?.('data-marao-standard-control', uniformControl);
     const sliderHeader = showName && (uniformControl || kind === 'hc_fan_card');
     const titleCard = kind === "hc_title_card";
-    const stateWanted = !camera && !titleCard && !glance && (kind === "hc_room_card" ? Boolean(displayValue) : Boolean(entity || entityGroup)) && config.show_state !== false;
+    const stateWanted = kind !== "hc_media_app_card" && !camera && !titleCard && !glance && (kind === "hc_room_card" ? Boolean(displayValue) : Boolean(entity || entityGroup)) && config.show_state !== false;
     const showState = stateWanted && !problem?.complete && (!redundantState || Boolean(displayValue));
     const showIcon = !camera && !titleCard && !glance && config.show_icon !== false && variables.show_icon !== false;
     const iconOnly = !camera && !showName && !stateWanted && config.show_label === false;

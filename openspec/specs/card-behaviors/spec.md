@@ -112,6 +112,10 @@ remote, optional volume remote and two-column app shortcuts. Icon-only controls
 SHALL retain semantic names. Relative rewind/forward SHALL compute authoritative
 position plus elapsed playback, then clamp to duration and send numeric data.
 App cards SHALL use `hc_media_app_card` and select the configured source.
+App shortcuts SHALL show full-card square app artwork without a visible title or
+normal player-state line, retaining semantic app names and visible problem reasons.
+Bundled brand artwork SHALL include MEO (also recognized as MEO Go); unknown apps
+SHALL retain their configured icon. Saved source values and custom names remain unchanged.
 
 #### Scenario: Rewind is requested near the start of playback
 - **WHEN** the relative offset would be negative

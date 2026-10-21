@@ -38,6 +38,12 @@ Missing or denied coordination storage must not fall back to an unguarded reload
 
 Only active generated-dashboard sessions execute recovery. Defer in hidden/offline states, HA edit mode, unsaved editor state, active pointer/hold/slider interactions and open control popups. Resume pending work on the corresponding state transitions rather than timers that repeatedly reload. Avoid interrupting an in-flight service interaction; do not dispatch services during recovery.
 
+Clear pointer tracking when the document becomes hidden or leaves the page,
+including a retained back/forward-cache document. Android can suspend its WebView
+without delivering `pointerup` or `blur`; that missing event must not leave a
+foreground update permanently deferred. Continue respecting open popups, edits
+and real service interactions after the app returns.
+
 The editor remains open to show save success; it is not itself the target dashboard. If navigation later returns to the dashboard, evaluate pending recovery then. Reuse existing dirty-state and modal/gesture ownership signals, extending their shared owner only where necessary. Localize brief updating/deferred/failure feedback through the existing refresh labels. Preserve full URL and native Android in-app reload handling.
 
 ### Validate actual delivery and fresh assets

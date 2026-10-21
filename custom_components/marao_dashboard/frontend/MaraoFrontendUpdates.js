@@ -105,10 +105,12 @@ export function createFrontendUpdates({ host = window, loadedVersion, context, r
   const down = event => { pointers.add(event.pointerId); };
   const up = event => { pointers.delete(event.pointerId); host.setTimeout(changed, 0); };
   const blur = () => { pointers.clear(); };
+  // Android may suspend a WebView without delivering pointerup or window blur.
+  const visibility = () => { if (host.document.visibilityState === 'hidden') blur(); else resume(); };
   for (const name of ['online', 'connection-status', 'focus', 'pageshow']) host.addEventListener(name, resume);
   for (const name of ['location-changed', 'popstate', 'hashchange', 'marao-interaction-settled']) host.addEventListener(name, changed);
   host.addEventListener('blur', blur);
-  host.document.addEventListener('visibilitychange', resume);
+  host.document.addEventListener('visibilitychange', visibility);
   host.document.addEventListener('pointerdown', down, true);
   host.document.addEventListener('pointerup', up, true);
   host.document.addEventListener('pointercancel', up, true);
@@ -117,12 +119,12 @@ export function createFrontendUpdates({ host = window, loadedVersion, context, r
     for (const name of ['online', 'connection-status', 'focus', 'pageshow']) host.removeEventListener(name, resume);
     for (const name of ['location-changed', 'popstate', 'hashchange', 'marao-interaction-settled']) host.removeEventListener(name, changed);
     host.removeEventListener('blur', blur); host.removeEventListener('pagehide', pagehide);
-    host.document.removeEventListener('visibilitychange', resume);
+    host.document.removeEventListener('visibilitychange', visibility);
     host.document.removeEventListener('pointerdown', down, true);
     host.document.removeEventListener('pointerup', up, true);
     host.document.removeEventListener('pointercancel', up, true);
   };
-  const pagehide = event => { if (!event.persisted) destroy(); };
+  const pagehide = event => { pointers.clear(); if (!event.persisted) destroy(); };
   host.addEventListener('pagehide', pagehide);
   return { update(value) {
     hass = value;

@@ -302,8 +302,12 @@ baselines together; see the update guide.
 Releases run affected unit tests only through `npm run verify:publish` (or
 `verify:release` without an upgrade-report argument). Reuse integration testing
 from development, including preserved-install checks where needed for concrete
-migration/recovery risk. Do not redeploy or rerun browser, camera, mobile or
-historical-upgrade checks during release unless explicitly requested. Supplied
+migration/recovery risk. Before publishing every release, install its final package
+and version metadata on disposable `192.168.0.28`, preserving test configuration
+and helper state. Reuse an installation only when that exact candidate is already
+installed. Installation failure blocks publication; the installer's served-asset
+and readiness checks suffice. This installation does not authorize rerunning
+browser, camera, mobile or historical-upgrade checks. Supplied
 upgrade-report validation remains available as an opt-in; report skipped coverage
 honestly and keep known failures visible.
 

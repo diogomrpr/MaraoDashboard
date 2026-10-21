@@ -738,26 +738,31 @@ test("slider headers follow family and preserve optional controls and hidden fie
   }
 });
 
-test("media app shortcuts retain a full-width title above the centered icon", () => {
+test("media app shortcuts fill the card with artwork without a visible title", () => {
   const card = new MaraoCard();
   card.setConfig({
     entity: "media_player.apple_tv",
     template: "hc_media_app_card",
     name: "YouTube",
     icon: "mdi:youtube",
-    show_state: false,
+    variables: { app_source: "YouTube" },
+    tap_action: { action: "call-service", service: "media_player.select_source", data: { source: "YouTube" } },
   });
-  card.hass = { states: { "media_player.apple_tv": { state: "idle", attributes: {} } } };
+  card.hass = { callService() {}, states: { "media_player.apple_tv": { state: "idle", attributes: {} } } };
 
   assert.match(card.shadowRoot.innerHTML, /class="body media-app-card"/);
-  assert.doesNotMatch(card.shadowRoot.innerHTML, /class="state"/);
-  assert.match(source, /\.body\.media-app-card \{[^}]*flex-direction:column;[^}]*align-items:center;[^}]*text-align:center;/);
-  assert.match(source, /\.body\.media-app-card \.title \{[^}]*min-height:2\.5em;/);
-  assert.doesNotMatch(source, /\.body\.media-app-card \.icon \{[^}]*order:-1/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="(?:state|title)">/);
+  assert.match(card.shadowRoot.innerHTML, /data-card-action aria-label="YouTube"/);
+  card.hass = { ...card.hass, states: { "media_player.apple_tv": { state: "unavailable", attributes: {} } } };
+  assert.match(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
+  assert.match(card.shadowRoot.innerHTML, /class="problem"/);
+  const unnamed = { ...card._config }; delete unnamed.name;
+  card.setConfig(unnamed);
+  assert.match(card.shadowRoot.innerHTML, /data-card-action aria-label="YouTube"/);
 });
 
 test("media app branding recognizes sources, ships real icons and preserves custom shortcuts", async () => {
-  for (const [source, id] of [["NETFLIX", "netflix"], ["com.google.ios.youtube", "youtube"], ["Disney+", "disney-plus"], ["Amazon Prime Video", "prime-video"], ["com.apple.TVWatchList", "apple-tv"], ["Plex", "plex"]]) {
+  for (const [source, id] of [["NETFLIX", "netflix"], ["com.google.ios.youtube", "youtube"], ["Disney+", "disney-plus"], ["Amazon Prime Video", "prime-video"], ["com.apple.TVWatchList", "apple-tv"], ["Plex", "plex"], ["MEO", "meo"], ["meo go", "meo"], ["pt.sapo.mobile.iphone.tmn.meomobile", "meo"]]) {
     const config = { template: "hc_media_app_card", entity: "media_player.apple_tv", name: "My app", icon: "mdi:play-box-outline", show_state: false, variables: { app_source: source } };
     const before = structuredClone(config);
     assert.equal(mediaAppBrand(config).id, id);
@@ -765,7 +770,7 @@ test("media app branding recognizes sources, ships real icons and preserves cust
     card.setConfig(config);
     card.hass = { states: { "media_player.apple_tv": { state: "idle", attributes: {} } } };
     assert.match(card.shadowRoot.innerHTML, new RegExp(`<img class="app-icon" src="[^"]*/media-apps/${id}\\.png"`));
-    assert.match(card.shadowRoot.innerHTML, /<div class="title">My app<\/div>/);
+    assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="title">/);
     const bytes = await fs.readFile(new URL(`../../custom_components/marao_dashboard/frontend/media-apps/${id}.png`, import.meta.url));
     assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
     assert.ok(stateAppearance("hc_media_app_card", "idle", config).background);
