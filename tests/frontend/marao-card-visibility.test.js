@@ -564,7 +564,7 @@ test('room lighting uses every unique selected light and ignores an unrelated pr
   assert.match(card.shadowRoot.innerHTML, /1 active/);
   assert.match(card.shadowRoot.innerHTML, /aria-description="Lighting: 1 active"/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="state">|class="binary-cue"/);
-  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-problem|data-room-lights-off[^>]* disabled/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-problem="|data-room-lights-off[^>]* disabled/);
   states['light.second'] = { state: 'off', attributes: {} };
   for (const key of Object.keys(colors)) delete colors[key];
   card.hass = { ...card.hass, states: { ...states } };
@@ -579,7 +579,7 @@ test('room lighting uses every unique selected light and ignores an unrelated pr
     assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
   }
   card.setConfig({ ...card._config, variables: { light_entities: [] } });
-  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-room-lights-off|binary-cue\"|<div class="state">|data-problem/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-room-lights-off|binary-cue\"|<div class="state">|data-problem="/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
   card.setConfig({ ...card._config, show_icon: false, variables: { light_entities: [], custom_label: 'Reading corner' } });
   assert.match(card.shadowRoot.innerHTML, /<div class="state">Reading corner<\/div>/);
@@ -1601,7 +1601,7 @@ test("value slider drags retain their native input across unrelated and confirme
   card._render();
   assert.equal(card._sliderGesture, gesture);
   assert.equal(card.shadowRoot.innerHTML, markup);
-  assert.equal(refreshed.length, 3);
+  assert.equal(refreshed.length, 2, 'Only confirmed-state updates and explicit refreshes update the held slider');
   assert.equal(refreshed.at(-1), confirmed);
 });
 

@@ -967,6 +967,7 @@ export class MaraoCard extends BaseElement {
   setConfig(config) {
     if (config.template === 'hc_camera_card' && Object.hasOwn(config.variables || {}, 'preload_stream') && typeof config.variables.preload_stream !== 'boolean') throw new Error(localize('camera.invalid_preload', this._hass, {}, 'Preload stream must be a boolean.'));
     this._stateEntities = [...new Set(referencedEntities(config))];
+    this._stateReferences = null;
     const previousGraph = this._graphEntity();
     if (this._config?.entity !== config.entity || this._config?.template !== config.template || this._config?.variables?.preload_stream !== config.variables?.preload_stream) this._disposeCamera();
     const historyIdentity = value => JSON.stringify({...value, variables: {...value.variables, display_unit: undefined, display_precision: undefined}});
@@ -993,6 +994,8 @@ export class MaraoCard extends BaseElement {
     if (this.preview && value) value = { ...value, connected: false, connection: { ...value.connection, connected: false } };
     const entity = text(this._config.entity);
     const previous = this._hass;
+    const previousReferences = this._stateReferences;
+    this._stateReferences = this._stateEntities?.map(id => value?.states?.[id]);
     const previousState = previous?.states?.[entity];
     const wasServiceReady = this._serviceReady;
     this._hass = value;
@@ -1030,8 +1033,8 @@ export class MaraoCard extends BaseElement {
     if (previous?.states && value?.states && this._config.template !== 'hc_header_card'
       && wasServiceReady === this._serviceReady
       && previous.connected === value.connected && previous.connection?.connected === value.connection?.connected
-      && ["themes", "locale", "language", "localize", "entities", "services", "config"].every(key => previous[key] === value[key])
-      && this._stateEntities?.every(id => previous.states[id] === value.states[id])) {
+      && ["themes", "locale", "language", "localize", "entities", "services", "config", "callApi"].every(key => previous[key] === value[key])
+      && previousReferences && this._stateReferences?.every((state, index) => previousReferences[index] === state)) {
       if (accessSlide) accessSlide.hass = value;
       return;
     }
@@ -1045,6 +1048,7 @@ export class MaraoCard extends BaseElement {
   }
   get hass() { return this._hass; }
   disconnectedCallback() {
+    this._stateReferences = null;
     queueMicrotask(() => { if (!this.isConnected) { this._historyPopup?._close(false); this._activeHistoryPopup?._close(false); } });
     this._disposeCamera();
     for (const type of ["location-changed", "popstate"]) globalThis.window?.removeEventListener?.(type, this._cancelHiddenControls);
@@ -1607,7 +1611,7 @@ export class MaraoCard extends BaseElement {
     const formattedReading = !iconOnly && Boolean(formattedPrimary || formattedPower);
     const stateMarkup = showState && kind !== "hc_wallbox_current_card" ? `<div class="state">${esc(displayValue)}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem, problemAppearance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`);
+    this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null && kind !== "hc_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem, problemAppearance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`);
     this._syncCamera();
     this.shadowRoot.querySelector('[data-history-open]')?.addEventListener('click', event => { event.stopPropagation(); this._openHistory(event.currentTarget); });
     this._activeHistoryPopup?._refreshHistory();
