@@ -46,7 +46,7 @@ def test_page_model_preserves_all_scopes_and_explicit_empty_or_absent_content():
     lambda c: c["pages"][0]["sections"][1]["entities"][0].update(page="removed"),
     lambda c: c["pages"][0]["sections"][1]["entities"][0].pop("page"),
     lambda c: c.update(navigation=["removed"]),
-    lambda c: c.update(navigation=["home"] * 6),
+    lambda c: c.update(navigation=[{"page": "removed"}] * 6),
     lambda c: c["pages"][0]["sections"][1]["entities"][1].update(entities=["lock.safe"]),
 ])
 def test_page_model_rejects_invalid_source_without_mutating_it(change):
@@ -55,6 +55,15 @@ def test_page_model_rejects_invalid_source_without_mutating_it(change):
     before = deepcopy(config)
     with pytest.raises(ValueError):
         validate_pages(config, TEMPLATES)
+    assert config == before
+
+
+@pytest.mark.parametrize("count", [6, 8])
+def test_page_model_preserves_long_page_navigation_for_overflow(count):
+    config = deepcopy(SOURCE)
+    config["navigation"] = ["home"] * count
+    before = deepcopy(config)
+    assert validate_pages(config, TEMPLATES) == {"home", "office", "empty", "absent"}
     assert config == before
 
 
