@@ -59,7 +59,7 @@ function fixture(t) {
       if (method === 'POST' && endpoint === '/api/services/homeassistant/reload_config_entry') {
         assert.deepEqual(body, { entry_id: 'safe' }); loadedVersion = fingerprint(remote + integration + '/frontend'); return [];
       }
-      if (method === 'GET' && endpoint.startsWith('/marao_dashboard_static/')) return fs.readFileSync(remote + integration + '/frontend/' + endpoint.slice('/marao_dashboard_static/'.length).split('?')[0], 'utf8');
+      if (method === 'GET' && endpoint.startsWith('/api/marao_dashboard/frontend/')) return fs.readFileSync(remote + integration + '/frontend/' + endpoint.split('/').slice(5).join('/').split('?')[0], 'utf8');
       throw new Error('Unexpected mutation: ' + method + ' ' + endpoint);
     },
   };
@@ -93,7 +93,7 @@ test('frontend preparation installs current assets, verifies served bytes and le
 
 test('stale served assets retain the candidate and recovery backup without accepting the deployment receipt', async t => {
   const f = fixture(t), api = f.dependencies.api;
-  f.dependencies.api = (config, method, endpoint, body) => endpoint.startsWith('/marao_dashboard_static/') ? 'stale served bytes' : api(config, method, endpoint, body);
+  f.dependencies.api = (config, method, endpoint, body) => endpoint.startsWith('/api/marao_dashboard/frontend/') ? 'stale served bytes' : api(config, method, endpoint, body);
   await assert.rejects(prepareFrontend(f.config, f.dependencies), /served MaraoDashboard.js is stale[\s\S]*recovery data retained/);
   assert.deepEqual(localHashes(f.remote + f.integration + '/frontend'), localHashes(f.root + f.integration + '/frontend'));
   assert.deepEqual(JSON.parse(fs.readFileSync(f.remote + '/.marao-test-deployment.json')), f.receipt);

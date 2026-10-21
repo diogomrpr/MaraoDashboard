@@ -42,6 +42,7 @@ def normalize_resource_url(value: object) -> str:
 
 _NORMALIZED_PREFIX = normalize_resource_url(LEGACY_VENDOR_RESOURCE_PREFIX).rstrip("/")
 _NORMALIZED_LEGACY_MODULES = {
+    normalize_resource_url("/marao_dashboard_static/MaraoDashboard.js"),
     normalize_resource_url(LEGACY_FRONTEND_MODULE),
     normalize_resource_url(LEGACY_CAMERA_EVENTS_MODULE),
     normalize_resource_url(LEGACY_FRONTEND_MODULE.rsplit("/", 1)[0] + "/MaraoCards.js"),

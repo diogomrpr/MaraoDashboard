@@ -113,10 +113,10 @@ test('cache cleanup removes only same-origin frontend responses and the native H
   host.navigator.serviceWorker = { getRegistrations: async () => ['/service_worker.js', '/other/service_worker.js', 'https://else.invalid/service_worker.js'].map(path => ({
     active: { scriptURL: new URL(path, own).href }, unregister: async () => workers.push(path),
   })) };
-  const paths = ['/', '/frontend_latest/core.old.js', '/marao_dashboard_static/MaraoCards.js?v=old', '/api/preferences', '/other/data', 'https://else.invalid/static/data'];
+  const paths = ['/', '/frontend_latest/core.old.js', '/marao_dashboard_static/MaraoCards.js?v=old', '/api/marao_dashboard/frontend.js?v=old', '/api/marao_dashboard/frontend/old/MaraoCards.js?v=old', '/api/preferences', '/other/data', 'https://else.invalid/static/data'];
   host.caches = { keys: async () => ['mixed'], open: async () => ({ keys: async () => paths.map(path => request(new URL(path, own).href)), delete: async entry => removed.push(entry.url) }) };
   await clearFrontendCaches(host, new AbortController().signal);
-  assert.deepEqual(workers, ['/service_worker.js']); assert.deepEqual(removed, paths.slice(0, 3).map(path => new URL(path, own).href));
+  assert.deepEqual(workers, ['/service_worker.js']); assert.deepEqual(removed, paths.slice(0, 5).map(path => new URL(path, own).href));
 });
 
 test('HTTP without web cache APIs reloads once without settings access or extra history', async t => {

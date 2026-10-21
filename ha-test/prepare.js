@@ -4,7 +4,7 @@ const path = require("node:path");
 const os = require("node:os");
 const { spawnSync } = require("node:child_process");
 const YAML = require("yaml");
-const { api, connect, fingerprint, readConfig, repoRoot, sourceFiles } = require("./client");
+const { api, connect, fingerprint, frontendAssetURL, readConfig, repoRoot, sourceFiles } = require("./client");
 
 const haYamlOptions = { customTags: ['!include', '!include_dir_list', '!include_dir_named', '!include_dir_merge_list', '!include_dir_merge_named', '!secret', '!env_var']
   .map(tag => ({ tag, resolve: value => value })) };
@@ -443,7 +443,7 @@ async function prepare(config = readConfig(), { dryRun = false } = {}) {
       if (missing.length) throw new Error("The generated dashboard references missing fixture entities: " + missing.join(", "));
       const version = fingerprint(path.join(integrationRoot, "frontend"));
       for (const name of ["MaraoDashboard.js", "MaraoCards.js", "MaraoFrigateEventsCard.js", "MaraoDashboardPanel.js"]) {
-        const actual = await api(config, "GET", "/marao_dashboard_static/" + name + "?v=" + version, undefined, { text: true });
+        const actual = await api(config, "GET", frontendAssetURL(version, name), undefined, { text: true });
         if (actual !== fs.readFileSync(path.join(integrationRoot, "frontend", name), "utf8")) throw new Error("The served " + name + " is stale.");
       }
       const editor = panels["marao-dashboard-editor"];

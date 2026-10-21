@@ -166,7 +166,7 @@ trap - 0 1 2 15`, { allowFailure: true });
     } finally { current.close(); }
     for (const name of ['MaraoDashboard.js', 'MaraoCards.js', 'MaraoFrigateEventsCard.js', 'MaraoDashboardPanel.js']) {
       assert.ok(Object.hasOwn(assets, name), 'Missing frontend entry: ' + name);
-      const actual = await api(config, 'GET', '/marao_dashboard_static/' + name + '?v=' + version, undefined, { text: true });
+      const actual = await api(config, 'GET', client.frontendAssetURL(version, name), undefined, { text: true });
       assert.equal(hash(actual), assets[name], 'The served ' + name + ' is stale');
     }
     assert.ok(sameHashes(localHashes(frontendRoot), assets), 'Workspace changed during frontend preparation; retry');

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from asyncio import Lock, run_coroutine_threadsafe
-from hashlib import sha256
 import json
 from pathlib import Path
 import re
@@ -42,7 +41,6 @@ from .const import (
     LEGACY_CARD_TEST_DASHBOARD_FILE,
     LEGACY_CARD_TEST_DASHBOARD_KEY,
     MARAO_DASHBOARD_MODULES,
-    MARAO_DASHBOARD_PANEL_MODULE,
     MARAO_DASHBOARD_STATIC_URL,
 )
 from .legacy_migration import (
@@ -50,6 +48,10 @@ from .legacy_migration import (
     async_clear_legacy_resource_issue,
     async_plan_legacy_resources,
     async_restore_legacy_resource_cache,
+)
+from .frontend_assets import (
+    ASSET_STATE, FrontendAssetView, FrontendBootstrapView,
+    asset_snapshot, frontend_asset_url, frontend_fingerprint,
 )
 from .editor import EDITOR_CATALOG, display_catalog, initial_entity_ids, page_templates
 from .native_storage import NativeDashboardPlan, async_find_native_dashboard, async_restore_native_cache, staged_native_dashboard
@@ -95,25 +97,6 @@ GENERATE_DASHBOARD_SCHEMA = vol.Schema(
         vol.Optional("dry_run", default=False): cv.boolean,
     }
 )
-
-
-def frontend_fingerprint(frontend_dir: Path) -> str:
-    """Fingerprint served paths and content so an entry reload sees new assets."""
-
-    digest = sha256()
-    for path in sorted(frontend_dir.rglob("*"), key=lambda path: path.relative_to(frontend_dir).as_posix()):
-        relative_path = path.relative_to(frontend_dir)
-        if (
-            not path.is_file()
-            or any(part.startswith(".") or part == "__pycache__" for part in relative_path.parts)
-            or path.suffix in (".pyc", ".pyo")
-        ):
-            continue
-        digest.update(relative_path.as_posix().encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(path.read_bytes())
-        digest.update(b"\0")
-    return digest.hexdigest()[:16]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -163,10 +146,11 @@ async def _async_setup_dashboard(hass: HomeAssistant, entry: ConfigEntry) -> boo
 
     hass.data.setdefault(DOMAIN, {})
     _register_services(hass)
-    await _async_register_static_path(hass)
-    fingerprint = await hass.async_add_executor_job(
-        frontend_fingerprint, Path(__file__).parent / "frontend"
+    hass.data[DOMAIN][ASSET_STATE] = await hass.async_add_executor_job(
+        asset_snapshot, Path(__file__).parent / "frontend"
     )
+    fingerprint = hass.data[DOMAIN][ASSET_STATE]["fingerprint"]
+    await _async_register_static_path(hass)
     module_urls = tuple(f"{url}?v={fingerprint}" for url in MARAO_DASHBOARD_MODULES)
     for module_url in module_urls:
         frontend.add_extra_js_url(hass, module_url)
@@ -177,7 +161,7 @@ async def _async_setup_dashboard(hass: HomeAssistant, entry: ConfigEntry) -> boo
         webcomponent_name="marao-dashboard-panel",
         sidebar_title=MANAGEMENT_PANEL_TITLE,
         sidebar_icon=MANAGEMENT_PANEL_ICON,
-        module_url=f"{MARAO_DASHBOARD_PANEL_MODULE}?v={fingerprint}",
+        module_url=frontend_asset_url(fingerprint, "MaraoDashboardPanel.js"),
         require_admin=True,
         config_panel_domain=DOMAIN,
     )
@@ -847,12 +831,14 @@ async def _async_register_static_path(hass: HomeAssistant) -> None:
 
     if hass.data[DOMAIN].get(STATIC_PATH_REGISTERED):
         return
+    hass.http.register_view(FrontendBootstrapView())
+    hass.http.register_view(FrontendAssetView())
     await hass.http.async_register_static_paths(
         [
             StaticPathConfig(
                 MARAO_DASHBOARD_STATIC_URL,
                 str(Path(__file__).parent / "frontend"),
-                True,
+                False,
             )
         ]
     )

@@ -137,4 +137,6 @@ async function assertCurrentFrontend(page, expected = fingerprint(path.join(repo
   await ready.dispose();
 }
 
-module.exports = { accessToken, setBrowserToken, api, assertCurrentFrontend, assertDisposableHaTarget, configPath, connect, fingerprint, readConfig, repoRoot, sourceFiles };
+const frontendAssetURL = (version, filename) => `/api/marao_dashboard/frontend/${version}/${filename}?v=${version}`;
+
+module.exports = { accessToken, setBrowserToken, api, assertCurrentFrontend, assertDisposableHaTarget, configPath, connect, fingerprint, frontendAssetURL, readConfig, repoRoot, sourceFiles };

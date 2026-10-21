@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { isDeepStrictEqual } = require('node:util');
-const { api, assertDisposableHaTarget, connect, fingerprint, repoRoot, sourceFiles } = require('../client');
+const { api, assertDisposableHaTarget, connect, fingerprint, frontendAssetURL, repoRoot, sourceFiles } = require('../client');
 
 const integration = path.join(repoRoot, 'custom_components/marao_dashboard');
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -163,7 +163,7 @@ async function verifyPrepared(config, filename, { ssh, referencedEntities, opera
     const resources = await connection.call({ type: 'lovelace/resources' });
     assert.ok(!resources.some(resource => {
       const url = new URL(resource.url, config.url);
-      return url.origin === config.url && ['/marao_dashboard_static/', '/hacsfiles/MaraoDashboard/', '/local/community/MaraoDashboard/'].some(prefix => url.pathname.startsWith(prefix));
+      return url.origin === config.url && ['/api/marao_dashboard/frontend', '/marao_dashboard_static/', '/hacsfiles/MaraoDashboard/', '/local/community/MaraoDashboard/'].some(prefix => url.pathname.startsWith(prefix));
     }), 'Stale owned card resources');
     const dashboard = await connection.call({ type: 'lovelace/config', url_path: 'marao-dashboard', force: true });
     const savedCases = Array.isArray(receipt.expected_config.pages)
@@ -174,7 +174,7 @@ async function verifyPrepared(config, filename, { ssh, referencedEntities, opera
     assertHistoricalBindings([...historical], states, referencedEntities);
     assert.ok([...referencedEntities(dashboard)].every(entity => states.has(entity) || entity.includes('_missing') || historical.has(entity)), 'Preserved dashboard references missing fixtures');
     for (const file of ['MaraoDashboard.js', 'MaraoCards.js', 'MaraoFrigateEventsCard.js', 'MaraoDashboardPanel.js']) {
-      const served = await api(config, 'GET', '/marao_dashboard_static/' + file + '?v=' + candidate.frontend_fingerprint, undefined, { text: true });
+      const served = await api(config, 'GET', frontendAssetURL(candidate.frontend_fingerprint, file), undefined, { text: true });
       assert.equal(sha256(served), sha256(fs.readFileSync(path.join(integration, 'frontend', file))), 'Served candidate asset is stale: ' + file);
     }
     assert.ok(isDeepStrictEqual(candidateIdentity(), candidate), 'Candidate changed during preserved-install inspection');

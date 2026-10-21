@@ -43,10 +43,13 @@ not clear its cache. Refresh waits while the app is hidden/offline or you are
 editing or using controls. It preserves sign-in, preferences and the current page;
 the editor itself stays open to show the save result.
 
-Older app sessions may need one manual three-second navbar hold to load this
-handler for the first time. Keep that gesture as a fallback if automatic recovery
-reports a failure. A client refresh failure does not undo a successful generation.
-Cache cleanup covers frontend responses, not all browser/OS storage.
+New page loads use an uncached network-only bootstrap that selects the installed
+release, including when the page HTML is cached. Older running sessions must
+contact the server before they can receive that loader; reopening the app may be
+needed once. The top-right refresh button and navbar hold remain fallbacks if
+automatic recovery reports a failure. A client refresh failure does not undo a
+successful generation. Cache cleanup covers frontend responses, not all browser/OS
+storage. See [updating](update.md#refresh-an-open-device-after-an-update).
 
 After installing Marao Dashboard with HACS, add the **Marao Dashboard**
 integration from Home Assistant's integrations page. On first setup, the

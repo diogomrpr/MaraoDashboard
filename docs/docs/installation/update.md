@@ -172,10 +172,24 @@ not clear the Repair.
 
 ## Refresh an open device after an update
 
-Once deployment has completed and the integration has registered its current
-assets, hold the Marao navbar for three seconds. This refreshes only the current
-device's frontend, keeping sign-in, preferences, dashboard settings and the
-current page. Save or discard edits before refreshing. Android and browsers use
-web recovery; supported iOS apps use native cache reset with a bounded fallback.
-Complete browser/OS cache erasure is not guaranteed. A client refresh cannot fix
-an incomplete server deployment or an unavailable frontend file.
+Restart Home Assistant after installing an integration update. Marao's small
+startup loader bypasses Home Assistant's custom-file cache and selects the
+installed release before loading cards. All JavaScript dependencies, editor
+styles and workers use that release's own asset path. A normal dashboard opening
+therefore does not need a manual cache clear. This also works when cached HTML
+references an older bootstrap version.
+
+An already-open dashboard with the automatic update handler refreshes after a
+version change, or when the app reconnects/returns to the foreground. Recovery
+waits for edits, open popups and active controls to finish. Existing flat entry
+URLs remain supported and select the current release on their next server request.
+An older, completely cached running session cannot receive new loading code
+until it contacts the server; reopening the app may be needed once when moving
+from such a release. Server code cannot erase a phone's already-satisfied cache.
+
+The small top-right refresh button and a three-second navbar hold remain manual
+fallbacks. They preserve sign-in, preferences, dashboard settings and the current
+page. Save or discard edits first. Android and browsers use web recovery;
+supported iOS apps use native cache reset with a bounded fallback. An incomplete
+server deployment is reported rather than silently mixing versions; complete
+the installation and restart Home Assistant to recover it.

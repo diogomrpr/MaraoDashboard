@@ -52,7 +52,9 @@ export async function clearFrontendCaches(host, signal) {
       check();
       const url = new URL(request.url);
       if (url.origin === origin && (['/', host.location.pathname].includes(url.pathname)
-        || /^\/(frontend_latest|frontend_es5|static|marao_dashboard_static)\//.test(url.pathname))) await cache.delete(request);
+        || /^\/(frontend_latest|frontend_es5|static|marao_dashboard_static)\//.test(url.pathname)
+        || url.pathname === '/api/marao_dashboard/frontend.js'
+        || url.pathname.startsWith('/api/marao_dashboard/frontend/'))) await cache.delete(request);
     }
   }
 }

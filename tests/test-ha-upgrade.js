@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync, spawn } = require('node:child_process');
 const YAML = require('yaml');
-const { accessToken, api, assertDisposableHaTarget, connect, readConfig, repoRoot, setBrowserToken, sourceFiles } = require('../ha-test/client');
+const { accessToken, api, assertDisposableHaTarget, connect, fingerprint, frontendAssetURL, readConfig, repoRoot, setBrowserToken, sourceFiles } = require('../ha-test/client');
 const { composeDashboard, haYamlOptions, resetBaseline, restoreHelperStates, restart } = require('../ha-test/prepare');
 const { assertHistoricalBindings, candidateIdentity, historicalEntityAliases, isolateHistoricalText } = require('../ha-test/upgrade/prepared');
 
@@ -185,7 +185,12 @@ async function releasedHealth(config, packageRoot, directory) {
     await page.waitForLoadState('networkidle');
     assert.equal(await page.locator('hui-error-card').count(), 0);
     assert.deepEqual(errors, [], 'Released package did not render a healthy dashboard');
-    for (const file of ['MaraoDashboard.js', 'MaraoCards.js', 'MaraoFrigateEventsCard.js']) assert.equal(sha256(await api(config, 'GET', '/marao_dashboard_static/' + file, undefined, { text: true })), sha256(fs.readFileSync(path.join(packageRoot, 'frontend', file))));
+    const version = fingerprint(path.join(packageRoot, 'frontend'));
+    for (const file of ['MaraoDashboard.js', 'MaraoCards.js', 'MaraoFrigateEventsCard.js']) {
+      const url = fs.existsSync(path.join(packageRoot, 'frontend_assets.py'))
+        ? frontendAssetURL(version, file) : '/marao_dashboard_static/' + file;
+      assert.equal(sha256(await api(config, 'GET', url, undefined, { text: true })), sha256(fs.readFileSync(path.join(packageRoot, 'frontend', file))));
+    }
     await page.screenshot({ path: path.join(directory, 'released-package-health.png'), scale: 'css' });
   } finally { await browser.close(); }
 }

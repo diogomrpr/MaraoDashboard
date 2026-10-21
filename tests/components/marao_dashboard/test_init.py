@@ -43,8 +43,7 @@ from custom_components.marao_dashboard.const import (
     DOMAIN,
     GENERATE_DASHBOARD_SERVICE,
     MARAO_DASHBOARD_MODULES,
-    MARAO_DASHBOARD_PANEL_MODULE,
-    MARAO_DASHBOARD_STATIC_URL,
+    MARAO_DASHBOARD_BOOTSTRAP,
 )
 from custom_components.marao_dashboard.legacy_migration import (
     LEGACY_RESOURCES_ISSUE_ID,
@@ -357,7 +356,7 @@ async def test_setup_entry_installs_base_dashboard_once(hass) -> None:
     module_urls = hass.data[DOMAIN][FRONTEND_MODULES]
     assert set(module_urls) <= set(hass.data[DATA_EXTRA_MODULE_URL].urls)
     assert tuple(url.split("?", 1)[0] for url in module_urls) == MARAO_DASHBOARD_MODULES
-    assert all(url.startswith(MARAO_DASHBOARD_STATIC_URL) and "?v=" in url for url in module_urls)
+    assert all(url.startswith(MARAO_DASHBOARD_BOOTSTRAP) and "?v=" in url for url in module_urls)
     assert "marao-dashboard-card-test" not in hass.data[LOVELACE_DATA].dashboards
     assert "marao-dashboard-card-test" not in hass.data[DATA_PANELS]
     assert hass.data[DOMAIN]["websocket_registered"]
@@ -415,8 +414,8 @@ async def test_reload_updates_frontend_urls_and_unloads_exact_registered_version
     new_urls = {f"{url}?v={new_version}" for url in MARAO_DASHBOARD_MODULES}
 
     with patch(
-        "custom_components.marao_dashboard.frontend_fingerprint",
-        side_effect=[old_version, new_version],
+        "custom_components.marao_dashboard.asset_snapshot",
+        side_effect=[{"fingerprint": old_version}, {"fingerprint": new_version}],
     ) as fingerprint:
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
@@ -430,7 +429,7 @@ async def test_reload_updates_frontend_urls_and_unloads_exact_registered_version
     assert new_urls <= registered
     panel = hass.data[DATA_PANELS]["marao-dashboard-editor"]
     assert panel.sidebar_icon == "marao_dashboard:mountain"
-    assert panel.config["_panel_custom"]["module_url"] == f"{MARAO_DASHBOARD_PANEL_MODULE}?v={new_version}"
+    assert panel.config["_panel_custom"]["module_url"] == f"/api/marao_dashboard/frontend/{new_version}/MaraoDashboardPanel.js?v={new_version}"
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert not new_urls & set(hass.data[DATA_EXTRA_MODULE_URL].urls)
