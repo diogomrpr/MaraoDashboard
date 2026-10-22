@@ -819,7 +819,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
       slug: { type: "string", description: "URL-safe dashboard identifier." },
       theme: { type: "string" },
       icon: { type: "string" },
-      show_cache_reset: { type: "boolean", default: true, description: "Show the cache reset button on the main page." },
+      show_cache_reset: { type: "boolean", description: "Show the cache reset button on the main page. Enabled when omitted." },
       navigation: {
         type: "array",
         items: {
