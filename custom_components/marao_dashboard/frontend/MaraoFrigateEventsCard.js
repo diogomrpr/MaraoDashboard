@@ -1,5 +1,5 @@
 const HTMLElementBase = globalThis.HTMLElement || class {};
-const { cardProblem, problemStyle } = await import(`./MaraoCards.js${new URL(import.meta.url).search}`);
+const { cardProblem, problemStyle, problemLabel, showCardDetails } = await import(`./MaraoCards.js${new URL(import.meta.url).search}`);
 
 const text = (value) => (value == null ? "" : String(value).trim());
 
@@ -226,6 +226,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
         "marao-frigate-events-card requires an entity",
       ));
     }
+    this._entityName = undefined;
     const requestedLimit = Number(config.limit ?? 12);
     this._config = {
       ...config,
@@ -277,6 +278,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   disconnectedCallback() {
+    this._detailsPopup?._close(false);
     this._connected = false;
     this._loadedKey = "";
     this._request += 1;
@@ -603,7 +605,9 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     const button = event.target?.closest?.("[data-action]");
     if (!button || button.disabled || this._unavailableState()) return;
     globalThis.window?.MaraoDashboard?.haptic?.("heavy");
-    if (button.dataset.action === "refresh") {
+    if (button.dataset.action === "details") {
+      showCardDetails(this, this._selected?.error || this._error, button);
+    } else if (button.dataset.action === "refresh") {
       this._loadedKey = "";
       this._maybeLoad();
     } else if (button.dataset.action === "back") {
@@ -663,7 +667,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   _title() {
     const state = this._hass?.states?.[this._config?.entity];
     return text(this._config?.title)
-      || text(state?.attributes?.friendly_name)
+      || (this._entityName = text(state?.attributes?.friendly_name) || this._entityName)
       || localize("camera_events.title", this._hass, {}, "Camera events");
   }
 
@@ -693,6 +697,8 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   _scrollRoot() {
+    const viewport = this.shadowRoot?.querySelector?.('main');
+    if (viewport) return viewport;
     for (let element = this.parentElement || this.getRootNode?.().host; element; element = element.parentElement || element.getRootNode?.().host) {
       if (element.classList?.contains("marao-popup-sheet") || ["auto", "scroll"].includes(globalThis.getComputedStyle?.(element)?.overflowY)) return element;
     }
@@ -758,8 +764,8 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       contentError: this._selected?.status === "error" ? this._selected.error : this._status === "error" ? this._error : this._thumbnailErrors.size ? localize("common.media_unavailable", this._hass, {}, "Media unavailable") : "",
       loading: this._selected?.status === "loading" || this._status === "loading",
     });
-    const reason = problem && problem.kind !== "loading"
-      ? `<p class="message" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="${problem.kind === "neutral" ? "mdi:help-circle-outline" : "mdi:alert-circle-outline"}" aria-hidden="true"></ha-icon> ${escapeHtml(problem.reason)}</p>` : "";
+    const reason = problem && problem.kind !== "loading" && (unavailable || this._status === "error")
+      ? `<p class="message" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="${problem.kind === "neutral" ? "mdi:help-circle-outline" : "mdi:alert-circle-outline"}" aria-hidden="true"></ha-icon> ${escapeHtml(problemLabel(problem, this._hass))}<button type="button" data-action="details" aria-label="${escapeHtml(problem.reason)}">${escapeHtml(localize("common.details", this._hass, {}, "Details"))}</button></p>` : "";
     const status = !this._hass?.states ? localize("common.loading", this._hass, {}, "Loading…")
       : unavailable ? localize(`common.${unavailable}`, this._hass, {}, unavailable === "unknown" ? "Unknown" : "Unavailable")
       : this._status === "loading" ? localize("camera_events.loading_events", this._hass, {}, "Loading events…")
@@ -778,7 +784,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     if (!card) {
       this.shadowRoot.innerHTML = `<style>${MaraoFrigateEventsCard.styles}</style><ha-card data-status="${!this._hass?.states ? "loading" : unavailable || this._status}"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}>
         <header><div class="heading"><h2>${escapeHtml(this._title())}</h2><button type="button" class="icon-button" data-action="${action}" aria-label="${escapeHtml(actionLabel)}" title="${escapeHtml(actionLabel)}"${disabled ? ' disabled aria-disabled="true"' : ""}>${this._selected ? '&#x2190;' : '&#x21bb;'}</button></div>
-          <div class="filters" role="group" aria-label="${escapeHtml(localize("camera_events.filters", this._hass, {}, "Event types"))}"${!list || this._selected ? " hidden" : ""}>${filterHtml}</div></header>
+          <div class="filters" role="group" aria-label="${escapeHtml(localize("camera_events.filters", this._hass, {}, "Event types"))}"${this._selected ? ' style="visibility:hidden"' : ""}>${filterHtml}</div></header>
         <main><div class="problem">${reason}</div><p class="message state" role="status"${this._selected || !status || reason ? " hidden" : ""}>${escapeHtml(status)}</p>
           <div class="feed"${!list || this._selected ? " hidden" : ""}><div class="grid">${list ? rows.map(({ event, index }) => this._renderEvent(event, index)).join("") : ""}</div>
           <button type="button" class="more" data-action="more"${!more ? " hidden" : ""}${!ready ? " disabled" : ""}>${escapeHtml(localize("camera_events.load_more", this._hass, {}, "Load more"))}</button></div>
@@ -807,7 +813,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       button.disabled = disabled;
       button.setAttribute("aria-disabled", String(disabled));
       const toolbar = this.shadowRoot.querySelector(".filters");
-      toolbar.hidden = !list || Boolean(this._selected);
+      toolbar.hidden = false; toolbar.style.visibility = this._selected ? 'hidden' : '';
       toolbar.setAttribute("aria-label", localize("camera_events.filters", this._hass, {}, "Event types"));
       // Keep pressed filter controls mounted so touch focus and horizontal scroll survive.
       const filterKey = JSON.stringify(filters);
@@ -896,8 +902,6 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   _renderDetail(detail) {
     const label = escapeHtml(this._eventLabel(detail.event));
     const date = escapeHtml(this._eventDate(detail.event));
-    if (detail.status === "loading") return `<p class="message" role="status">${escapeHtml(localize("camera_events.loading_event", this._hass, {}, "Loading event…"))}</p>`;
-    if (detail.status === "error") return `<p class="message error" role="alert">${escapeHtml(detail.error)}</p>`;
     const media = detail.kind === "hls"
       ? `<ha-hls-player url="${escapeHtml(detail.url)}" aria-label="${label}" controls playsinline></ha-hls-player>`
       : detail.kind === "clip"
@@ -905,7 +909,8 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       : `<img class="detail-image" src="${escapeHtml(detail.url)}" alt="${label}">`;
     const description = detail.event.provider === "netatmo" && text(detail.event.label)
       ? `<small>${escapeHtml(detail.event.label)}</small>` : "";
-    return `<section class="detail">${media}<div class="detail-meta"><strong>${label}</strong><small>${date}</small>${description}</div></section>`;
+    const feedback = detail.status === "loading" ? localize("camera_events.loading_event", this._hass, {}, "Loading event…") : localize("common.error", this._hass, {}, "Error");
+    return `<section class="detail"><div class="detail-media">${detail.status === "loading" || detail.status === "error" ? `<p class="message" role="${detail.status === "error" ? "alert" : "status"}">${escapeHtml(feedback)}${detail.status === "error" ? `<button type="button" data-action="details" aria-label="${escapeHtml(detail.error)}">${escapeHtml(localize("common.details", this._hass, {}, "Details"))}</button>` : ""}</p>` : media}</div><div class="detail-meta"><strong>${label}</strong><small>${date}</small>${description}</div></section>`;
   }
 
   _handleMediaError(event) {
@@ -936,7 +941,9 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     .more { display: block; margin: 16px auto 0; }
     .filter:active, .more:active { transform: scale(.96); }
     h2 { margin: 0; overflow-wrap: anywhere; font-size: var(--font-size-primary, 1.125rem); font-weight: var(--font-weight-primary, 700); }
-    main { padding: 0 12px 12px; }
+    main { position:relative;box-sizing:border-box;height:clamp(240px,60vh,600px);overflow-y:auto;padding:0 12px 12px; }
+    main>.state, main>.problem:not(:empty) { position:absolute;inset:0;display:grid;place-items:center; }
+    .message button { display:block;min-width:48px;min-height:48px;margin:8px auto 0;border:0;border-radius:12px;background:var(--secondary-background-color); }
     button { font: inherit; color: inherit; }
     .icon-button { justify-self: end; width: 48px; min-width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; cursor: pointer; font-size: max(1.5rem, var(--font-size-primary, 1.125rem)); transition: transform .12s ease, background-color .12s ease; }
     .icon-button:active { transform: scale(.94); }
@@ -957,7 +964,9 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     small { color: var(--secondary-text-color); font-size: var(--font-size-caption, .875rem); }
     .message { margin: 0; padding: 32px 12px; text-align: center; color: var(--secondary-text-color); font-size: var(--font-size-secondary, 1rem); }
     .error { color: var(--error-color); }
-    .detail video, .detail ha-hls-player, .detail-image { display: block; width: 100%; max-height: 65vh; object-fit: contain; border-radius: var(--ha-card-border-radius, 12px); background: #000; }
+    .detail-media { position:relative;aspect-ratio:16/9;background:var(--secondary-background-color);border-radius:var(--ha-card-border-radius,12px);overflow:hidden; }
+    .detail-media>.message { position:absolute;inset:0;display:grid;place-content:center; }
+    .detail video, .detail ha-hls-player, .detail-image { height:100%;position:absolute;inset:0; display: block; width: 100%; max-height: 65vh; object-fit: contain; border-radius: var(--ha-card-border-radius, 12px); background: #000; }
     .detail ha-hls-player { aspect-ratio:16/9; --video-max-height:65vh; }
   `;
 }

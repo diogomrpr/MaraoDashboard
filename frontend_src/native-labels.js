@@ -44,6 +44,7 @@ const labels = {
   "Access type": "Tipo de acesso",
   "Loading…": "A carregar…",
   "Retry": "Tentar novamente",
+  "Error": "Erro",
   "No entities configured": "Nenhuma entidade configurada",
   "Marao Native": "Marao Nativo",
   "Show name": "Mostrar nome",

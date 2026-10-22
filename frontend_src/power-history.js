@@ -1,3 +1,4 @@
+import { createPowerToolbar } from '../custom_components/marao_dashboard/frontend/MaraoHistoryLayout.js';
 import { bindDropdown, dropdownStyles } from '../custom_components/marao_dashboard/frontend/MaraoDropdown.js';
 import { normalizeSamples, periodRange, reduceSamples } from './history-data.js';
 
@@ -46,41 +47,13 @@ export async function loadPowerPeriod({ hass, ids, range, timeZone, convert, isC
   return { series, errors };
 }
 
-const CSS = `${dropdownStyles}
-
-:host{display:block;min-width:0;font-family:var(--primary-font-family,Montserrat,sans-serif);color:var(--primary-text-color)}
-.power-toolbar{position:sticky;top:var(--marao-popup-header-height,0px);z-index:1;display:grid;gap:8px;padding:8px 0 12px;background:var(--ha-card-background,var(--card-background-color))}
-.power-navigation{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;gap:8px;text-align:center}
-.power-navigation strong{overflow-wrap:anywhere;font-size:var(--font-size-primary,1.125rem)}
-.power-navigation button{display:grid;place-items:center;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:var(--secondary-background-color);color:inherit;font:inherit;cursor:pointer}
-.power-navigation button:active{transform:scale(.94)}.power-navigation ha-icon{--mdc-icon-size:24px;pointer-events:none}
-.power-toolbar :disabled{opacity:.5}.power-toolbar :focus{outline:none}.power-history-content{min-width:0}
-`;
 
 export function createPowerHistory(host, initial, createChart) {
   let options = initial, period = 'day', selectedStart, request = 0, destroyed = false, loading = false, loadedKey = '', data, error;
   const cache = new Map(), events = new AbortController();
   let probeTime, probeValues = {}, probing = false, pendingLive = {};
   let prefetchFrame, prefetchTimer, background;
-  const make = (tag, parent, className) => { const node = document.createElement(tag); if (className) node.className = className; parent.append(node); return node; };
-  const style = make('style', host); style.textContent = CSS;
-  const toolbar = make('div', host, 'power-toolbar'), picker = make('div', toolbar, 'power-picker marao-dropdown');
-  const trigger = make('button', picker), selectedLabel = make('span', trigger), chevron = make('ha-icon', trigger);
-  trigger.type = 'button'; trigger.setAttribute('aria-haspopup', 'menu'); trigger.setAttribute('aria-expanded', 'false');
-  chevron.setAttribute('icon','mdi:chevron-down'); chevron.setAttribute('aria-hidden','true');
-  const menu = make('div', picker, 'power-options marao-dropdown-options'); menu.setAttribute('role','menu'); menu.hidden = true;
-  const choices = ['day','week','month'].map(value => {
-    const button = make('button', menu), label = make('span', button), check = make('ha-icon', button);
-    button.type = 'button'; button.tabIndex = -1; button.setAttribute('role','menuitemradio');
-    check.setAttribute('icon','mdi:check'); check.setAttribute('aria-hidden','true');
-    return { value, button, label };
-  });
-  const navigation = make('div', toolbar, 'power-navigation');
-  const previous = make('button', navigation), title = make('strong', navigation), next = make('button', navigation);
-  previous.type = next.type = 'button';
-  previous.innerHTML = '<ha-icon icon="mdi:chevron-left" aria-hidden="true"></ha-icon>';
-  next.innerHTML = '<ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon>';
-  const content = make('div', host, 'power-history-content');
+  const { style, toolbar, picker, trigger, selectedLabel, menu, choices, previous, title, next, content } = createPowerToolbar(host, dropdownStyles);
   const text = key => options.localize?.(key) || key;
   const state = id => options.hass?.states?.[id];
   const availability = id => !options.hass || options.hass.connected === false || options.hass.connection?.connected === false ? 'common.unavailable'
@@ -96,6 +69,7 @@ export function createPowerHistory(host, initial, createChart) {
   const format = value => options.format(value, options.display_precision ?? (unit() === 'W' ? 0 : 2), options.hass);
   const unit = () => options.display_unit || state(options.entity)?.attributes?.unit_of_measurement || 'W';
   const display = value => { const reading = options.convert(value, 'W', unit()); return reading?.error ? null : reading?.value; };
+  const names = {};
   const chart = createChart(content, { loading: true, windows: false, power: true });
   const haptic = () => globalThis.window?.MaraoDashboard?.haptic?.('heavy');
   const render = () => {
@@ -116,7 +90,7 @@ export function createPowerHistory(host, initial, createChart) {
       const problem = availability(source.entity_id) || data?.errors[source.entity_id] || (sourceUnit && options.convert(1,sourceUnit,'W')?.error ? 'power.unit_error' : '');
       const raw = data?.series[source.entity_id] || [];
       const samples = problem || unavailable ? [] : raw.map(sample => ({ ...sample, value: sample.value === null ? null : display(sample.value) }));
-      return { id: source.entity_id, name: source.name || state(source.entity_id)?.attributes?.friendly_name || source.entity_id,
+      return { id: source.entity_id, name: source.name || (names[source.entity_id] = state(source.entity_id)?.attributes?.friendly_name || names[source.entity_id]) || source.entity_id,
         samples, color: index ? undefined : options.graph_color, problem: problem ? text(problem) : '' };
     });
     const incompatible = options.convert(1, 'W', unit())?.error;

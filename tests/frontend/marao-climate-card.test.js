@@ -70,7 +70,8 @@ test("null, missing and incomplete range targets never become zero or generate a
   await card._adjustNumber(climateEntity, "hc_climate_card", 1);
   await card._setClimateMode(climateEntity, "unsupported");
   assert.equal(calls, 0);
-  assert.equal(displayedTarget(card), undefined);
+  assert.equal(displayedTarget(card), "—");
+  assert.match(card.shadowRoot.innerHTML, /data-number-step="increase"[^>]* disabled/);
 });
 
 
@@ -377,14 +378,13 @@ test("climate modes use the theme state palette", () => {
   assert.equal(stateAppearance("hc_climate_card", "auto", {}, {}).text, "var(--color-black)");
 });
 
-test("selected climate mode keeps the same readable control surface", () => {
-  assert.match(
-    source,
-    /\.climate-mode\.active \{ background:var\(--ha-card-background,var\(--card-background-color\)\); color:var\(--primary-text-color\); box-shadow:inset 0 0 0 3px var\(--marao-accent-color,var\(--primary-color\)\); \}/,
-  );
-  assert.match(source, /\.climate-card \.current-temperature \{[^}]*font-size:calc\(var\(--font-size-primary,1\.125rem\) \* 1\.78\)/);
-  assert.match(source, /class="climate current-temperature" aria-label="\$\{esc\(climateReadingLabel\)\}">\$\{esc\(currentTemperature\)\}/);
-  assert.match(source, /\.climate-mode \{[^}]*display:flex;[^}]*flex-direction:column;[^}]*align-items:center;[^}]*justify-content:center;[^}]*min-height:72px/);
+test("climate modes use the shared dropdown and retain measured/target slots", t => {
+  const card = climateCard(t, { states: { [climateEntity]: reportedClimate("heat") } }, { show_mode_buttons: true });
+  assert.match(card.shadowRoot.innerHTML, /class="climate-mode-picker marao-dropdown"/);
+  assert.match(card.shadowRoot.innerHTML, /data-scene-select[^>]*aria-haspopup="menu"/);
+  assert.match(card.shadowRoot.innerHTML, /role="menuitemradio"[^>]*data-climate-mode="heat"[^>]*aria-checked="true"/);
+  assert.match(card.shadowRoot.innerHTML, /class="climate current-temperature"[^>]*>20</);
+  assert.equal(displayedTarget(card), "21");
 });
 
 test("light state palette colors share a dark foreground across card families", () => {

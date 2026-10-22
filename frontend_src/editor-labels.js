@@ -321,7 +321,7 @@ export const PT_LABELS = {
   "Label prefix": "Prefixo da legenda",
   "Temperature graph": "Gráfico de temperatura",
   "Graph entity": "Entidade do gráfico",
-  "Mode buttons": "Botões de modo",
+  "Mode selector": "Seletor de modo",
   "Graph color": "Cor do gráfico",
   "Setpoint label": "Legenda da temperatura",
   "Mode popup hash": "Endereço do popup de modo",
@@ -404,6 +404,7 @@ export const PT_LABELS = {
   "Reading 3 icon": "Leitura 3 ícone"
 };
 export function editorLabel(label, hass) {
+  if (label === "Mode buttons") label = "Mode selector";
   const language = String(hass?.locale?.language || hass?.language || "en").toLowerCase().split("-")[0];
   return language === "pt" ? PT_LABELS[label] || PT_LABELS[label + "."]?.replace(/\.$/, "") || label : label;
 }

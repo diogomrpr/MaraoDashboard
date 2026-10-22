@@ -8,7 +8,7 @@ import { entityMetadata, supportsEntity, dashboardRoot, previewHass } from "./na
 const query = new URL(import.meta.url).search;
 const cardsURL = "./MaraoCards.js" + query;
 const editorURL = "./MaraoNativeCardEditor.js" + query;
-const { MaraoCard, MaraoNavbarCard, MaraoPopupCard, haptic, safeArea } = await import(cardsURL);
+const { MaraoCard, MaraoNavbarCard, MaraoPopupCard, haptic, safeArea, showCardDetails } = await import(cardsURL);
 const BaseElement = globalThis.HTMLElement || class {};
 let instanceCount = 0;
 let editorModule;
@@ -47,7 +47,8 @@ export class MaraoNativeCard extends BaseElement {
   }
   setConfig(config) {
     if (!config || typeof config !== "object") throw new Error("Native card configuration must be an object");
-    this._config = structuredClone(config); this._identity = null;
+    this._config = structuredClone(config); this._identity = null; this._metadata = new Map();
+    this._children = [];
     if (this.shadowRoot) this._status(editorLabel("Loading…", this._hass));
     this._compile();
   }
@@ -55,7 +56,7 @@ export class MaraoNativeCard extends BaseElement {
   set preview(value) {
     this._preview = Boolean(value);
     for (const child of this._children) {
-      child.preview = this.preview; child.hass = previewHass(this._hass, this.preview);
+      child.preview = this._placeholder || this.preview; child.hass = previewHass(this._hass, this._placeholder || this.preview);
       if (this.preview && child instanceof MaraoPopupCard) child._close(false);
     }
     this._editAccess();
@@ -64,7 +65,7 @@ export class MaraoNativeCard extends BaseElement {
   set hass(value) {
     this._hass = value;
     this._theme();
-    for (const child of this._children) { child.preview = this.preview; child.hass = previewHass(value, this.preview); }
+    for (const child of this._children) { child.preview = this._placeholder || this.preview; child.hass = previewHass(value, this._placeholder || this.preview); }
     this._compile(); this._editAccess();
   }
   connectedCallback() {
@@ -72,7 +73,7 @@ export class MaraoNativeCard extends BaseElement {
     this._theme();
     this._compile();
   }
-  disconnectedCallback() { this._request++; if (this._loading) this._identity = null; this._loading = false; }
+  disconnectedCallback() { this._detailsPopup?._close(false); this._request++; if (this._loading) this._identity = null; this._loading = false; }
   _theme() {
     if (!this.style || !globalThis.getComputedStyle) return;
     const parent = this.parentElement || this.getRootNode?.().host;
@@ -92,17 +93,34 @@ export class MaraoNativeCard extends BaseElement {
   }
   _status(message, retry = false) {
     if (!this.shadowRoot) return;
-    this.shadowRoot.replaceChildren();
-    this._children = [];
-    const surface = document.createElement("ha-card");
-    surface.style.cssText = "padding:16px;min-height:80px;box-sizing:border-box;overflow-wrap:anywhere";
-    const text = document.createElement("p"); text.setAttribute("role", "status"); text.textContent = message; surface.append(text);
-    if (retry) {
-      const button = document.createElement("button"); button.type = "button"; button.textContent = editorLabel("Retry", this._hass);
-      button.style.cssText = "min-width:48px;min-height:48px;border:0;border-radius:12px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit";
-      button.onclick = () => { this._identity = null; this._compile(); }; surface.append(button);
+    if (!this._children.length) {
+      const spec = this.constructor.spec;
+      const type = spec?.runtime_type || spec?.legacy_type || 'custom:marao-card';
+      const Constructor = globalThis.customElements?.get(type.slice(7));
+      const child = Constructor ? document.createElement(type.slice(7)) : new MaraoCard();
+      const variables = { ...Object.fromEntries((spec?.variables || []).filter(item => item.default !== undefined).map(item => [item.key, item.default])), ...this._config.variables };
+      child.preview = true;
+      child.setConfig({ ...this._config, type, template: spec?.id || 'hc_base_card', variables,
+        ...(spec?.legacy_type ? variables : {}),
+        ...(spec?.entity_group ? { variables: { ...variables, entity_type: this._config.entity_type, summary_entities: this._config.entities || [] } } : {}) });
+      child.hass = previewHass(this._hass, true);
+      child.setAttribute('aria-busy', 'true');
+      this.shadowRoot.replaceChildren(child); this._children = [child]; this._placeholder = true;
     }
-    this.shadowRoot.append(surface);
+    this.shadowRoot.querySelector('.native-status')?.remove();
+    if (!retry && message === editorLabel('Loading…', this._hass)) return;
+    const overlay = document.createElement('div'); overlay.className = 'native-status';
+    overlay.style.cssText = 'position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:var(--ha-card-border-radius,20px);background:var(--secondary-background-color);color:var(--primary-text-color)';
+    this.style.position = 'relative';
+    for (const child of this._children) child.style.visibility = 'hidden';
+    if (!retry) overlay.textContent = message;
+    for (const action of retry ? ['Error','Retry'] : []) {
+      const button = document.createElement('button'); button.type = 'button'; button.textContent = editorLabel(action, this._hass);
+      button.style.cssText = 'min-width:48px;min-height:48px;border:0;border-radius:12px;background:var(--ha-card-background);color:inherit;font:inherit;outline:none';
+      button.onclick = action === 'Retry' ? () => { this._identity = null; this._compile(); } : () => showCardDetails(this, message, button);
+      overlay.append(button);
+    }
+    this.shadowRoot.append(overlay);
   }
   async _compile() {
     if (!this.isConnected || !this._hass?.callWS || !this._config.type) return;
@@ -112,7 +130,13 @@ export class MaraoNativeCard extends BaseElement {
       this._status(editorLabel("Choose an entity", this._hass)); return;
     }
     const message = { type: "marao_dashboard/native/card", config: this._config, instance: this._instance,
-      url_path: dashboardRoot(), entities: entityMetadata(this._config, this._hass), language: this._hass.language || "en", validate_units: false };
+      url_path: dashboardRoot(), entities: entityMetadata(this._config, this._hass).map(metadata => {
+        // Missing entity attributes must not recompile a different presentation.
+        const previous = this._metadata.get(metadata.entity_id) || {};
+        const retained = { ...previous, ...Object.fromEntries(Object.entries(metadata).filter(([, value]) => value !== undefined)) };
+        if (!metadata.has_state && previous.has_state) retained.has_state = true;
+        this._metadata.set(metadata.entity_id, retained); return retained;
+      }), language: this._hass.language || "en", validate_units: false };
     const identity = JSON.stringify(message);
     if (identity === this._identity) return;
     this._identity = identity;
@@ -146,7 +170,7 @@ export class MaraoNativeCard extends BaseElement {
     style.textContent = ":host{display:block;min-width:0;height:auto}:host([data-marao-control-cell]){display:flex;flex-direction:column;align-items:stretch}:host([data-marao-control-cell])>[data-marao-primary-content]{flex:1;min-height:0}button:focus{outline:none}.native-edit{position:fixed;top:max(12px," + safeArea("top") + ");right:max(12px," + safeArea("right") + ");z-index:1002;width:48px;height:48px;border:0;border-radius:50%;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow);cursor:pointer}";
     children[0]?.setAttribute("data-marao-primary-content", "");
     if (this.hasAttribute("data-marao-control-cell")) children[0]?.setAttribute("data-marao-control-cell", "");
-    this.shadowRoot.append(style, ...children); this._children = children;
+    this.shadowRoot.append(style, ...children); this._children = children; this._placeholder = false;
     // The host controls editor drag handles; prevent only the rendered card's own inputs.
     for (const event of ["click", "pointerdown", "pointerup", "keydown", "keyup"]) this.shadowRoot.addEventListener(event, this._guardPreview, true);
     this._editAccess();

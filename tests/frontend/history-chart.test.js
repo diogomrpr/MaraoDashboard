@@ -4,12 +4,14 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import * as data from '../../frontend_src/history-data.js';
 import { powerStateAt } from '../../frontend_src/power-history.js';
+const layoutSource=fs.readFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoHistoryLayout.js',import.meta.url),'utf8');
 const source=fs.readFileSync(new URL('../../frontend_src/history-chart.js',import.meta.url),'utf8');
 function fixture(options={}){
-  const registry=new Map(),instances=[],observers=[],frames=new Map();let frameId=0;
+  const registry=new Map(),instances=[],observers=[],visibilityObservers=[],frames=new Map();let frameId=0;
   let width=320,fail=false,attempts=0;
   class Element extends EventTarget{
     constructor(tag){super();this.tagName=tag;this.children=[];this.attributes={};this.style={};this.dataset={};this.ownerDocument=doc;this.hidden=false;}
+    get firstChild(){return this.children[0];}
     append(...elements){for(const element of elements){this.children.push(element);element.parent=this;}}
     replaceChildren(...elements){for(const child of this.children)child.parent=null;this.children=[];this.append(...elements);}
     remove(){if(this.parent)this.parent.children=this.parent.children.filter(element=>element!==this);}
@@ -27,20 +29,45 @@ function fixture(options={}){
     destroy(){this.destroys++;registry.delete(this.canvas);}
   }
   class Observer{constructor(callback){this.callback=callback;observers.push(this);}observe(){}disconnect(){this.disconnected=true;}}
+  class VisibilityObserver{constructor(callback){this.callback=callback;visibilityObservers.push(this);}observe(){}disconnect(){this.disconnected=true;}}
   const context=vm.createContext({...data,Chart:FakeChart,LineController:'line',LineElement:'lineElement',PointElement:'point',BarController:'bar',BarElement:'barElement',LinearScale:'linear',Filler:'fill',
-    chartColor:value=>({alpha:()=>({rgbString:()=>value})}),document:doc,ResizeObserver:Observer,AbortController,CustomEvent,
+    chartColor:value=>({alpha:()=>({rgbString:()=>value})}),document:doc,ResizeObserver:Observer,IntersectionObserver:VisibilityObserver,AbortController,CustomEvent,
     requestAnimationFrame:callback=>{frames.set(++frameId,callback);return frameId;},cancelAnimationFrame:id=>frames.delete(id),
     getComputedStyle:element=>({color:element.style.color||'#233044',fontSize:'16px',getPropertyValue:key=>options.theme?.[key]||''})});
   context.powerStateAt=powerStateAt;
-  vm.runInContext(source.replace(/^import .*;\n/gm,'').replaceAll('export function','function')+'\nglobalThis.create=createHistoryChart;',context);
+  vm.runInContext(layoutSource.replaceAll('export ', '') + '\n' + source.replace(/^import .*;\n/gm,'').replaceAll('export function','function')+'\nglobalThis.create=createHistoryChart;',context);
   const container=new Element('div'),end=Date.parse('2026-10-18T12:00:00Z');
   const samples=[{time:end-5*3600000,value:12.123456},{time:end-3600000,value:40.123456},{time:end-600000,value:null},{time:end,value:20.123456}];
   const renderer=context.create(container,{samples,end,hass:{locale:{language:'en'},config:{time_zone:'Europe/Lisbon'}},format:value=>value.toFixed(6),stateClass:'measurement',...options});
   const elements=(tag,root=container)=>root.children.flatMap(element=>[...(element.tagName===tag?[element]:[]),...elements(tag,element)]);
   const findClass=name=>{const walk=root=>root.className===name?root:root.children.map(walk).find(Boolean);return walk(container);};
   const click=element=>element.dispatchEvent(new Event('click'));
-  return{renderer,container,instances,observers,registry,elements,findClass,click,samples,end,Chart:FakeChart,flushFrames(){const pending=[...frames.values()];frames.clear();pending.forEach(callback=>callback());},get attempts(){return attempts;},setWidth(value){width=value;},setFail(value){fail=value;}};
+  return{renderer,container,instances,observers,visibilityObservers,registry,elements,findClass,click,samples,end,Chart:FakeChart,flushFrames(){const pending=[...frames.values()];frames.clear();pending.forEach(callback=>callback());},get attempts(){return attempts;},setWidth(value){width=value;},setFail(value){fail=value;}};
 }
+
+test('background chart updates avoid ancestor geometry measurements while navigation retains scroll',()=>{
+  const f=fixture();let measurements=0;
+  Object.defineProperty(f.container,'scrollHeight',{get(){measurements++;return 1500;}});
+  f.container.clientHeight=800;f.container.scrollTop=180;
+  f.renderer.update({samples:f.samples});assert.equal(measurements,0);
+  f.click(f.elements('button').find(button=>button.textContent==='Previous reading'));
+  assert.ok(measurements>0);const afterNavigation=measurements;
+  f.renderer.update({samples:f.samples});
+  assert.equal(measurements,afterNavigation);assert.equal(f.container.scrollTop,180);
+  f.renderer.destroy();
+});
+
+test('off-screen chart drawing waits until visible and uses the latest readings',()=>{
+  const f=fixture(),chart=f.instances[0],observer=f.visibilityObservers[0];
+  observer.callback([{isIntersecting:false}]);
+  const updates=chart.updates;
+  f.renderer.update({samples:f.samples.map(sample=>({...sample,value:99}))});
+  f.observers[0].callback();assert.equal(chart.updates,updates);
+  observer.callback([{isIntersecting:true}]);
+  assert.equal(chart.updates,updates+1);assert.ok(chart.data.datasets[0].data.every(point=>point.y===99));
+  f.renderer.destroy();assert.equal(observer.disconnected,true);
+  observer.callback([{isIntersecting:true}]);assert.equal(chart.updates,updates+1);
+});
 
 test('detail registers only required modules, uses click-only numeric axes, retains canvas and selects full precision original readings',()=>{
   const f=fixture(),chart=f.instances[0],canvas=f.elements('canvas')[0],readout=f.findClass('history-reading');
@@ -87,8 +114,8 @@ test('drawing errors retain readable values and require explicit retry instead o
 test('unavailable sources clear stale readouts and plots, hide summaries and disable controls without an error or retry',()=>{
   const f=fixture();f.renderer.update({unavailable:'Safe source unavailable',error:'Old recorder error'});
   assert.equal(f.findClass('history-reading').children[0].textContent,'—');assert.equal(f.findClass('history-reading').children[1].textContent,'');
-  assert.equal(f.findClass('history-plot').hidden,true);assert.equal(f.registry.size,0);
-  assert.equal(f.elements('dl')[0].children.every(element=>element.hidden),true);
+  assert.equal(f.findClass('history-plot').hidden,false);assert.equal(f.elements('canvas')[0].hidden,true);assert.equal(f.registry.size,0);
+  assert.equal(f.elements('dd').every(element=>element.textContent==='—'),true);
   assert.equal(f.elements('button').filter(button=>button.textContent!=='Retry').every(button=>button.disabled),true);
   assert.equal(f.elements('button').find(button=>button.textContent==='Retry').hidden,true);
   assert.ok(f.elements('p').some(element=>element.textContent==='Safe source unavailable'&&element.attributes.role==='status'));
@@ -166,7 +193,7 @@ test('monthly selection and reset keep the bar focus and contributor breakdown i
   assert.equal(selected.at(-1),start+day);assert.ok(f.elements('span').some(element=>element.textContent==='5 kWh'));
   f.renderer.update({samples:[...samples]});assert.equal(selected.at(-1),start+day,'Normal HA updates retain selected day');
   f.click(f.elements('button').find(button=>button.attributes['aria-label']==='Next day'));
-  assert.equal(selected.at(-1),start+2*day);assert.equal(f.findClass('history-donut'),undefined,'Missing day cannot use monthly totals');
+  assert.equal(selected.at(-1),start+2*day);assert.equal(f.findClass('history-donut').style.background,undefined,'Missing day keeps a neutral placeholder without monthly totals');
   f.click(reset);assert.equal(selected.at(-1),undefined);assert.ok(f.elements('span').some(element=>element.textContent==='7 kWh'));
   assert.equal(f.findClass('history-reading').hidden,true);assert.ok(chart.data.datasets[0].borderWidth.every(width=>width===0));
   chart.options.onClick({x:start+day/2});
@@ -221,15 +248,15 @@ test('breakdown shares compare configured values, preserve missing rows and show
   assert.match(f.findClass('history-donut').style.background,/0% 25%.*25% 100%/);
   assert.equal(f.elements('ul')[0].attributes['aria-label'],'Share of configured items');
   assert.ok(f.elements('p').some(element=>element.textContent===breakdown.note));
-  assert.ok(f.elements('p').some(element=>element.textContent==='History unavailable'));
+  assert.ok(f.elements('span').some(element=>element.textContent==='History unavailable'));
   assert.ok(f.elements('span').some(element=>element.textContent==='≈ 0.25 EUR'&&element.attributes['aria-label']==='Cost: ≈ 0.25 EUR'));
   f.renderer.update({breakdown:{...breakdown,items:[...breakdown.items,{name:'Export',energyLabel:'−2 kWh',costLabel:'—',value:-2}]}});
-  assert.equal(f.findClass('history-donut'),undefined);assert.equal(f.elements('li').length,4);
+  assert.equal(f.findClass('history-donut').style.background,undefined);assert.equal(f.elements('li').length,4);
   f.renderer.update({breakdown:{...breakdown,items:[{name:'Kitchen',energyLabel:'0 kWh',costLabel:'0 EUR',value:0}]}});
-  assert.equal(f.findClass('history-donut'),undefined);assert.equal(f.elements('li').length,1);
+  assert.equal(f.findClass('history-donut').style.background,undefined);assert.equal(f.elements('li').length,1);
   f.renderer.update({breakdown:{items:[],note:'No configured energy price.'}});
   assert.equal(f.findClass('history-breakdown').hidden,false);assert.ok(f.elements('p').some(element=>element.textContent==='No configured energy price.'));
-  f.renderer.update({unavailable:true});assert.equal(f.findClass('history-breakdown').hidden,true);f.renderer.destroy();
+  f.renderer.update({unavailable:true});assert.equal(f.findClass('history-breakdown').hidden,false);f.renderer.destroy();
 });
 
 test('local chart assets use selective registration and ship both exact dependency notices',()=>{
@@ -283,4 +310,14 @@ test('power comparisons share the plot without smoothing peaks and report select
     f.renderer.update({loading:true});assert.equal(f.findClass('history-plot').hidden,false,'Loading retains plot space');
     assert.equal(f.findClass('history-comparison').hidden,false,'Loading retains device rows');
   }finally{f.renderer.destroy();}
+});
+
+test('unavailable breakdown retains names but never stale consumption', () => {
+  const f=fixture({breakdown:{items:[{name:'Kitchen',value:42,energyLabel:'42 kWh',costLabel:'10 EUR'}]}});
+  f.renderer.update({unavailable:true});
+  assert.equal(f.elements('li').length,1);
+  assert.ok(f.elements('strong').some(item=>item.textContent==='Kitchen'));
+  assert.equal(f.findClass('history-donut').style.background,undefined);
+  assert.ok(!f.elements('span').some(item=>['42 kWh','10 EUR'].includes(item.textContent)));
+  f.renderer.destroy();
 });

@@ -205,9 +205,11 @@ the action it affects.
 ### Viewport behavior
 
 - Support a 320 CSS-pixel-wide viewport without horizontal page scrolling.
-- Use content-driven card height and minimum sizes; do not clip essential
-  content into a fixed-height composition.
-- Let essential titles, states, errors, and action labels wrap.
+- Derive each card footprint from its configured content and responsive typography.
+  Keep that footprint through loading, state changes, errors and recovery. Reserve
+  useful control/reading slots; replace details rather than appending feedback rows.
+- Let configured titles and action labels wrap. Keep changing readings and secondary
+  metadata in compact slots. Show short error labels with full details on tap.
   Access labels wrap beside the vertically centered resting thumb, including in
   narrow tracks. Let the track grow; never stack the label above the thumb.
 - Light, fan, cover and strict access-opener cards keep their visible icon beside
@@ -345,7 +347,7 @@ to it:
 never substituted with a plausible safe-looking or active state. Disable
 actions in either state.
 
-Every recognized availability or fault/error reason uses the whole card surface and a visible localized cue. Complete availability shows only its concise neutral status, taking priority over retained action/content errors; those errors remain stored until a successful retry or configuration replacement. Otherwise reported errors take priority over partial warnings and loading. Individual-card availability reasons omit entity names. Partially available group, legacy summary and room-light tiles keep their normal counts and palette without unavailable counts or member-warning rows; member sheets retain individual statuses. Other partial cards show concise availability cues and preserve usable readings and safe actions. Apply shared problem colors after custom colors and artwork, with readable contrast in both themes. Hidden normal state text or icons cannot hide a problem reason. Keep service errors local to the initiating card until a successful explicit retry or configuration replacement, with one native notification and no automatic retry. Card-owned media/history failures have explicit retry or back controls; empty content and ordinary loading remain distinct.
+Every recognized availability or fault/error reason uses the whole card surface and a visible localized cue. Complete availability shows only its concise neutral status, taking priority over retained action/content errors; those errors remain stored until a successful retry or configuration replacement. Otherwise reported errors take priority over partial warnings and loading. Individual-card availability reasons omit entity names. Partially available group, legacy summary and room-light tiles keep their normal counts and palette without unavailable counts or member-warning rows; member sheets retain individual statuses. Other partial cards show concise availability cues and preserve usable readings and safe actions. Apply shared problem colors after custom colors and artwork, with readable contrast in both themes. Hidden normal state text or icons cannot hide a problem reason. Keep service errors local to the initiating card until a successful explicit retry or configuration replacement, with one native notification and no automatic retry. Compact feedback replaces normal content without changing the card size; the details control opens the complete message. Card-owned media/history failures have explicit retry or back controls; empty content and ordinary loading remain distinct.
 
 Use Home Assistant's native connection warning when its authenticated
 connection is lost and disable entity actions until it recovers. Do not add a
@@ -535,8 +537,9 @@ large and readable.
 - Omit degree symbols and units from all visual and accessible climate values.
 - A single supported mode turns on directly to that mode.
 - Multiple supported modes open the Marao popup.
-- The popup begins with the normal climate card and follows it with large,
-  localized mode buttons in a two-column grid.
+- The climate card and its popup use the shared themed mode dropdown. Its menu
+  does not change the card footprint; requested-mode feedback replaces the state
+  line. Missing measured/target values keep disabled placeholder slots.
 - Mode and setpoint controls use a readable theme surface and state-colored
   selection treatment.
 - Climate card background follows heat, cool, heat/cool, auto, dry, fan, off,
@@ -702,8 +705,9 @@ contain readable text and the full-size icon. Keep both
 blocks contained and separate; Marao-owned sections instead reflow their columns.
 Ordinary short 50% value-slider examples fit within 140px in 172px-wide cells at
 normal typography. This reference is never a clipping limit. Strict access keeps
-its 64px track and 54px thumb; long text, errors and detailed families grow freely.
-Redundant normal On/Off rows remain absent; useful values and mandatory problems remain.
+its 64px track and 54px thumb; configured labels reflow with width and text size.
+State changes and errors replace content inside the same footprint. Redundant
+normal On/Off text stays invisible in a reserved state slot.
 
 Each owned logical section uses `custom:marao-control-grid`: all content rows
 share their tallest intrinsic height, with an 8px gap. Automatic domain groups
@@ -717,7 +721,7 @@ wrap content and grow vertically; control targets and room icons keep their size
 Substantially enlarged text still reduces the column count. Logo-only media-app groups
 use an 80px cell minimum because their labels remain accessible rather than
 visible; three app shortcuts therefore fit on phone widths. Their controls remain
-at least 48px square, and availability/error text still wraps and grows. Mixed
+at least 48px square; compact availability/error feedback fits inside the tile. Mixed
 groups retain the ordinary floor. This does not cap content
 height. Preferred columns reflow together before
 controls become cramped; incomplete rows keep their normal width. All Marao
@@ -741,3 +745,18 @@ preserves peaks. Only measurement series show the labeled sample average.
 Calendar energy ranges follow the HA timezone, including daylight-saving days.
 Parent sheets retain mounted content, scroll and focus through history drill-in;
 Close, browser navigation and removal release chart resources and inert state.
+
+### State-stable content
+
+The same rule applies inside popups. Media metadata, numeric controls, forecast
+items, timelines, chart plots/statistics and configured device rows keep their
+normal slots while data loads or fails. Do not retain stale measurements to fill
+those slots. Only presentation metadata such as names and capability descriptors
+may survive missing attributes; service dispatch still checks the live entity.
+Weather forecasts use one horizontally scrolling strip. Alarm actions use a
+horizontal row and retain the code-entry slot. Camera events use a bounded,
+internally scrolling viewer with fixed-aspect media, so initial loading, filters,
+empty results and playback errors do not move the rest of the popup. Lazy loading
+still adds events to that viewer. Native compilation uses the corresponding card
+shell and retains its footprint on failure. Raw Home Assistant cards keep their
+own implementation. Configuration changes and width/text-size changes may reflow.

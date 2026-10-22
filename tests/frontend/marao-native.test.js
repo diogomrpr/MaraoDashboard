@@ -219,3 +219,16 @@ test('critical native navbar converts locally and preserves complete configurati
   assert.deepEqual(owner._config,source);
   MaraoNativeNavbar.prototype.setConfig.call(owner,{...source,routes:[]});assert.deepEqual(child._config.routes,[]);
 });
+
+test('missing presentation metadata does not recompile native cards or retain live readings', async () => {
+  let calls=0;
+  const hass={states:{'light.safe':{state:'on',attributes:{friendly_name:'Safe light',supported_features:1}}},callWS:async()=>{calls++;return {card:{name:'Safe light'},popups:[]};}};
+  const card=new Probe(); card.setConfig({type:Probe.spec.type,entity:'light.safe'});card.hass=hass;
+  await new Promise(resolve=>setImmediate(resolve));
+  card.hass={...hass,states:{'light.safe':{state:'unavailable',attributes:{}}}};
+  card.hass={...hass,states:{}};
+  assert.equal(calls,1);
+  assert.deepEqual(card._hass.states,{});
+  assert.equal(card.result.card.name,'Safe light');
+  card.disconnectedCallback();
+});

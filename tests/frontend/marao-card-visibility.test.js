@@ -534,7 +534,7 @@ test("graph history failures remain readable without repeated requests and recov
   assert.match(card.shadowRoot.innerHTML, /data-graph-history-state="loading"/);
   await new Promise((resolve) => setImmediate(resolve));
   assert.match(card.shadowRoot.innerHTML, /data-graph-history-state="error"/);
-  assert.match(card.shadowRoot.innerHTML, /class="problem" role="alert">[\s\S]*History unavailable/);
+  assert.match(card.shadowRoot.innerHTML, /data-problem-details aria-label="History unavailable"/);
   assert.match(card.shadowRoot.innerHTML, /data-graph-retry/);
   assert.match(card.shadowRoot.innerHTML, /125 W/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /class="graph-background"/);
@@ -825,7 +825,7 @@ test("slider headers follow family and preserve optional controls and hidden fie
     card.setConfig(config);
     card.hass = { states: { [entity]: { state: entity.startsWith("lock.") ? "locked" : "on", attributes } } };
     const markup = () => card.shadowRoot.innerHTML.split("</style>")[1];
-    assert.match(markup(), /class="body slider-header/, template);
+    assert.match(markup(), /class="body[^"\n]* slider-header/, template);
     assert.equal(markup().includes('type="range"'), range, template);
     if (entity.startsWith("lock.")) {
       assert.match(markup(), /<marao-slide-to-open/);
@@ -841,7 +841,7 @@ test("slider headers follow family and preserve optional controls and hidden fie
     for (const state of ["unknown", "unavailable"]) {
       card.setConfig(config);
       card.hass = { states: { [entity]: { state, attributes } } };
-      assert.match(markup(), /class="body slider-header/);
+      assert.match(markup(), /class="body[^"\n]* slider-header/);
     }
   }
   for (const template of ["hc_switch_card", "hc_navigation_card", "hc_media_card", "hc_climate_card"]) {

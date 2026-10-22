@@ -7,7 +7,7 @@ class Shadow {
   set innerHTML(value) {
     for (const button of this.buttons || []) button.isConnected = false;
     this.activeElement = null;
-    this.html = value; this.renders = (this.renders || 0) + 1; this.surface = value.includes('<ha-card') ? {} : null;
+    this.html = value; this.renders = (this.renders || 0) + 1; this.surface = value.includes('<ha-card') ? {classList:{remove(){},add(){}},style:{setProperty(){}}} : null;
     const root = this;
     this.buttons = [...value.matchAll(/<button\b([^>]*)>/g)].map(([, attrs]) => ({
       localName: "button", isConnected: true,
@@ -43,7 +43,7 @@ const cardsSource = (await fs.readFile(new URL("../../custom_components/marao_da
 const cardsModule = `data:text/javascript;base64,${Buffer.from(cardsSource).toString("base64")}`;
 const { MaraoCard } = await import(cardsModule);
 const classes = source.slice(source.indexOf("function escapeHtml("), source.indexOf('if (!customElements.get("marao-energy-period-card"))'));
-const { MaraoStateTimelineCard, MaraoEnergyPeriodCard } = await import(`data:text/javascript;base64,${Buffer.from(`import { energyBuckets, statisticsBuckets, energyTotal, historyPeriodRange, historySamples, loadHistoryChart, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, focusRestorer, controlGridStyles, updateCardSurface } from "${cardsModule}";\nconst localize = (key) => key;\n${classes}\nexport { MaraoStateTimelineCard, MaraoEnergyPeriodCard };`).toString("base64")}`);
+const { MaraoStateTimelineCard, MaraoEnergyPeriodCard } = await import(`data:text/javascript;base64,${Buffer.from(`import { energyBuckets, statisticsBuckets, energyTotal, historyPeriodRange, historySamples, loadHistoryChart, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, problemLabel, showCardDetails, createHistoryPlaceholder, layoutState, focusRestorer, controlGridStyles, updateCardSurface } from "${cardsModule}";\nconst localize = (key) => key;\n${classes}\nexport { MaraoStateTimelineCard, MaraoEnergyPeriodCard };`).toString("base64")}`);
 const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
 const waitFor = async condition => {
   const deadline = Date.now() + 3000;
@@ -71,6 +71,73 @@ test('graph history retains replaced authoritative live readings without mutatin
   card.hass = { ...newer, states: { 'sensor.history': record(-1000,5) } };
   assert.equal(card._graphHistory.get('sensor.history').filter(item => item.last_updated === next.last_updated).length,1);
   assert.equal(card._graphHistory.get('sensor.history').find(item => item.last_updated === next.last_updated).state,'4');
+});
+
+test('graph updates reuse converted Recorder samples and retain exact spikes, gaps and corrected live readings', () => {
+  const card = new MaraoCard(), now = Date.now();
+  card._config = { template: 'hc_graph_card', entity: 'sensor.history' };
+  card._render = () => {}; card._subscribeClimate = () => {};
+  let reads = 0;
+  const raw = Object.freeze(Array.from({length:1000}, (_, index) => Object.freeze({
+    get state() { reads++; return index === 500 ? '12345.6789' : index === 600 ? 'unavailable' : '1'; },
+    attributes: { unit_of_measurement:'W' }, last_updated:new Date(now-10000+index).toISOString(),
+  })));
+  const live = {state:'2',attributes:{unit_of_measurement:'W'},last_updated:new Date(now-1000).toISOString()};
+  card.hass = {states:{'sensor.history':live}}; card._graphHistory.set('sensor.history',raw);
+  const initial = card._historyOptions().samples;
+  const initialReads = reads;
+  const next = {...live,state:'3',last_updated:new Date(now).toISOString()};
+  card.hass = {...card.hass,states:{'sensor.history':next}};
+  const samples = card._historyOptions().samples;
+  assert.equal(reads,initialReads,'A new observation must not reconvert existing Recorder history');
+  assert.equal(samples.length,1002); assert.equal(samples[500].value,12345.6789); assert.equal(samples[600].value,null);
+  assert.deepEqual(samples.slice(-2).map(sample=>sample.value),[2,3]);
+  assert.equal(initial.at(-1).value,2,'Previously returned chart data remains untouched');
+  assert.equal(raw.length,1000);
+  card.hass = {...card.hass,states:{'sensor.history':{...next,state:'4'}}};
+  assert.equal(card._historyOptions().samples.at(-1).value,4);
+  assert.equal(card._historyOptions().samples.length,1002,'A corrected timestamp replaces the old value');
+  card.hass = {...card.hass,states:{'sensor.history':{...next,state:'0.004',attributes:{unit_of_measurement:'kW'}}}};
+  const converted = card._historyOptions().samples;
+  assert.ok(Math.abs(converted[500].value-12.3456789)<1e-12); assert.equal(converted.at(-1).value,0.004);
+  assert.ok(reads>initialReads,'Changing the source unit must invalidate the derived conversion');
+});
+
+test('off-screen graphs retain observations and update active popups, then catch up before entering view', t => {
+  const previous = globalThis.IntersectionObserver, observers=[];
+  globalThis.IntersectionObserver = class { constructor(callback){this.callback=callback;observers.push(this);} observe(){} disconnect(){this.disconnected=true;} };
+  t.after(()=>{globalThis.IntersectionObserver=previous;});
+  const card = new MaraoCard(); card.isConnected=true;
+  card.setConfig({template:'hc_graph_card',entity:'sensor.history'});
+  const live = state('21'); card.hass={states:{'sensor.history':live}};
+  card._graphHistory.set('sensor.history',[]); card._render();
+  const observer=observers[0]; observer.callback([{isIntersecting:false}]);
+  const renders=card.shadowRoot.renders; let popupUpdates=0;
+  card._activeHistoryPopup={_refreshHistory(){popupUpdates++;}};
+  card.hass={...card.hass,states:{'sensor.history':{...live,state:'22',last_changed:new Date(Date.now()+1).toISOString()}}};
+  assert.equal(card.shadowRoot.renders,renders); assert.equal(popupUpdates,1);
+  assert.equal(card._graphHistory.get('sensor.history')[0],live);
+  observer.callback([{isIntersecting:true}]);
+  assert.match(card.shadowRoot.innerHTML,/22/); assert.ok(card.shadowRoot.renders>renders);
+  card._activeHistoryPopup=null; card.isConnected=false; card.disconnectedCallback();
+  assert.equal(observer.disconnected,true);
+});
+
+test('energy detail skips unrelated reports but updates readings, contributors, tariffs and locale', () => {
+  const card = new MaraoEnergyPeriodCard();
+  card.setConfig({entity:'sensor.history',popup:true,sub_entities:[{entity_id:'sensor.device',name:'Device'}]});
+  let renders=0; card._render=()=>renders++; card._load=()=>{};
+  const hass={states:{'sensor.history':state('10'),'sensor.device':state('2'),'sensor.price':{state:'0.25',attributes:{unit_of_measurement:'EUR/kWh'}}},config:{currency:'EUR',time_zone:'UTC'}};
+  card.hass=hass;
+  card._preferences={energy_sources:[{type:'grid',flow_from:[{stat_energy_from:'sensor.history',entity_energy_price:'sensor.price'}]}]};
+  card.hass=hass; const baseline=renders;
+  for(let index=0;index<3;index++)card.hass={...hass,states:{...hass.states,'sensor.history':{...hass.states['sensor.history'],last_changed:new Date().toISOString()},'sensor.unrelated':state(String(index))}};
+  assert.equal(renders,baseline,'Unrelated state reports must not reach the detail renderer');
+  card.hass={...hass,states:{...hass.states,'sensor.history':state('11')}}; assert.equal(renders,baseline+1);
+  card.hass={...card._hass,states:{...card._hass.states,'sensor.device':state('3')}}; assert.equal(renders,baseline+2);
+  card.hass={...card._hass,states:{...card._hass.states,'sensor.price':{...hass.states['sensor.price'],state:'0.30'}}}; assert.equal(renders,baseline+3);
+  card.hass={...card._hass,locale:{language:'pt'}}; assert.equal(renders,baseline+4);
+  card.hass={...card._hass,connected:false}; assert.equal(renders,baseline+5);
 });
 function create(Card, popup = true) {
   const card = new Card();
@@ -178,7 +245,7 @@ test("energy summary renders authoritative values without requesting history or 
   assert.equal(button.disabled, true);
   button.click();
   assert.equal(navigations, 1);
-  assert.match(card.shadowRoot.innerHTML, /class="value">common.unavailable</);
+  assert.match(card.shadowRoot.innerHTML, /class="value placeholder">—<\/span><span class="period">Disconnected</);
 });
 
 test("energy summary keeps the restored popup invoker focused through the next HA update", () => {
@@ -343,11 +410,13 @@ for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) test(`${Card
   assert.match(card.shadowRoot.innerHTML, /data-problem="error" style="background:var\(--marao-problem-error-background/);
   if (Card === MaraoEnergyPeriodCard) assert.equal(card._detailOptions.error, 'timeline.history_unavailable');
   else assert.match(card.shadowRoot.innerHTML, /role="alert"/);
-  assert.ok(card.shadowRoot.querySelector('[data-history-retry]'));
+  if (Card === MaraoStateTimelineCard) assert.ok(card.shadowRoot.querySelector('[data-history-retry]'));
+  else assert.equal(typeof card._detailOptions.onRetry, 'function');
   for (let index = 0; index < 3; index++) card.hass = { ...hass };
   assert.equal(calls, 1);
   fail = false;
-  card.shadowRoot.querySelector('[data-history-retry]').click();
+  if (Card === MaraoEnergyPeriodCard) card._detailOptions.onRetry();
+  else card.shadowRoot.querySelector('[data-history-retry]').click();
   await waitFor(() => !card._loading && !card._prefetching);
   assert.equal(calls, Card === MaraoEnergyPeriodCard ? 6 : 2);
   assert.match(card.shadowRoot.innerHTML, /data-history-state="empty"/);

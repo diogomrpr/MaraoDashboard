@@ -729,3 +729,11 @@ test('Netatmo uses typed metadata, lazy native media, multiple filters and contr
     await card._loadPreview(0);assert.equal(withoutPreview.thumbnailStatus,'empty');assert.equal(card._thumbnailErrors.size,0);
   } finally { globalThis.customElements = previous; }
 });
+
+test('event heading retains its name when camera attributes become unavailable', () => {
+  const card = new MaraoCameraEventsCard(); card._config={entity:'camera.safe'};
+  card._hass={states:{'camera.safe':{state:'idle',attributes:{friendly_name:'A configured camera name'}}}};
+  assert.equal(card._title(),'A configured camera name');
+  card._hass={states:{'camera.safe':{state:'unavailable'}}};
+  assert.equal(card._title(),'A configured camera name');
+});
