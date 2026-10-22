@@ -532,19 +532,21 @@ async function checkShowcaseActions(page, serviceCalls, output) {
   }
   for (let count = 1; count <= 5; count++) {
     const entity = `input_select.marao_dashboard_test_case_scene_options_${count}`;
-    const card = page.locator("marao-card").filter({ has: page.locator("[data-scene-option]") }).filter({
+    const card = page.locator("marao-card").filter({ has: page.locator("[data-scene-select]") }).filter({
       has: page.locator(".title").filter({ hasText: exactText(`Scene with ${["one", "two", "three", "four", "five"][count - 1]} option${count > 1 ? "s" : ""}`) }),
     });
-    const choices = card.locator("[data-scene-option]");
-    if (await choices.count() !== count) throw new Error(`${entity}: expected ${count} visible choices.`);
+    const dropdown = card.locator("[data-scene-select]"), choices = card.locator("[data-scene-option]");
+    if (await choices.count() !== count) throw new Error(`${entity}: expected ${count} dropdown options.`);
     const option = await choices.last().getAttribute("data-scene-option");
+    const changed = await choices.last().getAttribute("aria-checked") !== "true";
     const before = serviceCalls.filter((call) => call.entities.includes(entity)).length;
+    await dropdown.tap();
     await choices.last().tap();
     await page.waitForFunction(({ entity, option }) => document.querySelector("home-assistant").hass.states[entity]?.state === option, { entity, option });
     await page.waitForTimeout(150);
     const calls = serviceCalls.filter((call) => call.entities.includes(entity)).slice(before);
-    if (calls.length !== 1 || calls[0].service !== "select_option") throw new Error(`${entity}: choosing a scene must dispatch select_option once.`);
-    if (await choices.last().getAttribute("aria-pressed") !== "true") throw new Error(`${entity}: authoritative scene choice is not selected.`);
+    if (calls.length !== (changed ? 1 : 0) || calls.some(call => call.service !== "select_option")) throw new Error(`${entity}: choosing a changed scene must dispatch select_option once.`);
+    if (await choices.last().getAttribute("aria-checked") !== "true") throw new Error(`${entity}: authoritative scene choice is not selected.`);
   }
   const dual = manifest.dualClimateCase;
   const dualCard = cardByTitle(page, dual.name);
@@ -1609,6 +1611,7 @@ async function checkEntityGroups(page, serviceCalls, output, scenario, theme, co
 }
 
 async function main() {
+  if (process.argv.includes('--camera-slow-only')) throw new Error('The synthetic slow-camera validation has been retired.');
   const captureScreenshots = process.argv.includes("--screenshots");
   const screenshotRoot = require('./verification-browser').artifactDirectory('dashboard-e2e');
   if (captureScreenshots) fs.mkdirSync(screenshotRoot, { recursive: true });
@@ -1633,7 +1636,7 @@ async function main() {
   }
   const serviceCalls = [];
   let errors;
-  const cameraSelected = process.argv.includes('--camera-only') || process.argv.includes('--camera-live-only') || process.argv.includes('--camera-slow-only');
+  const cameraSelected = process.argv.includes('--camera-only') || process.argv.includes('--camera-live-only');
   const createSession = async theme => {
     const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
     try {
@@ -1737,8 +1740,7 @@ async function main() {
     } finally { await browser.close(); }
     return;
   }
-  const cameraSlowOnly = process.argv.includes('--camera-slow-only');
-  const cameraLiveOnly = process.argv.includes('--camera-live-only') || cameraSlowOnly;
+  const cameraLiveOnly = process.argv.includes('--camera-live-only');
   const selectedCheck = cameraLiveOnly ? 'camera' : ['actions', 'camera', 'history'].find(name => process.argv.includes('--' + name + '-only'));
   if (selectedCheck) {
     let completedTheme = false;
@@ -1751,16 +1753,15 @@ async function main() {
           await assertNoBrowserErrors(selectedCheck + '/closed context');
           browser = await chromium.launch(); ({ context, page, errors } = await createSession(theme));
         }
-        await page.goto(`${baseUrl}/marao-dashboard/${cameraSlowOnly ? 'security' : cameraLiveOnly ? 'entrance' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${baseUrl}/marao-dashboard/${cameraLiveOnly ? 'entrance' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
         await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         if (selectedCheck === 'history') await checkHistoryCases(page);
         if (cameraLiveOnly) {
-          const target = await require('./camera-live-native-checks').cameraCardByName(page, cameraSlowOnly ? 'Slow connection camera' : 'Front Door Camera · automatic live video').elementHandle();
+          const target = await require('./camera-live-native-checks').cameraCardByName(page, 'Front Door Camera · automatic live video').elementHandle();
           try { await applyVisualPreferences(page, scenario, theme, target); } finally { await target.dispose(); }
         } else await applyVisualPreferences(page, scenario, theme);
-        if (cameraSlowOnly) await require('./camera-slow-native-checks').checkSlowCamera(page, serviceCalls, {output:screenshotRoot});
-        else if (selectedCheck === 'camera') await require('./camera-live-native-checks').checkNativeCameraPlayback(page, serviceCalls, { output: screenshotRoot, scenario: scenario.name, theme, geometryOnly: cameraLiveOnly });
+        if (selectedCheck === 'camera') await require('./camera-live-native-checks').checkNativeCameraPlayback(page, serviceCalls, { output: screenshotRoot, scenario: scenario.name, theme, geometryOnly: cameraLiveOnly });
         if (!cameraLiveOnly && selectedCheck !== 'history') await ({ actions: checkActionDispatches, camera: checkCameraCases })[selectedCheck](page, serviceCalls);
         if (selectedCheck === 'camera') await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         else await page.waitForLoadState('networkidle');
@@ -1822,7 +1823,7 @@ async function main() {
           browser = await chromium.launch();
           ({ context, page, errors } = await createSession(theme));
         }
-        await page.goto(`${baseUrl}/marao-dashboard/${cameraSlowOnly ? 'security' : cameraLiveOnly ? 'entrance' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${baseUrl}/marao-dashboard/${cameraLiveOnly ? 'entrance' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
         await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);

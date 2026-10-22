@@ -6,6 +6,8 @@ export const PT_LABELS = {
   "Icon": "Ícone",
   "Entity": "Entidade",
   "Show icon": "Mostrar ícone",
+  "Show cache reset button": "Mostrar botão de limpeza da cache",
+  "Show cache reset button must be a boolean.": "Mostrar botão de limpeza da cache tem de ser um valor booleano.",
   "Volume remote": "Comando de volume",
   "Popup filter": "Filtro do popup",
   "Timeline": "Cronologia",

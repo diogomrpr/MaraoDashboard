@@ -51,6 +51,11 @@ automatic recovery reports a failure. A client refresh failure does not undo a
 successful generation. Cache cleanup covers frontend responses, not all browser/OS
 storage. See [updating](update.md#refresh-an-open-device-after-an-update).
 
+In the dashboard editor, **General → Show cache reset button** controls the
+main-page shortcut. Turn it off to hide the button and its top spacing. The JSON
+setting is `show_cache_reset: false`; omitting it keeps the button enabled.
+Automatic refresh and the three-second navbar hold remain available.
+
 After installing Marao Dashboard with HACS, add the **Marao Dashboard**
 integration from Home Assistant's integrations page. On first setup, the
 integration creates a base dashboard JSON from your current area-assigned
@@ -541,3 +546,9 @@ configuration and internals; structural headings, popup definitions and navbar
 keep their roles. Existing `custom:marao-control-grid` columns/cards inputs remain
 supported. Native/manual cards use the compact renderer; put them in an explicitly
 authored Marao grid when section-wide equality is wanted.
+
+Select cards (`input_select` and `select`) use Marao's themed dropdown, shared
+with the power-history period picker. All entity options remain in a scrollable
+menu, with the current selection marked. The current selection follows Home
+Assistant; large option lists do not expand the card. Escape or a tap outside
+closes the menu.

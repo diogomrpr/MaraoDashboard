@@ -4,26 +4,26 @@ Marao Dashboard:
   ha-card-border-radius: 20px
   ha-card-border-width: 0px
 
-  # Marao Dashboard Colors
-  color-green: '#3F7E4B'
-  color-red: '#C54C46'
-  color-blue: '#7BADE6'
-  color-yellow: '#F2A84A'
-  color-purple: '#8A5A7B'
-  color-peach: '#E86A4F'
-  color-orange: '#F2A84A'
-  color-gold: '#FFD479'
-  color-black: '#0F1722'
-  color-white: '#F5F7FA'
-  color-grey: '#8794A8'
-  color-dark-gray: '#C3CFDD'
-  color-light-gray-nav: '#202B3C'
-  
+  # Marão seasonal colors: forest, heather, carqueja, summer sky and autumn copper
+  color-green: '#39755B'
+  color-red: '#A34F48'
+  color-blue: '#ADCBD8'
+  color-yellow: '#D6B45C'
+  color-purple: '#8E5B83'
+  color-peach: '#E2B5A5'
+  color-orange: '#D69A63'
+  color-gold: '#E2CD91'
+  color-black: '#263338'
+  color-white: '#F1F3EC'
+  color-grey: '#7D8D91'
+  color-dark-gray: '#B4C1C3'
+  color-light-gray-nav: '#27353B'
+
   # HomeAssistant Theme Variables
-  primary-color: '#284D7D'
+  primary-color: '#506F79'
   text-primary-color: '#FFFFFF'
   ha-card-backgound-active: 'var(--primary-color)'
-  accent-color: '#7BADE6'
+  accent-color: 'var(--primary-color)'
   state-input_boolean-active-color: var(--primary-color)
   state-alarm_control_panel-disarmed-color: var(--icon-color)
   ha-card-box-shadow: none
@@ -33,43 +33,43 @@ Marao Dashboard:
   room-card-icon-color: var(--primary-color)
   active-text-color: '#FFFFFF'
   active-overlay-color: rgba(255,255,255,.24)
-  contrast-10: rgba(245,247,250,.1)
-  divider-color: '#2D3A4C'
+  contrast-10: rgba(241,243,236,.1)
+  divider-color: '#7B8C91'
   icon-color-default: var(--icon-color)
-  slider-color: rgba(123,173,230,.28)
-  # Pale blue tracks and white controls retain contrasting blue boundaries.
-  marao-slider-track: '#AAC9EF'
-  marao-slider-fill: '#EFF6FF'
-  marao-slider-disabled-fill: '#CCD5E1'
+  slider-color: rgba(166,194,203,.28)
+  # Pale mineral tracks and white controls retain contrasting slate boundaries.
+  marao-slider-track: '#B4C7C9'
+  marao-slider-fill: '#F3F3EE'
+  marao-slider-disabled-fill: '#D8DFDB'
   marao-slider-thumb: '#FFFFFF'
-  marao-slider-thumb-border: '#284D7D'
+  marao-slider-thumb-border: '#415C65'
   text-color: var(--primary-text-color)
-  warning-color: '#F2A84A'
+  warning-color: '#80682E'
   error-color: var(--color-red)
-  success-color: '#3F7E4B'
-  weather-sunny-background: 'linear-gradient(180deg, #A4C5EE 0%, #7BADE6 100%)'
-  weather-clear-night-background: 'linear-gradient(180deg, #202B3C 0%, #0F1722 100%)'
-  weather-clear-background: 'linear-gradient(180deg, #A4C5EE 0%, #7BADE6 100%)'
-  weather-cloudy-background: 'linear-gradient(180deg, #C3CFDD 0%, #8BA3BF 100%)'
-  weather-rain-background: 'linear-gradient(180deg, #4A6C8F 0%, #202B3C 100%)'
-  weather-storm-background: 'linear-gradient(180deg, #202B3C 0%, #0F1722 100%)'
+  success-color: '#39755B'
+  weather-sunny-background: 'linear-gradient(180deg, #F0E2BC 0%, #D6B45C 100%)'
+  weather-clear-night-background: 'linear-gradient(180deg, #506F79 0%, #263338 100%)'
+  weather-clear-background: 'linear-gradient(180deg, #CCDADB 0%, #A6C2CB 100%)'
+  weather-cloudy-background: 'linear-gradient(180deg, #E7ECEA 0%, #A6B9BD 100%)'
+  weather-rain-background: 'linear-gradient(180deg, #82999F 0%, #506F79 100%)'
+  weather-storm-background: 'linear-gradient(180deg, #506F79 0%, #263338 100%)'
 
   # slider styling
-  md-slider-active-track-color: '#7BADE6'
+  md-slider-active-track-color: 'var(--primary-color)'
   md-slider-inactive-track-color: rgba(255,255,255,.2)
-  md-slider-handle-color: '#F5F7FA'
-  md-slider-focus-handle-color: '#F5F7FA'
-  md-slider-hover-handle-color: '#dbdbdb'
+  md-slider-handle-color: '#F1F3EC'
+  md-slider-focus-handle-color: '#F1F3EC'
+  md-slider-hover-handle-color: '#E7ECEA'
   md-slider-handle-shadow-color: none
-  md-slider-pressed-handle-color: '#dbdbdb'
+  md-slider-pressed-handle-color: '#E7ECEA'
   md-slider-handle-width: 0px
   md-slider-handle-height: 0px
   md-ripple-hover-color: transparent
   md-slider-label-container-color: transparent
   md-slider-label-container-height: 0px
   md-slider-label-text-color: transparent
-  md-slider-hover-state-layer-color: '#F5F7FA'
-  md-slider-pressed-state-layer-color: '#F5F7FA'
+  md-slider-hover-state-layer-color: '#F1F3EC'
+  md-slider-pressed-state-layer-color: '#F1F3EC'
 
   # font
   primary-font-family: montserrat, Roboto, system-ui
@@ -90,111 +90,131 @@ Marao Dashboard:
   font-size-caption: 14px
   font-weight-primary: 700
   font-weight-secondary: 500
-  
-####################### MODES ####################
+
+  ####################### MODES ####################
   modes:
     light:
-      marao-problem-neutral-background: '#E2E8F0'
-      marao-problem-neutral-text: '#243348'
-      marao-problem-warning-background: '#FFF0C2'
-      marao-problem-warning-text: '#573E10'
-      marao-problem-error-background: '#FFE0E4'
-      marao-problem-error-text: '#65162C'
-
+      marao-problem-neutral-background: '#E2E8E3'
+      marao-problem-neutral-text: '#33443B'
+      marao-problem-warning-background: '#F0E7C9'
+      marao-problem-warning-text: '#5C4920'
+      marao-problem-error-background: '#F3DEDA'
+      marao-problem-error-text: '#6B3028'
 
       # Marao Dashboard Variables
-      color-black: '#17263F'
+      color-black: '#263338'
       color-white: '#FFFFFF'
-      color-grey: '#62728A'
-      color-dark-gray: '#42536C'
+      color-grey: '#58696E'
+      color-dark-gray: '#58696E'
       color-light-gray-nav: '#FFFFFF'
-      icon-color: '#42536C'
-      opacity-contrast-100: rgba(40,77,125,.10)
+      icon-color: '#58696E'
+      opacity-contrast-100: rgba(80,111,121,.10)
       opacity-contrast-0: rgba(255,255,255,.70)
-      subtext-color: '#62728A'
-      marao-card-background: '#EAF0F8'
-      weather-card-overlay: 'linear-gradient(0deg, rgba(245,247,250,0.72) 0%, rgba(245,247,250,0.92) 93%)'
+      subtext-color: '#58696E'
+      marao-card-background: '#E7ECEA'
+      weather-card-overlay: 'linear-gradient(0deg, rgba(243,243,238,0.72) 0%,
+        rgba(243,243,238,0.92) 93%)'
       active-text-color: '#FFFFFF'
       active-overlay-color: rgba(255,255,255,.34)
-      contrast-10: rgba(23,38,63,.10)
-      slider-color: rgba(123,173,230,.28)
-      md-slider-inactive-track-color: rgba(23,38,63,.18)
-      md-slider-handle-color: '#17201B'
-      md-slider-focus-handle-color: '#17201B'
-      md-slider-hover-handle-color: '#284D7D'
-      md-slider-pressed-handle-color: '#284D7D'
-      md-slider-hover-state-layer-color: '#284D7D'
-      md-slider-pressed-state-layer-color: '#284D7D'
-      weather-clear-night-background: 'linear-gradient(180deg, #4A6C8F 0%, #202B3C 100%)'
-      weather-cloudy-background: 'linear-gradient(180deg, #EAF0F8 0%, #C3CFDD 100%)'
-      weather-rain-background: 'linear-gradient(180deg, #8BA3BF 0%, #4A6C8F 100%)'
-      weather-storm-background: 'linear-gradient(180deg, #8BA3BF 0%, #4A6C8F 100%)'
+      contrast-10: rgba(38,51,56,.10)
+      slider-color: rgba(166,194,203,.28)
+      md-slider-inactive-track-color: rgba(38,51,56,.18)
+      md-slider-handle-color: '#263338'
+      md-slider-focus-handle-color: '#263338'
+      md-slider-hover-handle-color: '#506F79'
+      md-slider-pressed-handle-color: '#506F79'
+      md-slider-hover-state-layer-color: '#506F79'
+      md-slider-pressed-state-layer-color: '#506F79'
+      weather-clear-night-background: 'linear-gradient(180deg, #506F79 0%, #263338 100%)'
+      weather-cloudy-background: 'linear-gradient(180deg, #E7ECEA 0%, #A6B9BD 100%)'
+      weather-rain-background: 'linear-gradient(180deg, #82999F 0%, #506F79 100%)'
+      weather-storm-background: 'linear-gradient(180deg, #506F79 0%, #263338 100%)'
 
       # HomeAssistant Variables
-      primary-background-color: '#F5F7FA'
-      secondary-background-color: '#EAF0F8'
-      primary-text-color: '#17263F'
+      primary-background-color: '#F3F3EE'
+      secondary-background-color: '#E7ECEA'
+      primary-text-color: '#263338'
       ha-card-background: '#FFFFFF'
       card-background-color: '#FFFFFF'
       app-header-background-color: var(--primary-background-color)
-      app-header-text-color: var(--primary-text-color)     
-      secondary-text-color: '#42536C'
-      disabled-text-color: '#7E8AA0'
-      sidebar-icon-color: '#42536C'
+      app-header-text-color: var(--primary-text-color)
+      secondary-text-color: '#58696E'
+      disabled-text-color: '#74858B'
+      sidebar-icon-color: '#58696E'
       state-alarm_control_panel-disarmed-color: var(--icon-color)
-      ha-card-box-shadow: 0 1px 2px rgba(23,38,63,.08)
-      
+      ha-card-box-shadow: 0 1px 2px rgba(38,51,56,.08)
+      marao-chart-1: "#506F79"
+      marao-chart-2: "#8E5B83"
+      marao-chart-3: "#39755B"
+      marao-chart-4: "#947023"
+      marao-chart-5: "#A15F43"
+      marao-chart-6: "#79776D"
+      marao-chart-7: "#317F7B"
+      marao-chart-8: "#5476A4"
+      marao-chart-9: "#AD4E6C"
+      marao-chart-10: "#77659F"
 
     dark:
-      marao-problem-neutral-background: '#29313B'
-      marao-problem-neutral-text: '#E2E8F0'
-      marao-problem-warning-background: '#443518'
-      marao-problem-warning-text: '#FFE6A5'
-      marao-problem-error-background: '#47212E'
-      marao-problem-error-text: '#FFE0E4'
+      marao-problem-neutral-background: '#2C383D'
+      marao-problem-neutral-text: '#DEE7E4'
+      marao-problem-warning-background: '#403823'
+      marao-problem-warning-text: '#E4D3A0'
+      marao-problem-error-background: '#442C29'
+      marao-problem-error-text: '#F0C4B8'
 
-  
       # Marao Dashboard Variables
-      primary-color: '#7BADE6'
-      text-primary-color: '#0F1722'
-      divider-color: '#71839D'
-      color-black: '#0F1722'
-      color-white: '#F5F7FA'
-      color-grey: '#8794A8'
-      color-dark-gray: '#C3CFDD'
-      color-light-gray-nav: '#202B3C'
-      icon-color: '#C3CFDD'
-      opacity-contrast-0: rgba(245,247,250,.10)
-      opacity-contrast-100: rgba(245,247,250,.16)
-      subtext-color: '#8794A8'
-      marao-card-background: '#202B3C'
-      weather-card-overlay: 'linear-gradient(0deg, rgba(15,23,34,0.72) 0%, rgba(15,23,34,0.96) 93%)'
+      primary-color: '#A6C2CB'
+      text-primary-color: '#17282E'
+      divider-color: '#82979E'
+      color-black: '#17282E'
+      color-white: '#F1F3EC'
+      color-grey: '#B4C1C3'
+      color-dark-gray: '#B4C1C3'
+      color-light-gray-nav: '#1D292E'
+      icon-color: '#B4C1C3'
+      opacity-contrast-0: rgba(241,243,236,.10)
+      opacity-contrast-100: rgba(241,243,236,.16)
+      subtext-color: '#B4C1C3'
+      marao-card-background: '#27353B'
+      weather-card-overlay: 'linear-gradient(0deg, rgba(21,29,33,0.72) 0%, rgba(21,29,33,0.96) 93%)'
       active-text-color: '#FFFFFF'
       active-overlay-color: rgba(255,255,255,.24)
-      contrast-10: rgba(245,247,250,.1)
-      slider-color: rgba(123,173,230,.28)
+      contrast-10: rgba(241,243,236,.1)
+      slider-color: rgba(166,194,203,.28)
       md-slider-inactive-track-color: rgba(255,255,255,.2)
-      md-slider-handle-color: '#F5F7FA'
-      md-slider-focus-handle-color: '#F5F7FA'
-      md-slider-hover-handle-color: '#dbdbdb'
-      md-slider-pressed-handle-color: '#dbdbdb'
-      md-slider-hover-state-layer-color: '#F5F7FA'
-      md-slider-pressed-state-layer-color: '#F5F7FA'
-      weather-clear-night-background: 'linear-gradient(180deg, #202B3C 0%, #0F1722 100%)'
-      weather-cloudy-background: 'linear-gradient(180deg, #8BA3BF 0%, #4A6C8F 100%)'
-      weather-rain-background: 'linear-gradient(180deg, #4A6C8F 0%, #202B3C 100%)'
-      weather-storm-background: 'linear-gradient(180deg, #202B3C 0%, #0F1722 100%)'
+      md-slider-handle-color: '#F1F3EC'
+      md-slider-focus-handle-color: '#F1F3EC'
+      md-slider-hover-handle-color: '#E7ECEA'
+      md-slider-pressed-handle-color: '#E7ECEA'
+      md-slider-hover-state-layer-color: '#F1F3EC'
+      md-slider-pressed-state-layer-color: '#F1F3EC'
+      weather-clear-night-background: 'linear-gradient(180deg, #506F79 0%, #263338 100%)'
+      weather-cloudy-background: 'linear-gradient(180deg, #E7ECEA 0%, #A6B9BD 100%)'
+      weather-rain-background: 'linear-gradient(180deg, #82999F 0%, #506F79 100%)'
+      weather-storm-background: 'linear-gradient(180deg, #506F79 0%, #263338 100%)'
 
       # HomeAssistant Variables
-      ha-card-background: '#182335'
-      card-background-color: '#182335'
-      primary-background-color: '#0F1722'
-      secondary-background-color: '#202B3C'
-      primary-text-color: '#F5F7FA'
-      secondary-text-color: '#C3CFDD'
-      disabled-text-color: '#8794A8'
-      error-color: '#FFAA9F'
+      ha-card-background: '#1D292E'
+      card-background-color: '#1D292E'
+      primary-background-color: '#151D21'
+      secondary-background-color: '#27353B'
+      primary-text-color: '#F1F3EC'
+      secondary-text-color: '#B4C1C3'
+      disabled-text-color: '#8E9FA3'
+      error-color: '#E0A292'
       state-alarm_control_panel-disarmed-color: var(--icon-color)
       app-header-background-color: var(--primary-background-color)
-      app-header-text-color: '#F5F7FA'
+      app-header-text-color: '#F1F3EC'
       ha-card-box-shadow: none
+      warning-color: "#E2CD91"
+      success-color: "#91C9AA"
+      marao-chart-1: "#A6C2CB"
+      marao-chart-2: "#CCA2C4"
+      marao-chart-3: "#91C9AA"
+      marao-chart-4: "#E2CD91"
+      marao-chart-5: "#DDA582"
+      marao-chart-6: "#C1BCAF"
+      marao-chart-7: "#80C6C0"
+      marao-chart-8: "#9FBCE8"
+      marao-chart-9: "#E49FB4"
+      marao-chart-10: "#B9ACE0"

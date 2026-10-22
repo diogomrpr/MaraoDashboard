@@ -41,7 +41,8 @@ export function nativeFields(spec, config) {
       field(key + ".on_action", "Action service"), field(key + ".data.command", "Command"), field(key + ".data.params", "Parameters", "object"));
   }
   if (spec.id === "popup") common.push(field("hash", "Popup hash"), field("height", "Height"), field("max_height", "Maximum height"));
-  if (spec.id === "navbar") common.push(field("native", "Show native edit control", "boolean"));
+  if (spec.id === "navbar") common.push(field("native", "Show native edit control", "boolean"),
+    field("show_cache_reset", "Show cache reset button", "boolean", { default: true }));
   if (spec.id.includes("events")) common.push(choices(config.event_provider === undefined && config.provider !== undefined ? "provider" : "event_provider", "Event provider", ["auto", "frigate", "unifi_protect", "netatmo"]),
     field("limit", "Event limit", "number"), field("frigate_camera", "Frigate camera name"), field("frigate_instance_id", "Frigate instance ID"),
     field("unifi_protect_media_source", "UniFi Protect media source"));

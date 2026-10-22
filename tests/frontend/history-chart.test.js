@@ -30,7 +30,7 @@ function fixture(options={}){
   const context=vm.createContext({...data,Chart:FakeChart,LineController:'line',LineElement:'lineElement',PointElement:'point',BarController:'bar',BarElement:'barElement',LinearScale:'linear',Filler:'fill',
     chartColor:value=>({alpha:()=>({rgbString:()=>value})}),document:doc,ResizeObserver:Observer,AbortController,CustomEvent,
     requestAnimationFrame:callback=>{frames.set(++frameId,callback);return frameId;},cancelAnimationFrame:id=>frames.delete(id),
-    getComputedStyle:element=>({color:element.style.color||'#233044',fontSize:'16px',getPropertyValue:()=>''})});
+    getComputedStyle:element=>({color:element.style.color||'#233044',fontSize:'16px',getPropertyValue:key=>options.theme?.[key]||''})});
   context.powerStateAt=powerStateAt;
   vm.runInContext(source.replace(/^import .*;\n/gm,'').replaceAll('export function','function')+'\nglobalThis.create=createHistoryChart;',context);
   const container=new Element('div'),end=Date.parse('2026-10-18T12:00:00Z');
@@ -240,6 +240,30 @@ test('local chart assets use selective registration and ship both exact dependen
   for(const [dependency,notice] of [['chart.js','ChartJS.LICENSE.txt'],['@kurkle/color','KurkleColor.LICENSE.txt']]){
     assert.equal(fs.readFileSync(new URL(`../../custom_components/marao_dashboard/frontend/${notice}`,import.meta.url),'utf8'),fs.readFileSync(new URL(`../../node_modules/${dependency}/LICENSE.md`,import.meta.url),'utf8'));
   }
+});
+
+test('all ten landscape colors stay shared across power lines, legends and energy donuts after a theme change',()=>{
+  const light=['#506F79','#8E5B83','#39755B','#947023','#A15F43','#79776D','#317F7B','#5476A4','#AD4E6C','#77659F'];
+  const dark=['#A6C2CB','#CCA2C4','#91C9AA','#E2CD91','#DDA582','#C1BCAF','#80C6C0','#9FBCE8','#E49FB4','#B9ACE0'];
+  const tokens=colors=>Object.fromEntries(colors.map((color,index)=>[`--marao-chart-${index+1}`,color]));
+  const theme={'--primary-color':light[0],...tokens(light)};
+  const end=Date.parse('2026-10-18T12:00:00Z'),samples=[{time:end-1000,value:1},{time:end,value:2}];
+  const f=fixture({theme,power:true,samples,range:{start:end-1000,end},series:light.map((_,index)=>({name:`Device ${index+1}`,samples})),
+    breakdown:{items:light.map((_,index)=>({name:`Device ${index+1}`,value:1}))}});
+  try{
+    for(const [index,color] of light.entries()){
+      assert.equal(f.instances[0].data.datasets[index+1].borderColor,color);
+      assert.ok(f.elements('span').some(node=>node.style.background===color));
+      assert.ok(f.findClass('history-donut').style.background.includes(color));
+    }
+    Object.assign(theme,{'--primary-color':dark[0],...tokens(dark)});
+    f.renderer.update({});
+    for(const [index,color] of dark.entries()){
+      assert.equal(f.instances[0].data.datasets[index+1].borderColor,color);
+      assert.ok(f.elements('span').some(node=>node.style.background===color));
+      assert.ok(f.findClass('history-donut').style.background.includes(color));
+    }
+  }finally{f.renderer.destroy();}
 });
 
 test('power comparisons share the plot without smoothing peaks and report selected device readings',()=>{

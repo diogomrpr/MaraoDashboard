@@ -14,7 +14,7 @@ const python = file => ({ id: 'python:' + file, kind: 'offline', command: ['pyth
   inputs: ['tests/components/marao_dashboard/' + file + '.py', backend, 'tests/conftest.py', 'pyproject.toml'], exclusive: false });
 const browser = (id, file, args = [], exclusive = true) => ({ id, kind: 'browser', command: ['node', 'tests/' + file + '.js', ...args],
   inputs: [runtime, 'tests/' + file + '.js', 'tests/test-ha-dashboard-accessibility.js', 'tests/test-ha-dashboard-e2e.js', 'ha-test',
-    ...(file === 'test-ha-dashboard-e2e' && args.some(arg => ['--camera-only', '--camera-live-only', '--camera-slow-only'].includes(arg)) ? ['tests/camera-live-native-checks.js', 'tests/camera-slow-native-checks.js', 'tests/camera-request-ledger.js'] : []),
+    ...(file === 'test-ha-dashboard-e2e' && args.some(arg => ['--camera-only', '--camera-live-only'].includes(arg)) ? ['tests/camera-live-native-checks.js', 'tests/camera-request-ledger.js'] : []),
     ...(file === 'test-ha-card-alignment' && args.includes('--access-label') ? ['tests/test-ha-ui-batch.js'] : []),
     ...(['test-ha-editor', 'test-ha-card-alignment'].includes(file) ? ['tests/test-ha-editor.js', 'tests/json-editor-checks.js', 'tests/editor-drag-checks.js', 'tests/editor-rendering-checks.js', 'tests/editor-preload-checks.js'] : [])], exclusive });
 const families = {
@@ -136,9 +136,6 @@ const components = {
       browser('camera:streams:webkit', 'test-ha-camera-streams', ['--webkit']),
       browser('camera:latency', 'test-ha-camera-latency'),
       browser('camera:latency:webkit', 'test-ha-camera-latency', ['--webkit']),
-      browser('camera:slow', 'test-ha-dashboard-e2e', ['--camera-slow-only', '--scenario=iphone-normal', '--theme=light', '--screenshots=review']),
-      browser('camera:slow:webkit', 'test-ha-dashboard-e2e', ['--camera-slow-only', '--webkit', '--scenario=iphone-normal', '--theme=light', '--screenshots=review']),
-      ...['narrow-320','iphone-bold-text-200'].map(profile => browser('camera:slow:' + profile, 'test-ha-dashboard-e2e', ['--camera-slow-only', '--scenario=' + profile, '--theme=light', '--screenshots=review'])),
       browser('camera:webkit', 'test-ha-dashboard-e2e', ['--camera-live-only', '--webkit', '--scenario=iphone-normal', '--theme=light', '--screenshots=review']),
       ...['narrow-320','android-normal','iphone-landscape','android-landscape','iphone-bold','iphone-text-200','iphone-page-zoom-200','iphone-bold-text-200'].map(profile => browser('camera:live:' + profile, 'test-ha-dashboard-e2e', ['--camera-live-only', '--scenario=' + profile, '--theme=light', '--screenshots=' + (['narrow-320','iphone-bold-text-200'].includes(profile) ? 'review' : 'failure')]))] },
   history: { units: [['marao-history-cards']], browser: [browser('history', 'test-ha-dashboard-e2e', ['--history-only'])] },
@@ -218,11 +215,13 @@ const rules = [
   [/^frontend_src\/(build-|json-editor)/, ['packaging', 'editor-ui']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoDashboardPanel\./, ['editor-ui']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoCards\.js$/, 'shared'],
+  [/^custom_components\/marao_dashboard\/frontend\/MaraoDropdown\.js$/, ['chart-details']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoDashboard\.js$/, 'shared'],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoFrigateEventsCard\.js$/, ['camera']],
   [/^custom_components\/marao_dashboard\/frontend\/themes\//, ['labels', 'slider', 'popup', 'navbar', 'rooms']],
   [/^custom_components\/marao_dashboard\/frontend\/media-apps\//, ['labels', 'packaging']],
   [/^custom_components\/marao_dashboard\/frontend\/(brand|icons|MaraoDashboardJson)/, ['packaging', 'editor-ui']],
+  [/^custom_components\/marao_dashboard\/brand\//, ['packaging']],
   [/^custom_components\/marao_dashboard\/translations\//, ['labels', 'editor-ui']],
   [/^custom_components\/marao_dashboard\/(generator|editor)\.py$/, ['generator', 'editor-model']],
   [/^custom_components\/marao_dashboard\/(page_migration|page_model|native_storage|legacy_migration|migration|operation|recovery).*\.py$/, ['migration']],

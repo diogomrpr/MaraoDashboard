@@ -2,9 +2,35 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import YAML from 'yaml';
 
 const read = relative => fs.readFileSync(new URL('../../' + relative, import.meta.url));
 const sources = 'custom_components/marao_dashboard/frontend/brand/';
+
+test('landscape theme retains readable text, state colors, chart lines and slider boundaries in both modes', () => {
+  const theme=YAML.parse(read('custom_components/marao_dashboard/frontend/themes/MaraoDashboard/marao-dashboard.yaml').toString())['Marao Dashboard'];
+  const luminance=hex=>{
+    const values=[1,3,5].map(index=>parseInt(hex.slice(index,index+2),16)/255).map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4);
+    return values.reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0);
+  };
+  for(const mode of ['light','dark']){
+    const tokens={...theme,...theme.modes[mode]};
+    const color=key=>{const value=tokens[key];return value.startsWith('var(')?color(value.slice(6,-1)):value;};
+    const contrast=(a,b,minimum)=>{
+      const [high,low]=[luminance(color(a)),luminance(color(b))].sort((x,y)=>y-x);
+      assert.ok((high+.05)/(low+.05)>=minimum,`${mode}: ${a} against ${b}`);
+    };
+    for(const surface of ['primary-background-color','ha-card-background','marao-card-background']){
+      contrast('primary-text-color',surface,4.5);contrast('subtext-color',surface,4.5);
+      for(let index=1;index<=10;index++)contrast('marao-chart-'+index,surface,3);
+    }
+    contrast('text-primary-color','primary-color',4.5);
+    for(const hue of ['green','red','purple'])contrast('active-text-color','color-'+hue,4.5);
+    for(const hue of ['blue','yellow','orange','gold','peach'])contrast('color-black','color-'+hue,4.5);
+    for(const state of ['neutral','warning','error'])contrast('marao-problem-'+state+'-text','marao-problem-'+state+'-background',4.5);
+    for(const adjacent of ['marao-slider-track','marao-slider-fill','marao-slider-thumb','color-blue'])contrast('marao-slider-thumb-border',adjacent,3);
+  }
+});
 
 test('the existing iconset exposes the canonical compact mark and functional glyphs', async () => {
   const module = read('custom_components/marao_dashboard/frontend/MaraoRuntime.js').toString();

@@ -207,10 +207,14 @@ test('critical native navbar converts locally and preserves complete configurati
   assert.deepEqual(MaraoNativeNavbar.getStubConfig({language:'pt'}),{name:'Barra de navegação',routes:[],native:true});
   const child = Object.assign(Object.create(MaraoNavbarCard.prototype), { _closeOverflow() {}, _render() {} });
   const owner = { _child: child, _editAccess() {} };
-  const source = { type:'custom:marao-native-navbar-card', native:true, routes:[{path:'/marao-dashboard/rooms',label:'Rooms',future:[]}], future:{keep:[]} };
+  const source = { type:'custom:marao-native-navbar-card', native:true, show_cache_reset:false, routes:[{path:'/marao-dashboard/rooms',label:'Rooms',future:[]}], future:{keep:[]} };
   MaraoNativeNavbar.prototype.setConfig.call(owner, source);
   assert.deepEqual(child._config, {...source,type:'custom:marao-navbar-card'});
   assert.deepEqual(owner._config,source);assert.notEqual(owner._config,source);
+  const fields=nativeFields(catalog.cards.find(spec=>spec.id==='navbar'),source).common;
+  assert.equal(formData(source,fields).show_cache_reset,false);
+  assert.equal(formData({},fields).show_cache_reset,true);
+  assert.throws(()=>MaraoNativeNavbar.prototype.setConfig.call(owner,{...source,show_cache_reset:'false'}),/boolean/);
   assert.throws(()=>MaraoNativeNavbar.prototype.setConfig.call(owner,{...source,routes:[null]}));
   assert.deepEqual(owner._config,source);
   MaraoNativeNavbar.prototype.setConfig.call(owner,{...source,routes:[]});assert.deepEqual(child._config.routes,[]);

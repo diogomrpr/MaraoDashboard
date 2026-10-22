@@ -13,7 +13,7 @@ const [cardsModule, cameraEventsModule] = await Promise.all([
   import(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`),
   import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`),
 ]);
-const { loadHistoryChart, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, registerMaraoCards } = cardsModule;
+const { loadHistoryChart, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, updateCardSurface, registerMaraoCards } = cardsModule;
 registerMaraoCards();
 cameraEventsModule.registerMaraoCameraEventCards();
 
@@ -1417,7 +1417,7 @@ class MaraoStateTimelineCard extends HTMLElement {
     const states = [...new Set(segments.map((segment) => segment.state))].slice(-5);
     const legend = states.map((state) => `<span><i style="background:${this._stateColor(state)}"></i>${escapeHtml(this._stateLabel(state))}</span>`).join("");
 
-    this.shadowRoot.innerHTML = `
+    const markup = `
       <style>
         :host { display: block; width: 100%; }
         :host([data-marao-control-cell]) { display:grid; min-width:0; }
@@ -1455,6 +1455,9 @@ class MaraoStateTimelineCard extends HTMLElement {
         ${this._error && !unavailable ? `<button type="button" data-history-retry>${escapeHtml(localize("common.retry", this._hass))}</button>` : ""}
         ${segments.length ? `<div class="plot" role="img" aria-label="${escapeHtml(name)}"><div class="segments">${segmentMarkup}</div><div class="ticks">${ticks}</div><div class="cursor"></div><div class="tooltip"></div></div><div class="legend">${legend}</div>` : problem && problem.kind !== "loading" ? "" : `<div class="status" role="status">${escapeHtml(status)}</div>`}
       </ha-card>`;
+    if (markup === this._renderedMarkup && this.shadowRoot.querySelector('ha-card')) return;
+    updateCardSurface(this.shadowRoot, markup);
+    this._renderedMarkup = markup;
     this.shadowRoot.querySelector('[data-history-retry]')?.addEventListener('click', () => {
       if (!this._error || historyEntityState(this._hass, this._config) || this._loading) return;
       this._loadedKey = "";
@@ -1860,18 +1863,14 @@ class MaraoEnergyPeriodCard extends HTMLElement {
       div.surface{padding:var(--marao-popup-card-padding,18px 20px);padding-top:0;cursor:default} div.surface>h2{display:var(--marao-popup-detail-title-display,block)} @container marao-energy (max-width:240px){div.surface{padding:var(--marao-popup-card-padding,12px 8px);padding-top:0}}
       .problem{font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.25;}
     </style><${surfaceTag} class="surface"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""} data-history-state="${historyState}"${surfaceAttributes}>${this._config.popup ? body : `<h2>${escapeHtml(title)}</h2>${body}`}${retryable && !unavailable && this._config.popup ? `<button type="button" data-history-retry>${escapeHtml(localize("common.retry", this._hass))}</button>` : ""}${problem && problem.kind !== "loading" && !this._config.popup ? `<span class="problem" role="status"><ha-icon icon="mdi:help-circle-outline" aria-hidden="true"></ha-icon> <span>${escapeHtml(problem.reason)}</span></span>` : ""}</${surfaceTag}>`;
-    const retainedSurface = this.shadowRoot.querySelector('.surface');
-    const retainedChart = this.shadowRoot.querySelector('.chart');
-    if (retainedSurface && retainedChart && this._config.popup && document.createElement) {
-      const template = document.createElement('template'); template.innerHTML = markup;
-      const next = template.content.querySelector('.surface');
-      const old = [...retainedSurface.childNodes];
-      for (const attribute of [...retainedSurface.attributes]) retainedSurface.removeAttribute(attribute.name);
-      for (const attribute of [...next.attributes]) retainedSurface.setAttribute(attribute.name, attribute.value);
-      for (const child of [...next.childNodes]) if (!child.classList?.contains('chart')) retainedSurface.insertBefore(child, retainedChart);
+    if (!this._config.popup && markup === this._renderedMarkup && this.shadowRoot.querySelector('.surface')) return;
+    const retainedChart = this._config.popup && this.shadowRoot.querySelector('.chart');
+    updateCardSurface(this.shadowRoot, markup, '.surface', retainedChart ? (surface, next) => {
+      const old = [...surface.childNodes];
+      for (const child of [...next.childNodes]) if (!child.classList?.contains('chart')) surface.insertBefore(child, retainedChart);
       for (const child of old) if (child !== retainedChart) child.remove();
-      this.shadowRoot.querySelector('style').textContent = template.content.querySelector('style').textContent;
-    } else this.shadowRoot.innerHTML = markup;
+    } : undefined);
+    this._renderedMarkup = markup;
     if (this._config.popup) this._syncDetail(this.shadowRoot.querySelector('.chart'), {
       samples, bars: true, interval: this._config.period === 'month' ? 'day' : 'hour', range, windows: false, unit: costMode ? tariff.currency : unit,
       summaryLabel: total == null || this._loading || unavailable ? '' : `${costMode || consumption.limited ? '≈ ' : ''}${bound(total)}`,

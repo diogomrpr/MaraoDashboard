@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="890" viewBox="0 0 1080 890" role="img" aria-labelledby="title desc">
+<title id="title">Marao seasonal palette</title>
+<desc id="desc">Twenty-four representative UI swatches, refined from a fifteen-photo study across spring, summer, autumn and winter. UI colors are adjusted for contrast.</desc>
+<rect width="1080" height="890" fill="#F3F3EE"/>
+<g font-family="Montserrat, Arial, sans-serif" fill="#263338">
+<text x="40" y="55" font-size="30" font-weight="700">Marão, through the seasons</text>
+<text x="40" y="86" font-size="16">24 reference swatches · 15 photos · 4 seasons · adjusted for readable UI</text>
+<text x="40" y="125" font-size="18" font-weight="700">Mineral base</text>
+<rect x="40" y="141" width="150" height="80" rx="12" stroke="#B4C1C3" fill="#F3F3EE"/>
+<text x="40" y="246" font-size="16" font-weight="700">Neve</text>
+<text x="40" y="269" font-size="14" fill="#58696E">#F3F3EE</text>
+<rect x="208" y="141" width="150" height="80" rx="12" fill="#FFFFFF"/>
+<text x="208" y="246" font-size="16" font-weight="700">Luz</text>
+<text x="208" y="269" font-size="14" fill="#58696E">#FFFFFF</text>
+<rect x="376" y="141" width="150" height="80" rx="12" fill="#E7ECEA"/>
+<text x="376" y="246" font-size="16" font-weight="700">Névoa</text>
+<text x="376" y="269" font-size="14" fill="#58696E">#E7ECEA</text>
+<rect x="544" y="141" width="150" height="80" rx="12" fill="#B4C1C3"/>
+<text x="544" y="246" font-size="16" font-weight="700">Granito</text>
+<text x="544" y="269" font-size="14" fill="#58696E">#B4C1C3</text>
+<rect x="712" y="141" width="150" height="80" rx="12" fill="#506F79"/>
+<text x="712" y="246" font-size="16" font-weight="700">Encosta</text>
+<text x="712" y="269" font-size="14" fill="#58696E">#506F79</text>
+<rect x="880" y="141" width="150" height="80" rx="12" fill="#151D21"/>
+<text x="880" y="246" font-size="16" font-weight="700">Xisto</text>
+<text x="880" y="269" font-size="14" fill="#58696E">#151D21</text>
+<text x="40" y="303" font-size="18" font-weight="700">Forest and water</text>
+<rect x="40" y="319" width="150" height="80" rx="12" fill="#39755B"/>
+<text x="40" y="424" font-size="16" font-weight="700">Pinhal</text>
+<text x="40" y="447" font-size="14" fill="#58696E">#39755B</text>
+<rect x="208" y="319" width="150" height="80" rx="12" fill="#91C9AA"/>
+<text x="208" y="424" font-size="16" font-weight="700">Feto</text>
+<text x="208" y="447" font-size="14" fill="#58696E">#91C9AA</text>
+<rect x="376" y="319" width="150" height="80" rx="12" fill="#317F7B"/>
+<text x="376" y="424" font-size="16" font-weight="700">Ribeira</text>
+<text x="376" y="447" font-size="14" fill="#58696E">#317F7B</text>
+<rect x="544" y="319" width="150" height="80" rx="12" fill="#80C6C0"/>
+<text x="544" y="424" font-size="16" font-weight="700">Água clara</text>
+<text x="544" y="447" font-size="14" fill="#58696E">#80C6C0</text>
+<rect x="712" y="319" width="150" height="80" rx="12" fill="#A6C2CB"/>
+<text x="712" y="424" font-size="16" font-weight="700">Serra distante</text>
+<text x="712" y="447" font-size="14" fill="#58696E">#A6C2CB</text>
+<rect x="880" y="319" width="150" height="80" rx="12" fill="#5476A4"/>
+<text x="880" y="424" font-size="16" font-weight="700">Azul de inverno</text>
+<text x="880" y="447" font-size="14" fill="#58696E">#5476A4</text>
+<text x="40" y="481" font-size="18" font-weight="700">Heather and cool accents</text>
+<rect x="40" y="497" width="150" height="80" rx="12" fill="#8E5B83"/>
+<text x="40" y="602" font-size="16" font-weight="700">Urze</text>
+<text x="40" y="625" font-size="14" fill="#58696E">#8E5B83</text>
+<rect x="208" y="497" width="150" height="80" rx="12" fill="#CCA2C4"/>
+<text x="208" y="602" font-size="16" font-weight="700">Urze clara</text>
+<text x="208" y="625" font-size="14" fill="#58696E">#CCA2C4</text>
+<rect x="376" y="497" width="150" height="80" rx="12" fill="#77659F"/>
+<text x="376" y="602" font-size="16" font-weight="700">Lilás</text>
+<text x="376" y="625" font-size="14" fill="#58696E">#77659F</text>
+<rect x="544" y="497" width="150" height="80" rx="12" fill="#B9ACE0"/>
+<text x="544" y="602" font-size="16" font-weight="700">Lilás claro</text>
+<text x="544" y="625" font-size="14" fill="#58696E">#B9ACE0</text>
+<rect x="712" y="497" width="150" height="80" rx="12" fill="#AD4E6C"/>
+<text x="712" y="602" font-size="16" font-weight="700">Rosa da urze</text>
+<text x="712" y="625" font-size="14" fill="#58696E">#AD4E6C</text>
+<rect x="880" y="497" width="150" height="80" rx="12" fill="#E49FB4"/>
+<text x="880" y="602" font-size="16" font-weight="700">Rosa claro</text>
+<text x="880" y="625" font-size="14" fill="#58696E">#E49FB4</text>
+<text x="40" y="659" font-size="18" font-weight="700">Sun and autumn</text>
+<rect x="40" y="675" width="150" height="80" rx="12" fill="#D6B45C"/>
+<text x="40" y="780" font-size="16" font-weight="700">Carqueja</text>
+<text x="40" y="803" font-size="14" fill="#58696E">#D6B45C</text>
+<rect x="208" y="675" width="150" height="80" rx="12" fill="#E2CD91"/>
+<text x="208" y="780" font-size="16" font-weight="700">Palha</text>
+<text x="208" y="803" font-size="14" fill="#58696E">#E2CD91</text>
+<rect x="376" y="675" width="150" height="80" rx="12" fill="#D69A63"/>
+<text x="376" y="780" font-size="16" font-weight="700">Cobre</text>
+<text x="376" y="803" font-size="14" fill="#58696E">#D69A63</text>
+<rect x="544" y="675" width="150" height="80" rx="12" fill="#A34F48"/>
+<text x="544" y="780" font-size="16" font-weight="700">Terra</text>
+<text x="544" y="803" font-size="14" fill="#58696E">#A34F48</text>
+<rect x="712" y="675" width="150" height="80" rx="12" fill="#E2B5A5"/>
+<text x="712" y="780" font-size="16" font-weight="700">Pêssego</text>
+<text x="712" y="803" font-size="14" fill="#58696E">#E2B5A5</text>
+<rect x="880" y="675" width="150" height="80" rx="12" fill="#79776D"/>
+<text x="880" y="780" font-size="16" font-weight="700">Pedra</text>
+<text x="880" y="803" font-size="14" fill="#58696E">#79776D</text>
+<text x="40" y="860" font-size="14" fill="#58696E">Mineral surfaces stay calm; seasonal colors distinguish states and chart series.</text>
+</g></svg>

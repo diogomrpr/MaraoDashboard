@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import { bindDropdown } from '../../custom_components/marao_dashboard/frontend/MaraoDropdown.js';
 
 globalThis.HTMLElement = class {
   getRootNode() { return {}; }
@@ -30,12 +31,14 @@ function popupOverlay(close) {
 const source = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
 const dashboardSource = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url), "utf8");
-const { ACCESS_HOLD_MS, MaraoCard, MaraoPopupCard, callServiceWithNotification, focusRestorer, performAction, registerMaraoCards, binaryState, cardProblem, problemStyle, serviceOutcome, stateAppearance, summaryState, entityGroupState, vacuumActions, mediaAppBrand } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#visibility`);
+const { ACCESS_HOLD_MS, MaraoCard, MaraoPopupCard, callServiceWithNotification, focusRestorer, performAction, registerMaraoCards, binaryState, cardProblem, problemStyle, serviceOutcome, stateAppearance, summaryState, entityGroupState, vacuumActions, mediaAppBrand, updateCardSurface } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#visibility`);
 
 function retainedCardDOM(t, card) {
   const makeSurface = attributes => ({
     attributes: Object.entries(attributes).map(([name, value]) => ({ name, value })),
-    childNodes: [], shadowRoot: { slot: true }, style: { setProperty() {} }, classList: { remove() {} },
+    localName: 'ha-card', childNodes: [], shadowRoot: { slot: true }, style: { setProperty() {} }, classList: { remove() {} },
+    getAttribute(name) { return this.attributes.find(attribute => attribute.name === name)?.value ?? null; },
+    hasAttribute(name) { return this.getAttribute(name) !== null; },
     removeAttribute(name) { this.attributes = this.attributes.filter(attribute => attribute.name !== name); },
     setAttribute(name, value) { this.removeAttribute(name); this.attributes.push({ name, value }); },
     append(...children) { this.childNodes.push(...children); },
@@ -48,8 +51,9 @@ function retainedCardDOM(t, card) {
     querySelectorAll: selector => selector === 'ha-state-icon' && surface.childNodes.length ? [surface.childNodes[0].symbol] : [],
   };
   Object.defineProperty(root, 'innerHTML', { set() { assert.fail('Replacing the shadow root detaches the live HA surface'); } });
-  const previousDocument = globalThis.document;
-  t.after(() => { globalThis.document = previousDocument; });
+  const previousDocument = globalThis.document, previousFrame = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = callback => queueMicrotask(callback);
+  t.after(() => { globalThis.document = previousDocument; globalThis.requestAnimationFrame = previousFrame; });
   globalThis.document = { createElement(tag) {
     assert.equal(tag, 'template');
     return { set innerHTML(markup) {
@@ -61,6 +65,7 @@ function retainedCardDOM(t, card) {
     } };
   } };
   card.shadowRoot = root;
+  root.host = card; card.style = { minHeight: '24px' }; card.getBoundingClientRect = () => ({ height: 180 });
   return { surface, style, get replacement() { return replacement; } };
 }
 
@@ -73,7 +78,7 @@ test('rerenders never detach the native surface while replacing content and obso
     card._render();
     assert.equal(card.shadowRoot.querySelector('ha-card'), surface);
     assert.equal(surface.shadowRoot.slot, true);
-    assert.deepEqual(surface.attributes, dom.replacement.attributes);
+    assert.deepEqual(Object.fromEntries(surface.attributes.map(({name,value}) => [name,value])), Object.fromEntries(dom.replacement.attributes.map(({name,value}) => [name,value])));
     assert.equal(surface.childNodes[0], dom.replacement.childNodes[0]);
     assert.equal(surface.childNodes.length, 1, 'Old card content must be removed after mounting the replacement');
     assert.equal(surface.attributes.some(attribute => attribute.name === 'data-problem'), state === 'unavailable');
@@ -89,6 +94,31 @@ test('rerenders never detach the native surface while replacing content and obso
   card._render();
   assert.equal(card.shadowRoot.querySelector('ha-card'), surface);
   assert.match(style.textContent, /\.alarm-body/);
+});
+
+test('surface updates reserve height through native layout and restore it even on failure', async t => {
+  const card = new MaraoCard(), {surface} = retainedCardDOM(t, card);
+  const append = surface.append;
+  let appends = 0, height = 180;
+  card.getBoundingClientRect = () => ({height});
+  surface.append = function(...children) {
+    assert.equal(card.style.minHeight, `${height}px`, 'WebKit must never see the card collapse during mutation');
+    appends++; append.apply(this, children);
+  };
+  const markup = '<style>card</style><ha-card data-history-state="ready"><div>Updated reading</div></ha-card>';
+  updateCardSurface(card.shadowRoot, markup);
+  assert.equal(appends, 1);
+  assert.equal(card.style.minHeight, '180px', 'Reserve height through the native slot layout');
+  height = 240; updateCardSurface(card.shadowRoot, markup);
+  assert.equal(card.style.minHeight, '240px', 'A second update reserves the current height without losing the original minimum');
+  await Promise.resolve();
+  assert.equal(card.style.minHeight, '24px', 'Normal responsive height resumes after native layout');
+  assert.equal(card.shadowRoot.querySelector('ha-card'), surface);
+  assert.throws(() => updateCardSurface(card.shadowRoot, markup, 'ha-card', () => {
+    assert.equal(card.style.minHeight, '240px'); throw new Error('Failed content');
+  }), /Failed content/);
+  await Promise.resolve();
+  assert.equal(card.style.minHeight, '24px');
 });
 
 test('retained History buttons open once after equivalent state reports', t => {
@@ -920,56 +950,110 @@ test("climate and Wallbox cards share the same minimum stepper width", () => {
   assert.match(climate.shadowRoot.innerHTML, />22<\/output>/);
 });
 
-test("scene cards render the actual option count and authoritative selection", () => {
+test("scene dropdowns retain every option and the authoritative selection", () => {
   const card = new MaraoCard();
-  card.setConfig({ entity: "input_select.scene", template: "hc_scene_card", name: "Room scene" });
-  for (let count = 1; count <= 5; count += 1) {
-    const options = ["Relax", "Movie & Night", "Dinner", "Away", "Off"].slice(0, count);
-    card.hass = {
-      callService() {},
-      states: { "input_select.scene": { state: "Relax", attributes: { options } } },
-    };
-    const markup = card.shadowRoot.innerHTML.split("</style>")[1];
-    assert.equal((markup.match(/data-scene-option=/g) || []).length, count);
-    assert.match(markup, /data-scene-option="Relax" aria-pressed="true"/);
-    assert.doesNotMatch(markup, /data-card-action/);
-    if (count > 1) assert.match(markup, /data-scene-option="Movie &amp; Night" aria-pressed="false"/);
+  for (const domain of ["input_select", "select"]) {
+    const entity = `${domain}.scene`;
+    card.setConfig({ entity, template: "hc_scene_card", name: "Room scene" });
+    for (const count of [1, 5, 200]) {
+      const options = ["Relax", "Movie & Night", ...Array.from({length:198}, (_,index)=>`Option ${index+3}`)].slice(0,count);
+      card.hass = {callService() {}, states:{[entity]:{state:"Relax",attributes:{options}}}};
+      const markup = card.shadowRoot.innerHTML.split("</style>")[1];
+      assert.equal((markup.match(/data-scene-select /g) || []).length,1);
+      assert.equal((markup.match(/role="menuitemradio"/g) || []).length,count);
+      assert.match(markup, /data-scene-option="Relax" aria-checked="true"/);
+      assert.match(markup, /data-scene-select aria-label="Room scene"/);
+      assert.doesNotMatch(markup, /data-card-action|<select\b/);
+      if(count>1) assert.match(markup, /data-scene-option="Movie &amp; Night" aria-checked="false"/);
+    }
   }
-  assert.match(source, /\.scene-options button \{[^}]*min-width:48px; min-height:48px;[^}]*overflow-wrap:anywhere/);
-  assert.match(source, /\.scene-options button \{[^}]*font-size:var\(--font-size-secondary,1rem\); font-weight:var\(--font-weight-secondary,500\);/);
-  assert.match(source, /@container marao-card \(max-width:190px\) \{ \.scene-options \{ grid-template-columns:minmax\(0,1fr\);/);
 });
 
-test("scene option activation dispatches once and preserves state until HA responds", async () => {
-  const calls = [];
-  const card = new MaraoCard();
-  const entity = "input_select.scene";
-  card.setConfig({ entity, template: "hc_scene_card" });
-  card.hass = {
-    callService: (...args) => calls.push(args),
-    states: { [entity]: { state: "Relax", attributes: { options: ["Relax", "Movie"] } } },
-  };
-  const button = new EventTarget();
-  button.getAttribute = () => "Movie";
-  card.shadowRoot.querySelectorAll = (selector) => selector === "[data-scene-option]" ? [button] : [];
-  card._render();
-  button.dispatchEvent(new Event("click", { bubbles: true }));
-  assert.deepEqual(calls, [["input_select", "select_option", { entity_id: entity, option: "Movie" }, undefined, false]]);
-  assert.match(card.shadowRoot.innerHTML, /data-scene-option="Relax" aria-pressed="true"/);
-  card.shadowRoot.querySelectorAll = () => [];
-  card.hass = { ...card.hass, states: { [entity]: { state: "Movie", attributes: { options: ["Relax", "Movie"] } } } };
-  assert.match(card.shadowRoot.innerHTML, /data-scene-option="Movie" aria-pressed="true"/);
+test('the shared dropdown floats above clipping, scrolls to a distant choice and closes safely on removal', t => {
+  const doc=globalThis.document,win=globalThis.window;
+  t.after(()=>{globalThis.document=doc;globalThis.window=win;});
+  globalThis.document=new EventTarget();globalThis.window=Object.assign(new EventTarget(),{innerWidth:320,innerHeight:600});
+  let active,shown=false;
+  const control=()=>Object.assign(new EventTarget(),{attributes:{},setAttribute(key,value){this.attributes[key]=value;},focus(){active=this;}});
+  const picker=control(),trigger=control(),menu=Object.assign(control(),{style:{},offsetWidth:280,offsetHeight:360,clientHeight:360,
+    showPopover(){shown=true;},hidePopover(){shown=false;},matches(){return shown;}});
+  trigger.getBoundingClientRect=()=>({left:20,width:280,top:500,bottom:548});
+  const choices=Array.from({length:200},(_,index)=>({value:String(index),button:Object.assign(control(),{offsetTop:index*52,offsetHeight:48})}));
+  const dropdown=bindDropdown(picker,{trigger,menu,choices,value:()=>"199",activeElement:()=>active,haptic(){},onSelect(){}});
+  try{
+    trigger.dispatchEvent(new Event('click'));
+    assert.equal(shown,true);assert.equal(active,choices[199].button);assert.ok(menu.scrollTop>0);
+    assert.ok(parseFloat(menu.style.top)>=0&&parseFloat(menu.style.top)+menu.offsetHeight<=600);
+    assert.ok(parseFloat(menu.style.left)>=0&&parseFloat(menu.style.left)+menu.offsetWidth<=320);
+    shown=false; // Removing an element makes the browser close its popover first.
+    assert.doesNotThrow(()=>dropdown.destroy());assert.equal(menu.hidden,true);
+    trigger.dispatchEvent(new Event('click'));assert.equal(shown,false);
+  }finally{dropdown.destroy();}
+});
 
-  await card._selectSceneOption(entity, "Missing option");
-  for (const state of ["unknown", "unavailable"]) {
-    card.hass = { ...card.hass, states: { [entity]: { state, attributes: { options: ["Relax", "Movie"] } } } };
-    assert.match(card.shadowRoot.innerHTML, /data-scene-option="Movie" aria-pressed="false" disabled/);
-    await card._selectSceneOption(entity, "Movie");
+test('scene rerenders retain the attached dropdown while replacing surrounding content', t => {
+  class Node {
+    constructor(attributes={}){this.attributes=Object.entries(attributes).map(([name,value])=>({name,value}));this.childNodes=[];}
+    getAttribute(name){return this.attributes.find(item=>item.name===name)?.value;}
+    removeAttribute(name){this.attributes=this.attributes.filter(item=>item.name!==name);}
+    setAttribute(name,value){this.removeAttribute(name);this.attributes.push({name,value});}
+    append(...nodes){for(const node of nodes){node.remove();node.parentNode=this;this.childNodes.push(node);}}
+    insertBefore(node,before){node.remove();node.parentNode=this;this.childNodes.splice(this.childNodes.indexOf(before),0,node);}
+    remove(){if(this.parentNode)this.parentNode.childNodes=this.parentNode.childNodes.filter(node=>node!==this);this.parentNode=null;}
   }
-  card.hass = { ...card.hass, connected: false, states: { [entity]: { state: "Relax", attributes: { options: ["Relax", "Movie"] } } } };
-  assert.match(card.shadowRoot.innerHTML, /data-scene-option="Movie" aria-pressed="false" disabled/);
-  await card._selectSceneOption(entity, "Movie");
-  assert.equal(calls.length, 1);
+  const identity={'data-scene-identity':'same-options'}, picker=new Node(identity), replacement=new Node(identity);
+  const surface=new Node(),body=new Node({class:'old'}),next=new Node(),nextBody=new Node({class:'new'});
+  body.append(new Node(),picker,new Node());surface.append(new Node(),body,new Node());
+  const heading=new Node(),note=new Node(),before=new Node(),after=new Node();
+  nextBody.append(heading,replacement,note);next.append(before,nextBody,after);
+  picker.scrollTop=200;picker.remove=()=>assert.fail('An open dropdown must not be detached or reparented');
+  surface.querySelector=()=>picker;next.querySelector=()=>replacement;
+  const style={textContent:'old'},card=new MaraoCard(),doc=globalThis.document;
+  t.after(()=>{globalThis.document=doc;});
+  globalThis.document={createElement:()=>({set innerHTML(_markup){},content:{querySelector:selector=>selector==='ha-card'?next:{textContent:'new'}}})};
+  card._config={template:'hc_scene_card'};card.shadowRoot.querySelector=selector=>selector==='ha-card'?surface:style;
+  card._setMarkup('updated','bindings');
+  assert.deepEqual(surface.childNodes,[before,body,after]);
+  assert.deepEqual(body.childNodes,[heading,picker,note]);
+  assert.equal(body.getAttribute('class'),'new');assert.equal(picker.scrollTop,200);assert.equal(picker.parentNode,body);
+});
+
+test("the themed scene dropdown dispatches once, retains HA state and disables unavailable choices", async () => {
+  const calls = [], card = new MaraoCard(), entity = "input_select.scene";
+  card.setConfig({entity,template:"hc_scene_card"});
+  card.hass={callService:(...args)=>calls.push(args),states:{[entity]:{state:"Relax",attributes:{options:["Relax","Movie"]}}}};
+  const doc=globalThis.document;
+  globalThis.document=new EventTarget();
+  const control=()=>Object.assign(new EventTarget(),{attributes:{},setAttribute(key,value){this.attributes[key]=value;},getAttribute(key){return this.attributes[key];},focus(){card.shadowRoot.activeElement=this;}});
+  const trigger=control(),menu=control(),label={},picker=control();
+  const buttons=["Relax","Movie"].map(value=>{const button=control();button.setAttribute('data-scene-option',value);return button;});
+  picker.querySelector=selector=>selector==='[data-scene-select]'?trigger:selector==='[data-scene-menu]'?menu:label;
+  picker.querySelectorAll=()=>buttons;
+  card.shadowRoot.querySelector=selector=>selector==='[data-scene-picker]'?picker:null;
+  try{
+    card._syncSceneDropdown(entity,false);
+    trigger.dispatchEvent(new Event('click'));assert.equal(menu.hidden,false);
+    buttons[1].dispatchEvent(new Event('click'));assert.equal(menu.hidden,true);
+    assert.deepEqual(calls,[["input_select","select_option",{entity_id:entity,option:"Movie"},undefined,false]]);
+    assert.equal(label.textContent,"Relax");assert.equal(buttons[0].attributes['aria-checked'],'true');
+    trigger.dispatchEvent(new Event('click'));menu.scrollTop=150;
+    const owner=card._sceneDropdown;
+    card._hass={...card._hass,states:{[entity]:{state:"Movie",attributes:{options:["Relax","Movie"]}}}};
+    card._syncSceneDropdown(entity,false);
+    assert.equal(card._sceneDropdown,owner);assert.equal(menu.hidden,false);assert.equal(menu.scrollTop,150);
+    assert.equal(label.textContent,"Movie");assert.equal(buttons[1].attributes['aria-checked'],'true');
+    buttons[1].dispatchEvent(new Event('click'));assert.equal(calls.length,1,'Choosing the current item is a no-op');
+    await card._selectSceneOption(entity,"Missing option");
+    for(const state of ["unknown","unavailable"]){
+      card._hass={...card._hass,states:{[entity]:{state,attributes:{options:["Relax","Movie"]}}}};
+      card._syncSceneDropdown(entity,true);
+      assert.equal(trigger.disabled,true);assert.equal(menu.hidden,true);
+      assert.ok(buttons.every(button=>button.disabled&&button.attributes['aria-checked']==='false'));
+      buttons[0].dispatchEvent(new Event('click'));await card._selectSceneOption(entity,"Relax");
+    }
+    card._hass={...card._hass,connected:false,states:{[entity]:{state:"Relax",attributes:{options:["Relax","Movie"]}}}};
+    await card._selectSceneOption(entity,"Movie");assert.equal(calls.length,1);
+  }finally{card._sceneDropdown?.destroy();globalThis.document=doc;}
 });
 
 test("native select scene failures use the shared readable error notification", async () => {

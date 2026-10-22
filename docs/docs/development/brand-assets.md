@@ -17,8 +17,9 @@ shipped outside the editor's generated `assets/` directory:
 | `mark.svg`, `mark-dark.svg` | Compact name-free mark for small branding surfaces |
 | `mark-monochrome.svg` | Native sidebar glyph, inheriting the surrounding text color |
 
-The palette uses Marao blue `#7BADE6`, navy `#284D7D` and pale `#EFF6FF`.
-The dark variant exchanges the navy and pale facets to retain the silhouette on
+The mountain facets use Encosta mist blue `#A6C2CB`, slate `#506F79` and
+Névoa `#F3F3EE`, matching the Serra do Marão landscape theme.
+The dark variant exchanges the slate and pale facets to retain the silhouette on
 dark surfaces. The wordmark contains Montserrat-based vector outlines in an SVG
 mask; the background shows through the letters. Rendering requires no font or
 external artwork request.

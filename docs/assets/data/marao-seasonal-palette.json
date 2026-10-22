@@ -1,0 +1,1101 @@
+{
+  "method": "Pillow median-cut, 12 colors per photograph after proportional resize to at most 480px; separate HSV hue-family median samples at up to 320px. Hue groups are not object recognition. The summer rock accent sample excludes its black letterbox. Sources and seasons reviewed separately, never pooled by image size. UI colors are curated adjustments, not direct samples.",
+  "references": [
+    {
+      "id": "spring-heather",
+      "season": "spring",
+      "page": "https://amarantemagazine.sapo.pt/sociedade/o-marao-aqui-tao-perto/",
+      "image": "https://amarantemagazine.sapo.pt/wp-content/uploads/2021/05/SErra_Capa-2.jpeg",
+      "date": "Published 23 May 2021; flowers captioned, capture date unknown",
+      "credit": "Amarante Magazine; reference only",
+      "swatches": [
+        {
+          "hex": "#6E603E",
+          "share": 0.1096
+        },
+        {
+          "hex": "#868149",
+          "share": 0.0992
+        },
+        {
+          "hex": "#E7D8B8",
+          "share": 0.0991
+        },
+        {
+          "hex": "#FFFFFE",
+          "share": 0.0943
+        },
+        {
+          "hex": "#3B3937",
+          "share": 0.0941
+        },
+        {
+          "hex": "#2B2424",
+          "share": 0.0912
+        },
+        {
+          "hex": "#986256",
+          "share": 0.0773
+        },
+        {
+          "hex": "#764742",
+          "share": 0.0729
+        },
+        {
+          "hex": "#B08667",
+          "share": 0.0724
+        },
+        {
+          "hex": "#494C43",
+          "share": 0.0685
+        },
+        {
+          "hex": "#BEAA7D",
+          "share": 0.0684
+        },
+        {
+          "hex": "#F5FEFF",
+          "share": 0.0531
+        }
+      ],
+      "hue_family_samples": {
+        "green": {
+          "hex": "#394720",
+          "area": 0.0015
+        },
+        "blue": {
+          "hex": "#3C475B",
+          "area": 0.052
+        },
+        "gold": {
+          "hex": "#897F43",
+          "area": 0.1934
+        },
+        "copper": {
+          "hex": "#855D42",
+          "area": 0.1277
+        },
+        "pink-red": {
+          "hex": "#9E506B",
+          "area": 0.0392
+        }
+      }
+    },
+    {
+      "id": "spring-may",
+      "season": "spring",
+      "page": "https://commons.wikimedia.org/wiki/File:Serra_do_Marão_mês_de_Maio.jpg",
+      "image": "https://upload.wikimedia.org/wikipedia/commons/4/41/Serra_do_Mar%C3%A3o_m%C3%AAs_de_Maio.jpg",
+      "date": "18 May 2018; author caption",
+      "credit": "Sanjorgepinho; CC BY-SA 4.0",
+      "swatches": [
+        {
+          "hex": "#4D4B3D",
+          "share": 0.1283
+        },
+        {
+          "hex": "#7BA2DF",
+          "share": 0.1072
+        },
+        {
+          "hex": "#575E56",
+          "share": 0.1052
+        },
+        {
+          "hex": "#30322D",
+          "share": 0.095
+        },
+        {
+          "hex": "#7B683F",
+          "share": 0.0937
+        },
+        {
+          "hex": "#C0D3E7",
+          "share": 0.0827
+        },
+        {
+          "hex": "#8A7D51",
+          "share": 0.0759
+        },
+        {
+          "hex": "#9C8853",
+          "share": 0.0738
+        },
+        {
+          "hex": "#6B6343",
+          "share": 0.0733
+        },
+        {
+          "hex": "#6D7E8B",
+          "share": 0.0728
+        },
+        {
+          "hex": "#EFF2F5",
+          "share": 0.0648
+        },
+        {
+          "hex": "#ABADA3",
+          "share": 0.0274
+        }
+      ],
+      "hue_family_samples": {
+        "green": {
+          "hex": "#3E4D43",
+          "area": 0.0034
+        },
+        "blue": {
+          "hex": "#6790C7",
+          "area": 0.2643
+        },
+        "gold": {
+          "hex": "#7F7136",
+          "area": 0.2568
+        },
+        "copper": {
+          "hex": "#816446",
+          "area": 0.0193
+        }
+      }
+    },
+    {
+      "id": "spring-woodland",
+      "season": "spring",
+      "page": "https://greentrekker.pt/agenda/primavera-no-bosque-de-fervenca/",
+      "image": "https://greentrekker.pt/site/assets/files/181093/7.jpg",
+      "date": "Spring activity gallery; individual capture date unconfirmed",
+      "credit": "GreenTrekker; reference only",
+      "swatches": [
+        {
+          "hex": "#3F413F",
+          "share": 0.1244
+        },
+        {
+          "hex": "#242629",
+          "share": 0.1112
+        },
+        {
+          "hex": "#534E4B",
+          "share": 0.1105
+        },
+        {
+          "hex": "#6E6B5D",
+          "share": 0.0889
+        },
+        {
+          "hex": "#645F54",
+          "share": 0.0868
+        },
+        {
+          "hex": "#595952",
+          "share": 0.0763
+        },
+        {
+          "hex": "#7D7666",
+          "share": 0.0744
+        },
+        {
+          "hex": "#8C7F6E",
+          "share": 0.0713
+        },
+        {
+          "hex": "#B8BDC8",
+          "share": 0.0664
+        },
+        {
+          "hex": "#AC9F8E",
+          "share": 0.0648
+        },
+        {
+          "hex": "#E7EAF1",
+          "share": 0.0624
+        },
+        {
+          "hex": "#969183",
+          "share": 0.0623
+        }
+      ],
+      "hue_family_samples": {
+        "green": {
+          "hex": "#384231",
+          "area": 0.0046
+        },
+        "blue": {
+          "hex": "#515162",
+          "area": 0.0563
+        },
+        "gold": {
+          "hex": "#777350",
+          "area": 0.0494
+        },
+        "pink-red": {
+          "hex": "#6F213F",
+          "area": 0.0036
+        }
+      }
+    },
+    {
+      "id": "summer-ridge",
+      "season": "summer",
+      "page": "https://www.wikiloc.com/hiking-trails/serra-do-marao-mafomedes-fraga-da-ermida-senhora-da-serra-142821394",
+      "image": "https://s1.wklcdn.com/image_34/1025339/142821409/90377368.400x300.jpg",
+      "date": "Recorded August 2023; gallery date, individual capture unconfirmed",
+      "credit": "STrilhos; reference only",
+      "swatches": [
+        {
+          "hex": "#13171C",
+          "share": 0.1118
+        },
+        {
+          "hex": "#829DC0",
+          "share": 0.1012
+        },
+        {
+          "hex": "#6B94CC",
+          "share": 0.1002
+        },
+        {
+          "hex": "#93B3D4",
+          "share": 0.0987
+        },
+        {
+          "hex": "#6F6E54",
+          "share": 0.0914
+        },
+        {
+          "hex": "#51523F",
+          "share": 0.0864
+        },
+        {
+          "hex": "#5C6B75",
+          "share": 0.0795
+        },
+        {
+          "hex": "#AFC8DC",
+          "share": 0.0792
+        },
+        {
+          "hex": "#3C4037",
+          "share": 0.0696
+        },
+        {
+          "hex": "#95937E",
+          "share": 0.064
+        },
+        {
+          "hex": "#D2E1E9",
+          "share": 0.0594
+        },
+        {
+          "hex": "#787E75",
+          "share": 0.0586
+        }
+      ],
+      "hue_family_samples": {
+        "green": {
+          "hex": "#404834",
+          "area": 0.0015
+        },
+        "blue": {
+          "hex": "#799BD2",
+          "area": 0.4466
+        },
+        "gold": {
+          "hex": "#717045",
+          "area": 0.0816
+        }
+      }
+    },
+    {
+      "id": "summer-river",
+      "season": "summer",
+      "page": "https://www.wikiloc.com/hiking-trails/fonte-da-ribeira-com-partida-em-parque-de-merendas-da-povoa-220855883",
+      "image": "https://s2.wklcdn.com/image_334/10020568/220855912/139092800.400x300.jpg",
+      "date": "Recorded July 2025; gallery date, individual capture unconfirmed",
+      "credit": "Joana Pocahontas; reference only",
+      "swatches": [
+        {
+          "hex": "#3B412D",
+          "share": 0.1287
+        },
+        {
+          "hex": "#1C1E17",
+          "share": 0.1088
+        },
+        {
+          "hex": "#475C36",
+          "share": 0.1011
+        },
+        {
+          "hex": "#596247",
+          "share": 0.1009
+        },
+        {
+          "hex": "#7F896C",
+          "share": 0.0913
+        },
+        {
+          "hex": "#678253",
+          "share": 0.0868
+        },
+        {
+          "hex": "#E3DFC5",
+          "share": 0.0706
+        },
+        {
+          "hex": "#B5B09A",
+          "share": 0.0691
+        },
+        {
+          "hex": "#8FAB79",
+          "share": 0.0665
+        },
+        {
+          "hex": "#6B6957",
+          "share": 0.063
+        },
+        {
+          "hex": "#B7CE9E",
+          "share": 0.0594
+        },
+        {
+          "hex": "#97917D",
+          "share": 0.0537
+        }
+      ],
+      "hue_family_samples": {
+        "green": {
+          "hex": "#5A7748",
+          "area": 0.3411
+        },
+        "blue": {
+          "hex": "#636C7D",
+          "area": 0.0154
+        },
+        "gold": {
+          "hex": "#7E7C50",
+          "area": 0.0314
+        },
+        "copper": {
+          "hex": "#856951",
+          "area": 0.0038
+        }
+      }
+    },
+    {
+      "id": "summer-rock",
+      "season": "summer",
+      "page": "https://www.flickr.com/photos/_ferman_/7687046452/",
+      "image": "https://live.staticflickr.com/7271/7687046452_f5283780c3.jpg",
+      "date": "18 July 2012; explicit capture date",
+      "credit": "FerMan; reference only",
+      "swatches": [
+        {
+          "hex": "#000000",
+          "share": 0.3293
+        },
+        {
+          "hex": "#656225",
+          "share": 0.1115
+        },
+        {
+          "hex": "#575026",
+          "share": 0.1074
+        },
+        {
+          "hex": "#7A6643",
+          "share": 0.0765
+        },
+        {
+          "hex": "#9E8862",
+          "share": 0.0761
+        },
+        {
+          "hex": "#A89865",
+          "share": 0.0618
+        },
+        {
+          "hex": "#C0B27B",
+          "share": 0.0616
+        },
+        {
+          "hex": "#88813F",
+          "share": 0.0607
+        },
+        {
+          "hex": "#847446",
+          "share": 0.0529
+        },
+        {
+          "hex": "#353116",
+          "share": 0.0437
+        },
+        {
+          "hex": "#010002",
+          "share": 0.0113
+        },
+        {
+          "hex": "#000002",
+          "share": 0.0071
+        }
+      ],
+      "hue_family_samples": {
+        "gold": {
+          "hex": "#7E7535",
+          "area": 0.5516
+        },
+        "copper": {
+          "hex": "#846C50",
+          "area": 0.0862
+        }
+      }
+    },
+    {
+      "id": "summer-valley",
+      "season": "summer",
+      "page": "https://www.wikiloc.com/hiking-trails/serra-do-marao-mafomedes-fraga-da-ermida-senhora-da-serra-142821394",
+      "image": "https://s2.wklcdn.com/image_34/1025339/142821403/90377171.400x300.jpg",
+      "date": "Recorded August 2023; gallery date, individual capture unconfirmed",
+      "credit": "STrilhos; reference only",
+      "swatches": [
+        {
+          "hex": "#A99E82",
+          "share": 0.1252
+        },
+        {
+          "hex": "#86C9FC",
+          "share": 0.1217
+        },
+        {
+          "hex": "#0F1918",
+          "share": 0.1075
+        },
+        {
+          "hex": "#737358",
+          "share": 0.0967
+        },
+        {
+          "hex": "#807C65",
+          "share": 0.093
+        },
+        {
+          "hex": "#908F71",
+          "share": 0.0892
+        },
+        {
+          "hex": "#9C987B",
+          "share": 0.0869
+        },
+        {
+          "hex": "#343B39",
+          "share": 0.0785
+        },
+        {
+          "hex": "#8B826C",
+          "share": 0.0748
+        },
+        {
+          "hex": "#5F5D45",
+          "share": 0.0609
+        },
+        {
+          "hex": "#A6B3A7",
+          "share": 0.0439
+        },
+        {
+          "hex": "#B8D3CD",
+          "share": 0.0218
+        }
+      ],
+      "hue_family_samples": {
+        "green": {
+          "hex": "#434D36",
+          "area": 0.0059
+        },
+        "blue": {
+          "hex": "#85C7FB",
+          "area": 0.144
+        },
+        "gold": {
+          "hex": "#908D5B",
+          "area": 0.1217
+        },
+        "copper": {
+          "hex": "#CC9372",
+          "area": 0.0066
+        }
+      }
+    },
+    {
+      "id": "autumn-gold",
+      "season": "autumn",
+      "page": "https://www.flickr.com/photos/vribeiro/54300471351/",
+      "image": "https://live.staticflickr.com/65535/54300471351_ae4d9c5f55.jpg",
+      "date": "27 November 2016; photographer date",
+      "credit": "Vítor Ribeiro; reference only",
+      "swatches": [
+        {
+          "hex": "#333013",
+          "share": 0.1167
+        },
+        {
+          "hex": "#190D04",
+          "share": 0.1124
+        },
+        {
+          "hex": "#5C4720",
+          "share": 0.0944
+        },
+        {
+          "hex": "#85491F",
+          "share": 0.0938
+        },
+        {
+          "hex": "#612C0F",
+          "share": 0.0912
+        },
+        {
+          "hex": "#996A31",
+          "share": 0.0801
+        },
+        {
+          "hex": "#D6973C",
+          "share": 0.0786
+        },
+        {
+          "hex": "#E8E4BD",
+          "share": 0.0735
+        },
+        {
+          "hex": "#746431",
+          "share": 0.0691
+        },
+        {
+          "hex": "#B67232",
+          "share": 0.0654
+        },
+        {
+          "hex": "#A79249",
+          "share": 0.0636
+        },
+        {
+          "hex": "#D9B65E",
+          "share": 0.0613
+        }
+      ],
+      "hue_family_samples": {
+        "green": {
+          "hex": "#334825",
+          "area": 0.0273
+        },
+        "blue": {
+          "hex": "#8A9CAF",
+          "area": 0.005
+        },
+        "gold": {
+          "hex": "#A88521",
+          "area": 0.2508
+        },
+        "copper": {
+          "hex": "#90562B",
+          "area": 0.3355
+        }
+      }
+    },
+    {
+      "id": "autumn-leaves",
+      "season": "autumn",
+      "page": "https://www.flickr.com/photos/vribeiro/54929381106/",
+      "image": "https://live.staticflickr.com/65535/54929381106_8890f53eb1_b.jpg",
+      "date": "27 November 2016; explicit capture date",
+      "credit": "Vítor Ribeiro; reference only",
+      "swatches": [
+        {
+          "hex": "#2E341B",
+          "share": 0.1187
+        },
+        {
+          "hex": "#B9C1C1",
+          "share": 0.1183
+        },
+        {
+          "hex": "#4D542F",
+          "share": 0.0969
+        },
+        {
+          "hex": "#3A4D25",
+          "share": 0.0957
+        },
+        {
+          "hex": "#13160B",
+          "share": 0.0952
+        },
+        {
+          "hex": "#888054",
+          "share": 0.0863
+        },
+        {
+          "hex": "#75794B",
+          "share": 0.0817
+        },
+        {
+          "hex": "#5B6739",
+          "share": 0.0726
+        },
+        {
+          "hex": "#D3DEE1",
+          "share": 0.0718
+        },
+        {
+          "hex": "#615736",
+          "share": 0.058
+        },
+        {
+          "hex": "#9EA68E",
+          "share": 0.0534
+        },
+        {
+          "hex": "#627643",
+          "share": 0.0513
+        }
+      ],
+      "hue_family_samples": {
+        "green": {
+          "hex": "#3A5029",
+          "area": 0.1759
+        },
+        "blue": {
+          "hex": "#6A818C",
+          "area": 0.0293
+        },
+        "gold": {
+          "hex": "#777137",
+          "area": 0.146
+        },
+        "copper": {
+          "hex": "#745739",
+          "area": 0.017
+        }
+      }
+    },
+    {
+      "id": "autumn-pines",
+      "season": "autumn",
+      "page": "https://www.flickr.com/photos/vribeiro/54796248891/",
+      "image": "https://live.staticflickr.com/65535/54796248891_064941c1f1_b.jpg",
+      "date": "27 November 2016; explicit capture date",
+      "credit": "Vítor Ribeiro; reference only",
+      "swatches": [
+        {
+          "hex": "#754C19",
+          "share": 0.1532
+        },
+        {
+          "hex": "#693610",
+          "share": 0.1142
+        },
+        {
+          "hex": "#251908",
+          "share": 0.0929
+        },
+        {
+          "hex": "#41461A",
+          "share": 0.0856
+        },
+        {
+          "hex": "#F5FBFE",
+          "share": 0.0818
+        },
+        {
+          "hex": "#353311",
+          "share": 0.0815
+        },
+        {
+          "hex": "#5F653E",
+          "share": 0.0778
+        },
+        {
+          "hex": "#7D9395",
+          "share": 0.0756
+        },
+        {
+          "hex": "#9B6426",
+          "share": 0.072
+        },
+        {
+          "hex": "#E6F1F7",
+          "share": 0.0602
+        },
+        {
+          "hex": "#C2C9CE",
+          "share": 0.054
+        },
+        {
+          "hex": "#7E632E",
+          "share": 0.0512
+        }
+      ],
+      "hue_family_samples": {
+        "green": {
+          "hex": "#3F5238",
+          "area": 0.0383
+        },
+        "blue": {
+          "hex": "#789FBD",
+          "area": 0.0639
+        },
+        "gold": {
+          "hex": "#6D5C15",
+          "area": 0.1351
+        },
+        "copper": {
+          "hex": "#7C4717",
+          "area": 0.255
+        }
+      }
+    },
+    {
+      "id": "autumn-wood",
+      "season": "autumn",
+      "page": "https://www.flickr.com/photos/vribeiro/54654749170/",
+      "image": "https://live.staticflickr.com/65535/54654749170_5cf5beec2f_b.jpg",
+      "date": "27 November 2016; explicit capture date",
+      "credit": "Vítor Ribeiro; reference only",
+      "swatches": [
+        {
+          "hex": "#030101",
+          "share": 0.1319
+        },
+        {
+          "hex": "#0D0C06",
+          "share": 0.113
+        },
+        {
+          "hex": "#2F2317",
+          "share": 0.1008
+        },
+        {
+          "hex": "#664634",
+          "share": 0.0924
+        },
+        {
+          "hex": "#AC9568",
+          "share": 0.0789
+        },
+        {
+          "hex": "#75624E",
+          "share": 0.0773
+        },
+        {
+          "hex": "#976E52",
+          "share": 0.0761
+        },
+        {
+          "hex": "#B7774A",
+          "share": 0.0686
+        },
+        {
+          "hex": "#D9B769",
+          "share": 0.0666
+        },
+        {
+          "hex": "#582F21",
+          "share": 0.0664
+        },
+        {
+          "hex": "#D39C5D",
+          "share": 0.0643
+        },
+        {
+          "hex": "#EDD873",
+          "share": 0.0636
+        }
+      ],
+      "hue_family_samples": {
+        "green": {
+          "hex": "#415038",
+          "area": 0.002
+        },
+        "blue": {
+          "hex": "#687084",
+          "area": 0.0015
+        },
+        "gold": {
+          "hex": "#CBA943",
+          "area": 0.1859
+        },
+        "copper": {
+          "hex": "#A46E47",
+          "area": 0.2326
+        },
+        "pink-red": {
+          "hex": "#6A4C58",
+          "area": 0.0051
+        }
+      }
+    },
+    {
+      "id": "winter-fog",
+      "season": "winter",
+      "page": "https://rawtraveller.blogs.sapo.pt/a-descoberta-da-serra-do-marao-nao-825",
+      "image": "https://farm66.static.flickr.com/65535/52736319030_35cb61ab93_b.jpg",
+      "date": "Last weekend February 2023 per photographer narrative",
+      "credit": "Raw Traveller; reference only",
+      "swatches": [
+        {
+          "hex": "#BBBBC4",
+          "share": 0.1127
+        },
+        {
+          "hex": "#A2A2AC",
+          "share": 0.1048
+        },
+        {
+          "hex": "#261C0F",
+          "share": 0.1046
+        },
+        {
+          "hex": "#B3B2BC",
+          "share": 0.1011
+        },
+        {
+          "hex": "#CACAD0",
+          "share": 0.0908
+        },
+        {
+          "hex": "#584122",
+          "share": 0.0895
+        },
+        {
+          "hex": "#3F311D",
+          "share": 0.0824
+        },
+        {
+          "hex": "#C1C0C9",
+          "share": 0.0814
+        },
+        {
+          "hex": "#AAAAB4",
+          "share": 0.0732
+        },
+        {
+          "hex": "#C5C4CC",
+          "share": 0.0664
+        },
+        {
+          "hex": "#D6D5DA",
+          "share": 0.0485
+        },
+        {
+          "hex": "#827974",
+          "share": 0.0445
+        }
+      ],
+      "hue_family_samples": {
+        "gold": {
+          "hex": "#624B27",
+          "area": 0.0057
+        },
+        "copper": {
+          "hex": "#6B4F2B",
+          "area": 0.053
+        }
+      }
+    },
+    {
+      "id": "winter-pines",
+      "season": "winter",
+      "page": "https://rawtraveller.blogs.sapo.pt/a-descoberta-da-serra-do-marao-nao-825",
+      "image": "https://farm66.static.flickr.com/65535/52736368263_857b73630f_b.jpg",
+      "date": "Last weekend February 2023 per photographer narrative",
+      "credit": "Raw Traveller; reference only",
+      "swatches": [
+        {
+          "hex": "#3F3634",
+          "share": 0.1121
+        },
+        {
+          "hex": "#030303",
+          "share": 0.1011
+        },
+        {
+          "hex": "#1E1A16",
+          "share": 0.0938
+        },
+        {
+          "hex": "#0C0B08",
+          "share": 0.0929
+        },
+        {
+          "hex": "#312722",
+          "share": 0.0863
+        },
+        {
+          "hex": "#17130F",
+          "share": 0.0846
+        },
+        {
+          "hex": "#080805",
+          "share": 0.0794
+        },
+        {
+          "hex": "#11100C",
+          "share": 0.0787
+        },
+        {
+          "hex": "#28221E",
+          "share": 0.0725
+        },
+        {
+          "hex": "#060504",
+          "share": 0.0714
+        },
+        {
+          "hex": "#93868C",
+          "share": 0.0638
+        },
+        {
+          "hex": "#5F5254",
+          "share": 0.0634
+        }
+      ],
+      "hue_family_samples": {
+        "gold": {
+          "hex": "#655738",
+          "area": 0.002
+        },
+        "copper": {
+          "hex": "#624936",
+          "area": 0.0033
+        }
+      }
+    },
+    {
+      "id": "winter-ridge",
+      "season": "winter",
+      "page": "https://rawtraveller.blogs.sapo.pt/a-descoberta-da-serra-do-marao-nao-825",
+      "image": "https://farm66.static.flickr.com/65535/52736140714_12254e6ef8_b.jpg",
+      "date": "Last weekend February 2023 per photographer narrative",
+      "credit": "Raw Traveller; reference only",
+      "swatches": [
+        {
+          "hex": "#ABB0C2",
+          "share": 0.1288
+        },
+        {
+          "hex": "#787E8E",
+          "share": 0.1107
+        },
+        {
+          "hex": "#414550",
+          "share": 0.0937
+        },
+        {
+          "hex": "#B2B6C7",
+          "share": 0.0897
+        },
+        {
+          "hex": "#999FB0",
+          "share": 0.0874
+        },
+        {
+          "hex": "#565A67",
+          "share": 0.0867
+        },
+        {
+          "hex": "#636875",
+          "share": 0.0777
+        },
+        {
+          "hex": "#BBBDCD",
+          "share": 0.0728
+        },
+        {
+          "hex": "#C0C1CF",
+          "share": 0.0667
+        },
+        {
+          "hex": "#AFB3C4",
+          "share": 0.0638
+        },
+        {
+          "hex": "#B6B9C9",
+          "share": 0.0619
+        },
+        {
+          "hex": "#B8BBCB",
+          "share": 0.0603
+        }
+      ],
+      "hue_family_samples": {
+        "blue": {
+          "hex": "#5D6271",
+          "area": 0.2257
+        }
+      }
+    },
+    {
+      "id": "winter-snow",
+      "season": "winter",
+      "page": "https://rawtraveller.blogs.sapo.pt/a-descoberta-da-serra-do-marao-nao-825",
+      "image": "https://farm66.static.flickr.com/65535/52736303690_b46d65bfaa_b.jpg",
+      "date": "Last weekend February 2023 per photographer narrative",
+      "credit": "Raw Traveller; reference only",
+      "swatches": [
+        {
+          "hex": "#080603",
+          "share": 0.121
+        },
+        {
+          "hex": "#120E07",
+          "share": 0.1203
+        },
+        {
+          "hex": "#1C150C",
+          "share": 0.1115
+        },
+        {
+          "hex": "#2F261D",
+          "share": 0.0878
+        },
+        {
+          "hex": "#685851",
+          "share": 0.0815
+        },
+        {
+          "hex": "#281E14",
+          "share": 0.0773
+        },
+        {
+          "hex": "#221B11",
+          "share": 0.0764
+        },
+        {
+          "hex": "#3A2E27",
+          "share": 0.0764
+        },
+        {
+          "hex": "#5A4A44",
+          "share": 0.0691
+        },
+        {
+          "hex": "#433630",
+          "share": 0.068
+        },
+        {
+          "hex": "#4E403A",
+          "share": 0.0675
+        },
+        {
+          "hex": "#93817D",
+          "share": 0.0431
+        }
+      ],
+      "hue_family_samples": {
+        "copper": {
+          "hex": "#64493C",
+          "area": 0.0013
+        }
+      }
+    }
+  ]
+}

@@ -435,6 +435,7 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
   else if (version > configVersion) errors.push("Unsupported dashboard format. Update Marao before editing this configuration.");
   if (errors.length) return errors;
   if (!String(config.name || "").trim()) errors.push("Dashboard name is required.");
+  if (Object.hasOwn(config, 'show_cache_reset') && typeof config.show_cache_reset !== 'boolean') errors.push('Show cache reset button must be a boolean.');
   if (version === 2) errors.push(...validatePages(config, catalog));
   else if (!Array.isArray(config.rooms)) errors.push("Rooms must be a list.");
   for (const [index, room] of (Array.isArray(config.rooms) ? config.rooms : []).entries()) {
@@ -818,6 +819,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
       slug: { type: "string", description: "URL-safe dashboard identifier." },
       theme: { type: "string" },
       icon: { type: "string" },
+      show_cache_reset: { type: "boolean", default: true, description: "Show the cache reset button on the main page." },
       navigation: {
         type: "array",
         items: {

@@ -7,7 +7,7 @@ class Shadow {
   set innerHTML(value) {
     for (const button of this.buttons || []) button.isConnected = false;
     this.activeElement = null;
-    this.html = value;
+    this.html = value; this.renders = (this.renders || 0) + 1; this.surface = value.includes('<ha-card') ? {} : null;
     const root = this;
     this.buttons = [...value.matchAll(/<button\b([^>]*)>/g)].map(([, attrs]) => ({
       localName: "button", isConnected: true,
@@ -23,7 +23,7 @@ class Shadow {
     }));
   }
   get innerHTML() { return this.html; }
-  querySelector(selector) { return selector === ".surface" ? this.buttons.find((button) => button.surface) : selector === '[data-history-retry]' ? this.buttons.find(button => button.retry) : null; }
+  querySelector(selector) { return selector === "ha-card" ? this.surface : selector === ".surface" ? this.buttons.find((button) => button.surface) : selector === '[data-history-retry]' ? this.buttons.find(button => button.retry) : null; }
   querySelectorAll(selector) { return selector === "button" ? this.buttons : selector === "[data-period]" ? this.buttons.filter((button) => button.dataset.period) : []; }
 }
 globalThis.HTMLElement = class { attachShadow() { this.shadowRoot = new Shadow(); } };
@@ -43,7 +43,7 @@ const cardsSource = (await fs.readFile(new URL("../../custom_components/marao_da
 const cardsModule = `data:text/javascript;base64,${Buffer.from(cardsSource).toString("base64")}`;
 const { MaraoCard } = await import(cardsModule);
 const classes = source.slice(source.indexOf("function escapeHtml("), source.indexOf('if (!customElements.get("marao-energy-period-card"))'));
-const { MaraoStateTimelineCard, MaraoEnergyPeriodCard } = await import(`data:text/javascript;base64,${Buffer.from(`import { energyBuckets, statisticsBuckets, energyTotal, historyPeriodRange, historySamples, loadHistoryChart, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, focusRestorer, controlGridStyles } from "${cardsModule}";\nconst localize = (key) => key;\n${classes}\nexport { MaraoStateTimelineCard, MaraoEnergyPeriodCard };`).toString("base64")}`);
+const { MaraoStateTimelineCard, MaraoEnergyPeriodCard } = await import(`data:text/javascript;base64,${Buffer.from(`import { energyBuckets, statisticsBuckets, energyTotal, historyPeriodRange, historySamples, loadHistoryChart, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, focusRestorer, controlGridStyles, updateCardSurface } from "${cardsModule}";\nconst localize = (key) => key;\n${classes}\nexport { MaraoStateTimelineCard, MaraoEnergyPeriodCard };`).toString("base64")}`);
 const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
 const waitFor = async condition => {
   const deadline = Date.now() + 3000;
@@ -79,6 +79,16 @@ function create(Card, popup = true) {
   card.setConfig({ entity: "sensor.history", popup, popup_hash: "#history" });
   return card;
 }
+
+for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) test(`${Card.name} keeps unchanged content mounted on background updates`, () => {
+  const card = create(Card, false), reported = state();
+  card.hass = { states: { 'sensor.history': reported } };
+  const renders = card.shadowRoot.renders;
+  for (let index = 0; index < 3; index++) card.hass = { states: { 'sensor.history': {...reported}, 'sensor.unrelated': state(String(index)) } };
+  assert.equal(card.shadowRoot.renders, renders, 'Equivalent readings and unrelated changes must not reset the page');
+  card.hass = { states: { 'sensor.history': state('unavailable') } };
+  assert.ok(card.shadowRoot.renders > renders, 'Availability must still update immediately');
+});
 
 test('energy periods retain legacy entity aliases and day-summary defaults', () => {
   const card = new MaraoEnergyPeriodCard();

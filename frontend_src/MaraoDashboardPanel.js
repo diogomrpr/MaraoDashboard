@@ -693,13 +693,14 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   _mountGeneralForm(host) {
-    const data = { name: this._model.name || "", slug: this._model.slug || "", theme: this._model.theme || "", icon: this._model.icon || "", ...(this._model.config_version === 2 ? { landing_page: this._model.landing_page } : {}) };
+    const data = { name: this._model.name || "", slug: this._model.slug || "", theme: this._model.theme || "", icon: this._model.icon || "", show_cache_reset: this._model.show_cache_reset !== false, ...(this._model.config_version === 2 ? { landing_page: this._model.landing_page } : {}) };
     const themes = Object.keys(this._hass?.themes?.themes || {}).sort().map((theme) => ({ value: theme, label: theme }));
     this._mountForm(host, data, [
       this._schema("name", "Dashboard name", { text: {} }, true),
       this._schema("slug", "URL slug", { text: {} }),
       this._schema("theme", "Theme", { select: { mode: "dropdown", custom_value: true, options: themes } }),
       this._schema("icon", "Icon", { icon: {} }),
+      this._schema("show_cache_reset", "Show cache reset button", { boolean: {} }),
       ...(this._model.config_version === 2 ? [this._schema('landing_page', 'Landing page', { select: { mode: 'dropdown', options: this._availablePages().map(page => ({ value: page.path, label: page.name })) } }, true)] : []),
     ], (value) => {
       const landing = this._model.landing_page;

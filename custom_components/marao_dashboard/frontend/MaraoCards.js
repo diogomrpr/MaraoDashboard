@@ -1,3 +1,4 @@
+const { bindDropdown, dropdownStyles } = await import(new URL(`./MaraoDropdown.js${new URL(import.meta.url).search}`, import.meta.url));
 const { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic, navigate, fullscreenUsers, findElements, focusRestorer, focusableElements, deepActiveElement, FOCUSABLE, beginFrontendInteraction } = await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`, import.meta.url));
 export { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic, focusRestorer };
 const historyData = await import(new URL(`./MaraoHistoryData.js${new URL(import.meta.url).search}`, import.meta.url));
@@ -733,8 +734,44 @@ export function controlGridStyles(selector = '.control-grid') {
   return `${selector}{display:grid;min-width:0;grid-template-columns:repeat(auto-fill,minmax(min(100%,max(${CONTROL_CELL_MIN}px,calc(var(--font-size-primary,1.125rem) * ${CONTROL_CELL_FONT_SCALE}),calc((100% - (var(--marao-control-columns,2) - 1) * var(--marao-control-gap,8px)) / var(--marao-control-columns,2)))),1fr));grid-auto-rows:minmax(0,1fr);gap:var(--marao-control-gap,8px);align-items:stretch}${selector}>*{min-width:0;align-self:stretch}`;
 }
 
+const surfaceHeightReservations = new WeakMap();
+
+export function updateCardSurface(root, markup, selector = 'ha-card', updateContent) {
+  const surface = root.querySelector(selector);
+  if (!surface || !globalThis.document?.createElement) { root.innerHTML = markup; return; }
+  const template = document.createElement('template'); template.innerHTML = markup;
+  const next = template.content.querySelector(selector);
+  if (surface.localName !== next.localName) { root.innerHTML = markup; return; }
+  const host = root.host;
+  let reservation = surfaceHeightReservations.get(root), releaseHeight;
+  // Keep height until native slot layout settles; WebKit otherwise clamps scroll.
+  if (host?.getBoundingClientRect) {
+    if (!reservation) {
+      reservation = { minimum: host.style.minHeight };
+      surfaceHeightReservations.set(root, reservation);
+      releaseHeight = () => { host.style.minHeight = reservation.minimum; surfaceHeightReservations.delete(root); };
+    }
+    host.style.minHeight = `${host.getBoundingClientRect().height}px`;
+  }
+  try {
+    const style = root.querySelector('style'), css = template.content.querySelector('style').textContent;
+    if (style.textContent !== css) style.textContent = css;
+    for (const attribute of [...surface.attributes]) if (!next.hasAttribute(attribute.name)) surface.removeAttribute(attribute.name);
+    for (const attribute of [...next.attributes]) if (surface.getAttribute(attribute.name) !== attribute.value) surface.setAttribute(attribute.name, attribute.value);
+    if (updateContent) updateContent(surface, next);
+    else {
+      const previous = [...surface.childNodes];
+      surface.append(...next.childNodes);
+      for (const node of previous) node.remove();
+    }
+  } finally {
+    if (releaseHeight) requestAnimationFrame(releaseHeight);
+  }
+}
+
 function cardStyles() {
-  return `
+  return `${dropdownStyles}
+
     :host { display:block; container:marao-card / inline-size; color:var(--primary-text-color); font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif); }
     ha-icon, ha-state-icon { display:inline-flex; width:var(--mdc-icon-size,24px); height:var(--mdc-icon-size,24px); vertical-align:middle; }
     ha-card { position:relative; display:flex; flex-direction:column; box-sizing:border-box; overflow:hidden; border-radius:var(--ha-card-border-radius,20px); background:var(--marao-card-background,var(--ha-card-background,var(--card-background-color))); color:var(--marao-card-text-color,inherit); border:var(--marao-card-border,0 solid transparent); transition:transform .12s ease; }
@@ -837,12 +874,12 @@ function cardStyles() {
     .number-value[data-number-range] { min-width:0; white-space:normal; overflow-wrap:normal; }
     .slider { position:relative; display:flex; align-items:center; width:100%; min-height:48px; height:48px; }
     .slider-track { position:absolute; inset:0; width:100%; height:48px; pointer-events:none; shape-rendering:geometricPrecision; }
-    .slider-background,.slider-fill,.slider-thumb { stroke:var(--marao-slider-thumb-border,#284D7D); stroke-width:1px; }
+    .slider-background,.slider-fill,.slider-thumb { stroke:var(--marao-slider-thumb-border,#415C65); stroke-width:1px; }
     .slider-background,.slider-fill { x:.5px; y:.5px; height:47px; rx:23.5px; ry:23.5px; }
-    .slider-background { width:calc(100% - 1px); fill:var(--marao-slider-track,#AAC9EF); }
-    .slider-fill { width:calc(47px + (100% - 48px) * var(--marao-slider-fraction,0)); fill:var(--marao-slider-fill,#EFF6FF); }
+    .slider-background { width:calc(100% - 1px); fill:var(--marao-slider-track,#B4C7C9); }
+    .slider-fill { width:calc(47px + (100% - 48px) * var(--marao-slider-fraction,0)); fill:var(--marao-slider-fill,#F3F3EE); }
     .slider-thumb { cx:calc(24px + (100% - 48px) * var(--marao-slider-target-fraction,0)); cy:24px; r:23.5px; fill:var(--marao-slider-thumb,#FFFFFF); transition:filter .12s ease; }
-    .slider:has(input:disabled) .slider-fill { fill:var(--marao-slider-disabled-fill,#CCD5E1); }
+    .slider:has(input:disabled) .slider-fill { fill:var(--marao-slider-disabled-fill,#D8DFDB); }
     .slider:has(input:active:not(:disabled)) .slider-thumb { filter:brightness(.9); }
     input[type=range] { position:absolute; inset:0; z-index:1; appearance:none; width:100%; min-height:48px; height:48px; margin:0; padding:0; border:0; border-radius:24px; background:transparent; cursor:pointer; }
     input[type=range]:disabled { cursor:default; }
@@ -881,13 +918,8 @@ function cardStyles() {
     .room-lights-off { position:relative; z-index:3; box-sizing:border-box; display:flex; align-items:center; justify-content:center; flex:0 0 48px; width:48px; height:48px; padding:0; border:1px solid currentColor; border-radius:50%; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); pointer-events:auto; }
     .room-lights-off:disabled { opacity:.6; cursor:default; }
     .room-lights-off ha-icon { --mdc-icon-size:28px; }
-    .scene-options { grid-area:control; z-index:2; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; width:100%; pointer-events:auto; }
-    .scene-options button { min-width:48px; min-height:48px; overflow-wrap:anywhere; font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-secondary,500); line-height:1.25; }
-    .scene-options button:disabled { opacity:.6; cursor:default; }
-    .scene-options button:only-child { grid-column:1/-1; }
-    .scene-options button[aria-pressed=true] { box-shadow:inset 0 0 0 3px var(--marao-accent-color,var(--primary-color)); font-weight:var(--font-weight-primary,700); }
-    @container marao-card (max-width:280px) { .scene-options { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-    @container marao-card (max-width:190px) { .scene-options { grid-template-columns:minmax(0,1fr); } .body.with-climate-modes { padding-inline:8px; } .climate-mode { padding-inline:4px; } }
+    .scene-options { grid-area:control; z-index:2; width:100%; pointer-events:auto; font-size:var(--font-size-secondary,1rem); }
+    @container marao-card (max-width:190px) { .body.with-climate-modes { padding-inline:8px; } .climate-mode { padding-inline:4px; } }
     .camera { grid-column:1/-1; width:100%; aspect-ratio:16/9; object-fit:cover; background:#000; }
     .media-artwork { position:absolute; inset:0; pointer-events:none; }
     .media-artwork img { width:100%; height:100%; object-fit:cover; }
@@ -900,7 +932,7 @@ function cardStyles() {
       .body.room-card .room-artwork { bottom:-24px; }
       .control.number-control { grid-area:control; justify-self:start; }
       .number-stepper { min-width:56px; max-width:100%; }
-      .wallbox-shortcuts, .scene-options, .climate-modes { grid-template-columns:minmax(0,1fr); }
+      .wallbox-shortcuts, .climate-modes { grid-template-columns:minmax(0,1fr); }
     }
     .body.slider-header, .body.slider-header.binary-card:not(:has(>.state)) { grid-template-columns:minmax(0,1fr) auto; grid-template-areas:'title icon' 'state state' 'control control'; }
     .body.slider-header:not(:has(>.icon)) .title { grid-column:1/-1; }
@@ -1056,6 +1088,7 @@ export class MaraoCard extends BaseElement {
   }
   get hass() { return this._hass; }
   disconnectedCallback() {
+    this._sceneDropdown?.destroy(); this._sceneDropdown = null;
     this._stateReferences = null;
     queueMicrotask(() => { if (!this.isConnected) { this._historyPopup?._close(false); this._activeHistoryPopup?._close(false); } });
     this._disposeCamera();
@@ -1129,21 +1162,35 @@ export class MaraoCard extends BaseElement {
       this._renderedMarkup = markup; this._renderedBindings = bindings; this._renderedConfig = this._config;
       return;
     }
-    // Removing even a retained HA surface resets its ancestor's scroll in WebKit.
-    const template = document.createElement('template');
-    template.innerHTML = markup;
-    const next = template.content.querySelector('ha-card');
-    const style = this.shadowRoot.querySelector('style');
-    const css = template.content.querySelector('style').textContent;
-    if (style.textContent !== css) style.textContent = css;
-    for (const attribute of [...surface.attributes]) surface.removeAttribute(attribute.name);
-    for (const attribute of [...next.attributes]) surface.setAttribute(attribute.name, attribute.value);
-    // Connect the replacement before removing old content so WebKit never clamps an empty card.
-    const previous = [...surface.childNodes];
-    const cameraSlot = this._camera?.slot || this._cameraSlot;
-    if (cameraSlot) for (const node of [...next.childNodes]) surface.insertBefore(node, cameraSlot);
-    else surface.append(...next.childNodes);
-    for (const node of previous) if (node !== this._camera?.slot && node !== this._cameraSlot) node.remove();
+    updateCardSurface(this.shadowRoot, markup, 'ha-card', (surface, next) => {
+      const previous = [...surface.childNodes];
+      const cameraSlot = this._camera?.slot || this._cameraSlot;
+      const picker = this._config.template === 'hc_scene_card' ? surface.querySelector('[data-scene-picker]') : null;
+      const nextPicker = picker ? next.querySelector('[data-scene-picker]') : null;
+      if (picker && nextPicker && picker.getAttribute('data-scene-identity') === nextPicker.getAttribute('data-scene-identity')) {
+        // Keep the open menu attached: reparenting a popover closes it and loses its scroll.
+        const body = picker.parentNode, nextBody = nextPicker.parentNode;
+        for (const attribute of [...body.attributes]) body.removeAttribute(attribute.name);
+        for (const attribute of [...nextBody.attributes]) body.setAttribute(attribute.name, attribute.value);
+        const oldChildren = [...body.childNodes].filter(node => node !== picker);
+        let after = false;
+        for (const node of [...nextBody.childNodes]) {
+          if (node === nextPicker) after = true;
+          else if (after) body.append(node); else body.insertBefore(node, picker);
+        }
+        for (const node of oldChildren) node.remove();
+        after = false;
+        for (const node of [...next.childNodes]) {
+          if (node === nextBody) after = true;
+          else if (after) surface.append(node); else surface.insertBefore(node, body);
+        }
+        for (const node of previous) if (node !== body) node.remove();
+      } else {
+        if (cameraSlot) for (const node of [...next.childNodes]) surface.insertBefore(node, cameraSlot);
+        else surface.append(...next.childNodes);
+        for (const node of previous) if (node !== this._camera?.slot && node !== this._cameraSlot) node.remove();
+      }
+    });
     this._renderedMarkup = markup; this._renderedBindings = bindings; this._renderedConfig = this._config;
   }
 
@@ -1506,8 +1553,8 @@ export class MaraoCard extends BaseElement {
     const sceneOptions = kind === "hc_scene_card" && ["input_select", "select"].includes(domainOf(entity)) && Array.isArray(state.attributes?.options)
       ? state.attributes.options.filter((option) => typeof option === "string")
       : [];
-    const sceneButtons = sceneOptions.length
-      ? `<div class="scene-options" role="group" aria-label="${esc(this._label(entity, config, state))}">${sceneOptions.map((option) => `<button type="button" data-scene-option="${esc(option)}" aria-pressed="${!interactionUnavailable && option === value}"${controlsDisabled ? " disabled" : ""}>${esc(option)}</button>`).join("")}</div>`
+    const sceneDropdown = sceneOptions.length
+      ? `<div class="scene-options marao-dropdown" data-scene-picker data-scene-identity="${esc(JSON.stringify([entity,sceneOptions]))}"><button type="button" data-scene-select aria-label="${esc(this._label(entity, config, state))}" aria-haspopup="menu" aria-expanded="false"${controlsDisabled ? " disabled" : ""}><span data-scene-label>${esc(entityStateLabel(state, entity, kind, this._hass))}</span><ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon></button><div class="marao-dropdown-options" data-scene-menu role="menu" aria-label="${esc(this._label(entity, config, state))}" hidden>${sceneOptions.map(option=>`<button type="button" role="menuitemradio" tabindex="-1" data-scene-option="${esc(option)}" aria-checked="${!controlsDisabled && option === value}"${controlsDisabled ? " disabled" : ""}><span>${esc(option)}</span><ha-icon icon="mdi:check" aria-hidden="true"></ha-icon></button>`).join('')}</div></div>`
       : "";
     const climateControls = currentTemperature ? `<div class="climate current-temperature" aria-label="${esc(climateReadingLabel)}">${esc(currentTemperature)}</div>` : "";
     const previewAvailable = !loading && !interactionUnavailable && this._hass?.connected !== false && this._hass?.connection?.connected !== false;
@@ -1628,7 +1675,7 @@ export class MaraoCard extends BaseElement {
     const formattedReading = !iconOnly && Boolean(formattedPrimary || formattedPower);
     const stateMarkup = showState && kind !== "hc_wallbox_current_card" ? `<div class="state">${esc(displayValue)}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null && kind !== "hc_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
+    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null && kind !== "hc_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
     this._syncCamera();
     this._activeHistoryPopup?._refreshHistory();
     for (const symbol of this.shadowRoot.querySelectorAll("ha-state-icon")) {
@@ -1652,6 +1699,7 @@ export class MaraoCard extends BaseElement {
       if (text(variables.graph_color).trim()) card.style.setProperty("--marao-graph-color", text(variables.graph_color).trim());
       if (text(variables.graph_background).trim()) card.style.setProperty("--marao-graph-background", text(variables.graph_background).trim());
     }
+    this._syncSceneDropdown(entity, controlsDisabled);
     if (contentChanged === false) {
       if (showsGraph) this._loadGraphHistory(graphEntity);
       return;
@@ -1794,12 +1842,6 @@ export class MaraoCard extends BaseElement {
       button.addEventListener("click", (event) => {
         event.stopPropagation();
         this._setNumberValue(entity, Number(button.getAttribute("data-current-shortcut")));
-      });
-    });
-    this.shadowRoot.querySelectorAll("[data-scene-option]").forEach((button) => {
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
-        this._selectSceneOption(entity, button.getAttribute("data-scene-option"));
       });
     });
     restoreFocus?.();
@@ -1948,6 +1990,25 @@ export class MaraoCard extends BaseElement {
     if (!serviceConnectionReady(this._hass) || !entity || !serviceTargetReady(this._hass, entity) || !stateOf(this._hass, entity).attributes?.hvac_modes?.includes(mode)) return;
     haptic("heavy");
     return this._callService("climate", "set_hvac_mode", { entity_id: entity, hvac_mode: mode });
+  }
+
+  _syncSceneDropdown(entity, disabled) {
+    const picker = this.shadowRoot.querySelector('[data-scene-picker]');
+    if (picker !== this._sceneDropdown?.element) { this._sceneDropdown?.destroy(); this._sceneDropdown = null; }
+    if (!picker) return;
+    const trigger = picker.querySelector('[data-scene-select]'), menu = picker.querySelector('[data-scene-menu]');
+    const state = stateOf(this._hass, entity), label = this._label(entity, this._config, state);
+    trigger.disabled = disabled; trigger.setAttribute('aria-label', label); menu.setAttribute('aria-label', label);
+    picker.querySelector('[data-scene-label]').textContent = entityStateLabel(state, entity, 'hc_scene_card', this._hass);
+    this._sceneDropdown ||= bindDropdown(picker, { trigger, menu,
+      choices: [...picker.querySelectorAll('[data-scene-option]')].map(button=>({button,value:button.getAttribute('data-scene-option')})),
+      value: () => stateOf(this._hass, entity).state, activeElement: () => this.shadowRoot.activeElement,
+      haptic: () => haptic('heavy'), onSelect: option => {
+        if (option === stateOf(this._hass, entity).state) { haptic('heavy'); return; }
+        this._selectSceneOption(entity, option);
+      },
+    });
+    this._sceneDropdown.sync();
   }
 
   _selectSceneOption(entity, option) {

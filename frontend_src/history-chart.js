@@ -23,8 +23,8 @@ const CSS = `
 .marao-history-chart .history-reading{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;padding:12px 0}
 .marao-history-chart .history-reading strong{font-size:1.4em}.marao-history-chart time{flex:1 1 18ch}
 .marao-history-chart .history-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
-.marao-history-chart button{font:inherit;min-width:48px;min-height:48px;flex:1 1 6ch;padding:10px 12px;border:1px solid var(--divider-color,#667085);border-radius:14px;background:var(--ha-card-background,var(--card-background-color,#fff));color:var(--primary-text-color);white-space:normal;overflow-wrap:anywhere;outline:none}
-.marao-history-chart button[aria-pressed=true]{background:var(--primary-color,#235b9c);color:var(--text-primary-color,#fff)}
+.marao-history-chart button{font:inherit;min-width:48px;min-height:48px;flex:1 1 6ch;padding:10px 12px;border:1px solid var(--divider-color,#7B8C91);border-radius:14px;background:var(--ha-card-background,var(--card-background-color,#fff));color:var(--primary-text-color);white-space:normal;overflow-wrap:anywhere;outline:none}
+.marao-history-chart button[aria-pressed=true]{background:var(--primary-color,#506F79);color:var(--text-primary-color,#fff)}
 .marao-history-chart button:disabled{opacity:.5}.marao-history-chart dl{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}
 .marao-history-chart dl>div{flex:1 1 12ch;min-width:0}.marao-history-chart dt{color:var(--secondary-text-color)}
 .marao-history-chart dd{margin:4px 0 0;font-weight:600}.marao-history-chart [hidden]{display:none!important}
@@ -40,7 +40,7 @@ const CSS = `
 .marao-history-chart .history-breakdown-layout>.history-donut{align-self:center}
 .marao-history-chart .history-comparison{list-style:none;padding:0;margin:16px 0}.marao-history-chart .history-comparison>div{display:flex;justify-content:space-between;align-items:baseline;gap:8px 16px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--divider-color)}.marao-history-chart .history-comparison .history-item-heading{flex:1 1 14ch}.marao-history-chart .history-comparison .history-item-problem{color:var(--secondary-text-color)}
 .marao-history-chart .history-donut::after{content:"";position:absolute;inset:24%;border-radius:50%;background:var(--ha-card-background,var(--card-background-color,#fff))}
-.marao-history-chart .history-breakdown ul{list-style:none;padding:0;margin:0}.marao-history-chart .history-breakdown li{padding:12px 0;border-bottom:1px solid var(--divider-color,#667085)}
+.marao-history-chart .history-breakdown ul{list-style:none;padding:0;margin:0}.marao-history-chart .history-breakdown li{padding:12px 0;border-bottom:1px solid var(--divider-color,#7B8C91)}
 .marao-history-chart .history-item-heading{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.marao-history-chart .history-item-heading strong{flex:1 1 12ch}
 .marao-history-chart .history-swatch{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
 .marao-history-chart .history-item-values{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:6px}.marao-history-chart .history-item-problem{color:var(--secondary-text-color)}
@@ -69,6 +69,7 @@ export function createHistoryChart(container, initial) {
   container.append(root);
   let options = initial, chart, selectedTime, reportedTime, hours=24, destroyed=false, visible=[], drawError, scrollFrame;
   const events = new AbortController();
+  const seriesColor = index => getComputedStyle(root).getPropertyValue(`--marao-chart-${index % 10 + 1}`).trim() || `hsl(${(210 + index * 137.5) % 360} 55% 48%)`;
   const language = () => options.hass?.locale?.language || options.hass?.language || 'en';
   const text = key => {const translated=options.localize?.(key);return translated&&translated!==key?translated:(language().startsWith('pt')?PT[key]:null)||key;};
   const formatter = () => new Intl.DateTimeFormat(language(), { timeZone:options.hass?.config?.time_zone || 'UTC',
@@ -108,7 +109,7 @@ export function createHistoryChart(container, initial) {
     const sum=items.reduce((total,item)=>total+(Number.isFinite(item.value)&&item.value>=0?item.value:0),0);
     const negative=items.some(item=>Number.isFinite(item.value)&&item.value<0);
     if(negative)make('p','',content).textContent=text('Negative values are excluded from shares.');
-    const color=index=>`hsl(${(210+index*137.5)%360} 55% 48%)`;
+    const color=seriesColor;
     const comparison=make('div',sum>0&&!negative?'history-breakdown-layout':'',content);
     if(sum>0&&!negative){
       let position=0;
@@ -136,8 +137,8 @@ export function createHistoryChart(container, initial) {
   const draw = () => {
     if (destroyed || options.unavailable || options.loading || options.error || drawError || plot.hidden || !visible.length) return;
     const bounds=plot.getBoundingClientRect();if(bounds.width<=0||bounds.height<=0)return;
-    const computed=getComputedStyle(root), tone=computed.color || '#233044', grid=computed.getPropertyValue('--divider-color').trim() || '#667085';
-    const color=options.color || computed.getPropertyValue('--primary-color').trim() || '#235b9c';
+    const computed=getComputedStyle(root), tone=computed.color || '#263338', grid=computed.getPropertyValue('--divider-color').trim() || '#7B8C91';
+    const color=options.color || options.series?.[0]?.color || computed.getPropertyValue('--primary-color').trim() || '#506F79';
     // Resolve theme variables through the DOM before passing a canvas color to Chart.js.
     const probe=make('span','',root);probe.style.color=color;const trace=getComputedStyle(probe).color;probe.remove();
     const data=options.bars ? visible.map((sample,index)=>({x:midpoint(sample,index),y:sample.value}))
@@ -162,7 +163,7 @@ export function createHistoryChart(container, initial) {
     if(options.power)for(const [index,item] of (options.series||[]).entries()){
       if(!index)continue;
       const points=reduceSamples((item.samples||[]).filter(sample=>sample.time>=currentRange.start&&sample.time<=currentRange.end),Math.max(32,Math.floor(bounds.width*2))).map(sample=>({x:sample.time,y:sample.value}));
-      datasets.push({type:'line',data:holdLastState(points),borderColor:item.color,borderWidth:2,pointRadius:0,spanGaps:false,tension:0,stepped:true,fill:false});
+      datasets.push({type:'line',data:holdLastState(points),borderColor:item.color||seriesColor(index),borderWidth:2,pointRadius:0,spanGaps:false,tension:0,stepped:true,fill:false});
     }
     const chartOptions={responsive:true,maintainAspectRatio:false,animation:false,parsing:false,normalized:true,devicePixelRatio:Math.min(globalThis.devicePixelRatio||1,3),events:['click'],
       onClick:event=>{
@@ -242,7 +243,7 @@ export function createHistoryChart(container, initial) {
       const rows=[];
       for(const [index,item] of options.series.entries()){
         const row=make('div'),heading=make('span','history-item-heading',row),swatch=make('span','history-swatch',heading);row.setAttribute('role','listitem');
-        swatch.style.background=item.color||options.color||'var(--primary-color)';swatch.setAttribute('aria-hidden','true');
+        swatch.style.background=item.color||(!index?options.color||'var(--primary-color)':seriesColor(index));swatch.setAttribute('aria-hidden','true');
         make('span','',heading).textContent=item.name;
         const sample=Number.isFinite(selectedTime)?powerStateAt(item.samples||[],selectedTime):null;
         const reading=make('span',item.problem?'history-item-problem':'',row);

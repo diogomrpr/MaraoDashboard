@@ -75,6 +75,8 @@ def compile_card(config, instance, url_path, entities=None, language="en", valid
         raise ValueError("Choose a supported native Marao card")
     if spec.get("runtime_type"):
         runtime = {**deepcopy(config), "type": spec["runtime_type"]}
+        if spec["id"] == "navbar" and "show_cache_reset" in runtime and not isinstance(runtime["show_cache_reset"], bool):
+            raise ValueError("Show cache reset button must be a boolean.")
         if spec["id"] == "navbar" and not isinstance(runtime.get("routes", []), list):
             raise ValueError("Navigation routes must be a list")
         if spec["id"] == "navbar" and any(not isinstance(route, dict) or not isinstance(route.get("url") or route.get("path"), str)

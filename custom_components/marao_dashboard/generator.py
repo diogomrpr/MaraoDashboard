@@ -430,6 +430,9 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     dashboard_config_version(config)
     config = deepcopy(config)
 
+    if "show_cache_reset" in config and not isinstance(config["show_cache_reset"], bool):
+        raise ValueError("Show cache reset button must be a boolean.")
+
     name = str(config.get("name") or "").strip()
     if not name:
         raise ValueError("Dashboard configuration requires a non-empty name")
@@ -1583,6 +1586,7 @@ def _navigation_bar(config: dict[str, Any], dashboard_key: str, language: str = 
             {
                 "type": "custom:marao-navbar-card",
                 "routes": routes,
+                **({"show_cache_reset": config["show_cache_reset"]} if "show_cache_reset" in config else {}),
             },
         ],
     }
@@ -2356,7 +2360,8 @@ def _page_navigation_bar(config, dashboard_key, language="en"):
             routes.append(route)
         else:
             routes.append(deepcopy(entry))
-    return {"type": "vertical-stack", "cards": [{"type": "custom:marao-navbar-card", "routes": routes}]}
+    return {"type": "vertical-stack", "cards": [{"type": "custom:marao-navbar-card", "routes": routes,
+            **({"show_cache_reset": config["show_cache_reset"]} if "show_cache_reset" in config else {})}]}
 
 
 def _page_assets(config, include_root, dashboard_key, language="en"):

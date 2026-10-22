@@ -10,6 +10,31 @@ from custom_components.marao_dashboard import generator as g
 SOURCE = json.loads((Path(__file__).parents[2] / "frontend/canonical-pages.fixture.json").read_text())
 
 
+@pytest.mark.parametrize("version", [0, 1, 2])
+@pytest.mark.parametrize("setting", [None, False, True])
+def test_cache_reset_option_preserves_legacy_defaults_and_explicit_choices(version, setting):
+    source = {"name": "Safe", "rooms": [], "future": {"keep": []}}
+    if version == 1:
+        source["config_version"] = 1
+    elif version == 2:
+        source = {**deepcopy(SOURCE), "future": {"keep": []}}
+    if setting is not None:
+        source["show_cache_reset"] = setting
+    original = deepcopy(source)
+    normalized = g.normalize_config(source)
+    navbar = g._navigation_bar(normalized, "marao-dashboard")["cards"][0]
+    if setting is None:
+        assert "show_cache_reset" not in navbar
+        assert "show_cache_reset" not in normalized
+    else:
+        assert navbar["show_cache_reset"] is setting
+    assert normalized["future"] == {"keep": []}
+    assert source == original
+    for invalid in ("false", None, 0, []):
+        with pytest.raises(ValueError, match="must be a boolean"):
+            g.normalize_config({**source, "show_cache_reset": invalid})
+
+
 @pytest.mark.parametrize("members", [[], [
     {"entity_id": "sensor.heating_energy", "name": "Heating", "cost_entity": "sensor.heating_cost", "future": []},
     {"entity_id": "sensor.lighting_energy", "name": ""},

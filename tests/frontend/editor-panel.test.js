@@ -61,6 +61,27 @@ const canonical = () => ({ config_version: 2, name: 'Safe', landing_page: 'home'
   { name: 'Office', path: 'office', entities: [{ page: 'home', name: 'Back home' }], cards: [{ type: 'markdown', content: 'Saved note' }] },
 ] });
 
+test('General cache reset toggle preserves its default, explicit false and unrelated settings', () => {
+  for (const source of [{name:'Legacy',rooms:[]}, canonical()]) {
+    const p=panel({...source,future:{keep:[]}}), before=p._source();
+    let form;
+    p._mountForm=(host,data,schema,changed)=>{form={data,schema,changed};};
+    p._mountGeneralForm({});
+    assert.equal(form.data.show_cache_reset,true);
+    assert.equal(p._source(),before,'Opening General must not write a default');
+    assert.deepEqual(JSON.parse(JSON.stringify(form.schema.find(field=>field.name==='show_cache_reset').selector)),{boolean:{}});
+    form.changed({...form.data,show_cache_reset:false});
+    const saved=JSON.parse(p._source());
+    assert.equal(saved.show_cache_reset,false);
+    assert.deepEqual(saved.future,{keep:[]});
+    p._mountGeneralForm({});assert.equal(form.data.show_cache_reset,false);
+    assert.ok(!model.validateConfig(saved,2).some(error=>error.includes('cache reset')));
+    assert.ok(model.validateConfig({...saved,show_cache_reset:'false'},2).some(error=>error.includes('must be a boolean')));
+  }
+  const schema=model.buildJsonSchema({cards:[],pages:{},config_version:2},[]);
+  assert.equal(schema.allOf[0].then.properties.show_cache_reset.type,'boolean');
+});
+
 test('unchanged Visual/JSON switching retains exact text, model history and view state', async () => {
   const p = panel(canonical()); p._loaded = true; p._tab = 'json'; p.isConnected = true;
   p._catalog = { config_version: 2, cards: [], pages: {} };

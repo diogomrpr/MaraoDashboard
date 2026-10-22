@@ -12,6 +12,9 @@ Codex uses the project `marao-testing` skill to apply this policy. See the
 for task routing; the selector and evidence validator remain the source of check
 selection, not a duplicate list inside the skill.
 
+The synthetic slow-camera/HLS stress validation is retired at the user's request.
+Do not run it or reintroduce it into verification plans; retain historical reports.
+
 ## Default: deliver, then hand off visual testing
 
 The repository contract's **Verification policy: minimal by default** controls

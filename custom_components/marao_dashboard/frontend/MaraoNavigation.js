@@ -49,6 +49,7 @@ export const navigationTranslations = {
     "navigation.loading_error": "Dashboard content could not load",
     "navigation.card_name": "Navbar",
     "navigation.invalid_routes": "Navigation routes must be a list",
+    "navigation.invalid_refresh": "Show cache reset button must be a boolean.",
     "navigation.invalid_entry": "Navigation entries require a destination and label",
     "navigation.invalid_native": "Native card configuration must be an object"
   },
@@ -70,6 +71,7 @@ export const navigationTranslations = {
     "navigation.loading_error": "Não foi possível carregar o conteúdo do painel",
     "navigation.card_name": "Barra de navegação",
     "navigation.invalid_routes": "Os destinos de navegação têm de ser uma lista",
+    "navigation.invalid_refresh": "Mostrar botão de limpeza da cache tem de ser um valor booleano.",
     "navigation.invalid_entry": "Os destinos de navegação precisam de um destino e etiqueta",
     "navigation.invalid_native": "A configuração do cartão nativo tem de ser um objeto"
   }
@@ -128,6 +130,7 @@ export class MaraoNavbarCard extends BaseElement {
   constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._slots = 1; }
   setConfig(config) {
     const routes = config?.routes === undefined ? [] : config.routes;
+    if (config && Object.hasOwn(config, 'show_cache_reset') && typeof config.show_cache_reset !== 'boolean') throw new Error(localize('navigation.invalid_refresh', this._hass));
     if (!Array.isArray(routes)) throw new Error(localize("navigation.invalid_routes", this._hass));
     if (routes.some(route => !route || typeof route !== 'object' || Array.isArray(route)
       || typeof (route.url || route.path) !== 'string' || !(route.url || route.path).trim()
@@ -296,7 +299,7 @@ export class MaraoNavbarCard extends BaseElement {
   }
   _syncPageRefresh() {
     const view = this._view(), lovelace = this._root()?.lovelace;
-    if (!this.isConnected || this._surface || this.preview || this._editing || lovelace?.editMode || !view
+    if (!this.isConnected || this._surface || this.preview || this._editing || this._config?.show_cache_reset === false || lovelace?.editMode || !view
       || !navbarMainPage(lovelace?.config || lovelace?.rawConfig)) {
       this._pageRefresh?.remove(); return;
     }

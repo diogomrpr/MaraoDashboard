@@ -60,37 +60,75 @@ token that expresses the role:
 | Divider | `--divider-color` |
 | Warning, error, success | `--warning-color`, `--error-color`, `--success-color` |
 
-The domain palette is:
+## Marão landscape palette
+
+Marao takes its name from Serra do Marão in Portugal. The expanded palette draws
+on 15 photographs across spring, summer, autumn and winter: heather and carqueja,
+forest and rivers, autumn copper, snowy ridges and mist. See the
+[seasonal study, swatches and source credits]({{ '/docs/development/seasonal-palette.html' | relative_url }}).
+Raw photo samples are recorded separately from the UI colors, which are adjusted
+for readable light/dark pairings. Photographs are not bundled into the dashboard.
+
+| Role | Light | Dark |
+|:--|:--|:--|
+| Page — Névoa / deep Xisto | `#F3F3EE` | `#151D21` |
+| Surface | `#FFFFFF` | `#1D292E` |
+| Inactive card | `#E7ECEA` | `#27353B` |
+| Primary text | `#263338` | `#F1F3EC` |
+| Secondary text | `#58696E` | `#B4C1C3` |
+| Primary — Encosta | `#506F79` | `#A6C2CB` |
+| Foreground on primary | `#FFFFFF` | `#17282E` |
+
+Most surfaces stay mineral and neutral. Slate blue identifies primary controls
+and selected navigation. Supporting colors remain restrained and retain their
+semantic state roles:
 
 | Token | Value | Typical state |
 |:--|:--|:--|
-| `--color-green` | `#3F7E4B` | safe, switch, climate fan |
-| `--color-red` | `#C54C46` | heat, open access, alarm |
-| `--color-blue` | `#7BADE6` | light, fan, cover, cool |
-| `--color-yellow` | `#F2A84A` | dry, warning |
-| `--color-purple` | `#8A5A7B` | heat/cool |
-| `--color-gold` | `#FFD479` | automatic climate |
+| `--color-green` — Pinhal | `#39755B` | safe, switch, climate fan |
+| `--color-red` — Terra | `#A34F48` | heat, open access, alarm |
+| `--color-blue` — Céu | `#ADCBD8` | light, fan, cover, cool |
+| `--color-yellow` — Carqueja | `#D6B45C` | dry, low battery |
+| `--color-orange` — Cobre | `#D69A63` | moving access, arming, vacuum returning |
+| `--color-purple` — Urze | `#8E5B83` | heat/cool, media |
+| `--color-gold` — Palha | `#E2CD91` | automatic climate |
+| `--color-peach` — Pêssego | `#E2B5A5` | existing warm surface compatibility |
 
-State colors belong in the shared Marao state mapping. Do not reproduce that
-mapping in a generated card. Active cards pair their background with readable
-text and icon treatment; inactive, loading, disabled, unknown, and unavailable
-states remain distinct. Never communicate a state by color alone.
+State colors belong in the shared Marao state mapping. Active primary/room
+surfaces use the paired primary foreground; pale blue, ochre, copper, gold and peach
+state surfaces use dark text; forest-green, red and heather surfaces use white text.
+Inactive, loading, disabled, unknown and unavailable states remain distinct.
+Never communicate a state by color alone.
 
-The blue palette follows the supplied dashboard reference: soft blue active
-cards, pale blue icon backgrounds and tracks, and white controls. Labels retain
-a dark foreground for readable contrast on the lighter blue. Light-mode neutral
-surfaces use cool whites and grays; dark mode retains its navy surfaces.
-The primary accent uses deeper blue in light mode and soft blue in dark mode;
-its labels and icons use the paired foreground so both remain readable. Dark
-dividers and timeline segments use lighter slate against the navy surfaces.
+### Charts and sliders
 
-Value sliders share a pale blue track (`#AAC9EF`), near-white confirmed fill
-(`#EFF6FF`), and white thumb across both modes. Persistent blue boundaries
-(`#284D7D`) distinguish the track, fill, and independently moving thumb without
-changing their geometry. Track, fill and thumb share a vector drawing with
-consistent 1px strokes; a transparent native range handles input above it.
-The card, track, fill, and thumb each retain a separate background. Disabled
-fills stay neutral.
+`--marao-chart-1` through `--marao-chart-10` supply the shared sequence below.
+Power lines, legends and energy donuts resolve the same tokens. Explicit chart
+colors remain supported; non-Marao themes retain the existing generated fallback.
+After ten series the theme sequence repeats, so labels remain essential.
+
+| Series | Family | Light | Dark |
+|:--|:--|:--|:--|
+| 1 | Encosta / slate | `#506F79` | `#A6C2CB` |
+| 2 | Urze / heather | `#8E5B83` | `#CCA2C4` |
+| 3 | Pinhal / forest | `#39755B` | `#91C9AA` |
+| 4 | Carqueja / ochre | `#947023` | `#E2CD91` |
+| 5 | Cobre / earth | `#A15F43` | `#DDA582` |
+| 6 | Pedra / stone | `#79776D` | `#C1BCAF` |
+| 7 | Ribeira / teal | `#317F7B` | `#80C6C0` |
+| 8 | Inverno / blue | `#5476A4` | `#9FBCE8` |
+| 9 | Rosa / rose | `#AD4E6C` | `#E49FB4` |
+| 10 | Lilás / lilac | `#77659F` | `#B9ACE0` |
+
+Chart colors are deeper in light mode and lighter in dark mode to retain 3:1
+contrast against the page, popup and card surfaces. State backgrounds have their
+own foreground pairing; a pale card fill is not automatically a suitable chart line.
+
+Value sliders share a pale mineral track (`#B4C7C9`), Névoa confirmed fill
+(`#F3F3EE`) and white thumb across both modes. Persistent slate boundaries
+(`#415C65`) distinguish track, fill and the independently moving thumb, including
+on pale active cards. Their geometry, transparent native range input and feedback
+remain unchanged. Disabled fills stay neutral (`#D8DFDB`).
 
 ## Contrast and shape
 

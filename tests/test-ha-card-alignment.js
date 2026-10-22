@@ -50,7 +50,7 @@ async function checkControlContrast(page) {
 async function checkTextScaling(page) {
   const normal = scenarios.find((scenario) => scenario.name === "iphone-normal");
   const enlarged = scenarios.find((scenario) => scenario.name === "iphone-bold-text-200");
-  const measure = () => page.locator(".scene-options button,.wallbox-stepper .number-value,marao-energy-period-card .value,marao-energy-period-card .empty,.body.title-card .title,.current-temperature,.graph-card .state").evaluateAll((elements) =>
+  const measure = () => page.locator(".scene-options > [data-scene-select],.wallbox-stepper .number-value,marao-energy-period-card .value,marao-energy-period-card .empty,.body.title-card .title,.current-temperature,.graph-card .state").evaluateAll((elements) =>
     elements.map((element) => ({ label: element.textContent.trim(), size: parseFloat(getComputedStyle(element).fontSize) })));
   await page.setViewportSize({ width: 390, height: 844 });
   await applyVisualPreferences(page, normal, "light");

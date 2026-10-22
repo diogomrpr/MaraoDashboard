@@ -28,6 +28,18 @@ test('inferred generated staging is not a source identity, while source and expl
   write('ha-test/.cache/dist/package.js','explicit input changed');assert.notEqual(checkIdentity(explicit,directory),before,'Explicit check inputs remain binding');
 });
 
+test('camera plans exclude the retired slow validation and retain normal playback checks', () => {
+  const selection = selectComponents([], ['camera']);
+  for (const options of [{}, { full: true }]) {
+    const checks = checksFor(selection, options);
+    assert.ok(!checks.some(check => check.id.startsWith('camera:slow') || check.command.includes('--camera-slow-only')));
+    for (const id of ['camera', 'camera:streams', 'camera:streams:webkit', 'camera:webkit']) {
+      assert.ok(checks.some(check => check.id === id), id + ' remains available');
+    }
+    assert.ok(!checks.some(check => check.inputs.includes('tests/camera-slow-native-checks.js')));
+  }
+});
+
 test('frontend refresh scope covers recovery, native/navbar ownership and alignment without fixture resets', () => {
   const selection = selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js',
     'custom_components/marao_dashboard/frontend/MaraoFrontendRefresh.js', 'tests/test-ha-card-alignment.js',

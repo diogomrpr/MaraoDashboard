@@ -1,3 +1,4 @@
+import { bindDropdown, dropdownStyles } from '../custom_components/marao_dashboard/frontend/MaraoDropdown.js';
 import { normalizeSamples, periodRange, reduceSamples } from './history-data.js';
 
 export function powerStateAt(samples, time) {
@@ -45,17 +46,10 @@ export async function loadPowerPeriod({ hass, ids, range, timeZone, convert, isC
   return { series, errors };
 }
 
-const CSS = `
+const CSS = `${dropdownStyles}
+
 :host{display:block;min-width:0;font-family:var(--primary-font-family,Montserrat,sans-serif);color:var(--primary-text-color)}
 .power-toolbar{position:sticky;top:var(--marao-popup-header-height,0px);z-index:1;display:grid;gap:8px;padding:8px 0 12px;background:var(--ha-card-background,var(--card-background-color))}
-.power-picker{position:relative;min-width:0}
-.power-picker button{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;width:100%;min-width:0;padding:12px;border:0;border-radius:12px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;text-align:start;cursor:pointer;overflow-wrap:anywhere}
-.power-picker ha-icon{flex:0 0 24px;--mdc-icon-size:24px;pointer-events:none}
-.power-picker button:active:not(:disabled){transform:scale(.98)}
-.power-options{position:absolute;inset:calc(100% + 4px) 0 auto;z-index:2;display:grid;gap:4px;padding:4px;border-radius:16px;background:var(--ha-card-background,var(--card-background-color));box-shadow:0 4px 16px var(--opacity-contrast-200,rgba(0,0,0,.2))}
-.power-options[hidden]{display:none}
-.power-options button[aria-checked=true]{box-shadow:inset 0 0 0 2px var(--primary-color);font-weight:var(--font-weight-primary,700)}
-.power-options button[aria-checked=false] ha-icon{visibility:hidden}
 .power-navigation{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;gap:8px;text-align:center}
 .power-navigation strong{overflow-wrap:anywhere;font-size:var(--font-size-primary,1.125rem)}
 .power-navigation button{display:grid;place-items:center;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:var(--secondary-background-color);color:inherit;font:inherit;cursor:pointer}
@@ -70,11 +64,11 @@ export function createPowerHistory(host, initial, createChart) {
   let prefetchFrame, prefetchTimer, background;
   const make = (tag, parent, className) => { const node = document.createElement(tag); if (className) node.className = className; parent.append(node); return node; };
   const style = make('style', host); style.textContent = CSS;
-  const toolbar = make('div', host, 'power-toolbar'), picker = make('div', toolbar, 'power-picker');
+  const toolbar = make('div', host, 'power-toolbar'), picker = make('div', toolbar, 'power-picker marao-dropdown');
   const trigger = make('button', picker), selectedLabel = make('span', trigger), chevron = make('ha-icon', trigger);
   trigger.type = 'button'; trigger.setAttribute('aria-haspopup', 'menu'); trigger.setAttribute('aria-expanded', 'false');
   chevron.setAttribute('icon','mdi:chevron-down'); chevron.setAttribute('aria-hidden','true');
-  const menu = make('div', picker, 'power-options'); menu.setAttribute('role','menu'); menu.hidden = true;
+  const menu = make('div', picker, 'power-options marao-dropdown-options'); menu.setAttribute('role','menu'); menu.hidden = true;
   const choices = ['day','week','month'].map(value => {
     const button = make('button', menu), label = make('span', button), check = make('ha-icon', button);
     button.type = 'button'; button.tabIndex = -1; button.setAttribute('role','menuitemradio');
@@ -115,7 +109,7 @@ export function createPowerHistory(host, initial, createChart) {
     trigger.setAttribute('aria-label', `${text('power.period')}: ${selectedLabel.textContent}`);
     menu.setAttribute('aria-label', text('power.period'));
     for (const item of choices) { item.label.textContent = text(`power.${item.value}`); item.button.disabled = trigger.disabled; item.button.setAttribute('aria-checked', String(item.value === period)); }
-    if (trigger.disabled) setPicker(false);
+    dropdown.sync();
     previous.setAttribute('aria-label', text(`power.previous_${period}`)); next.setAttribute('aria-label', text(`power.next_${period}`));
     const mapped = sources().map((source, index) => {
       const sourceUnit=state(source.entity_id)?.attributes?.unit_of_measurement;
@@ -123,7 +117,7 @@ export function createPowerHistory(host, initial, createChart) {
       const raw = data?.series[source.entity_id] || [];
       const samples = problem || unavailable ? [] : raw.map(sample => ({ ...sample, value: sample.value === null ? null : display(sample.value) }));
       return { id: source.entity_id, name: source.name || state(source.entity_id)?.attributes?.friendly_name || source.entity_id,
-        samples, color: index ? `hsl(${(210 + index * 137.5) % 360} 55% 48%)` : options.graph_color, problem: problem ? text(problem) : '' };
+        samples, color: index ? undefined : options.graph_color, problem: problem ? text(problem) : '' };
     });
     const incompatible = options.convert(1, 'W', unit())?.error;
     chart.update({ samples: mapped[0]?.samples || [], series: mapped, power: true, range: interval, recordedUntil: Math.min(+interval.end,now()), windows: false, unit: unit(), hass: options.hass,
@@ -243,33 +237,14 @@ export function createPowerHistory(host, initial, createChart) {
     } catch { if (!destroyed && request === current) error = true; }
     if (!destroyed && request === current) { loading = false; render(); if (!error && !Object.keys(data.errors).length) schedulePrefetch(); }
   }
-  function setPicker(open, focus = false) {
-    menu.hidden = !open;
-    trigger.setAttribute('aria-expanded', String(open));
-    if (focus) (open ? choices.find(item => item.value === period).button : trigger).focus({ preventScroll: true });
-  }
-  trigger.addEventListener('click', () => { if (!trigger.disabled) { haptic(); setPicker(menu.hidden, true); } }, { signal: events.signal });
-  trigger.addEventListener('keydown', event => {
-    if (!trigger.disabled && ['ArrowDown','ArrowUp'].includes(event.key)) { event.preventDefault(); event.stopPropagation(); setPicker(true, true); }
-  }, { signal: events.signal });
-  for (const item of choices) item.button.addEventListener('click', () => {
-    if (item.button.disabled) return;
-    haptic(); setPicker(false, true);
-    if (period === item.value) return;
-    period = item.value; selectedStart = undefined; loadedKey = ''; load();
-  }, { signal: events.signal });
-  picker.addEventListener('keydown', event => {
-    if (menu.hidden) return;
-    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setPicker(false, true); }
-    else if (event.key === 'Tab') { event.preventDefault(); setPicker(false); (event.shiftKey ? trigger : previous).focus({ preventScroll: true }); }
-    else if (['ArrowDown','ArrowUp','Home','End'].includes(event.key)) {
-      event.preventDefault();
-      const index = choices.findIndex(item => item.button === host.activeElement);
-      const target = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowDown' ? 1 : 2)) % 3;
-      choices[target].button.focus({ preventScroll: true });
-    }
-  }, { signal: events.signal });
-  globalThis.document.addEventListener?.('pointerdown', event => { if (!event.composedPath().includes(picker)) setPicker(false); }, { signal: events.signal, capture: true });
+  const dropdown = bindDropdown(picker, { trigger, menu, choices, value: () => period,
+    activeElement: () => host.activeElement, haptic,
+    onTab: backwards => (backwards ? trigger : previous).focus({ preventScroll: true }),
+    onSelect: value => {
+      haptic(); if (period === value) return;
+      period = value; selectedStart = undefined; loadedKey = ''; load();
+    },
+  });
   for (const [button, direction] of [[previous, -1], [next, 1]]) button.addEventListener('click', () => {
     if (button.disabled) return; haptic(); selectedStart = periodRange(range().start, direction, period, zone()).start;
     if(+selectedStart===+periodRange(now(),0,period,zone()).start)selectedStart=undefined;
@@ -283,6 +258,6 @@ export function createPowerHistory(host, initial, createChart) {
       if (priorIds !== JSON.stringify(sources().map(source => source.entity_id))) { loadedKey = ''; cache.clear(); }
       captureLive();load();
     },
-    destroy() { if(destroyed)return; destroyed = true; request++; cancelPrefetch(); cache.clear(); probeTime=undefined; events.abort(); chart.destroy(); style.remove(); toolbar.remove(); content.remove(); },
+    destroy() { if(destroyed)return; destroyed = true; request++; cancelPrefetch(); cache.clear(); probeTime=undefined; events.abort(); dropdown.destroy(); chart.destroy(); style.remove(); toolbar.remove(); content.remove(); },
   };
 }

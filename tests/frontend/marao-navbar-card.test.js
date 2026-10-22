@@ -237,6 +237,8 @@ test('main-page cache recovery belongs to scrollable page flow and cleans up on 
     assert.equal(currentView.children[0],row);
     assert.doesNotMatch(row.shadowRoot.innerHTML,/position:(?:fixed|sticky|absolute)/);
     sync();assert.equal(currentView.children.length,1);
+    owner._config={show_cache_reset:false};sync();assert.equal(currentView.children.length,0,'Disabling the button removes its entire spacing row');
+    owner._config.show_cache_reset=true;sync();assert.equal(currentView.children[0],row);
     button.dispatchEvent(new Event('click'));assert.equal(calls,1);
     eligible=false;button.dispatchEvent(new Event('click'));assert.equal(calls,1);
     eligible=true;inert=true;button.dispatchEvent(new Event('click'));assert.equal(calls,1);inert=false;
