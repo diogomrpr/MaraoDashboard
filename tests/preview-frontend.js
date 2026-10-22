@@ -58,7 +58,7 @@ function previewRoute(dashboard, families) {
     const visit = card => {
       if (!card || typeof card !== 'object') return;
       if (card.type === 'conditional' || card.type === 'custom:marao-popup-card' || card.visibility?.length) { count++; return; }
-      if (['vertical-stack', 'horizontal-stack', 'grid'].includes(card.type)) { (card.cards || []).forEach(visit); return; }
+      if (['vertical-stack', 'horizontal-stack', 'grid', 'custom:marao-control-grid'].includes(card.type)) { (card.cards || []).forEach(visit); return; }
       count++;
       if (card.type === 'custom:marao-card') found.add(card.template);
       else if (card.type?.startsWith('custom:marao-')) found.add(card.type.slice('custom:'.length));

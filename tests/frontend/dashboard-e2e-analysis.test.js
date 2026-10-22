@@ -130,7 +130,8 @@ test('title geometry rejects rounded-corner clipping while retaining narrow cont
 
 test('compact header geometry permits contained wrapping only below the reference card width', async () => {
   const cases = [
-    { name: 'reference adjacent', width: 172, copy: [8,14,88,34], icon: [108,0,156,48], head: [8,0,164,48], valid: true },
+    { name: 'reference adjacent', width: 172, copy: [8,0,88,20], icon: [108,0,156,48], head: [8,0,164,48], valid: true },
+    { name: 'old centered copy', width: 172, copy: [8,14,88,34], icon: [108,0,156,48], head: [8,0,164,48], valid: false },
     { name: 'constrained wrapped', width: 75, copy: [8,8,67,28], icon: [8,36,56,84], head: [8,8,67,84], valid: true },
     { name: 'reference wrapped', width: 172, copy: [8,8,164,28], icon: [8,36,56,84], head: [8,8,164,84], valid: false },
     { name: 'enlarged text wrapped', width: 172, fontSize: 36, copy: [8,8,164,28], icon: [8,36,56,84], head: [8,8,164,84], valid: true },
@@ -220,27 +221,33 @@ test('history loading gate holds only the exact safe native GET, preserves reque
   await gate.dispose();assert.equal(removed,true);
 });
 
-test('history checks release controlled loading before waiting for idle and retain the repeated-request guard', async () => {
+test('history checks release loading, await nearby prefetch and reject warm-cache retry loops', async () => {
   const { manifest } = require('../../ha-test/cases');
   for (const repeated of [false, true]) {
-    let settled = false, released = false, loadingReads = 0;
+    let settled = false, released = false, loadingReads = 0, record, releasedListener = false;
     const elements = manifest.historyCases.flatMap(example => ['Graph', 'Energy', 'Timeline'].map(label => ({
-      _config: { name: `${label} history · ${example.id}` },
+      _config: { name: `${label} history · ${example.id}` }, _hass: {},
       shadowRoot: { querySelector: () => ({ dataset: { historyState: example.expectedStatus === 'loading' && settled ? 'ready' : example.expectedStatus } }) },
     })));
     const environment = vm.createContext({ document: { querySelectorAll: selector => selector === '*' ? [] : elements }, URL,
-      performance: { getEntriesByType: () => repeated ? Array.from({ length: 4 }, () => ({ name: 'http://homeassistant.test/history?filter_entity_id=' + manifest.historyCases[0].entity })) : [] } });
+      requestAnimationFrame: callback => callback() });
     const run = (callback, arg) => vm.runInContext('(' + callback.toString() + ')', environment)(arg);
     const page = {
       __historyLoadingGate: { release() { assert.equal(loadingReads,3); assert.equal(settled,false); released=true; } },
-      locator: () => ({ evaluateAll: async (callback, arg) => { assert.equal(settled, false); loadingReads++; return callback(elements, arg); } }),
-      waitForFunction: async (callback, arg) => { assert.equal(run(callback, arg), true); },
-      waitForLoadState: async state => { assert.equal(state, 'networkidle'); assert.equal(loadingReads, 3); assert.equal(released,true,'Idle must never wait on the controlled pending requests'); settled = true; },
+      locator: () => ({ evaluateAll: async (callback, arg) => {
+        if (typeof arg === 'string') { assert.equal(settled, false); loadingReads++; }
+        else if (repeated) record({ url: () => 'http://homeassistant.test/api/history/period/current?filter_entity_id=' + manifest.historyCases[0].entity });
+        return callback(elements, arg);
+      } }),
+      waitForFunction: async (callback, arg) => { if (released) settled = true; assert.equal(run(callback, arg), true); },
+      waitForLoadState: async () => assert.fail('Continuous camera streams must not block history readiness'),
+      on: (event, callback) => { assert.equal(event, 'request'); record = callback; },
+      off: (event, callback) => { assert.equal(event, 'request'); assert.equal(callback, record); releasedListener = true; },
       evaluate: async (callback, arg) => run(callback, arg),
     };
-    if (repeated) await assert.rejects(() => checkHistoryCases(page), /4 history requests for three cards/);
+    if (repeated) await assert.rejects(() => checkHistoryCases(page), /Settled history requested again/);
     else await checkHistoryCases(page);
-    assert.equal(settled, true);
+    assert.equal(settled, true); assert.equal(releasedListener, true);
   }
 });
 
@@ -314,6 +321,8 @@ test("installed card counts exclude inactive conditional descendants", () => {
   );
 
   assert.deepEqual(view.configuredCounts, { "marao-card": 2 });
+  const sectioned = { views: [{ path: 'card-test', sections: [{ cards: dashboard.views[0].cards }] }] };
+  assert.deepEqual(buildViewChecks(sectioned, '/marao-dashboard/overview', { 'light.active': 'on', 'light.inactive': 'off' })[0].configuredCounts, view.configuredCounts);
 });
 
 test("missing card checks retain direct and active conditional assertions", () => {
@@ -357,6 +366,8 @@ test("dashboard navigation stays in one dashboard and resolves every target", ()
   };
 
   assert.deepEqual(dashboardNavigationViolations(config, "marao-dashboard"), []);
+  config.views[0].cards[2].type = 'custom:marao-native-popup-card';
+  assert.deepEqual(dashboardNavigationViolations(config, "marao-dashboard"), [], 'Native popup wrappers own their hash too');
   config.views[0].cards[0].routes.push({ url: "/another-dashboard/home" });
   config.views[0].cards[1].tap_action.navigation_path = "#missing";
   assert.deepEqual(dashboardNavigationViolations(config, "marao-dashboard"), [

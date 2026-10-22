@@ -62,3 +62,19 @@ in three columns/two rows, with every local app image loaded. No helper state wa
 changed by that inspection. Native iPhone appearance and service taps remain
 unchecked; broader matrices/publication were not requested. Saved configuration,
 source aliases, custom colors, dispatch and unrelated work were preserved.
+
+## Follow-up: compact Android capacity
+
+- [x] Share a 120px/six-times-font capacity floor across CSS and runtime grids,
+  preserving preferred columns, app-logo capacity, mounted controls and icon sizes.
+- [x] Update independent width/text boundary expectations and layout documentation.
+- [x] Install on disposable HA and inspect a representative Android layout.
+
+All 11 control-grid unit tests pass, including 248px at 18px/20px text, 272px at
+22px text, narrower one-column fallback and 200% text reflow. The existing local
+browser expectations were updated and syntax checked; its broader matrix was
+not run. Installed assets/readiness passed. The real Rooms page in a 360px Android
+browser viewport, with temporary preview typography increased to 22px primary,
+retained two 157px columns, a fully wrapped long room name and a 48px lights-off
+button. Room artwork retained its configured size. No saved configuration or
+helper state changed; physical-phone verification remains with the user.

@@ -17,7 +17,7 @@ for (const spec of catalog.cards) test(spec.label + ": editing a controlled fiel
   const result = patchForm(original, fields, data, { ...data, name: "New" });
   assert.deepEqual(original, exact);
   assert.deepEqual(result, { ...exact, name: "New" });
-  for (const option of spec.variables.filter(option => !["number_list", "vacuum_action", "energy_sub_entities"].includes(option.kind)))
+  for (const option of spec.variables.filter(option => !["number_list", "vacuum_action", "energy_sub_entities", "power_devices"].includes(option.kind)))
     assert.ok(fields.some(field => field.path === "variables." + option.key), "Missing native form option: " + option.key);
 });
 

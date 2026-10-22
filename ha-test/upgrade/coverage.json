@@ -3,6 +3,8 @@
   "catalog": {
     "hc_camera_card": {
       "options": [
+        "popup_stream_entity",
+        "preload_stream",
         "popup_hash",
         "event_provider",
         "frigate_camera",
@@ -14,7 +16,10 @@
         "generation",
         "builder-model",
         "content",
-        "card-runtime"
+        "card-runtime",
+        "camera-live-runtime",
+        "netatmo-metadata",
+        "camera-runtime"
       ]
     },
     "hc_light_card": {
@@ -206,6 +211,7 @@
         "graph_color",
         "graph_background",
         "history_popup",
+        "power_devices",
         "popup_hash",
         "display_unit",
         "display_precision"
@@ -214,7 +220,8 @@
         "page-generation",
         "page-model",
         "content",
-        "card-runtime"
+        "card-runtime",
+        "power-history-runtime"
       ]
     },
     "hc_toggle_graph_card": {
@@ -329,7 +336,11 @@
       ]
     },
     "hc_access_hold_action_card": {
-      "options": [],
+      "options": [
+        "action_color",
+        "action_label",
+        "action_label_key"
+      ],
       "checks": [
         "page-generation",
         "page-model",
@@ -341,6 +352,9 @@
       "options": [
         "card_color",
         "custom_label",
+        "action_color",
+        "action_label",
+        "action_label_key",
         "display_unit",
         "display_precision"
       ],
@@ -354,6 +368,9 @@
     "hc_energy_period_card": {
       "options": [
         "period",
+        "calculate_cost",
+        "cost_per_kwh",
+        "sub_entities",
         "popup_hash",
         "display_unit",
         "display_precision"
@@ -367,7 +384,10 @@
     },
     "hc_media_app_card": {
       "options": [
-        "app_source"
+        "app_source",
+        "action_color",
+        "action_label",
+        "action_label_key"
       ],
       "checks": [
         "page-generation",
@@ -377,12 +397,79 @@
       ]
     },
     "hc_access_slide_action_card": {
-      "options": [],
+      "options": [
+        "action_color",
+        "action_label",
+        "action_label_key"
+      ],
       "checks": [
         "page-generation",
         "page-model",
         "content",
         "card-runtime"
+      ]
+    },
+    "hc_alarm_controls_card": {
+      "checks": [
+        "page-generation",
+        "native-cards-runtime",
+        "security-runtime",
+        "content"
+      ],
+      "options": []
+    },
+    "hc_header_card": {
+      "checks": [
+        "page-generation",
+        "page-model",
+        "native-cards-runtime",
+        "content"
+      ],
+      "options": [
+        "person_entity",
+        "air_quality_sensor"
+      ]
+    },
+    "hc_glance_card": {
+      "checks": [
+        "page-generation",
+        "page-model",
+        "native-cards-runtime",
+        "content"
+      ],
+      "options": [
+        "entity1",
+        "entity1_name",
+        "entity1_icon",
+        "entity2",
+        "entity2_name",
+        "entity2_icon",
+        "entity3",
+        "entity3_name",
+        "entity3_icon"
+      ]
+    },
+    "hc_scene_card": {
+      "checks": [
+        "page-generation",
+        "page-model",
+        "native-cards-runtime",
+        "content"
+      ],
+      "options": []
+    },
+    "hc_access_action_card": {
+      "checks": [
+        "page-generation",
+        "native-cards-runtime",
+        "gesture-runtime",
+        "content"
+      ],
+      "options": [
+        "action_service",
+        "action_color",
+        "action_label",
+        "action_label_key"
       ]
     }
   },
@@ -416,7 +503,9 @@
     "marao-state-timeline-card",
     "marao-energy-period-card",
     "marao-frigate-events-card",
-    "marao-camera-events-card"
+    "marao-camera-events-card",
+    "marao-control-grid",
+    "marao-power-history-card"
   ],
   "profiles": [
     "iphone-normal",
@@ -664,6 +753,41 @@
     "control-grid-sections": {
       "file": "tests/components/marao_dashboard/test_control_grid.py",
       "assertion": "test_sections_keep_all_owned_families_and_structural_raw_boundaries",
+      "scope": "candidate"
+    },
+    "native-cards-runtime": {
+      "file": "tests/frontend/marao-native.test.js",
+      "assertion": "editing a controlled field preserves unknown/empty/order data",
+      "scope": "candidate"
+    },
+    "security-runtime": {
+      "file": "tests/frontend/marao-security.test.js",
+      "assertion": "alarm code validation, cleanup, single dispatch and authoritative state survive an attempt",
+      "scope": "candidate"
+    },
+    "power-history-runtime": {
+      "file": "tests/frontend/power-history.test.js",
+      "assertion": "raw history includes all changes, preserves peaks and normalizes each recorded unit",
+      "scope": "candidate"
+    },
+    "frontend-refresh-runtime": {
+      "file": "tests/frontend/frontend-refresh.test.js",
+      "assertion": "future version refresh needs no save and cannot loop across stale document reloads",
+      "scope": "candidate"
+    },
+    "camera-live-runtime": {
+      "file": "tests/frontend/marao-camera-live.test.js",
+      "assertion": "loadNativeCamera",
+      "scope": "candidate"
+    },
+    "netatmo-metadata": {
+      "file": "tests/components/marao_dashboard/test_camera_events.py",
+      "assertion": "test_denied_permission_never_reads_registry_state_or_provider_cache",
+      "scope": "candidate"
+    },
+    "editor-drag-runtime": {
+      "file": "tests/frontend/editor-drag.test.js",
+      "assertion": "valid release commits once with the current insertion boundary and consumes its native click",
       "scope": "candidate"
     }
   },
@@ -1133,7 +1257,14 @@
         "Front entrance camera and live preview",
         "Front entrance activity during the last day",
         "Household energy readings for the current day",
-        null
+        null,
+        "Lighting header with brightness disabled",
+        "Lighting header without native dimming support",
+        "Ventilation header without native speed control",
+        "Cover header with its icon deliberately hidden",
+        "Lighting header retaining its hidden-icon state marker",
+        "Ventilation control with its title deliberately hidden",
+        "Legacy access action using the strict opener header"
       ],
       "checks": [
         "layout"
@@ -1240,6 +1371,8 @@
         "gallery-cover-active",
         "gallery-climate-all",
         "gallery-climate-active",
+        "gallery-battery-live",
+        "gallery-battery-medium",
         "gallery-battery-all",
         "gallery-battery-active",
         "gallery-light-inactive",
@@ -1282,15 +1415,99 @@
     },
     "controlGridCases": {
       "identities": [
-        "names",
-        "templates",
         "columns",
+        "compactReferenceMaximumHeight",
+        "coverage",
         "gap",
-        "minimumHeight"
+        "names",
+        "sectionEqualityTolerance",
+        "templates"
       ],
       "checks": [
         "control-grid-generation",
         "control-grid-layout"
+      ]
+    },
+    "frontendRefreshCoverage": {
+      "checks": [
+        "frontend-refresh-runtime",
+        "popup-runtime"
+      ],
+      "identities": [
+        "three-second-horizontal-navbar-hold",
+        "critical-navbar-before-content",
+        "navbar-continuity-during-view-replacement",
+        "android-icon-hold-without-url-preview",
+        "navbar-press-without-rectangular-highlight",
+        "ordinary-tap-and-overflow",
+        "cancelled-and-incomplete-hold",
+        "generated-and-native-host",
+        "dirty-and-inert-host",
+        "native-reset-and-web-fallback",
+        "http-without-cache-apis",
+        "stale-service-worker-recovery",
+        "preserved-sign-in-settings-page"
+      ]
+    },
+    "cameraLiveCases": {
+      "checks": [
+        "camera-live-runtime",
+        "netatmo-metadata",
+        "camera-runtime",
+        "camera"
+      ],
+      "identities": [
+        "Low dashboard and high popup camera",
+        "HLS-only live camera",
+        "Automatic still to live camera",
+        "Snapshot failure with explicit recovery",
+        "Slow connection · selected low quality",
+        "Saved entrance title hidden from the camera card",
+        "Netatmo camera · native HLS and events"
+      ]
+    },
+    "editorDragCoverage": {
+      "checks": [
+        "editor-drag-runtime",
+        "builder-model"
+      ],
+      "identities": [
+        "stable-top-middle-bottom-pickup",
+        "partly-visible-handle",
+        "16px-post-pickup-edge-approach",
+        "8px-reversal-fresh-reapproach",
+        "stationary-armed-scroll",
+        "geometry-only-native-pickup"
+      ]
+    },
+    "sectionLayoutCases": {
+      "checks": [
+        "control-grid-generation",
+        "control-grid-layout",
+        "control-grid-sections"
+      ],
+      "identities": [
+        null,
+        null,
+        null
+      ]
+    },
+    "historyDetailCoverage": {
+      "checks": [
+        "history-runtime",
+        "power-history-runtime",
+        "history"
+      ],
+      "identities": [
+        "power",
+        "climate-unitless",
+        "counter-reset",
+        "known-gap",
+        "dense-narrow-peak",
+        "single-empty-error",
+        "popup-drill-in",
+        "native-preview",
+        "no-inspection-service"
       ]
     }
   },

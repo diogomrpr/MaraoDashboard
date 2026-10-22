@@ -19,7 +19,7 @@ and affected runtime before changing their shape.
 
 | Card | Existing behavior/options | Contract |
 | --- | --- | --- |
-| `hc_camera_card` | HA picture preview, generated events sheet; `popup_hash`, `event_provider`, Frigate camera/instance, Protect media source, `event_limit` | [Camera/history](specs/camera-history-content/spec.md) |
+| `hc_camera_card` | HA picture preview, generated events sheet; `popup_hash`, `event_provider`, Frigate camera/instance, Protect media source, Netatmo typed events/HLS recordings, `event_limit` | [Camera/history](specs/camera-history-content/spec.md) |
 | `hc_light_card` | Toggle, supported brightness, `enable_slider`, `card_color`, `custom_label` | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
 | `hc_cover_card` | State and position with confirmed fill/target thumb, `card_color`; separate access classification | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
 | `hc_climate_card` | Mode/current/target, single mode or generated mode sheet, single/range target stepping; graph entity/color, `show_graph`, `show_mode_buttons`, `setpoint_label`, `mode_selector_hash` | [Cards](specs/card-behaviors/spec.md), [values](specs/value-numeric-controls/spec.md), [history](specs/camera-history-content/spec.md) |

@@ -235,7 +235,7 @@ async function main() {
       });
       try {
         await page.goto(config.url + '/marao-dashboard/card-test');
-        await page.locator('marao-navbar-card nav').waitFor();
+        await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor();
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);
         await page.waitForLoadState('networkidle');

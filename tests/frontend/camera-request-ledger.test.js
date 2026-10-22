@@ -242,7 +242,10 @@ test('only changed hash on the same origin/path/query retains its document', () 
 
 test('managed context/browser close preserves failed-request diagnostics and still closes after failure', async () => {
   for (const target of ['context', 'browser']) {
-    const previous = { window: globalThis.window, requestAnimationFrame: globalThis.requestAnimationFrame };
+    const previous = { window: globalThis.window, requestAnimationFrame: globalThis.requestAnimationFrame, document: globalThis.document };
+    let dashboardReleased = false;
+    const card = { _camera: { player: {} }, remove() { assert.equal(dashboardReleased, true); this._camera.player = null; } };
+    globalThis.document = { querySelector: () => ({ remove() { dashboardReleased = true; } }) };
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-camera-ledger-close-'));
     const trace = { document: 'managed-document', events: [], sessions: [], stops: [], handoffs: [], releases: [], order: 0 };
     globalThis.window = { __maraoCameraRequestTrace: trace, __maraoProveCameraHandoffs: async () => {} };
@@ -251,7 +254,7 @@ test('managed context/browser close preserves failed-request diagnostics and sti
     const browser = { close: async () => { closed = true; throw Error('original browser close failure'); } };
     const context = { addInitScript: async () => {}, browser: () => browser, close: async () => { closed = true; throw Error('original context close failure'); } };
     const page = { on: (name, listener) => listeners.set(name, listener), isClosed: () => closed, url: () => 'http://192.168.0.28:8123/marao-dashboard/card-test',
-      goto: async () => {}, evaluate: async (callback, data) => callback(data), waitForTimeout: async () => {}, locator: () => ({ evaluateAll: async () => {} }) };
+      goto: async () => {}, evaluate: async (callback, data) => callback(data), waitForTimeout: async () => {}, locator: () => ({ evaluateAll: async callback => callback([card]) }) };
     try {
       await managedCameraLedger(context, page, { output: directory, scenario: 'iphone-normal', theme: 'light' });
       listeners.get('requestfailed')({ url: () => 'http://192.168.0.28:8123/not-owned.js', resourceType: () => 'script', failure: () => ({ errorText: 'net::ERR_ABORTED' }), headers: () => ({}) });
@@ -328,7 +331,7 @@ test('instrumentation handles grouped WebSocket replies and tags only same-origi
   }
 });
 
-function immediateHandoffFixture({ siblingSelection = false, boundary = null } = {}) {
+function immediateHandoffFixture({ siblingSelection = false, boundary = null, preloaded = false } = {}) {
   let now = 0; const timers = [];
   class Socket { addEventListener() {} send() {} }
   class Xhr { open() {} send() {} abort() {} setRequestHeader() {} }
@@ -358,6 +361,12 @@ function immediateHandoffFixture({ siblingSelection = false, boundary = null } =
   const rtc = new DomElement('ha-web-rtc-player', host), video = new DomElement('video', rtc); rtc.entityid = entity;
   Object.defineProperty(video, 'currentTime', { get: () => now / 1000, configurable: true }); video.paused = false; video.readyState = 3;
   const camera = { player: host, video, generation: 3, streamRequests: 1, state: 'live', eligible: () => true }; wrapper._camera = camera;
+  if (preloaded) {
+    const root = new DomElement('hui-root'); wrapper.parentNode = root;
+    wrapper.hasAttribute = name => name === 'data-marao-camera-preload';
+    root.shadowRoot = { querySelector: () => ({ _navigationRecord: { cameraPreload: { sessions: new Map([[entity, { host: wrapper, playback: camera }]]) } } }) };
+    delete wrapper._camera;
+  }
   const hls = new DomElement('ha-hls-player', host); hls.entityid = entity;
   if (siblingSelection) {
     const losing = new DomElement('video', hls); losing.paused = false; losing.readyState = 3;
@@ -384,6 +393,18 @@ test('native reorder proof starts before any explicit settle call and preserves 
   fixture.camera.player = null; fixture.camera.generation++;
   await fixture.environment.window.__maraoProveCameraHandoffs();
   assert.equal(fixture.state.handoffs[0].proof, proof, 'Later offscreen disposal cannot replace an already completed causal receipt');
+});
+
+test('dashboard-owned preload handoffs require the actual retained playback and advancing video', async () => {
+  const fixture = immediateHandoffFixture({ preloaded: true });
+  await new Promise(resolve => setImmediate(resolve));
+  await fixture.tick(300);
+  assert.equal(fixture.state.handoffs.length, 1);
+  assert.equal(fixture.state.handoffs[0].proof.valid, true);
+  const invalid = immediateHandoffFixture({ preloaded: true });
+  invalid.camera.generation++;
+  await invalid.tick(300);
+  assert.equal(invalid.state.handoffs[0].proof.valid, false);
 });
 
 test('an unrelated camera release boundary retains exact native handoff evidence and restores its outer scope', async () => {

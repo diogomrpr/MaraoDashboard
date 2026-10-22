@@ -728,6 +728,14 @@ def _validate_energy_formatting(value: Any, registry: list[dict[str, Any]], *, v
             item.get("type") in (None, "custom:marao-card")
             and (template in ENERGY_FORMAT_TEMPLATES or load_source)
         )
+        if template == "hc_graph_card" and item.get("type") in (None, "custom:marao-card") and isinstance(options, dict) and "power_devices" in options:
+            from .page_model import validate_power_devices
+            main = options.get("graph_entity") or entity_id
+            validate_power_devices(options, main)
+            if validate_source_units and options["power_devices"]:
+                sources = [main, *[member["entity_id"] for member in options["power_devices"]]]
+                if any(units.get(source) and ENERGY_UNITS.get(units[source], (None,))[0] != "power" for source in sources):
+                    raise ValueError("Power devices require power sensors in W or kW.")
         if (direct or template == "hc_energy_period_card") and isinstance(options, dict):
             from .page_model import validate_energy_options
             validate_energy_options(options)
@@ -1843,12 +1851,24 @@ def _energy_graph_card(
         "variables": variables,
     }
     if popup_hash:
+        variables["history_popup"] = True
+        variables["popup_hash"] = popup_hash
         card["tap_action"] = {
             "action": "navigate",
             "navigation_path": popup_hash,
             "haptic": "heavy",
         }
     return card
+
+
+def _power_history_card(entity: dict[str, Any], title: str) -> dict[str, Any]:
+    options = entity.get("variables") or {}
+    return {
+        "type": "custom:marao-power-history-card",
+        "entity": options.get("graph_entity") or entity.get("graph_entity") or entity["entity_id"],
+        "name": entity.get("name") or title,
+        **{key: deepcopy(options[key]) for key in ("power_devices", "display_unit", "display_precision", "graph_color") if key in options},
+    }
 
 
 def _energy_period_card(
@@ -1895,7 +1915,7 @@ def _energy_popups(config: dict[str, Any], language: str = "en") -> dict[str, di
                         popup=True,
                     )
                     if name != "energy_house_power"
-                    else _energy_graph_card(entity, title, icon, None)
+                    else _power_history_card(entity, title)
                     for entity in entities
                 ],
             }
@@ -2213,7 +2233,12 @@ def _page_card_popups(entity, language="en"):
                  "cards": [_scene_card(member) for member in page_entries(item["entities"])] or
                           [{"type": "markdown", "content": _t(language, "overview.scenes_empty")}]}]
     if role == "hc_energy_period_card" or role == "hc_graph_card" and variables.get("history_popup"):
-        card = _energy_period_card(item, item["name"], variables.get("period", "day"), item.get("icon") or "mdi:flash", None, popup=True) if role == "hc_energy_period_card" else _energy_graph_card(item, item["name"], item.get("icon") or "mdi:flash", None)
+        if role == "hc_energy_period_card":
+            card = _energy_period_card(item, item["name"], variables.get("period", "day"), item.get("icon") or "mdi:flash", None, popup=True)
+        elif ENERGY_UNITS.get(item.get("unit_of_measurement"), (None,))[0] == "power" or variables.get("power_devices"):
+            card = _power_history_card(item, item["name"])
+        else:
+            card = _energy_graph_card(item, item["name"], item.get("icon") or "mdi:flash", None)
         return [{**_popup_header(variables["popup_hash"], item["entity_id"], item["name"], item.get("icon") or "mdi:flash"), "cards": [card]}]
     if role == "hc_climate_card":
         return [_climate_mode_popup(item, language)]
@@ -2700,8 +2725,8 @@ def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
     if apps:
         media_controls.append(
             {
-                "type": "grid",
-                "columns": 2,
+                "type": "custom:marao-control-grid",
+                "columns": 3,
                 "square": False,
                 "cards": [
                     {

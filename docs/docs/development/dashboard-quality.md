@@ -345,7 +345,7 @@ to it:
 never substituted with a plausible safe-looking or active state. Disable
 actions in either state.
 
-Every recognized availability or fault/error reason uses the whole card surface and a visible localized cue. Complete availability takes neutral priority over retained action/content errors; otherwise reported errors take priority over partial warnings and loading. Partial cards identify affected members and preserve usable readings and safe actions. Apply shared problem colors after custom colors and artwork, with readable contrast in both themes. Hidden normal state text or icons cannot hide a problem reason. Keep service errors local to the initiating card until a successful explicit retry or configuration replacement, with one native notification and no automatic retry. Card-owned media/history failures have explicit retry or back controls; empty content and ordinary loading remain distinct.
+Every recognized availability or fault/error reason uses the whole card surface and a visible localized cue. Complete availability shows only its concise neutral status, taking priority over retained action/content errors; those errors remain stored until a successful retry or configuration replacement. Otherwise reported errors take priority over partial warnings and loading. Individual-card availability reasons omit entity names. Partially available group, legacy summary and room-light tiles keep their normal counts and palette without unavailable counts or member-warning rows; member sheets retain individual statuses. Other partial cards show concise availability cues and preserve usable readings and safe actions. Apply shared problem colors after custom colors and artwork, with readable contrast in both themes. Hidden normal state text or icons cannot hide a problem reason. Keep service errors local to the initiating card until a successful explicit retry or configuration replacement, with one native notification and no automatic retry. Card-owned media/history failures have explicit retry or back controls; empty content and ordinary loading remain distinct.
 
 Use Home Assistant's native connection warning when its authenticated
 connection is lost and disable entity actions until it recovers. Do not add a
@@ -403,6 +403,8 @@ The control must:
 - use a concise localized visible label such as `Unlock`;
 - expose an internal semantic name containing both action and target;
 - have a track and thumb that meet the visible 48-by-48 minimum;
+- show a rounded theme track without a progressing fill, with a label that fades during travel;
+- accept starts across the entire measured round handle, including its edges, and reject the surrounding track;
 - require deliberate travel to the completion boundary;
 - establish horizontal intent before capturing the pointer;
 - cancel when vertical motion indicates page scrolling;
@@ -560,6 +562,7 @@ large and readable.
 ### Popups
 
 - Animate upward from the bottom.
+- Popup content ends with ordinary 8px spacing or the device bottom safe inset, whichever is larger; do not reserve navbar height inside a sheet that covers navigation.
 - Stay above the navbar and all dashboard cards.
 - Keep a visible close button and internal scrolling.
 - Use content-driven height by default, growing to the available viewport with
@@ -684,7 +687,7 @@ A change is done when:
   when the automated gate cannot detect it;
 - routine results are reported concisely and any known limitation is stated.
 
-Battery-group defaults use the minimum valid member percentage for the shared battery palette: below 20 red, 20–below 80 yellow, 80–100 green. The first usable reading and existing counts keep their meaning. A critical group with partial availability retains its red surface and low/unavailable details; noncritical partial warnings, complete neutral loss and reported errors retain their existing priority.
+Battery-group defaults use the minimum valid member percentage for the shared battery palette: below 20 red, 20–below 80 yellow, 80–100 green. The first usable reading and existing counts keep their meaning. A critical group with partial availability retains its red surface and low count without an unavailable-member warning. Noncritical partial groups retain their normal palette; complete neutral loss and reported errors retain their priority.
 
 Strict-access cards in Home Assistant grids use the available grid row when the configured columns would leave less than 144px per cell. This keeps the fixed thumb and wrapping label contained at 200% zoom, including generated, popup and native card hosts, without changing saved column preferences.
 
@@ -707,9 +710,11 @@ share their tallest intrinsic height, with an 8px gap. Automatic domain groups
 retain their order, widths and group starts inside that same height boundary.
 Explicit sections size independently. Two-column sections fit normal/bold
 320px, 360px and 384px phone viewports, including host margins, and
-282px/322px/346px embedded sections. A shared 136px floor and
-7.5-times-primary-font policy governs capacity, requiring 280px of usable width
-for two columns at the normal 18px primary text size. Logo-only media-app groups
+282px/322px/346px embedded sections. A shared 120px floor and
+six-times-primary-font policy governs capacity, requiring 248px of usable width
+for two columns at 18px or 20px primary text, and 272px at 22px. Narrow cards
+wrap content and grow vertically; control targets and room icons keep their sizes.
+Substantially enlarged text still reduces the column count. Logo-only media-app groups
 use an 80px cell minimum because their labels remain accessible rather than
 visible; three app shortcuts therefore fit on phone widths. Their controls remain
 at least 48px square, and availability/error text still wraps and grows. Mixed

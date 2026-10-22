@@ -121,3 +121,7 @@ Reserve top space within the existing route-scoped fullscreen owner so the
 button cannot cover page content. The native edit action sits beside it. The
 button shares the persistent navbar surface and leaves with its owner; no new
 bootstrap dependency, saved option, backend endpoint or service call is added.
+
+## Main-page recovery placement follow-up
+
+The early navigation runtime now owns a separate normal-flow recovery row prepended to HA's view container on the main page. Its inline-icon 48px button keeps the existing refresh action/eligibility and loading label; the row disappears when leaving the main page, entering edit/preview, or releasing its owner. It is reused across updates/view replacement and cannot be duplicated by retained navbar placeholders. Removing the previous 60px top-padding reservation lets the row own its space while all pages retain safe-area spacing. The bottom navigation/feedback layer remains independently floating. No configuration, cache-clear mechanism or backend contract changes.

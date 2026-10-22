@@ -56,7 +56,9 @@ the dashboard generator:
 }
 ```
 
-App shortcuts appear first in a two-column grid. The remote below follows the Apple TV layout: back,
+App shortcuts appear first in the same compact, responsive three-column grid used
+by media-page app sections. Six apps fit in two rows on ordinary phone widths;
+narrower popups reduce the column count. The remote below follows the Apple TV layout: back,
 up, home; left, select, right; rewind, down, fast-forward; then volume,
 play/pause, volume. Without `volume_remote_entity`, the normal media-player
 volume services are used.
@@ -64,11 +66,16 @@ volume services are used.
 App shortcuts show the logo across the full square card, without a visible title
 or normal player-state line. The configured app name remains the accessible button
 label. Unavailable players still show a readable warning and disable launching.
+Enabled app tiles show a pointer cursor, a theme-colored edge and a slight lift
+on hover. Pressing adds the same edge and a short compression on mouse or touch;
+disabled tiles keep their neutral appearance. These cues apply to both page and
+popup shortcuts.
+
 Logo-only app sections use an 80px cell minimum, so three shortcuts fit on
 ordinary phone widths while configured columns still reflow on narrower hosts.
 Unavailable messages can wrap and grow the row.
 YouTube, Netflix, Disney+, Prime Video, Apple TV, Plex, Spotify and MEO shortcuts automatically
-use their real app icons and brand colors. MEO and MEO Go use the official MEO Go artwork. Recognition uses the configured app source
+use their real app icons and brand colors. MEO and MEO Go use the simple official MEO mark. Recognition uses the configured app source
 (including its bundle ID), so you can keep your own display name. Icons ship with
 Marao and do not require an external image service while using the dashboard.
 Other apps retain their configured icon and theme colors. Existing source values,

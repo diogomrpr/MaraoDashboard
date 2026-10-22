@@ -3,11 +3,11 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {createHash}=require('node:crypto');
 const {chromium}=require('playwright');
-const {prepareFrontend}=require('../ha-test/prepare-frontend');
+const {prepare}=require('../ha-test/prepare');
 const {accessToken,setBrowserToken,assertCurrentFrontend,connect}=require('../ha-test/client');
 const {artifactDirectory}=require('./verification-browser');
 async function run(){
- const prepared=await prepareFrontend(),{config,version}=prepared;
+ const prepared=await prepare(),{config,version}=prepared;
  assert.equal(new URL(config.url).hostname,'192.168.0.28');
  const ws=await connect(config),digest=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
  const saved=async()=>{

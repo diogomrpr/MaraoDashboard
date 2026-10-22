@@ -72,13 +72,18 @@ export function reduceSamples(samples, maxPoints = 240) {
 
 export function periodRange(now, offset, period, timeZone = 'UTC') {
   const instant = +new Date(now);
-  if (!Number.isFinite(instant) || !Number.isInteger(offset) || !['day', 'month'].includes(period)) throw new Error('Invalid history period');
+  if (!Number.isFinite(instant) || !Number.isInteger(offset) || !['day', 'week', 'month'].includes(period)) throw new Error('Invalid history period');
   const formatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
   const civil = value => Object.fromEntries(formatter.formatToParts(new Date(value)).filter(part => ['year','month','day'].includes(part.type)).map(part => [part.type, Number(part.value)]));
   const current = civil(instant);
+  if (period === 'week') {
+    const weekday = new Date(Date.UTC(current.year, current.month - 1, current.day)).getUTCDay();
+    current.day += offset * 7 - (weekday + 6) % 7;
+    offset = 0;
+  }
   const startDate = new Date(Date.UTC(current.year, current.month - 1 + (period === 'month' ? offset : 0), period === 'month' ? 1 : current.day + offset));
   const endDate = new Date(startDate);
-  if (period === 'month') endDate.setUTCMonth(endDate.getUTCMonth() + 1); else endDate.setUTCDate(endDate.getUTCDate() + 1);
+  if (period === 'month') endDate.setUTCMonth(endDate.getUTCMonth() + 1); else endDate.setUTCDate(endDate.getUTCDate() + (period === 'week' ? 7 : 1));
   const boundary = date => {
     const key = date.getUTCFullYear() * 10000 + (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
     let low = +date - 48 * 3600000, high = +date + 48 * 3600000;
@@ -162,4 +167,17 @@ export function statisticsBuckets(records, { range, period, timeZone = 'UTC', co
 export function energyTotal(samples) {
   const values = samples.filter(sample => Number.isFinite(sample.value));
   return values.length ? values.reduce((total, sample) => total + sample.value, 0) : null;
+}
+
+export function validatePowerDevices(options, main) {
+  if (!Object.hasOwn(options, 'power_devices')) return [];
+  if (!Array.isArray(options.power_devices)) return ['Power devices must be a list.'];
+  const seen = new Set(main ? [main] : []), errors = [];
+  for (const item of options.power_devices) {
+    if (!item || typeof item !== 'object' || Array.isArray(item) || !/^sensor\.[a-z0-9_]+$/.test(item.entity_id || '')) { errors.push('Choose a power sensor for each device.'); continue; }
+    if (seen.has(item.entity_id)) errors.push('Power devices must be unique and different from the house sensor.');
+    seen.add(item.entity_id);
+    if (Object.hasOwn(item, 'name') && typeof item.name !== 'string') errors.push('Power device names must be text.');
+  }
+  return [...new Set(errors)];
 }

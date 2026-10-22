@@ -122,6 +122,12 @@ Owned section grids SHALL preserve configured order, the existing fixed/automati
 ### Requirement: Whole-grid responsive control reflow
 Saved columns SHALL remain the preferred maximum. Each owned section SHALL reflow responsively when usable width or supported text settings require it, preserving order, group composition, contained content and section-wide equal heights. Controls SHALL retain their minimum dimensions. Layout SHALL restore preferred columns when space permits without changing saved configuration or remounting active controls.
 
+#### Scenario: Compact Android content still accommodates two columns
+- **WHEN** a section prefers two columns and provides 248px of usable width at 18px or 20px primary text, or 272px at 22px text
+- **THEN** it retains two columns with wrapped labels and content-driven height
+- **AND** controls remain at least 48px square and configured icon sizes stay unchanged
+- **AND** smaller widths or substantially enlarged text still reflow without changing saved preferences or replacing mounted controls
+
 #### Scenario: Narrow or enlarged text makes two columns unusable
 - **WHEN** 320px width or supported text/zoom settings cannot contain the preferred columns
 - **THEN** the section uses fewer effective columns without horizontal overflow or clipped essential content

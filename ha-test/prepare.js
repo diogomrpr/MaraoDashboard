@@ -46,7 +46,7 @@ function composeDashboard(config, view) {
     dashboard.pages = [
       ...dashboard.pages.filter(page => page.path !== 'card-test'),
       { id: 'card-test', name: 'Cases', path: 'card-test', icon: 'mdi:test-tube', output_path: 'views/custom/01-cases.yaml', sections: [
-        { entities: view.entities || [] }, ...cards.map(card => ({ cards: [card] })),
+        ...(view.entities || []).map(entity => ({ entities: [entity] })), ...cards.map(card => ({ cards: [card] })),
       ] },
     ];
     return dashboard;
@@ -311,7 +311,7 @@ async function prepare(config = readConfig(), { dryRun = false } = {}) {
     if (!(await connection.call({ type: "auth/current_user" })).is_admin) throw new Error("The development token must belong to an administrator.");
     entries = await connection.call({ type: "config_entries/get" });
   } finally { connection.close(); }
-  if (entries.some((entry) => ["frigate", "unifiprotect"].includes(entry.domain))) throw new Error("Test camera fixtures cannot replace a real Frigate or UniFi Protect integration.");
+  if (entries.some((entry) => ["frigate", "unifiprotect", "netatmo"].includes(entry.domain))) throw new Error("Test camera fixtures cannot replace a real Frigate, UniFi Protect or Netatmo integration.");
   const haConfig = await api(config, "GET", "/api/config");
   if (haConfig.config_dir !== config.remoteConfigPath) throw new Error("remoteConfigPath does not match this Home Assistant instance.");
   const root = config.remoteConfigPath;

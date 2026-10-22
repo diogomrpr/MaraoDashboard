@@ -304,6 +304,20 @@ const TRANSLATIONS = {
     "history.title": "History",
     "history.back": "Back",
     "history.load_error": "History chart could not load",
+    "power.title": "Power history",
+    "power.period": "Period",
+    "power.day": "Day",
+    "power.week": "Week",
+    "power.month": "Month",
+    "power.previous_day": "Previous day",
+    "power.next_day": "Next day",
+    "power.previous_week": "Previous week",
+    "power.next_week": "Next week",
+    "power.previous_month": "Previous month",
+    "power.next_month": "Next month",
+    "power.loading_reading": "Loading…",
+    "power.load_error": "Power history unavailable",
+    "power.unit_error": "Power history requires compatible recorded power units",
     "grid.invalid": "Use content cards and one to six columns.",
     "common.on_count": "{count} on",
     "common.open_count": "{count} open",
@@ -334,6 +348,22 @@ const TRANSLATIONS = {
     "camera_events.event": "Event",
     "camera_events.back": "Back to events",
     "camera_events.refresh": "Refresh events",
+    "camera_events.all": "All",
+    "camera_events.filters": "Event types",
+    "camera_events.load_more": "Load more",
+    "camera_events.loading_preview": "Loading preview…",
+    "camera_events.type.person": "Person",
+    "camera_events.type.car": "Car",
+    "camera_events.type.vehicle": "Vehicle",
+    "camera_events.type.motion": "Motion",
+    "camera_events.type.ring": "Doorbell",
+    "camera_events.type.audio": "Audio",
+    "camera_events.type.dog": "Dog",
+    "camera_events.type.cat": "Cat",
+    "camera_events.type.package": "Package",
+    "camera_events.type.animal": "Animal",
+    "camera_events.no_preview": "No preview",
+    "camera_events.error.resolve_media_failed": "Unable to resolve camera media URL",
     "camera_events.loading_events": "Loading events…",
     "camera_events.loading_event": "Loading event…",
     "camera_events.no_recent_events": "No recent events.",
@@ -488,6 +518,20 @@ const TRANSLATIONS = {
     "history.title": "Histórico",
     "history.back": "Voltar",
     "history.load_error": "Não foi possível carregar o gráfico",
+    "power.title": "Histórico de potência",
+    "power.period": "Período",
+    "power.day": "Dia",
+    "power.week": "Semana",
+    "power.month": "Mês",
+    "power.previous_day": "Dia anterior",
+    "power.next_day": "Dia seguinte",
+    "power.previous_week": "Semana anterior",
+    "power.next_week": "Semana seguinte",
+    "power.previous_month": "Mês anterior",
+    "power.next_month": "Mês seguinte",
+    "power.loading_reading": "A carregar…",
+    "power.load_error": "Histórico de potência indisponível",
+    "power.unit_error": "O histórico de potência requer unidades de potência compatíveis nos registos",
     "grid.invalid": "Use cartões de conteúdo e uma a seis colunas.",
     "common.on_count": "{count} ligados",
     "common.open_count": "{count} abertos",
@@ -518,6 +562,22 @@ const TRANSLATIONS = {
     "camera_events.event": "Evento",
     "camera_events.back": "Voltar aos eventos",
     "camera_events.refresh": "Atualizar eventos",
+    "camera_events.all": "Todos",
+    "camera_events.filters": "Tipos de evento",
+    "camera_events.load_more": "Carregar mais",
+    "camera_events.loading_preview": "A carregar pré-visualização…",
+    "camera_events.type.person": "Pessoa",
+    "camera_events.type.car": "Carro",
+    "camera_events.type.vehicle": "Veículo",
+    "camera_events.type.motion": "Movimento",
+    "camera_events.type.ring": "Campainha",
+    "camera_events.type.audio": "Áudio",
+    "camera_events.type.dog": "Cão",
+    "camera_events.type.cat": "Gato",
+    "camera_events.type.package": "Encomenda",
+    "camera_events.type.animal": "Animal",
+    "camera_events.no_preview": "Sem pré-visualização",
+    "camera_events.error.resolve_media_failed": "Não foi possível resolver o URL multimédia da câmara",
     "camera_events.loading_events": "A carregar eventos…",
     "camera_events.loading_event": "A carregar evento…",
     "camera_events.no_recent_events": "Sem eventos recentes.",
@@ -877,7 +937,7 @@ class MaraoSlideToOpen extends HTMLElement {
     const problem = owner?._callService ? null : cardProblem({ entity: this._entityId() }, this._hassInstance(), { error: this._actionError });
     const markup = `
       <style>
-        :host { position: relative; z-index: 2; display: block; width: 100%; container: marao-access / inline-size; pointer-events: auto; --marao-slide-foreground: var(--primary-text-color); --marao-slide-progress: color-mix(in srgb, var(--secondary-background-color) 65%, var(--primary-text-color)); }
+        :host { position: relative; z-index: 2; display: block; width: 100%; container: marao-access / inline-size; pointer-events: auto; --marao-slide-foreground: var(--primary-text-color); }
         .track {
           position: relative;
           width: 100%;
@@ -892,19 +952,11 @@ class MaraoSlideToOpen extends HTMLElement {
           user-select: none;
           -webkit-user-select: none;
         }
-        .track[aria-disabled="false"] { cursor: grab; }
-        .track.dragging { cursor: grabbing; }
+        .track[aria-disabled="false"] .thumb { cursor: grab; }
+        .track.dragging .thumb { cursor: grabbing; }
         .track.completing { animation: marao-slide-complete 280ms ease-out; }
         @keyframes marao-slide-complete {
           50% { box-shadow: inset 0 0 0 4px var(--marao-slide-foreground); }
-        }
-        .fill {
-          position: absolute;
-          inset: 0;
-          transform: scaleX(0);
-          transform-origin: left center;
-          background: var(--marao-slide-progress);
-          pointer-events: none;
         }
         .label {
           position: relative;
@@ -916,7 +968,7 @@ class MaraoSlideToOpen extends HTMLElement {
           color: var(--marao-slide-foreground);
           font-family: var(--primary-font-family);
           font-size: max(1.125rem, var(--font-size-primary));
-          font-weight: 800;
+          font-weight: var(--font-weight-secondary, 500);
           line-height: 1.15;
           overflow-wrap: anywhere;
           text-align: center;
@@ -940,9 +992,9 @@ class MaraoSlideToOpen extends HTMLElement {
           font-size: 0;
           line-height: 1;
           padding: 0;
-          pointer-events: none;
+          pointer-events: auto;
         }
-        .thumb ha-icon { --mdc-icon-size: 32px; }
+        .thumb ha-icon { --mdc-icon-size: 32px; pointer-events: none; }
         .problem { display:flex; gap:8px; padding:12px; margin:0; font-size:var(--font-size-secondary,1rem); line-height:1.25; overflow-wrap:anywhere; }
         .problem ha-icon { flex:0 0 24px; }
         .track[aria-disabled="true"] .thumb {
@@ -956,7 +1008,6 @@ class MaraoSlideToOpen extends HTMLElement {
       </style>
       <div${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}>
       <div class="track" role="slider" tabindex="${disabled ? -1 : 0}" aria-label="${escapeHtml(semanticLabel)}" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0%" aria-disabled="${disabled}">
-        <div class="fill"></div>
         <span class="label">${escapeHtml(label)}</span>
         <span class="thumb"><ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon></span>
       </div>
@@ -991,12 +1042,12 @@ class MaraoSlideToOpen extends HTMLElement {
   _setProgress(progress) {
     this._progress = Math.max(0, Math.min(1, progress));
     const track = this.shadowRoot?.querySelector(".track");
-    const fill = this.shadowRoot?.querySelector(".fill");
     const thumb = this.shadowRoot?.querySelector(".thumb");
-    if (!track || !fill || !thumb) return;
+    const label = this.shadowRoot?.querySelector(".label");
+    if (!track || !thumb) return;
     const travel = Math.max(0, track.clientWidth - 62);
-    fill.style.transform = `scaleX(${this._progress})`;
     thumb.style.transform = `translateX(${travel * this._progress}px)`;
+    if (label) label.style.opacity = String(1 - this._progress);
     const percentage = Math.round(this._progress * 100);
     track.setAttribute("aria-valuenow", String(percentage));
     track.setAttribute("aria-valuetext", `${percentage}%`);
@@ -1009,9 +1060,9 @@ class MaraoSlideToOpen extends HTMLElement {
       || (point.pointerId !== undefined && event.button !== undefined && event.button !== 0)
       || this._disabled()
     ) return;
-    const track = event.currentTarget;
-    const bounds = track.getBoundingClientRect();
-    if (point.clientX > bounds.left + 72) return;
+    const bounds = this.shadowRoot?.querySelector(".thumb")?.getBoundingClientRect();
+    if (!bounds || point.clientX < bounds.left || point.clientX > bounds.right
+      || point.clientY < bounds.top || point.clientY > bounds.bottom) return;
     this._pointerId = point.pointerId ?? point.identifier;
     this._startX = point.clientX;
     this._startY = point.clientY;

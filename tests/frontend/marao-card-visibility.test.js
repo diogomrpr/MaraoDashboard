@@ -180,9 +180,9 @@ test('unrelated state updates preserve scrolling cards while their own inputs st
 
 test('typed groups count complete membership independently of filtering and duplicate references', () => {
   for (const [type, values, active, label] of [
-    ['light', ['off', 'on', 'unknown'], ['member.1'], '1 active, 1 unavailable'],
+    ['light', ['off', 'on', 'unknown'], ['member.1'], '1 active'],
     ['cover', ['closed', 'opening', 'closing', 'open'], ['member.1', 'member.3'], '2 active'],
-    ['climate', ['off', 'heat', 'auto', 'unavailable'], ['member.1', 'member.2'], '2 active, 1 unavailable'],
+    ['climate', ['off', 'heat', 'auto', 'unavailable'], ['member.1', 'member.2'], '2 active'],
   ]) {
     const states = Object.fromEntries(values.map((state, index) => [`member.${index}`, { state, attributes: { hvac_action: 'idle' } }]));
     const ids = [...Object.keys(states), 'member.1'];
@@ -206,7 +206,7 @@ test('battery groups retain first usable reading and count secondary lows and in
   const summary = entityGroupState('battery', [...Object.keys(states), 'sensor.2'], { states });
   assert.equal(summary.reading, 75); assert.equal(summary.available, 6);
   assert.deepEqual(summary.activeEntities, ['sensor.2', 'sensor.5']);
-  assert.equal(summary.label, '75% · 2 low, 6 unavailable');
+  assert.equal(summary.label, '75% · 2 low');
   const invalid = { states: { 'sensor.invalid': { state: 'not a number' } } };
   assert.equal(entityGroupState('battery', ['sensor.invalid'], invalid).state, 'unavailable');
   const card = new MaraoCard();
@@ -246,10 +246,12 @@ test('battery group rendered surfaces reconcile thresholds, partial availability
     assert.equal(colors['--marao-card-background'], 'var(--color-' + color + ')');
   }
   let markup = render('10', 'unavailable');
-  assert.match(markup, /data-problem="warning" style="background:var\(--color-red\)/);
-  assert.match(markup, /1 low, 1 unavailable/);
+  assert.doesNotMatch(markup, /data-problem=|class="problem"/);
+  assert.equal(colors['--marao-card-background'], 'var(--color-red)');
+  assert.match(markup, /1 low/);
   assert.doesNotMatch(markup, /data-card-action[^>]* disabled/);
-  assert.match(render('80', 'unavailable'), /background:var\(--marao-problem-warning-background/);
+  assert.doesNotMatch(render('80', 'unavailable'), /data-problem=|class="problem"/);
+  assert.equal(colors['--marao-card-background'], 'var(--color-green)');
   assert.match(render('unavailable', 'unknown'), /data-problem="neutral"/);
   assert.match(render('10', '80', { connected: false }), /data-problem="neutral"/);
   card._actionError = 'Reported failure';
@@ -300,13 +302,13 @@ test("actions disable and decline unavailable service targets independent of the
 test("summaries count every device and keep mixed-availability navigation actionable", () => {
   const states = { "light.off": { state: "off" }, "light.on": { state: "on" }, "light.unavailable": { state: "unavailable" } };
   assert.deepEqual(summaryState(["light.off", "light.on", "light.on"], { states }), { state: "on", label: "1 active" });
-  assert.deepEqual(summaryState(["light.unavailable", "light.on"], { states }), { state: "on", label: "1 active, 1 unavailable" });
+  assert.deepEqual(summaryState(["light.unavailable", "light.on"], { states }), { state: "on", label: "1 active" });
   assert.deepEqual(summaryState(["light.off"], { states }), { state: "off", label: "All off" });
   const card = new MaraoCard();
   card.setConfig({ template: "hc_navigation_card", entity: "light.unavailable", variables: { summary_entities: ["light.unavailable", "light.on"] }, tap_action: { action: "navigate", navigation_path: "#lights" } });
   card.hass = { states, callService() {} };
   assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
-  assert.match(card.shadowRoot.innerHTML, /1 active, 1 unavailable/);
+  assert.match(card.shadowRoot.innerHTML, /1 active/);
   card.hass = { states: { "light.unavailable": states["light.unavailable"] }, callService() {} };
   assert.match(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
 });
@@ -407,9 +409,9 @@ test("card registration can be retried after the custom-element registry becomes
   };
   try {
     registerMaraoCards();
-    assert.deepEqual([...registered.keys()], ["marao-card", "marao-control-grid", "marao-navbar-card", "marao-popup-card"]);
+    assert.deepEqual([...registered.keys()], ["marao-card", "marao-power-history-card", "marao-control-grid", "marao-navbar-card", "marao-popup-card"]);
     registerMaraoCards();
-    assert.equal(registered.size, 4);
+    assert.equal(registered.size, 5);
   } finally {
     globalThis.customElements = previousRegistry;
   }
@@ -655,7 +657,7 @@ test('room lighting uses every unique selected light and ignores an unrelated pr
   for (const value of ['unknown', 'unavailable', null]) {
     const second = value === null ? undefined : { state: value, attributes: {} };
     card.hass = { ...card.hass, states: { ...states, 'light.second': second } };
-    assert.match(card.shadowRoot.innerHTML, /data-problem="neutral"/);
+    assert.doesNotMatch(card.shadowRoot.innerHTML, /data-problem="|class="problem"/);
     assert.match(card.shadowRoot.innerHTML, /data-room-lights-off[^>]* disabled/);
     assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
   }
@@ -843,7 +845,7 @@ test("media app shortcuts fill the card with artwork without a visible title", (
 });
 
 test("media app branding recognizes sources, ships real icons and preserves custom shortcuts", async () => {
-  for (const [source, id, extension = "png"] of [["NETFLIX", "netflix", "svg"], ["Spotify", "spotify", "svg"], ["com.google.ios.youtube", "youtube"], ["Disney+", "disney-plus"], ["Amazon Prime Video", "prime-video"], ["com.apple.TVWatchList", "apple-tv"], ["Plex", "plex"], ["MEO", "meo"], ["meo go", "meo"], ["pt.sapo.mobile.iphone.tmn.meomobile", "meo"]]) {
+  for (const [source, id, extension = "png"] of [["NETFLIX", "netflix", "svg"], ["Spotify", "spotify", "svg"], ["com.google.ios.youtube", "youtube"], ["Disney+", "disney-plus"], ["Amazon Prime Video", "prime-video"], ["com.apple.TVWatchList", "apple-tv"], ["Plex", "plex"], ["MEO", "meo", "svg"], ["meo go", "meo", "svg"], ["pt.sapo.mobile.iphone.tmn.meomobile", "meo", "svg"]]) {
     const config = { template: "hc_media_app_card", entity: "media_player.apple_tv", name: "My app", icon: "mdi:play-box-outline", show_state: false, variables: { app_source: source } };
     const before = structuredClone(config);
     assert.equal(mediaAppBrand(config).id, id);
@@ -896,7 +898,7 @@ test("wallbox current card uses a large stepper and optional shortcuts", () => {
   assert.doesNotMatch(source, /\.climate-stepper \{[^}]*min-width:/);
   assert.match(source, /\.wallbox-stepper \{[^}]*background:var\(--ha-card-background,var\(--card-background-color,#fff\)\);[^}]*color:var\(--primary-text-color,#141414\);/);
   assert.match(source, /\.wallbox-shortcuts \{[^}]*pointer-events:auto;/);
-  assert.match(source, /\.wallbox-shortcuts button \{[^}]*background:var\(--ha-card-background,var\(--card-background-color,#fff\)\);[^}]*color:var\(--primary-text-color,#141414\);/);
+  assert.match(source, /\.wallbox-shortcuts button \{[^}]*background:var\(--opacity-contrast-100,color-mix\(in srgb,currentColor 14%,transparent\)\);[^}]*color:var\(--primary-text-color,#141414\);/);
   return card._setNumberValue("input_number.wallbox_current", 12).then(() => {
     assert.deepEqual(calls, [["input_number", "set_value", { entity_id: "input_number.wallbox_current", value: 12 }, undefined, false]]);
   });
@@ -1776,9 +1778,9 @@ test('binary hiding preserves explicit title-hidden and icon-only roles',()=>{
  assert.doesNotMatch(renderBinary({entity,show_name:false,show_state:true,show_label:false},states),/body icon-only/);
  assert.match(renderBinary({entity,show_name:false,show_state:false,show_label:false},states),/body icon-only/);
 });
-test('summaries retain active counts and unavailable members, but omit known All off',()=>{
+test('summaries retain usable counts without member warnings and omit known All off',()=>{
  const entity='switch.test',config={template:'hc_navigation_card',entity,variables:{summary_entities:[entity,'switch.other']}};
- for(const [first,second,expected] of [['on','off','1 active'],['on','unavailable','1 active, 1 unavailable'],['off','unavailable','All off, 1 unavailable']]) assert.match(renderBinary(config,{[entity]:{state:first},'switch.other':{state:second}}),new RegExp(`<div class="state">${expected}<`));
+ for(const [first,second,expected] of [['on','off','1 active'],['on','unavailable','1 active'],['off','unavailable','All off']]) assert.match(renderBinary(config,{[entity]:{state:first},'switch.other':{state:second}}),new RegExp(`<div class="state">${expected}<`));
  assert.doesNotMatch(renderBinary(config,{[entity]:{state:'off'},'switch.other':{state:'off'}}),/<div class="state">/);
 });
 test('toggle graphs use their actual toggle while preserving numeric state and header details',()=>{
@@ -1839,17 +1841,17 @@ test('outcome rendering failures cannot invent or hide native service errors',as
 const entity='light.test';const state=value=>({state:value,attributes:{}});const normal={states:{[entity]:state('on'),'sensor.reading':state('21')}};
 test('complete availability has priority over retained action and content errors',()=>{
  for(const [states,reason] of [[{},'Entity missing'],[{[entity]:state('unknown')},'Unknown'],[{[entity]:state('unavailable')},'Unavailable']]) {
-  const problem=cardProblem({entity},{states},{error:'Rejected',contentError:'History unavailable'});assert.equal(problem.kind,'neutral');assert.equal(problem.complete,true);assert.equal(problem.reason,`${reason} · Action failed: Rejected · History unavailable`);
+  const problem=cardProblem({entity},{states},{error:'Rejected',contentError:'History unavailable'});assert.equal(problem.kind,'neutral');assert.equal(problem.complete,true);assert.equal(problem.reason,reason);
  }
  const disconnected=cardProblem({entity},{...normal,connected:false});assert.equal(disconnected.kind,'neutral');assert.equal(disconnected.reason,'Disconnected');
  assert.equal(cardProblem({entity},{},{error:'Rejected'}).kind,'loading');assert.equal(cardProblem({template:'hc_title_card'},{connected:false}),null);
 });
-test('usable summary and glance data remain partial with failed actual members',()=>{
+test('usable summaries omit availability warnings while glance data retains a compact cue',()=>{
  const summary={template:'hc_navigation_card',entity,variables:{summary_entities:[entity,'light.missing']}};
- assert.equal(cardProblem(summary,normal).kind,'warning');assert.equal(cardProblem(summary,normal).complete,false);
+ assert.equal(cardProblem(summary,normal),null);
  assert.equal(cardProblem(summary,{states:{}}).kind,'neutral');
  const glance={template:'hc_glance_card',entity:'sensor.missing',variables:{entity1:'sensor.reading'}};assert.equal(cardProblem(glance,normal).kind,'warning');
- assert.equal(cardProblem({template:'hc_room_card',entity,variables:{light_entities:[entity,'light.missing']}},normal).kind,'neutral');
+ assert.equal(cardProblem({template:'hc_room_card',entity,variables:{light_entities:[entity,'light.missing']}},normal),null);
 });
 test('actual toggle, remote and graph failures remain distinct from readable primary content',()=>{
  for(const config of [
@@ -1886,7 +1888,7 @@ test('problem surfaces override custom colors and hidden normal fields without h
   card.hass = { states: { 'sensor.value': { state: '21', attributes: { unit_of_measurement: 'W' } } } };
   assert.match(card.shadowRoot.innerHTML, /data-problem="warning"/);
   assert.match(card.shadowRoot.innerHTML, /21 W/);
-  assert.match(card.shadowRoot.innerHTML, /sensor.missing: Entity missing/);
+  assert.match(card.shadowRoot.innerHTML, /Entity missing/);
 });
 
 test('failed media stays local, waits for explicit retry, and ignores old resource callbacks', () => {
@@ -1963,5 +1965,38 @@ test('unrelated HA updates retain idle and active strict access slides with the 
     card.hass = next;
     assert.equal(renders, change === 'unrelated' ? 0 : 1, change);
     if (change === 'unrelated') assert.equal(slide.hass, next);
+  }
+});
+
+
+test('availability labels omit long member names and recover retained errors when the device returns', () => {
+  const name = 'A very long auxiliary device name '.repeat(8);
+  const hass = { states: { 'switch.main': { state: 'on' }, 'sensor.power': { state: 'unavailable', attributes: { friendly_name: name } } } };
+  const config = { entity: 'switch.main', template: 'hc_switch_card', variables: { power_entity: 'sensor.power' } };
+  assert.equal(cardProblem(config, hass).reason, 'Unavailable');
+  const card = new MaraoCard();card.setConfig(config);card.hass = hass;
+  assert.match(card.shadowRoot.innerHTML, /class="problem"[^>]*><ha-icon[^>]*><\/ha-icon><span>Unavailable<\/span>/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, new RegExp(name));
+  card._actionError = 'Reported failure';
+  card.hass = { states: { 'switch.main': { state: 'unavailable' } } };
+  assert.equal(cardProblem(config, card._hass, { error: card._actionError }).reason, 'Unavailable');
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /Reported failure/);
+  card.hass = hass;
+  assert.match(card.shadowRoot.innerHTML, /Reported failure/);
+});
+
+test('partially available group tiles keep their counts without adding warning rows', () => {
+  for (const type of ['light','cover','climate','battery']) {
+    const card = new MaraoCard(), ids = ['sensor.first','sensor.missing'];
+    card.setConfig({ template: 'hc_entity_group_card', name: 'Group', variables: { entity_type: type, summary_entities: ids }, tap_action: { action: 'navigate', navigation_path: '#group' } });
+    const state = { light: 'on', cover: 'open', climate: 'heat', battery: '10' }[type];
+    for (const failure of ['unknown','unavailable',null]) {
+      card.hass = { states: { [ids[0]]: { state }, ...(failure ? { [ids[1]]: { state: failure, attributes: { friendly_name: 'Long member name '.repeat(10) } } } : {}) } };
+      const markup = card.shadowRoot.innerHTML.split('</style>')[1];
+      assert.doesNotMatch(markup, /class="problem"|data-problem=|unavailable|Unknown|Entity missing|Long member name/);
+      assert.match(markup, type === 'battery' ? /10% · 1 low/ : /1 active/);
+      assert.doesNotMatch(markup, /data-card-action[^>]* disabled/);
+      assert.deepEqual(card._config.variables.summary_entities, ids);
+    }
   }
 });

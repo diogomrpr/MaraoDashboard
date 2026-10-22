@@ -12,8 +12,7 @@ globalThis.navigationTranslations = (await import('../../custom_components/marao
 const dashboard = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url), "utf8");
 const runtime = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
 const { MaraoCard, alarmActions, alarmCodeRequired, accessOpenerService } = runtime;
-const modelSource = await fs.readFile(new URL("../../frontend_src/editor-model.js", import.meta.url), "utf8");
-const { validateConfig, normalizeConfig, serializeConfig } = await import(`data:text/javascript;base64,${Buffer.from(modelSource).toString("base64")}`);
+const { validateConfig, normalizeConfig, serializeConfig } = await import('../../frontend_src/editor-model.js');
 const entity = "alarm_control_panel.safe";
 const reported = (state = "disarmed", attributes = {}) => ({ state, attributes: { supported_features: 55, ...attributes } });
 function alarm(t, hass) {
@@ -156,6 +155,7 @@ test("strict slide routes every native opener once and rejects incompatible over
     slide.connectedCallback();
     slide.hass = { states: { [id]: { state } }, callService: async (...args) => { calls.push(args); } };
     const track = { clientWidth: 310, classList: { add() {}, remove() {} }, getBoundingClientRect: () => ({ left: 0, right: 310, top: 0, bottom: 64 }), setPointerCapture() {}, releasePointerCapture() {} };
+    slide.shadowRoot.querySelector = selector => selector === '.thumb' ? { getBoundingClientRect: () => ({ left: 4, right: 58, top: 5, bottom: 59 }) } : null;
     const event = { currentTarget: track, button: 0, preventDefault() {}, stopPropagation() {} };
     const point = (x, y = 20) => ({ pointerId: 1, clientX: x, clientY: y });
     for (const [x, y] of [[24, 20], [80, 20], [32, 90]]) {

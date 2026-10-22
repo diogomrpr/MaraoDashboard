@@ -109,8 +109,10 @@ registry identity so existing gallery and realistic-page references remain stabl
 The production runtime uses the same Frigate and UniFi interfaces for both
 real integrations and these disposable fixtures.
 
-Preparation composes Cases as an ordinary `pages.custom` entry and lets the
-generator supply its navigation. Keep gallery YAML free of separate navbar
+Preparation composes Cases as an ordinary page and lets the generator supply
+its navigation. Each editable example gets its own section so a tall card cannot
+stretch unrelated examples. Explicit multi-card layout fixtures stay together
+to exercise shared section sizing. Keep gallery YAML free of separate navbar
 includes, and keep every absolute route inside `/marao-dashboard`.
 
 Static validation checks that the editor catalog remains represented, the

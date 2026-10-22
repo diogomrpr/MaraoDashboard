@@ -238,7 +238,7 @@ async function main() {
         await configurePageEmulation(context,page,scenario);
         if(scenario.name==='iphone-normal'&&!process.argv.includes('--alignment'))await persistence(config,page);
         await page.goto(config.url+'/marao-dashboard/overview');
-        const card=page.locator('marao-navbar-card');await card.locator('.nav').waitFor();await assertCurrentFrontend(page);await applyVisualPreferences(page,scenario,theme);
+        const card=page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])');await card.locator('.nav').waitFor();await assertCurrentFrontend(page);await applyVisualPreferences(page,scenario,theme);
         await exercise(page,card,scenario.name+'-'+theme,['iphone-normal','android-normal'].includes(scenario.name)&&!process.argv.includes('--alignment'));
         await page.evaluate(routes=>{
           const card=document.createElement('marao-navbar-card');card.id='bounded-navbar-preview';card.preview=true;

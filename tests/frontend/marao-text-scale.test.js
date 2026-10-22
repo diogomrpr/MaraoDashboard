@@ -289,9 +289,9 @@ function slideFixture() {
       activeCaptures.delete(pointerId);
     },
   };
-  const fill = { style: {} };
-  const thumb = { style: {} };
-  const nodes = { ".track": track, ".fill": fill, ".thumb": thumb };
+  const thumb = { style: {}, getBoundingClientRect: () => ({ left: 4, right: 58, top: 5, bottom: 59 }) };
+  const label = { style: {} };
+  const nodes = { ".track": track, ".thumb": thumb, ".label": label };
   const slide = new MaraoSlideToOpen();
   slide.shadowRoot = {
     innerHTML: "",
@@ -304,7 +304,7 @@ function slideFixture() {
     states: { "lock.front_door": { state: "locked", attributes: { friendly_name: "Front Door" } } },
     callService: (...args) => serviceCalls.push(args),
   };
-  return { attributes, captured, fill, listeners, released, serviceCalls, slide, thumb, track };
+  return { attributes, captured, label, listeners, released, serviceCalls, slide, thumb, track };
 }
 
 function pointerEvent(track, clientX, clientY, pointerId = 1) {
@@ -320,6 +320,42 @@ function pointerEvent(track, clientX, clientY, pointerId = 1) {
     stopPropagation() { this.stopped = true; },
   };
 }
+
+test('slide starts across the whole round handle for pointer and touch input without painting a fill', () => {
+  for (const input of ['pointer', 'touch']) for (const [x, y] of [[5,32],[57,32],[31,6],[31,58],[31,32]]) {
+    const { slide, track, thumb, label, serviceCalls } = slideFixture();
+    const start = pointerEvent(track, x, y);
+    if (input === 'touch') { delete start.pointerId; start.identifier = 7; }
+    slide._start(start, start);
+    assert.equal(slide._pointerId, input === 'touch' ? 7 : 1);
+    assert.equal(start.prevented, false);
+    const move = { ...start, clientX: x + 200 };
+    slide._move(move, move);
+    assert.equal(thumb.style.transform, 'translateX(200px)');
+    assert.equal(label.style.opacity, '0');
+    slide._end(move, move);slide._end(move, move);
+    assert.equal(serviceCalls.length, 1);
+    assert.equal(label.style.opacity, '1');
+    slide.disconnectedCallback();
+  }
+});
+
+test('slide start follows the measured handle after layout changes and rejects the surrounding track', () => {
+  const { slide, track, thumb, serviceCalls } = slideFixture();
+  thumb.getBoundingClientRect = () => ({ left: 4, right: 58, top: 37, bottom: 91 });
+  track.getBoundingClientRect = () => ({ left: 0, right: 262, top: 0, bottom: 128 });
+  for (const [x,y] of [[3,64],[59,64],[31,36],[31,92],[150,64]]) {
+    const start = pointerEvent(track,x,y);slide._start(start,start);
+    assert.equal(slide._pointerId,null);
+    const move = pointerEvent(track,250,64);slide._move(move,move);slide._end(move,move);
+  }
+  assert.equal(serviceCalls.length,0);
+  for (const [x,y] of [[5,64],[57,64],[31,38],[31,90]]) {
+    const start=pointerEvent(track,x,y);slide._start(start,start);assert.equal(slide._pointerId,1);
+    slide._cancel({currentTarget:track},start);
+  }
+  assert.equal(serviceCalls.length,0);
+});
 
 test('access tracks survive unrelated HA updates and refresh when the connection changes', () => {
   const { slide, listeners } = slideFixture();
@@ -519,7 +555,7 @@ test("slide control keeps an action-only label, meaningful semantics, and a larg
   assert.match(slide.shadowRoot.innerHTML, /top: calc\(50% - 27px\)/);
   assert.doesNotMatch(slide.shadowRoot.innerHTML, /padding: 8px 8px 72px|top: auto; bottom: 4px/);
   assert.match(slide.shadowRoot.innerHTML, /--marao-slide-foreground: var\(--primary-text-color\)/);
-  assert.match(slide.shadowRoot.innerHTML, /--marao-slide-progress: color-mix\(in srgb, var\(--secondary-background-color\) 65%, var\(--primary-text-color\)\)/);
+  assert.doesNotMatch(slide.shadowRoot.innerHTML, /class="fill"|marao-slide-progress/);
   assert.match(slide.shadowRoot.innerHTML, /font-size: max\(1\.125rem, var\(--font-size-primary\)\)/);
   assert.match(slide.shadowRoot.innerHTML, /<ha-icon icon="mdi:chevron-right" aria-hidden="true"><\/ha-icon>/);
   assert.doesNotMatch(slide.shadowRoot.innerHTML, /var\(--color-green\)/);

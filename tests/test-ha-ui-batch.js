@@ -37,12 +37,12 @@ async function batteryChecks(page, config, output, scenario, theme, geometryOnly
       const copy = structuredClone(e._config); copy.variables.summary_entities.push('sensor.marao_dashboard_test_case_battery_unavailable'); e.setConfig(copy);
     }, await partial.elementHandle());
     await set(10); assert.deepEqual(await color(group), await color(normal), 'Critical partial availability lost the red palette');
-    assert.match(await group.locator('.problem').textContent(), /Unavailable|Indisponível/);
+    assert.equal(await group.locator('.problem').count(), 0, 'Partial group availability must not add an error label');
     assert.equal(await group.locator('[data-card-action]').isDisabled(), false);
     await group.locator('[data-card-action]').tap();
     await page.locator('.marao-popup-overlay').waitFor({ state: 'visible' });
     await page.locator('.marao-popup-close').tap(); await page.locator('.marao-popup-overlay').waitFor({ state: 'detached' });
-    await set(50); assert.notDeepEqual(await color(group), await color(normal), 'Noncritical partial availability must retain the warning palette');
+    await set(50); assert.deepEqual(await color(group), await color(normal), 'Partial availability must retain the usable battery palette');
     assert.equal(await group.evaluate(e => {
       e.hass = { ...e._hass, connected: false };
       return e.shadowRoot.querySelector('[data-card-action]').disabled;
@@ -93,10 +93,12 @@ async function main() {
     try {
       const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
       await context.addInitScript(setBrowserToken, { hassUrl: config.url, ...accessToken(config) });
-      page = await context.newPage(); await configurePageEmulation(context, page, scenario);
+      page = await context.newPage();
+      const cameraLedger = await require('./camera-request-ledger').managedCameraLedger(context, page, { output, scenario: scenario.name, theme });
+      await configurePageEmulation(context, page, scenario);
       const errors = [], calls = [];
       page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (['warning', 'error'].includes(m.type())) errors.push(m.text()); });
-      page.on('requestfailed', r => errors.push('Failed ' + new URL(r.url()).pathname)); page.on('response', r => { if (r.status() >= 400) errors.push('HTTP ' + r.status() + ' ' + new URL(r.url()).pathname); });
+      page.on('response', r => { if (r.status() >= 400) errors.push('HTTP ' + r.status() + ' ' + new URL(r.url()).pathname); });
       page.on('websocket', socket => socket.on('framesent', ({ payload }) => { const m = JSON.parse(payload); if (m.type === 'call_service') calls.push([m.domain, m.service]); }));
       await page.goto(config.url + '/marao-dashboard/card-test'); await page.locator('marao-card .body').first().waitFor({ state: 'attached' });
       await assertCurrentFrontend(page); await applyVisualPreferences(page, scenario, theme);
@@ -131,7 +133,8 @@ async function main() {
           }
         }
       }
-      await page.waitForLoadState('networkidle'); assert.deepEqual(errors, []);
+      await readySubtree(page, page.locator('hui-root'), scenario, theme);
+      await cameraLedger.assert(); assert.deepEqual(errors, []);
       fs.writeFileSync(path.join(output, `${scenario.name}-${theme}.json`), JSON.stringify({ passed: true, scenario: scenario.name, theme }), { mode: 0o600 });
       console.log(`Battery/access focused checks: ${scenario.name}/${theme} passed.`);
     } catch (error) { if (page) await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-failure.png`), scale: 'css' }); throw error; }

@@ -268,6 +268,27 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
     if hass.data[DOMAIN].get(WEBSOCKET_REGISTERED):
         return
 
+    @websocket_api.websocket_command({
+        "type": "marao_dashboard/camera/netatmo_events",
+        vol.Required("entity_id"): cv.entity_id,
+        vol.Optional("limit", default=12): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
+    })
+    @websocket_api.async_response
+    async def websocket_netatmo_events(hass, connection, msg):
+        from .camera_events import netatmo_events
+
+        try:
+            result = netatmo_events(hass, connection.user, msg["entity_id"], msg["limit"])
+        except PermissionError:
+            connection.send_error(msg["id"], "unauthorized", "Camera access denied")
+            return
+        except ValueError as err:
+            connection.send_error(msg["id"], "camera_events_unavailable", str(err))
+            return
+        connection.send_result(msg["id"], result)
+
+    websocket_api.async_register_command(hass, websocket_netatmo_events)
+
     @websocket_api.websocket_command({"type": "marao_dashboard/frontend/subscribe"})
     @callback
     def websocket_frontend(hass, connection, msg):

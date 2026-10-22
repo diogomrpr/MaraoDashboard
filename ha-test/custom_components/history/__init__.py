@@ -93,6 +93,16 @@ class FixtureHistoryPeriodView(core_history.HistoryPeriodView):
             return await super().get(request, datetime)
         end = min(end, now)
         records = []
+        if case == "loading":
+            # Hourly energy buckets need a baseline and observations inside each hour.
+            cursor = start
+            while cursor <= end:
+                stamp = cursor.isoformat()
+                records.append({"entity_id": entity, "state": str(21 + (cursor - start).total_seconds() / 3600), "attributes": {}, "last_changed": stamp, "last_updated": stamp})
+                if cursor == end:
+                    break
+                cursor = min(cursor + timedelta(minutes=15), end)
+            return self.json([records])
         if demo:
             cursor = start
             previous = None

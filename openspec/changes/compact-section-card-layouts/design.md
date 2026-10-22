@@ -100,6 +100,16 @@ Use reference-theme geometry for narrow 320, representative iPhone/Android portr
 4. During future explicit versioned release preparation, run scoped `test:ha:upgrade -- --scope control-grid` for affected supported source formats and generated-section features. Preserved-install proof, independent expected data, relevant failure recovery and disposable cleanup are required because owned output changes; fresh fixture preparation is insufficient. Require scoped `verify:publish`, applicable exact-commit CI and `verify:release` for publication. Reuse only unchanged valid evidence.
 5. Roll back the matching previous package, exact source, generated output and affected owned state together. Do not downgrade assets alone while leaving new section metadata installed. No release, commit, push, tag or live upgrade is part of creating this plan.
 
+### Compact Android widths
+
+Ordinary groups use a 120 CSS-pixel cell floor and six times the primary font
+size, shared by CSS grids and runtime group capacity. Two configured columns
+fit in 248px of content space at 18px/20px text, or 272px at 22px text. This
+replaces the overly conservative 136px/7.5-times-font cutoff. Cards wrap and grow
+vertically rather than reducing text, icon or control sizes; 200% text still
+reflows to one column on ordinary phone widths. Preferred columns, mounted
+children, section equality and the 80px app-logo floor remain intact.
+
 ### Compact media app groups
 
 Logo-only media app groups use an 80px capacity floor independently of ordinary

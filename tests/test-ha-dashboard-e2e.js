@@ -33,7 +33,7 @@ function dashboardNavigationViolations(dashboard, dashboardKey) {
   const visit = (value) => {
     if (Array.isArray(value)) return value.forEach(visit);
     if (!value || typeof value !== "object") return;
-    if (value.type === "custom:marao-popup-card" && typeof value.hash === "string") {
+    if (["custom:marao-popup-card", "custom:marao-native-popup-card"].includes(value.type) && typeof value.hash === "string") {
       popupHashes.add(value.hash);
     }
     for (const key of ["navigation_path", "room_navigation_path", "popup_hash"]) {
@@ -91,7 +91,7 @@ function buildViewChecks(dashboard, dashboardUrl, entityStates = {}) {
   };
   return (dashboard.views || []).map((view, index) => {
     const configuredCounts = {};
-    walk(view.cards || [], configuredCounts);
+    walk([view.cards || [], view.sections || []], configuredCounts);
     const pathName = String(view.path ?? index).replace(/^\/+/, "");
     return { name: view.title || pathName, path: pathName, url: `/${String(dashboardUrl).split("/").filter(Boolean)[0]}/${pathName}`, configuredCounts };
   });
@@ -145,7 +145,7 @@ async function titleLayoutIssues(page, families = [], subtree) {
       if (!sliderHeader || !body.classList.contains('slider-header')) issues.push(`${name}: missing compact family header marker`);
       if (Math.abs(rect.width - copy.width) > 1 || rect.left < head.left - .5 || rect.right > head.right + .5) issues.push(`${name}: compact title does not use its text block`);
       if (picture) {
-        const adjacent = Math.abs((copy.top + copy.bottom - picture.top - picture.bottom) / 2) <= 1 && copy.right <= picture.left - 4;
+        const adjacent = Math.abs(copy.top - picture.top) <= 1 && copy.right <= picture.left - 4;
         const primarySize = parseFloat(getComputedStyle(title).getPropertyValue?.('--font-size-primary')) || 18;
         const constrainedWrap = head.width < primarySize * 3 + picture.width + 8 - .5 && copy.bottom <= picture.top - 4
           && picture.left >= head.left - .5 && picture.right <= head.right + .5 && picture.bottom <= head.bottom + .5;
@@ -157,6 +157,17 @@ async function titleLayoutIssues(page, families = [], subtree) {
       }
       return issues;
     }
+    if (parent.classList.contains('wallbox-card')) {
+      const value = parent.querySelector('.wallbox-value')?.getBoundingClientRect();
+      const stepper = parent.querySelector('.wallbox-stepper')?.getBoundingClientRect();
+      if (!value || !stepper || value.bottom > rect.top - 4 || rect.right > stepper.left - 4
+        || value.right > stepper.left - 4 || Math.abs(value.left - rect.left) > 1
+        || stepper.right > parent.getBoundingClientRect().right + .5) issues.push(`${name}: current reading/title overlap the stepper`);
+      for (const button of parent.querySelectorAll('.wallbox-shortcuts button')) {
+        if (button.getBoundingClientRect().top < rect.bottom - 1) issues.push(`${name}: shortcut appears above the current title`);
+      }
+      return issues;
+    }
     const icon = sliderHeader ? parent.querySelector(':scope > .icon') : null;
     const iconBox = icon?.getBoundingClientRect();
     const titleWidth = contentWidth - (iconBox ? iconBox.width + parseFloat(style.columnGap) : 0);
@@ -165,6 +176,7 @@ async function titleLayoutIssues(page, families = [], subtree) {
       || rect.right > iconBox.left - parseFloat(style.columnGap) + 1)) issues.push(`${name}: title and icon do not share a separated header row`);
     for (const child of parent.children) {
       const other = child.getBoundingClientRect();
+      if (getComputedStyle(child).clipPath === 'inset(50%)' && other.width <= 1 && other.height <= 1) continue;
       if (child !== title && child !== icon && other.width && other.height && other.top < (iconBox ? Math.max(rect.bottom, iconBox.bottom) : rect.bottom) - 1) issues.push(`${name}: content appears alongside or above its title`);
     }
     return issues;
@@ -747,7 +759,6 @@ async function checkHistoryCases(page, { loading = true } = {}) {
       }
     }
   } finally { page.__historyLoadingGate?.release(); }
-  await page.waitForLoadState('networkidle');
   await page.waitForFunction((examples) => {
     const elements = [];
     const visit = (root) => {
@@ -768,11 +779,24 @@ async function checkHistoryCases(page, { loading = true } = {}) {
     fs.writeFileSync(path.join(require('./verification-browser').artifactDirectory('dashboard-e2e'), 'history-failure.json'), JSON.stringify(states, null, 2), { mode: 0o600 });
     throw error;
   });
-  const repeated = await page.evaluate((examples) => examples.flatMap(({ entity }) => {
-    const requests = performance.getEntriesByType("resource").filter((entry) => new URL(entry.name).searchParams.get("filter_entity_id") === entity);
-    return requests.length > 3 ? [`${entity}: ${requests.length} history requests for three cards`] : [];
-  }), manifest.historyCases);
-  if (repeated.length) throw new Error(repeated.join("\n"));
+  await page.waitForFunction(() => {
+    const find = root => [...root.querySelectorAll('marao-energy-period-card')].every(card => !card._loading && !card._prefetching)
+      && [...root.querySelectorAll('*')].every(element => !element.shadowRoot || find(element.shadowRoot));
+    return find(document);
+  });
+  const repeated = [], entities = new Set(manifest.historyCases.map(example => example.entity));
+  const record = request => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith('/api/history/period/') && entities.has(url.searchParams.get('filter_entity_id'))) repeated.push(url.searchParams.get('filter_entity_id'));
+  };
+  page.on('request', record);
+  try {
+    await cards.evaluateAll(elements => {
+      for (const card of elements) if (card._hass) card.hass = { ...card._hass };
+    });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  } finally { page.off('request', record); }
+  assert.deepEqual(repeated, [], 'Settled history requested again after an unchanged HA update');
 }
 
 async function checkOverviewPopups(page, config, screenshotRoot) {
@@ -1186,7 +1210,7 @@ async function captureClimateFeedback(page, name, target, output, visualProfile)
     const valueIssues = await target.evaluate(element => {
       const issues = [];
       for (const output of element.shadowRoot.querySelectorAll('.number-value')) {
-        const track = output.closest('.number-stepper').getBoundingClientRect();
+        const track = output.closest('.number-stepper,.wallbox-card').getBoundingClientRect();
         const range = document.createRange(); range.selectNodeContents(output);
         for (const rect of range.getClientRects()) if (rect.width && rect.height
           && (rect.left < track.left - .5 || rect.right > track.right + .5 || rect.top < track.top - .5 || rect.bottom > track.bottom + .5)) {
@@ -1202,12 +1226,12 @@ async function captureClimateFeedback(page, name, target, output, visualProfile)
     assert.deepEqual(valueIssues, [], name);
   }
   await page.screenshot({ path: path.join(output, `${name}.png`), scale: 'css' });
-  const navbar = await page.locator('marao-navbar-card nav').boundingBox();
+  const navbar = await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').boundingBox();
   const bottom = navbar.y - 8;
   if (target && await target.evaluate((element, limit) => element.getBoundingClientRect().height > limit - 16, bottom)) {
     await verifyProfile();
     for (let attempt = 0; attempt < 3; attempt++) {
-    const limit = (await page.locator('marao-navbar-card nav').boundingBox()).y - 8;
+    const limit = (await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').boundingBox()).y - 8;
     await target.evaluate((element, limit) => {
       const distance = Math.max(0, element.getBoundingClientRect().bottom - limit);
       let scrolled = false;
@@ -1223,7 +1247,7 @@ async function captureClimateFeedback(page, name, target, output, visualProfile)
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     if (await target.evaluate((element, limit) => element.getBoundingClientRect().bottom <= limit + .5, limit)) break;
     }
-    const limit = (await page.locator('marao-navbar-card nav').boundingBox()).y - 8;
+    const limit = (await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').boundingBox()).y - 8;
     assert.ok(await target.evaluate((element, limit) => element.getBoundingClientRect().bottom <= limit + .5, limit),
       `${name}: the captured card bottom is obscured by the navbar`);
     await page.screenshot({ path: path.join(output, `${name}-bottom.png`), scale: 'css' });
@@ -1384,7 +1408,7 @@ async function checkClimateFeedback(page, serviceCalls, output, visualProfile) {
   } finally {
     await reset();
     await page.reload();
-    await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+    await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
   }
 }
 
@@ -1696,16 +1720,16 @@ async function main() {
       let coldAssets = 0;
       if (!geometryOnly) {
         await page.goto(`${baseUrl}/marao-dashboard/overview`, { waitUntil: 'domcontentloaded' });
-        await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
-        await assertCurrentFrontend(page); await page.waitForLoadState('networkidle');
+        await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
+        await assertCurrentFrontend(page); await applyVisualPreferences(page, scenario, requestedTheme);
         coldAssets = await page.evaluate(() => performance.getEntriesByType('resource').filter(entry => entry.name.includes('/MaraoHistoryChart.js')).length);
         assert.equal(coldAssets, 0, 'Ordinary Home load fetched the detailed Chart.js bundle');
       }
       await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
-      await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+      await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
       await assertCurrentFrontend(page); await applyVisualPreferences(page, scenario, requestedTheme);
       await require('./history-detail-checks').checkHistoryDetails(page, serviceCalls, { scenario, theme: requestedTheme, geometryOnly, coldAssets });
-      await page.waitForLoadState('networkidle'); await assertNoBrowserErrors(`Chart details/${scenario.name}/${requestedTheme}`);
+      await applyVisualPreferences(page, scenario, requestedTheme); await assertNoBrowserErrors(`Chart details/${scenario.name}/${requestedTheme}`);
       console.log(`Chart details ${scenario.name}/${requestedTheme}: exact readings, windows, retained resources, safe inspection and selected geometry passed.`);
     } catch (error) {
       await require('./verification-browser').capture(page, { path: path.join(screenshotRoot, `chart-details-${scenario.name}-${requestedTheme}-failure.png`), scale: 'css' });
@@ -1728,7 +1752,7 @@ async function main() {
           browser = await chromium.launch(); ({ context, page, errors } = await createSession(theme));
         }
         await page.goto(`${baseUrl}/marao-dashboard/${cameraSlowOnly ? 'security' : cameraLiveOnly ? 'entrance' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
-        await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+        await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         if (selectedCheck === 'history') await checkHistoryCases(page);
         if (cameraLiveOnly) {
@@ -1763,7 +1787,7 @@ async function main() {
   if (process.argv.includes('--media-only')) {
     try {
       await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
-      await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+      await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
       await assertCurrentFrontend(page);
       await checkMediaRecovery(page, serviceCalls, path.join(screenshotRoot, 'media-recovery'));
       await page.waitForLoadState('networkidle');
@@ -1776,7 +1800,7 @@ async function main() {
       for (const theme of ['light','dark']) {
         if (theme === 'dark') { await browser.close(); browser = await chromium.launch(); ({ context, page, errors } = await createSession(theme)); }
         await page.goto(`${baseUrl}/marao-dashboard/card-test`);
-        await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+        await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);
         await checkEntityGroups(page, serviceCalls, path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), `entity-groups-${scenario.name}-${theme}`), scenario, theme, config);
@@ -1799,7 +1823,7 @@ async function main() {
           ({ context, page, errors } = await createSession(theme));
         }
         await page.goto(`${baseUrl}/marao-dashboard/${cameraSlowOnly ? 'security' : cameraLiveOnly ? 'entrance' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
-        await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+        await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);
         await checkNativeSurfaces(page);
@@ -1829,12 +1853,12 @@ async function main() {
   try {
     if (process.argv.includes("--ui-only")) {
       await page.goto(`${baseUrl}/marao-dashboard/overview`, { waitUntil: "domcontentloaded" });
-      await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
+      await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible" });
       await assertCurrentFrontend(page);
       await checkOverviewPopups(page, config, captureScreenshots ? screenshotRoot : null);
       await checkGeneratedMedia(page, config, captureScreenshots ? screenshotRoot : null);
       await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: "domcontentloaded" });
-      await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
+      await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible" });
       await checkCardContent(page, serviceCalls);
       await assertNoBrowserErrors("Popup and card content checks");
       console.log("Generated popups and gallery content checks passed.");
@@ -1842,7 +1866,7 @@ async function main() {
     }
     if (process.argv.includes("--actions-only")) {
       await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: "domcontentloaded" });
-      await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
+      await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible" });
       await assertCurrentFrontend(page);
       for (const theme of ['light', 'dark']) {
         await applyVisualPreferences(page, scenario, theme);
@@ -1856,7 +1880,7 @@ async function main() {
       return;
     }
     await page.goto(`${baseUrl}/marao-dashboard/overview`, { waitUntil: "domcontentloaded" });
-    await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
+    await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible" });
     await assertCurrentFrontend(page);
     await assertNoBrowserErrors("Overview");
     const overview = await deepSnapshot();
@@ -1898,7 +1922,7 @@ async function main() {
     const checks = buildViewChecks(dashboard.config, dashboard.payload.dashboard_url, dashboard.states);
     for (const view of checks) {
       await page.goto(`${baseUrl}${view.url}`, { waitUntil: "domcontentloaded" });
-      await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
+      await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible" });
       await assertCurrentFrontend(page);
       await scrollDashboard(page);
       await page.waitForLoadState('networkidle');
@@ -1908,7 +1932,7 @@ async function main() {
       if (!result.nav) throw new Error(`${view.name} did not render custom:marao-navbar-card.`);
     }
     await page.goto(`${baseUrl}/marao-dashboard/energy`, { waitUntil: "domcontentloaded" });
-    await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
+    await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible" });
     await assertCurrentFrontend(page);
     await scrollDashboard(page);
     await page.waitForLoadState('networkidle');
@@ -1923,7 +1947,7 @@ async function main() {
       if (!cardTestSerialized.includes(type)) throw new Error(`Card test dashboard is missing ${type}.`);
     }
     await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: "domcontentloaded" });
-    await page.locator("marao-navbar-card").first().waitFor({ state: "visible" });
+    await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible" });
     await assertCurrentFrontend(page);
     // The dedicated history visit holds the initial request to prove loading;
     // this later gallery revisit checks the completed states and request counts.
@@ -2277,7 +2301,7 @@ async function main() {
           screenshotErrors.push(`Failed ${request.resourceType()} request: ${new URL(request.url()).pathname} (${request.failure()?.errorText || "unknown error"})`);
         });
         await screenshotPage.goto(`${baseUrl}${view.url}`, { waitUntil: "domcontentloaded" });
-        await screenshotPage.locator("marao-navbar-card").first().waitFor({ state: "visible", timeout: 10000 });
+        await screenshotPage.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible", timeout: 10000 });
         await assertCurrentFrontend(screenshotPage);
         const filename = view.url.split("/").filter(Boolean).at(-1).replace(/[^a-z0-9-]/gi, "-");
         await scrollDashboard(screenshotPage, { screenshotPrefix: path.join(screenshotRoot, filename) });

@@ -13,5 +13,9 @@ not require external image requests when the dashboard runs.
   https://developer.spotify.com/images/guidelines/design/2024-spotify-logo-icon.zip
   Guidelines: https://developer.spotify.com/documentation/design
 
-Apple TV and MEO artwork retain their existing files. Brand marks remain the
+- MEO: unmodified official MEO SVG linked by https://www.meo.pt/, retrieved
+  2026-10-22. Uses the simple MEO mark rather than MEO Go artwork:
+  https://conteudos.meo.pt/Style%20Library/consumo/images/logo-meo.svg
+
+Apple TV artwork retains its existing file. Brand marks remain the
 property of their respective owners.

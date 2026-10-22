@@ -31,13 +31,13 @@ async function setRoomOffline(card) {
 }
 
 async function capture(page, card, filename, scenario, theme) {
-  await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+  await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
   await page.evaluate(() => document.fonts.ready);
   await card.evaluate(element => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
   const aboveNavbar = async () => {
     for (let attempt = 0; attempt < 3; attempt++) {
-      await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
-      const bar = await visibleBounds(page.locator('marao-navbar-card'), 'nav');
+      await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
+      const bar = await visibleBounds(page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])'), 'nav');
       await card.evaluate((element, bottom) => {
         const delta = element.getBoundingClientRect().bottom - bottom + 8;
         if (delta <= 0) return;
@@ -49,7 +49,7 @@ async function capture(page, card, filename, scenario, theme) {
         document.scrollingElement.scrollBy({ top: delta, behavior: 'instant' });
       }, bar.y);
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-      const bounds = await visibleBounds(card), currentBar = await visibleBounds(page.locator('marao-navbar-card'), 'nav');
+      const bounds = await visibleBounds(card), currentBar = await visibleBounds(page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])'), 'nav');
       if (bounds.y + bounds.height <= currentBar.y - 7) break;
     }
   };
@@ -73,7 +73,7 @@ async function capture(page, card, filename, scenario, theme) {
   }
   const button = card.locator('[data-room-lights-off]');
   if (await button.count()) {
-    const bounds = await visibleBounds(card, '[data-room-lights-off]'), bar = await visibleBounds(page.locator('marao-navbar-card'), 'nav');
+    const bounds = await visibleBounds(card, '[data-room-lights-off]'), bar = await visibleBounds(page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])'), 'nav');
     assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= bar.y,
       'Room action cannot be scrolled above the navbar: ' + JSON.stringify({ name: await card.locator('.title').textContent(), bounds, bar }));
   }
@@ -143,7 +143,7 @@ async function main() {
         for (const view of ['card-test', 'rooms']) {
           await page.goto(config.url + '/marao-dashboard/' + view);
           await page.locator('marao-card .room-bottom').first().waitFor();
-          await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+          await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
           await assertCurrentFrontend(page); await applyVisualPreferences(page, scenario, theme);
           await page.waitForLoadState('networkidle');
           await checkRoomComposition(page);

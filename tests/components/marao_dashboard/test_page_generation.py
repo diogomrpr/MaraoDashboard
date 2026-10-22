@@ -338,10 +338,11 @@ def test_editor_section_moves_preserve_generated_identities_sheets_and_protected
 
 
 @pytest.mark.parametrize("popup_stream", [None, "", "camera.front_high"])
-def test_camera_popup_stream_preserves_dashboard_identity_and_event_options(popup_stream):
+@pytest.mark.parametrize("provider", ["unifiprotect", "netatmo"])
+def test_camera_popup_stream_preserves_dashboard_identity_and_event_options(popup_stream, provider):
     item = {"entity_id": "camera.front_low", "template": "hc_camera_card", "name": "Entrance",
             "show_name": False, "future": [], "variables": {"popup_stream_entity": popup_stream,
-            "event_provider": "unifiprotect", "unifi_protect_media_source": "media-source://unifiprotect/test", "event_limit": 7}}
+            "event_provider": provider, "unifi_protect_media_source": "media-source://unifiprotect/test", "event_limit": 7}}
     original = deepcopy(item)
     card, popup = g._page_card(item, "marao-dashboard"), g._camera_popup(item)
     assert card["entity"] == "camera.front_low"
@@ -349,7 +350,7 @@ def test_camera_popup_stream_preserves_dashboard_identity_and_event_options(popu
     assert live == {"type": "custom:marao-card", "template": "hc_camera_card", "entity": popup_stream or "camera.front_low",
                     "name": "Entrance", "show_name": False, "tap_action": {"action": "fullscreen"}}
     assert events["entity"] == "camera.front_low"
-    assert events["event_provider"] == "unifiprotect" and events["limit"] == 7
+    assert events["event_provider"] == provider and events["limit"] == 7
     assert events["unifi_protect_media_source"] == "media-source://unifiprotect/test"
     assert item == original
 
@@ -382,3 +383,66 @@ def test_camera_preload_option_preserves_source_and_rejects_non_booleans(preload
         assert {key: value for key, value in generated.items() if key != "popup_hash"} == variables
         assert "preload_stream" not in g._camera_popup(item)["cards"][0].get("variables", {})
     assert variables == original
+
+
+@pytest.mark.parametrize("members", [[], [
+    {"entity_id": "sensor.kitchen", "name": "Kitchen", "future": {"keep": []}},
+    {"entity_id": "sensor.heating", "name": ""},
+]])
+def test_power_history_popup_preserves_devices_across_canonical_native_and_legacy_paths(members):
+    from custom_components.marao_dashboard.native import compile_card
+    options = {"history_popup": True, "power_devices": members, "display_unit": "kW", "display_precision": 2, "future": []}
+    descriptor = {"template": "hc_graph_card", "entity_id": "sensor.house", "name": "House", "variables": options}
+    source = {"config_version": 2, "name": "Power", "landing_page": "energy", "pages": [{"name": "Energy", "path": "energy", "entities": [descriptor]}]}
+    before = deepcopy(source)
+    registry = [{"entity_id": "sensor.house", "unit_of_measurement": "W"}, {"entity_id": "sensor.kitchen", "unit_of_measurement": "kW"}, {"entity_id": "sensor.heating", "unit_of_measurement": "W"}]
+    item = g._resolve_pages(source, registry)["pages"][0]["_sections"][0]["ordered_cards"][0]
+    canonical = g._page_card_popups(item)[0]
+    native = compile_card({"type": "custom:marao-native-graph-card", "entity": "sensor.house", "name": "House", "variables": options}, "power", "marao-dashboard", registry)
+    legacy = g._energy_popups({"pages": {"energy": {"house_power": descriptor}}})["energy_house_power"]
+    expected = {"type": "custom:marao-power-history-card", "entity": "sensor.house", "name": "House", "power_devices": members, "display_unit": "kW", "display_precision": 2}
+    for popup in [canonical, native["popups"][0], legacy]:
+        assert popup["cards"] == [expected]
+    assert source == before
+    assert native["card"]["variables"]["future"] == []
+    assert native["card"]["tap_action"]["navigation_path"] == native["popups"][0]["hash"]
+
+
+@pytest.mark.parametrize("devices,message", [
+    (None, "must be a list"),
+    ([{"entity_id": "light.kitchen"}], "Choose a power sensor"),
+    ([{"entity_id": "sensor.house"}], "must be unique"),
+    ([{"entity_id": "sensor.kitchen"}, {"entity_id": "sensor.kitchen"}], "must be unique"),
+    ([{"entity_id": "sensor.kitchen", "name": 5}], "must be text"),
+])
+def test_power_history_device_validation_preserves_rejected_source(devices, message):
+    source = {"config_version": 2, "name": "Power", "landing_page": "energy", "pages": [{"name": "Energy", "path": "energy", "entities": [
+        {"template": "hc_graph_card", "entity_id": "sensor.house", "variables": {"power_devices": devices}},
+    ]}]}
+    before = deepcopy(source)
+    with pytest.raises(ValueError, match=message):
+        g._resolve_pages(source, [])
+    assert source == before
+
+
+def test_power_history_rejects_known_energy_devices_and_keeps_non_power_graphs_working():
+    from custom_components.marao_dashboard.native import compile_card
+    config = {"type": "custom:marao-native-graph-card", "entity": "sensor.house", "variables": {"history_popup": True, "power_devices": [{"entity_id": "sensor.kitchen"}]}}
+    before = deepcopy(config)
+    with pytest.raises(ValueError, match="require power sensors"):
+        compile_card(config, "power", "marao-dashboard", [{"entity_id": "sensor.house", "unit_of_measurement": "W"}, {"entity_id": "sensor.kitchen", "unit_of_measurement": "kWh"}])
+    assert config == before
+    compatible = compile_card(config, "power", "marao-dashboard", validate_units=False)
+    assert compatible["popups"][0]["cards"][0]["power_devices"] == config["variables"]["power_devices"]
+    other = compile_card({"type": "custom:marao-native-graph-card", "entity": "sensor.humidity", "variables": {"history_popup": True}}, "humidity", "marao-dashboard", [{"entity_id": "sensor.humidity", "unit_of_measurement": "%"}])
+    assert other["popups"][0]["cards"][0]["template"] == "hc_graph_card"
+
+
+def test_power_device_option_remains_opaque_on_unrelated_card_families():
+    source = {"config_version": 2, "name": "Power", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [
+        {"entity_id": "sensor.safe", "template": "hc_sensor_card", "variables": {"power_devices": {"future_hook": []}}},
+    ]}]}
+    before = deepcopy(source)
+    resolved = g._resolve_pages(source, [])
+    assert resolved["pages"][0]["_sections"][0]["ordered_cards"][0]["variables"]["power_devices"] == {"future_hook": []}
+    assert source == before

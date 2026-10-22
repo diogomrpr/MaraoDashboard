@@ -10,7 +10,7 @@ function readBatchSnapshot(config, request, ssh) {
   const base = config.remoteConfigPath;
   assert.match(request.slug, /^[a-z0-9][a-z0-9_-]*$/);
   const directories = ['custom_components/marao_dashboard', 'dashboard/MaraoDashboard/' + request.slug,
-    ...request.domains.map(domain => { assert.match(domain, /^(marao_test_[a-z0-9_]+|history|frigate|unifiprotect)$/); return 'custom_components/' + domain; })];
+    ...request.domains.map(domain => { assert.match(domain, /^(marao_test_[a-z0-9_]+|history|frigate|unifiprotect|netatmo)$/); return 'custom_components/' + domain; })];
   const files = ['dashboard/MaraoDashboard/dashboard.json', ...request.files];
   for (const file of files) assert.ok(!file.startsWith('/') && file.split('/').every(part => part && !['.', '..'].includes(part)));
   const command = [

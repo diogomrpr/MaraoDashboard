@@ -173,6 +173,16 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
   };
   const identity = node => { if (!node) return null; if (!identities.has(node)) identities.set(node, ++nextOwner); return identities.get(node); };
   const ancestor = (node, tag) => { for (let current = node; current; current = current.parentNode || current.host) if (current.localName === tag) return current; };
+  const cameraWrapper = node => {
+    for (let current = node; current; current = current.parentNode || current.host) if (current.hasAttribute?.('data-marao-camera-preload')) return current;
+    return ancestor(node, 'marao-card');
+  };
+  const cameraFor = wrapper => {
+    const surface = ancestor(wrapper, 'hui-root')?.shadowRoot?.querySelector('[data-marao-navigation-surface]');
+    const sessions = [...(surface?._navigationRecord?.cameraPreload?.sessions.values() || [])]
+      .filter(entry => entry.host === wrapper || entry.lease?.card === wrapper);
+    return sessions.length ? sessions.length === 1 ? sessions[0].playback : null : wrapper?._camera;
+  };
   const visibleWithin = (node, host) => {
     if (!node?.isConnected) return false;
     for (let current = node; current; current = current.parentNode || current.host) {
@@ -198,7 +208,7 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
     const entity = node?.stateObj?.entity_id || node?.entityid;
     if (!node?.isConnected || outerBoundary && (!entity || outerBoundary.entities.includes(entity))) return invoke();
     if (node.localName === 'ha-camera-stream') {
-      const wrapper = ancestor(node, 'marao-card'), camera = wrapper?._camera;
+      const wrapper = cameraWrapper(node), camera = cameraFor(wrapper);
       if (!entities.includes(node.stateObj?.entity_id) || !camera) return invoke();
       const stack = new Error('Marao native host release').stack;
       const receipt = { id: state.releases.length + 1, stack, date: Date.now(), order: ++state.order, wrapper: identity(wrapper), host: identity(node), camera: identity(camera), generation: camera.generation,
@@ -212,10 +222,10 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
         state.boundary = outerBoundary;
         queueMicrotask(() => {
           const consumers = [...new Set(openRoots(document).flatMap(root => [...root.querySelectorAll('marao-card')]))]
-            .map(card => ({ card, camera: card._camera })).filter(item => item.camera?.player && item.camera.player !== node && item.camera.player.isConnected
+            .map(card => ({ card, camera: cameraFor(card) })).filter(item => item.camera?.player && item.camera.player !== node && item.camera.player.isConnected
               && item.camera.player.stateObj?.entity_id === node.stateObj.entity_id && item.camera.eligible())
             .map(item => ({ wrapper: identity(item.card), host: identity(item.camera.player), ...currentPrefix(item.camera.player) }));
-          receipt.proof = { originalCameraOrNull: wrapper._camera === camera || wrapper._camera == null, camera: identity(camera), generation: camera.generation, hostDisconnected: !node.isConnected, playerReleased: camera.player !== node,
+          receipt.proof = { originalCameraOrNull: cameraFor(wrapper) === camera || cameraFor(wrapper) == null, camera: identity(camera), generation: camera.generation, hostDisconnected: !node.isConnected, playerReleased: camera.player !== node,
             released: !node.isConnected && camera.player !== node && !camera.attempt, ownershipUnambiguous: Boolean(receipt.prefix) && consumers.every(item => item.prefix), remainingConsumers: consumers };
           if (qualityRelease) {
             const selected = camera.streamEntity, registry = camera.hass.entities || {}, old = camera.hass.states[receipt.entity]?.attributes || {}, next = camera.hass.states[selected]?.attributes || {};
@@ -250,7 +260,7 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
       .filter(transport => entities.includes(transport.entityid));
     // Multiple descendants cannot identify a particular loader safely.
     if (transports.length !== 1) return invoke();
-    const transport = transports[0], host = ancestor(transport, 'ha-camera-stream'), wrapper = ancestor(host, 'marao-card');
+    const transport = transports[0], host = ancestor(transport, 'ha-camera-stream'), wrapper = cameraWrapper(host);
     if (!wrapper || !entities.includes(host?.stateObj?.entity_id)) return invoke();
     const stack = new Error('native HLS DOM disconnect').stack;
     const native = /https?:\/\/192\.168\.0\.28(?::\d+)?\/frontend_(?:latest|es5)\/[^\s)]+\.js:\d+(?::\d+)?/.test(stack);
@@ -258,19 +268,19 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
     const prefixes = [...new Set(state.sessions.filter(session => session.entity === transport.entityid).map(session => session.prefix))];
     let prefix = prefixes.length === 1 ? prefixes[0] : null;
     if (publicUrl) { const url = new URL(publicUrl, location.href); prefix = url.origin + url.pathname.split('/').slice(0, 4).join('/') + '/'; }
-    const active = wrapper._camera?.video, activeTransport = ancestor(active, 'ha-hls-player') || ancestor(active, 'ha-web-rtc-player');
+    const active = cameraFor(wrapper)?.video, activeTransport = ancestor(active, 'ha-hls-player') || ancestor(active, 'ha-web-rtc-player');
     const siblings = [...new Set(openRoots(host).flatMap(root => [...root.querySelectorAll('ha-web-rtc-player')]))]
       .flatMap(sibling => [...new Set(openRoots(sibling).flatMap(root => [...root.querySelectorAll('video')]))].map(video => ({ sibling, video })));
     const candidate = siblings.length === 1 ? siblings[0] : null;
     const receipt = { id: state.handoffs.length + 1, operation, date: Date.now(), order: ++state.order, stack, prefix, publicUrl,
       prefixSource: publicUrl ? 'public transport url' : 'unique owned camera/stream reply', wrapper: identity(wrapper), host: identity(host), transport: identity(transport),
-      camera: identity(wrapper._camera), generation: wrapper._camera?.generation, activeVideo: identity(active), activeTransport: activeTransport?.localName, activeTransportId: identity(activeTransport),
+      camera: identity(cameraFor(wrapper)), generation: cameraFor(wrapper)?.generation, activeVideo: identity(active), activeTransport: activeTransport?.localName, activeTransportId: identity(activeTransport),
       retiringVideo: ancestor(active, 'ha-hls-player') === transport ? identity(active) : null,
       siblings: siblings.map(item => ({ transport: identity(item.sibling), video: identity(item.video), connected: item.video.isConnected && item.sibling.isConnected,
         sameHost: ancestor(item.sibling, 'ha-camera-stream') === host, entitySafe: item.sibling.entityid === transport.entityid, visibleBefore: visibleWithin(item.video, host),
         timeBefore: item.video.currentTime, pausedBefore: item.video.paused, readyBefore: item.video.readyState })),
-      currentHost: wrapper._camera?.player === host, streamRequests: state.streamRequests, ownStreamRequests: wrapper._camera?.streamRequests, selectionSamples: [] };
-    state.handoffs.push(receipt); owners.set(receipt.id, { wrapper, host, camera: wrapper._camera, retiring: transport, retiringVideo: activeTransport === transport ? active : null, candidate });
+      currentHost: cameraFor(wrapper)?.player === host, streamRequests: state.streamRequests, ownStreamRequests: cameraFor(wrapper)?.streamRequests, selectionSamples: [] };
+    state.handoffs.push(receipt); owners.set(receipt.id, { wrapper, host, camera: cameraFor(wrapper), retiring: transport, retiringVideo: activeTransport === transport ? active : null, candidate });
     if (!native) return invoke();
     state.boundary = { kind: 'native-handoff', handoff: receipt.id, entities: [transport.entityid], date: receipt.date };
     try { return invoke(); } finally { state.boundary = outerBoundary; queueMicrotask(() => startHandoffProof(receipt)); }
@@ -296,7 +306,7 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
           if (settled) return;
           settled = true; cleanup(); source = cause;
           receipt.observationWakeups.push({ source, date: Date.now(), elapsedMs: Date.now() - receipt.date,
-            phase: wrapper._camera?.state, withinDeadline: Date.now() < deadline });
+            phase: cameraFor(wrapper)?.state, withinDeadline: Date.now() < deadline });
           resolve();
         };
         const playing = () => wake('playing'), timeupdate = () => wake('timeupdate');
@@ -307,7 +317,7 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
       try {
         do {
           if (Date.now() >= deadline) break;
-          const camera = wrapper._camera;
+          const camera = cameraFor(wrapper);
           const proof = { wrapper: identity(wrapper), host: identity(camera?.player), generation: camera?.generation,
             connected: wrapper.isConnected && host.isConnected, newStreamRequests: state.streamRequests - receipt.streamRequests,
             ownNewStreamRequests: Number.isInteger(receipt.ownStreamRequests) && Number.isInteger(camera?.streamRequests) ? camera.streamRequests - receipt.ownStreamRequests : undefined };
@@ -395,7 +405,9 @@ async function cameraRequestLedger(context, { output, scenario, theme }) {
       if (stoppedForClose) return ledger.assert();
       await ledger.boundary('final context release', async () => {
         await page.locator('marao-card').evaluateAll(async cards => {
-          for (const card of cards) if (card._camera) card.hidden = true;
+          // Preloaded streams belong to the dashboard lifetime, beyond visible cards.
+          document.querySelector('home-assistant')?.remove();
+          for (const card of cards) card.remove();
           await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
           if (cards.some(card => card._camera?.player)) throw Error('Camera session survived final context release');
         });

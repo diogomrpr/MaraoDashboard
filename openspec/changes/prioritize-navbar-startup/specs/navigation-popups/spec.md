@@ -87,3 +87,8 @@ A continuous eligible primary-pointer hold of 3000 milliseconds SHALL request on
 - **WHEN** holding or recovery feedback appears in English or Portuguese at 320 CSS pixels, phone portrait/landscape, bold text, 200% text, 200% zoom or bold plus 200% text
 - **THEN** essential copy wraps within safe bounds and controls remain visibly at least 48 by 48 CSS pixels
 - **AND** the one-row navbar, active-route cues, safe-area placement and popup layering remain intact
+
+#### Scenario: Scrolling the main page
+- **WHEN** the main page scrolls down
+- **THEN** the top-right cache button scrolls away as part of the page content rather than staying fixed or sticky
+- **AND** no duplicate button or reserved top-button gap appears on secondary pages, while the bottom navbar retains its floating placement

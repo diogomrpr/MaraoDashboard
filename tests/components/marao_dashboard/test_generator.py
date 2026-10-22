@@ -934,7 +934,8 @@ def test_room_media_card_opens_generated_apple_tv_remote_popup(tmp_path: Path) -
     assert "perform_action: media_player.media_seek" in source
     assert "seek_offset: -10" in source and "seek_offset: 30" in source
     assert "[[[" not in source
-    assert app_grid["columns"] == 2
+    assert app_grid["type"] == "custom:marao-control-grid"
+    assert app_grid["columns"] == 3
     assert all(card["show_state"] is False for card in app_grid["cards"])
 
 
@@ -1120,6 +1121,7 @@ def test_generates_configured_julian_pages_and_derived_overview_popups(tmp_path:
         Loader=MaraoDashboardLoader,
     )
     app_grid = next(card for card in _walk_generated_cards(media["cards"]) if card.get("cards", [{}]) and card.get("cards", [{}])[0].get("template") == "hc_media_app_card")
+    assert app_grid["type"] == "custom:marao-control-grid"
     assert app_grid["columns"] == 2
     assert app_grid["cards"][0]["variables"]["app_source"] == "YouTube"
     assert app_grid["cards"][0]["show_state"] is False

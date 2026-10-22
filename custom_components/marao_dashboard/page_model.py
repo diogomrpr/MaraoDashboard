@@ -58,6 +58,24 @@ def validate_energy_options(options: dict[str, Any]) -> None:
             raise ValueError("Choose a cost sensor for each breakdown entry.")
 
 
+def validate_power_devices(options: dict[str, Any], main: str | None = None) -> None:
+    """Keep ordered optional power bindings intact across generation paths."""
+    if "power_devices" not in options:
+        return
+    members = options["power_devices"]
+    if not isinstance(members, list):
+        raise ValueError("Power devices must be a list.")
+    seen = {main} if main else set()
+    for member in members:
+        if not isinstance(member, dict) or not isinstance(member.get("entity_id"), str) or not re.fullmatch(r"sensor\.[a-z0-9_]+", member["entity_id"]):
+            raise ValueError("Choose a power sensor for each device.")
+        if member["entity_id"] in seen:
+            raise ValueError("Power devices must be unique and different from the house sensor.")
+        seen.add(member["entity_id"])
+        if "name" in member and not isinstance(member["name"], str):
+            raise ValueError("Power device names must be text.")
+
+
 def page_entries(spec: Any) -> list[dict[str, Any]]:
     """Retain mixed order and whole descriptors, including entity-free cards."""
     if spec is None:
@@ -147,6 +165,8 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                 if card.get("variables") is not None and not isinstance(card["variables"], dict):
                     raise ValueError("Card options must be an object")
                 options = card.get("variables") or {}
+                if role == "hc_graph_card":
+                    validate_power_devices(options, options.get("graph_entity") or entity)
                 if role == "hc_vacuum_card":
                     for key in ("action_1", "action_2", "action_3"):
                         action = options.get(key)

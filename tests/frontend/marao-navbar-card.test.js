@@ -56,7 +56,8 @@ test("fullscreen behavior starts only after the navbar is connected", () => {
   assert.doesNotMatch(source, /this\._render\(\); registerFullscreen\(this\);/);
 });
 
-test("fullscreen owns only active Marao roots and restores styles on replacement, exit and disconnect", () => {
+test("fullscreen owns only active Marao roots and restores styles on replacement, exit and disconnect", async () => {
+  const { navbarMainPage } = await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
   const style = (initial = {}) => {
     const values = new Map(Object.entries(initial));
     return {
@@ -66,14 +67,14 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
       removeProperty: key => values.delete(key),
     };
   };
-  const view = { style: style({ "padding-top": ["8px", "important"], "padding-bottom": ["13px", ""] }) };
+  const view = { style: style({ "padding-top": ["8px", "important"], "padding-bottom": ["13px", ""], "flex-direction": ["row", "important"] }) };
   const header = { style: style({ display: ["flex", "important"] }) };
   const unrelated = { style: style({ display: ["grid", ""] }) };
   let currentView = view;
-  const root = { localName: "hui-root", shadowRoot: {
+  const root = { localName: "hui-root", lovelace: { config: { views: [{ path: "overview" }, { path: "energy" }] } }, shadowRoot: {
     querySelectorAll: () => [header], querySelector: () => currentView,
   } };
-  let navRect;
+  let navRect, navBottom = 24;
   const navbar = () => ({ isConnected: true, getClientRects: () => [{}], parentElement: root,
     shadowRoot: { querySelector: () => navRect ? {getBoundingClientRect: () => navRect} : null },
     _config: { routes: [{ url: "/marao-dashboard/overview" }] },
@@ -84,30 +85,48 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
     addEventListener: (key, callback) => events.set(key, callback), removeEventListener: key => events.delete(key),
   };
   let timers = 0;
-  const functions = new Function("window", "getComputedStyle", "setInterval", "clearInterval", "safeArea",
+  const functions = new Function("window", "getComputedStyle", "setInterval", "clearInterval", "safeArea", "navbarMainPage",
     source.slice(source.indexOf("const fullscreenUsers"), source.indexOf("export function registerNavigation")).replaceAll("export ", "")
     + ";return {registerFullscreen,unregisterFullscreen,applyFullscreen};")(window,
-      node => ({ getPropertyValue: property => node.style.getPropertyValue(property) || "0px" }),
-      () => { timers++; return 1; }, () => { timers--; }, side => `var(--safe-${side})`);
+      node => ({ bottom: `${navBottom}px`, getPropertyValue: property => node.style?.getPropertyValue(property) || "0px" }),
+      () => { timers++; return 1; }, () => { timers--; }, side => `var(--safe-${side})`, navbarMainPage);
   functions.registerFullscreen(first);
+  assert.equal(view.style.getPropertyValue("flex-direction"), "column", "The main-page refresh row sits above the full-width view");
   assert.equal(header.style.getPropertyValue("display"), "none");
-  assert.equal(view.style.getPropertyValue("padding-top"), "max(8px, calc(60px + var(--safe-top)))");
-  assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(max(0px, calc(60px + var(--safe-bottom) + 12px)) + 48px))");
+  assert.equal(view.style.getPropertyValue("padding-top"), "max(8px, var(--safe-top))");
+  assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(calc(60px + var(--safe-bottom) + 12px) + 8px))");
   assert.equal(unrelated.style.getPropertyValue("display"), "grid");
+  window.location.pathname = "/marao-dashboard/energy";
+  events.get("location-changed")();
+  assert.deepEqual(view.style.values.get("flex-direction"), ["row", "important"], "Secondary pages retain their original layout");
+  assert.equal(view.style.getPropertyValue("padding-top"), "max(8px, var(--safe-top))", "Secondary pages retain the safe area without refresh-button clearance");
+  assert.equal(header.style.getPropertyValue("display"), "none");
+  window.location.pathname = "/marao-dashboard/overview";
+  events.get("location-changed")();
+  assert.equal(view.style.getPropertyValue("padding-top"), "max(8px, var(--safe-top))", "The main page uses the in-flow refresh row rather than extra top clearance");
   functions.registerFullscreen(second);
   assert.equal(timers, 1);
   window.innerHeight = 844; navRect = {top: 740, height: 80};
   functions.applyFullscreen();
-  assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(max(104px, calc(80px + var(--safe-bottom) + 12px)) + 48px))");
+  assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(104px + 8px))");
+  const stableBottom = view.style.getPropertyValue("padding-bottom");
   window.visualViewport = {offsetTop: 12, height: 800};
   functions.applyFullscreen();
-  assert.ok(view.style.getPropertyValue("padding-bottom").includes("max(72px,"), "Use the current mobile viewport when browser chrome changes");
+  assert.equal(view.style.getPropertyValue("padding-bottom"), stableBottom, "Viewport movement must not change scrollable page height");
+  for (const offset of [-60, -12, 0, 24, 60, 0]) {
+    window.visualViewport.offsetTop = offset; navRect.top = 740 + offset;
+    functions.applyFullscreen();
+    assert.equal(view.style.getPropertyValue("padding-bottom"), stableBottom, "Elastic scrolling must not feed back into bottom padding");
+  }
+  navBottom = 14; navRect.height = 60; functions.applyFullscreen();
+  assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(74px + 8px))", "Actual navbar size and safe-area offset still update clearance");
   delete window.visualViewport; navRect = undefined;
   delete window.innerHeight;
   currentView = { style: style() };
   functions.applyFullscreen();
   assert.deepEqual(view.style.values.get("padding-top"), ["8px", "important"]);
   assert.deepEqual(view.style.values.get("padding-bottom"), ["13px", ""]);
+  assert.deepEqual(view.style.values.get("flex-direction"), ["row", "important"]);
   assert.ok(!view.style.values.has("padding-right"));
   assert.ok(currentView.style.getPropertyValue("padding-top").includes("var(--safe-top)"));
   for (const path of ["/config/dashboard", "/marao-dashboard-editor", "/marao-dashboard/overview"]) {
@@ -145,7 +164,7 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
 
 test("popup cleanup distinguishes retained masonry cards from removed cards and views", () => {
   const removed = [];
-  const Popup = new Function("BaseElement", "window", cardsSource.slice(cardsSource.indexOf("export class MaraoPopupCard"), cardsSource.indexOf("export function registerMaraoCards")).replace("export class", "class") + ";return MaraoPopupCard;")(
+  const Popup = new Function("BaseElement", "window", cardsSource.match(/export class MaraoPopupCard[\s\S]*?(?=\nexport )/)[0].replace("export class", "class") + ";return MaraoPopupCard;")(
     class {}, { removeEventListener: event => removed.push(event) });
   const popup = new Popup(), card = {};
   const view = { isConnected: true, cards: [card] };
@@ -195,4 +214,37 @@ test('refresh button follows the configured main view including dashboard-root a
   }
   assert.equal(navbarMainPage({views: [{}]}, {pathname: '/marao-dashboard/0'}), true);
   assert.equal(navbarMainPage(undefined, {pathname: '/marao-dashboard/home'}), false);
+});
+
+
+test('main-page cache recovery belongs to scrollable page flow and cleans up on navigation', async () => {
+  const { MaraoNavbarCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
+  const originalDocument=globalThis.document,originalWindow=globalThis.window;
+  const view=()=>({children:[],prepend(row){row.remove();this.children.unshift(row);row.parentNode=this;}});
+  let currentView=view(), calls=0, eligible=true, inert=false;
+  globalThis.window={location:{href:'http://disposable.test/marao-dashboard/home',pathname:'/marao-dashboard/home'}};
+  globalThis.document={createElement(){
+    const button=new EventTarget();button.setAttribute=(name,value)=>{button[name]=value;};
+    return {setAttribute(){},closest(){return inert?{}:null;},
+      attachShadow(){return this.shadowRoot={innerHTML:'',querySelector:()=>button};},
+      remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(item=>item!==this);this.parentNode=null;}};
+  }};
+  const lovelace={config:{views:[{path:'home'},{path:'energy'}]}};
+  const owner={isConnected:true,_root:()=>({lovelace}),_view:()=>currentView,_refreshEligible:()=>eligible,_refreshFrontend:()=>{calls++;}};
+  const sync=()=>MaraoNavbarCard.prototype._syncPageRefresh.call(owner);
+  try{
+    sync();const row=owner._pageRefresh,button=row.shadowRoot.querySelector('button');
+    assert.equal(currentView.children[0],row);
+    assert.doesNotMatch(row.shadowRoot.innerHTML,/position:(?:fixed|sticky|absolute)/);
+    sync();assert.equal(currentView.children.length,1);
+    button.dispatchEvent(new Event('click'));assert.equal(calls,1);
+    eligible=false;button.dispatchEvent(new Event('click'));assert.equal(calls,1);
+    eligible=true;inert=true;button.dispatchEvent(new Event('click'));assert.equal(calls,1);inert=false;
+    globalThis.window.location.pathname='/marao-dashboard/energy';sync();assert.equal(currentView.children.length,0);
+    globalThis.window.location.pathname='/marao-dashboard/home';sync();assert.equal(currentView.children[0],row);
+    currentView=view();sync();assert.equal(currentView.children[0],row);
+    lovelace.editMode=true;sync();assert.equal(currentView.children.length,0);lovelace.editMode=false;
+    owner._surface={};sync();assert.equal(currentView.children.length,0,'A retained navbar placeholder cannot add a duplicate page button');delete owner._surface;
+    sync();owner.isConnected=false;sync();assert.equal(currentView.children.length,0);
+  }finally{globalThis.document=originalDocument;globalThis.window=originalWindow;}
 });

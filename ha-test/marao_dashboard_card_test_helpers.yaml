@@ -260,6 +260,8 @@ climate:
     precision: 0.5
 
 camera:
+  - platform: netatmo
+    name: Marao Dashboard Test Netatmo
   - platform: marao_test_camera
     name: Marao Dashboard Test Media Error
     picture_error: true
@@ -826,6 +828,18 @@ template:
       - name: Marao Dashboard Test Graph History
         unique_id: marao_dashboard_test_graph_history
         state: "{{ 100 + ((as_timestamp(now()) | int) % 60) }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Marao Dashboard Test Kitchen Power
+        unique_id: marao_dashboard_test_kitchen_power
+        state: "{{ (100 + ((as_timestamp(now()) | int) % 60)) * 0.35 }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Marao Dashboard Test Heating Power
+        unique_id: marao_dashboard_test_heating_power
+        state: "{{ (100 + ((as_timestamp(now()) | int) % 60)) * 0.25 }}"
         unit_of_measurement: W
         device_class: power
         state_class: measurement

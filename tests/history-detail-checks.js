@@ -17,8 +17,8 @@ async function checkHistoryDetails(page,serviceCalls,{scenario,theme,geometryOnl
   const hass=document.querySelector('home-assistant').hass;
   window.__chartSavedSource=(await hass.callWS({type:'marao_dashboard/config/get'})).config;
   const NativeResizeObserver=window.ResizeObserver,active=new Set(),listeners=new Map(),add=HTMLCanvasElement.prototype.addEventListener,remove=HTMLCanvasElement.prototype.removeEventListener;
-  window.ResizeObserver=class extends NativeResizeObserver{observe(target,...args){if(target.closest?.('.marao-history-chart'))active.add(this);return super.observe(target,...args);}disconnect(){active.delete(this);return super.disconnect();}};
-  HTMLCanvasElement.prototype.addEventListener=function(type,callback,options){if(this.closest('.marao-history-chart')){let own=listeners.get(this);if(!own)listeners.set(this,own=new Set());own.add(callback);}return add.call(this,type,callback,options);};
+  window.ResizeObserver=class extends NativeResizeObserver{observe(target,...args){if(target.closest?.('.marao-history-content'))active.add(this);return super.observe(target,...args);}disconnect(){active.delete(this);return super.disconnect();}};
+  HTMLCanvasElement.prototype.addEventListener=function(type,callback,options){if(this.closest('.marao-history-content')){let own=listeners.get(this);if(!own)listeners.set(this,own=new Set());own.add(callback);}return add.call(this,type,callback,options);};
   HTMLCanvasElement.prototype.removeEventListener=function(type,callback,options){listeners.get(this)?.delete(callback);return remove.call(this,type,callback,options);};
   window.__chartResources=()=>({observers:active.size,listeners:[...listeners.values()].reduce((count,set)=>count+set.size,0)});
   window.__restoreChartResources=()=>{window.ResizeObserver=NativeResizeObserver;HTMLCanvasElement.prototype.addEventListener=add;HTMLCanvasElement.prototype.removeEventListener=remove;delete window.__chartResources;delete window.__restoreChartResources;};

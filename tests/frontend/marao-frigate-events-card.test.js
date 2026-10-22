@@ -90,9 +90,11 @@ test("camera event actions keep a visible 48px target and strong feedback", () =
   assert.match(source, /\.icon-button:active \{ transform: scale\(\.94\); \}/);
   assert.match(source, /button:disabled \{ cursor: default; opacity: \.55;/);
   assert.doesNotMatch(source, /:focus-visible/);
-  assert.match(MaraoFrigateEventsCard.styles, /repeat\(auto-fill, minmax\(min\(145px, 100%\), 1fr\)\)/);
-  assert.match(MaraoFrigateEventsCard.styles, /\.meta strong, \.detail-meta strong \{ overflow-wrap: anywhere;/);
-  assert.match(MaraoFrigateEventsCard.styles, /\.meta small, \.detail-meta small \{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap;/);
+  assert.match(MaraoFrigateEventsCard.styles, /grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(MaraoFrigateEventsCard.styles, /\.meta > \* \{ overflow-wrap: anywhere;/);
+  assert.match(MaraoFrigateEventsCard.styles, /top: var\(--marao-popup-header-height, 0px\)/);
+  assert.match(MaraoFrigateEventsCard.styles, /\.filters \{[^}]*overflow-x: auto/);
+  assert.match(MaraoFrigateEventsCard.styles, /\.filter, \.more \{ min-width: 48px; min-height: 48px/);
   assert.doesNotMatch(MaraoFrigateEventsCard.styles, /@media/);
 });
 
@@ -199,6 +201,10 @@ test("Frigate events are requested and media is signed through Home Assistant", 
     cameras: ["front"],
     limit: 12,
   });
+  assert.equal(calls.length, 1, "metadata is usable before any preview is signed");
+  assert.equal(card._events[0].thumbnailUrl, undefined);
+  card._connected = true;
+  await card._loadPreview(0);
   assert.equal(calls[1].type, "auth/sign_path");
   assert.equal(calls[1].path, "/api/frigate/frigate-main/thumbnail/event-1");
   assert.equal(card._events[0].thumbnailUrl, "https://home.example/api/frigate/frigate-main/thumbnail/event-1?authSig=signed");
@@ -375,6 +381,9 @@ test("UniFi Protect discovers a same-device camera across NVRs and resolves sign
     calls.filter((call) => call.type === "media_source/browse_media").map((call) => call.media_content_id),
     [root, firstNvr, secondNvr, cameraSource, recentSource],
   );
+  assert.equal(calls.some(call => call.type === "media_source/resolve_media"), false);
+  card._connected = true;
+  await card._loadPreview(0);
   assert.deepEqual(
     calls.filter((call) => call.type === "media_source/resolve_media").map((call) => call.media_content_id),
     [`${root}/nvr-two:eventthumb:newest-event`],
@@ -433,7 +442,10 @@ test("camera entity availability disables events and invalidates in-flight resul
     assert.equal(calls, 0);
     assert.match(card.shadowRoot.innerHTML, new RegExp(`data-status="${state || "unknown"}"`));
     assert.match(card.shadowRoot.innerHTML, /data-action="refresh"[^>]*disabled/);
-    assert.doesNotMatch(card.shadowRoot.innerHTML, /class="grid"|<video|class="detail-image"/);
+    assert.match(card.shadowRoot.innerHTML, /data-action="filter"[^>]*disabled/);
+    assert.match(card.shadowRoot.innerHTML, /data-action="more"[^>]*disabled/);
+    assert.doesNotMatch(card.shadowRoot.innerHTML, /<article|<video|class="detail-image"/);
+    assert.match(card.shadowRoot.innerHTML, /class="feed" hidden/);
   }
 
   const card = new MaraoCameraEventsCard();
@@ -507,4 +519,213 @@ test('native media failures preserve other events, mark the whole surface and ig
   media.isConnected = false;
   card._handleMediaError({ target: media });
   assert.equal(card._thumbnailErrors.size, 0);
+});
+
+
+const availableCard = () => {
+  const card = new MaraoCameraEventsCard();
+  card._connected = true;
+  card._config = { entity: "camera.safe", limit: 12 };
+  card._hass = { states: { "camera.safe": { state: "idle" } } };
+  card._identity = { instanceId: "main", camera: "safe" };
+  card._provider = "frigate";
+  card._status = "ready";
+  return card;
+};
+const settle = () => new Promise(resolve => setImmediate(resolve));
+
+test("native Protect headings split the supplied timestamp without parsing its locale", () => {
+  const titles = [
+    "10/21/26 17:01:22 1m 12s Object Detection - Person",
+    "21/10/2026 17:00:00 0s Ring Event",
+    "21.10.2026 16:59:00 1h 2m 3s Motion Event",
+    "10/21/26 16:58:00 2s Audio Detection - Glass break",
+    "Provider title that must stay intact",
+  ];
+  const events = normalizeProtectEvents({ children: titles.map((title, index) => ({ title, media_content_id: `media-source://unifiprotect/nvr:event:${index}` })) });
+  assert.deepEqual(events.map(event => event.eventType), ["person", "ring", "motion", "audio", undefined]);
+  assert.equal(events[0].dateLabel, "10/21/26 17:01:22");
+  assert.equal(events[1].dateLabel, "21/10/2026 17:00:00");
+  assert.equal(events[4].label, titles[4]);
+  const card = availableCard();
+  card._events = events;
+  assert.equal(card._eventType(events[4]), "event");
+  assert.equal(card._eventDate(events[4]), "");
+  const row = card._renderEvent(events[0], 0);
+  assert.match(row, /<time>10\/21\/26 17:01:22<\/time><span>Person<\/span><\/h3>\s*<button/);
+  const preview = row.slice(row.indexOf(">", row.indexOf("<button")) + 1);
+  assert.doesNotMatch(preview, /17:01:22|<h3|<time>/);
+});
+
+test("event limits retain defaults, clamping and unrelated saved configuration", () => {
+  const card = new MaraoCameraEventsCard();
+  for (const [limit, expected] of [[undefined, 12], [0, 1], [6.6, 7], [200, 100], ["bad", 12]]) {
+    card.setConfig({ entity: "camera.safe", limit, extension: { keep: true } });
+    assert.equal(card._config.limit, expected);
+    assert.deepEqual(card._config.extension, { keep: true });
+  }
+});
+
+test("type filters include unrevealed metadata and progressive rows keep original indexes", () => {
+  const card = availableCard();
+  card._events = Array.from({ length: 10 }, (_, index) => ({ id: String(index), label: index >= 6 ? "car" : "person" }));
+  let renders = 0;
+  card._render = () => { renders += 1; };
+  card._setFilter("car");
+  assert.deepEqual(card._filteredEvents().map(item => item.index), [6, 7, 8, 9]);
+  assert.deepEqual(card._filteredEvents().slice(0, card._visibleCount).map(item => item.index), [6, 7, 8]);
+  card._showMore();
+  assert.deepEqual(card._filteredEvents().slice(0, card._visibleCount).map(item => item.index), [6, 7, 8, 9]);
+  const before = renders;
+  card._showMore();
+  assert.equal(renders, before, "no work after the configured metadata is exhausted");
+  card._setFilter("");
+  assert.equal(card._visibleCount, 3);
+  assert.equal(card._filteredEvents().length, 10);
+});
+
+test("preview observation defers offscreen URLs and stops obsolete observer callbacks", async () => {
+  const original = globalThis.IntersectionObserver;
+  let observed;
+  globalThis.IntersectionObserver = class {
+    constructor(callback, options) { this.callback = callback; this.options = options; observed = this; }
+    observe() {}
+    unobserve() {}
+    disconnect() { this.disconnected = true; }
+  };
+  try {
+    const card = availableCard();
+    const scroller = { scrollTop: 40 };
+    card._scrollRoot = () => scroller;
+    card._events = [{ id: "one" }, { id: "two" }];
+    const targets = [0, 1].map(index => ({ isConnected: true, dataset: { action: "event", index: String(index) } }));
+    const more = { isConnected: true, dataset: { action: "more" } };
+    card.shadowRoot = { querySelectorAll: () => [...targets, more] };
+    card._render = () => {};
+    const paths = [];
+    card._signPath = async path => { paths.push(path); return path; };
+    card._observeFeed();
+    assert.equal(observed.options.root, scroller);
+    assert.deepEqual(paths, []);
+    observed.callback([{ target: targets[0], isIntersecting: false }]);
+    assert.deepEqual(paths, []);
+    observed.callback([{ target: targets[0], isIntersecting: true }]);
+    await settle();
+    assert.deepEqual(paths, ["/api/frigate/main/thumbnail/one"]);
+    observed.callback([{ target: targets[0], isIntersecting: true }]);
+    await settle();
+    assert.equal(paths.length, 1, "each preview resolves once");
+    card.disconnectedCallback();
+    observed.callback([{ target: targets[1], isIntersecting: true }]);
+    assert.equal(paths.length, 1);
+    assert.equal(observed.disconnected, true);
+  } finally { globalThis.IntersectionObserver = original; }
+});
+
+test("preview work is bounded, filter queues are discarded, and stale completions cannot update a replacement feed", async () => {
+  const card = availableCard();
+  card._events = Array.from({ length: 5 }, (_, index) => ({ id: String(index), label: "person" }));
+  card._render = () => {};
+  const pending = [];
+  card._signPath = path => new Promise(resolve => pending.push({ path, resolve }));
+  for (let index = 0; index < 5; index += 1) card._queuePreview(index);
+  assert.equal(pending.length, 2);
+  card._setFilter("car");
+  assert.equal(card._previewQueue.length, 0);
+  assert.equal(card._events[2].thumbnailStatus, undefined, "dropped previews can be requested after changing the filter again");
+  const oldEvents = card._events;
+  card._request += 1;
+  card._events = [{ id: "replacement", label: "car" }];
+  for (const request of pending) request.resolve("/obsolete");
+  await settle();
+  assert.equal(pending.length, 2, "discarded queued requests never start");
+  assert.equal(card._events[0].thumbnailUrl, undefined);
+  assert.equal(oldEvents[0].thumbnailUrl, undefined);
+  card._queuePreview(0);
+  assert.equal(pending.length, 3);
+  pending[2].resolve("/current");
+  await settle();
+  assert.equal(card._events[0].thumbnailUrl, "/current");
+});
+
+test("failed previews stay readable without retries until an explicit refreshed feed", async () => {
+  const card = availableCard();
+  card._events = [{ id: "bad" }];
+  let requests = 0;
+  card._signPath = async () => { requests += 1; throw new Error("denied"); };
+  card._queuePreview(0);
+  await settle();
+  assert.equal(card._events[0].thumbnailStatus, "error");
+  assert.match(card._preview(card._events[0]), /Media unavailable/);
+  card._queuePreview(0);
+  await card._loadPreview(0);
+  assert.equal(requests, 1);
+  card._request += 1;
+  card._events = [{ id: "bad" }];
+  card._resetFeed();
+  card._queuePreview(0);
+  await settle();
+  assert.equal(requests, 2);
+});
+
+test("Back restores filtered feed position and invalidates pending detail", async () => {
+  const card = availableCard();
+  card._events = [{ id: "one", label: "person", has_clip: true }];
+  card._filter = "person";
+  card._visibleCount = 9;
+  const scroller = { scrollTop: 830 };
+  card._scrollRoot = () => scroller;
+  card._render = () => { if (card._selected) scroller.scrollTop = 0; };
+  let focus;
+  card.shadowRoot = { querySelector: () => ({ focus: options => { focus = options; } }) };
+  let finish;
+  card._signPath = () => new Promise(resolve => { finish = resolve; });
+  const pending = card._openEvent(0);
+  assert.equal(scroller.scrollTop, 0);
+  card._handleClick({ target: { closest: () => ({ dataset: { action: "back" } }) } });
+  assert.equal(card._filter, "person");
+  assert.equal(card._visibleCount, 9);
+  assert.equal(scroller.scrollTop, 830);
+  assert.deepEqual(focus, { preventScroll: true });
+  finish("/late-detail");
+  await pending;
+  assert.equal(card._selected, undefined);
+});
+
+test('Netatmo uses typed metadata, lazy native media, multiple filters and controlled HLS detail', async () => {
+  const previous = globalThis.customElements;
+  globalThis.customElements = {get: name => name === 'ha-hls-player' ? class {} : undefined};
+  try {
+    const camera = 'camera.netatmo';
+    const calls = [];
+    const event = {id:'200',provider:'netatmo',label:'<script>provider text</script>',start_time:200,eventTypes:['person','animal'],hasThumbnail:true,mediaContentId:'media-source://netatmo/events/camera-id/200'};
+    const card = new MaraoFrigateEventsCard();
+    card.shadowRoot = {innerHTML:''}; card._connected = true;
+    card._config = {entity:camera, limit:12};
+    card._hass = {states:{[camera]:{state:'idle',attributes:{id:'camera-id'}}}, entities:{[camera]:{platform:'netatmo'}}, callWS: async message => {
+      calls.push(message);
+      if(message.type === 'marao_dashboard/camera/netatmo_events') return [structuredClone(event)];
+      if(message.type === 'media_source/browse_media') return {thumbnail:'https://fixture.invalid/preview.jpg'};
+      if(message.type === 'media_source/resolve_media') return {url:'https://fixture.invalid/recording.m3u8'};
+      throw new Error('Unexpected API');
+    }};
+    assert.equal(cameraEventProvider(card._config,card._hass),'netatmo');
+    assert.equal(cameraEventProvider({...card._config,event_provider:'frigate'},card._hass),'frigate');
+    await card._load({},'netatmo-key','netatmo');
+    assert.deepEqual(calls,[{type:'marao_dashboard/camera/netatmo_events',entity_id:camera,limit:12}]);
+    card._filter='animal'; assert.equal(card._filteredEvents().length,1);
+    card._filter='vehicle'; assert.equal(card._filteredEvents().length,0);
+    await card._loadPreview(0);
+    assert.equal(card._events[0].thumbnailUrl,'https://fixture.invalid/preview.jpg');
+    await card._openEvent(0);
+    assert.equal(card._selected.kind,'hls');
+    const markup = card._renderDetail(card._selected);
+    assert.match(markup,/<ha-hls-player[^>]*controls playsinline/);
+    assert.doesNotMatch(markup,/autoplay|<script>/);
+    assert.match(markup,/&lt;script&gt;provider text&lt;\/script&gt;/);
+    assert.match(card._eventDate(event),/1970/);
+    assert.deepEqual(calls.slice(1).map(call=>call.type),['media_source/browse_media','media_source/resolve_media']);
+    const withoutPreview={...event,hasThumbnail:false};card._events=[withoutPreview];card._thumbnailErrors.clear();
+    await card._loadPreview(0);assert.equal(withoutPreview.thumbnailStatus,'empty');assert.equal(card._thumbnailErrors.size,0);
+  } finally { globalThis.customElements = previous; }
 });

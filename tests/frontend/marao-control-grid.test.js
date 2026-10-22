@@ -165,7 +165,7 @@ test('phone-width sections retain two columns and reflow the same mounted cards 
     const children = [...grid._children], layout = { style: {} };
     const query = grid.shadowRoot.querySelector.bind(grid.shadowRoot);
     grid.shadowRoot.querySelector = selector => selector === '.control-grid' ? layout : query(selector);
-    for (const [available, font, columns] of [[279.5,18,1],[280,18,2],[280.5,18,2],[282,18,2],[320,18,2],[322,18,2],[346,18,2],[352,18,2],[307.5,20,1],[308,20,2],[322,20,2],[282,36,1],[322,36,1],[346,36,1],[282,18,2]]) {
+    for (const [available, font, columns] of [[247.5,18,1],[248,18,2],[248.5,18,2],[279.5,18,2],[280,18,2],[282,18,2],[320,18,2],[322,18,2],[346,18,2],[352,18,2],[248,20,2],[271.5,22,1],[272,22,2],[282,22,2],[307.5,20,2],[308,20,2],[322,20,2],[282,36,1],[322,36,1],[346,36,1],[282,18,2]]) {
       width = available; fontSize = `${font}px`; grid._layout();
       assert.equal(layout.style.gridTemplateColumns, `repeat(${columns},minmax(0,1fr))`, `${available}px with ${font}px text`);
       assert.equal(children[1].style.gridRow, columns === 2 ? '1' : '2');

@@ -1924,6 +1924,16 @@
       "show_icon": true,
       "show_state": true,
       "show_label": true
+    },
+    {
+      "type": "custom:marao-card",
+      "template": "hc_camera_card",
+      "entity": "camera.marao_dashboard_test_netatmo",
+      "name": "Netatmo camera · native HLS and events",
+      "variables": {
+        "event_provider": "netatmo",
+        "popup_hash": "#marao-netatmo-camera"
+      }
     }
   ],
   "editorDragCoverage": [

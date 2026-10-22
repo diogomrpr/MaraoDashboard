@@ -9,6 +9,22 @@ const { concreteCases, expandGallery, expandHelpers, validateCoverage, popupCase
 const helpers = expandHelpers(YAML.parse(fs.readFileSync(new URL('../../ha-test/marao_dashboard_card_test_helpers.yaml', import.meta.url), 'utf8')));
 const view = expandGallery(YAML.parse(fs.readFileSync(new URL('../../ha-test/dashboard/views/00-card-test.yaml', import.meta.url), 'utf8')));
 
+test('Cases isolates editable card heights while preserving every example and intentional layout', () => {
+  const { composeDashboard } = require('../../ha-test/prepare.js');
+  const source = require('../../ha-test/marao_dashboard_test_dashboard.json');
+  const original = structuredClone(source);
+  const composed = composeDashboard(source, view);
+  const sections = composed.pages.find(page => page.path === 'card-test').sections;
+  const editable = sections.filter(section => section.entities);
+  assert.equal(editable.length, view.entities.length);
+  assert.ok(editable.every(section => section.entities.length === 1));
+  assert.deepEqual(editable.flatMap(section => section.entities), view.entities);
+  assert.deepEqual(sections.flatMap(section => section.cards || []), view.cards);
+  assert.deepEqual(composed.pages.filter(page => page.path !== 'card-test'), source.pages.filter(page => page.path !== 'card-test'));
+  assert.deepEqual(composeDashboard(composed, view), composed);
+  assert.deepEqual(source, original);
+});
+
 test('camera gallery covers explicit low dashboard, high popup and native HLS fallback',()=>{
  const native=manifest.cameraLiveCases.find(card=>card.name==='Low dashboard and high popup camera');
  const adaptive=manifest.cameraLiveCases.find(card=>card.name==='HLS-only live camera');
@@ -126,7 +142,7 @@ test('a saved mixed page reuses safe entities with independent popups and an unp
   assert.equal(television.entity_id, source.pages.find(page => page.id === 'media').sections[0].entities[0].entity_id);
   assert.equal(energy.entity_id, source.pages.find(page => page.id === 'energy').sections[2].entities[0].entity_id);
   assert.equal(energy.variables.popup_hash, undefined);
-  assert.deepEqual(television.apple_tv.apps.map(app => app.source), ['YouTube']);
+  assert.deepEqual(television.apple_tv.apps.map(app => app.source), ['YouTube', 'MEO']);
   assert.ok(studio.sections[4].cards.some(card => card.type === 'markdown'));
   assert.deepEqual(studio.sections[3].entities, []);
   assert.equal(cards.filter(card => card.entity_id === 'light.marao_dashboard_test_light').length, 5);

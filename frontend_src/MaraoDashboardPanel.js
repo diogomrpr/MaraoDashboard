@@ -1476,9 +1476,10 @@ class MaraoDashboardPanel extends HTMLElement {
     const initialData = clone(data);
     const content = dialog.querySelector(".dialog-content");
     const variables = this._expandedFields(selected.variables);
-    const basic = variables.filter((field) => !field.advanced && field.kind !== 'energy_sub_entities');
-    const advanced = variables.filter((field) => field.advanced && field.kind !== 'energy_sub_entities');
-    content.innerHTML = `<div id="card-form"></div><div id="summary" class="summary"></div>${selected.scene_collection ? '<div id="scene-order"></div>' : ''}${selected.id === 'hc_energy_period_card' ? '<div id="energy-breakdown"></div>' : ''}${selected.id === 'hc_media_card' ? `<ha-button data-media-options>${this._l('Apple TV options')}</ha-button>` : ''}${advanced.length ? `<ha-expansion-panel id="advanced-panel" outlined><div slot="header">${this._t("advanced")}</div><div id="advanced-form" class="advanced-form"></div></ha-expansion-panel>` : ""}<div class="dialog-actions"><ha-button data-close>${this._t("cancel")}</ha-button><ha-button data-save appearance="filled">${existing ? this._t("update") : this._t("create")}</ha-button></div>`;
+    const basic = variables.filter((field) => !field.advanced && !['energy_sub_entities','power_devices'].includes(field.kind));
+    const advanced = variables.filter((field) => field.advanced && !['energy_sub_entities','power_devices'].includes(field.kind));
+    content.innerHTML = `<div id="card-form"></div><div id="summary" class="summary"></div>${selected.scene_collection ? '<div id="scene-order"></div>' : ''}${selected.id === 'hc_energy_period_card' ? '<div id="energy-breakdown"></div>' : ''}${selected.id === 'hc_graph_card' ? '<div id="power-devices"></div>' : ''}${selected.id === 'hc_media_card' ? `<ha-button data-media-options>${this._l('Apple TV options')}</ha-button>` : ''}${advanced.length ? `<ha-expansion-panel id="advanced-panel" outlined><div slot="header">${this._t("advanced")}</div><div id="advanced-form" class="advanced-form"></div></ha-expansion-panel>` : ""}<div class="dialog-actions"><ha-button data-close>${this._t("cancel")}</ha-button><ha-button data-save appearance="filled">${existing ? this._t("update") : this._t("create")}</ha-button></div>`;
+    if (selected.id === 'hc_graph_card') this._renderEnergySubEntities(content.querySelector('#power-devices'), clone(data.var__power_devices || []), value => { data.var__power_devices = value; }, true);
     if (selected.id === 'hc_energy_period_card') this._renderEnergySubEntities(content.querySelector('#energy-breakdown'), clone(data.var__sub_entities || []), value => { data.var__sub_entities = value; });
     const renderCollection = () => {
       if (!selected.scene_collection) return;
@@ -1547,23 +1548,23 @@ class MaraoDashboardPanel extends HTMLElement {
     });
   }
 
-  _renderEnergySubEntities(host, values, changed) {
+  _renderEnergySubEntities(host, values, changed, power = false) {
     const render = () => {
-      host.innerHTML = `<h3>${this._l('Energy breakdown')}</h3><div data-energy-rows></div><ha-button data-energy-add>${this._t('add')}</ha-button>`;
+      host.innerHTML = `<h3>${this._l(power ? 'Power devices' : 'Energy breakdown')}</h3><div data-energy-rows></div><ha-button data-energy-add>${this._t('add')}</ha-button>`;
       const rows = host.querySelector('[data-energy-rows]');
-      if (!Array.isArray(values)) rows.textContent = this._l('Energy breakdown must be a list.');
+      if (!Array.isArray(values)) rows.textContent = this._l(power ? 'Power devices must be a list.' : 'Energy breakdown must be a list.');
       else values.forEach((member, index) => {
         const row = document.createElement('div'); row.className = 'advanced-form';
-        if (!member || typeof member !== 'object' || Array.isArray(member)) row.textContent = this._l('Energy breakdown entries must be objects.');
+        if (!member || typeof member !== 'object' || Array.isArray(member)) row.textContent = this._l(power ? 'Choose a power sensor for each device.' : 'Energy breakdown entries must be objects.');
         else {
           const data = { entity_id: member.entity_id || '', name: member.name || '', cost_entity: member.cost_entity || '' };
           this._mountForm(row, data, [
-            this._schema('entity_id', 'Energy sensor', { entity: { domain: ['sensor'] } }, true),
+            this._schema('entity_id', power ? 'Power sensor (W/kW)' : 'Energy sensor', { entity: { domain: ['sensor'] } }, true),
             this._schema('name', 'Display name', { text: {} }),
-            this._schema('cost_entity', 'Cost sensor (optional)', { entity: { domain: ['sensor'] } }),
+            ...(power ? [] : [this._schema('cost_entity', 'Cost sensor (optional)', { entity: { domain: ['sensor'] } })]),
           ], value => {
             const next = { ...values[index] };
-            for (const key of ['entity_id', 'name', 'cost_entity']) {
+            for (const key of power ? ['entity_id', 'name'] : ['entity_id', 'name', 'cost_entity']) {
               if (value[key] === (next[key] || '')) continue;
               if (value[key] || key === 'entity_id') next[key] = value[key]; else delete next[key];
             }

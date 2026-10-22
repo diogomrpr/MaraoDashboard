@@ -34,6 +34,7 @@ that responds to the selector changing and activates the matching scene.
 ## Behavior
 
 - Buttons wrap their labels and remain at least 48 by 48 CSS pixels.
+- Options use three columns, reducing to two or one inside narrower cards.
 - `unknown`, `unavailable`, missing entities, and disconnected Home Assistant
   disable selection. Unknown and unavailable states stay neutral.
 - A rejected action produces a readable Home Assistant notification.

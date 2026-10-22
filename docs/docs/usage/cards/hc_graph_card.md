@@ -68,3 +68,49 @@ partial and failed history remain explicit, with Retry after a failure. These
 windows use retained Recorder data; no long-term statistics, consumption totals
 or pinch/zoom plugin are added. Saved graph options and generated configuration
 retain their meaning.
+
+## House power history
+
+With **History popup** enabled on a power graph, opening the card or **History**
+shows the detailed power chart directly. The time-unit dropdown and its options
+use the dashboard theme, with a checkmark for the current unit. Choose **Day**, **Week** or **Month**
+and use the arrows to move between calendar periods. The selector and period
+stay visible while scrolling. Weeks start Monday, using Home Assistant's time
+zone. Future periods are disabled.
+
+After the selected chart loads and paints, the current day, week and month
+load in the background, then the nearest four periods in each direction for
+the selected unit, excluding the future. Changing unit reuses its warmed current
+page and starts preloading that unit's neighbors. Current pages stay cached while
+you navigate other units. Navigation reuses cached or pending history; accumulating
+periods refresh on return when their snapshot is over a minute old.
+
+The chart requests recorded state changes and preserves peaks when reducing
+points for display. It shows actual available Recorder data, including gaps;
+it cannot recover readings Home Assistant has already purged. Enable Recorder
+for the house and device sensors and retain enough history for the periods you
+want to inspect. Energy counters in kWh cannot provide instantaneous power.
+
+Edit the House Power card and add **Power devices** in the builder or native
+card editor. Pick each device's power sensor (W/kW), optionally rename it, and
+reorder the list as needed. The device lines share the house chart. Tap a time
+to see the reported state for each device at that moment; selected-device
+readings are resolved from Recorder rather than guessed from reduced plot points.
+Configured devices need not account for the complete house total.
+
+```json
+{
+  "template": "hc_graph_card",
+  "entity_id": "sensor.house_power",
+  "variables": {
+    "history_popup": true,
+    "power_devices": [
+      {"entity_id": "sensor.kitchen_power", "name": "Kitchen"},
+      {"entity_id": "sensor.heating_power", "name": "Heating"}
+    ]
+  }
+}
+```
+
+Omit `power_devices` or save an empty list for only the house trace. Existing
+unit and decimal-place settings apply to the chart and device readings.

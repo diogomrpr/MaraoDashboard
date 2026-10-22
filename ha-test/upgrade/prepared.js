@@ -78,7 +78,7 @@ function validatePreparedReceipt(receipt, config, candidate, now = Date.now(), {
   }
   assert.ok(Array.isArray(receipt.fixture_domains) && receipt.fixture_domains.length > 0 && new Set(receipt.fixture_domains).size === receipt.fixture_domains.length, 'Missing fixture ownership');
   for (const domain of receipt.fixture_domains) {
-    assert.ok(typeof domain === 'string' && (/^marao_test_[a-z0-9_]+$/.test(domain) || ['history', 'frigate', 'unifiprotect'].includes(domain)), 'Invalid fixture ownership');
+    assert.ok(typeof domain === 'string' && (/^marao_test_[a-z0-9_]+$/.test(domain) || ['history', 'frigate', 'unifiprotect', 'netatmo'].includes(domain)), 'Invalid fixture ownership');
   }
   assert.ok(receipt.fixture_files && typeof receipt.fixture_files === 'object' && !Array.isArray(receipt.fixture_files) && Object.keys(receipt.fixture_files).length, 'Missing installed fixture-file identity');
   for (const [file, digest] of Object.entries(receipt.fixture_files)) {
@@ -133,7 +133,7 @@ async function verifyPrepared(config, filename, { ssh, referencedEntities, opera
     const entries = await connection.call({ type: 'config_entries/get' });
     assert.equal(entries.filter(entry => entry.domain === 'marao_dashboard').length, 1, 'Unexpected Marao integration count');
     assert.ok(entries.some(entry => entry.domain === 'marao_dashboard' && entry.entry_id === receipt.entry_id && entry.state === 'loaded'), 'Preserved integration identity changed');
-    assert.ok(!entries.some(entry => ['frigate', 'unifiprotect'].includes(entry.domain)), 'Fixtures cannot replace real camera providers');
+    assert.ok(!entries.some(entry => ['frigate', 'unifiprotect', 'netatmo'].includes(entry.domain)), 'Fixtures cannot replace real camera providers');
     assert.equal((await api(config, 'GET', '/api/config')).config_dir, config.remoteConfigPath, 'Unexpected disposable configuration directory');
     const quote = value => "'" + value.replace(/'/g, "'\\''") + "'";
     const readSnapshot = () => batch ? require('../prepared-batch').readBatchSnapshot(config, {

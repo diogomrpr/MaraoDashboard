@@ -54,7 +54,7 @@ async function run(){
      const timing=await page.evaluate(()=>({registered:definitions['marao-native-navbar-card'],optional:performance.getEntriesByType('resource').find(r=>r.name.includes('MaraoRuntime.js'))?.startTime}));
      assert.ok(timing.registered);if(timing.optional!=null)assert.ok(timing.registered<=timing.optional);
      assert.equal(await nav.locator('a[href],[draggable=true],[title]').count(),0);
-     const refresh=bar.getByRole('button',{name:'Limpar cache e atualizar',exact:true});
+     const refresh=page.getByRole('button',{name:'Limpar cache e atualizar',exact:true});
      await refresh.waitFor({state:'visible'});
      const refreshBox=await refresh.boundingBox();assert.ok(refreshBox.width>=48&&refreshBox.height>=48);
      assert.equal(await refresh.locator('svg').count(),1,'Recovery icon needs no optional icon renderer');

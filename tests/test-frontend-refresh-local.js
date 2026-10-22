@@ -24,7 +24,7 @@ async function pointer(page, locator, milliseconds, cancel = false) {
 }
 
 async function geometry(page) {
-  return page.locator('marao-navbar-card').evaluate(card => {
+  return page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])').evaluate(card => {
     const nav = card.shadowRoot.querySelector('.nav'), box = nav.getBoundingClientRect();
     const controls = [...nav.querySelectorAll('a,button')].map(node => {
       const rect = node.getBoundingClientRect(), icon = node.querySelector('ha-icon').getBoundingClientRect();
@@ -89,7 +89,7 @@ async function run({ alignmentOnly = false } = {}) {
             const native = profile.name === 'android' || engine === webkit;
             const original = base + '/marao-dashboard/rooms?external_auth=1&keep=a%20b' + (native ? '&native=1' : '') + '#detail';
             await page.goto(original); await page.waitForFunction(() => window.ready);
-            const card = page.locator('marao-navbar-card'), nav = card.locator('.nav'); await nav.waitFor({ state: 'visible' });
+            const card = page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])'), nav = card.locator('.nav'); await nav.waitFor({ state: 'visible' });
             await page.evaluate(() => {
               card.hass = { ...hass, language: 'pt' };
             });
@@ -139,7 +139,7 @@ async function run({ alignmentOnly = false } = {}) {
                 version = 2;
                 await page.reload(); await page.waitForFunction(() => window.ready); assert.equal(await page.locator('meta[name=fixture-build]').getAttribute('content'), '1');
                 const historyLength = await page.evaluate(() => history.length);
-                await pointer(page, page.locator('marao-navbar-card .nav [data-route]').first(), 3100);
+                await pointer(page, page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) .nav [data-route]').first(), 3100);
                 await page.waitForFunction(() => document.querySelector('meta[name=fixture-build]').content === '2' && window.ready);
                 const fresh = new URL(page.url()); assert.equal(fresh.pathname, '/marao-dashboard/rooms'); assert.equal(fresh.hash, '#detail');
                 assert.equal(fresh.searchParams.get('external_auth'), '1'); assert.equal(fresh.searchParams.get('keep'), 'a b');

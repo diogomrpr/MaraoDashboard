@@ -133,7 +133,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             "label": "Camera",
             "icon": "mdi:cctv",
             "domains": ["camera"],
-            "description": "Automatic camera preview to live video with a generated Frigate or UniFi Protect events popup.",
+            "description": "Automatic camera preview to live video with a generated Frigate, UniFi Protect or Netatmo events popup.",
             "variables": [
                 _field("popup_stream_entity", "Popup stream", "entity", domains=["camera"]),
                 _field("preload_stream", "Preload stream in background", "boolean", default=False,
@@ -323,6 +323,7 @@ EDITOR_CATALOG: dict[str, Any] = {
                 _field("graph_color", "Graph color", "color", advanced=True),
                 _field("graph_background", "Graph background", "color", advanced=True),
                 _field("history_popup", "History popup", "boolean", default=False),
+                _field("power_devices", "Power devices", "power_devices"),
                 _field("popup_hash", "Popup hash", "text", advanced=True),
             ],
         },

@@ -56,7 +56,7 @@ async function main() {
           await page.waitForFunction(({ root, expected }) => root.config?.views?.[root._curView]?.path === expected, {
             root: await page.locator('hui-root').elementHandle(), expected: view.path,
           });
-          await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+          await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
           await assertCurrentFrontend(page);
           await applyVisualPreferences(page, scenario, theme);
           await page.waitForLoadState('networkidle');

@@ -70,7 +70,7 @@ workflows. These are documented in this cards section:
 
 Normal binary state words are omitted across Marao cards, including raw cards with `show_state: true`. Backgrounds and visible state markers communicate the current state, with localized accessible names. Useful values, labels, action names, transitions and historical interval labels remain.
 
-Unknown, unavailable, missing and disconnected entities use a neutral whole-card surface with a localized reason. Recognized faults and reported action/content errors use an alert surface; partial problems identify affected members while preserving useful content and safe actions. Problem reasons remain visible with `show_state: false` or hidden icons. A later successful explicit action retry clears its reported error without replacing Home Assistant’s authoritative state.
+Unknown, unavailable, missing and disconnected entities use a neutral whole-card surface with a localized reason. Recognized faults and reported action/content errors use an alert surface; individual-card availability cues use concise localized status text without repeating entity names. Partially available group/room summaries keep their usable counts and normal palette without unavailable counts or member-warning rows; their sheets still show individual member status. Other partial cards keep useful content and safe actions with a concise availability cue. Problem reasons remain visible with `show_state: false` or hidden icons. A later successful explicit action retry clears its reported error without replacing Home Assistant’s authoritative state.
 
 ## Energy reading format
 
@@ -147,3 +147,8 @@ format error instead of an unconverted number under another unit. Compatible
 records remain available. A separately selected graph sensor uses its own
 metadata. Changing only format settings reuses raw history and keeps the selected
 period. Source or period changes invalidate obsolete requests.
+
+Strict access open/unlock sliders use a rounded track and round arrow handle,
+without a progressing background fill. Drag from anywhere on the handle,
+including its edges; the label fades during travel and returns on reset. Track
+taps, incomplete slides and scrolling gestures never execute the access action.

@@ -181,7 +181,7 @@ async function releasedHealth(config, packageRoot, directory) {
     page.on('requestfailed', request => errors.push(request.failure()?.errorText));
     page.on('response', response => { if (response.status() >= 400) errors.push('HTTP ' + response.status()); });
     await page.goto(config.url + '/marao-dashboard/overview');
-    await page.locator('marao-navbar-card nav').waitFor({ state: 'visible' });
+    await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
     await page.waitForLoadState('networkidle');
     assert.equal(await page.locator('hui-error-card').count(), 0);
     assert.deepEqual(errors, [], 'Released package did not render a healthy dashboard');

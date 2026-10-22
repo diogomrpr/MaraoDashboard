@@ -17,7 +17,7 @@ from homeassistant.util import slugify
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_state_change_event
 
-SOURCES = ["YouTube", "Plex", "Netflix", "Disney+", "Prime Video", "Spotify"]
+SOURCES = ["YouTube", "Plex", "Netflix", "Disney+", "Prime Video", "Spotify", "MEO"]
 ARTWORK = "data:image/svg+xml;base64," + base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270"><rect width="480" height="270" fill="#805a81"/><circle cx="360" cy="80" r="150" fill="#fff"/><circle cx="90" cy="230" r="170" fill="#e7c278"/></svg>').decode()
 
 

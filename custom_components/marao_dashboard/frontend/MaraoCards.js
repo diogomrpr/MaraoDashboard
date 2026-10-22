@@ -35,7 +35,7 @@ const mediaApps = [
   { id: "prime-video", sources: ["Prime Video", "Amazon Prime Video", "com.amazon.aiv.AIVApp"], color: "#0064b5", text: "#fff" },
   { id: "apple-tv", sources: ["TV", "Apple TV", "Apple TV+", "com.apple.tv", "com.apple.TVWatchList"], color: "#151515", text: "#fff" },
   { id: "plex", sources: ["Plex", "com.plexapp.plex"], color: "#e5a00d", text: "#171717" },
-  { id: "meo", sources: ["MEO", "MEO Go", "pt.sapo.mobile.iphone.tmn.meomobile"], color: "#3525ff", text: "#fff" },
+  { id: "meo", file: "meo.svg", sources: ["MEO", "MEO Go", "pt.sapo.mobile.iphone.tmn.meomobile"], color: "#2e26ff", text: "#fff" },
 ];
 
 export function mediaAppBrand(config) {
@@ -251,12 +251,11 @@ export function summaryState(entities, hass) {
   const states = [...new Set(entities)].map((entity) => text(stateOf(hass, entity).state, "unknown"));
   const known = states.filter((state) => !["unknown", "unavailable"].includes(state));
   const active = known.filter((state) => !["off", "closed", "closing", "idle", "standby", "docked"].includes(state)).length;
-  const unavailable = states.length - known.length;
   const state = known.length ? active ? "on" : "off" : states.includes("unknown") ? "unknown" : "unavailable";
   const label = !known.length ? localize(`common.${state}`, hass, {}, state)
     : active ? localize("common.active_count", hass, { count: active }, `${active} active`)
     : localize("common.all_off", hass, {}, "All off");
-  return { state, label: known.length && unavailable ? localize("common.partial_summary", hass, { label, count: unavailable }, `${label}, ${unavailable} unavailable`) : label };
+  return { state, label };
 }
 
 function batteryReading(value) {
@@ -291,7 +290,6 @@ export function entityGroupState(type, entities, hass) {
     : activeEntities.length ? localize('common.active_count', hass, { count: activeEntities.length }, `${activeEntities.length} active`)
     : type === 'cover' ? localize('group.all_closed', hass, {}, 'All closed') : localize('common.all_off', hass, {}, 'All off');
   if (type === 'battery' && activeEntities.length) label += ' · ' + localize('group.low_count', hass, { count: activeEntities.length }, `${activeEntities.length} low`);
-  if (usable.length && unavailableEntities.length) label = localize('common.partial_summary', hass, { label, count: unavailableEntities.length }, `${label}, ${unavailableEntities.length} unavailable`);
   return { state, label, activeEntities, unavailableEntities, available: usable.length, reading, minimumReading };
 }
 
@@ -610,6 +608,7 @@ export function cardProblem(config, hass, { error = "", contentError = "", loadi
   const variables = config.variables || {};
   const entity = text(config.entity);
   const summaries = Array.isArray(variables.summary_entities) ? variables.summary_entities : [];
+  const summary = kind === 'hc_entity_group_card' || kind === 'hc_room_card' || summaries.length > 0;
   const readings = kind === "hc_glance_card" ? Array.from({ length: 3 }, (_, index) => variables[`entity${index + 1}`]).filter(Boolean) : [];
   const roomMembers = kind === "hc_room_card" ? roomLightEntities(config) : [];
   const content = kind === "hc_room_card" ? roomMembers : [...new Set(summaries.length ? summaries : [entity, ...readings].filter(Boolean))];
@@ -623,9 +622,8 @@ export function cardProblem(config, hass, { error = "", contentError = "", loadi
   const details = [];
   let severity;
   if (complete) {
-    severity = "neutral";
     const state = disconnected ? "disconnected" : failedContent.some(id => !hass.states[id]) ? "missing" : failedContent.some(id => hass.states[id].state === "unknown") ? "unknown" : "unavailable";
-    details.push(localize(`common.${state}`, hass, {}, { disconnected: "Disconnected", missing: "Entity missing", unknown: "Unknown", unavailable: "Unavailable" }[state]));
+    return { kind: "neutral", reason: localize(`common.${state}`, hass, {}, { disconnected: "Disconnected", missing: "Entity missing", unknown: "Unknown", unavailable: "Unavailable" }[state]), complete: true };
   }
   if (error) details.push(localize("actions.failed", hass, { error }, `Action failed: ${error}`));
   if (contentError) details.push(contentError);
@@ -642,7 +640,7 @@ export function cardProblem(config, hass, { error = "", contentError = "", loadi
     }
   }
   if (fault) details.push(entityStateLabel(hass.states[entity], entity, kind, hass));
-  if (severity !== "neutral" && (error || contentError || fault)) severity = "error";
+  if (error || contentError || fault) severity = "error";
   const targets = [kind === "hc_toggle_graph_card" ? variables.toggle_entity : null,
     ...roomMembers];
   if (kind === "hc_switch_card") targets.push(variables.power_entity);
@@ -655,14 +653,12 @@ export function cardProblem(config, hass, { error = "", contentError = "", loadi
     targets.push(...(Array.isArray(target) ? target : [target]));
   }
   const partial = [...new Set([...failedContent, ...failed(targets.filter(Boolean))])];
-  if (!complete && partial.length) {
-    severity ||= kind === "hc_room_card" ? "neutral" : "warning";
+  if (partial.length && !summary) {
+    severity ||= "warning";
     details.push(...partial.map(id => {
       const state = hass.states[id];
       const reason = !state ? "missing" : state.state;
-      const name = state?.attributes?.friendly_name || id;
-      const label = localize(`common.${reason}`, hass, {}, reason === "missing" ? "Entity missing" : reason);
-      return `${name}: ${label}`;
+      return localize(`common.${reason}`, hass, {}, { missing: "Entity missing", unknown: "Unknown", unavailable: "Unavailable" }[reason] || reason);
     }));
   }
   if (!severity && loading) return { kind: "loading", reason: localize("common.loading", hass, {}, "Loading…") };
@@ -727,10 +723,10 @@ export function standardControl(config = {}) {
 export function ownedContent(config = {}) {
   if (config.type === 'custom:marao-card') return Boolean(config.template) && !['hc_title_card', 'hc_navbar_card', 'hc_popup_card'].includes(config.template);
   return /^custom:marao-native-/.test(config.type || '') && !/-(title|navbar|popup)-card$/.test(config.type)
-    || ['custom:marao-timeline-card', 'custom:marao-energy-period-card', 'custom:marao-frigate-events-card', 'custom:marao-slide-to-open'].includes(config.type);
+    || ['custom:marao-timeline-card', 'custom:marao-energy-period-card', 'custom:marao-frigate-events-card', 'custom:marao-power-history-card', 'custom:marao-slide-to-open'].includes(config.type);
 }
 
-const CONTROL_CELL_MIN = 136, CONTROL_CELL_FONT_SCALE = 7.5;
+const CONTROL_CELL_MIN = 120, CONTROL_CELL_FONT_SCALE = 6;
 
 // Equal flexible tracks use the tallest intrinsic row, including later rows.
 export function controlGridStyles(selector = '.control-grid') {
@@ -785,7 +781,15 @@ function cardStyles() {
     ha-card.title-surface { overflow:visible; background:transparent; box-shadow:none; }
     .body.title-card { display:block; min-height:0; padding:0 0 20px; }
     .body.title-card .title { font-size:calc(var(--font-size-primary,1.125rem) * 1.39); font-weight:800; }
-    .body.media-app-card { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:0; min-height:48px; aspect-ratio:1; text-align:center; }
+    .body.media-app-card { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:0; min-height:48px; aspect-ratio:1; text-align:center; border-radius:inherit; }
+    .body.media-app-card::after { content:""; position:absolute; inset:0; z-index:3; border-radius:inherit; box-shadow:inset 0 0 0 0 var(--primary-color); pointer-events:none; transition:box-shadow .12s ease; }
+    ha-card:has(.media-app-card):has(.card-action:not(:disabled)) { cursor:pointer; }
+    ha-card:has(.card-action:not(:disabled)).is-pressed .media-app-card::after { box-shadow:inset 0 0 0 3px var(--primary-color); }
+    @media (hover:hover) and (pointer:fine) {
+      ha-card:has(.media-app-card):has(.card-action:not(:disabled)):hover { transform:translateY(-2px); }
+      ha-card:has(.card-action:not(:disabled)):hover .media-app-card::after { box-shadow:inset 0 0 0 3px var(--primary-color); }
+    }
+    ha-card:has(.media-app-card):has(.card-action:not(:disabled)).is-pressed { transform:scale(.97); }
     .body.media-app-card .icon { width:100%; height:100%; flex:1; border-radius:0; background:transparent; --mdc-icon-size:clamp(48px,50cqi,96px); }
     .body.media-app-card .app-icon { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:cover; }
     .body.media-app-card .app-symbol { object-fit:contain; padding:18%; box-sizing:border-box; }
@@ -819,7 +823,7 @@ function cardStyles() {
     .climate-mode.active { background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); box-shadow:inset 0 0 0 3px var(--marao-accent-color,var(--primary-color)); }
     .control.number-control { grid-area:icon; justify-self:end; }
     .wallbox-shortcuts { grid-area:wallbox; z-index:2; display:grid; grid-template-columns:repeat(auto-fit,minmax(48px,1fr)); gap:8px; width:100%; margin-top:8px; pointer-events:auto; }
-    .wallbox-shortcuts button { min-width:48px; min-height:48px; background:var(--ha-card-background,var(--card-background-color,#fff)); color:var(--primary-text-color,#141414); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-black,#000) 12%,transparent); font-size:var(--font-size-primary,1.125rem); font-weight:var(--font-weight-primary,700); }
+    .wallbox-shortcuts button { min-width:48px; min-height:48px; background:var(--opacity-contrast-100,color-mix(in srgb,currentColor 14%,transparent)); color:var(--primary-text-color,#141414); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-black,#000) 12%,transparent); font-size:var(--font-size-primary,1.125rem); font-weight:var(--font-weight-primary,700); }
     .control.climate-number-control { align-self:stretch; }
     .number-stepper { display:grid; justify-items:center; gap:2px; min-width:84px; width:auto; max-width:42vw; padding:4px; box-sizing:border-box; border-radius:999px; background:var(--button-card-background,var(--secondary-background-color)); }
     .number-stepper button { display:grid; place-items:center; width:48px; height:48px; padding:0; border-radius:50%; background:transparent; }
@@ -872,17 +876,17 @@ function cardStyles() {
     .vacuum-actions button { padding:10px 4px; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); }
     .body.room-card { display:flex; flex-direction:column; align-items:stretch; gap:8px; }
     .room-bottom { position:relative; display:flex; align-items:flex-end; min-height:48px; margin-top:auto; }
-    .room-bottom:has(.room-artwork) { min-height:100px; }
     .room-artwork { --room-artwork-size:clamp(48px,65cqi,128px); position:absolute; right:calc(-1 * var(--room-edge-inset,14px)); bottom:calc(-1 * var(--room-edge-inset,14px)); width:calc(.8 * var(--room-artwork-size)); height:calc(.8 * var(--room-artwork-size)); overflow:hidden; color:var(--marao-icon-color,var(--icon-color)); opacity:.2; pointer-events:none; }
     .room-artwork :is(ha-icon,ha-state-icon) { display:block; width:var(--room-artwork-size); height:var(--room-artwork-size); --mdc-icon-size:var(--room-artwork-size); }
     .room-lights-off { position:relative; z-index:3; box-sizing:border-box; display:flex; align-items:center; justify-content:center; flex:0 0 48px; width:48px; height:48px; padding:0; border:1px solid currentColor; border-radius:50%; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); pointer-events:auto; }
     .room-lights-off:disabled { opacity:.6; cursor:default; }
     .room-lights-off ha-icon { --mdc-icon-size:28px; }
-    .scene-options { grid-area:control; z-index:2; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; width:100%; pointer-events:auto; }
+    .scene-options { grid-area:control; z-index:2; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; width:100%; pointer-events:auto; }
     .scene-options button { min-width:48px; min-height:48px; overflow-wrap:anywhere; font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-secondary,500); line-height:1.25; }
     .scene-options button:disabled { opacity:.6; cursor:default; }
     .scene-options button:only-child { grid-column:1/-1; }
     .scene-options button[aria-pressed=true] { box-shadow:inset 0 0 0 3px var(--marao-accent-color,var(--primary-color)); font-weight:var(--font-weight-primary,700); }
+    @container marao-card (max-width:280px) { .scene-options { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     @container marao-card (max-width:190px) { .scene-options { grid-template-columns:minmax(0,1fr); } .body.with-climate-modes { padding-inline:8px; } .climate-mode { padding-inline:4px; } }
     .camera { grid-column:1/-1; width:100%; aspect-ratio:16/9; object-fit:cover; background:#000; }
     .media-artwork { position:absolute; inset:0; pointer-events:none; }
@@ -912,7 +916,7 @@ function cardStyles() {
       .body.wallbox-card .wallbox-value { font-size:calc(1.75 * var(--font-size-primary,1.125rem)); }
       .body.wallbox-card .wallbox-stepper { min-width:56px; width:56px; padding:4px; }
     }
-    @media (prefers-reduced-motion:reduce) { ha-card,button,.slider-thumb { transition:none; } }
+    @media (prefers-reduced-motion:reduce) { ha-card,button,.slider-thumb,.media-app-card::after { transition:none; } }
   `;
 }
 
@@ -1395,6 +1399,10 @@ export class MaraoCard extends BaseElement {
   _openHistory(opener) {
     if (this.preview || this._graphAvailability(this._graphEntity())) return;
     haptic('heavy');
+    const options = this._config.variables || {}, source = stateOf(this._hass, this._graphEntity());
+    if (options.history_popup && options.popup_hash && (energyUnits[source.attributes?.unit_of_measurement]?.[0] === 'power' || options.power_devices?.length)) {
+      navigate(options.popup_hash); return;
+    }
     const overlays = new Set();
     for (let node = this; node; node = node.parentElement || node.getRootNode()?.host) if (node.classList?.contains('marao-popup-overlay')) overlays.add(node);
     let popup = findElements('marao-popup-card').find(popup => popup._open && overlays.has(popup._overlay));
@@ -1465,8 +1473,6 @@ export class MaraoCard extends BaseElement {
     const batteryGroup = entityGroup && variables.entity_type === 'battery' && summary.minimumReading !== null;
     const batteryConfig = batteryGroup && variables.hc_color ? { ...config, variables: { ...variables, active_color: variables.hc_color } } : config;
     const appearance = stateAppearance(batteryGroup ? 'hc_battery_card' : kind, batteryGroup ? summary.minimumReading : value, batteryConfig, this._hass);
-    const criticalPartial = batteryGroup && summary.minimumReading < 20 && summary.unavailableEntities.length && problem?.kind === 'warning' && !problem.complete;
-    const problemAppearance = criticalPartial ? stateAppearance('hc_battery_card', summary.minimumReading, {}, this._hass) : null;
     const interactionUnavailable = ["unknown", "unavailable"].includes(text(interactionState.state, "unknown").toLowerCase());
     const stateDisabled = loading || entityGroup && (this._hass?.connected === false || this._hass?.connection?.connected === false)
       || Boolean(entity || toggleEntity || entityGroup) && (toggleEntity ? interactionUnavailable : appearance.unavailable);
@@ -1622,7 +1628,7 @@ export class MaraoCard extends BaseElement {
     const formattedReading = !iconOnly && Boolean(formattedPrimary || formattedPower);
     const stateMarkup = showState && kind !== "hc_wallbox_current_card" ? `<div class="state">${esc(displayValue)}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null && kind !== "hc_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem, problemAppearance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
+    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null && kind !== "hc_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binary !== null ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneButtons}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${graphMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
     this._syncCamera();
     this._activeHistoryPopup?._refreshHistory();
     for (const symbol of this.shadowRoot.querySelectorAll("ha-state-icon")) {
@@ -2202,7 +2208,7 @@ export class MaraoPopupCard extends BaseElement {
     const maxWidth = columnWidth > 0 ? `${columnWidth}px` : "100%";
     const closeLabel = localize("popup.close", this._hass, {}, "Close popup");
     const overlay = document.createElement("div"); overlay.className = "marao-popup-overlay";
-    overlay.innerHTML = `<style>${controlGridStyles(".marao-popup-content.control-grid")}@keyframes marao-popup-slide-up{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}.marao-popup-overlay{position:fixed;inset:0;z-index:1100;display:flex;align-items:flex-end;box-sizing:border-box;padding:max(50px, ${safeArea("top")}) ${safeArea("right")} 0 ${safeArea("left")};background:rgba(0,0,0,.42);font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}.marao-popup-sheet{--marao-popup-card-padding:8px;--marao-popup-detail-title-display:${title && this._config.cards?.length === 1 && this._config.cards[0].name === title ? 'none' : 'block'};box-sizing:border-box;width:100%;max-width:${maxWidth};height:${esc(height)};max-height:min(${esc(this._config.max_height)}, 100%);margin:0 auto;overflow:auto;padding:0 8px;border-radius:22px 22px 0 0;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);overscroll-behavior:contain;animation:marao-popup-slide-up .28s cubic-bezier(.2,.8,.2,1) both}.marao-popup-head{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;padding:20px 0 12px;background:inherit;z-index:1}.marao-popup-head h2{min-width:0;margin:0;font-size:var(--font-size-primary,1.25rem);line-height:1.2;overflow-wrap:anywhere}.marao-popup-close{flex:0 0 48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;font-size:1.5rem;background:var(--secondary-background-color);color:inherit;cursor:pointer;transition:transform .12s ease,filter .12s ease}.marao-popup-close:active{transform:scale(.92);filter:brightness(.96)}.marao-popup-close:focus,.marao-popup-sheet:focus{outline:none}.marao-popup-content>p{min-width:0;font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.4;overflow-wrap:anywhere}.marao-popup-content[hidden]{display:none}.marao-popup-content{display:grid;min-width:0;gap:8px;isolation:isolate;padding-bottom:calc(92px + ${safeArea("bottom")})}@media(max-width:240px){.marao-popup-sheet{padding-left:4px;padding-right:4px}}@media(prefers-reduced-motion:reduce){.marao-popup-sheet{animation:none}.marao-popup-close{transition:none}}</style><section class="marao-popup-sheet" role="dialog" aria-modal="true" aria-label="${esc(title || this._config.name || localize("popup.title", this._hass, {}, "Marao popup"))}" tabindex="-1"><div class="marao-popup-head"><h2>${esc(title)}</h2><button class="marao-popup-close" type="button" aria-label="${esc(closeLabel)}" title="${esc(closeLabel)}">×</button></div><div class="marao-popup-content"></div></section>`;
+    overlay.innerHTML = `<style>${controlGridStyles(".marao-popup-content.control-grid")}@keyframes marao-popup-slide-up{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}.marao-popup-overlay{position:fixed;inset:0;z-index:1100;display:flex;align-items:flex-end;box-sizing:border-box;padding:max(50px, ${safeArea("top")}) ${safeArea("right")} 0 ${safeArea("left")};background:rgba(0,0,0,.42);font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}.marao-popup-sheet{--marao-popup-card-padding:8px;--marao-popup-detail-title-display:${title && this._config.cards?.length === 1 && this._config.cards[0].name === title ? 'none' : 'block'};box-sizing:border-box;width:100%;max-width:${maxWidth};height:${esc(height)};max-height:min(${esc(this._config.max_height)}, 100%);margin:0 auto;overflow:auto;padding:0 8px;border-radius:22px 22px 0 0;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);overscroll-behavior:contain;animation:marao-popup-slide-up .28s cubic-bezier(.2,.8,.2,1) both}.marao-popup-head{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;padding:20px 0 12px;background:inherit;z-index:1}.marao-popup-head h2{min-width:0;margin:0;font-size:var(--font-size-primary,1.25rem);line-height:1.2;overflow-wrap:anywhere}.marao-popup-close{flex:0 0 48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;font-size:1.5rem;background:var(--secondary-background-color);color:inherit;cursor:pointer;transition:transform .12s ease,filter .12s ease}.marao-popup-close:active{transform:scale(.92);filter:brightness(.96)}.marao-popup-close:focus,.marao-popup-sheet:focus{outline:none}.marao-popup-content>p{min-width:0;font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.4;overflow-wrap:anywhere}.marao-popup-content[hidden]{display:none}.marao-popup-content{display:grid;min-width:0;gap:8px;isolation:isolate;padding-bottom:max(8px, ${safeArea("bottom")})}@media(max-width:240px){.marao-popup-sheet{padding-left:4px;padding-right:4px}}@media(prefers-reduced-motion:reduce){.marao-popup-sheet{animation:none}.marao-popup-close{transition:none}}</style><section class="marao-popup-sheet" role="dialog" aria-modal="true" aria-label="${esc(title || this._config.name || localize("popup.title", this._hass, {}, "Marao popup"))}" tabindex="-1"><div class="marao-popup-head"><h2>${esc(title)}</h2><button class="marao-popup-close" type="button" aria-label="${esc(closeLabel)}" title="${esc(closeLabel)}">×</button></div><div class="marao-popup-content"></div></section>`;
     overlay.addEventListener("click", (event) => { if (event.target === overlay) this._close(true); });
     overlay.querySelector(".marao-popup-close").addEventListener("click", () => { haptic("heavy"); this._close(true); });
     overlay.addEventListener("keydown", (event) => {
@@ -2391,8 +2397,61 @@ export class MaraoPopupCard extends BaseElement {
   getCardSize() { return 0; }
 }
 
+export class MaraoPowerHistoryCard extends BaseElement {
+  constructor() { super(); this.attachShadow?.({ mode: 'open' }); this._loadId = 0; }
+  setConfig(config) {
+    if (!/^(sensor|number|input_number)\.[a-z0-9_]+$/.test(config?.entity || '')) throw new Error('Choose a power sensor.');
+    const errors = historyData.validatePowerDevices(config, config.entity);
+    if (errors.length) throw new Error(errors[0]);
+    if (config.display_unit != null && energyUnits[config.display_unit]?.[0] !== 'power') throw new Error('Power devices require power sensors in W or kW.');
+    if (config.display_precision != null && (!Number.isInteger(config.display_precision) || config.display_precision < 0 || config.display_precision > 6)) throw new Error('Decimal places must be an integer from 0 to 6.');
+    this._config = structuredClone(config); this._failed = false; this._sync();
+  }
+  set hass(value) {
+    this._hass = value;
+    const ids = [this._config?.entity, ...(this._config?.power_devices || []).map(item => item.entity_id)];
+    const marker = JSON.stringify([value?.connected, value?.connection?.connected, value?.locale, value?.language, value?.config?.time_zone, new Date().toLocaleDateString('en-CA', { timeZone: value?.config?.time_zone || 'UTC' }),
+      ids.map(id => value?.states?.[id]), value?.themes]);
+    if (marker !== this._marker) { this._marker = marker; this._sync(); }
+  }
+  get preview() { return Boolean(this._preview); }
+  set preview(value) { this._preview = Boolean(value); this._sync(); }
+  connectedCallback() { this._sync(); }
+  disconnectedCallback() { this._loadId++; this._starting = false; this._failed = false; this._chart?.destroy(); this._chart = null; this.shadowRoot?.replaceChildren(); }
+  getCardSize() { return 6; }
+  getGridOptions() { return { columns: 12, rows: 'auto' }; }
+  _options() {
+    return { ...this._config, hass: this._hass,
+      convert: (value, source, target) => energyValue(value, source, { display_unit: target }),
+      format: formatEnergyNumber, localize: key => localize(key, this._hass, {}, key) };
+  }
+  async _sync() {
+    if (!this._config || !this._hass || this.isConnected === false || !this.shadowRoot) return;
+    if (this.preview) { this._chart?.destroy(); this._chart = null; this.shadowRoot.textContent = localize('power.title', this._hass, {}, 'Power history'); return; }
+    if (this._chart) { this._chart.update(this._options()); return; }
+    if (this._starting || this._failed) return;
+    const request = ++this._loadId;
+    this._starting = true;
+    this.shadowRoot.textContent = localize('timeline.loading', this._hass, {}, 'Loading history…');
+    try {
+      const module = await loadHistoryChart();
+      if (request !== this._loadId || this.isConnected === false || this.preview) return;
+      this.shadowRoot.replaceChildren();
+      this._chart = module.createPowerHistory(this.shadowRoot, this._options());
+    } catch {
+      if (request !== this._loadId || this.isConnected === false) return;
+      this._failed = true;
+      const message = document.createElement('p'); message.setAttribute('role', 'alert'); message.textContent = localize('history.load_error', this._hass, {}, 'History chart could not load');
+      const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = localize('common.retry', this._hass, {}, 'Retry');
+      retry.style.cssText = 'min-width:48px;min-height:48px;border:0;border-radius:12px;padding:10px 12px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit';
+      retry.addEventListener('click', () => { haptic('heavy'); this._failed = false; this._sync(); });
+      this.shadowRoot.replaceChildren(message, retry);
+    } finally { if (request === this._loadId) this._starting = false; }
+  }
+}
+
 export function registerMaraoCards() {
-  for (const [name, klass] of [["marao-card", MaraoCard], ["marao-control-grid", MaraoControlGrid], ["marao-navbar-card", MaraoNavbarCard], ["marao-popup-card", MaraoPopupCard]]) {
+  for (const [name, klass] of [["marao-card", MaraoCard], ["marao-power-history-card", MaraoPowerHistoryCard], ["marao-control-grid", MaraoControlGrid], ["marao-navbar-card", MaraoNavbarCard], ["marao-popup-card", MaraoPopupCard]]) {
     if (globalThis.customElements && !globalThis.customElements.get(name)) globalThis.customElements.define(name, klass);
   }
   if (globalThis.window) {

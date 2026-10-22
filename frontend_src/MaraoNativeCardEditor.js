@@ -27,7 +27,7 @@ export function nativeFields(spec, config) {
     choices("popup_filter", "Popup filter", ["all", "active"]));
   const advanced = (camera ? [] : ["show_name", "show_icon", "show_state", "show_label"]).map(key => field(key, key.replaceAll("_", " ").replace(/^./, s => s.toUpperCase()), "boolean"));
   for (const option of spec.variables) {
-    if (["vacuum_action", "number_list", "energy_sub_entities"].includes(option.kind)) continue;
+    if (["vacuum_action", "number_list", "energy_sub_entities", "power_devices"].includes(option.kind)) continue;
     const item = field("variables." + option.key, option.label, option.kind, option);
     (option.advanced ? advanced : common).push(item);
   }
@@ -42,7 +42,7 @@ export function nativeFields(spec, config) {
   }
   if (spec.id === "popup") common.push(field("hash", "Popup hash"), field("height", "Height"), field("max_height", "Maximum height"));
   if (spec.id === "navbar") common.push(field("native", "Show native edit control", "boolean"));
-  if (spec.id.includes("events")) common.push(choices(config.event_provider === undefined && config.provider !== undefined ? "provider" : "event_provider", "Event provider", ["auto", "frigate", "unifi_protect"]),
+  if (spec.id.includes("events")) common.push(choices(config.event_provider === undefined && config.provider !== undefined ? "provider" : "event_provider", "Event provider", ["auto", "frigate", "unifi_protect", "netatmo"]),
     field("limit", "Event limit", "number"), field("frigate_camera", "Frigate camera name"), field("frigate_instance_id", "Frigate instance ID"),
     field("unifi_protect_media_source", "UniFi Protect media source"));
   if (!["navbar", "popup", "hc_alarm_controls_card", "hc_access_slide_action_card", "hc_access_hold_action_card", "hc_access_action_card", "hc_entity_group_card"].includes(spec.id) && !spec.id.includes("events"))
@@ -89,7 +89,7 @@ export class MaraoNativeCardEditor extends (globalThis.HTMLElement || class {}) 
         const selected = item.path.split(".").reduce((value, key) => value?.[key], this._draft);
         if (selected && !options.includes(selected)) options.push(selected);
       }
-      const labels = { fullscreen: "Full screen", none: "No action", toggle: "Toggle", "more-info": "More information", navigate: "Navigate", url: "Open URL", "perform-action": "Service action", "call-service": "Service action", unifi_protect: "UniFi Protect", frigate: "Frigate", all: "All entities", active: "Active only", light: "Lights", cover: "Covers", battery: "Batteries", climate: "Thermostats", day: "Day", month: "Month", auto: "Auto" };
+      const labels = { fullscreen: "Full screen", none: "No action", toggle: "Toggle", "more-info": "More information", navigate: "Navigate", url: "Open URL", "perform-action": "Service action", "call-service": "Service action", unifi_protect: "UniFi Protect", frigate: "Frigate", netatmo: "Netatmo", all: "All entities", active: "Active only", light: "Lights", cover: "Covers", battery: "Batteries", climate: "Thermostats", day: "Day", month: "Month", auto: "Auto" };
       return { select: { options: options.map(value => ({ value, label: this._label(labels[value] || catalog.cards.find(card => card.type === value || card.id === value)?.label || value) })) } };
     }
     if (["boolean", "icon", "object"].includes(item.kind)) return { [item.kind]: {} };
@@ -172,6 +172,8 @@ export class MaraoNativeCardEditor extends (globalThis.HTMLElement || class {}) 
     if (spec.id === "hc_energy_period_card") this._repeat(host, this._draft.type === spec.legacy_type ? "sub_entities" : "variables.sub_entities", "Energy breakdown",
       [field("entity_id", "Energy sensor", "entity", { domains: ["sensor"], required: true }), field("name", "Name"),
         field("cost_entity", "Cost sensor (optional)", "entity", { domains: ["sensor"] })], { entity_id: "" });
+    if (spec.id === "hc_graph_card") this._repeat(host, "variables.power_devices", "Power devices",
+      [field("entity_id", "Power sensor (W/kW)", "entity", { domains: ["sensor"], required: true }), field("name", "Name")], { entity_id: "" });
     if (spec.id === "hc_media_card") this._repeat(host, "apple_tv.apps", "Apps",
       [field("source", "Source"), field("name", "Name"), field("icon", "Icon", "icon")], { source: "" });
     if (["hc_entity_group_card", "hc_scene_collection_card"].includes(spec.id)) {

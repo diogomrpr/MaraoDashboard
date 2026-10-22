@@ -160,8 +160,8 @@ async def test_history_fixture_uses_native_routes_auth_and_delegation(hass, hass
     hass.http.app[KEY_HASS] = hass
     base = "/api/history/period/2999-09-15T00:00:00%2B00:00?end_time=2999-09-16T00:00:00%2B00:00&filter_entity_id="
 
-    async def request(entity, authenticated=True):
-        result = make_mocked_request("GET", base + entity, app=hass.http.app)
+    async def request(entity, authenticated=True, period=base):
+        result = make_mocked_request("GET", period + entity, app=hass.http.app)
         result[KEY_AUTHENTICATED] = authenticated
         if authenticated:
             result[KEY_HASS_USER] = hass_admin_user
@@ -186,8 +186,16 @@ async def test_history_fixture_uses_native_routes_auth_and_delegation(hass, hass
     assert error.status == 200
     with pytest.raises(json.JSONDecodeError):
         json.loads(error.text)
-    loading = await request("sensor.marao_dashboard_test_history_loading")
-    assert len(json.loads(loading.body)[0]) == 3
+    from datetime import timedelta
+
+    start = fixture.dt_util.utcnow() - timedelta(hours=2)
+    loading = await request("sensor.marao_dashboard_test_history_loading", period=f"/api/history/period/{start.isoformat()}?filter_entity_id=")
+    records = json.loads(loading.body)[0]
+    stamps = [fixture.dt_util.parse_datetime(record["last_updated"]) for record in records]
+    assert len(records) >= 9
+    assert stamps[0] == start
+    assert all(0 < (right - left).total_seconds() <= 900 for left, right in zip(stamps, stamps[1:]))
+    assert all(float(right["state"]) > float(left["state"]) for left, right in zip(records, records[1:]))
     sleep.assert_awaited_once_with(5)
     with pytest.raises(web.HTTPUnauthorized):
         await request("sensor.marao_dashboard_test_energy_format_mixed", False)

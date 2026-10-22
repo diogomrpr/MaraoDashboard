@@ -1,3 +1,4 @@
+import { validatePowerDevices } from './history-data.js';
 export function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
@@ -502,6 +503,13 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
     const domain = typeof entity === "string" ? entity.split(".")[0] : undefined;
     const template = item.template || ({sensor: "hc_sensor_card", switch: "hc_switch_card", input_boolean: "hc_switch_card"})[domain];
     const options = direct ? item : item.variables;
+    if (template==='hc_graph_card' && (!item.type || item.type==='custom:marao-card') && options && Object.hasOwn(options,'power_devices')) {
+      errors.push(...validatePowerDevices(options, options.graph_entity || entity));
+      if (Array.isArray(options.power_devices) && options.power_devices.length && Object.keys(units).length) {
+        const sources=[options.graph_entity||entity,...options.power_devices.map(item=>item?.entity_id)];
+        if(sources.some(source=>metadata.get(source)&&units[metadata.get(source)]?.[0]!=='power'))errors.push('Power devices require power sensors in W or kW.');
+      }
+    }
     if ((direct || template === 'hc_energy_period_card') && options) {
       errors.push(...validateEnergyOptions(options));
       const members = Array.isArray(options.sub_entities) ? options.sub_entities : [];
@@ -611,6 +619,7 @@ export function validatePages(config, catalog) {
         }
         if (card.template === 'hc_energy_period_card' && !['day', 'month'].includes(options.period ?? 'day')) errors.push('Energy period must be day or month.');
         if (card.template === 'hc_energy_period_card') errors.push(...validateEnergyOptions(options));
+        if (card.template === 'hc_graph_card') errors.push(...validatePowerDevices(options, options.graph_entity || card.entity_id));
         if (card.template === 'hc_wallbox_current_card' && Object.hasOwn(options, 'shortcuts') && (!Array.isArray(options.shortcuts) || options.shortcuts.length > 3 || options.shortcuts.some(value => typeof value !== 'number' || !Number.isFinite(value)))) errors.push('Charging shortcuts require at most three finite numbers.');
         if (card.template === 'hc_camera_card' && Object.hasOwn(options, 'preload_stream') && typeof options.preload_stream !== 'boolean') errors.push('Preload stream must be a boolean.');
         if (card.template === 'hc_camera_card' && options.popup_stream_entity != null && options.popup_stream_entity !== '' && (!entityId(options.popup_stream_entity) || !options.popup_stream_entity.startsWith('camera.'))) errors.push('Choose a camera entity for the popup stream.');
@@ -688,6 +697,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
     else if (field.kind === 'boolean') schema = { type: 'boolean' };
     else if (['number', 'energy_precision'].includes(field.kind)) schema = { type: 'number', ...(field.key === 'cost_per_kwh' ? { minimum: 0 } : {}) };
     else if (field.kind === 'number_list') return { type: 'array', items: { type: 'number' }, description: field.description || field.label };
+    else if (field.kind === 'power_devices') return { type: 'array', items: { ...object({ entity_id: binding(['sensor']), name: { type: 'string' } }), required: ['entity_id'] }, description: field.label };
     else if (field.kind === 'energy_sub_entities') return { type: 'array', items: { ...object({ entity_id: binding(['sensor']), name: { type: 'string' }, cost_entity: { anyOf: [binding(['sensor']), { enum: ['', null] }] } }), required: ['entity_id'] }, description: field.label };
     else if (field.kind === 'vacuum_action') return object({ icon: { type: 'string' }, name: { type: 'string' }, segment: { type: 'number' },
       on_action: { type: 'string' }, data: { description: 'Native command data is preserved verbatim; command and params depend on the vacuum integration.' } });
@@ -703,7 +713,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
     const properties = { entity_id: binding(card.domains, card.device_classes), page: pagePath,
       variables: object(Object.fromEntries((card.variables || []).map(field => [field.key, fieldSchema(field)]))),
       tap_action: action, hold_action: action, double_tap_action: action };
-    if (card.id === 'hc_camera_card') properties.variables.properties.event_provider = suggested(['auto', 'frigate', 'unifi_protect']);
+    if (card.id === 'hc_camera_card') properties.variables.properties.event_provider = suggested(['auto', 'frigate', 'unifi_protect', 'netatmo']);
     if (card.id === 'hc_media_card') properties.apple_tv = { anyOf: [{ type: ['boolean', 'null'] }, object({
       remote_entity: binding(['remote']), volume_remote_entity: binding(['remote', 'media_player']),
       apps: { type: 'array', items: object({ name: { type: 'string' }, source: { type: 'string' }, icon: { type: 'string' } }) },

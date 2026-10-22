@@ -44,8 +44,9 @@ The bar deliberately shows icons without visible labels. The `label` is still
 required for semantics and may be exposed as an optional tooltip; navigation
 must never depend on a tooltip.
 
-A compact refresh button at the top right clears the frontend cache and reloads
-with a single tap. It loads with the navigation before optional dashboard content,
+A compact refresh button at the top right of the main page clears the frontend
+cache and reloads with a single tap. It scrolls away with the page rather than
+floating over content. It loads with the navigation before optional dashboard content,
 so it also works when a content module fails. The existing navbar hold gesture
 remains available and uses the same recovery action. Save or discard edits first.
 
@@ -68,6 +69,10 @@ remains available and uses the same recovery action. Save or discard edits first
   Assistant's native top bar only while the dashboard is active.
 
 Page and navbar side clearance follow the current insets during rotation.
+Page bottom clearance follows the navbar's current height and offset, with only
+8px of extra spacing so the final card can scroll fully above it.
+It uses the bar's CSS bottom offset, so elastic scrolling cannot change the
+page height or cause an extra jump at the bottom. Native scrolling bounce remains.
 Marao sheets keep their full-screen backdrop, but their content stays inside
 the overlay's own top and side safe bounds. `height: auto` keeps short sheets
 compact; fixed `height` and `max_height` are limited to available safe height.

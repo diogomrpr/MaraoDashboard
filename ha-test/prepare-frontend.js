@@ -103,7 +103,7 @@ async function prepareFrontend(config = client.readConfig(), dependencies = {}) 
     const owned = entries.filter(row => row.domain === 'marao_dashboard');
     assert.ok(owned.length === 1 && owned[0].state === 'loaded', 'Prepare the disposable Marao installation with ha:sync before preview');
     entry = owned[0];
-    assert.ok(!entries.some(row => ['frigate', 'unifiprotect'].includes(row.domain)), 'Preview requires safe camera fixtures');
+    assert.ok(!entries.some(row => ['frigate', 'unifiprotect', 'netatmo'].includes(row.domain)), 'Preview requires safe camera fixtures');
     dashboard = await connection.call({ type: 'lovelace/config', url_path: 'marao-dashboard', force: true });
     assert.equal(dashboard.views?.filter(view => view.path === 'card-test').length, 1, 'Prepare the single Cases view before preview');
     panels = await connection.call({ type: 'get_panels' });

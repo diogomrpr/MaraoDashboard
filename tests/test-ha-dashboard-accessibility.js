@@ -159,8 +159,8 @@ async function safeAreaGeometry(page, source) {
     if(Math.abs(padding-(hostTop?0:top))>1)issues.push('Active container does not match selected clearance');
     if(hostTop && padding>1)issues.push('Already-safe host has duplicate top clearance');
     if(bounds.left<(expected.left||0)-1||bounds.right>innerWidth-(expected.right||0)+1)issues.push('First content overlaps a safe side edge');
-    const navbar=ancestors.find(e=>e.localName==='hui-view')?.querySelector('marao-navbar-card');
-    const findNav=root=>{if(!root)return;const n=root.querySelector?.('marao-navbar-card');if(n)return n;for(const e of root.querySelectorAll?.('*')||[]){const n=findNav(e.shadowRoot);if(n)return n;}};
+    const navbar=ancestors.find(e=>e.localName==='hui-view')?.querySelector('marao-navbar-card:not([data-marao-navbar-placeholder])');
+    const findNav=root=>{if(!root)return;const n=root.querySelector?.('marao-navbar-card:not([data-marao-navbar-placeholder])');if(n)return n;for(const e of root.querySelectorAll?.('*')||[]){const n=findNav(e.shadowRoot);if(n)return n;}};
     const nav=(navbar||findNav(document))?.shadowRoot.querySelector('nav')?.getBoundingClientRect();
     if(nav && (nav.left<(expected.left||0)-1||nav.right>innerWidth-(expected.right||0)+1))issues.push('Navbar overlaps a safe side edge');
     const navBottom=/iPhone|iPod/.test(navigator.userAgent)?Math.max(4,(expected.bottom||0)-20):12;
@@ -217,7 +217,7 @@ async function inspectSafeAreaSheets(context, page, output, runName) {
 
 async function inspectFullscreenLifecycle(page) {
   for (const route of ['/config/dashboard', '/marao-dashboard-editor']) {
-    await page.locator('marao-navbar-card').evaluate(navbar => {
+    await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])').evaluate(navbar => {
       let root=navbar;while(root&&root.localName!=='hui-root')root=root.parentElement||root.getRootNode()?.host;
       window.__safeOwned={view:root.shadowRoot.querySelector('#view'),header:root.shadowRoot.querySelector('.header')};
     });
@@ -250,9 +250,9 @@ async function inspectFullscreenLifecycle(page) {
       return !view.style.getPropertyValue('padding-top') && !header.style.getPropertyValue('display');
     });
     await page.evaluate(() => {history.pushState(null,'','/marao-dashboard/card-test');window.dispatchEvent(new CustomEvent('location-changed'));});
-    await page.locator('marao-navbar-card').waitFor({state:'visible'});
+    await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])').waitFor({state:'visible'});
     await page.waitForFunction(() => {
-      const find=root=>{if(!root)return;const nav=root.querySelector?.('marao-navbar-card');if(nav)return nav;for(const e of root.querySelectorAll?.('*')||[]){const nav=find(e.shadowRoot);if(nav)return nav;}};
+      const find=root=>{if(!root)return;const nav=root.querySelector?.('marao-navbar-card:not([data-marao-navbar-placeholder])');if(nav)return nav;for(const e of root.querySelectorAll?.('*')||[]){const nav=find(e.shadowRoot);if(nav)return nav;}};
       let root=find(document);while(root&&root.localName!=='hui-root')root=root.parentElement||root.getRootNode()?.host;
       return root?.shadowRoot.querySelector('.header')?.style.display==='none';
     });
@@ -396,7 +396,7 @@ function visualVariablesForScenario(scenario, theme) {
 
 async function applyVisualPreferences(page, scenario, theme, subtree) {
   const engine = emulationEngine(page.context(), scenario);
-  if (!subtree) await page.waitForLoadState("networkidle");
+  if (!subtree) await page.waitForLoadState("domcontentloaded");
   const variables = visualVariablesForScenario(scenario, theme);
   if (engine === 'webkit') for (const key of Object.keys(variables)) if (key.startsWith('--marao-safe-area-inset-')) delete variables[key];
   const apply = settle => page.evaluate(async ({ cssVariables, profile, mode, subtree, settle }) => {
@@ -410,7 +410,16 @@ async function applyVisualPreferences(page, scenario, theme, subtree) {
     };
     const visit = async element => {
       apply(element);
-      if (settle) { await element.updateComplete; await element._ready; }
+      if (settle) {
+        await element.updateComplete; await element._ready;
+        if (element.localName?.startsWith('marao-native-')) {
+          const deadline = Date.now() + 10000;
+          while (element._loading) {
+            if (Date.now() > deadline) throw new Error('Native card compilation did not settle');
+            await new Promise(requestAnimationFrame);
+          }
+        }
+      }
       apply(element);
       await Promise.all([...element.children, ...(element.shadowRoot?.children || [])].map(visit));
     };
@@ -1023,7 +1032,7 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
 }
 
 async function waitForNavbar(page) {
-  const card = page.locator('marao-navbar-card');
+  const card = page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])');
   await card.waitFor({ state: 'attached' });
   await card.locator('nav').waitFor({ state: 'attached' });
   const routes = await card.evaluate(element => element._config.routes.length);
@@ -1138,7 +1147,7 @@ async function main() {
       }
       await assertCurrentFrontend(page);
       if(options.safeArea) {
-        await page.locator('marao-navbar-card nav').waitFor({state:'visible'});
+        await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({state:'visible'});
         await page.evaluate(()=>document.fonts.ready);
         const cold=await safeAreaGeometry(page,safeAreaCases[0]);
         fs.writeFileSync(path.join(output,`${runName}-cold.json`),JSON.stringify(cold,null,2));
@@ -1192,7 +1201,7 @@ async function main() {
             }document.scrollingElement.scrollTo({top:document.scrollingElement.scrollHeight,behavior:'instant'});
           });
           const last=await page.locator('marao-card').last().boundingBox();
-          const bar=await page.locator('marao-navbar-card nav').boundingBox();
+          const bar=await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').boundingBox();
           if(last.y+last.height>bar.y-8)throw new Error(`${source.name}: Last card is covered by the navbar`);
           await page.screenshot({path:path.join(output,`${runName}-safe-last-${source.name}.png`),scale:'css'});
         }

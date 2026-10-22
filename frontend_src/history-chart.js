@@ -1,6 +1,7 @@
 import { Chart, LineController, LineElement, PointElement, BarController, BarElement, LinearScale, Filler } from 'chart.js';
 import { color as chartColor } from 'chart.js/helpers';
 import { historyWindow, nearestSample, reduceSamples, summary } from './history-data.js';
+import { createPowerHistory as createPowerController, powerStateAt } from './power-history.js';
 
 Chart.register(LineController, LineElement, PointElement, BarController, BarElement, LinearScale, Filler);
 const PT = {
@@ -37,6 +38,7 @@ const CSS = `
 .marao-history-chart .history-breakdown p{margin:8px 0}.marao-history-chart .history-donut{width:120px;height:120px;border-radius:50%;position:relative;margin:16px auto}
 .marao-history-chart .history-breakdown-layout{--marao-control-columns:2;--marao-control-gap:8px}
 .marao-history-chart .history-breakdown-layout>.history-donut{align-self:center}
+.marao-history-chart .history-comparison{list-style:none;padding:0;margin:16px 0}.marao-history-chart .history-comparison>div{display:flex;justify-content:space-between;align-items:baseline;gap:8px 16px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--divider-color)}.marao-history-chart .history-comparison .history-item-heading{flex:1 1 14ch}.marao-history-chart .history-comparison .history-item-problem{color:var(--secondary-text-color)}
 .marao-history-chart .history-donut::after{content:"";position:absolute;inset:24%;border-radius:50%;background:var(--ha-card-background,var(--card-background-color,#fff))}
 .marao-history-chart .history-breakdown ul{list-style:none;padding:0;margin:0}.marao-history-chart .history-breakdown li{padding:12px 0;border-bottom:1px solid var(--divider-color,#667085)}
 .marao-history-chart .history-item-heading{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.marao-history-chart .history-item-heading strong{flex:1 1 12ch}
@@ -62,9 +64,10 @@ export function createHistoryChart(container, initial) {
   const summaries = ['Minimum','Maximum','Sample average'].map(label => { const item=make('div','',stats);return {label,item,term:make('dt','',item),value:make('dd','',item)}; });
   const status = make('p','',root);status.setAttribute('role','status');
   const coverage = make('p','',root), retry = make('button','',root);retry.type='button';retry.hidden=true;
+  const comparison = make('section','history-comparison',root);comparison.setAttribute('role','list');
   const breakdown = make('section','history-breakdown',root);
   container.append(root);
-  let options = initial, chart, selectedTime, hours=24, destroyed=false, visible=[], drawError, scrollFrame;
+  let options = initial, chart, selectedTime, reportedTime, hours=24, destroyed=false, visible=[], drawError, scrollFrame;
   const events = new AbortController();
   const language = () => options.hass?.locale?.language || options.hass?.language || 'en';
   const text = key => {const translated=options.localize?.(key);return translated&&translated!==key?translated:(language().startsWith('pt')?PT[key]:null)||key;};
@@ -139,6 +142,13 @@ export function createHistoryChart(container, initial) {
     const probe=make('span','',root);probe.style.color=color;const trace=getComputedStyle(probe).color;probe.remove();
     const data=options.bars ? visible.map((sample,index)=>({x:midpoint(sample,index),y:sample.value}))
       : reduceSamples(visible,Math.max(32,Math.floor(bounds.width*2))).map(sample=>({x:sample.time,y:sample.value}));
+    const holdLastState=points=>{
+      const last=points.at(-1),end=Math.min(range().end,options.recordedUntil??Date.now());
+      // Extend the drawn step only; retained readings and selected timestamps stay untouched.
+      if(options.power&&Number.isFinite(last?.y)&&last.x<end)points.push({x:end,y:last.y});
+      return points;
+    };
+    holdLastState(data);
     canvas.dataset.historyRenderedPoints=String(data.length);canvas.dataset.historySourcePoints=String(visible.length);
     const selected=nearestSample(visible,selectedTime), selectedPoint=selected ? [{x:selected.time,y:selected.value}] : [];
     const fontSize=parseFloat(computed.fontSize)||14, currentRange=range();
@@ -147,8 +157,13 @@ export function createHistoryChart(container, initial) {
     const datasets=options.bars ? [{type:'bar',data,backgroundColor:visible.map(sample=>sample.time===selectedTime?trace:chartColor(trace).alpha(.45).rgbString()),
       borderColor:visible.map(sample=>sample.time===selectedTime?tone:trace),borderWidth:visible.map(sample=>sample.time===selectedTime?2:0),borderRadius:3,borderSkipped:false,barPercentage:.78,categoryPercentage:1,maxBarThickness:28}]
       : [{type:'line',data,borderColor:trace,backgroundColor:chartColor(trace).alpha(.12).rgbString(),borderWidth:options.showLine===false?0:2,fill:options.showFill!==false?'origin':false,
-      pointRadius:data.filter(point=>point.y!==null).length===1?4:0,pointBackgroundColor:trace,spanGaps:false,tension:0},
+      pointRadius:data.filter(point=>point.y!==null).length===1?4:0,pointBackgroundColor:trace,spanGaps:false,tension:0,stepped:options.stepped||false},
       {type:'line',data:selectedPoint,borderColor:trace,backgroundColor:trace,showLine:false,pointRadius:5,pointBorderColor:tone,pointBorderWidth:1}];
+    if(options.power)for(const [index,item] of (options.series||[]).entries()){
+      if(!index)continue;
+      const points=reduceSamples((item.samples||[]).filter(sample=>sample.time>=currentRange.start&&sample.time<=currentRange.end),Math.max(32,Math.floor(bounds.width*2))).map(sample=>({x:sample.time,y:sample.value}));
+      datasets.push({type:'line',data:holdLastState(points),borderColor:item.color,borderWidth:2,pointRadius:0,spanGaps:false,tension:0,stepped:true,fill:false});
+    }
     const chartOptions={responsive:true,maintainAspectRatio:false,animation:false,parsing:false,normalized:true,devicePixelRatio:Math.min(globalThis.devicePixelRatio||1,3),events:['click'],
       onClick:event=>{
         const stamp=chart.scales.x.getValueForPixel(event.x);
@@ -161,7 +176,7 @@ export function createHistoryChart(container, initial) {
         ticks:{color:tone,font:{family:computed.fontFamily,size:fontSize,weight:computed.fontWeight},maxTicksLimit:Math.max(2,Math.min(5,Math.floor(bounds.width/(fontSize*7)))),maxRotation:0,
           callback:stamp=>axisTime.format(new Date(options.bars?visible[data.findIndex(point=>point.x===stamp)]?.time??stamp:stamp))}},
         y:{type:'linear',beginAtZero:Boolean(options.bars),grid:{color:options.bars?chartColor(grid).alpha(.2).rgbString():grid},border:{display:false},ticks:{color:tone,font:{family:computed.fontFamily,size:fontSize,weight:computed.fontWeight},maxTicksLimit:4,
-          ...(options.bars?{precision:0,callback:number=>new Intl.NumberFormat(language(),{maximumFractionDigits:0}).format(number)}:{callback:number=>format(number)})}}}};
+          ...(options.bars?{precision:0,callback:number=>new Intl.NumberFormat(language(),{maximumFractionDigits:0}).format(number)}:{callback:number=>options.axisFormat?options.axisFormat(number):format(number)})}}}};
     try {
       if (chart) {chart.data.datasets=datasets;chart.options=chartOptions;chart.update('none');}
       else chart=new Chart(canvas,{type:options.bars?'bar':'line',data:{datasets},options:chartOptions});
@@ -206,21 +221,41 @@ export function createHistoryChart(container, initial) {
     previous.setAttribute('aria-label',previousLabel);next.setAttribute('aria-label',nextLabel);
     previous.disabled=Boolean(options.unavailable||options.loading||options.error)||!choices.length||index===0;
     next.disabled=Boolean(options.unavailable||options.loading||options.error)||!choices.length||index>=choices.length-1;
+    actions.hidden=Boolean(options.power);
     stats.hidden=Boolean(options.bars);
     const statsValues=summary(visible,options.stateClass);
     for(const [index,item] of summaries.entries()){
       const number=statsValues[['minimum','maximum','average'][index]];
-      item.item.hidden=number==null;item.term.textContent=text(item.label);item.value.textContent=number==null?'':format(number);
+      item.item.hidden=number==null&&(!options.power||index===2);item.term.textContent=text(item.label);item.value.textContent=number==null?(options.power?'—':''):format(number);
     }
     status.setAttribute('role',!options.unavailable&&(options.error||drawError)?'alert':'status');
     status.textContent=options.unavailable?(typeof options.unavailable==='string'?options.unavailable:text('History unavailable')):options.error?String(options.error):drawError?text('Could not draw history.'):options.loading?text('Loading history…'):!valid.length?text('No readings in this period.'):' ';status.hidden=!options.unavailable&&!options.error&&!drawError&&!options.loading&&valid.length>0;
     coverage.textContent=text('Recorded coverage may be limited.');coverage.hidden=Boolean(options.bars||options.unavailable)||!options.coverageLimited;
-    retry.textContent=text('Retry');retry.hidden=Boolean(options.unavailable)||(!options.error&&!drawError);
-    plot.hidden=Boolean(options.unavailable||options.error||options.loading||!valid.length);
-    unit.textContent=options.unit||'';unit.hidden=!options.bars||!options.unit||plot.hidden;
+    retry.textContent=text('Retry');retry.hidden=Boolean(options.unavailable)||(!options.error&&!drawError&&!options.partialError);
+    plot.hidden=!options.power&&Boolean(options.unavailable||options.error||options.loading||!valid.length);
+    canvas.hidden=Boolean(options.power&&(options.unavailable||options.error||options.loading||!valid.length));
+    if(options.power){status.style.minHeight='1.4em';status.style.visibility=status.hidden?'hidden':'visible';status.hidden=false;}
+    unit.textContent=options.unit||'';unit.hidden=(!options.bars&&!options.power)||!options.unit||plot.hidden;
     if(options.unavailable||options.error||options.loading||!valid.length){chart?.destroy();chart=null;}else draw();
+    comparison.hidden=!options.power||(options.series||[]).length<2||Boolean(options.unavailable);
+    if(!comparison.hidden){
+      const rows=[];
+      for(const [index,item] of options.series.entries()){
+        const row=make('div'),heading=make('span','history-item-heading',row),swatch=make('span','history-swatch',heading);row.setAttribute('role','listitem');
+        swatch.style.background=item.color||options.color||'var(--primary-color)';swatch.setAttribute('aria-hidden','true');
+        make('span','',heading).textContent=item.name;
+        const sample=Number.isFinite(selectedTime)?powerStateAt(item.samples||[],selectedTime):null;
+        const reading=make('span',item.problem?'history-item-problem':'',row);
+        const exact=options.selection?.time===selectedTime?options.selection.values?.[item.id]:undefined;
+        reading.textContent=item.problem||exact?.problem||(Number.isFinite(exact?.value)?format(exact.value):options.onSelect&&index>0?text('No data'):Number.isFinite(sample?.value)?format(sample.value):text('No data'));
+        rows.push(row);
+      }
+      comparison.replaceChildren(...rows);
+    }else comparison.replaceChildren();
     renderBreakdown();
     restoreScroll();
+    const reportKey=`${options.selectionKey}:${selectedTime}`;
+    if(options.onSelect&&reportKey!==reportedTime){reportedTime=reportKey;options.onSelect(selectedTime);}
   };
   for(const {hours:window,button} of windowButtons)button.addEventListener('click',()=>{haptic();hours=window;render();},{signal:events.signal});
   previous.addEventListener('click',()=>{if(previous.disabled)return;const choices=selectable(),index=choices.findIndex(sample=>sample.time===selectedTime);select(index<0?choices.filter(sample=>Number.isFinite(sample.value)).at(-1)||choices.at(-1):choices[index-1]);},{signal:events.signal});
@@ -231,3 +266,5 @@ export function createHistoryChart(container, initial) {
   render();
   return { update(nextOptions){options={...options,...nextOptions};render();},destroy(){if(destroyed)return;destroyed=true;cancelAnimationFrame(scrollFrame);events.abort();observer.disconnect();chart?.destroy();chart=null;root.remove();} };
 }
+
+export function createPowerHistory(host, options) { return createPowerController(host, options, createHistoryChart); }

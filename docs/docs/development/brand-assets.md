@@ -80,7 +80,8 @@ update needs no saved-configuration migration or replacement gallery entities.
 
 Bundled `frontend/media-apps/` artwork is served locally. YouTube, Disney+, Prime
 Video and Plex use 512-pixel publisher PNGs retrieved through Apple’s public Lookup
-API on 2026-10-21. Apple TV and MEO retain their existing PNGs. Netflix uses a flat
+API on 2026-10-21. Apple TV retains its existing PNG; MEO uses the official blue
+and white MEO vector mark without the Go lettering. Netflix uses a flat
 vector rendition of its N symbol; Spotify uses its official green vector icon.
 The directory’s `SOURCES.md` records the artwork references. App names and logos belong to their
 respective owners. They identify the configured app; they do not imply affiliation.

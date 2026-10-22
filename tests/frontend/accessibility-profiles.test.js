@@ -91,7 +91,8 @@ test('visual preferences wait for native card rendering and reach late mounts', 
   html.children = [ha]; ha.shadowRoot = shadow;
   const lateCard = node('marao-card');
   const frameCard = node('marao-popup-card');
-  const native = node('hui-card');
+  const native = node('marao-native-light-card');
+  native._loading = true;
   let nativeRendered = false;
   Object.defineProperty(native, 'updateComplete', { get: () => Promise.resolve().then(() => {
     native.children = [lateCard]; nativeRendered = true;
@@ -103,13 +104,14 @@ test('visual preferences wait for native card rendering and reach late mounts', 
   globalThis.requestAnimationFrame = callback => {
     if (!native.children.includes(frameCard)) native.children.push(frameCard);
     painted.push({ size: frameCard.style.values.get('--font-size-primary'), theme: html.dataset.maraoThemeMode });
-    assert.deepEqual(emulation.at(-1), { method: 'Emulation.setTouchEmulationEnabled', params: { enabled: true, maxTouchPoints: 1 } });
+    if (!native._loading) assert.deepEqual(emulation.at(-1), { method: 'Emulation.setTouchEmulationEnabled', params: { enabled: true, maxTouchPoints: 1 } });
+    native._loading = false;
     queueMicrotask(callback);
   };
   globalThis.document = { documentElement: html, fonts: { ready: Promise.resolve() } };
   let sessions = 0;
   const page = { evaluate: async (callback, data) => callback(data), waitForLoadState: async state => {
-    assert.equal(state, 'networkidle'); shadow.children = [native];
+    assert.equal(state, 'domcontentloaded'); shadow.children = [native];
   }, waitForTimeout: async () => {},
     context: () => ({ newCDPSession: async () => { sessions += 1; return { send: async (method, params) => emulation.push({ method, params }) }; } }) };
   try {

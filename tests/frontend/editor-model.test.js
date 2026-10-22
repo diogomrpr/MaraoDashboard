@@ -472,3 +472,19 @@ test('camera background preload is optional, boolean and preserved without defau
     assert.deepEqual(serializeConfig(normalizeConfig(config)), before);
   }
 });
+
+test('power devices preserve ordered unknown data and validate sensor dimensions',()=>{
+  const options={history_popup:true,power_devices:[{entity_id:'sensor.fridge',name:'Kitchen',future:{keep:[]}}],future:[]};
+  const source={config_version:2,name:'Power',landing_page:'energy',pages:[{name:'Energy',path:'energy',entities:[{entity_id:'sensor.house',template:'hc_graph_card',variables:options}]}]};
+  const original=structuredClone(source);
+  const entities=[{entity_id:'sensor.house',unit_of_measurement:'W'},{entity_id:'sensor.fridge',unit_of_measurement:'kW'}];
+  const units={W:['power',1],kW:['power',1000],kWh:['energy',1000]};
+  assert.deepEqual(validateConfig(source,2,entities,units),[]);
+  assert.deepEqual(serializeConfig(normalizeConfig(source)),source);
+  assert.deepEqual(source,original);
+  entities[1].unit_of_measurement='kWh';
+  assert.ok(validateConfig(source,2,entities,units).includes('Power devices require power sensors in W or kW.'));
+  source.pages[0].entities[0].variables.power_devices=[];
+  assert.deepEqual(validateConfig(source,2,entities,units),[]);
+  assert.deepEqual(serializeConfig(normalizeConfig(source)).pages[0].entities[0].variables.power_devices,[]);
+});

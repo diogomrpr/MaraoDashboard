@@ -92,6 +92,7 @@ export function frigateEventPath(instanceId, eventId, kind = "thumbnail") {
 
 const PROTECT_ROOT = "media-source://unifiprotect";
 const PROTECT_EVENT_TYPE = /:(?:all|motion|smart|ring|audio)$/;
+const EVENT_BATCH = 3;
 export function cameraEventProvider(config = {}, hass = {}) {
   const explicit = text(config.event_provider) || text(config.provider);
   const provider = explicit.toLowerCase().replace(/[\s-]+/g, "_");
@@ -112,6 +113,7 @@ export function cameraEventProvider(config = {}, hass = {}) {
     device.name,
     device.name_by_user,
   ].map(text).join(" ").toLowerCase();
+  if (/netatmo/.test(clues)) return "netatmo";
   return /unifi[\s_-]*protect|ubiquiti/.test(clues) ? "unifi_protect" : "frigate";
 }
 
@@ -182,10 +184,15 @@ export function normalizeProtectEvents(payload, limit = 12) {
     .slice(0, maximum)
     .map((item) => {
       const mediaContentId = text(item.media_content_id);
+      const title = text(item.title);
+      // Native Protect titles contain locale dates: keep their text, never guess a timezone.
+      const heading = title.match(/^(.*?)\s+(?:\d+[hms]\s+)+(Ring Event|Motion Event|Object Detection - (.+)|Audio Detection - (.+))$/);
+      const eventType = heading && (heading[3] ? normalizedName(heading[3]) : heading[4] ? "audio" : heading[2] === "Ring Event" ? "ring" : "motion");
       return {
         id: mediaContentId.slice(mediaContentId.lastIndexOf(":event:") + 7),
         provider: "unifi_protect",
-        label: text(item.title) || localize("camera_events.event", undefined, {}, "Event"),
+        label: heading ? heading[3] || heading[4] || eventType : title || localize("camera_events.event", undefined, {}, "Event"),
+        ...(heading ? { eventType, dateLabel: heading[1] } : {}),
         mediaContentId,
         thumbnailContentId: protectThumbnailMediaSource(mediaContentId),
       };
@@ -201,6 +208,10 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     this._request = 0;
     this._detailRequest = 0;
     this._availabilityState = "unavailable";
+    this._filter = "";
+    this._visibleCount = EVENT_BATCH;
+    this._previewQueue = [];
+    this._previewActive = 0;
     this.attachShadow?.({ mode: "open" });
     this.shadowRoot?.addEventListener("click", (event) => this._handleClick(event));
     this.shadowRoot?.addEventListener("error", (event) => this._handleMediaError(event), true);
@@ -227,6 +238,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     this._events = [];
     this._request += 1;
     this._detailRequest += 1;
+    this._resetFeed();
     this._render();
     this._maybeLoad();
   }
@@ -242,6 +254,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       this._selected = undefined;
       this._request += 1;
       this._detailRequest += 1;
+      this._resetFeed();
     }
     if (previous && previousAvailability === this._availabilityState
       && previous.states?.[this._config?.entity] === hass?.states?.[this._config?.entity]
@@ -268,6 +281,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     this._loadedKey = "";
     this._request += 1;
     this._detailRequest += 1;
+    this._resetFeed();
   }
 
   _connectionAvailable() {
@@ -313,6 +327,9 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     this._loadedKey = key;
     this._selected = undefined;
     this._thumbnailErrors.clear();
+    this._detailRequest += 1;
+    this._events = [];
+    this._resetFeed();
     if (provider === "frigate" && (!identity.instanceId || !identity.camera)) {
       this._status = "error";
       this._error = localize(
@@ -324,7 +341,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       this._render();
       return;
     }
-    if (!["frigate", "unifi_protect"].includes(provider)) {
+    if (!["frigate", "unifi_protect", "netatmo"].includes(provider)) {
       this._status = "error";
       this._error = localize(
         "camera_events.error.unsupported_provider",
@@ -351,11 +368,12 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     this._error = "";
     this._render();
     try {
-      const withThumbnails = provider === "unifi_protect"
+      const events = provider === "unifi_protect"
         ? await this._loadProtectEvents()
+        : provider === "netatmo" ? await this._hass.callWS({ type: "marao_dashboard/camera/netatmo_events", entity_id: this._config.entity, limit: this._config.limit })
         : await this._loadFrigateEvents(identity);
       if (request !== this._request) return;
-      this._events = withThumbnails;
+      this._events = events;
       this._status = "ready";
     } catch {
       if (request !== this._request) return;
@@ -378,15 +396,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       cameras: [identity.camera],
       limit: this._config.limit,
     });
-    const events = normalizeFrigateEvents(response).slice(0, this._config.limit);
-    return Promise.all(events.map(async (event) => {
-      try {
-        const path = frigateEventPath(identity.instanceId, event.id, "thumbnail");
-        return { ...event, thumbnailUrl: await this._signPath(path) };
-      } catch {
-        return { ...event, thumbnailUrl: "" };
-      }
-    }));
+    return normalizeFrigateEvents(response).slice(0, this._config.limit);
   }
 
   async _loadProtectEvents() {
@@ -394,14 +404,96 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     const cameraSource = configuredSource || await this._discoverProtectCameraSource();
     const recentSource = await this._protectRecentSource(cameraSource);
     const response = await this._browseMedia(recentSource);
-    const events = normalizeProtectEvents(response, this._config.limit);
-    return Promise.all(events.map(async (event) => {
-      try {
-        return { ...event, thumbnailUrl: await this._resolveMedia(event.thumbnailContentId) };
-      } catch {
-        return { ...event, thumbnailUrl: "" };
+    return normalizeProtectEvents(response, this._config.limit);
+  }
+
+  _resetFeed() {
+    this._observer?.disconnect();
+    this._observer = undefined;
+    this._previewQueue = [];
+    this._filter = "";
+    this._visibleCount = EVENT_BATCH;
+    this._feedScroll = undefined;
+  }
+
+  _eventType(event) {
+    if (event.provider === "netatmo") return event.eventTypes?.[0] || "event";
+    return event.provider === "unifi_protect" ? event.eventType || "event" : normalizedName(event.label) || "event";
+  }
+
+  _eventTypes(event) {
+    return event.provider === "netatmo" && event.eventTypes?.length ? event.eventTypes : [this._eventType(event)];
+  }
+
+  _typeLabel(type) {
+    const labels = {
+      event: ["camera_events.event", "Event"],
+      person: ["camera_events.type.person", "Person"],
+      car: ["camera_events.type.car", "Car"],
+      vehicle: ["camera_events.type.vehicle", "Vehicle"],
+      motion: ["camera_events.type.motion", "Motion"],
+      ring: ["camera_events.type.ring", "Doorbell"],
+      audio: ["camera_events.type.audio", "Audio"],
+      dog: ["camera_events.type.dog", "Dog"],
+      cat: ["camera_events.type.cat", "Cat"],
+      package: ["camera_events.type.package", "Package"],
+      animal: ["camera_events.type.animal", "Animal"],
+    };
+    const label = Object.hasOwn(labels, type) ? labels[type] : undefined;
+    return label ? localize(label[0], this._hass, {}, label[1])
+      : text(this._events.find(event => this._eventType(event) === type)?.label) || type;
+  }
+
+  _filteredEvents() {
+    return this._events.map((event, index) => ({ event, index }))
+      .filter(({ event }) => !this._filter || this._eventTypes(event).includes(this._filter));
+  }
+
+  _queuePreview(index) {
+    const event = this._events[index];
+    if (!event || event.thumbnailUrl || event.thumbnailStatus) return;
+    event.thumbnailStatus = "queued";
+    this._previewQueue.push(index);
+    this._drainPreviews();
+  }
+
+  _drainPreviews() {
+    while (this._connected && !this._selected && !this._unavailableState() && this._previewActive < 2 && this._previewQueue.length) {
+      const index = this._previewQueue.shift();
+      this._previewActive += 1;
+      this._loadPreview(index).finally(() => {
+        this._previewActive -= 1;
+        this._drainPreviews();
+      });
+    }
+  }
+
+  async _loadPreview(index) {
+    const event = this._events[index];
+    if (!event || !this._connected || this._unavailableState() || event.thumbnailUrl || ["loading", "ready", "error"].includes(event.thumbnailStatus)) return;
+    const request = this._request;
+    event.thumbnailStatus = "loading";
+    try {
+      if (this._provider === "netatmo" && !event.hasThumbnail) {
+        event.thumbnailStatus = "empty";
+        this._render();
+        return;
       }
-    }));
+      const url = this._provider === "netatmo"
+        ? text((await this._browseMedia(event.mediaContentId))?.thumbnail)
+        : this._provider === "unifi_protect"
+        ? await this._resolveMedia(event.thumbnailContentId)
+        : await this._signPath(frigateEventPath(this._identity.instanceId, event.id, "thumbnail"));
+      if (!url) throw new Error("Missing preview");
+      if (request !== this._request || !this._connected || this._unavailableState()) return;
+      event.thumbnailUrl = url;
+      event.thumbnailStatus = "ready";
+    } catch {
+      if (request !== this._request || !this._connected || this._unavailableState()) return;
+      event.thumbnailStatus = "error";
+      this._thumbnailErrors.add(event.id);
+    }
+    this._render();
   }
 
   async _discoverProtectCameraSource() {
@@ -479,10 +571,10 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     const url = text(resolved?.url);
     if (!url) {
       throw new Error(localize(
-        "camera_events.error.resolve_protect_media_failed",
+        "camera_events.error.resolve_media_failed",
         this._hass,
         {},
-        "Unable to resolve UniFi Protect media URL",
+        "Unable to resolve camera media URL",
       ));
     }
     return typeof this._hass.hassUrl === "function" ? this._hass.hassUrl(url) : url;
@@ -518,6 +610,13 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       this._detailRequest += 1;
       this._selected = undefined;
       this._render();
+      if (this._feedScroll) this._feedScroll.element.scrollTop = this._feedScroll.top;
+      this.shadowRoot.querySelector?.(`.event[data-index="${this._openedIndex}"]`)?.focus({ preventScroll: true });
+      this._drainPreviews();
+    } else if (button.dataset.action === "filter") {
+      this._setFilter(button.dataset.type);
+    } else if (button.dataset.action === "more") {
+      this._showMore();
     } else if (button.dataset.action === "event") {
       this._openEvent(Number(button.dataset.index));
     }
@@ -527,14 +626,22 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     if (this._unavailableState()) return;
     const event = this._events[index];
     if (!event) return;
+    const scroller = this._scrollRoot() || globalThis.document?.scrollingElement;
+    this._feedScroll = scroller ? { element: scroller, top: scroller.scrollTop } : undefined;
+    this._openedIndex = index;
     const detailRequest = ++this._detailRequest;
     this._selected = { event, status: "loading" };
     this._render();
     try {
-      const kind = this._provider === "unifi_protect" || event.has_clip ? "clip" : "snapshot";
-      const url = this._provider === "unifi_protect"
+      const kind = this._provider === "netatmo" ? "hls" : this._provider === "unifi_protect" || event.has_clip ? "clip" : "snapshot";
+      const url = ["netatmo", "unifi_protect"].includes(this._provider)
         ? await this._resolveMedia(event.mediaContentId)
         : await this._signPath(frigateEventPath(this._identity.instanceId, event.id, kind));
+      if (kind === "hls" && !globalThis.customElements?.get("ha-hls-player")) {
+        const { loadNativeCamera } = await import(`./MaraoCamera.js${new URL(import.meta.url).search}`);
+        await loadNativeCamera();
+        if (!globalThis.customElements?.get("ha-hls-player")) throw new Error("HLS player unavailable");
+      }
       if (detailRequest !== this._detailRequest) return;
       this._selected = { event, kind, status: "ready", url };
     } catch {
@@ -561,15 +668,18 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   _eventLabel(event) {
+    if (event.provider === "netatmo") return this._eventTypes(event).map(type => this._typeLabel(type)).join(" · ");
     if (event.provider === "unifi_protect") {
-      return text(event.label) || localize("camera_events.event", this._hass, {}, "Event");
+      return event.eventType && event.eventType !== "audio" ? this._typeLabel(event.eventType)
+        : text(event.label) || localize("camera_events.event", this._hass, {}, "Event");
     }
-    const label = text(event.label) || localize("camera_events.event", this._hass, {}, "Event");
+    const label = this._typeLabel(this._eventType(event));
     const subLabel = Array.isArray(event.sub_label) ? text(event.sub_label[0]) : text(event.sub_label);
     return subLabel ? `${label} · ${subLabel}` : label;
   }
 
   _eventDate(event) {
+    if (event.provider === "unifi_protect") return text(event.dateLabel);
     const seconds = eventTime(event);
     if (!seconds) return "";
     try {
@@ -582,59 +692,205 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     }
   }
 
+  _scrollRoot() {
+    for (let element = this.parentElement || this.getRootNode?.().host; element; element = element.parentElement || element.getRootNode?.().host) {
+      if (element.classList?.contains("marao-popup-sheet") || ["auto", "scroll"].includes(globalThis.getComputedStyle?.(element)?.overflowY)) return element;
+    }
+    return null;
+  }
+
+  _setFilter(type) {
+    if (type === this._filter) return;
+    for (const index of this._previewQueue) delete this._events[index]?.thumbnailStatus;
+    this._previewQueue = [];
+    this._filter = type;
+    this._visibleCount = EVENT_BATCH;
+    this._render();
+  }
+
+  _showMore() {
+    if (this._selected || this._visibleCount >= this._filteredEvents().length) return;
+    this._visibleCount += EVENT_BATCH;
+    this._render();
+  }
+
+  _observeFeed() {
+    this._observer?.disconnect();
+    this._observer = undefined;
+    if (!this._connected || this._selected || this._status !== "ready" || this._unavailableState()) return;
+    const targets = this.shadowRoot?.querySelectorAll?.('.event, [data-action="more"]:not([hidden])');
+    if (!targets) return;
+    if (!globalThis.IntersectionObserver) {
+      for (const target of targets) if (target.dataset.action === "event") this._queuePreview(Number(target.dataset.index));
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (this._observer !== observer || this._selected || !this._connected) return;
+      for (const { target, isIntersecting } of entries) {
+        if (this._observer !== observer) return;
+        if (!isIntersecting || !target.isConnected) continue;
+        observer.unobserve(target);
+        if (target.dataset.action === "more") this._showMore();
+        else this._queuePreview(Number(target.dataset.index));
+      }
+    }, { root: this._scrollRoot(), rootMargin: "160px 0px" });
+    this._observer = observer;
+    for (const target of targets) observer.observe(target);
+  }
+
+  _preview(event) {
+    if (event.thumbnailStatus === "empty") return `<span class="preview-status">${escapeHtml(localize("camera_events.no_preview", this._hass, {}, "No preview"))}</span>`;
+    if (event.thumbnailUrl && !this._thumbnailErrors.has(event.thumbnailUrl)) {
+      return `<img src="${escapeHtml(event.thumbnailUrl)}" alt="" loading="lazy" decoding="async">`;
+    }
+    const failed = event.thumbnailStatus === "error" || this._thumbnailErrors.has(event.thumbnailUrl);
+    return `<span class="preview-status"${failed ? ' role="status"' : ""}>${escapeHtml(failed
+      ? localize("common.media_unavailable", this._hass, {}, "Media unavailable")
+      : localize("camera_events.loading_preview", this._hass, {}, "Loading preview…"))}</span>`;
+  }
+
   _render() {
     if (!this.shadowRoot || !this._config) return;
-    const title = escapeHtml(this._title());
-    const back = escapeHtml(localize("camera_events.back", this._hass, {}, "Back to events"));
-    const refresh = escapeHtml(localize("camera_events.refresh", this._hass, {}, "Refresh events"));
     const unavailable = this._unavailableState();
+    const ready = Boolean(this._hass?.states) && !unavailable && this._status === "ready";
+    const list = ready && this._events.length > 0;
     const problem = cardProblem({ entity: this._config.entity }, this._hass, {
       contentError: this._selected?.status === "error" ? this._selected.error : this._status === "error" ? this._error : this._thumbnailErrors.size ? localize("common.media_unavailable", this._hass, {}, "Media unavailable") : "",
       loading: this._selected?.status === "loading" || this._status === "loading",
     });
-    const disabled = unavailable || (!this._selected && this._status === "loading") ? ' disabled aria-disabled="true"' : "";
-    const header = `
-      <header>
-        <h2>${title}</h2>
-        ${this._selected
-          ? `<button class="icon-button" data-action="back" aria-label="${back}" title="${back}"${disabled}>&#x2190;</button>`
-          : `<button class="icon-button" data-action="refresh" aria-label="${refresh}" title="${refresh}"${disabled}>&#x21bb;</button>`}
-      </header>`;
-    let content;
-    if (!this._hass?.states) content = `<p class="message" role="status">${escapeHtml(localize("common.loading", this._hass, {}, "Loading…"))}</p>`;
-    else if (unavailable) content = `<p class="message" role="status">${escapeHtml(localize(`common.${unavailable}`, this._hass, {}, unavailable === "unknown" ? "Unknown" : "Unavailable"))}</p>`;
-    else if (this._selected) content = this._renderDetail(this._selected);
-    else if (this._status === "loading") content = `<p class="message" role="status">${escapeHtml(localize("camera_events.loading_events", this._hass, {}, "Loading events…"))}</p>`;
-    else if (this._status === "error") content = `<p class="message error" role="alert">${escapeHtml(this._error)}</p>`;
-    else if (!this._events.length) content = `<p class="message">${escapeHtml(localize("camera_events.no_recent_events", this._hass, {}, "No recent events."))}</p>`;
-    else content = `<div class="grid">${this._events.map((event, index) => this._renderEvent(event, index)).join("")}</div>`;
-
-    if (problem && problem.kind !== "loading") {
-      const reason = `<p class="message" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="${problem.kind === "neutral" ? "mdi:help-circle-outline" : "mdi:alert-circle-outline"}" aria-hidden="true"></ha-icon> ${escapeHtml(problem.reason)}</p>`;
-      content = reason + (problem.complete || this._selected?.status === "error" || this._status === "error" ? "" : content);
+    const reason = problem && problem.kind !== "loading"
+      ? `<p class="message" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="${problem.kind === "neutral" ? "mdi:help-circle-outline" : "mdi:alert-circle-outline"}" aria-hidden="true"></ha-icon> ${escapeHtml(problem.reason)}</p>` : "";
+    const status = !this._hass?.states ? localize("common.loading", this._hass, {}, "Loading…")
+      : unavailable ? localize(`common.${unavailable}`, this._hass, {}, unavailable === "unknown" ? "Unknown" : "Unavailable")
+      : this._status === "loading" ? localize("camera_events.loading_events", this._hass, {}, "Loading events…")
+      : this._status === "error" ? this._error
+      : !this._events.length ? localize("camera_events.no_recent_events", this._hass, {}, "No recent events.") : "";
+    const action = this._selected ? "back" : "refresh";
+    const actionLabel = this._selected ? localize("camera_events.back", this._hass, {}, "Back to events") : localize("camera_events.refresh", this._hass, {}, "Refresh events");
+    const disabled = Boolean(unavailable || (!this._selected && this._status === "loading"));
+    const types = [...new Set(this._events.flatMap(event => this._eventTypes(event)))];
+    const filters = [{ type: "", label: localize("camera_events.all", this._hass, {}, "All") }, ...types.map(type => ({ type, label: this._typeLabel(type) }))];
+    const filterHtml = filters.map(({ type, label }) => `<button type="button" class="filter" data-action="filter" data-type="${escapeHtml(type)}" aria-pressed="${this._filter === type}"${!ready ? " disabled" : ""}>${escapeHtml(label)}</button>`).join("");
+    const rows = this._filteredEvents().slice(0, this._visibleCount);
+    const more = rows.length < this._filteredEvents().length;
+    const detail = this._selected ? this._renderDetail(this._selected) : "";
+    let card = this.shadowRoot.querySelector?.("ha-card");
+    if (!card) {
+      this.shadowRoot.innerHTML = `<style>${MaraoFrigateEventsCard.styles}</style><ha-card data-status="${!this._hass?.states ? "loading" : unavailable || this._status}"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}>
+        <header><div class="heading"><h2>${escapeHtml(this._title())}</h2><button type="button" class="icon-button" data-action="${action}" aria-label="${escapeHtml(actionLabel)}" title="${escapeHtml(actionLabel)}"${disabled ? ' disabled aria-disabled="true"' : ""}>${this._selected ? '&#x2190;' : '&#x21bb;'}</button></div>
+          <div class="filters" role="group" aria-label="${escapeHtml(localize("camera_events.filters", this._hass, {}, "Event types"))}"${!list || this._selected ? " hidden" : ""}>${filterHtml}</div></header>
+        <main><div class="problem">${reason}</div><p class="message state" role="status"${this._selected || !status || reason ? " hidden" : ""}>${escapeHtml(status)}</p>
+          <div class="feed"${!list || this._selected ? " hidden" : ""}><div class="grid">${list ? rows.map(({ event, index }) => this._renderEvent(event, index)).join("") : ""}</div>
+          <button type="button" class="more" data-action="more"${!more ? " hidden" : ""}${!ready ? " disabled" : ""}>${escapeHtml(localize("camera_events.load_more", this._hass, {}, "Load more"))}</button></div>
+          <div class="event-detail"${!this._selected ? " hidden" : ""}>${detail}</div></main></ha-card>`;
+      card = this.shadowRoot.querySelector?.("ha-card");
+      for (const { event, index } of rows) {
+        const thumbnail = card?.querySelector(`.event[data-index="${index}"] .thumbnail`);
+        if (thumbnail) thumbnail._preview = this._preview(event);
+      }
+      this._observeFeed();
+    } else {
+      card.dataset.status = !this._hass?.states ? "loading" : unavailable || this._status;
+      if (problem) {
+        card.dataset.problem = problem.kind;
+        card.style.cssText = problemStyle(problem);
+      } else {
+        card.removeAttribute("data-problem");
+        card.removeAttribute("style");
+      }
+      this.shadowRoot.querySelector("h2").textContent = this._title();
+      const button = this.shadowRoot.querySelector(".icon-button");
+      button.dataset.action = action;
+      button.textContent = this._selected ? "←" : "↻";
+      button.setAttribute("aria-label", actionLabel);
+      button.title = actionLabel;
+      button.disabled = disabled;
+      button.setAttribute("aria-disabled", String(disabled));
+      const toolbar = this.shadowRoot.querySelector(".filters");
+      toolbar.hidden = !list || Boolean(this._selected);
+      toolbar.setAttribute("aria-label", localize("camera_events.filters", this._hass, {}, "Event types"));
+      // Keep pressed filter controls mounted so touch focus and horizontal scroll survive.
+      const filterKey = JSON.stringify(filters);
+      if (this._filterKey !== filterKey) toolbar.innerHTML = filterHtml;
+      for (const filter of toolbar.children) {
+        filter.setAttribute("aria-pressed", String(filter.dataset.type === this._filter));
+        filter.disabled = !ready;
+      }
+      this._filterKey = filterKey;
+      const problemHost = this.shadowRoot.querySelector(".problem");
+      if (this._reason !== reason) problemHost.innerHTML = reason;
+      this._reason = reason;
+      const state = this.shadowRoot.querySelector(".state");
+      state.hidden = Boolean(this._selected || !status || reason);
+      state.textContent = status;
+      const feed = this.shadowRoot.querySelector(".feed");
+      const wasHidden = feed.hidden;
+      feed.hidden = !list || Boolean(this._selected);
+      const grid = feed.querySelector(".grid");
+      const indexes = rows.map(({ index }) => String(index));
+      const current = [...grid.children].map(row => row.dataset.index);
+      let changed = false;
+      if (!list || this._renderedEvents !== this._events || !current.every((index, offset) => index === indexes[offset])) {
+        grid.replaceChildren();
+        changed = true;
+      }
+      if (list) for (const { event, index } of rows) {
+        let row = grid.querySelector(`[data-index="${index}"]`);
+        if (!row) {
+          grid.insertAdjacentHTML("beforeend", this._renderEvent(event, index));
+          row = grid.lastElementChild;
+          row.querySelector(".thumbnail")._preview = this._preview(event);
+          changed = true;
+        }
+        const heading = row.querySelector(".meta");
+        const headingHtml = this._eventHeading(event);
+        if (heading._html !== headingHtml) {
+          heading.innerHTML = headingHtml;
+          heading._html = headingHtml;
+        }
+        row.querySelector(".event").setAttribute("aria-label", this._openLabel(event));
+        const thumbnail = row.querySelector(".thumbnail");
+        const preview = this._preview(event);
+        if (thumbnail._preview !== preview) {
+          thumbnail.innerHTML = preview;
+          thumbnail._preview = preview;
+        }
+      }
+      const moreButton = feed.querySelector('[data-action="more"]');
+      moreButton.hidden = !more;
+      moreButton.disabled = !ready;
+      moreButton.textContent = localize("camera_events.load_more", this._hass, {}, "Load more");
+      const detailHost = this.shadowRoot.querySelector(".event-detail");
+      detailHost.hidden = !this._selected;
+      if (this._detailHtml !== detail) detailHost.innerHTML = detail;
+      this._detailHtml = detail;
+      if (changed || wasHidden !== feed.hidden || (!this._observer && !feed.hidden)) this._observeFeed();
     }
-    this.shadowRoot.innerHTML = `<style>${MaraoFrigateEventsCard.styles}</style><ha-card data-status="${!this._hass?.states ? "loading" : unavailable || this._status}"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}>${header}<main>${content}</main></ha-card>`;
+    const player = this.shadowRoot.querySelector?.("ha-hls-player");
+    if (player) { player.hass = this._hass; player.autoPlay = false; player.controls = true; player.playsInline = true; }
+    this._renderedEvents = this._events;
+    this._filterKey = JSON.stringify(filters);
+    this._reason = reason;
+    this._detailHtml = detail;
   }
 
   _renderEvent(event, index) {
-    const eventLabel = this._eventLabel(event);
-    const eventDate = this._eventDate(event);
-    const label = escapeHtml(eventLabel);
-    const date = escapeHtml(eventDate);
-    const image = event.thumbnailUrl && !this._thumbnailErrors.has(event.thumbnailUrl)
-      ? `<img src="${escapeHtml(event.thumbnailUrl)}" alt="" loading="lazy">`
-      : '<span class="no-image" aria-hidden="true">&#x1f4f7;</span>';
-    const openLabel = escapeHtml(localize(
-      "camera_events.open_event",
-      this._hass,
-      { event: eventLabel, date: eventDate ? `, ${eventDate}` : "" },
-      "Open {event}{date}",
-    ));
-    return `
-      <button class="event" data-action="event" data-index="${index}" aria-label="${openLabel}"${this._unavailableState() ? ' disabled aria-disabled="true"' : ""}>
-        <span class="thumbnail">${image}</span>
-        <span class="meta"><strong>${label}</strong><small>${date}</small></span>
-      </button>`;
+    return `<article class="event-row" data-index="${index}">
+      <h3 class="meta">${this._eventHeading(event)}</h3>
+      <button type="button" class="event" data-action="event" data-index="${index}" aria-label="${escapeHtml(this._openLabel(event))}"${this._unavailableState() ? ' disabled aria-disabled="true"' : ""}>
+        <span class="thumbnail">${this._preview(event)}</span>
+      </button></article>`;
+  }
+
+  _eventHeading(event) {
+    const date = this._eventDate(event);
+    return `${date ? `<time>${escapeHtml(date)}</time>` : ""}<span>${escapeHtml(this._eventLabel(event))}</span>`;
+  }
+
+  _openLabel(event) {
+    const date = this._eventDate(event);
+    return localize("camera_events.open_event", this._hass,
+      { event: this._eventLabel(event), date: date ? `, ${date}` : "" }, "Open {event}{date}");
   }
 
   _renderDetail(detail) {
@@ -642,10 +898,14 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     const date = escapeHtml(this._eventDate(detail.event));
     if (detail.status === "loading") return `<p class="message" role="status">${escapeHtml(localize("camera_events.loading_event", this._hass, {}, "Loading event…"))}</p>`;
     if (detail.status === "error") return `<p class="message error" role="alert">${escapeHtml(detail.error)}</p>`;
-    const media = detail.kind === "clip"
+    const media = detail.kind === "hls"
+      ? `<ha-hls-player url="${escapeHtml(detail.url)}" aria-label="${label}" controls playsinline></ha-hls-player>`
+      : detail.kind === "clip"
       ? `<video src="${escapeHtml(detail.url)}" aria-label="${label}" controls playsinline preload="metadata"></video>`
       : `<img class="detail-image" src="${escapeHtml(detail.url)}" alt="${label}">`;
-    return `<section class="detail">${media}<div class="detail-meta"><strong>${label}</strong><small>${date}</small></div></section>`;
+    const description = detail.event.provider === "netatmo" && text(detail.event.label)
+      ? `<small>${escapeHtml(detail.event.label)}</small>` : "";
+    return `<section class="detail">${media}<div class="detail-meta"><strong>${label}</strong><small>${date}</small>${description}</div></section>`;
   }
 
   _handleMediaError(event) {
@@ -664,30 +924,41 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     :host { display: block; color: var(--primary-text-color); font-family: var(--primary-font-family, Montserrat, Roboto, system-ui, sans-serif); }
     :host([data-marao-control-cell]) { display:grid; min-width:0; }
     :host([data-marao-control-cell]) ha-card { height:100%; box-sizing:border-box; }
-    ha-card { overflow: hidden; background: var(--ha-card-background, var(--card-background-color)); }
-    header { display: grid; gap: 8px; padding: 14px 16px 10px; }
+    ha-card { overflow: visible; background: var(--ha-card-background, var(--card-background-color)); }
+    header { position: sticky; top: var(--marao-popup-header-height, 0px); z-index: 1; display: grid; gap: 8px; padding: 8px 12px 12px; background: var(--marao-card-background, var(--ha-card-background, var(--card-background-color))); }
+    .heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .heading h2 { min-width: 0; }
+    [hidden] { display: none !important; }
+    .filters { display: flex; min-width: 0; gap: 8px; overflow-x: auto; }
+    .filter, .more { min-width: 48px; min-height: 48px; padding: 10px 16px; border: 0; border-radius: 24px; background: var(--secondary-background-color); cursor: pointer; font-size: var(--font-size-secondary, 1rem); }
+    .filter { flex: 0 0 auto; }
+    .filter[aria-pressed="true"] { color: var(--text-primary-color, #fff); background: var(--primary-color); font-weight: var(--font-weight-primary, 700); }
+    .more { display: block; margin: 16px auto 0; }
+    .filter:active, .more:active { transform: scale(.96); }
     h2 { margin: 0; overflow-wrap: anywhere; font-size: var(--font-size-primary, 1.125rem); font-weight: var(--font-weight-primary, 700); }
     main { padding: 0 12px 12px; }
     button { font: inherit; color: inherit; }
     .icon-button { justify-self: end; width: 48px; min-width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; cursor: pointer; font-size: max(1.5rem, var(--font-size-primary, 1.125rem)); transition: transform .12s ease, background-color .12s ease; }
-    .icon-button:hover { background: var(--secondary-background-color); }
     .icon-button:active { transform: scale(.94); }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(145px, 100%), 1fr)); gap: 10px; }
-    .event { min-width: 0; min-height: 48px; padding: 0; overflow: hidden; text-align: left; border: 0; border-radius: var(--ha-card-border-radius, 12px); background: var(--secondary-background-color); cursor: pointer; transition: transform .12s ease; }
-    .event:hover { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+    .event { display: block; width: 100%; min-width: 0; min-height: 48px; padding: 0; overflow: hidden; text-align: left; border: 0; border-radius: var(--ha-card-border-radius, 12px); background: var(--secondary-background-color); cursor: pointer; transition: transform .12s ease; }
     button:focus { outline: none; }
     .event:active { transform: scale(.985); }
     button:disabled { cursor: default; opacity: .55; transform: none; }
     .thumbnail { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: var(--divider-color); }
     .thumbnail img { width: 100%; height: 100%; object-fit: cover; }
-    .no-image { font-size: 1.75rem; }
-    .meta, .detail-meta { display: flex; flex-direction: column; gap: 3px; padding: 9px 10px 10px; font-size: var(--font-size-secondary, 1rem); font-weight: var(--font-weight-secondary, 500); }
-    .meta strong, .detail-meta strong { overflow-wrap: anywhere; }
-    .meta small, .detail-meta small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .preview-status { padding: 16px; text-align: center; font-size: var(--font-size-caption, .875rem); color: var(--secondary-text-color); overflow-wrap: anywhere; }
+    .event-row { min-width: 0; }
+    .meta { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin: 0 0 8px; font-size: var(--font-size-caption, .875rem); font-weight: var(--font-weight-secondary, 500); }
+    .meta time { color: var(--secondary-text-color); }
+    .meta > * { overflow-wrap: anywhere; }
+    .detail-meta { display: flex; flex-direction: column; gap: 3px; padding: 9px 0 10px; font-size: var(--font-size-secondary, 1rem); font-weight: var(--font-weight-secondary, 500); }
+    .detail-meta strong, .detail-meta small { overflow-wrap: anywhere; }
     small { color: var(--secondary-text-color); font-size: var(--font-size-caption, .875rem); }
     .message { margin: 0; padding: 32px 12px; text-align: center; color: var(--secondary-text-color); font-size: var(--font-size-secondary, 1rem); }
     .error { color: var(--error-color); }
-    .detail video, .detail-image { display: block; width: 100%; max-height: 65vh; object-fit: contain; border-radius: var(--ha-card-border-radius, 12px); background: #000; }
+    .detail video, .detail ha-hls-player, .detail-image { display: block; width: 100%; max-height: 65vh; object-fit: contain; border-radius: var(--ha-card-border-radius, 12px); background: #000; }
+    .detail ha-hls-player { aspect-ratio:16/9; --video-max-height:65vh; }
   `;
 }
 

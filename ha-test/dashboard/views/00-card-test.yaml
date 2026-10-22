@@ -3,6 +3,12 @@ path: card-test
 icon: mdi:test-tube
 theme: Marao Dashboard
 cards:
+  - type: custom:marao-card
+    template: hc_scene_card
+    entity: input_select.marao_dashboard_test_scene
+    name: Input select
+    icon: mdi:form-select
+
   - type: vertical-stack
     cards:
       - type: custom:marao-card

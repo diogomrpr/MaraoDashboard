@@ -153,6 +153,7 @@ export class MaraoNavbarCard extends BaseElement {
     applyFullscreen();
   }
   disconnectedCallback() {
+    this._pageRefresh?.remove();
     if (this._surface) { queueMicrotask(() => syncNavigation(this._surface._navigationRecord)); return; }
     if (this._navigationRecord && !this._navigationRecord.root.isConnected) releaseNavigation(this._navigationRecord);
     this._refreshGesture?.destroy();
@@ -215,6 +216,7 @@ export class MaraoNavbarCard extends BaseElement {
   _render() {
     if (!this.shadowRoot) return;
     if (!this._isSurface && this._surface && !this.preview) {
+      this._pageRefresh?.remove();
       this.setAttribute('data-marao-navbar-placeholder', '');
       this.shadowRoot.innerHTML = '<style>:host{display:none}</style>';
       if (this._hostPath === window.location.pathname && this.isConnected) updateNavigation(this._surface._navigationRecord, this._config, this);
@@ -232,8 +234,6 @@ export class MaraoNavbarCard extends BaseElement {
     this.shadowRoot.innerHTML = `<style>
       :host{display:block;height:128px;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}
       :host([data-empty]){display:none}:host([data-preview]){height:auto}
-      .frontend-refresh{position:fixed;top:max(12px,${safeArea("top")});right:max(12px,${safeArea("right")});z-index:1002;pointer-events:auto;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow,0 1px 6px rgba(0,0,0,.12))}
-      .frontend-refresh:disabled{opacity:.5;cursor:default}.frontend-refresh[hidden],:host([data-preview]) .frontend-refresh{display:none}
       .bounds{position:fixed;visibility:hidden;pointer-events:none;inset:${safeArea("top")} calc(12px + ${safeArea("right")}) ${safeArea("bottom")} calc(12px + ${safeArea("left")})}
       .surface{pointer-events:auto;display:flex;gap:clamp(2px,.5vw,4px);box-sizing:border-box;padding:6px 10px;border-radius:999px;background:var(--ha-card-background,var(--card-background-color));box-shadow:0 8px 30px rgba(0,0,0,.22)}
       .nav{position:fixed;z-index:1001;left:var(--marao-navbar-left,50%);bottom:${bottom};transform:translateX(-50%);flex-wrap:nowrap;justify-content:center;width:max-content;max-width:var(--marao-navbar-width,calc(100vw - 24px - ${safeArea("left")} - ${safeArea("right")}));height:60px}
@@ -248,11 +248,7 @@ export class MaraoNavbarCard extends BaseElement {
       .refresh-feedback{position:fixed;z-index:1002;left:var(--marao-navbar-left,50%);bottom:calc(${bottom} + 72px);transform:translateX(-50%);box-sizing:border-box;width:max-content;max-width:var(--marao-navbar-width,calc(100vw - 24px));padding:12px 16px;border-radius:18px;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:0 8px 30px rgba(0,0,0,.22);font-size:var(--font-size-primary,1.125rem);font-weight:var(--font-weight-primary,500);line-height:1.35;overflow-wrap:anywhere;pointer-events:none}
       .refresh-feedback[hidden],progress[hidden]{display:none}progress{display:block;box-sizing:border-box;appearance:none;-webkit-appearance:none;width:100%;height:10px;margin-top:8px;border:1px solid var(--primary-text-color);border-radius:8px;overflow:hidden;background:var(--ha-card-background,var(--card-background-color));accent-color:var(--primary-text-color)}progress::-webkit-progress-bar{background:var(--ha-card-background,var(--card-background-color))}progress::-webkit-progress-value{background:var(--primary-text-color)}progress::-moz-progress-bar{background:var(--primary-text-color)}
       @media(prefers-reduced-motion:reduce){a,button{transition:none}}
-    </style><button type="button" class="frontend-refresh" hidden><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-2.6L20 7M4 17l2.4 2.6A7 7 0 0 0 17.9 17"/></svg></button><div class="bounds" aria-hidden="true"></div><div class="refresh-feedback" role="status" hidden><span></span><progress max="1" hidden></progress></div><nav class="nav surface">${routes.slice(0, this._visibleCount).map((route, i) => this._link(route, i, true)).join('')}${overflow ? '<button type="button" data-overflow aria-expanded="false" aria-controls="marao-overflow"><ha-icon icon="mdi:dots-horizontal"></ha-icon></button>' : ''}</nav>`;
-    this.shadowRoot.querySelector('.frontend-refresh').addEventListener('click', () => {
-      if (!this._refreshEligible()) return;
-      haptic('heavy'); this._refreshFrontend();
-    });
+    </style><div class="bounds" aria-hidden="true"></div><div class="refresh-feedback" role="status" hidden><span></span><progress max="1" hidden></progress></div><nav class="nav surface">${routes.slice(0, this._visibleCount).map((route, i) => this._link(route, i, true)).join('')}${overflow ? '<button type="button" data-overflow aria-expanded="false" aria-controls="marao-overflow"><ha-icon icon="mdi:dots-horizontal"></ha-icon></button>' : ''}</nav>`;
     this._refreshGesture = bindNavbarRefresh(this.shadowRoot.querySelector('.nav'), {
       eligible: () => this._refreshEligible(), haptic: () => haptic('heavy'),
       progress: value => this._refreshFeedback(value == null ? '' : 'hold', value), complete: () => this._refreshFrontend(),
@@ -298,17 +294,35 @@ export class MaraoNavbarCard extends BaseElement {
       onStatus: state => this._refreshFeedback(state),
     }).catch(() => { /* The operation already renders its localized error. */ }).finally(() => { this._refreshing = false; this._updateCurrent(); });
   }
+  _syncPageRefresh() {
+    const view = this._view(), lovelace = this._root()?.lovelace;
+    if (!this.isConnected || this._surface || this.preview || this._editing || lovelace?.editMode || !view
+      || !navbarMainPage(lovelace?.config || lovelace?.rawConfig)) {
+      this._pageRefresh?.remove(); return;
+    }
+    if (!this._pageRefresh) {
+      const row = this._pageRefresh = document.createElement('div');
+      row.setAttribute('data-marao-page-refresh', '');
+      row.attachShadow({ mode: 'open' }).innerHTML = `<style>
+        :host{display:flex;flex-direction:row!important;justify-content:flex-end;box-sizing:border-box;width:100%;height:60px;min-height:60px;min-width:0;flex:none;padding:12px 12px 0}
+        button{display:grid;place-items:center;box-sizing:border-box;min-width:48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow,0 1px 6px rgba(0,0,0,.12));cursor:pointer;appearance:none;-webkit-appearance:none;-webkit-tap-highlight-color:transparent}
+        button:active:not(:disabled){transform:scale(.92)}button:disabled{opacity:.5;cursor:default}button:focus{outline:none}
+      </style><button type="button" class="frontend-refresh"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-2.6L20 7M4 17l2.4 2.6A7 7 0 0 0 17.9 17"/></svg></button>`;
+      row.shadowRoot.querySelector('button').addEventListener('click', () => {
+        if (!this._refreshEligible() || row.closest('[inert]')) return;
+        haptic('heavy'); this._refreshFrontend();
+      });
+    }
+    if (this._pageRefresh.parentNode !== view) view.prepend(this._pageRefresh);
+    const refresh = this._pageRefresh.shadowRoot.querySelector('button');
+    refresh.disabled = Boolean(this._refreshing);
+    refresh.setAttribute('aria-label', localize(this._refreshing ? 'navigation.refresh.refreshing' : 'navigation.refresh.action', this._hass));
+  }
   _updateCurrent() {
     if (!this.shadowRoot) return;
     const routes = this._config.routes || [], disabled = this.preview || this._editing;
     const current = route => route && navbarRouteCurrent(route);
-    const refresh = this.shadowRoot.querySelector('.frontend-refresh');
-    if (refresh) {
-      const lovelace = this._root()?.lovelace;
-      refresh.hidden = Boolean(disabled || !navbarMainPage(lovelace?.config || lovelace?.rawConfig));
-      refresh.disabled = Boolean(disabled || this._refreshing);
-      refresh.setAttribute('aria-label', localize(this._refreshing ? 'navigation.refresh.refreshing' : 'navigation.refresh.action', this._hass));
-    }
+    this._syncPageRefresh();
     this.shadowRoot.querySelector('.nav')?.setAttribute('aria-label', localize('navigation.label', this._hass, {}, 'Marao navigation'));
     this.shadowRoot.querySelectorAll('[data-route]').forEach(link => {
       const route = routes[Number(link.dataset.route)], active = current(route);
@@ -516,20 +530,24 @@ function applyFullscreen() {
       || root?.lovelace?.rawConfig?.strategy?.type === "custom:marao-starter";
     activeNavbars.add(navbar);
     const view = root?.shadowRoot?.querySelector("#view");
+    const pageFlow = navbarMainPage(root?.lovelace?.config || root?.lovelace?.rawConfig, window.location) ? ["flex-direction"] : [];
     if (navbar.nativeHost && !nativeDashboard) {
       // An individually added floating navbar needs room at the bottom while
       // retaining the ordinary Home Assistant toolbar and view shell.
-      if (view && !owned.has(view)) owned.set(view, ["padding-bottom"]);
+      if (view && !owned.has(view)) owned.set(view, ["padding-bottom", ...pageFlow]);
       continue;
     }
     for (const header of root?.shadowRoot?.querySelectorAll("app-header, ha-app-layout > header, .header") || []) owned.set(header, ["display"]);
-    if (view) owned.set(view, ["padding-top", "padding-right", "padding-left", "padding-bottom"]);
+    if (view) {
+      owned.set(view, ["padding-top", "padding-right", "padding-left", "padding-bottom", ...pageFlow]);
+    }
   }
-  // Include the actual floating offset, including mobile viewport changes.
-  const viewportBottom = window.visualViewport ? window.visualViewport.offsetTop + window.visualViewport.height : window.innerHeight;
+  // Elastic scrolling moves viewport coordinates; keep page height tied to CSS geometry.
   const coveredBottom = Math.max(0, ...[...activeNavbars].map(navbar => {
-    const rect = navbar.shadowRoot?.querySelector("nav")?.getBoundingClientRect();
-    return rect && Number.isFinite(viewportBottom) ? viewportBottom - rect.top : 0;
+    const nav = navbar.shadowRoot?.querySelector("nav"), height = nav?.getBoundingClientRect().height || 0;
+    if (!height) return 0;
+    const bottom = parseFloat(getComputedStyle(nav).bottom);
+    return Number.isFinite(bottom) ? height + Math.max(0, bottom) : 0;
   }));
   for (const [node, original] of fullscreenOriginals) {
     const properties = owned.get(node) || [];
@@ -555,11 +573,11 @@ function applyFullscreen() {
       // Native top padding includes the hidden header and inset; retain only its ordinary spacing token.
       const normal = original.value || (["padding-top", "padding-bottom"].includes(property) ? `var(--view-container-${property}, 0px)` : "0px");
       const clearance = property === "padding-top"
-        ? `calc(60px + ${safeArea("top")})`
+        ? safeArea("top")
         : property === "padding-bottom"
-        ? `calc(max(${coveredBottom}px, calc(${Math.max(60, ...[...activeNavbars].map(navbar => navbar.shadowRoot?.querySelector("nav")?.getBoundingClientRect().height || 0))}px + ${safeArea("bottom")} + 12px)) + 48px)`
+        ? `calc(${coveredBottom ? `${coveredBottom}px` : `calc(60px + ${safeArea("bottom")} + 12px)`} + 8px)`
         : safeArea(property.slice(8));
-      node.style.setProperty(property, property === "display" ? "none"
+      node.style.setProperty(property, property === "display" ? "none" : property === "flex-direction" ? "column"
         : `max(${normal}, ${clearance})`, "important");
     }
   }

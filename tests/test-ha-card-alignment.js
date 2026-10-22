@@ -89,7 +89,7 @@ async function checkRoomComposition(page) {
 
 async function checkMediaShortcutIcons(page) {
   const icons = await page.locator(".marao-popup-sheet .body.media-app-card").evaluateAll((cards) => cards.map((card) => {
-    const icon = card.querySelector(".icon").getBoundingClientRect();
+    const icon = (card.querySelector(".app-icon,.icon")).getBoundingClientRect();
     const body = card.getBoundingClientRect();
     return { name: card.querySelector(".title")?.textContent, width: icon.width, height: icon.height, offset: icon.left + icon.width / 2 - body.left - body.width / 2 };
   }));
@@ -99,8 +99,8 @@ async function checkMediaShortcutIcons(page) {
 }
 
 async function checkNavbar(page) {
-  await page.locator("marao-navbar-card .nav").first().waitFor({ state: "attached" });
-  const issues = await page.locator("marao-navbar-card .nav").evaluateAll((navbars) => navbars.flatMap((navbar) => {
+  await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder]) .nav").first().waitFor({ state: "attached" });
+  const issues = await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder]) .nav").evaluateAll((navbars) => navbars.flatMap((navbar) => {
     const failures = [];
     const box = navbar.getBoundingClientRect();
     const links = [...navbar.querySelectorAll("a,button")].map((link) => link.getBoundingClientRect());

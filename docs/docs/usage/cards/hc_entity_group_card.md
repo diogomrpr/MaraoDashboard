@@ -44,7 +44,7 @@ separate groups and ordinary room cards keep independent selections/options.
 | `light` | On | Active count or All off |
 | `cover` | Open or opening | Active count or All closed |
 | `climate` | An enabled mode, including idle operation | Enabled count or All off |
-| `battery` | A valid percentage below 20 | First usable percentage, low count and availability count |
+| `battery` | A valid percentage below 20 | First usable percentage and low count |
 
 Summary readings always consider the complete deduplicated membership. Invalid
 battery readings are unavailable, never zero. All entities includes inactive and
@@ -57,9 +57,10 @@ neutral and disabled; a usable secondary keeps a partial group reachable.
 Battery-group tile colors follow the lowest valid percentage across the complete
 deduplicated selection: red below 20, yellow from 20 to below 80, and green at 80
 or above. The displayed percentage remains the first usable reading. A known
-critical battery stays red when another member is unavailable, with both low and
-unavailable details visible. Noncritical partial groups keep their warning
-surface; complete loss or disconnection stays neutral. Reported errors retain
+critical battery stays red when another member is unavailable, keeping the low
+count. Partially available groups keep their normal summary and palette without
+an unavailable count or member-error row. Open the sheet to see each member's
+status. Complete loss or disconnection stays neutral with a concise status. Reported errors retain
 their existing priority. Filtering the popup does not change severity.
 
 The converted `overview-maintenance` group retains legacy sensors with `battery`

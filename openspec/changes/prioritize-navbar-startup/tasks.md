@@ -60,3 +60,12 @@ final assets on disposable `192.168.0.28`. Native device cache clearing was not
 retested; its implementation was left unchanged. No release/full suite or
 physical iPhone/Android testing was requested. Saved configuration and unrelated
 working-tree changes were preserved.
+
+## Main-page cache button scrolling follow-up
+
+- [x] Move the early cache button into normal main-page flow, retain the shared refresh action and visibility/cleanup guards, remove obsolete top clearance, and verify the scoped navbar checks.
+- [x] Install final compatible frontend changes on disposable 192.168.0.28 and confirm served assets/readiness.
+
+Baseline: `/private/tmp/marao-cache-button-scroll-start.json`; starting commit `036190cd3e7227c73a7608180036484bad87449b`. Prior unrelated changes remain preserved. The affected owner is the shared navbar/page recovery layer for generated and native consumers.
+
+Follow-up evidence: all 11 scoped navbar unit checks passed, including normal-flow page ownership, main-page-only visibility, view replacement, edit/disconnect cleanup, placeholder deduplication, inert/eligibility guards and original recovery dispatch. The popup-extraction test fixture was narrowed to its own class to fix a pre-existing failure caused by the newly added adjacent power-history class. Syntax/diff and strict OpenSpec checks passed. The reviewed navbar plan includes startup ownership with no unresolved mappings; broad/browser checks were not run. Final compatible frontend assets were installed on disposable `192.168.0.28` and served-asset/readiness checks passed without resetting saved configuration/helper state. Phone scroll appearance remains for user inspection; the cache-clear implementation was unchanged.

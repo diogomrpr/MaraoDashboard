@@ -160,8 +160,9 @@ const templateSource = fs.readFileSync(
   path.join(repoRoot, frontendRoot, "MaraoCards.js"),
   "utf8",
 );
+const navigationSource = fs.readFileSync(path.join(repoRoot, frontendRoot, "MaraoNavigation.js"), "utf8");
 for (const expected of ["class MaraoCard", "class MaraoNavbarCard", "class MaraoPopupCard", "customElements.define"]) {
-  if (!templateSource.includes(expected)) {
+  if (!`${templateSource}\n${navigationSource}`.includes(expected)) {
     hasError = true;
     console.error(`Marao frontend runtime is missing ${expected}.`);
   }
@@ -253,7 +254,8 @@ if (literalCardColors.length > 0) {
   hasError = true;
   console.error(`Dashboard cards must use theme variables, not literal colors: ${[...new Set(literalCardColors)].join(", ")}`);
 }
-const frontendSource = fs.readFileSync(path.join(repoRoot, frontendRoot, "MaraoDashboard.js"), "utf8");
+const frontendSource = ["MaraoDashboard.js", "MaraoRuntime.js"].map(file =>
+  fs.readFileSync(path.join(repoRoot, frontendRoot, file), "utf8")).join("\n");
 for (const expected of [
   "function installPopupScrollGuard()",
   "popupScrollGuardInstalled",
@@ -294,7 +296,7 @@ const frontendConstants = fs.readFileSync(
   path.join(repoRoot, "custom_components/marao_dashboard/const.py"),
   "utf8"
 );
-if (!frontendConstants.match(/MARAO_DASHBOARD_MODULES\s*=\s*\(\s*MARAO_DASHBOARD_FRONTEND_MODULE,\s*\)/s)) {
+if (!frontendConstants.match(/MARAO_DASHBOARD_MODULES\s*=\s*\(\s*MARAO_DASHBOARD_BOOTSTRAP,\s*\)/s)) {
   hasError = true;
   console.error("Only the registry-gated Marao dashboard entry module may be registered with Home Assistant.");
 }
@@ -413,9 +415,10 @@ for (const error of validateCoverage(cardTest)) {
   hasError = true;
   console.error(error);
 }
-if (!cardTest.cards?.length || cardTest.cards[0]?.type !== "vertical-stack") {
+const visibleGallery = { cards: (cardTest.cards || []).filter(card => card.type !== "custom:marao-popup-card") };
+if (!cardTest.cards?.some(card => card.type === "vertical-stack")) {
   hasError = true;
-  console.error("Card test dashboard must start with a vertical-stack card.");
+  console.error("Card test dashboard must include its stacked controls section.");
 }
 
 function findCardType(value, type) {
@@ -514,14 +517,18 @@ const editorSource = fs.readFileSync(
 const catalogTemplates = [...new Set(
   [...editorSource.matchAll(/"id":\s*"(hc_[a-z0-9_]+_card)"/g)].map((match) => match[1])
 )];
-const visibleMaraoCards = findCardsByType(cardTest.cards[0], "custom:marao-card");
+const visibleMaraoCards = findCardsByType(visibleGallery, "custom:marao-card");
 const visibleTemplates = visibleMaraoCards.map((card) => card.template).filter(Boolean);
+const nativeCatalog = JSON.parse(fs.readFileSync(path.join(repoRoot, frontendRoot, "MaraoNativeCatalog.js"), "utf8")
+  .replace(/^export const catalog = /, "").trim().replace(/;$/, ""));
 for (const template of catalogTemplates) {
-  const count = template === "hc_timeline_card"
-    ? findCardsByType(cardTest.cards[0], "custom:marao-state-timeline-card").length
+  let count = template === "hc_timeline_card"
+    ? findCardsByType(visibleGallery, "custom:marao-state-timeline-card").length
     : ['hc_entity_group_card', 'hc_scene_collection_card', 'hc_energy_period_card', 'hc_media_app_card'].includes(template)
       ? (cardTest.entities || []).filter((entity) => entity.template === template).length
     : visibleTemplates.filter((candidate) => candidate === template).length;
+  const nativeType = nativeCatalog.cards.find(card => card.id === template)?.type;
+  if (nativeType) count += findCardsByType(visibleGallery, nativeType).length;
   if (count < 1) {
     hasError = true;
     console.error(`Card test dashboard must include at least one visible ${template} example; found ${count}.`);
@@ -562,7 +569,7 @@ for (const type of ["custom:marao-popup-card", "custom:marao-camera-events-card"
   }
 }
 
-const timelineCards = findCardsByType(cardTest.cards[0], "custom:marao-state-timeline-card");
+const timelineCards = findCardsByType(visibleGallery, "custom:marao-state-timeline-card");
 if (
   timelineCards.length < 1 ||
   timelineCards.some((card) => !card.entity)
@@ -696,7 +703,7 @@ if (
   console.error("Card test dashboard must include the safe fake camera and its events popup.");
 }
 
-const appleTvCard = findCardsByType(cardTest.cards[0], "custom:marao-card").find(
+const appleTvCard = findCardsByType(visibleGallery, "custom:marao-card").find(
   (card) => card.template === "hc_media_card" && card.variables?.apple_tv === true
 );
 const appleTvPopup = cardTest.cards.find(
@@ -717,7 +724,7 @@ if (
 }
 
 const graphEntity = "sensor.marao_dashboard_test_graph_history";
-const graphCards = findCardsByType(cardTest.cards[0], "custom:marao-card").filter((card) =>
+const graphCards = findCardsByType(visibleGallery, "custom:marao-card").filter((card) =>
   ["hc_graph_card", "hc_toggle_graph_card"].includes(card.template) || card.variables?.show_graph === true
 );
 const hasGraphCard = (template, entity = graphEntity) => graphCards.some((card) =>

@@ -40,7 +40,7 @@ def validate_inventory(manifest: dict, catalog: dict, cases: dict, profiles: lis
     require(set(manifest["cases"]) == set(cases), "Unmapped Cases collection")
     for key, value in cases.items():
         require(manifest["cases"][key]["identities"] == case_identities(key, value), "Unmapped material state or option: " + key)
-    runtime = "\n".join((ROOT / "custom_components/marao_dashboard/frontend" / file).read_text() for file in ["MaraoCards.js", "MaraoDashboard.js", "MaraoFrigateEventsCard.js"])
+    runtime = "\n".join((ROOT / "custom_components/marao_dashboard/frontend" / file).read_text() for file in ["MaraoCards.js", "MaraoDashboard.js", "MaraoRuntime.js", "MaraoFrigateEventsCard.js"])
     registrations = set(re.findall(r'(?:define\(|\[)"(marao-[a-z-]+)"', runtime))
     require(set(manifest["runtime_components"]) == registrations, "Unmapped runtime registration")
     checks = manifest["checks"]

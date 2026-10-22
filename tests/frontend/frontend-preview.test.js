@@ -29,7 +29,7 @@ test('preview chooses the smallest existing view containing all families outside
     { path: 'conditional', cards: [light, { type: 'conditional', card: fan }] },
     { path: 'unrelated-nested-data', cards: [{ type: 'markdown', content: { cards: [light, fan] } }] },
     { path: 'larger', cards: [light, fan, { type: 'markdown' }] },
-    { path: 'studio', sections: [{ cards: [{ type: 'grid', cards: [light, fan] }] }] },
+    { path: 'studio', sections: [{ cards: [{ type: 'custom:marao-control-grid', cards: [{ type: 'grid', cards: [light, fan] }] }] }] },
     { path: 'light-only', cards: [light] },
   ] };
   assert.equal(previewRoute(dashboard, ['hc_light_card', 'hc_fan_card']), 'studio');

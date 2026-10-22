@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import * as data from '../../frontend_src/history-data.js';
+import { powerStateAt } from '../../frontend_src/power-history.js';
 const source=fs.readFileSync(new URL('../../frontend_src/history-chart.js',import.meta.url),'utf8');
 function fixture(options={}){
   const registry=new Map(),instances=[],observers=[],frames=new Map();let frameId=0;
@@ -30,7 +31,8 @@ function fixture(options={}){
     chartColor:value=>({alpha:()=>({rgbString:()=>value})}),document:doc,ResizeObserver:Observer,AbortController,CustomEvent,
     requestAnimationFrame:callback=>{frames.set(++frameId,callback);return frameId;},cancelAnimationFrame:id=>frames.delete(id),
     getComputedStyle:element=>({color:element.style.color||'#233044',fontSize:'16px',getPropertyValue:()=>''})});
-  vm.runInContext(source.replace(/^import .*;\n/gm,'').replace('export function createHistoryChart','function createHistoryChart')+'\nglobalThis.create=createHistoryChart;',context);
+  context.powerStateAt=powerStateAt;
+  vm.runInContext(source.replace(/^import .*;\n/gm,'').replaceAll('export function','function')+'\nglobalThis.create=createHistoryChart;',context);
   const container=new Element('div'),end=Date.parse('2026-10-18T12:00:00Z');
   const samples=[{time:end-5*3600000,value:12.123456},{time:end-3600000,value:40.123456},{time:end-600000,value:null},{time:end,value:20.123456}];
   const renderer=context.create(container,{samples,end,hass:{locale:{language:'en'},config:{time_zone:'Europe/Lisbon'}},format:value=>value.toFixed(6),stateClass:'measurement',...options});
@@ -238,4 +240,23 @@ test('local chart assets use selective registration and ship both exact dependen
   for(const [dependency,notice] of [['chart.js','ChartJS.LICENSE.txt'],['@kurkle/color','KurkleColor.LICENSE.txt']]){
     assert.equal(fs.readFileSync(new URL(`../../custom_components/marao_dashboard/frontend/${notice}`,import.meta.url),'utf8'),fs.readFileSync(new URL(`../../node_modules/${dependency}/LICENSE.md`,import.meta.url),'utf8'));
   }
+});
+
+test('power comparisons share the plot without smoothing peaks and report selected device readings',()=>{
+  const end=Date.parse('2026-10-18T12:00:00Z');
+  const samples=[{time:end-3600000,value:100},{time:end-1800000,value:9000},{time:end,value:200}];
+  const f=fixture({samples,range:{start:end-3600000,end},windows:false,power:true,unit:'W',stepped:true,
+    axisFormat:value=>String(value),format:value=>`${value} W`,stateClass:undefined,
+    series:[{id:'house',name:'House',samples},{id:'fridge',name:'Fridge',color:'#f00',samples:[{time:end-3600000,value:40},{time:end,value:80}]}]});
+  try{
+    const chart=f.instances[0];assert.equal(chart.data.datasets.length,3);assert.equal(chart.data.datasets[0].stepped,true);
+    assert.equal(chart.data.datasets[0].data[1].y,9000);assert.equal(chart.data.datasets[2].borderColor,'#f00');
+    assert.equal(chart.options.scales.y.ticks.callback(500),'500');assert.equal(f.findClass('history-unit').hidden,false);
+    chart.options.onClick({x:end-1800000});
+    const rows=f.findClass('history-comparison').children;assert.equal(rows[1].children.at(-1).textContent,'40 W');
+    f.renderer.update({selection:{time:end-1800000,values:{fridge:{value:65}}}});
+    assert.equal(f.findClass('history-comparison').children[1].children.at(-1).textContent,'65 W');
+    f.renderer.update({loading:true});assert.equal(f.findClass('history-plot').hidden,false,'Loading retains plot space');
+    assert.equal(f.findClass('history-comparison').hidden,false,'Loading retains device rows');
+  }finally{f.renderer.destroy();}
 });

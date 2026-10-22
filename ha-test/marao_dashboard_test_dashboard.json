@@ -448,6 +448,19 @@
               "name": "Building door"
             }
           ]
+        },
+        {
+          "entities": [
+            {
+              "id": "netatmo-camera",
+              "template": "hc_camera_card",
+              "entity_id": "camera.marao_dashboard_test_netatmo",
+              "name": "Netatmo camera",
+              "variables": {
+                "event_provider": "netatmo"
+              }
+            }
+          ]
         }
       ]
     },
@@ -472,7 +485,17 @@
                 "display_unit": "kW",
                 "display_precision": 2,
                 "history_popup": true,
-                "popup_hash": "#energy-house-power"
+                "popup_hash": "#energy-house-power",
+                "power_devices": [
+                  {
+                    "entity_id": "sensor.marao_dashboard_test_kitchen_power",
+                    "name": "Kitchen"
+                  },
+                  {
+                    "entity_id": "sensor.marao_dashboard_test_heating_power",
+                    "name": "Heating"
+                  }
+                ]
               },
               "template": "hc_graph_card",
               "icon": "mdi:flash",
@@ -773,6 +796,11 @@
                     "name": "Spotify",
                     "source": "Spotify",
                     "icon": "mdi:spotify"
+                  },
+                  {
+                    "name": "MEO",
+                    "source": "MEO",
+                    "icon": "mdi:television"
                   }
                 ]
               },
@@ -848,6 +876,17 @@
               "show_state": false,
               "variables": {
                 "app_source": "Spotify"
+              }
+            },
+            {
+              "name": "MEO",
+              "icon": "mdi:television",
+              "id": "app-meo",
+              "template": "hc_media_app_card",
+              "entity_id": "media_player.marao_dashboard_test_apple_tv",
+              "show_state": false,
+              "variables": {
+                "app_source": "MEO"
               }
             }
           ]
@@ -1481,6 +1520,11 @@
                     "name": "YouTube",
                     "source": "YouTube",
                     "icon": "mdi:youtube"
+                  },
+                  {
+                    "name": "MEO",
+                    "source": "MEO",
+                    "icon": "mdi:television"
                   }
                 ]
               },
@@ -1868,6 +1912,11 @@
                   "name": "Plex",
                   "source": "Plex",
                   "icon": "mdi:plex"
+                },
+                {
+                  "name": "MEO",
+                  "source": "MEO",
+                  "icon": "mdi:television"
                 }
               ]
             }
