@@ -73,7 +73,7 @@ async function checkRoomComposition(page) {
     const art = decoration?.getBoundingClientRect(), t = title?.getBoundingClientRect();
     const label = String(card._config.variables?.custom_label || '').trim();
     const lighting = card._config.variables?.light_entities || [];
-    const state = root.querySelector('.state');
+    const state = root.querySelector('.state:not(.placeholder)');
     return { name: card._config.name, titleFits: !t || Math.abs(t.width - (b.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight))) <= .5,
       normalState: !root.querySelector('.binary-cue') && (!state || Boolean(label) && !/[:：]$/.test(label) && state.textContent === label),
       semanticLighting: !lighting.length || Boolean((root.querySelector('[data-card-action]') || root.querySelector('ha-card')).getAttribute('aria-description')),

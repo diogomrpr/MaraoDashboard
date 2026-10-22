@@ -116,7 +116,10 @@ async function inspectGallery(page, run, requests) {
     const card = byLabel(label);
     assert.equal(await card.locator('ha-card').getAttribute('data-problem'), 'error');
     assert.equal(await card.locator('polyline').count(), 0);
-    assert.match(await card.locator('.problem').innerText(), /source unit|unidade de origem/);
+    assert.match(await card.locator('.problem').innerText(), /^(Error|Erro)$/);
+    await card.locator('[data-problem-details]').tap();
+    assert.match(await page.locator('.marao-popup-content > p').innerText(), /source unit|unidade de origem/);
+    await page.locator('.marao-popup-close').tap();
   }
   assert.equal(await byLabel('unavailable').locator('ha-card').getAttribute('data-problem'), 'neutral');
   const graph = byLabel('converted two decimals');

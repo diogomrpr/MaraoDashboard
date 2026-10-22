@@ -114,7 +114,7 @@ function cardAction(page, title) {
 async function titleLayoutIssues(page, families = [], subtree) {
   return page.locator("marao-card,marao-state-timeline-card,marao-energy-period-card,marao-camera-events-card,marao-frigate-events-card").evaluateAll((cards, { families, subtree }) => cards.filter(card => (!subtree || card === subtree || subtree.contains(card)) && (!families.length || families.includes(card._config?.template || card.localName))).flatMap((card) => {
     const title = card.shadowRoot?.querySelector(".body > .title,.compact-copy > .title,header > h2,.surface > h2");
-    if (!title || !title.getBoundingClientRect().width) return [];
+    if (!title || getComputedStyle(title).visibility === "hidden" || !title.getBoundingClientRect().width) return [];
     const parent = title.parentElement;
     const style = getComputedStyle(parent);
     const contentWidth = parent.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
@@ -284,11 +284,12 @@ async function checkStateCases(page, serviceCalls) {
         }
       };
       root.querySelectorAll("*").forEach(visit);
-      if (controls.some((control) => !control.disabled && control.getAttribute("aria-disabled") !== "true")) {
+      const actions = controls.filter(control => !control.matches('[data-problem-details],[data-card-details],[data-slide-details]'));
+      if (actions.some((control) => !control.disabled && control.getAttribute("aria-disabled") !== "true")) {
         failures.push(`${example.id}: unknown/unavailable/missing entity has an enabled control`);
       }
       // Native activation must leave disabled controls inert.
-      controls.filter((control) => control.matches("button,input,select")).forEach((control) => control.click());
+      actions.filter((control) => control.matches("button,input,select")).forEach((control) => control.click());
     }
     return failures;
   }, cases);
@@ -575,7 +576,10 @@ async function checkShowcaseActions(page, serviceCalls, output) {
     }
   });
   await cardAction(page, failure.name).tap();
-  await failedCard.locator('.problem[role="alert"]').filter({ hasText: failure.expectedError }).waitFor({ state: 'visible' });
+  await failedCard.locator('.problem[role="alert"]').filter({ hasText: /^(Error|Erro)$/ }).waitFor({ state: 'visible' });
+  await failedCard.locator('[data-problem-details]').tap();
+  await page.locator('.marao-popup-content > p').filter({ hasText: failure.expectedError }).waitFor({ state: 'visible' });
+  await page.locator('.marao-popup-close').tap();
   if (output) {
     fs.mkdirSync(path.dirname(output), { recursive: true });
     await failedCard.scrollIntoViewIfNeeded();
@@ -682,20 +686,30 @@ async function checkMediaRecovery(page, serviceCalls, output) {
 }
 
 async function checkNativeSurfaces(page) {
+  await cardByTitle(page, manifest.nativeSurfaceCase.name).waitFor({ state: 'attached', timeout: 30000 });
   await page.waitForFunction(() => {
     function ready(root) {
       for (const element of root?.children || []) {
         if (element.localName.startsWith('marao-native-') && (element._loading || !element._children?.length)) return false;
-        if (element.getAttribute('data-graph-history-state') === 'loading' || element.getAttribute('data-history-state') === 'loading') return false;
+        // Off-screen graphs intentionally retain their last DOM until visible.
+        const graphEntity = element._graphEntity?.();
+        if (graphEntity && element.shadowRoot?.querySelector('[data-graph-history-state]')
+          && !element.preview && element._graphStatus(graphEntity) === 'loading') return false;
+        if (element.getAttribute('data-history-state') === 'loading') return false;
         if (!ready(element.shadowRoot) || !ready(element)) return false;
       }
       return true;
     }
     return ready(document);
   }, undefined, { timeout: 20000 });
-  const result = await page.locator('marao-card').evaluateAll(async (cards, example) => {
-    const target = cards.find(card => card._config.name === example.name && card._config.entity === example.entity);
-    if (!target) throw new Error('Missing native-surface gallery fixture');
+  const result = await cardByTitle(page, manifest.nativeSurfaceCase.name).evaluate(async target => {
+    const cards = [];
+    const visit = root => { for (const element of root?.children || []) {
+      if (element.localName === 'marao-card') cards.push(element);
+      visit(element.shadowRoot); visit(element);
+    } };
+    visit(document);
+    if (!target.isConnected || !cards.includes(target)) throw new Error('Native-surface fixture detached before inspection');
     await Promise.all(cards.map(card => card.shadowRoot.querySelector('ha-card')?.updateComplete));
     target.scrollIntoView({ block: 'start', behavior: 'instant' });
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -707,7 +721,7 @@ async function checkNativeSurfaces(page) {
     await Promise.all(cards.map(card => card.shadowRoot.querySelector('ha-card')?.updateComplete));
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     return { before, during, after: read(), replaced: cards.filter((card, index) => card.shadowRoot.querySelector('ha-card') !== surfaces[index]).length };
-  }, manifest.nativeSurfaceCase);
+  }, undefined, { timeout: 30000 });
   assert.equal(result.replaced, 0, 'HA updates replaced native card surfaces');
   assert.deepEqual(result.during, result.before, 'HA updates temporarily collapsed or clamped the gallery');
   assert.deepEqual(result.after, result.before, 'HA updates changed the unchanged gallery layout');
@@ -836,6 +850,7 @@ async function checkOverviewPopups(page, config, screenshotRoot) {
     assert.deepEqual(await sheet.locator('marao-card').evaluateAll(cards => cards.map(card => card._config.entity)), [lightIds[1]], 'Active-only lighting must contain exactly the active member');
     await api(config, 'POST', '/api/services/light/turn_off', { entity_id: lightIds[1] });
     await checkEmpty();
+    await page.__cameraRequestLedger?.beforeNavigation();
     await page.reload({ waitUntil: 'domcontentloaded' });
     await sheet.waitFor({ state: 'visible' });
     await checkEmpty();
@@ -907,7 +922,7 @@ async function checkCardContent(page, serviceCalls) {
       const surface = root.querySelector('ha-card'), accessible = root.querySelector('[role="img"][aria-label]');
       const active = ['on', 'running', 'unlocked'].includes(state.state);
       if (root.querySelector('.binary-cue') || surface?.dataset.binaryState !== String(active) || !accessible?.getAttribute('aria-label')) issues.push(`${name}: unexpected badge or missing semantic state`);
-      if (root.querySelector('.state') && !['Binary configured label and reading'].includes(name)) issues.push(`${name}: redundant current-state line`);
+      if (root.querySelector('.state:not(.placeholder)') && !['Binary configured label and reading'].includes(name)) issues.push(`${name}: redundant current-state line`);
       if (['on', 'off'].includes(state.state) && entity.startsWith('binary_sensor.') && !accessible?.getAttribute('aria-label').includes(card._hass.formatEntityState(state))) issues.push(`${name}: lost localized device-class state`);
       if (name.startsWith('Binary configured')) {
         if (root.querySelector('.state')?.textContent !== 'Reading corner' || !root.querySelector('.climate')?.textContent.includes('W')) issues.push(`${name}: useful label or reading missing`);
@@ -923,7 +938,7 @@ async function checkCardContent(page, serviceCalls) {
     const graph = cards.find(card => card._config.name === 'Numeric graph with binary toggle');
     if (!graph?.shadowRoot.querySelector('.state')?.textContent.includes('W') || graph.shadowRoot.querySelector('ha-card')?.dataset.binaryState !== 'true') issues.push('Numeric toggle graph lost its reading or actual-toggle state');
     const summary = cards.find(card => card._config.name === 'Summary · all off');
-    if (summary?.shadowRoot.querySelector('.state')) issues.push('All-off summary retained redundant state');
+    if (summary?.shadowRoot.querySelector('.state:not(.placeholder)')) issues.push('All-off summary retained redundant state');
     return issues;
   });
   if (binaryIssues.length) throw new Error(`Binary presentation failed: ${binaryIssues.join('; ')}`);
@@ -947,7 +962,7 @@ async function checkCardContent(page, serviceCalls) {
   const readings = await glance.locator(".reading dd").allTextContents();
   if (readings.length !== 2 || !readings[0].includes("W") || !readings[1].trim()) throw new Error("Glance readings lost values, units or unavailable state.");
   const forecast = cardByTitle(page, "Weather with forecast");
-  if (await forecast.locator(".reading").count() !== 2) throw new Error("The forecast card did not render its safe forecast data.");
+  if (await forecast.locator(".reading:not(.placeholder)").count() !== 2 || await forecast.locator(".reading").count() !== 5) throw new Error("The forecast card did not render its safe forecast data.");
   if (!await page.locator('marao-card').filter({ has: page.locator('.body.glance-card') }).count()) throw new Error("The gallery is missing glance layouts.");
   const stalePreviews = await page.locator("marao-card").evaluateAll((cards) => cards.filter((card) => {
     const state = card._hass?.states?.[card._config.entity]?.state;
@@ -1256,6 +1271,17 @@ async function captureClimateFeedback(page, name, target, output, visualProfile)
   }
 }
 
+async function selectClimateMode(card, mode, keyboard = false) {
+  const trigger = card.locator('.climate-mode-picker > [data-scene-select]');
+  if (await trigger.getAttribute('aria-expanded') !== 'true') {
+    if (keyboard) { await trigger.focus(); await trigger.press('ArrowDown'); }
+    else await trigger.tap();
+  }
+  const option = card.locator(`[data-climate-mode="${mode}"]`);
+  if (keyboard) { await option.focus(); await option.press('Enter'); }
+  else await option.tap();
+}
+
 function climateFeedbackSnapshot(card, phase) {
   const read = () => {
     const state = card.hass.states[card._config.entity];
@@ -1293,7 +1319,7 @@ async function checkClimateFeedback(page, serviceCalls, output, visualProfile) {
   const examples = manifest.climateFeedbackCases;
   const delayed = examples.find(example => example.id === 'delayed_confirmation');
   const duplicate = cardByTitle(page, 'Delayed climate duplicate');
-  const cardFor = example => cardByTitle(page, example.name).filter({ has: page.locator('.climate-modes') });
+  const cardFor = example => cardByTitle(page, example.name).filter({ has: page.locator('.climate-mode-picker') });
   const snapshot = card => card.evaluate(climateFeedbackSnapshot);
   const callsFor = entity => serviceCalls.filter(call => call.domain === 'climate' && call.entities.includes(entity));
   const capture = (name, target) => captureClimateFeedback(page, name, target, output, visualProfile);
@@ -1311,12 +1337,8 @@ async function checkClimateFeedback(page, serviceCalls, output, visualProfile) {
     const card = cardFor(delayed);
     for (const mode of ['heat', 'cool', 'off']) {
       const before = await snapshot(card), count = callsFor(delayed.entity).length;
-      const control = card.locator(`[data-climate-mode="${mode}"]`);
-      if (mode === 'heat') {
-        await control.focus();
-        await control.press('Enter');
-        assert.equal(await card.evaluate(card => card.shadowRoot.activeElement?.dataset.climateMode), mode);
-      } else await control.tap();
+      await selectClimateMode(card, mode, mode === 'heat');
+      if (mode === 'heat') assert.equal(await card.evaluate(card => card.shadowRoot.activeElement?.hasAttribute('data-scene-select')), true);
       const immediate = await snapshot(card);
       assert.equal(immediate.selected, mode);
       assert.equal(immediate.pending, true, `Immediate feedback for mode ${mode}`);
@@ -1330,8 +1352,8 @@ async function checkClimateFeedback(page, serviceCalls, output, visualProfile) {
       await card.locator('.climate-pending').waitFor({ state: 'detached' });
       if (mode === 'heat') {
         // Focus restoration waits for the replacement ha-card's Lit render.
-        await page.waitForFunction(card => card.shadowRoot.activeElement?.dataset.climateMode === 'heat', await card.elementHandle());
-        assert.equal(await card.evaluate(card => card.shadowRoot.activeElement?.dataset.climateMode), mode);
+        await page.waitForFunction(card => card.shadowRoot.activeElement?.hasAttribute('data-scene-select'), await card.elementHandle());
+        assert.equal(await card.evaluate(card => card.shadowRoot.activeElement?.hasAttribute('data-scene-select')), true);
       }
     }
     const start = callsFor(delayed.entity).length;
@@ -1367,7 +1389,7 @@ async function checkClimateFeedback(page, serviceCalls, output, visualProfile) {
       const count = callsFor(example.entity).length;
       const notificationCount = await page.evaluate(() => window.__climateFeedbackNotifications.length);
       await card.evaluate(climateFeedbackSnapshot, 'observe');
-      if (example.id === 'delayed_ack') await card.locator('[data-climate-mode="heat"]').tap();
+      if (example.id === 'delayed_ack') await selectClimateMode(card, 'heat');
       else await card.locator('[data-number-step="increase"]').tap();
       const immediate = await card.evaluate(climateFeedbackSnapshot, 'observed');
       assert.equal(immediate?.pending, true, `Immediate feedback for ${example.id}: ${JSON.stringify({ before, immediate, current: await snapshot(card), dispatched: callsFor(example.entity).length - count })}`);
@@ -1409,6 +1431,7 @@ async function checkClimateFeedback(page, serviceCalls, output, visualProfile) {
     console.log('Climate feedback: immediate modes, rapid steps, shared sheet, confirmation, rejection and expiry passed.');
   } finally {
     await reset();
+    await page.__cameraRequestLedger?.beforeNavigation();
     await page.reload();
     await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
   }
@@ -1596,11 +1619,11 @@ async function checkEntityGroups(page, serviceCalls, output, scenario, theme, co
   const thermostat = 'climate.marao_dashboard_test_case_climate_heat';
   const modeIndex = await climateMembers.evaluateAll((cards, entity) => cards.findIndex(card => card._config.entity === entity), thermostat);
   await climateMembers.nth(modeIndex).locator('[data-card-action]').tap();
-  const modes = page.locator('.marao-popup-sheet [data-climate-mode="cool"]');
-  await modes.waitFor({ state: 'visible' });
+  const modeCard = page.locator('.marao-popup-sheet marao-card').filter({ has: page.locator('.climate-mode-picker') });
+  await modeCard.waitFor({ state: 'visible' });
   assert.equal(await page.locator('.marao-popup-sheet h2').isVisible(), false, 'Actual mode-sheet title behavior must remain intact');
   const modeBefore = climateCalls(thermostat).length;
-  await modes.tap();
+  await selectClimateMode(modeCard, 'cool');
   await page.waitForFunction(entity => document.querySelector('home-assistant').hass.states[entity].state === 'cool', thermostat);
   assert.equal(climateCalls(thermostat).length, modeBefore + 1);
   assert.equal(climateCalls(thermostat).at(-1).service, 'set_hvac_mode');
@@ -1641,7 +1664,7 @@ async function main() {
     const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
     try {
     const sessionErrors = [];
-    const cameraLedger = cameraSelected ? await require('./camera-request-ledger').cameraRequestLedger(context, { output: screenshotRoot, scenario: scenario.name, theme }) : null;
+    let cameraLedger = cameraSelected ? await require('./camera-request-ledger').cameraRequestLedger(context, { output: screenshotRoot, scenario: scenario.name, theme }) : null;
     await context.addInitScript(setBrowserToken, {
       ...tokens, hassUrl: baseUrl, clientId: `${baseUrl}/`, expires: Date.now() + tokens.expires_in * 1000,
     });
@@ -1652,7 +1675,8 @@ async function main() {
     const page = await context.newPage();
     page.__cameraDelayedRequests = [];
     if (process.argv.includes('--history-only')) page.__historyLoadingGate = await installHistoryLoadingGate(page, baseUrl);
-    cameraLedger?.attach(page);
+    if (cameraLedger) cameraLedger.attach(page);
+    else cameraLedger = await require('./camera-request-ledger').managedCameraLedger(context, page, { output: screenshotRoot, scenario: scenario.name, theme });
     await configurePageEmulation(context, page, scenario);
     page.on("websocket", (socket) => socket.on("framesent", ({ payload }) => {
       let message;
@@ -1664,7 +1688,6 @@ async function main() {
     }));
     page.on("pageerror", (error) => sessionErrors.push(error.message));
     page.on("console", (message) => { if (["error", "warning"].includes(message.type())) sessionErrors.push(message.text()); });
-    if (!cameraLedger) page.on("requestfailed", (request) => sessionErrors.push(`Failed ${request.resourceType()} request: ${new URL(request.url()).pathname} (${request.failure()?.errorText || "unknown error"})`));
     page.on("response", (response) => {
       if (response.status() >= 400) {
         sessionErrors.push(`${response.status()} ${response.request().resourceType()} response: ${new URL(response.url()).pathname}`);
@@ -2140,27 +2163,22 @@ async function main() {
     if ((await page.locator(".marao-popup-head h2").innerText()).trim()) {
       throw new Error("Climate mode popup still rendered a duplicate heading.");
     }
-    const climateModes = page.locator(".marao-popup-sheet [data-climate-mode]");
-    if (await climateModes.count() < 2) throw new Error("Multi-mode climate did not render its mode choices.");
-    const climateModeLayout = await page.locator(".marao-popup-sheet .climate-modes").evaluate((element) => ({
-      columns: getComputedStyle(element).gridTemplateColumns.split(" ").length,
-      buttonHeight: Math.round(element.querySelector("button").getBoundingClientRect().height),
-      buttonFontSize: parseFloat(getComputedStyle(element.querySelector("button")).fontSize),
-      labels: [...element.querySelectorAll("button")].map((button) => button.textContent.trim()),
-      icons: [...element.querySelectorAll("button ha-icon")].map((icon) => icon.getAttribute("icon")),
-      backgrounds: [...element.querySelectorAll("button")].map((button) => getComputedStyle(button).backgroundColor),
-    }));
-    if (
-      climateModeLayout.columns !== 2 ||
-      climateModeLayout.buttonHeight < 56 ||
-      climateModeLayout.buttonFontSize < 18 ||
-      climateModeLayout.icons.length !== climateModeLayout.labels.length ||
-      climateModeLayout.icons.some((icon) => !icon) ||
-      new Set(climateModeLayout.backgrounds).size !== 1 ||
-      climateModeLayout.labels.some((label) => label[0] !== label[0].toUpperCase())
-    ) {
-      throw new Error(`Climate modes must use a large two-column grid: ${JSON.stringify(climateModeLayout)}`);
-    }
+    const modePicker = page.locator('.marao-popup-sheet .climate-mode-picker');
+    const modeTrigger = modePicker.locator('[data-scene-select]');
+    const closedHeight = await page.locator('.marao-popup-sheet .climate-card').evaluate(element => element.getBoundingClientRect().height);
+    await modeTrigger.tap();
+    const climateModes = modePicker.locator('[data-climate-mode]');
+    if (await climateModes.count() < 2) throw new Error('Multi-mode climate did not render its mode choices.');
+    const modeLayout = await climateModes.evaluateAll(elements => elements.map(element => ({
+      width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height,
+      label: element.textContent.trim(), role: element.getAttribute('role'),
+      selected: element.getAttribute('aria-checked'), icon: element.querySelector('ha-icon')?.getAttribute('icon'),
+    })));
+    if (modeLayout.some(item => item.width < 48 || item.height < 48 || !item.label || !item.icon || item.role !== 'menuitemradio')
+      || modeLayout.filter(item => item.selected === 'true').length !== 1) throw new Error('Climate dropdown lost readable choices, selection or touch targets.');
+    const openHeight = await page.locator('.marao-popup-sheet .climate-card').evaluate(element => element.getBoundingClientRect().height);
+    if (Math.abs(openHeight - closedHeight) > .5) throw new Error('Opening climate choices resized the card.');
+    await modeTrigger.tap();
     const climateStateFontSize = await page.locator(".marao-popup-sheet .climate-card .state").evaluate(
       (element) => parseFloat(getComputedStyle(element).fontSize)
     );
@@ -2208,7 +2226,7 @@ async function main() {
     if (await multiModeClimateModes.count() < 6) {
       throw new Error("Multi-mode climate example did not render all common HVAC modes.");
     }
-    await multiModeClimateModes.filter({ hasText: exactText("Cool") }).tap();
+    await selectClimateMode(page.locator('.marao-popup-sheet marao-card').filter({ has: page.locator('.climate-mode-picker') }), 'cool');
     await page.waitForTimeout(500);
     if ((await page.locator(".marao-popup-sheet .climate-card .state").innerText()).trim() !== "Cool") {
       throw new Error("Multi-mode climate example did not apply the selected mode.");
