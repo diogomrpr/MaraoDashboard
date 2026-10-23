@@ -132,7 +132,7 @@ async function checkDrillIn(page,graph,sheet,serviceCalls,startedCalls){
  assert.equal(await page.locator('.marao-popup-overlay').count(),1);
  assert.equal(await page.evaluate(()=>__chartParent.hidden&&__chartParent.inert&&__chartChild.isConnected),true,'Drill-in detached the retained parent');
  await page.evaluate(()=>{
-  __chartChild.setConfig({...__chartChild._config,name:'Retained graph updated'});
+  __chartInvoker.replaceWith(__chartInvoker.cloneNode(true));
   if(__chartInvoker.isConnected)throw Error('The focus regression must replace the original opener');
  });
  await sheet.getByRole('button',{name:/^(Back|Voltar)$/,exact:true}).tap();await sheet.locator('.marao-history-content').waitFor({state:'detached'});

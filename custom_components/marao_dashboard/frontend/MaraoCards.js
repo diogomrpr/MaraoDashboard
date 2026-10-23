@@ -933,6 +933,7 @@ function cardStyles() {
       .icon :is(ha-icon,ha-state-icon) { --mdc-icon-size:24px; }
       .body:has(>.number-control) { grid-template-columns:minmax(0,1fr); grid-template-areas:'title' 'state' 'climate' 'control' 'modes' 'wallbox'; }
       .body:has(>.number-control)>.number-control { grid-area:control; justify-self:stretch; justify-content:center; }
+      .body:has(>.number-control) .number-stepper { max-width:100%; }
     }
     .hold-progress { position:absolute; inset:1px; z-index:4; width:calc(100% - 2px); height:calc(100% - 2px); overflow:visible; pointer-events:none; }
     .hold-progress rect { width:calc(100% - 3px); height:calc(100% - 3px); rx:calc(var(--ha-card-border-radius,20px) - 2.5px); fill:none; stroke:var(--marao-accent-color,var(--primary-color)); stroke-width:3px; stroke-dasharray:100; stroke-dashoffset:100; opacity:0; }
@@ -989,6 +990,7 @@ function cardStyles() {
       .body.wallbox-card .wallbox-value { font-size:calc(1.75 * var(--font-size-primary,1.125rem)); }
       .body.wallbox-card .wallbox-stepper { min-width:56px; width:56px; padding:4px; }
     }
+    @container marao-card (max-width:160px) { .body.wallbox-card { padding-inline:4px; column-gap:4px; } }
     @media (prefers-reduced-motion:reduce) { ha-card,button,.slider-thumb,.media-app-card::after { transition:none; } }
   `;
 }

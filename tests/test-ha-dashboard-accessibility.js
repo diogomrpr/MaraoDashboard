@@ -1073,7 +1073,7 @@ async function main() {
     // Keep each profile's touch emulation independent of other target
     // lifecycles by giving it a complete browser process.
     const browser = await chromium.launch({ headless: !options.preview });
-    let page;
+    let page, primaryFailure;
     try {
       const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
       await context.addInitScript(setBrowserToken, {
@@ -1289,13 +1289,17 @@ async function main() {
       console.log(`${runName}: ${options.pagesOnly ? 'saved-page' : 'gallery'} and popup checks passed.`);
       await context.close();
     } catch (error) {
+      primaryFailure = error;
       if (!options.preview && page && !page.isClosed()) {
         try { await page.screenshot({ path: path.join(output, `${scenario.name}-${theme}-failure.png`), scale: 'css' }); }
         catch (captureError) { error.message += '\nFailure screenshot could not be captured: ' + captureError.message; }
       }
       throw error;
     } finally {
-      if (browser.isConnected()) await browser.close();
+      if (browser.isConnected()) {
+        try { await browser.close(); }
+        catch (error) { throw primaryFailure ? new AggregateError([primaryFailure, error], 'Layout check and browser cleanup failed') : error; }
+      }
     }
   };
   const concurrency = options.parallel ? 3 : 1;
@@ -1305,7 +1309,7 @@ async function main() {
   if (!options.preview) console.log(`Accessibility layout OK (${runs.length} mobile profile/theme runs; screenshots in ${output})`);
 }
 
-if (require.main === module) main().catch((error) => { console.error(error.message || error); process.exitCode = 1; });
+if (require.main === module) main().catch((error) => { console.error(error); process.exitCode = 1; });
 
 module.exports = {
   readySubtree,

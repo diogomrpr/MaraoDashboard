@@ -39,7 +39,7 @@ async function openBrowser(config, run) {
     assert.ok(entities.length && entities.every(id => typeof id === 'string' && id.includes('.marao_dashboard_test_')), 'Native proof attempted a non-fixture service');
     calls.push({ domain: message.domain, service: message.service, entity }); // Never record service data/PINs.
   }));
-  return { browser, context, page, issues, calls, close: async () => {
+  return { browser, context, page, issues, calls, cameraLedger, close: async () => {
     const errors = [];
     try { await context.close(); } catch (error) { errors.push(error); }
     try { await browser.close(); } catch (error) { errors.push(error); }
@@ -128,7 +128,7 @@ function fixtureDashboard(starter, { overflow = false } = {}) {
   ] };
 }
 
-async function interactions(page, calls) {
+async function interactions(page, calls, cameraLedger) {
   const sheet = page.locator('.marao-popup-sheet');
   const light = page.locator('marao-native-light-card').first();
   const initial = await light.evaluate(card => ({ entity: card._config.entity, state: card._hass.states[card._config.entity].state }));
@@ -150,7 +150,11 @@ async function interactions(page, calls) {
       throw Error(role + ' sheet did not open: ' + JSON.stringify(composition));
     });
     await sheet.locator('marao-card, marao-energy-period-card, marao-camera-events-card').first().waitFor();
-    await page.locator('.marao-popup-close').click();
+    const close = () => page.locator('.marao-popup-close').click();
+    if (role === 'camera') {
+      const entity = await host.evaluate(card => card._config.entity);
+      await cameraLedger.boundary('close native camera popup', close, { terminal: false, entities: [entity] });
+    } else await close();
     await sheet.waitFor({ state: 'detached' });
   }
   const media = page.locator('marao-native-media-card');
@@ -305,15 +309,15 @@ async function main() {
       assert.deepEqual(await layoutIssues(active.page), []);
       if (run.scenario.name === 'iphone-normal') {
         if (navbarOnly) await require('./test-ha-navbar-overflow').nativeEditor(active.page, active.calls, run.theme);
-        else { await interactions(active.page, active.calls); await editor(active.page, active.calls, run.theme); }
+        else { await interactions(active.page, active.calls, active.cameraLedger); await editor(active.page, active.calls, run.theme); }
       }
       await active.page.locator('marao-native-navbar-card').evaluate(card => {
         card.hass = { ...card._hass, user: { ...card._hass.user, is_admin: false } };
       });
       assert.equal(await active.page.locator('.native-edit').count(), 0, 'Non-administrator sees Edit dashboard');
       if (navbarOnly) {
-        await active.page.locator('marao-native-navbar-card [data-overflow]').tap();
-        await active.page.locator('marao-native-navbar-card .overflow a').first().waitFor();
+        await active.page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) [data-overflow]').tap();
+        await active.page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) .overflow a').first().waitFor();
         await active.page.keyboard.press('Escape');
       }
       assert.deepEqual(active.issues, [], 'Native browser warnings/errors');

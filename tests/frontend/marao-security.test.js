@@ -152,8 +152,15 @@ test("strict slide routes every native opener once and rejects incompatible over
   for (const [domain, service, state] of [["lock", "unlock", "locked"], ["cover", "open_cover", "closed"], ["button", "press", "2026-01-01"], ["switch", "turn_on", "off"], ["script", "turn_on", "off"]]) {
     const id = domain + ".safe", calls = [];
     const slide = new Slide(); slide.attributes = { entity: id }; slide._render = () => {}; slide._setProgress = value => { slide._progress = Math.max(0, Math.min(1, value)); }; slide._animateCompletion = () => {};
+    const hass = { states: { [id]: { state } }, callService: async (...args) => { calls.push(args); } };
+    Object.defineProperty(slide, 'hass', { value: hass, writable: true, configurable: true });
     slide.connectedCallback();
-    slide.hass = { states: { [id]: { state } }, callService: async (...args) => { calls.push(args); } };
+    assert.equal(Object.hasOwn(slide, 'hass'), false, 'Pre-registration assignments must not shadow the setter');
+    assert.equal(slide._hass, hass);
+    slide.hass = { ...hass, connected: false };
+    assert.equal(slide._disabled(), true);
+    await slide._trigger(); assert.equal(calls.length, 0);
+    slide.hass = hass;
     const track = { clientWidth: 310, classList: { add() {}, remove() {} }, getBoundingClientRect: () => ({ left: 0, right: 310, top: 0, bottom: 64 }), setPointerCapture() {}, releasePointerCapture() {} };
     slide.shadowRoot.querySelector = selector => selector === '.thumb' ? { getBoundingClientRect: () => ({ left: 4, right: 58, top: 5, bottom: 59 }) } : null;
     const event = { currentTarget: track, button: 0, preventDefault() {}, stopPropagation() {} };

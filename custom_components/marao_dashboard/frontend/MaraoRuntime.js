@@ -835,6 +835,11 @@ class MaraoSlideToOpen extends HTMLElement {
   }
 
   connectedCallback() {
+    // Parent cards may assign hass before this custom element is registered.
+    if (Object.hasOwn(this, "hass")) {
+      this._hass = this.hass;
+      delete this.hass;
+    }
     this._actionLive = true;
     this._fitAccessGrid();
     this._cancelHiddenSlide ||= event => {

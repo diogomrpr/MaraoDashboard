@@ -123,6 +123,8 @@ async function inspectGallery(page, run, requests) {
   }
   assert.equal(await byLabel('unavailable').locator('ha-card').getAttribute('data-problem'), 'neutral');
   const graph = byLabel('converted two decimals');
+  await graph.scrollIntoViewIfNeeded();
+  await page.waitForFunction(card => card._graphVisible !== false, await graph.elementHandle());
   await waitIdle(graph);
   const graphRequestCount = requests.length;
   const cached = await graph.evaluate(card => {
@@ -139,6 +141,7 @@ async function inspectGallery(page, run, requests) {
   const controller = reading(page, 'Simulate source unit loss');
   await controller.locator('[data-card-action]').click();
   try {
+    await byLabel('missing source unit').scrollIntoViewIfNeeded();
     await byLabel('missing source unit').locator('ha-card[data-problem="error"]').waitFor();
     assert.equal(await text('missing source unit'), '42');
     await capture(page, byLabel('missing source unit'), run + '-live-unit-error');

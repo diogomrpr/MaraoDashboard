@@ -71,6 +71,14 @@ async function checkRoomComposition(page) {
     const box = root.querySelector('ha-card').getBoundingClientRect(), b = body.getBoundingClientRect(), style = getComputedStyle(body);
     const target = action?.getBoundingClientRect(), glyph = action?.querySelector('ha-icon').getBoundingClientRect();
     const art = decoration?.getBoundingClientRect(), t = title?.getBoundingClientRect();
+    const paths = node => [...(node?.querySelectorAll('path') || []), ...[...(node?.querySelectorAll('*') || [])].flatMap(element => element.shadowRoot ? paths(element.shadowRoot) : [])];
+    const range = document.createRange(); if (title) range.selectNodeContents(title);
+    const textBounds = title ? [...range.getClientRects()] : [];
+    const artworkOverlapsText = paths(decoration).some(path => {
+      const glyph = path.getBoundingClientRect();
+      return textBounds.some(text => Math.min(glyph.right, art.right, text.right) - Math.max(glyph.left, art.left, text.left) > .5
+        && Math.min(glyph.bottom, art.bottom, text.bottom) - Math.max(glyph.top, art.top, text.top) > .5);
+    });
     const label = String(card._config.variables?.custom_label || '').trim();
     const lighting = card._config.variables?.light_entities || [];
     const state = root.querySelector('.state:not(.placeholder)');
@@ -80,7 +88,7 @@ async function checkRoomComposition(page) {
       actionFits: !target || target.width >= 48 && target.height >= 48 && target.left >= box.left && target.right <= box.right && target.top >= box.top && target.bottom <= box.bottom,
       glyphCentered: !glyph || Math.abs(glyph.left + glyph.width / 2 - target.left - target.width / 2) <= .5 && Math.abs(glyph.top + glyph.height / 2 - target.top - target.height / 2) <= .5,
       circle: !action || getComputedStyle(action).borderRadius === '50%',
-      artwork: !art || decoration.getAttribute('aria-hidden') === 'true' && getComputedStyle(decoration).pointerEvents === 'none' && (!t || art.top >= t.bottom) && !root.querySelector('.icon') && decoration.scrollWidth > decoration.clientWidth,
+      artwork: !art || decoration.getAttribute('aria-hidden') === 'true' && getComputedStyle(decoration).pointerEvents === 'none' && !artworkOverlapsText && !root.querySelector('.icon') && decoration.scrollWidth > decoration.clientWidth,
     };
   }));
   const failures = rooms.filter(room => !room.titleFits || !room.normalState || !room.semanticLighting || !room.actionFits || !room.glyphCentered || !room.circle || !room.artwork);

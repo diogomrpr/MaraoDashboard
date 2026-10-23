@@ -1037,7 +1037,7 @@ async function checkDisconnected(browser, config, functionalCompleted = false) {
   const nativeFailures = [];
   let connection = 0;
   let phase = "connected";
-  let transport;
+  const transports = [];
   // Chromium's HTTP offline emulation does not reliably block WebSocket
   // reconnects. Cut the real transport and reject retries until recovery.
   await context.routeWebSocket(`${config.url.replace(/^http/, "ws")}/api/websocket`, async (socket) => {
@@ -1048,7 +1048,7 @@ async function checkDisconnected(browser, config, functionalCompleted = false) {
     }
     const server = socket.connectToServer();
     const connectionId = ++connection;
-    transport = { socket, server };
+    transports.push({ socket, server });
     socket.onMessage((payload) => {
       const message = JSON.parse(String(payload));
       if (/subscribe|stream/.test(message.type)) subscriptions.push({ phase, connection: connectionId, type: message.type, id: message.id, subscription: message.subscription });
@@ -1106,12 +1106,14 @@ async function checkDisconnected(browser, config, functionalCompleted = false) {
     await page.getByText(readiness, { exact: true }).and(page.locator(".message")).waitFor({ state: "hidden" });
     phase = "offline";
     await context.setOffline(true);
-    await transport.server.close({ code: 1001, reason: "Marao test outage" });
-    await transport.socket.close({ code: 1001, reason: "Marao test outage" });
+    for (const transport of transports) {
+      await transport.server.close({ code: 1001, reason: "Marao test outage" });
+      await transport.socket.close({ code: 1001, reason: "Marao test outage" });
+    }
     transportEvents.push("Home Assistant WebSocket closed during outage");
     await page.waitForFunction(() => document.querySelector("home-assistant")?.hass?.connected === false);
     for (const title of ["Switch + graph", "Light + slider", "Number", "Arm away · hold", "Open-only door"]) {
-      const disabled = await cardByTitle(page, title).locator('button,input,select,[role="slider"]').evaluateAll((controls) =>
+      const disabled = await cardByTitle(page, title).locator('button:not([data-card-details]):not([data-problem-details]),input,select,[role="slider"]').evaluateAll((controls) =>
         controls.length > 0 && controls.every((control) => control.disabled || control.getAttribute("aria-disabled") === "true")
       );
       if (!disabled) throw new Error(`${title}: disconnected fixture controls remained enabled.`);
