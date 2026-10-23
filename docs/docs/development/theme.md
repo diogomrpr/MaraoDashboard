@@ -85,20 +85,38 @@ semantic state roles:
 
 | Token | Value | Typical state |
 |:--|:--|:--|
-| `--color-green` — Pinhal | `#39755B` | safe, switch, climate fan |
-| `--color-red` — Terra | `#A34F48` | heat, open access, alarm |
-| `--color-blue` — Céu | `#ADCBD8` | light, fan, cover, cool |
+| `--color-green` — Pinhal | `#39755B` | safe, switch |
+| `--color-red` — Terra | `#A34F48` | open access, alarm, error |
+| `--color-blue` — Céu | `#ADCBD8` | cover, cool |
 | `--color-yellow` — Carqueja | `#D6B45C` | dry, low battery |
-| `--color-orange` — Cobre | `#D69A63` | moving access, arming, vacuum returning |
-| `--color-purple` — Urze | `#8E5B83` | heat/cool, media |
-| `--color-gold` — Palha | `#E2CD91` | automatic climate |
+| `--color-orange` — Cobre | `#D69A63` | heating, moving access, arming, vacuum returning |
+| `--color-purple` — Urze | `#8E5B83` | media |
+| `--color-gold` — Palha | `#E2CD91` | lighting, automatic climate |
+| `--color-teal` — Água clara | `#80C6C0` | fan, climate fan, vacuum cleaning |
+| `--color-lilac` — Lilás claro | `#B9ACE0` | mixed heating/cooling |
 | `--color-peach` — Pêssego | `#E2B5A5` | existing warm surface compatibility |
 
 State colors belong in the shared Marao state mapping. Active primary/room
-surfaces use the paired primary foreground; pale blue, ochre, copper, gold and peach
+surfaces use the paired primary foreground; pale blue, ochre, copper, gold, peach, teal and lilac
 state surfaces use dark text; forest-green, red and heather surfaces use white text.
 Inactive, loading, disabled, unknown and unavailable states remain distinct.
 Never communicate a state by color alone.
+
+### State-driven seasonal backgrounds
+
+Seasonal colors fill the card when its device state calls for a highlight. Inactive
+cards keep their neutral mineral surface; loading, unknown, unavailable and error
+states retain their existing treatment. Color does not replace state labels or icons.
+
+Active lights use Palha gold, fans use Água clara teal, covers use sky blue,
+switches use forest green and media uses heather. Heating uses copper, cooling
+uses blue and mixed heating/cooling uses lilac. Active light, cover and climate
+groups use the corresponding family; existing configured colors take priority.
+Access and alarm warnings retain their safety colors, and room lighting keeps its
+existing active-background contract. Always-on category icon accents and colored
+energy readings are not used.
+
+These changes add no controls, padding, configuration or seasonal switching.
 
 ### Charts and sliders
 

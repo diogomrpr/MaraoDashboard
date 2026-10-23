@@ -1112,7 +1112,7 @@ test("access actions use tap or a cancellable 1.2 second hold as configured", ()
   assert.match(heldMarkup, /class="hold-progress"/);
   assert.match(heldMarkup, /<div class="climate">Hold to Lock<\/div>/);
   assert.match(source, /\["pointerup", "pointerleave", "pointercancel"\]/);
-  assert.match(source, /\}, ACCESS_HOLD_MS\);/);
+  assert.equal(ACCESS_HOLD_MS, 1200);
   assert.match(source, /this\._holdCompleted = false;\s+haptic\("heavy"\);/);
   assert.match(source, /variables\?\.action_label_key/);
 });

@@ -28,10 +28,11 @@ changing dashboard behavior.
    `npm run verify:publish`.
 8. Open a pull request against `main` explaining the problem and the change.
 
-Dashboard/frontend changes can also be checked against a local Home Assistant VM
-with `npm run ha:sync`. The publish verification includes the browser E2E check
-and therefore requires the disposable local VM described in the development
-documentation. Never run it against a live Home Assistant instance.
+Dashboard/frontend changes can also be checked against the disposable Home
+Assistant VM with `npm run ha:sync`. Publication verification runs affected unit
+tests only; browser and upgrade checks belong to development and run when
+explicitly requested. Install the final release candidate on the disposable VM
+before publishing. Never use a live Home Assistant instance for these checks.
 
 Fix every warning, error card, console exception, failed resource, or repeated
 request at its root. Do not suppress it or treat it as expected output.

@@ -43,6 +43,26 @@ The slider uses the entity's supported color modes to detect dimming support.
 On/off-only lights have a toggle without a slider. Set `enable_slider: false` to
 hide it on dimmable lights. `custom_label` adds a prefix to useful nonbinary state content or retains a substantive label on a binary card.
 
+## Color and white temperature
+
+For lights that support color or white temperature, tap the existing light-icon
+circle to open the controls. A small palette indicator marks this button without
+making the card larger. You can also hold the card for 600 ms; scrolling cancels
+the hold. A body tap still uses the configured tap action or toggles the light.
+Explicit hold actions, including `action: none`, take precedence, and hidden
+icons remain hidden.
+
+The Marao popup offers a color wheel, a warm-to-cool slider within the light's
+reported limits, and the shared brightness control where supported. Dragging
+previews the selection; releasing sends one update. Selecting a color or white
+temperature turns an off light on. Opening or cancelling sends nothing. Controls
+disable if the light becomes unavailable or Home Assistant disconnects.
+
+When opened from a group popup, **Back** restores the list's scroll position.
+On/off-only and brightness-only lights keep their existing card behavior.
+
+## Layout
+
 Standard light, cover and access controls share a 174px minimum outer height,
 with title and icon in the same header. Omitted sliders remain absent; essential
 text and problems can increase the required height.

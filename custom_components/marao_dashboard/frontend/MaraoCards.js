@@ -1,7 +1,10 @@
-const [dropdownModule, historyLayout, navigationModule, historyData] = await Promise.all([
-  'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js',
+const [dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities] = await Promise.all([
+  'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
 const { bindDropdown, dropdownStyles } = dropdownModule;
+const { bindSlider, sliderMarkup, sliderStyles } = sliderModule;
+const { lightColorCapabilities } = lightCapabilities;
+export { lightColorCapabilities };
 const { createHistoryPlaceholder, createPowerToolbar } = historyLayout;
 export { createHistoryPlaceholder };
 const { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic, navigate, fullscreenUsers, findElements, focusRestorer, focusableElements, deepActiveElement, FOCUSABLE, beginFrontendInteraction } = navigationModule;
@@ -9,6 +12,13 @@ export { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic,
 let historyChartModule;
 let historyChartAttempt = 0;
 let historyEntryId = 0;
+let lightColorModule;
+let lightColorAttempt = 0;
+export function loadLightColorPicker() {
+  const url = new URL(`./MaraoLightColor.js${new URL(import.meta.url).search}`, import.meta.url);
+  if (lightColorAttempt) url.searchParams.set('marao_retry', String(lightColorAttempt));
+  return lightColorModule ||= import(url.href).catch(error => { lightColorModule = null; lightColorAttempt++; throw error; });
+}
 export function loadHistoryChart() {
   const url = new URL(`./MaraoHistoryChart.js${new URL(import.meta.url).search}`, import.meta.url);
   if (historyChartAttempt) url.searchParams.set('marao_retry', String(historyChartAttempt));
@@ -31,6 +41,7 @@ function referencedEntities(value) {
   return typeof value === "string" && /^[a-z_]+\.[a-z0-9_]+$/.test(value) ? [value] : [];
 }
 export const ACCESS_HOLD_MS = 1200;
+export const LIGHT_COLOR_HOLD_MS = 600;
 
 const mediaApps = [
   { id: "netflix", file: "netflix.svg", sources: ["Netflix", "com.netflix.Netflix"], color: "#000", text: "#fff" },
@@ -331,6 +342,10 @@ export function stateAppearance(kind, state, config, hass) {
   const red = "var(--color-red)";
   const orange = "var(--color-orange)";
   const blue = "var(--color-blue)";
+  const teal = "var(--color-teal,var(--color-blue))";
+  const gold = "var(--color-gold)";
+  const domain = variables.entity_type || domainOf(config?.entity);
+  const domainBackground = { light: gold, fan: teal, cover: blue, climate: orange }[domain];
   let accent = active;
   let background;
   let foreground;
@@ -360,24 +375,24 @@ export function stateAppearance(kind, state, config, hass) {
     accent = active || blue;
     if (["open", "opening", "closing"].includes(value)) background = active || blue;
   } else if (["hc_light_card", "hc_fan_card"].includes(kind)) {
-    accent = active || blue;
-    if (value === "on") background = active || blue;
+    accent = active || (kind === "hc_light_card" ? gold : teal);
+    if (value === "on") background = accent;
   } else if (kind === "hc_switch_card") {
     accent = active || "var(--color-green)";
     if (value === "on") background = active || "var(--color-green)";
   } else if (kind === "hc_climate_card") {
     const colors = {
-      heat: red,
-      heating: red,
+      heat: orange,
+      heating: orange,
       cool: blue,
       cooling: blue,
       cold: blue,
-      heat_cool: "var(--color-purple)",
+      heat_cool: "var(--color-lilac,var(--color-blue))",
       auto: "var(--color-gold)",
       dry: "var(--color-yellow)",
       drying: "var(--color-yellow)",
-      fan_only: green,
-      fan: green,
+      fan_only: teal,
+      fan: teal,
     };
     if (!["off", "unavailable", "unknown"].includes(value)) background = colors[value] || "var(--primary-color)";
     accent = background || active;
@@ -390,7 +405,7 @@ export function stateAppearance(kind, state, config, hass) {
     background = active || app?.color;
     foreground = active ? undefined : app?.text;
   } else if (kind === "hc_vacuum_card") {
-    background = { docked: green, cleaning: blue, returning: orange, error: red }[value];
+    background = { docked: green, cleaning: teal, returning: orange, error: red }[value];
   } else if (kind === "hc_wallbox_current_card") {
     accent = active || "var(--primary-color)";
     if (!["unknown", "unavailable"].includes(value)) {
@@ -407,14 +422,14 @@ export function stateAppearance(kind, state, config, hass) {
   if (unavailable) return { unavailable: true };
   const binary = binaryState(Array.isArray(variables.summary_entities) && variables.summary_entities.length ? "binary_sensor.marao_summary" : config?.entity, { state: value }, kind);
   if (binary === false && ["hc_access_action_card", "hc_access_hold_action_card", "hc_access_slide_action_card"].includes(kind)) background = undefined;
-  if (binary && !background) background = active || blue;
+  if (binary && !background) background = active || domainBackground || blue;
   if (kind === "hc_navigation_card") {
     background = binary === false ? undefined : variables.hc_color || background;
   }
   if (kind === "hc_toggle_graph_card") {
     const enabled = stateOf(hass, text(variables.toggle_entity)).state === "on";
     const content = enabled ? variables.active_content_color : variables.inactive_name_color;
-    const defaultContent = enabled ? (/^var\(\s*--color-(?:blue|yellow|orange|gold|peach)\s*[,)]/.test(background) ? "var(--color-black)" : "var(--text-primary-color,var(--active-text-color))") : undefined;
+    const defaultContent = enabled ? (/^var\(\s*--color-(?:blue|yellow|orange|gold|peach|teal|lilac)\s*[,)]/.test(background) ? "var(--color-black)" : "var(--text-primary-color,var(--active-text-color))") : undefined;
     return { unavailable, background: background || variables.inactive_background, accent,
       text: content || defaultContent, stateText: enabled ? content || defaultContent : variables.inactive_state_color,
       icon: enabled ? content || defaultContent : variables.inactive_icon_color,
@@ -422,7 +437,7 @@ export function stateAppearance(kind, state, config, hass) {
   }
   if (!background) return { unavailable, accent };
   const primaryBackground = /^var\(\s*--(?:primary-color|room-card-active-background)\s*[,)]/.test(background);
-  foreground = primaryBackground ? "var(--text-primary-color,var(--active-text-color))" : /^var\(\s*--color-(?:blue|yellow|orange|gold|peach)\s*[,)]/.test(background)
+  foreground = primaryBackground ? "var(--text-primary-color,var(--active-text-color))" : /^var\(\s*--color-(?:blue|yellow|orange|gold|peach|teal|lilac)\s*[,)]/.test(background)
     ? "var(--color-black)" : foreground || "var(--active-text-color)";
   const iconBackground = primaryBackground || foreground === "var(--color-black)" ? "var(--active-overlay-color)" : undefined;
   return { background, text: foreground, icon: kind === "hc_navigation_card" ? variables.hc_icon_color || foreground : foreground, ...(iconBackground ? { iconBackground } : {}), accent, unavailable };
@@ -679,7 +694,7 @@ export function problemStyle(problem, appearance = null) {
 
 // Only presentation metadata survives loss of availability; readings never do.
 export function layoutState(owner, state = {}) {
-  const keys = ['friendly_name', 'icon', 'unit_of_measurement', 'device_class', 'supported_features', 'supported_color_modes', 'hvac_modes', 'code_format', 'code_arm_required', 'options'];
+  const keys = ['friendly_name', 'icon', 'unit_of_measurement', 'device_class', 'supported_features', 'supported_color_modes', 'min_color_temp_kelvin', 'max_color_temp_kelvin', 'hvac_modes', 'code_format', 'code_arm_required', 'options'];
   if (state.state && !['unknown', 'unavailable'].includes(state.state)) owner._layoutMetadata = {};
   owner._layoutMetadata ||= {};
   for (const key of keys) if (state.attributes?.[key] != null) owner._layoutMetadata[key] = state.attributes[key];
@@ -882,6 +897,8 @@ function cardStyles() {
     .climate-card .current-temperature { font-size:calc(var(--font-size-primary,1.125rem) * 1.78); font-weight:var(--font-weight-primary,700); line-height:1.25; }
     .icon { position:relative; grid-area:icon; align-self:end; display:grid; place-items:center; width:52px; height:52px; border-radius:50%; background:var(--marao-icon-background,var(--opacity-contrast-100,rgba(0,0,0,.08))); color:var(--marao-icon-color,var(--icon-color)); }
     .icon :is(ha-icon,ha-state-icon) { --mdc-icon-size:28px; }
+    .icon[data-light-color] { padding:0; border:0; }
+    .icon .palette-indicator { position:absolute; right:2px; bottom:2px; width:16px; height:16px; --mdc-icon-size:16px; border-radius:50%; background:var(--marao-icon-background,var(--secondary-background-color)); pointer-events:none; }
     .readings { grid-column:1/-1; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,max(110px,calc(var(--font-size-caption,.9375rem) * 8))),1fr)); gap:12px; margin:8px 0 0; min-width:0; }
     .reading { display:grid; justify-items:center; align-content:start; gap:4px; min-width:0; text-align:center; overflow-wrap:anywhere; line-height:1.25; }
     .reading dt { font-size:var(--font-size-caption,.9375rem); }
@@ -909,22 +926,7 @@ function cardStyles() {
     .climate-stepper ha-icon { --mdc-icon-size:32px; }
     .climate-stepper .number-value { font-size:var(--font-size-primary,1.1875rem); opacity:1; }
     .number-value[data-number-range] { min-width:0; white-space:normal; overflow-wrap:normal; }
-    .slider { position:relative; display:flex; align-items:center; width:100%; min-height:48px; height:48px; }
-    .slider-track { position:absolute; inset:0; width:100%; height:48px; pointer-events:none; shape-rendering:geometricPrecision; }
-    .slider-background,.slider-fill,.slider-thumb { stroke:var(--marao-slider-thumb-border,#415C65); stroke-width:1px; }
-    .slider-background,.slider-fill { x:.5px; y:.5px; height:47px; rx:23.5px; ry:23.5px; }
-    .slider-background { width:calc(100% - 1px); fill:var(--marao-slider-track,#B4C7C9); }
-    .slider-fill { width:calc(47px + (100% - 48px) * var(--marao-slider-fraction,0)); fill:var(--marao-slider-fill,#F3F3EE); }
-    .slider-thumb { cx:calc(24px + (100% - 48px) * var(--marao-slider-target-fraction,0)); cy:24px; r:23.5px; fill:var(--marao-slider-thumb,#FFFFFF); transition:filter .12s ease; }
-    .slider:has(input:disabled) .slider-fill { fill:var(--marao-slider-disabled-fill,#D8DFDB); }
-    .slider:has(input:active:not(:disabled)) .slider-thumb { filter:brightness(.9); }
-    input[type=range] { position:absolute; inset:0; z-index:1; appearance:none; width:100%; min-height:48px; height:48px; margin:0; padding:0; border:0; border-radius:24px; background:transparent; cursor:pointer; }
-    input[type=range]:disabled { cursor:default; }
-    input[type=range]::-webkit-slider-runnable-track { height:48px; border-radius:24px; background:transparent; }
-    input[type=range]::-webkit-slider-thumb { appearance:none; box-sizing:border-box; width:48px; height:48px; margin-top:0; border:0; border-radius:50%; background:transparent; box-shadow:none; }
-    input[type=range]::-moz-range-track { height:48px; border-radius:24px; background:transparent; }
-    input[type=range]::-moz-range-progress { height:48px; border-radius:24px; background:transparent; }
-    input[type=range]::-moz-range-thumb { box-sizing:border-box; width:48px; height:48px; border:0; border-radius:50%; background:transparent; box-shadow:none; }
+    ${sliderStyles}
     @container marao-card (max-width:190px) {
       .body { gap:4px; padding:10px; }
       .body.room-card { --room-edge-inset:10px; }
@@ -1180,6 +1182,7 @@ export class MaraoCard extends BaseElement {
     for (const type of ["location-changed", "popstate"]) globalThis.window?.removeEventListener?.(type, this._cancelHiddenControls);
     globalThis.document?.removeEventListener?.("visibilitychange", this._cancelHiddenControls);
     this._clearAlarmPIN(); this._alarmSignature = ""; this._actionLive = false; this._actionError = ""; this._mediaError = ""; this._mediaURL = ""; this._actionRequest = (this._actionRequest || 0) + 1; this._climateConnected = false; this._subscribeClimate(); this._cancelHold(); this._cancelSliderGesture();
+    this._sliderControl?.destroy(); this._sliderControl = null;
   }
 
   _disposeCamera() {
@@ -1423,7 +1426,7 @@ export class MaraoCard extends BaseElement {
     const stored = this._sliderTargets.get(key);
     const value = Number.isFinite(stored) && Math.abs(stored - current) > step / 2 ? stored : current;
     if (stored != null && value === current) this._sliderTargets.delete(key);
-    return `<div class="slider"><svg class="slider-track" aria-hidden="true" focusable="false"><rect class="slider-background"></rect><rect class="slider-fill"></rect><circle class="slider-thumb"></circle></svg><input data-slider-key="${esc(key)}" data-slider-current="${Number.isFinite(current) ? current : min}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${esc(modeLabel)}" title="${esc(modeLabel)}"${disabled ? " disabled" : ""}></div>`;
+    return sliderMarkup({ key, current, value, min, max, step, label: modeLabel, disabled });
   }
 
   _graphAvailability(entity, hass = this._hass) {
@@ -1582,17 +1585,45 @@ export class MaraoCard extends BaseElement {
     if (options.history_popup && options.popup_hash && (energyUnits[source.attributes?.unit_of_measurement]?.[0] === 'power' || options.power_devices?.length)) {
       navigate(options.popup_hash); return;
     }
+    const popup = this._detailPopup(this._label(this._graphEntity(), this._config, stateOf(this._hass, this._graphEntity())));
+    popup.openHistory(this, opener);
+  }
+
+  _openLightColor(opener) {
+    const state = stateOf(this._hass, this._config.entity), capability = lightColorCapabilities(state);
+    if (this.preview || !serviceConnectionReady(this._hass) || !serviceTargetReady(this._hass, this._config.entity) || !(capability.color || capability.temperature)) return;
+    haptic('heavy');
+    this._detailPopup(this._label(this._config.entity, this._config, state)).openLightColor(this, opener);
+  }
+
+  _lightColorOptions() {
+    const entity = this._config.entity;
+    return { entity, hass: this._hass, localize: (key, placeholders, fallback) => localize(key, this._hass, placeholders, fallback), haptic,
+      callService: async data => {
+        if (this.preview || entity !== this._config.entity) return;
+        const outcome = serviceOutcome(this);
+        let failure;
+        await callServiceWithNotification(this._hass, 'light', 'turn_on', { ...data, entity_id: entity }, (status, error) => {
+          outcome(status, error);
+          if (status === 'error') failure = error;
+        });
+        if (failure) throw failure;
+      },
+    };
+  }
+
+  _detailPopup(title) {
     const overlays = new Set();
     for (let node = this; node; node = node.parentElement || node.getRootNode()?.host) if (node.classList?.contains('marao-popup-overlay')) overlays.add(node);
     let popup = findElements('marao-popup-card').find(popup => popup._open && overlays.has(popup._overlay));
     if (!popup) {
       this._historyPopup ||= document.createElement('marao-popup-card');
       popup = this._historyPopup; popup._transientHistory = true;
-      popup.setConfig({ title: this._label(this._graphEntity(), this._config, stateOf(this._hass, this._graphEntity())), cards: [] });
+      popup.setConfig({ title, cards: [] });
       if (!popup.isConnected) this.shadowRoot.append(popup);
     }
     if (!popup._open) popup.hass = this._hass;
-    popup.openHistory(this, opener);
+    return popup;
   }
 
   _render() {
@@ -1752,6 +1783,9 @@ export class MaraoCard extends BaseElement {
     const stateWanted = kind !== "hc_media_app_card" && !camera && !titleCard && !glance && (kind === "hc_room_card" ? Boolean(displayValue) : Boolean(entity || entityGroup)) && config.show_state !== false;
     const showState = stateWanted;
     const showIcon = !camera && !titleCard && !glance && config.show_icon !== false && variables.show_icon !== false;
+    const lightCapabilities = kind === 'hc_light_card' ? lightColorCapabilities(state) : {};
+    const lightColor = lightCapabilities.color || lightCapabilities.temperature;
+    const colorHold = lightColor && !Object.hasOwn(config, 'hold_action');
     const iconOnly = !camera && !showName && !stateWanted && config.show_label === false;
     const isAction = ["hc_switch_card", "hc_light_card", "hc_cover_card", "hc_fan_card", "hc_access_card"].includes(kind);
     const popupHash = config.variables?.popup_hash;
@@ -1774,7 +1808,7 @@ export class MaraoCard extends BaseElement {
     const app = kind === "hc_media_app_card" ? mediaAppBrand(config) : null;
     const iconElement = usesNumberStepper ? "" : kind === "hc_room_card" || !showIcon ? hiddenBinaryState : app
       ? `<img class="app-icon${app.symbol ? " app-symbol" : ""}" src="${esc(new URL(`./media-apps/${app.file || `${app.id}.png`}${new URL(import.meta.url).search}`, import.meta.url).href)}" width="64" height="64" alt="" aria-hidden="true">`
-      : `<div class="icon"${binaryLabel ? ` role="img" aria-label="${esc(binaryLabel)}"` : ' aria-hidden="true"'}>${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : `<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>`}</div>`;
+      : `<${lightColor ? 'button type="button" data-light-color' : 'div'} class="icon"${lightColor ? ` aria-label="${esc(localize('light.picker', this._hass, { name: this._label(entity, config, state) }, `Change color for ${this._label(entity, config, state)}`))}"${binaryLabel ? ` aria-description="${esc(binaryLabel)}"` : ''}${controlsDisabled ? ' disabled' : ''}` : binaryLabel ? ` role="img" aria-label="${esc(binaryLabel)}"` : ' aria-hidden="true"'}>${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : `<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>`}${lightColor ? '<ha-icon class="palette-indicator" icon="mdi:palette" aria-hidden="true"></ha-icon>' : ''}</${lightColor ? 'button' : 'div'}>`;
     const roomArtwork = kind === "hc_room_card" && showIcon ? `<div class="room-artwork" aria-hidden="true">${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : '<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>'}</div>` : "";
     const roomBottom = roomLightsControl || roomArtwork ? `<div class="room-bottom">${roomLightsControl}${roomArtwork}</div>` : "";
     const controlClass = kind === "hc_climate_card" ? "control number-control climate-number-control" : kind === "hc_wallbox_current_card" ? "control number-control wallbox-current-control" : usesNumberStepper ? "control number-control" : "control";
@@ -1791,8 +1825,8 @@ export class MaraoCard extends BaseElement {
     const actionLabel = holdAction ? localize("access.hold_to_activate", this._hass, { action: semanticActionLabel }, `Hold to ${semanticActionLabel}`) : semanticActionLabel;
     const roomDescription = kind === "hc_room_card" && roomLights.length ? localize("room.lighting_summary", this._hass, { label: summary?.label || localize("common.loading", this._hass, {}, "Loading…") }, `Lighting: ${summary?.label || "Loading…"}`) : "";
     const feedback = problem && problem.kind !== 'loading' && !camera;
-    let actionControl = action ? `<button class="card-action" type="button" data-card-action${holdAction ? " data-hold-action" : ""} aria-label="${esc(actionLabel)}"${roomDescription ? ` aria-description="${esc(roomDescription)}"` : ""} title="${esc(actionLabel)}"${actionDisabled ? " disabled" : ""}></button>` : "";
-    if (!action && !camera && !titleCard && !iconOnly) actionControl += `<button class="card-action" type="button" data-card-details aria-label="${esc(localize('common.details', this._hass, {}, 'Details'))}"></button>`;
+    let actionControl = action || colorHold ? `<button class="card-action" type="button" data-card-action${holdAction ? " data-hold-action" : ""} aria-label="${esc(actionLabel)}"${roomDescription ? ` aria-description="${esc(roomDescription)}"` : ""} title="${esc(actionLabel)}"${actionDisabled || colorHold && controlsDisabled ? " disabled" : ""}></button>` : "";
+    if (!action && !colorHold && !camera && !titleCard && !iconOnly) actionControl += `<button class="card-action" type="button" data-card-details aria-label="${esc(localize('common.details', this._hass, {}, 'Details'))}"></button>`;
     if (feedback) actionControl += `<button class="card-action problem-details" type="button" data-problem-details aria-label="${esc(problem.reason)}"></button>`;
     const holdProgress = holdAction || alternateHold ? '<svg class="hold-progress" aria-hidden="true" focusable="false"><rect x="1.5" y="1.5" pathLength="100"></rect></svg>' : "";
     const holdHint = holdAction ? `<div class="climate">${esc(actionLabel)}</div>` : "";
@@ -1849,10 +1883,12 @@ export class MaraoCard extends BaseElement {
       showCardDetails(this, problem?.reason || detail, event.currentTarget);
     });
     this.shadowRoot.querySelector('[data-history-open]')?.addEventListener('click', event => { event.stopPropagation(); this._openHistory(event.currentTarget); });
+    this.shadowRoot.querySelector('[data-light-color]')?.addEventListener('click', event => { event.stopPropagation(); this._openLightColor(event.currentTarget); });
     const actionButton = this.shadowRoot.querySelector("[data-card-action]");
     if (actionButton) {
       if (holdAction) this._bindHoldAction(actionButton, card, () => this._performAction(action, entity));
       else if (alternateHold) this._bindHoldAction(actionButton, card, () => this._performAction(config.hold_action, entity), () => { actionButton.focus?.({ preventScroll: true }); this._performAction(action, entity); });
+      else if (colorHold) this._bindHoldAction(actionButton, card, () => this._openLightColor(actionButton), () => { actionButton.focus?.({ preventScroll: true }); this._performAction(action, entity); }, LIGHT_COLOR_HOLD_MS);
       else this._bindTapAction(actionButton, card, () => this._performAction(action, entity));
     }
     for (const button of this.shadowRoot.querySelectorAll("[data-vacuum-action]")) {
@@ -1893,40 +1929,15 @@ export class MaraoCard extends BaseElement {
     });
     if (showsGraph) this._loadGraphHistory(graphEntity);
     const input = this.shadowRoot.querySelector("input[type=range]");
+    this._sliderControl?.destroy(); this._sliderControl = null;
     if (input) {
-      const min = Number(input.min);
-      const max = Number(input.max);
-      const toPercent = (value) => max > min ? Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100)) : 0;
-      const setProgress = (progress) => {
-        const percent = Math.max(0, Math.min(100, progress));
-        input.style.setProperty("--marao-slider-progress", `${percent}%`);
-        const parent = input.parentElement;
-        parent?.style.setProperty("--marao-slider-progress", `${percent}%`);
-        // CSS shares the native thumb's travel, including after a resize.
-        parent?.style.setProperty("--marao-slider-fraction", String(percent / 100));
-      };
-      const updateProgress = (target = Number(input.value)) => {
-        const progress = Math.min(toPercent(Number(input.dataset.sliderCurrent ?? input.value)), toPercent(target));
-        input.parentElement?.style.setProperty("--marao-slider-target-fraction", String(toPercent(target) / 100));
-        setProgress(progress);
-      };
-      updateProgress();
-      input.addEventListener("input", () => {
-        const value = Number(input.value);
-        if (kind === "hc_access_slide_action_card") {
-          setProgress(value);
-        }
-        else this._sliderTargets.set(`${kind}:${entity}`, value);
-        if (kind !== "hc_access_slide_action_card") updateProgress(value);
-      });
-      let sliderGesture;
-      input.addEventListener("pointerdown", () => {
-        if (input.disabled) return;
-        sliderGesture = this._sliderGesture = {
-          input, key: input.dataset.sliderKey, completed: false, cancelled: false, dispatched: false,
-          refresh: (state) => {
-            input.dataset.sliderCurrent = this._sliderCurrent(kind, state.attributes);
-            updateProgress();
+      this._sliderControl = bindSlider(input, {
+        haptic,
+        onInput: value => this._sliderTargets.set(`${kind}:${entity}`, value),
+        onStart: gesture => {
+          this._sliderGesture = gesture;
+          gesture.refresh = state => {
+            this._sliderControl.update(this._sliderCurrent(kind, state.attributes));
             const label = this.shadowRoot.querySelector('.state');
             const binary = binaryState(entity, state, kind);
             if (label && binary === null) label.textContent = entityStateLabel(state, entity, kind, this._hass);
@@ -1943,31 +1954,21 @@ export class MaraoCard extends BaseElement {
               symbol.hass = this._hass;
               symbol.stateObj = presentationState(state, entity, kind);
             }
-          },
-        };
-        haptic("heavy");
-      });
-      input.addEventListener("pointerup", () => {
-        if (!sliderGesture || sliderGesture.cancelled) return;
-        sliderGesture.completed = true;
-        const completedGesture = sliderGesture;
-        // Let the native change event finish before rebuilding the released control.
-        requestAnimationFrame(() => {
-          if (this._sliderGesture !== completedGesture) return;
-          this._sliderGesture = null;
-          this._render();
-        });
-      });
-      input.addEventListener("pointercancel", () => { this._cancelSliderGesture(); this._render(); });
-      input.addEventListener("keydown", (event) => {
-        if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) haptic("heavy");
-      });
-      input.addEventListener("change", () => {
-        if (sliderGesture && (sliderGesture.cancelled || !sliderGesture.completed || sliderGesture.dispatched)) return;
-        if (sliderGesture) sliderGesture.dispatched = true;
-        const value = Number(input.value);
-        if (kind !== "hc_access_slide_action_card") this._sliderTargets.set(`${kind}:${entity}`, value);
-        this._setRange(entity, kind, value);
+          };
+        },
+        onCommit: value => {
+          this._sliderTargets.set(`${kind}:${entity}`, value);
+          this._setRange(entity, kind, value);
+        },
+        onEnd: gesture => {
+          // Let native release events finish before rebuilding the control.
+          requestAnimationFrame(() => {
+            if (this._sliderGesture !== gesture) return;
+            this._sliderGesture = null;
+            this._render();
+          });
+        },
+        onCancel: () => { this._cancelSliderGesture(); this._render(); },
       });
     }
 
@@ -1993,11 +1994,13 @@ export class MaraoCard extends BaseElement {
     button.addEventListener("click", () => { release(); button.focus?.({ preventScroll: true }); run(); });
   }
 
-  _bindHoldAction(button, card, run, shortTap = null) {
+  _bindHoldAction(button, card, run, shortTap = null, duration = ACCESS_HOLD_MS) {
     let suppressClick = false;
+    let origin;
     const start = (event) => {
       if (button.disabled || this._holdActive || (event.button != null && event.button !== 0)) return;
       suppressClick = false;
+      origin = { x: event.clientX, y: event.clientY };
       this._holdActive = true;
       this._holdControl = card;
       this._holdCompleted = false;
@@ -2006,7 +2009,7 @@ export class MaraoCard extends BaseElement {
       const startedAt = globalThis.performance?.now?.() ?? Date.now();
       const draw = (now) => {
         if (!this._holdActive || this._holdCompleted) return;
-        this._setHoldProgress(((now - startedAt) / ACCESS_HOLD_MS) * 100);
+        this._setHoldProgress(((now - startedAt) / duration) * 100);
         this._holdFrame = globalThis.requestAnimationFrame?.(draw) ?? null;
       };
       this._setHoldProgress(0);
@@ -2019,7 +2022,11 @@ export class MaraoCard extends BaseElement {
         this._holdFrame = null;
         this._setHoldProgress(100);
         run();
-      }, ACCESS_HOLD_MS);
+      }, duration);
+      if (duration === LIGHT_COLOR_HOLD_MS) {
+        this._holdScrollCancel = () => { suppressClick = true; this._cancelHold(); };
+        globalThis.window?.addEventListener('scroll', this._holdScrollCancel, true);
+      }
     };
     const cancel = () => { suppressClick = true; this._cancelHold(); };
     const finish = () => {
@@ -2030,6 +2037,7 @@ export class MaraoCard extends BaseElement {
     button.addEventListener("pointerdown", start);
     button.addEventListener("pointermove", (event) => {
       if (!this._holdActive) return;
+      if (duration === LIGHT_COLOR_HOLD_MS && Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 8) { cancel(); return; }
       const bounds = button.getBoundingClientRect();
       if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) cancel();
     });
@@ -2059,6 +2067,8 @@ export class MaraoCard extends BaseElement {
   }
 
   _cancelHold() {
+    if (this._holdScrollCancel) globalThis.window?.removeEventListener('scroll', this._holdScrollCancel, true);
+    this._holdScrollCancel = null;
     clearTimeout(this._holdTimer);
     globalThis.cancelAnimationFrame?.(this._holdFrame);
     this._holdTimer = null;
@@ -2307,9 +2317,11 @@ export class MaraoPopupCard extends BaseElement {
     this._viewOwner = null; this._close(false);
   }
   _invalidateHistory() { this._close(false); this._historyContext = null; }
-  openHistory(owner, opener) {
+  openLightColor(owner, opener) { this.openHistory(owner, opener, 'light-color'); }
+  _detailSource(context) { return context.kind === 'light-color' ? context.owner._config.entity : context.owner._graphEntity?.(); }
+  openHistory(owner, opener, kind = 'history') {
     if (this.preview || !owner.isConnected) return;
-    this._historyContext = { owner, restoreFocus: focusRestorer(opener), id: `${Date.now()}-${++historyEntryId}`, path: window.location.pathname, hash: window.location.hash, source: owner._graphEntity?.() };
+    this._historyContext = { owner, kind, restoreFocus: focusRestorer(opener), id: `${Date.now()}-${++historyEntryId}`, path: window.location.pathname, hash: window.location.hash, source: kind === 'light-color' ? owner._config.entity : owner._graphEntity?.() };
     owner._activeHistoryPopup = this;
     this._openSheet(this._historyContext.restoreFocus);
     window.history.pushState({ ...window.history.state, maraoHistory: { id: this._historyContext.id } }, '', window.location.href);
@@ -2318,10 +2330,18 @@ export class MaraoPopupCard extends BaseElement {
   _showHistory() {
     const context = this._historyContext;
     if (!context || this._historyHost || !this._overlay) return;
+    context.owner._activeHistoryPopup = this;
     const parent = this._overlay.querySelector('.marao-popup-content');
     this._historyScroll = this._overlay.querySelector('.marao-popup-sheet').scrollTop;
     parent.hidden = true; parent.inert = true;
-    const host = document.createElement('div'); host.className = 'marao-history-content';
+    const host = document.createElement('div'); host.className = context.kind === 'light-color' ? 'marao-light-color-content' : 'marao-history-content';
+    if (context.kind === 'light-color') {
+      host.style.paddingBottom = `max(8px, ${safeArea('bottom')})`;
+      const title = this._overlay.querySelector('.marao-popup-head h2');
+      this._detailTitle = title.textContent;
+      title.textContent = context.owner._label(context.source, context.owner._config, stateOf(context.owner.hass, context.source));
+      this._overlay.querySelector('.marao-popup-sheet').setAttribute('aria-label', title.textContent);
+    }
     parent.after(host); this._historyHost = host;
     const back = document.createElement('button'); back.type = 'button'; back.className = 'marao-popup-back';
     back.textContent = localize('history.back', this._hass, {}, 'Back');
@@ -2330,32 +2350,46 @@ export class MaraoPopupCard extends BaseElement {
     if (!this._transientHistory) this._overlay.querySelector('.marao-popup-head').prepend(back);
     this._historyBack = back;
     this._overlay.querySelector('.marao-popup-sheet').scrollTop = 0;
+    (this._transientHistory ? this._overlay.querySelector('.marao-popup-close') : back)?.focus?.({ preventScroll: true });
     this._refreshHistory();
   }
   async _refreshHistory() {
     const context = this._historyContext, host = this._historyHost;
     if (!context || !host) return;
-    if (!context.owner.isConnected || context.path !== window.location.pathname || context.source !== context.owner._graphEntity?.()) { this._close(false); return; }
-    const options = context.owner._historyOptions();
+    if (!context.owner.isConnected || context.path !== window.location.pathname || context.source !== this._detailSource(context)) { this._close(false); return; }
+    const color = context.kind === 'light-color';
+    const options = color ? context.owner._lightColorOptions() : context.owner._historyOptions();
     if (this._historyChart) { this._historyChart.update(options); return; }
     if (this._historyLoading || this._historyFailed) return;
     this._historyLoading = true;
     host.replaceChildren();
-    const placeholder = createHistoryPlaceholder(host, { ...options, loadingText: localize('timeline.loading', this._hass, {}, 'Loading history…') });
+    let placeholder;
+    if (color) {
+      const capabilities = lightColorCapabilities(stateOf(options.hass, options.entity));
+      const loading = document.createElement('div');
+      loading.style.cssText = 'display:grid;gap:16px;padding:0 4px 16px';
+      loading.setAttribute('aria-busy', 'true');
+      loading.innerHTML = `${capabilities.color ? '<div style="width:min(260px,100%);aspect-ratio:1;margin:auto;border-radius:50%;background:var(--secondary-background-color)"></div>' : ''}${Array.from({ length: Number(capabilities.temperature) + Number(capabilities.brightness) }, () => '<div style="height:76px;border-radius:24px;background:var(--secondary-background-color)"></div>').join('')}<p role="status" style="margin:0;min-height:1.5em"></p><button type="button" hidden style="min-width:48px;min-height:48px;border:0;border-radius:12px;background:var(--secondary-background-color);color:inherit;font:inherit"></button>`;
+      host.append(loading);
+      placeholder = { status: loading.querySelector('p'), retry: loading.querySelector('button') };
+      placeholder.status.textContent = localize('common.loading', this._hass, {}, 'Loading…');
+    } else placeholder = createHistoryPlaceholder(host, { ...options, loadingText: localize('timeline.loading', this._hass, {}, 'Loading history…') });
     try {
-      const module = await loadHistoryChart();
-      if (host !== this._historyHost || context !== this._historyContext || !context.owner.isConnected || context.path !== window.location.pathname || context.hash !== window.location.hash || context.source !== context.owner._graphEntity?.()) return;
+      const module = await (color ? loadLightColorPicker() : loadHistoryChart());
+      if (host !== this._historyHost || context !== this._historyContext || !context.owner.isConnected || context.path !== window.location.pathname || context.hash !== window.location.hash || context.source !== this._detailSource(context)) return;
       host.replaceChildren();
-      this._historyChart = module.createHistoryChart(host, context.owner._historyOptions());
+      this._historyChart = color ? module.createLightColorPicker(host, context.owner._lightColorOptions()) : module.createHistoryChart(host, context.owner._historyOptions());
     } catch (error) {
       if (host !== this._historyHost || context !== this._historyContext) return;
       this._historyFailed = true;
       const message = document.createElement('p'); message.setAttribute('role', 'alert');
-      message.textContent = localize('history.load_error', this._hass, {}, 'History chart could not load');
+      message.textContent = color ? localize('light.color_load_error', this._hass, {}, 'Color controls could not load') : localize('history.load_error', this._hass, {}, 'History chart could not load');
       const retry = document.createElement('button'); retry.type = 'button'; retry.style.cssText = 'min-width:48px;min-height:48px;font:inherit';
       retry.textContent = localize('common.retry', this._hass, {}, 'Retry');
       retry.onclick = () => { haptic('heavy'); this._historyFailed = false; this._refreshHistory(); };
       placeholder.status.textContent = message.textContent;
+      placeholder.status.setAttribute('role', 'alert');
+      if (color) placeholder.status.parentElement.removeAttribute('aria-busy');
       placeholder.retry.hidden = false; placeholder.retry.disabled = false;
       placeholder.retry.textContent = retry.textContent; placeholder.retry.onclick = () => retry.click();
     } finally { if (host === this._historyHost) this._historyLoading = false; }
@@ -2366,9 +2400,18 @@ export class MaraoPopupCard extends BaseElement {
     this._historyHost?.remove(); this._historyHost = null;
     this._historyBack?.remove(); this._historyBack = null;
     this._historyLoading = false; this._historyFailed = false;
+    if (this._detailTitle != null && this._overlay) {
+      this._overlay.querySelector('.marao-popup-head h2').textContent = this._detailTitle;
+      this._overlay.querySelector('.marao-popup-sheet').setAttribute('aria-label', this._detailTitle);
+      this._detailTitle = null;
+    }
     const parent = this._overlay?.querySelector('.marao-popup-content');
     if (parent) { parent.hidden = false; parent.inert = false; }
     if (restore && this._overlay) {
+      if (this._historyContext?.kind === 'light-color') {
+        this._historyContext.owner._activeHistoryPopup = null;
+        this._reconcileGroupChildren();
+      }
       this._overlay.querySelector('.marao-popup-sheet').scrollTop = this._historyScroll || 0;
       this._historyContext?.restoreFocus();
     }
@@ -2391,7 +2434,7 @@ export class MaraoPopupCard extends BaseElement {
     if (this._historyContext) {
       const context = this._historyContext;
       const current = window.history.state?.maraoHistory?.id === context.id;
-      if (current && context.owner.isConnected && context.path === window.location.pathname && context.hash === window.location.hash && context.source === context.owner._graphEntity?.()) { this._openSheet(); this._showHistory(); return; }
+      if (current && context.owner.isConnected && context.path === window.location.pathname && context.hash === window.location.hash && context.source === this._detailSource(context)) { this._openSheet(); this._showHistory(); return; }
       if (this._historyHost) this._hideHistory();
       if (this._transientHistory) { this._close(false); return; }
     }
@@ -2490,6 +2533,9 @@ export class MaraoPopupCard extends BaseElement {
     const group = this._config.entity_group;
     const activity = entityGroupState(group.entity_type, group.entities, this._hass);
     const eligible = new Set(group.popup_filter === 'active' ? activity.activeEntities : group.entities);
+    const detail = this._historyContext;
+    // Keep the inspected light mounted when it turns off or loses availability.
+    if (this._historyHost && detail?.kind === 'light-color' && group.entities.includes(detail.source)) eligible.add(detail.source);
     for (const [id, card] of this._groupChildren) {
       if (eligible.has(id)) continue;
       let active = deepActiveElement();

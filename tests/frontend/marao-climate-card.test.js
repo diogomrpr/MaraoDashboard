@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { sliderStyles } from '../../custom_components/marao_dashboard/frontend/MaraoSlider.js';
 import fs from "node:fs/promises";
 
 globalThis.HTMLElement = class {
@@ -362,20 +363,49 @@ test("climate tap behavior distinguishes zero, single, and multiple modes", () =
 
 test("climate modes use the theme state palette", () => {
   const expected = {
-    heat: "var(--color-red)",
-    heating: "var(--color-red)",
+    heat: "var(--color-orange)",
+    heating: "var(--color-orange)",
     cool: "var(--color-blue)",
     cooling: "var(--color-blue)",
-    heat_cool: "var(--color-purple)",
+    heat_cool: "var(--color-lilac,var(--color-blue))",
     auto: "var(--color-gold)",
     dry: "var(--color-yellow)",
-    fan_only: "var(--color-green)",
+    fan_only: "var(--color-teal,var(--color-blue))",
   };
   for (const [state, background] of Object.entries(expected)) {
     assert.equal(stateAppearance("hc_climate_card", state, {}, {}).background, background);
   }
   assert.equal(stateAppearance("hc_climate_card", "off", {}, {}).background, undefined);
   assert.equal(stateAppearance("hc_climate_card", "auto", {}, {}).text, "var(--color-black)");
+});
+
+test("seasonal backgrounds follow active device state and preserve custom colors", () => {
+  for (const [kind, entity, activeState, inactiveState, color] of [
+    ['hc_light_card', 'light.test', 'on', 'off', 'var(--color-gold)'],
+    ['hc_fan_card', 'fan.test', 'on', 'off', 'var(--color-teal,var(--color-blue))'],
+    ['hc_cover_card', 'cover.test', 'open', 'closed', 'var(--color-blue)'],
+    ['hc_climate_card', 'climate.test', 'heat', 'off', 'var(--color-orange)'],
+  ]) {
+    const config = { entity };
+    assert.equal(stateAppearance(kind, activeState, config, {}).background, color);
+    for (const state of [inactiveState, 'unknown', 'unavailable']) {
+      assert.equal(stateAppearance(kind, state, config, {}).background, undefined, `${kind}: ${state} remains neutral`);
+    }
+  }
+  for (const config of [
+    { entity: 'light.test', variables: { summary_entities: ['light.test'] } },
+    { variables: { entity_type: 'light', summary_entities: ['light.test'] } },
+  ]) {
+    assert.equal(stateAppearance('hc_navigation_card', 'on', config, {}).background, 'var(--color-gold)');
+    assert.equal(stateAppearance('hc_navigation_card', 'off', config, {}).background, undefined);
+    assert.equal(stateAppearance('hc_navigation_card', 'on', { ...config, variables: { ...config.variables, hc_color: '#234567' } }, {}).background, '#234567');
+  }
+  for (const key of ['active_color', 'card_color', 'hc_card_color']) {
+    assert.equal(stateAppearance('hc_light_card', 'on', { variables: { [key]: '#234567' } }, {}).background, '#234567');
+  }
+  assert.equal(stateAppearance('hc_sensor_card', '150', { entity: 'sensor.power' }, {}).background, undefined);
+  assert.equal(stateAppearance('hc_security_card', 'triggered', {}, {}).background, 'var(--color-red)');
+  assert.equal(stateAppearance('hc_access_card', 'unlocked', {}, {}).background, 'var(--color-red)');
 });
 
 test("climate modes use the shared dropdown and retain measured/target slots", t => {
@@ -390,8 +420,8 @@ test("climate modes use the shared dropdown and retain measured/target slots", t
 test("light state palette colors share a dark foreground across card families", () => {
   for (const [kind, state, color] of [
     ["hc_cover_card", "open", "blue"],
-    ["hc_light_card", "on", "blue"],
-    ["hc_fan_card", "on", "blue"],
+    ["hc_light_card", "on", "gold"],
+    ["hc_fan_card", "on", "teal,var(--color-blue)"],
     ["hc_climate_card", "cool", "blue"],
     ["hc_battery_card", "50", "yellow"],
     ["hc_access_card", "opening", "orange"],
@@ -403,13 +433,13 @@ test("light state palette colors share a dark foreground across card families", 
     assert.equal(appearance.icon, appearance.text, kind);
     assert.equal(appearance.iconBackground, "var(--active-overlay-color)", kind);
   }
-  for (const color of ["blue", "yellow", "orange", "gold", "peach"]) {
+  for (const color of ["blue", "yellow", "orange", "gold", "peach", "teal", "lilac"]) {
     const active_color = `var(--color-${color}, #abcdef)`;
     const appearance = stateAppearance("hc_wallbox_current_card", "16", { variables: { active_color } }, {});
     assert.equal(appearance.background, active_color);
     assert.equal(appearance.text, "var(--color-black)", "the Wallbox default does not override its light palette");
   }
-  for (const [kind, state] of [["hc_access_card", "locked"], ["hc_switch_card", "on"], ["hc_climate_card", "fan_only"]]) {
+  for (const [kind, state] of [["hc_access_card", "locked"], ["hc_switch_card", "on"]]) {
     assert.equal(stateAppearance(kind, state, {}, {}).text, "var(--active-text-color)", `${kind}: green keeps white text`);
   }
   const current = stateAppearance("hc_wallbox_current_card", "16", {}, {});
@@ -455,7 +485,7 @@ test("heat/cool limits preserve the target range", () => {
 test("number controls and slider hit areas expose at least 48px touch targets", () => {
   assert.match(source, /\.number-stepper button \{[^}]*width:48px; height:48px/);
   assert.match(source, /\.climate-stepper button \{ width:52px; height:48px; \}/);
-  assert.match(source, /input\[type=range\] \{[^}]*min-height:48px; height:48px/);
+  assert.match(sliderStyles, /input\[type=range\] \{[^}]*min-height:48px; height:48px/);
 });
 
 test("new card control text has English and Portuguese translations", () => {

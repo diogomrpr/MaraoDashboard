@@ -69,6 +69,25 @@ input_number:
     max: 255
     step: 1
     mode: slider
+  marao_dashboard_test_light_hue:
+    name: Marao Dashboard Test Light Hue
+    min: 0
+    max: 360
+    step: 1
+    mode: slider
+  marao_dashboard_test_light_saturation:
+    name: Marao Dashboard Test Light Saturation
+    min: 0
+    max: 100
+    step: 1
+    mode: slider
+  marao_dashboard_test_light_temperature:
+    name: Marao Dashboard Test Light Temperature
+    min: 2000
+    max: 6250
+    step: 1
+    mode: slider
+    unit_of_measurement: K
   marao_dashboard_test_cover_position:
     name: Marao Dashboard Test Cover Position
     min: 0
@@ -372,6 +391,10 @@ template:
         unique_id: marao_dashboard_test_light
         state: "{{ is_state('input_boolean.marao_dashboard_test_light', 'on') }}"
         level: "{{ states('input_number.marao_dashboard_test_light_brightness') | int }}"
+        hs: "{{ (states('input_number.marao_dashboard_test_light_hue') | float(0), states('input_number.marao_dashboard_test_light_saturation') | float(0)) }}"
+        temperature: "{{ 1000000 / states('input_number.marao_dashboard_test_light_temperature') | float(2000) }}"
+        min_mireds: 160
+        max_mireds: 500
         turn_on:
           - action: input_boolean.turn_on
             target:
@@ -389,6 +412,29 @@ template:
               entity_id: input_number.marao_dashboard_test_light_brightness
             data:
               value: "{{ brightness }}"
+        set_hs:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.marao_dashboard_test_light
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_light_hue
+            data:
+              value: "{{ h }}"
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_light_saturation
+            data:
+              value: "{{ s }}"
+        set_temperature:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.marao_dashboard_test_light
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_light_temperature
+            data:
+              value: "{{ color_temp_kelvin }}"
       - name: Marao Dashboard Test Room Light
         default_entity_id: light.marao_dashboard_test_room_light
         unique_id: marao_dashboard_test_room_light

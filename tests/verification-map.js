@@ -99,9 +99,11 @@ const components = {
     profiles: ['iphone-normal', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200', 'narrow-320', 'iphone-landscape', 'android-normal', 'android-landscape'],
     browser: [browser('security:iphone', 'test-ha-security', ['--scenario', 'iphone-normal']), browser('security:android', 'test-ha-security', ['--scenario', 'android-normal'])] },
   labels: { units: [['marao-text-scale'], ['marao-card-visibility']], profiles: ['iphone-normal', 'narrow-320', 'iphone-bold-text-200'] },
-  slider: { units: [['marao-climate-card', 'slider|brightness|percentage|cover']], consumers: ['light', 'fan', 'cover'],
+  slider: { units: [['marao-slider'], ['marao-climate-card', 'slider|brightness|percentage|cover']], consumers: ['light', 'fan', 'cover'],
     browser: [browser('sliders:iphone', 'test-ha-value-sliders', ['--scenario', 'iphone-normal']), browser('sliders:android', 'test-ha-value-sliders', ['--scenario', 'android-normal'])] },
   light: { units: [['marao-climate-card', 'light|brightness']], templates: ['hc_light_card'] },
+  'light-color': { units: [['marao-light-color'], ['marao-slider'], ['marao-card-visibility', 'light|hold|popup']], templates: ['hc_light_card'],
+    browser: [{ id: 'light-color:local', kind: 'offline', command: ['node', 'tests/test-light-color-local.js'], inputs: [runtime, 'tests/test-light-color-local.js'], exclusive: true }] },
   fan: { units: [['marao-climate-card', 'fan|percentage']], templates: ['hc_fan_card'] },
   cover: { units: [['marao-climate-card', 'cover|position']], templates: ['hc_cover_card'] },
   popup: { units: [['marao-navbar-card'], ['marao-climate-card', 'popup|focus|inert']], profiles: ['iphone-normal', 'iphone-landscape', 'narrow-320'], popups: true },
@@ -157,6 +159,8 @@ const components = {
 };
 
 const rules = [
+  [/^custom_components\/marao_dashboard\/frontend\/MaraoLight(?:Color|Capabilities)\.js$|^tests\/test-light-color-local\.js$/, ['light-color']],
+  [/^custom_components\/marao_dashboard\/frontend\/MaraoSlider\.js$/, ['slider']],
   [/^tests\/test-ha-navbar-startup\.js$/, ['navbar-startup']],
   [/^custom_components\/marao_dashboard\/frontend\/Marao(?:Navigation|NativeNavbar)\.js$|^frontend_src\/MaraoNativeNavbar\.js$|^tests\/test-navbar-startup-local\.js$/, ['navbar-startup']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoRuntime\.js$/, 'shared'],
@@ -260,7 +264,7 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     if (ids === 'editor-labels') ids = declared.includes('editor-drag') && !declared.includes('native') ? ['editor-ui', 'editor-drag'] : ['native', 'editor-ui'];
     if (ids === 'shared') {
       if (!declared.length && !conservativeShared) throw new Error(file + ': declare --component after reviewing the shared-component diff.');
-      const consumers = ['navbar-startup', 'frontend-refresh', 'chart-details', 'control-grid', 'battery-groups', 'access-label', 'slider-headers', 'navbar-overflow', 'native', 'security', 'labels', 'slider', 'light', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
+      const consumers = ['navbar-startup', 'frontend-refresh', 'chart-details', 'control-grid', 'battery-groups', 'access-label', 'slider-headers', 'navbar-overflow', 'native', 'security', 'labels', 'slider', 'light', 'light-color', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
       ids = declared.length ? declared.filter(id => consumers.includes(id)) : consumers;
       if (!ids.length) throw new Error(file + ': a runtime component is required; documentation scope cannot omit its checks.');
     }

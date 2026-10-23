@@ -26,9 +26,9 @@ test('landscape theme retains readable text, state colors, chart lines and slide
     }
     contrast('text-primary-color','primary-color',4.5);
     for(const hue of ['green','red','purple'])contrast('active-text-color','color-'+hue,4.5);
-    for(const hue of ['blue','yellow','orange','gold','peach'])contrast('color-black','color-'+hue,4.5);
+    for(const hue of ['blue','yellow','orange','gold','peach','teal','lilac'])contrast('color-black','color-'+hue,4.5);
     for(const state of ['neutral','warning','error'])contrast('marao-problem-'+state+'-text','marao-problem-'+state+'-background',4.5);
-    for(const adjacent of ['marao-slider-track','marao-slider-fill','marao-slider-thumb','color-blue'])contrast('marao-slider-thumb-border',adjacent,3);
+    for(const adjacent of ['marao-slider-track','marao-slider-fill','marao-slider-thumb','color-blue','color-gold','color-teal','color-lilac'])contrast('marao-slider-thumb-border',adjacent,3);
   }
 });
 
