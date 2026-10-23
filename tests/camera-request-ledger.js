@@ -436,7 +436,9 @@ async function cameraRequestLedger(context, { output, scenario, theme, manualTra
     },
     async stopForClose() {
       if (manualTransport) {
-        // Test-owned navigation must not abort ordinary history or asset fetches.
+        if (page.isClosed()) return ledger.assert();
+        // Unmount the application so prefetch stops scheduling successors while its finite requests drain.
+        await page.evaluate(() => document.querySelector('home-assistant')?.remove());
         let timer;
         try {
           await Promise.race([

@@ -255,6 +255,13 @@ test('only changed hash on the same origin/path/query retains its document', () 
   for (const target of [current, '?mode=2#first', '/marao-dashboard/overview', 'http://other.test/marao-dashboard/card-test?mode=1#second']) assert.equal(sameDocumentHashNavigation(current, target), false);
 });
 
+function applicationTeardownEvaluator(remove = () => {}, present = true) {
+  let application = present ? { remove() { application = null; remove(); } } : null;
+  return async callback => vm.runInNewContext(`(${callback.toString()})()`, {
+    document: { querySelector(selector) { assert.equal(selector, 'home-assistant'); return application; } },
+  });
+}
+
 test('managed context/browser close preserves failed-request diagnostics and still closes after failure', async () => {
   for (const target of ['context', 'browser']) {
     const previous = { window: globalThis.window, requestAnimationFrame: globalThis.requestAnimationFrame, document: globalThis.document };
@@ -290,7 +297,7 @@ test('managed checks leave native camera cancellation and HLS errors to manual v
   const context = { addInitScript: () => assert.fail('Manual camera acceptance must not instrument native transports'), browser: () => browser, close: async () => { closed = true; } };
   const page = { on: (name, listener) => listeners.set(name, listener), isClosed: () => closed,
     url: () => 'http://192.168.0.28:8123/marao-dashboard/card-test', goto: async () => { navigated = true; },
-    evaluate: () => assert.fail('Manual camera acceptance must not probe playback or force teardown') };
+    evaluate: applicationTeardownEvaluator() };
   try {
     const ledger = await managedCameraLedger(context, page, { output: directory, scenario: 'iphone-normal', theme: 'light' });
     const url = 'http://192.168.0.28:8123/api/hls/private-session/playlist.m3u8';
@@ -308,29 +315,48 @@ test('managed checks leave native camera cancellation and HLS errors to manual v
 test('managed navigation and close drain ordinary finite requests without waiting for camera or persistent transports', async () => {
   for (const action of ['navigation', 'context', 'browser']) {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-finite-requests-'));
-    const listeners = new Map(); let completed = false, closed = false;
+    const listeners = new Map(); let completed = false, closed = false, unmounts = 0;
+    const request = (pathname, type = 'fetch') => ({ url: () => 'http://192.168.0.28:8123' + pathname, resourceType: () => type });
+    const history = request('/api/history/period/2026-10-22'), asset = request('/marao_dashboard_static/MaraoHistoryChart.js', 'script');
     const browser = { close: async () => { completed = closed = true; } };
     const context = { addInitScript: () => assert.fail('No camera instrumentation'), browser: () => browser, close: async () => { completed = closed = true; } };
     const page = { on: (name, listener) => listeners.set(name, listener), isClosed: () => closed,
       url: () => 'http://192.168.0.28:8123/marao-dashboard/card-test', goto: async () => { completed = true; },
-      evaluate: () => assert.fail('No camera probe or forced teardown') };
-    const request = (pathname, type = 'fetch') => ({ url: () => 'http://192.168.0.28:8123' + pathname, resourceType: () => type });
+      evaluate: applicationTeardownEvaluator(() => { unmounts++; listeners.get('request')(asset); }) };
     try {
-      await managedCameraLedger(context, page, { output: directory, scenario: action, theme: 'light' });
-      const history = request('/api/history/period/2026-10-22'), asset = request('/marao_dashboard_static/MaraoHistoryChart.js', 'script');
+      const ledger = await managedCameraLedger(context, page, { output: directory, scenario: action, theme: 'light' });
       for (const item of [history, request('/api/hls/session/playlist.m3u8', 'xhr'), request('/api/camera_proxy_stream/camera.safe'), request('/api/websocket', 'websocket'), request('/events', 'eventsource')]) listeners.get('request')(item);
       const result = action === 'navigation' ? page.goto('/marao-dashboard-editor') : action === 'context' ? context.close() : browser.close();
       await new Promise(resolve => setImmediate(resolve));
+      assert.equal(unmounts, 1, 'Unmount the application before waiting so it cannot schedule further prefetch');
       assert.equal(completed, false, 'The test must leave in-flight history requests alive');
-      listeners.get('request')(asset);
       listeners.get('requestfinished')(history);
       await new Promise(resolve => setImmediate(resolve));
-      assert.equal(completed, false, 'Requests started during the drain must also finish');
+      assert.equal(completed, false, 'Requests started during unmount must also finish');
       listeners.get('requestfinished')(asset);
       await result;
       assert.equal(completed, true);
+      await ledger.stopForClose();
+      assert.equal(unmounts, 1, 'Repeated teardown must be harmless');
     } finally { fs.rmSync(directory, { recursive: true, force: true }); }
   }
+});
+
+test('managed teardown tolerates an initial empty document and never evaluates a closed page', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-empty-page-'));
+  let closed = false, evaluations = 0;
+  const browser = { close: async () => { closed = true; } };
+  const context = { browser: () => browser, close: async () => { closed = true; } };
+  const unmount = applicationTeardownEvaluator(() => assert.fail('An empty document has no HA application'), false);
+  const page = { on() {}, isClosed: () => closed, url: () => 'about:blank', goto: async () => {},
+    evaluate: async callback => { assert.equal(closed, false); evaluations++; return unmount(callback); } };
+  try {
+    const ledger = await managedCameraLedger(context, page, { output: directory, scenario: 'empty', theme: 'light' });
+    await page.goto('http://192.168.0.28:8123/marao-dashboard/card-test');
+    await context.close();
+    await ledger.stopForClose();
+    assert.equal(evaluations, 2);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
 test('a failed finite request during the navigation drain stays a raw blocking failure', async () => {
@@ -339,7 +365,7 @@ test('a failed finite request during the navigation drain stays a raw blocking f
   const browser = { close: async () => {} };
   const context = { addInitScript: () => assert.fail('No camera instrumentation'), browser: () => browser, close: async () => {} };
   const page = { on: (name, listener) => listeners.set(name, listener), isClosed: () => false,
-    url: () => 'http://192.168.0.28:8123/marao-dashboard/card-test', goto: async () => { navigated = true; } };
+    url: () => 'http://192.168.0.28:8123/marao-dashboard/card-test', goto: async () => { navigated = true; }, evaluate: applicationTeardownEvaluator() };
   try {
     await managedCameraLedger(context, page, { output: directory, scenario: 'failure', theme: 'light' });
     const request = { url: () => 'http://192.168.0.28:8123/api/history/period/2026-10-22', resourceType: () => 'fetch', failure: () => ({ errorText: 'net::ERR_CONNECTION_RESET' }), headers: () => ({}) };
