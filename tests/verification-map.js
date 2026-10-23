@@ -203,7 +203,7 @@ const rules = [
   [/^tests\/test-ha-scroll\.js$/, ['scroll']],
   [/^tests\/test-ha-navbar-overflow\.js$|^tests\/frontend\/navbar-overflow\.fixture\.json$/, ['navbar-overflow']],
   [/^tests\/test-ha-energy-format\.js$/, ['energy']],
-  [/^(AGENTS\.md|README\.md|docs\/|openspec\/|\.agents\/)/, ['docs']],
+  [/^(AGENTS\.md|README\.md|\.github\/CONTRIBUTING\.md|docs\/|openspec\/|\.agents\/)/, ['docs']],
   [/^tests\/frontend\/([^/]+)\.test\.js$/, 'test'],
   [/^tests\/components\/marao_dashboard\/(test_[^/]+)\.py$/, 'test'],
   [/^tests\/(verification|test-ha-|verify-|native-reconnect|mobile-devices|upgrade)|^ha-test\/(prepared-batch|upgrade)/, ['verification']],

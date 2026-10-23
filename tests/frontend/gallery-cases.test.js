@@ -366,11 +366,33 @@ test('value sliders have independent minimum, middle and maximum fixtures', () =
   const cases = concreteCases().filter((entry) => entry.sliderPercentage !== undefined);
   assert.equal(cases.length, 9);
   for (const example of cases) {
-    const controls = Object.entries(helpers.input_number).filter(([key]) => key.startsWith(`${example.entity.split('.')[1]}_control_`));
+    const domain = example.entity.split('.')[0];
+    const fixture = helpers.template.flatMap(block => block[domain] || []).find(entry => entry.default_entity_id === example.entity);
+    const field = { light: 'level', fan: 'percentage', cover: 'position' }[domain];
+    const controls = [...fixture[field].matchAll(/input_number\.([a-z0-9_]+)/g)];
     assert.equal(controls.length, 1, example.id);
+    const key = controls[0][1], control = helpers.input_number[key];
+    assert.ok(key.startsWith(`${example.entity.split('.')[1]}_control_`), example.id);
     const maximum = example.template === 'hc_light_card' ? 255 : 100;
-    assert.equal(controls[0][1].initial, Math.max(controls[0][1].min, Math.round(example.sliderPercentage * maximum / 100)), example.id);
-    assert.ok(controls[0][1].initial <= controls[0][1].max, example.id);
+    assert.equal(control.initial, Math.max(control.min, Math.round(example.sliderPercentage * maximum / 100)), example.id);
+    assert.ok(control.initial <= control.max, example.id);
+  }
+});
+
+test('brightness endpoints preserve independent light color defaults', () => {
+  const source = YAML.parse(fs.readFileSync(new URL('../../ha-test/marao_dashboard_card_test_helpers.yaml', import.meta.url), 'utf8'));
+  const defaults = { hue: 210, saturation: 77, temperature: 4300 };
+  for (const [name, value] of Object.entries(defaults)) source.input_number[`marao_dashboard_test_light_${name}`].initial = value;
+  const expanded = expandHelpers(source);
+  const seen = new Set();
+  for (const example of concreteCases().filter(entry => entry.template === 'hc_light_card' && entry.sliderPercentage !== undefined)) {
+    const fixture = expanded.template.flatMap(block => block.light || []).find(entry => entry.default_entity_id === example.entity);
+    const keys = [...`${fixture.hs} ${fixture.temperature}`.matchAll(/input_number\.([a-z0-9_]+)/g)].map(match => match[1]);
+    assert.equal(new Set(keys).size, 3, example.id);
+    assert.deepEqual(keys.map(key => expanded.input_number[key].initial), Object.values(defaults), example.id);
+    for (const key of keys) { assert.ok(!seen.has(key), `Shared color helper: ${key}`); seen.add(key); }
+    const brightness = fixture.level.match(/input_number\.([a-z0-9_]+)/)[1];
+    assert.equal(expanded.input_number[brightness].initial, Math.max(expanded.input_number[brightness].min, Math.round(example.sliderPercentage * 255 / 100)), example.id);
   }
 });
 

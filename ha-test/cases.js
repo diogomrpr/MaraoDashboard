@@ -249,6 +249,8 @@ function expandHelpers(source) {
     if (!original) throw new Error(`Case source lacks a fixture template: ${example.source}`);
     let serialized = JSON.stringify(original.value);
     const dependencies = [...new Set(serialized.match(/input_(?:boolean|number|select)\.marao_dashboard_test_[a-z0-9_]+/g) || [])];
+    const sliderField = { light: 'level', fan: 'percentage', cover: 'position' }[domain];
+    const sliderDependency = dependencies.find(dependency => original.value[sliderField]?.includes(dependency));
     for (const [index, dependency] of dependencies.entries()) {
       const [helperDomain, helperKey] = dependency.split('.');
       const replacementKey = `${key}_control_${index}`;
@@ -257,8 +259,9 @@ function expandHelpers(source) {
       if (helperDomain === 'input_boolean') value.initial = ['on', 'locked'].includes(example.state);
       if (helperDomain === 'input_number') {
         const number = Number(example.state);
-        value.initial = Number.isFinite(number) ? number : ['off', 'closed'].includes(example.state) ? value.min : Math.max(value.min, Math.min(value.max, helperKey.includes('brightness') ? 128 : 50));
-        if (example.sliderPercentage !== undefined) value.initial = Math.max(value.min, Math.min(value.max, Math.round(example.sliderPercentage * (helperKey.includes('brightness') ? 255 : 100) / 100)));
+        if (domain === 'light' && dependency !== sliderDependency) value.initial ??= value.min;
+        else value.initial = Number.isFinite(number) ? number : ['off', 'closed'].includes(example.state) ? value.min : Math.max(value.min, Math.min(value.max, helperKey.includes('brightness') ? 128 : 50));
+        if (example.sliderPercentage !== undefined && dependency === sliderDependency) value.initial = Math.max(value.min, Math.min(value.max, Math.round(example.sliderPercentage * (helperKey.includes('brightness') ? 255 : 100) / 100)));
       }
       if (helperDomain === 'input_select') {
         if (!value.options.includes(example.state)) value.options.push(example.state);
