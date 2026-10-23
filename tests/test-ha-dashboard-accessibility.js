@@ -1033,7 +1033,11 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
       }
       await sheet.evaluate((element) => element.scrollTo({ top: 0, behavior: "instant" }));
     }
-    await page.locator(".marao-popup-close").tap();
+    const closePopup = () => page.locator(".marao-popup-close").tap();
+    const cameraEntities = await sheet.locator('ha-camera-stream').evaluateAll(players => [...new Set(players.map(player => player.stateObj?.entity_id).filter(Boolean))]);
+    if (cameraEntities.length && page.__cameraRequestLedger) {
+      await page.__cameraRequestLedger.boundary('close inspected camera popup', closePopup, { terminal: false, entities: cameraEntities });
+    } else await closePopup();
     await sheet.waitFor({ state: "detached" });
     await page.waitForFunction(() => !location.hash);
     // Focus restoration waits for Home Assistant's native card slot to render.
