@@ -101,6 +101,7 @@ async function main() {
       await page.waitForFunction(() => document.querySelector('home-assistant').hass.states['alarm_control_panel.marao_dashboard_test_alarm'].state === 'disarmed');
       assert.equal(calls.length, count + 1, 'Completed hold must dispatch once');
       assert.equal(await code.inputValue(), '');
+      assert.equal(await controls.evaluate(card => card._actionError), '', 'The release after a completed hold must not activate a replacement button');
       await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-alarm.png'), scale: 'css' });
       await page.locator('.marao-popup-close').tap();
       assert.equal(await page.locator('[data-alarm-code]').count(), 0, 'Closed popup retained PIN input');

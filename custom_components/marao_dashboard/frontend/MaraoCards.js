@@ -1084,7 +1084,16 @@ export function fitNativeGrid(card, minimumWidth) {
 }
 
 export class MaraoCard extends BaseElement {
-  constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._hass = null; this._sliderTargets = new Map(); this._sliderGesture = null; this._graphHistory = new Map(); this._graphRequests = new Map(); this._graphErrors = new Set(); this._holdTimer = null; this._holdFrame = null; this._holdActive = false; this._holdCompleted = false; }
+  constructor() {
+    super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._hass = null; this._sliderTargets = new Map(); this._sliderGesture = null; this._graphHistory = new Map(); this._graphRequests = new Map(); this._graphErrors = new Set(); this._holdTimer = null; this._holdFrame = null; this._holdActive = false; this._holdCompleted = false;
+    // A completed hold can replace its button before the native click arrives.
+    for (const type of ['pointerdown', 'keydown']) this.shadowRoot?.addEventListener?.(type, () => { this._suppressHoldClick = false; }, true);
+    this.shadowRoot?.addEventListener?.('click', event => {
+      if (!this._suppressHoldClick) return;
+      this._suppressHoldClick = false;
+      event.preventDefault(); event.stopImmediatePropagation();
+    }, true);
+  }
   get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
   set preview(value) {
     this._preview = Boolean(value);
@@ -2023,6 +2032,7 @@ export class MaraoCard extends BaseElement {
         globalThis.cancelAnimationFrame?.(this._holdFrame);
         this._holdFrame = null;
         this._setHoldProgress(100);
+        this._suppressHoldClick = true;
         run();
       }, duration);
       if (duration === LIGHT_COLOR_HOLD_MS) {
