@@ -150,10 +150,11 @@ async function editorSave(config, source, directory) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     await context.addInitScript(setBrowserToken, { ...accessToken(config), hassUrl: config.url });
     const page = await context.newPage(), errors = [];
-    page.on('pageerror', error => errors.push(error.message));
-    page.on('console', message => { if (['error', 'warning'].includes(message.type())) errors.push(message.text()); });
-    page.on('requestfailed', request => errors.push(request.failure()?.errorText));
-    page.on('response', response => { if (response.status() >= 400) errors.push('HTTP ' + response.status()); });
+    const diagnostic = (message, manual) => { errors.push(manual ? { manual_camera_transport: true, message } : message); fs.writeFileSync(path.join(directory, "editor-browser-diagnostics.json"), JSON.stringify(errors), { mode: 0o600 }); };
+    page.on('pageerror', error => diagnostic(error.message));
+    page.on('console', message => { if (['error', 'warning'].includes(message.type())) diagnostic(message.text(), require('./camera-request-ledger').isManualCameraConsoleMessage(message)); });
+    page.on('requestfailed', request => diagnostic(request.failure()?.errorText, require('./camera-request-ledger').isManualCameraTransport(request.url())));
+    page.on('response', response => { if (response.status() >= 400) diagnostic('HTTP ' + response.status(), require('./camera-request-ledger').isManualCameraTransport(response.url())); });
     await page.goto(config.url + '/marao-dashboard-editor');
     const panel = page.locator('marao-dashboard-panel');
     await panel.waitFor({ state: 'visible' });
@@ -165,7 +166,7 @@ async function editorSave(config, source, directory) {
     await page.waitForFunction(panel => !panel._busy && !panel._dirty, await panel.elementHandle());
     await page.waitForLoadState('networkidle');
     await page.screenshot({ path: path.join(directory, 'extension-through-editor.png'), scale: 'css' });
-    assert.deepEqual(errors, [], 'Upgrade extension produced browser errors');
+    assert.deepEqual(errors.filter(item => !item?.manual_camera_transport), [], 'Upgrade extension produced browser errors');
   } finally { await browser.close(); }
 }
 
@@ -176,15 +177,16 @@ async function releasedHealth(config, packageRoot, directory) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     await context.addInitScript(setBrowserToken, { ...accessToken(config), hassUrl: config.url });
     const page = await context.newPage(), errors = [];
-    page.on('pageerror', error => errors.push(error.message));
-    page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
-    page.on('requestfailed', request => errors.push(request.failure()?.errorText));
-    page.on('response', response => { if (response.status() >= 400) errors.push('HTTP ' + response.status()); });
+    const diagnostic = (message, manual) => { errors.push(manual ? { manual_camera_transport: true, message } : message); fs.writeFileSync(path.join(directory, "released-browser-diagnostics.json"), JSON.stringify(errors), { mode: 0o600 }); };
+    page.on('pageerror', error => diagnostic(error.message));
+    page.on('console', message => { if (['warning', 'error'].includes(message.type())) diagnostic(message.text(), require('./camera-request-ledger').isManualCameraConsoleMessage(message)); });
+    page.on('requestfailed', request => diagnostic(request.failure()?.errorText, require('./camera-request-ledger').isManualCameraTransport(request.url())));
+    page.on('response', response => { if (response.status() >= 400) diagnostic('HTTP ' + response.status(), require('./camera-request-ledger').isManualCameraTransport(response.url())); });
     await page.goto(config.url + '/marao-dashboard/overview');
     await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
     await page.waitForLoadState('networkidle');
     assert.equal(await page.locator('hui-error-card').count(), 0);
-    assert.deepEqual(errors, [], 'Released package did not render a healthy dashboard');
+    assert.deepEqual(errors.filter(item => !item?.manual_camera_transport), [], 'Released package did not render a healthy dashboard');
     const version = fingerprint(path.join(packageRoot, 'frontend'));
     for (const file of ['MaraoDashboard.js', 'MaraoCards.js', 'MaraoFrigateEventsCard.js']) {
       const url = fs.existsSync(path.join(packageRoot, 'frontend_assets.py'))

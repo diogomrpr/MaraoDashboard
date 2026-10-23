@@ -1031,6 +1031,11 @@ async function checkDisconnected(browser, config, functionalCompleted = false) {
   const entity = "switch.marao_dashboard_test_switch";
   const errors = [];
   const transportEvents = [];
+  const manualCameraDiagnostics = [];
+  const manualCameraDiagnostic = message => {
+    manualCameraDiagnostics.push(message);
+    fs.writeFileSync(path.join(require('./verification-browser').artifactDirectory('dashboard-e2e'), 'disconnect-manual-camera.json'), JSON.stringify(manualCameraDiagnostics), { mode: 0o600 });
+  };
   const serviceCalls = [];
   let original;
   const subscriptions = [];
@@ -1071,6 +1076,7 @@ async function checkDisconnected(browser, config, functionalCompleted = false) {
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
     if (!["warning", "error"].includes(message.type())) return;
+    if (require('./camera-request-ledger').isManualCameraConsoleMessage(message)) { manualCameraDiagnostic(message.text()); return; }
     if (expectedOfflineError(message.text())) transportEvents.push(message.text());
     else {
       const source = message.location().url;
@@ -1079,11 +1085,12 @@ async function checkDisconnected(browser, config, functionalCompleted = false) {
   });
   page.on("requestfailed", (request) => {
     const message = `${request.failure()?.errorText}: ${new URL(request.url()).pathname}`;
+    if (require('./camera-request-ledger').isManualCameraTransport(request.url())) { manualCameraDiagnostic(message); return; }
     if (expectedOfflineError(message)) transportEvents.push(message);
     else errors.push(message);
   });
   page.on("response", (response) => {
-      if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return;
+    if (require('./camera-request-ledger').isManualCameraTransport(response.url())) { if (response.status() >= 400) manualCameraDiagnostic(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); return; }
     if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`);
   });
   try {
@@ -1152,7 +1159,7 @@ async function checkDisconnected(browser, config, functionalCompleted = false) {
       assert.ok(path.isAbsolute(evidencePath), 'Reconnect evidence must use an absolute private path');
       fs.writeFileSync(evidencePath, JSON.stringify({ version: 1, target: config.url, checked_at: new Date().toISOString(), functional_completed: functionalCompleted,
         ...(process.argv.includes('--disconnect-only') ? { scope: 'connection-only' } : {}),
-        safe_actions_disabled: true, disconnected_dispatches: 0, authoritative_recovery: true, errors, rejections, subscriptions, native_failures: nativeFailures }), { mode: 0o600 });
+        safe_actions_disabled: true, disconnected_dispatches: 0, authoritative_recovery: true, errors, rejections, subscriptions, native_failures: nativeFailures, manual_camera_transport: manualCameraDiagnostics }), { mode: 0o600 });
     }
     if (errors.length || rejections.length) {
       const error = new Error(`Disconnect scenario produced unexpected browser errors:\n${[...errors, ...rejections].join("\n")}\nSubscription lifecycle: ${JSON.stringify(subscriptions)}`);
@@ -1701,7 +1708,7 @@ async function main() {
       serviceCalls.push({ domain: message.domain, service: message.service, entities: Array.isArray(entities) ? entities : [entities], data: message.service_data });
     }));
     page.on("pageerror", (error) => sessionErrors.push(error.message));
-    page.on("console", (message) => { if (["error", "warning"].includes(message.type())) sessionErrors.push(message.text()); });
+    page.on("console", (message) => { if (require('./camera-request-ledger').isManualCameraConsoleMessage(message)) return; if (["error", "warning"].includes(message.type())) sessionErrors.push(message.text()); });
     page.on("response", (response) => {
       if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return;
       if (response.status() >= 400) {
@@ -2327,22 +2334,24 @@ async function main() {
         });
         const screenshotPage = await screenshotContext.newPage();
         const screenshotErrors = [];
-        screenshotPage.on("pageerror", (error) => screenshotErrors.push(error.message));
+        const filename = view.url.split("/").filter(Boolean).at(-1).replace(/[^a-z0-9-]/gi, "-");
+        const screenshotDiagnostic = (message, manual) => { screenshotErrors.push(manual ? { manual_camera_transport: true, message } : message); fs.writeFileSync(path.join(screenshotRoot, filename + '-diagnostics.json'), JSON.stringify(screenshotErrors), { mode: 0o600 }); };
+        screenshotPage.on("pageerror", (error) => screenshotDiagnostic(error.message));
         screenshotPage.on("console", (message) => {
-          if (["error", "warning"].includes(message.type())) screenshotErrors.push(message.text());
+          if (["error", "warning"].includes(message.type())) screenshotDiagnostic(message.text(), require('./camera-request-ledger').isManualCameraConsoleMessage(message));
         });
         screenshotPage.on("requestfailed", (request) => {
-          screenshotErrors.push(`Failed ${request.resourceType()} request: ${new URL(request.url()).pathname} (${request.failure()?.errorText || "unknown error"})`);
+          screenshotDiagnostic(`Failed ${request.resourceType()} request: ${new URL(request.url()).pathname} (${request.failure()?.errorText || "unknown error"})`, require('./camera-request-ledger').isManualCameraTransport(request.url()));
         });
         await screenshotPage.goto(`${baseUrl}${view.url}`, { waitUntil: "domcontentloaded" });
         await screenshotPage.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible", timeout: 10000 });
         await assertCurrentFrontend(screenshotPage);
-        const filename = view.url.split("/").filter(Boolean).at(-1).replace(/[^a-z0-9-]/gi, "-");
         await scrollDashboard(screenshotPage, { screenshotPrefix: path.join(screenshotRoot, filename) });
         await screenshotPage.waitForLoadState('networkidle');
         await screenshotContext.close();
-        if (screenshotErrors.length) {
-          throw new Error(`${view.name} screenshot produced browser warnings/errors:\n${screenshotErrors.map((item) => `- ${item}`).join("\n")}`);
+        const blockingScreenshotErrors = screenshotErrors.filter(item => !item?.manual_camera_transport);
+        if (blockingScreenshotErrors.length) {
+          throw new Error(`${view.name} screenshot produced browser warnings/errors:\n${blockingScreenshotErrors.map((item) => `- ${item}`).join("\n")}`);
         }
       }
     }

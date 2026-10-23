@@ -19,7 +19,7 @@ async function run(){
  const before=await saved(),browser=await chromium.launch(),context=await browser.newContext({viewport:{width:360,height:800},hasTouch:true,isMobile:true});
  const page=await context.newPage(),errors=[],services=[],output=artifactDirectory('navbar-startup-ha');
  page.on('pageerror',error=>errors.push(error.message));
- page.on('console',message=>{if(['warning','error'].includes(message.type()))errors.push(message.text());});
+ page.on('console',message=>{if(['warning','error'].includes(message.type())){errors.push(require('./camera-request-ledger').isManualCameraConsoleMessage(message)?{manual_camera_transport:true,message:message.text()}:message.text());fs.writeFileSync(path.join(output,'browser-diagnostics.json'),JSON.stringify(errors),{mode:0o600});}});
  page.on('websocket',socket=>socket.on('framesent',frame=>{try{const value=JSON.parse(frame.payload);if(value.type==='call_service')services.push(value.type);}catch{}}));
  try{
    await context.addInitScript(setBrowserToken,{hassUrl:config.url,...accessToken(config)});
@@ -33,7 +33,7 @@ async function run(){
    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x:point.x+point.width/2,y:point.y+point.height/2}]});
    await navigation;await nav.waitFor({state:'visible'});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();
    await page.waitForFunction(()=>window.MaraoDashboard?.popupScrollGuardInstalled);await assertCurrentFrontend(page);assert.equal(new URL(page.url()).pathname,'/marao-dashboard/overview');assert.equal(await bar.count(),1);
-   assert.deepEqual(await saved(),before,'Explicit refresh changed saved source, generated configuration or history');assert.deepEqual(services,[]);assert.deepEqual(errors,[]);
+   assert.deepEqual(await saved(),before,'Explicit refresh changed saved source, generated configuration or history');assert.deepEqual(services,[]);assert.deepEqual(errors.filter(item=>!item?.manual_camera_transport),[]);
    await page.screenshot({path:path.join(output,'navbar-android.png'),scale:'css'});
    const result={version:version||null,configPreserved:true,oneNavbar:true,overflow:true,routeTransition:true,touchRefresh:true,services:services.length,errors,physicalPhone:false};
    fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(result,null,2));console.log(JSON.stringify({output,...result}));

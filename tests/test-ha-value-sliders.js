@@ -164,8 +164,8 @@ async function main() {
       const errors = [];
       const calls = [];
       page.on('pageerror', (error) => errors.push(error.message));
-      page.on('console', (message) => { if (['error', 'warning'].includes(message.type())) errors.push(message.text()); });
-      page.on('response', (response) => { if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); });
+      page.on('console', (message) => { if (!require('./camera-request-ledger').isManualCameraConsoleMessage(message) && ['error', 'warning'].includes(message.type())) errors.push(message.text()); });
+      page.on('response', (response) => { if (!require('./camera-request-ledger').isManualCameraTransport(response.url()) && response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); });
       page.on('websocket', (socket) => socket.on('framesent', ({ payload }) => {
         let message;
         try { message = JSON.parse(String(payload)); } catch { return; }

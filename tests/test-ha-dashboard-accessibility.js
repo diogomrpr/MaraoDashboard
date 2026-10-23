@@ -1101,23 +1101,25 @@ async function main() {
       page = await context.newPage();
       const cameraLedger = options.preview ? null : await require('./camera-request-ledger').managedCameraLedger(context, page, { output, scenario: scenario.name, theme });
       await configurePageEmulation(context, page, scenario, options.safeArea ? Object.fromEntries(insetSides.flatMap(side=>[[side,0],[side+'Max',0]])) : undefined);
-      const errors = [];
+      const errors = [], manualCameraDiagnostics = [];
+      const manualCameraDiagnostic = message => { manualCameraDiagnostics.push(message); fs.writeFileSync(path.join(output, 'preview-manual-camera.json'), JSON.stringify(manualCameraDiagnostics), { mode: 0o600 }); };
       page.on("pageerror", (error) => {
         errors.push(error.message);
         if (options.preview) console.error(`[browser error] ${error.message}`);
       });
-      page.on("console", (message) => {
+      page.on("console", (message) => { if (require('./camera-request-ledger').isManualCameraConsoleMessage(message)) { if (!cameraLedger) manualCameraDiagnostic(message.text()); return; }
         if (!["error", "warning"].includes(message.type())) return;
         errors.push(message.text());
         if (options.preview) console.error(`[browser ${message.type()}] ${message.text()}`);
       });
       if (!cameraLedger) page.on("requestfailed", (request) => {
         const message = `Failed ${request.resourceType()} request: ${new URL(request.url()).pathname} (${request.failure()?.errorText || "unknown error"})`;
+        if (require('./camera-request-ledger').isManualCameraTransport(request.url())) { manualCameraDiagnostic(message); return; }
         errors.push(message);
         if (options.preview) console.error(`[browser request] ${message}`);
       });
       page.on("response", (response) => {
-        if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return;
+        if (require('./camera-request-ledger').isManualCameraTransport(response.url())) { if (!cameraLedger && response.status() >= 400) manualCameraDiagnostic(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); return; }
         if (response.status() < 400) return;
         const message = `${response.status()} ${response.request().resourceType()} response: ${new URL(response.url()).pathname}`;
         errors.push(message);

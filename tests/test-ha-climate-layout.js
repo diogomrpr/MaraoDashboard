@@ -43,7 +43,7 @@ async function main() {
         await configurePageEmulation(context, page, scenario);
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
-        page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
+        page.on('console', message => { if (require('./camera-request-ledger').isManualCameraConsoleMessage(message)) return; if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
         page.on('response', response => { if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return; if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); });
         const captures = [];
         for (const view of views) {

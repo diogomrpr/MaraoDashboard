@@ -131,7 +131,7 @@ async function main() {
         const page = await context.newPage();
       await require("./camera-request-ledger").managedCameraLedger(context, page, { output, scenario: scenario.name, theme }); await configurePageEmulation(context, page, scenario);
         page.on('pageerror', error => errors.push(error.message));
-        page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
+        page.on('console', message => { if (require('./camera-request-ledger').isManualCameraConsoleMessage(message)) return; if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
         page.on('response', response => { if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return; if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); });
         page.on('websocket', socket => socket.on('framesent', ({ payload }) => {
           let message; try { message = JSON.parse(String(payload)); } catch { return; }

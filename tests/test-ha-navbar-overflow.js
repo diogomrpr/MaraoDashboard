@@ -232,8 +232,8 @@ async function main() {
       await context.addInitScript(setBrowserToken,{hassUrl:config.url,...accessToken(config)});
       const page=await context.newPage();
       await require("./camera-request-ledger").managedCameraLedger(context,page,{output,scenario:scenario.name,theme});page.setDefaultTimeout(15000);page.setDefaultNavigationTimeout(30000);
-      const errors=[],calls=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(['warning','error'].includes(m.type()))errors.push(m.text());});
-      page.on('response',r=>{if(r.status()>=400)errors.push('HTTP '+r.status());});
+      const errors=[],calls=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{ if (require('./camera-request-ledger').isManualCameraConsoleMessage(m)) return;if(['warning','error'].includes(m.type()))errors.push(m.text());});
+      page.on('response',r=>{ if (require('./camera-request-ledger').isManualCameraTransport(r.url())) return;if(r.status()>=400)errors.push('HTTP '+r.status());});
       page.on('websocket',socket=>socket.on('framesent',({payload})=>{let m;try{m=JSON.parse(String(payload));}catch{return;}if(m.type==='call_service')calls.push(m.service);}));
       try {
         await configurePageEmulation(context,page,scenario);

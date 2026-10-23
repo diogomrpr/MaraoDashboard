@@ -6,10 +6,20 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-const { classifyCameraCancellations, installTrace, managedCameraLedger, sameDocumentHashNavigation } = createRequire(import.meta.url)('../camera-request-ledger');
+const { classifyCameraCancellations, installTrace, managedCameraLedger, sameDocumentHashNavigation, isManualCameraConsoleMessage } = createRequire(import.meta.url)('../camera-request-ledger');
 const url = 'http://192.168.0.28:8123/api/hls/fake-session/playlist.m3u8?_HLS_msn=8';
 const stack = 'Error\n at Hls.destroy (http://192.168.0.28:8123/frontend_latest/native-hls.js:12:34)';
 const entity = 'camera.marao_dashboard_test_camera';
+
+test('manual camera console exclusion requires an exact camera transport source', () => {
+  const message = url => ({ location: () => ({ url }), text: () => 'Failed to load resource: 400' });
+  assert.equal(isManualCameraConsoleMessage(message(url)), true);
+  assert.equal(isManualCameraConsoleMessage(message('http://192.168.0.28:8123/api/camera_proxy_stream/camera.safe')), true);
+  for (const source of ['', 'http://192.168.0.28:8123/api/history/period/now', 'http://192.168.0.28:8123/frontend_latest/app.js']) {
+    assert.equal(isManualCameraConsoleMessage(message(source)), false);
+  }
+  assert.equal(isManualCameraConsoleMessage({}), false);
+});
 const fixture = () => ({ failures: [{ document: 'first-document', url, xhr: 1, type: 'xhr', error: 'net::ERR_ABORTED', started: 100, date: 200 }],
   trace: { document: 'first-document', sessions: [{ entity, prefix: 'http://192.168.0.28:8123/api/hls/fake-session/' }], stops: [], events: [
     { kind: 'send', id: 1, url, date: 100, stack },

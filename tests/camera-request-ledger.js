@@ -358,6 +358,10 @@ function isManualCameraTransport(url) {
   catch { return false; }
 }
 
+function isManualCameraConsoleMessage(message) {
+  return isManualCameraTransport(message.location?.().url);
+}
+
 async function cameraRequestLedger(context, { output, scenario, theme, manualTransport = false }) {
   if (!manualTransport) await context.addInitScript(installTrace, { subscriptions: process.env.MARAO_CAMERA_SUBSCRIPTION_DIAGNOSTIC === '1', entities: SAFE_ENTITIES });
   let page, sequence = 0, lastTrace, stoppedForClose = false; const failures = [], manualResponses = [], starts = new WeakMap(), documents = new Map(), pending = new Map();
@@ -512,4 +516,4 @@ async function managedCameraLedger(context, page, options) {
   return ledger;
 }
 
-module.exports = { isManualCameraTransport, cameraRequestLedger, managedCameraLedger, sameDocumentHashNavigation, classifyCameraCancellations, installTrace };
+module.exports = { isManualCameraTransport, isManualCameraConsoleMessage, cameraRequestLedger, managedCameraLedger, sameDocumentHashNavigation, classifyCameraCancellations, installTrace };

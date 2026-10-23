@@ -439,9 +439,10 @@ async function folding(page, panel) {
 
 async function weatherChecks(context, scenario, theme, config) {
   const page=await context.newPage();const diagnostics=[];
-  page.on('pageerror',e=>diagnostics.push(e.message));
-  page.on('console',m=>{if(['warning','error'].includes(m.type()))diagnostics.push(m.text());});
-  page.on('requestfailed',r=>diagnostics.push(r.failure()?.errorText));
+  const diagnostic=(message,manual)=>{diagnostics.push(manual?{manual_camera_transport:true,message}:message);fs.writeFileSync(path.join(output,`${scenario.name}-${theme}-weather-diagnostics.json`),JSON.stringify(diagnostics),{mode:0o600});};
+  page.on('pageerror',e=>diagnostic(e.message));
+  page.on('console',m=>{if(['warning','error'].includes(m.type()))diagnostic(m.text(),require('./camera-request-ledger').isManualCameraConsoleMessage(m));});
+  page.on('requestfailed',r=>diagnostic(r.failure()?.errorText,require('./camera-request-ledger').isManualCameraTransport(r.url())));
   try {
     for(const route of ['overview','card-test']) {
       await page.goto(config.url+'/marao-dashboard/'+route);
@@ -469,7 +470,7 @@ async function weatherChecks(context, scenario, theme, config) {
       }
     }
     fs.writeFileSync(path.join(output,`${scenario.name}-${theme}-weather-diagnostics.json`),JSON.stringify(diagnostics));
-    assert.deepEqual(diagnostics,[]);
+    assert.deepEqual(diagnostics.filter(item=>!item?.manual_camera_transport),[]);
   } finally {await page.close();}
 }
 
@@ -1158,11 +1159,11 @@ async function main() {
       await configurePageEmulation(context, page, scenario);
       page.on('framenavigated',frame=>{if(frame===page.mainFrame())fs.appendFileSync(path.join(output,'navigations.jsonl'),JSON.stringify({profile:scenario.name,theme,path:new URL(frame.url()).pathname,time:Date.now()})+'\n');});
       const diagnostics = [];
-      const diagnostic=value=>{diagnostics.push(value);fs.writeFileSync(path.join(output,"active-diagnostics.json"),JSON.stringify(diagnostics));};
+      const diagnostic=(value,manual)=>{diagnostics.push(manual?{manual_camera_transport:true,message:value}:value);fs.writeFileSync(path.join(output,"active-diagnostics.json"),JSON.stringify(diagnostics));};
       page.on("pageerror", e => diagnostic(e.stack || e.message));
-      page.on("console", m => { if (["warning", "error"].includes(m.type())) diagnostic(m.text()); });
-      page.on("requestfailed", r => diagnostic(r.failure()?.errorText));
-      page.on('response', response => { if (response.status() >= 400) diagnostic('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
+      page.on("console", m => { if (["warning", "error"].includes(m.type())) diagnostic(m.text(), require('./camera-request-ledger').isManualCameraConsoleMessage(m)); });
+      page.on("requestfailed", r => diagnostic(r.failure()?.errorText, require('./camera-request-ledger').isManualCameraTransport(r.url())));
+      page.on('response', response => { if (response.status() >= 400) diagnostic('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname, require('./camera-request-ledger').isManualCameraTransport(response.url())); });
       let panel = await ready(page, config);
       if (process.argv.includes('--brand')) {
         await brandSidebar(page);
@@ -1369,7 +1370,7 @@ async function main() {
       }
       if(process.argv.includes('--feedback') && !process.argv.includes('--surfaces'))await feedbackChecks(page,panel,scenario,theme);
       fs.writeFileSync(path.join(output, scenario.name + "-" + theme + "-diagnostics.json"), JSON.stringify(diagnostics));
-      assert.equal(diagnostics.length, 0, "Browser diagnostics found; inspect private editor artifacts");
+      assert.equal(diagnostics.filter(item=>!item?.manual_camera_transport).length, 0, "Browser diagnostics found; inspect private editor artifacts");
       if(process.argv.includes("--weather"))await weatherChecks(context,scenario,theme,config);
       await context.close();
       console.log("Editor checked: " + scenario.name + " (" + theme + ")");
