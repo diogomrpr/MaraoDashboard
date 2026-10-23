@@ -302,13 +302,22 @@ if (!frontendConstants.match(/MARAO_DASHBOARD_MODULES\s*=\s*\(\s*MARAO_DASHBOARD
 }
 for (const expected of [
   'customElements?.get("home-assistant")',
+  "await waitForHomeAssistantRegistry();",
   "registerMaraoCards();",
-  "registerMaraoCameraEventCards();",
+  'import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`).then(module => module.registerMaraoCameraEventCards())',
 ]) {
   if (!frontendSource.includes(expected)) {
     hasError = true;
     console.error(`Marao dashboard bootstrap must wait for Home Assistant and retry card registration: ${expected}`);
   }
+}
+const registryReady = frontendSource.indexOf("await waitForHomeAssistantRegistry();");
+const cardsImport = frontendSource.indexOf("const cardsModule = await import(");
+const cardsRegistration = frontendSource.indexOf("registerMaraoCards();");
+const eventsRegistration = frontendSource.indexOf("module.registerMaraoCameraEventCards()");
+if (!(registryReady >= 0 && registryReady < cardsImport && cardsImport < cardsRegistration && cardsRegistration < eventsRegistration)) {
+  hasError = true;
+  console.error("Marao must wait for Home Assistant before loading cards, then retry optional event registration after its import resolves.");
 }
 
 if (fs.existsSync(path.join(repoRoot, "custom_components/marao_dashboard/strings.json"))) {
