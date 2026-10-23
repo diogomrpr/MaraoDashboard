@@ -110,7 +110,21 @@ test('visual preferences wait for native card rendering and reach late mounts', 
   };
   globalThis.document = { documentElement: html, fonts: { ready: Promise.resolve() } };
   let sessions = 0;
-  const page = { evaluate: async (callback, data) => callback(data), waitForLoadState: async state => {
+  const page = { waitForFunction: async (callback, unused, options) => {
+    assert.equal(options.timeout, 20000);
+    const previousRegistry = globalThis.customElements;
+    let registered = false;
+    const error = { localName: 'hui-error-card', config: { message: "Custom element doesn't exist: marao-native-light-card." }, children: [] };
+    globalThis.customElements = { get: () => registered };
+    document.querySelector = () => ha; shadow.children.push(error);
+    try {
+      assert.equal(callback(), false, 'Navbar readiness cannot substitute for content registration');
+      registered = true; assert.equal(callback(), false, 'Wait for HA to rebuild its transient registration error');
+      error.config.message = 'Invalid card configuration';
+      assert.equal(callback(), true, 'Persistent configuration errors must reach the layout assertion');
+      shadow.children.pop(); assert.equal(callback(), true);
+    } finally { globalThis.customElements = previousRegistry; delete document.querySelector; }
+  }, evaluate: async (callback, data) => callback(data), waitForLoadState: async state => {
     assert.equal(state, 'domcontentloaded'); shadow.children = [native];
   }, waitForTimeout: async () => {},
     context: () => ({ newCDPSession: async () => { sessions += 1; return { send: async (method, params) => emulation.push({ method, params }) }; } }) };
@@ -143,7 +157,7 @@ test('readiness waits for finite dialog animation without waiting for continuous
   const previous = { document: globalThis.document, requestAnimationFrame: globalThis.requestAnimationFrame };
   globalThis.document = { documentElement: html, fonts: { ready: Promise.resolve() } };
   globalThis.requestAnimationFrame = callback => queueMicrotask(callback);
-  const page = { evaluate: async (callback, data) => callback(data), waitForLoadState: async () => {},
+  const page = { waitForFunction: async callback => assert.equal(callback(), true), evaluate: async (callback, data) => callback(data), waitForLoadState: async () => {},
     context: () => ({ newCDPSession: async () => ({ send: async () => {} }) }) };
   try { await applyVisualPreferences(page, scenarios.find(s => s.name === 'iphone-normal'), 'light'); assert.equal(height, 48); }
   finally { Object.assign(globalThis, previous); }
@@ -198,7 +212,7 @@ test('WebKit visual readiness applies normal shipped typography without CDP or s
   globalThis.document = { documentElement: html, fonts: { ready: Promise.resolve() } };
   globalThis.requestAnimationFrame = callback => queueMicrotask(callback);
   const context = { browser: () => ({ browserType: () => ({ name: () => 'webkit' }) }), newCDPSession: () => assert.fail('WebKit visual readiness must not use CDP') };
-  const page = { context: () => context, evaluate: async (callback, data) => callback(data), waitForLoadState: async () => {} };
+  const page = { waitForFunction: async callback => assert.equal(callback(), true), context: () => context, evaluate: async (callback, data) => callback(data), waitForLoadState: async () => {} };
   try {
     await applyVisualPreferences(page, scenarios.find(value => value.name === 'iphone-normal'), 'dark');
     assert.equal(values.get('--font-size-primary'), '18px');

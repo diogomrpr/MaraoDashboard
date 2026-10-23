@@ -396,7 +396,17 @@ function visualVariablesForScenario(scenario, theme) {
 
 async function applyVisualPreferences(page, scenario, theme, subtree) {
   const engine = emulationEngine(page.context(), scenario);
-  if (!subtree) await page.waitForLoadState("domcontentloaded");
+  if (!subtree) {
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForFunction(() => {
+      if (!document.querySelector?.('home-assistant')) return true;
+      if (!customElements.get('marao-native-base-card')) return false;
+      const pending = root => [...(root?.children || [])].some(element =>
+        element.localName === 'hui-error-card' && /^Custom element doesn't exist: marao-/.test(element.config?.message || '')
+        || pending(element.shadowRoot) || pending(element));
+      return !pending(document.documentElement);
+    }, undefined, { timeout: 20000 });
+  }
   const variables = visualVariablesForScenario(scenario, theme);
   if (engine === 'webkit') for (const key of Object.keys(variables)) if (key.startsWith('--marao-safe-area-inset-')) delete variables[key];
   const apply = settle => page.evaluate(async ({ cssVariables, profile, mode, subtree, settle }) => {
@@ -545,6 +555,7 @@ async function emulationIssues(page, scenario, theme) {
 async function layoutIssues(page, families = [], subtree) {
   const issues = await page.evaluate(({ families, subtree }) => {
     const issues = [];
+    const visible = element => getComputedStyle(element).visibility !== 'hidden' && element.getClientRects().length > 0;
     const intersects = (a, b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
     const context = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
     const rgba = (color) => {
@@ -565,9 +576,9 @@ async function layoutIssues(page, families = [], subtree) {
           || element.localName?.startsWith("marao-")
           || element.classList?.contains("marao-popup-overlay");
         if (element.localName === "hui-error-card" || element.localName === "hui-warning") {
-          issues.push(`${element.localName}: ${element.textContent?.trim() || "rendered without details"}`);
+          issues.push(`${element.localName}: ${element.config?.message || element.textContent?.trim() || "rendered without details"}`);
         }
-        if (owned && element.matches?.('.message.error,.problem span,.reading.neutral dt,.reading.neutral dd,[data-problem]:not([data-problem="loading"]) .message,[data-problem]:not([data-problem="loading"]) .status,[data-problem]:not([data-problem="loading"]) .empty')) {
+        if (owned && visible(element) && element.matches?.('.message.error,.problem span,.reading.neutral dt,.reading.neutral dd,[data-problem]:not([data-problem="loading"]) .message,[data-problem]:not([data-problem="loading"]) .status,[data-problem]:not([data-problem="loading"]) .empty')) {
           let background;
           let opacity = 1;
           for (let ancestor = element; ancestor; ancestor = ancestor.parentElement || ancestor.getRootNode()?.host) {
@@ -588,7 +599,7 @@ async function layoutIssues(page, families = [], subtree) {
           const body = element.shadowRoot?.querySelector(".body,.alarm-body");
           const card = element.shadowRoot?.querySelector("ha-card");
           if (body && body.scrollWidth > body.clientWidth + 1) issues.push(`${element._config?.name || element._config?.entity || "card"}: horizontal overflow`);
-          const labels = [...(element.shadowRoot?.querySelectorAll(".title,.state,.climate") || [])];
+          const labels = [...(element.shadowRoot?.querySelectorAll(".title,.state,.climate") || [])].filter(visible);
           const controls = [...(element.shadowRoot?.querySelectorAll(".icon,.number-stepper") || [])];
           for (const label of labels) for (const control of controls) {
             if (intersects(label.getBoundingClientRect(), control.getBoundingClientRect())) issues.push(`${element._config?.name || element._config?.entity || "card"}: text overlaps control`);
@@ -604,7 +615,7 @@ async function layoutIssues(page, families = [], subtree) {
             if (links.slice(index + 1).some((other) => intersects(link, other))) issues.push("navbar touch targets overlap");
           }
         }
-        if (owned && element.matches?.('[data-history-retry],[data-graph-retry],[data-media-retry],.surface > .problem[role="status"],[data-alarm-action],[data-alarm-code],.alarm-body label')) {
+        if (owned && visible(element) && element.matches?.('[data-history-retry],[data-graph-retry],[data-media-retry],.surface > .problem[role="status"],[data-alarm-action],[data-alarm-code],.alarm-body label')) {
           const probe = document.createElement('span');
           probe.style.cssText = 'font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500)';
           element.parentElement.append(probe);
@@ -658,8 +669,12 @@ async function layoutIssues(page, families = [], subtree) {
             }
           }
         }
-        if (owned && element.matches?.(".title,.state,.climate,.current-temperature,.number-value,.value,.empty,h1,h2,.message,.climate-mode,.legend span,.meta strong,.detail-meta strong,.reading dt,.reading dd,.header-date,.media-summary,.alarm-body label,[data-alarm-action]:not(:disabled)")) {
-          if (element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1) {
+        if (owned && visible(element) && element.matches?.(".title,.state,.climate,.current-temperature,.number-value,.value,.empty,h1,h2,.message,.climate-mode,.legend span,.meta strong,.detail-meta strong,.reading dt,.reading dd,.header-date,.media-summary,.alarm-body label,[data-alarm-action]:not(:disabled)")) {
+          const style = getComputedStyle(element);
+          const secondary = element.matches('.state,.climate:not(.current-temperature),.reading dt,.reading dd');
+          const ellipsis = secondary && style.overflow === 'hidden' && style.textOverflow === 'ellipsis';
+          const clampedCaption = element.matches('.reading dt') && style.overflow === 'hidden' && style.webkitLineClamp === '2';
+          if ((!ellipsis && element.scrollWidth > element.clientWidth + 1) || (!clampedCaption && element.scrollHeight > element.clientHeight + 1)) {
             issues.push(`${element.textContent?.trim() || element.localName}: essential text is clipped (${element.getRootNode()?.host?._config?.name || element.getRootNode()?.host?.localName}, ${element.className}, ${getComputedStyle(element).visibility}, ${element.clientWidth}x${element.clientHeight}, content ${element.scrollWidth}x${element.scrollHeight})`);
           }
           if (element.matches('.number-value')) {
@@ -682,13 +697,13 @@ async function layoutIssues(page, families = [], subtree) {
             if (lines.size > 1) issues.push(`${element.textContent.trim()}: numeric value is split across lines`);
           }
         }
-        if (owned && element.matches?.(".climate-mode span") && /^[\p{L}]{1,4}$/u.test(element.textContent?.trim() || "")) {
+        if (owned && visible(element) && element.matches?.(".climate-mode span") && /^[\p{L}]{1,4}$/u.test(element.textContent?.trim() || "")) {
           const range = document.createRange();
           range.selectNodeContents(element);
           const lines = new Set([...range.getClientRects()].filter((rect) => rect.width && rect.height).map((rect) => Math.round(rect.top)));
           if (lines.size > 1) issues.push(`${element.textContent.trim()}: short climate mode label is split across lines`);
         }
-        if (owned && element.matches?.('button,a[href],input,[role="button"],[role="slider"]')) {
+        if (owned && visible(element) && element.matches?.('button,a[href],input,[role="button"],[role="slider"]')) {
           const rect = element.getBoundingClientRect();
           const style = getComputedStyle(element);
           if (style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0 && (rect.width < 48 || rect.height < 48)) {
