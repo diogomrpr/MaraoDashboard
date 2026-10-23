@@ -274,7 +274,7 @@ test('managed context/browser close preserves failed-request diagnostics and sti
       await managedCameraLedger(context, page, { output: directory, scenario: 'iphone-normal', theme: 'light' });
       listeners.get('requestfailed')({ url: () => 'http://192.168.10.229:8123/not-owned.js', resourceType: () => 'script', failure: () => ({ errorText: 'net::ERR_ABORTED' }), headers: () => ({}) });
       await assert.rejects(target === 'context' ? context.close() : browser.close(), error => error instanceof AggregateError
-        && error.errors.some(item => item.message.includes('Unexpected camera-context request'))
+        && error.errors.some(item => item.message.includes('Unexpected non-camera request'))
         && error.errors.some(item => item.message.includes('original ' + target + ' close failure')));
       assert.equal(closed, true);
       const saved = JSON.parse(fs.readFileSync(path.join(directory, 'camera-requests-iphone-normal-light.json')));
@@ -283,27 +283,26 @@ test('managed context/browser close preserves failed-request diagnostics and sti
   }
 });
 
-test('managed goto checkpoints real document reloads while retaining hash-only document ownership', async () => {
-  const previous = { window: globalThis.window, requestAnimationFrame: globalThis.requestAnimationFrame };
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-camera-ledger-goto-'));
-  const blank = document => ({ document, events: [], sessions: [], stops: [], handoffs: [], releases: [], order: 0 });
-  globalThis.window = { __maraoCameraRequestTrace: blank('document-one'), __maraoProveCameraHandoffs: async () => {} };
-  globalThis.requestAnimationFrame = callback => callback();
-  let current = 'http://192.168.10.229:8123/marao-dashboard/card-test', released = 0, closed = false;
+test('managed checks leave native camera cancellation and HLS errors to manual validation', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-camera-manual-'));
+  const listeners = new Map(); let navigated = false, closed = false;
   const browser = { close: async () => { closed = true; } };
-  const context = { addInitScript: async () => {}, browser: () => browser, close: async () => { closed = true; } };
-  const page = { on() {}, isClosed: () => closed, url: () => current, evaluate: async (callback, data) => callback(data), waitForTimeout: async () => {}, waitForLoadState: async (state, options) => { assert.equal(state, 'networkidle'); assert.equal(options.timeout, 15000); },
-    locator: () => ({ evaluateAll: async () => { released++; } }),
-    goto: async value => { const after = new URL(value, current).href; if (!sameDocumentHashNavigation(current, after)) window.__maraoCameraRequestTrace = blank('document-two'); current = after; } };
+  const context = { addInitScript: () => assert.fail('Manual camera acceptance must not instrument native transports'), browser: () => browser, close: async () => { closed = true; } };
+  const page = { on: (name, listener) => listeners.set(name, listener), isClosed: () => closed,
+    url: () => 'http://192.168.10.229:8123/marao-dashboard/card-test', goto: async () => { navigated = true; },
+    evaluate: () => assert.fail('Manual camera acceptance must not probe playback or force teardown') };
   try {
     const ledger = await managedCameraLedger(context, page, { output: directory, scenario: 'iphone-normal', theme: 'light' });
-    await page.goto('#events'); assert.equal(released, 0); assert.equal(window.__maraoCameraRequestTrace.document, 'document-one');
-    await page.goto(current); assert.equal(released, 1); assert.equal(window.__maraoCameraRequestTrace.document, 'document-two');
-    await ledger.assert();
+    const url = 'http://192.168.10.229:8123/api/hls/private-session/playlist.m3u8';
+    listeners.get('requestfailed')({url: () => url, resourceType: () => 'xhr', failure: () => ({errorText:'net::ERR_ABORTED'}), headers: () => ({})});
+    listeners.get('response')({url: () => url, status: () => 400});
+    await page.goto('/marao-dashboard-editor'); assert.equal(navigated, true);
+    await ledger.assert(); await context.close(); assert.equal(closed, true);
     const saved = JSON.parse(fs.readFileSync(path.join(directory, 'camera-requests-iphone-normal-light.json')));
-    assert.deepEqual(saved.trace.documents.map(item => item.document), ['document-one', 'document-two']);
-    await context.close(); assert.equal(closed, true);
-  } finally { Object.assign(globalThis, previous); fs.rmSync(directory, { recursive: true, force: true }); }
+    assert.equal(saved.manual_camera_transport, true); assert.equal(saved.failures.length, 1);
+    assert.equal(saved.manual_responses[0].status, 400); assert.deepEqual(saved.rejected, []);
+    assert.ok(!JSON.stringify(saved).includes('private-session'));
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
 test('instrumentation handles grouped WebSocket replies and tags only same-origin HLS XHR', () => {

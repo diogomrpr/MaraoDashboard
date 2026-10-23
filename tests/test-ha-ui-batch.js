@@ -100,7 +100,7 @@ async function main() {
       await configurePageEmulation(context, page, scenario);
       const errors = [], calls = [];
       page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (['warning', 'error'].includes(m.type())) errors.push(m.text()); });
-      page.on('response', r => { if (r.status() >= 400) errors.push('HTTP ' + r.status() + ' ' + new URL(r.url()).pathname); });
+      page.on('response', r => { if (require('./camera-request-ledger').isManualCameraTransport(r.url())) return; if (r.status() >= 400) errors.push('HTTP ' + r.status() + ' ' + new URL(r.url()).pathname); });
       page.on('websocket', socket => socket.on('framesent', ({ payload }) => { const m = JSON.parse(payload); if (m.type === 'call_service') calls.push([m.domain, m.service]); }));
       await page.goto(config.url + '/marao-dashboard/card-test'); await page.locator('marao-card .body').first().waitFor({ state: 'attached' });
       await assertCurrentFrontend(page); await applyVisualPreferences(page, scenario, theme);

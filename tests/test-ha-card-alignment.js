@@ -171,7 +171,7 @@ async function checkSliderHeaders() {
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
       page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
-      page.on('response', response => { if (response.status() >= 400) errors.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
+      page.on('response', response => { if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return; if (response.status() >= 400) errors.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
       const routes = ['card-test', ...(scenario.name === 'iphone-normal' ? ['living-room', 'native-example'] : [])];
       const checked = [];
       for (const route of routes) {

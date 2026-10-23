@@ -74,7 +74,7 @@ async function main() {
       const issues = [], calls = [];
       page.on('pageerror', error => issues.push(error.message));
       page.on('console', message => { if (['warning', 'error'].includes(message.type())) issues.push(message.text()); });
-      page.on('response', response => { if (response.status() >= 400) issues.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
+      page.on('response', response => { if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return; if (response.status() >= 400) issues.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
       page.on('websocket', socket => socket.on('framesent', ({ payload }) => {
         let message; try { message = JSON.parse(String(payload)); } catch { return; }
         if (message.type === 'call_service') calls.push({ domain: message.domain, service: message.service,

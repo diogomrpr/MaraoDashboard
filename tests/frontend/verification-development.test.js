@@ -77,7 +77,8 @@ test('visual selection runs no suites and behavior excludes local browser matric
   assert.ok(behavior.checks.every(check => /^(unit:|python:|editor-assets$|package-assets$)/.test(check.id)));
   assert.ok(!behavior.checks.some(check => check.command.some(arg => /test-camera-live-local|test-ha-/.test(arg))));
   const focused = makePlan({}, comparison);
-  assert.equal(focused.development_only, false); assert.ok(focused.checks.some(check => check.id === 'camera:local'));
+  assert.equal(focused.development_only, false); assert.ok(!focused.checks.some(check => check.id === 'camera:local'));
+  assert.ok(focused.excluded.some(reason => reason.includes('camera playback')));
 });
 
 test('task scope never guesses shared consumers even in offline mode', () => {

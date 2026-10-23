@@ -1,3 +1,4 @@
+if (require.main === module) throw new Error('Camera playback and transport validation is manual-only by user instruction.');
 // Offline only: loopback static server + native-host contract double + real
 // synthetic advancing video. Does not import HA preparation/client/configuration.
 const assert = require('node:assert/strict');

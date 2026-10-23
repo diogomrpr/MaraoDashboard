@@ -216,9 +216,9 @@ async function inspectSafeAreaSheets(context, page, output, runName) {
 }
 
 async function inspectFullscreenLifecycle(page) {
-  const prefetches = new Set();
-  const started = request => { if (/prefetch/.test(request.headers()['sec-purpose'] || request.headers().purpose || '')) prefetches.add(request); };
-  const finished = request => prefetches.delete(request);
+  const editorRequests = new Set();
+  const started = request => { if (/MaraoDashboard(?:Json|EditorWorker)/.test(new URL(request.url()).pathname)) editorRequests.add(request); };
+  const finished = request => editorRequests.delete(request);
   page.on('request', started); page.on('requestfinished', finished); page.on('requestfailed', finished);
   try {
   for (const route of ['/config/dashboard', '/marao-dashboard-editor']) {
@@ -229,7 +229,7 @@ async function inspectFullscreenLifecycle(page) {
     await page.evaluate(route => {history.pushState(null,'',route);window.dispatchEvent(new CustomEvent('location-changed'));},route);
     const native = page.locator(route === '/marao-dashboard-editor' ? 'marao-dashboard-panel' : 'ha-config-dashboard');
     await native.waitFor({state:'visible'});
-    if(route === '/marao-dashboard-editor') await page.waitForFunction(panel => panel._loaded && panel._visualReady && panel._jsonWarmed, await native.elementHandle());
+    if(route === '/marao-dashboard-editor') await page.waitForFunction(panel => panel._loaded && panel._visualReady && panel._monaco && !panel._jsonPreparing, await native.elementHandle());
     else {
       const count = await native.evaluate(async panel=>(await panel.hass.callWS({type:'repairs/list_issues'})).issues.filter(issue=>!issue.ignored).length);
       await page.waitForFunction(({panel,count})=>panel._repairsIssues.total===count,{panel:await native.elementHandle(),count});
@@ -255,8 +255,8 @@ async function inspectFullscreenLifecycle(page) {
       return !view.style.getPropertyValue('padding-top') && !header.style.getPropertyValue('display');
     });
     const deadline = Date.now() + 15000;
-    while (prefetches.size && Date.now() < deadline) await page.waitForTimeout(50);
-    if (prefetches.size) throw new Error('Editor prefetch requests did not finish before route disposal');
+    while (editorRequests.size && Date.now() < deadline) await page.waitForTimeout(50);
+    if (editorRequests.size) throw new Error('Editor asset requests did not finish before route disposal');
     await page.evaluate(() => {history.pushState(null,'','/marao-dashboard/card-test');window.dispatchEvent(new CustomEvent('location-changed'));});
     await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])').waitFor({state:'visible'});
     await page.waitForFunction(() => {
@@ -1117,6 +1117,7 @@ async function main() {
         if (options.preview) console.error(`[browser request] ${message}`);
       });
       page.on("response", (response) => {
+        if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return;
         if (response.status() < 400) return;
         const message = `${response.status()} ${response.request().resourceType()} response: ${new URL(response.url()).pathname}`;
         errors.push(message);
@@ -1339,6 +1340,7 @@ module.exports = {
   frontendRegistrationIssues,
   inspectPopups,
   layoutIssues,
+  inspectFullscreenLifecycle,
   parseArgs,
   popupFocusFailure,
   popupHasVisibleContent,

@@ -1132,15 +1132,6 @@ class MaraoDashboardPanel extends HTMLElement {
     return url.href;
   }
 
-  _warmJsonResources() {
-    if (this._jsonWarmed) return;
-    this._jsonWarmed = true;
-    for (const [file, locale] of [['MaraoDashboardJsonPreparation.js'], ['MaraoDashboardJsonEditor.js', true], ['MaraoDashboardJsonEditor.css'], ['MaraoDashboardJsonWorker.js'], ['MaraoDashboardEditorWorker.js']]) {
-      const link = document.createElement('link'); link.rel = 'prefetch'; link.href = this._jsonUrl(file, locale);
-      link.as = file.endsWith('.css') ? 'style' : 'script'; this.shadowRoot.append(link);
-    }
-  }
-
   async _nativeVisualReady() {
     const lifecycle = this._lifecycle;
     const root = this.shadowRoot.getElementById('visual-view');
@@ -1191,7 +1182,6 @@ class MaraoDashboardPanel extends HTMLElement {
 
   _startJsonPreparation() {
     if (!this._loaded || !this.isConnected || !this._visualReady || this._busy) return;
-    this._warmJsonResources();
     if (!this._contextReady) this._requestEditorContext().catch(() => {});
     if (this._jsonFailure || this._monaco) return;
     this._prepareJson().catch(() => {});

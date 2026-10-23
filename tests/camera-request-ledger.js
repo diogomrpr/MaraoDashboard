@@ -1,5 +1,5 @@
-// Test-only evidence for commanded native media cancellation. Nothing is exempt
-// merely because its URL looks like HLS or its browser failure says ERR_ABORTED.
+// Keep transport diagnostics, but camera playback acceptance belongs to manual use.
+// Strict cancellation classification remains available to isolated unit tests.
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -353,9 +353,14 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
   };
 }
 
-async function cameraRequestLedger(context, { output, scenario, theme }) {
-  await context.addInitScript(installTrace, { subscriptions: process.env.MARAO_CAMERA_SUBSCRIPTION_DIAGNOSTIC === '1', entities: SAFE_ENTITIES });
-  let page, sequence = 0, lastTrace, stoppedForClose = false; const failures = [], starts = new WeakMap(), documents = new Map();
+function isManualCameraTransport(url) {
+  try { return /^\/api\/(?:hls\/|camera_proxy_stream\/)/.test(new URL(url).pathname); }
+  catch { return false; }
+}
+
+async function cameraRequestLedger(context, { output, scenario, theme, manualTransport = false }) {
+  if (!manualTransport) await context.addInitScript(installTrace, { subscriptions: process.env.MARAO_CAMERA_SUBSCRIPTION_DIAGNOSTIC === '1', entities: SAFE_ENTITIES });
+  let page, sequence = 0, lastTrace, stoppedForClose = false; const failures = [], manualResponses = [], starts = new WeakMap(), documents = new Map();
   const safe = value => {
     if (Array.isArray(value)) return value.map(safe);
     if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, (key === 'url' || key === 'prefix') && typeof item === 'string'
@@ -368,17 +373,22 @@ async function cameraRequestLedger(context, { output, scenario, theme }) {
     attach(subject) {
       page = subject; page.__cameraRequestLedger = ledger;
       page.on('request', request => starts.set(request, Date.now()));
+      if (manualTransport) page.on('response', response => {
+        if (isManualCameraTransport(response.url()) && response.status() >= 400) manualResponses.push({ url: response.url(), status: response.status() });
+      });
       page.on('requestfailed', request => failures.push({ url: request.url(), type: request.resourceType(), error: request.failure()?.errorText || 'unknown error',
         xhr: Number(request.headers()['x-marao-test-xhr']) || null, document: request.headers()['x-marao-test-document'] || null, started: starts.get(request), date: Date.now() }));
     },
     async checkpoint() {
+      if (manualTransport) return null;
       const trace = page.isClosed() ? null : await page.evaluate(() => window.__maraoCameraRequestTrace || null);
       if (trace) { if (lastTrace?.document !== trace.document) stoppedForClose = false; lastTrace = trace; documents.set(trace.document, trace); }
       return trace;
     },
-    async resume() { await page.evaluate(() => { const state = window.__maraoCameraRequestTrace; for (const stop of state.stops) if (!stop.end && !['marao-ineligible-release', 'marao-quality-release'].includes(stop.kind)) { stop.end = Date.now(); stop.endOrder = ++state.order; } }); },
-    async settleHandoffs() { if (!page.isClosed()) await page.evaluate(() => window.__maraoProveCameraHandoffs?.()); },
+    async resume() { if (manualTransport) return; await page.evaluate(() => { const state = window.__maraoCameraRequestTrace; for (const stop of state.stops) if (!stop.end && !['marao-ineligible-release', 'marao-quality-release'].includes(stop.kind)) { stop.end = Date.now(); stop.endOrder = ++state.order; } }); },
+    async settleHandoffs() { if (!manualTransport && !page.isClosed()) await page.evaluate(() => window.__maraoProveCameraHandoffs?.()); },
     async boundary(label, action, { terminal = true, entities = [SAFE_ENTITY] } = {}) {
+      if (manualTransport) return action();
       assert.ok(entities.length && entities.every(entity => SAFE_ENTITIES.includes(entity)));
       const id = ++sequence;
       await page.evaluate(async ({ id, label, entities }) => { await window.__maraoProveCameraHandoffs?.(); const state = window.__maraoCameraRequestTrace; if (state.boundary) throw Error('Nested camera release boundary'); state.boundary = { id, label, entities, date: Date.now() }; }, { id, label, entities });
@@ -390,6 +400,16 @@ async function cameraRequestLedger(context, { output, scenario, theme }) {
       } finally { await page.evaluate(() => { window.__maraoCameraRequestTrace.boundary = null; }); }
     },
     async assert() {
+      if (manualTransport) {
+        const rejected = failures.filter(failure => !isManualCameraTransport(failure.url));
+        fs.mkdirSync(output, { recursive: true, mode: 0o700 });
+        fs.writeFileSync(path.join(output, `camera-requests-${scenario}-${theme}.json`), JSON.stringify(safe({
+          scope: 'Camera transport is manual-only by user instruction; observations are not a passing playback check.',
+          manual_camera_transport: true, failures, manual_responses: manualResponses, rejected,
+        }), null, 2), { mode: 0o600 });
+        assert.equal(rejected.length, 0, `Unexpected non-camera request failures: ${JSON.stringify(safe(rejected))}`);
+        return;
+      }
       await ledger.settleHandoffs();
       await ledger.checkpoint();
       if (!documents.size) { assert.equal(failures.length, 0, 'Uninitialized context reported a failed request'); return; }
@@ -403,6 +423,7 @@ async function cameraRequestLedger(context, { output, scenario, theme }) {
       assert.equal(observerErrors.length, 0, `Native handoff proof observer failed: ${JSON.stringify(safe(observerErrors))}`);
     },
     async stopForClose() {
+      if (manualTransport) return ledger.assert();
       if (!await ledger.checkpoint()) return ledger.assert();
       if (stoppedForClose) return ledger.assert();
       await ledger.boundary('final context release', async () => {
@@ -432,7 +453,7 @@ function sameDocumentHashNavigation(current, target) {
 const managedBrowsers = new WeakMap();
 async function managedCameraLedger(context, page, options) {
   let ledger;
-  try { ledger = await cameraRequestLedger(context, options); ledger.attach(page); }
+  try { ledger = await cameraRequestLedger(context, { ...options, manualTransport: true }); ledger.attach(page); }
   catch (error) {
     try { await context.close(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Managed camera ledger setup and context cleanup failed'); }
     throw error;
@@ -466,4 +487,4 @@ async function managedCameraLedger(context, page, options) {
   return ledger;
 }
 
-module.exports = { cameraRequestLedger, managedCameraLedger, sameDocumentHashNavigation, classifyCameraCancellations, installTrace };
+module.exports = { isManualCameraTransport, cameraRequestLedger, managedCameraLedger, sameDocumentHashNavigation, classifyCameraCancellations, installTrace };

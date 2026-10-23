@@ -214,7 +214,15 @@ keep future work in changes and archive only completed, verified work.
 - Treat observed warnings, error cards, console exceptions, failed resources,
   repeated requests and duplicate service calls as defects. Fix their shared root;
   never hide, suppress or relabel failures. Known relevant violations block release.
-- The user permits only the diagnosed native Home Assistant stale-unsubscribe
+- Camera playback/transport validation is permanently manual-only at the user's
+  request (2026-10-23). Do not run synthetic live/slow-link/latency, HLS transport,
+  native handoff or cancellation checks, including inside full/upgrade suites.
+  Existing camera HLS HTTP errors and native cancellation findings are explicitly
+  accepted release exceptions, not passing checks. Retain observed diagnostics
+  without making them gates. Keep camera code, configuration, event-provider,
+  security and data-preservation tests; non-camera failures still block release.
+  Never use a production instance to perform the user's manual checks.
+- The user also permits the diagnosed native Home Assistant stale-unsubscribe
   reconnect failure until its upstream fix reaches a stable frontend. Preserve raw
   assertions/native evidence and check expiry when applying it. Other selected
   checks and required cleanup remain binding.

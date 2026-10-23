@@ -1083,6 +1083,7 @@ async function checkDisconnected(browser, config, functionalCompleted = false) {
     else errors.push(message);
   });
   page.on("response", (response) => {
+      if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return;
     if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`);
   });
   try {
@@ -1647,7 +1648,7 @@ async function checkEntityGroups(page, serviceCalls, output, scenario, theme, co
 }
 
 async function main() {
-  if (process.argv.includes('--camera-slow-only')) throw new Error('The synthetic slow-camera validation has been retired.');
+  if (process.argv.some(arg => ['--camera-only', '--camera-live-only', '--camera-slow-only'].includes(arg))) throw new Error('Camera playback and transport validation is manual-only by user instruction.');
   const captureScreenshots = process.argv.includes("--screenshots");
   const screenshotRoot = require('./verification-browser').artifactDirectory('dashboard-e2e');
   if (captureScreenshots) fs.mkdirSync(screenshotRoot, { recursive: true });
@@ -1702,6 +1703,7 @@ async function main() {
     page.on("pageerror", (error) => sessionErrors.push(error.message));
     page.on("console", (message) => { if (["error", "warning"].includes(message.type())) sessionErrors.push(message.text()); });
     page.on("response", (response) => {
+      if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return;
       if (response.status() >= 400) {
         sessionErrors.push(`${response.status()} ${response.request().resourceType()} response: ${new URL(response.url()).pathname}`);
       }

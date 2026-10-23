@@ -120,6 +120,18 @@ Run additional changed-feature checks only when the user explicitly requests the
 `test:full` command and parallel execution also require explicit requests. Known
 failures remain failures; never claim skipped integration checks passed.
 
+## Camera transport is manual-only
+
+At the user's request (2026-10-23), camera playback, synthetic stream/slow-link/
+latency, HLS transport and native cancellation/handoff validation are permanently
+excluded from affected, full and upgrade gates. Existing HLS errors and native
+cancellation findings are accepted release exceptions, not repaired or passing
+checks. General browser runs retain redacted transport observations in their
+private camera request reports; these observations do not block other checks.
+Camera code, configuration, event-provider, security and data-preservation tests
+remain automated. Other network/editor errors remain failures. Real-camera
+acceptance belongs to the user; agents never operate production cameras.
+
 ## Explicitly selected integration coverage
 
 Reviewed theme-independent geometry and behavior run in light; representative
@@ -287,7 +299,8 @@ retain administrator/recovery guards and never write source or History.
 Use the reviewed editor-preload scope for changes to this boundary and JSON
 preparation. Its native-control readiness excludes optional transport. Context is
 shared across data-dependent consumers; no per-row reads or speculative History
-reads are allowed. Resource prefetch is fetch-only and advisory. Module evaluation,
+reads are allowed. JSON assets use the single preparation path; duplicate advisory
+prefetches are not scheduled. Module evaluation,
 schema/model and hidden-editor construction use separate idle opportunities after
 native readiness, with no timeout forcing work while busy. Explicit JSON promotes
 the same attempt. Browsers without an idle callback keep CPU work on demand.

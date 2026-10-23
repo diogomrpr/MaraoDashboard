@@ -1,3 +1,4 @@
+if (require.main === module) throw new Error('Camera playback and transport validation is manual-only by user instruction.');
 // Compare independently decoded scene counters on the same synthetic camera.
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const {chromium,webkit}=require('playwright');

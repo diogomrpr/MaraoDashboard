@@ -302,7 +302,7 @@ function loadingPanel(callWS) {
   p.isConnected=true;
   p._hass={callWS};
   p._contextReady=false;
-  p._warmJsonResources=()=>{}; p._startJsonPreparation=()=>{};
+  p._startJsonPreparation=()=>{};
   p._nativeVisualReady=async()=>{p._visualReady=true;};
   p.shadowRoot={getElementById:()=>({href:''}),querySelector:()=>null};
   p._setBusy=value=>{p._busy=value;};
@@ -552,9 +552,9 @@ test('initial loading makes native Visual ready independently of deferred contex
     if (message.scope === 'context') return new Promise(resolve => { contextResolve = resolve; });
     return Promise.resolve({ ...payload, editor: { ...payload.editor, display_entity_ids: [] } });
   });
-  let warmed = 0, prepared = 0;
-  p._warmJsonResources = () => { assert.equal(p._busy, false); assert.equal(p._visualReady, true); warmed++; };
-  p._prepareJson = () => { prepared++; return Promise.resolve(); };
+  let prepared = 0;
+  p._prepareJson = () => { assert.equal(p._busy, false); assert.equal(p._visualReady, true); prepared++; return Promise.resolve(); };
+  p.shadowRoot.append = () => assert.fail('Background preparation must not create duplicate speculative requests');
   p._startJsonPreparation = Panel.prototype._startJsonPreparation;
   p._nativeVisualReady = () => new Promise(resolve => {
     nativeResolve = () => { p._visualReady = true; resolve(); };
@@ -563,13 +563,13 @@ test('initial loading makes native Visual ready independently of deferred contex
   const loading = p._load();
   await nativePending;
   assert.deepEqual(messages.map(message => message.scope), ['initial']);
-  assert.equal(warmed, 0); assert.equal(prepared, 0);
+  assert.equal(prepared, 0);
   p._startJsonPreparation();
-  assert.equal(warmed, 0); assert.equal(prepared, 0);
+  assert.equal(prepared, 0);
   nativeResolve();
   await loading;
   assert.equal(p._loaded, true); assert.equal(p._visualReady, true); assert.equal(p._busy, false);
-  assert.equal(warmed, 1); assert.equal(prepared, 1);
+  assert.equal(prepared, 1);
   assert.deepEqual(messages.map(message => message.scope), ['initial', 'context']);
   assert.equal(p._contextReady, false); assert.equal(p._historyLoaded, true);
   contextResolve({ editor: { catalog: { cards: [] }, entities: [], areas: [] } });

@@ -195,12 +195,11 @@ Navbar overflow keeps complete saved navigation lists and uses the shared render
   initialization, foreground promotion, draft preservation and explicit retry.
   `editor-drag` covers steady pickup, deliberate 16px edge approach and 8px
   reversal/cancellation through unit and native-input geometry checks.
-- `camera` includes explicit dashboard/popup stream selection and native fullscreen, decoded-frame progress,
-  retained video during buffering, native slow-link checks in Chromium/WebKit,
-  `MaraoCamera.js`, advancing safe media fixtures, native-loader
-  binding, per-offer native signaling ownership, early-authentication/local-ICE
-  cancellation and synthetic Chromium/WebKit lifecycle checks. Those local checks do
-  not establish actual HA transport, physical Safari or production NVR behavior.
+- `camera` retains code, configuration, event-provider and preservation checks.
+  Playback, synthetic live/slow-link/latency, HLS and native cancellation/handoff
+  acceptance are permanently manual-only by user instruction (2026-10-23).
+  Browser diagnostics record transport failures without treating them as passing
+  checks or release blockers. Agents never perform production-camera validation.
 
 This source/check inventory describes selected work; completion and executed
 proof are recorded in each change's implementation record, not inferred here.

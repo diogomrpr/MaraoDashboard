@@ -86,6 +86,7 @@ function makePlan(options = {}, comparison) {
     ...(development ? { inspection: { ...inspectionFor(selection), status: 'not performed by this command' } } : {}),
     excluded: tier === 'visual' ? ['automated checks', 'publication validation'] : tier === 'behavior' ? ['browser interaction and visual inspection', 'mobile matrices', 'publication validation']
       : [...(unit ? ['integration/browser checks', 'build checks', 'mobile layouts', 'preserved-install upgrades (reuse development testing; explicit request only)'] : options.offline ? ['live browser checks', 'mobile layouts', 'preserved-install upgrades'] : options.full ? [] : ['unrelated suites', 'complete mobile matrix', 'unaffected historical baselines']),
+        'camera playback, HLS and native cancellation (manual-only by user instruction)',
         ...(development ? ['publication validation'] : [])] };
 }
 

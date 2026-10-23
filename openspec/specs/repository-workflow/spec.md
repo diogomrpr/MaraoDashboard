@@ -128,6 +128,12 @@ root. Assertions SHALL NOT be suppressed to make verification appear successful.
 - **THEN** the reproduction, upstream evidence and unresolved status are recorded
 - **AND** the defect is neither relabeled as a passing check nor silently allowed in future releases
 
+#### Scenario: The user reserves camera transport acceptance for real-world use
+- **WHEN** affected, comprehensive, upgrade or release verification is selected
+- **THEN** synthetic camera playback, HLS and native cancellation/handoff checks are excluded permanently
+- **AND** recorded transport observations stay visible as manual-only, never as passing playback proof
+- **AND** existing HLS and cancellation findings do not block release; non-camera failures and camera code/data/security checks retain their contracts
+
 ### Requirement: Persistent default verification command
 The repository SHALL save one affected-check command and document it in the agent contract and development guidance. The command SHALL expose visual, behavior and focused development tiers with explicit task scope. Existing invocations, version hooks, publication gates and automatic CI SHALL retain focused affected coverage. Development-only scope or reports SHALL NOT satisfy publication gates. Full-suite and parallel options SHALL be explicit; no automatic fallback or hidden hook SHALL invoke them.
 

@@ -1,3 +1,4 @@
+if (require.main === module) throw new Error('Camera playback and transport validation is manual-only by user instruction.');
 // Native HA low dashboard / high popup proof using only safe disposable cameras.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -23,7 +24,7 @@ const redact = value => String(value).replace(/https?:\S+/g, '[URL]').replace(/(
   const ledger = await managedCameraLedger(context, page, { output, scenario: engine.name(), theme: 'light' });
   page.on('pageerror', error => issues.push(redact(error.stack || error)));
   page.on('console', message => { if (['warning', 'error'].includes(message.type())) issues.push(redact(message.text())); });
-  page.on('response', response => { if (response.status() >= 400) issues.push('HTTP ' + response.status() + ' ' + new URL(response.url()).pathname); });
+  page.on('response', response => { if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return; if (response.status() >= 400) issues.push('HTTP ' + response.status() + ' ' + new URL(response.url()).pathname); });
   page.on('request', request => { if (/\/api\/marao_dashboard\/camera\/|MaraoHls\.js/.test(new URL(request.url()).pathname)) forbidden.push('adaptive request'); });
   page.on('websocket', socket => socket.on('framesent', frame => {
     try { const message = JSON.parse(frame.payload); if (message.type === 'call_service') calls.push({ domain: message.domain, service: message.service }); } catch {}

@@ -52,7 +52,7 @@ async function main() {
       }));
       page.on('pageerror', error => errors.push(error.message));
       page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
-      page.on('response', response => { if (response.status() >= 400) errors.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
+      page.on('response', response => { if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return; if (response.status() >= 400) errors.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
       const results = [];
       if (engine === chromium) {
         await page.goto(config.url + '/marao-dashboard/overview#overview-blinds');

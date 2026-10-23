@@ -28,16 +28,15 @@ test('inferred generated staging is not a source identity, while source and expl
   write('ha-test/.cache/dist/package.js','explicit input changed');assert.notEqual(checkIdentity(explicit,directory),before,'Explicit check inputs remain binding');
 });
 
-test('camera plans exclude the retired slow validation and retain normal playback checks', () => {
+test('camera playback stays manual-only in affected and full plans while code tests remain', () => {
   const selection = selectComponents([], ['camera']);
   for (const options of [{}, { full: true }]) {
     const checks = checksFor(selection, options);
-    assert.ok(!checks.some(check => check.id.startsWith('camera:slow') || check.command.includes('--camera-slow-only')));
-    for (const id of ['camera', 'camera:streams', 'camera:streams:webkit', 'camera:webkit']) {
-      assert.ok(checks.some(check => check.id === id), id + ' remains available');
-    }
-    assert.ok(!checks.some(check => check.inputs.includes('tests/camera-slow-native-checks.js')));
+    assert.ok(!checks.some(check => check.id === 'camera' || check.id.startsWith('camera:')));
+    assert.ok(!checks.some(check => check.command.some(arg => /camera-(?:slow|live)-only|test-ha-camera|test-camera-live-local/.test(arg))));
   }
+  assert.ok(checksFor(selection).some(check => check.id === 'unit:marao-camera-live'));
+  assert.ok(checksFor(selection).some(check => check.id === 'python:test_camera_events'));
 });
 
 test('frontend refresh scope covers recovery, native/navbar ownership and alignment without fixture resets', () => {
@@ -125,7 +124,7 @@ test('release defaults to unit tests even for camera, shared UI and persistence 
     assert.ok(plan.checks.every(check => check.command.includes('--test') || check.command.includes('pytest')));
     assert.ok(!plan.checks.some(check => check.id === 'preserved-upgrade'));
   }
-  const explicit = makePlan({ components: ['camera'] }, comparison);
+  const explicit = makePlan({ components: ['navbar-startup'] }, comparison);
   assert.ok(explicit.checks.some(check => check.kind === 'browser'));
   assert.throws(() => parseArgs(['--unit', '--full']), /cannot be combined/);
 });
