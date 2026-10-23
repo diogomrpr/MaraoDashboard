@@ -54,7 +54,7 @@ class AggregateMediaBudget {
 
 async function cameraMediaShaper(config,{bytesPerSecond}) {
   const origin=new URL(config.url).origin;
-  if(new URL(origin).hostname!=='192.168.10.229') throw Error('Camera shaping is disposable-only');
+  if(new URL(origin).hostname!=='192.168.0.28') throw Error('Camera shaping is disposable-only');
   const secret=crypto.randomBytes(24).toString('hex'),budget=new AggregateMediaBudget(bytesPerSecond);
   const active=new Set(),sockets=new Set(),records=[];
   const server=http.createServer(async(req,res)=>{

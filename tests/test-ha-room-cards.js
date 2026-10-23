@@ -117,7 +117,7 @@ async function actions(page, calls, run, scenario, theme) {
 
 async function main() {
   const config = readConfig(); assertDisposableHaTarget(config);
-  assert.equal(new URL(config.url).hostname, '192.168.10.229');
+  assert.equal(new URL(config.url).hostname, '192.168.0.28');
   const options = parseArgs();
   await prepare(config);
   fs.mkdirSync(output, { recursive: true });

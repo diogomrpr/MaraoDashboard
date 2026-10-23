@@ -36,7 +36,7 @@ Marao's identity and the README's single approved attribution SHALL be preserved
 - **AND** no test-only asset or third-party card dependency enters the installed integration
 
 ### Requirement: Safe target and private evidence
-Agents SHALL access and operate only disposable Home Assistant `192.168.10.229`.
+Agents SHALL access and operate only disposable Home Assistant `192.168.0.28`.
 Actions SHALL target safe helpers/templates/in-memory fixtures. Tokens, keys,
 alarm codes, camera data, private entity data and secret-bearing evidence SHALL
 remain outside committed source, specs, reports and shared screenshots.

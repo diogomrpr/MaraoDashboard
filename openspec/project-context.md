@@ -83,7 +83,7 @@ paths; old reports are not rewritten or claimed as current scoped evidence.
 
 ## Environment decisions
 
-The only agent target is disposable `192.168.10.229:8123`. Authenticated browser,
+The only agent target is disposable `192.168.0.28:8123`. Authenticated browser,
 API, administrator WebSocket, and SSH access were verified during setup.
 Node 24 LTS/npm were installed through Homebrew and exposed to login shells.
 Python 3.14 lives in `.venv`; activate it before Python or publication checks.
@@ -232,7 +232,7 @@ request. This supersedes earlier release-evidence requirements in this document
 and older change artifacts; historical results remain unchanged.
 
 Before publishing every release, install its final candidate and version metadata
-on disposable Home Assistant `192.168.10.229`, preserving test configuration and
+on disposable Home Assistant `192.168.0.28`, preserving test configuration and
 helper state. Reuse an exact matching installation; otherwise batch one install
 after final edits. Installation failure blocks publication. Normal asset/readiness
 confirmation is sufficient and does not add integration tests to the release.

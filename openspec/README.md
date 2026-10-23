@@ -119,7 +119,7 @@ user request at release. Known failures remain failures; report skipped coverage
 honestly. This supersedes stricter release requirements in older change artifacts.
 
 Before every release is published, install the final candidate and its version
-metadata on disposable `192.168.10.229`, preserving test configuration and helper
+metadata on disposable `192.168.0.28`, preserving test configuration and helper
 state. Reuse an exact matching installation; otherwise install once after final
 edits. A failed installation blocks publication. Installer asset/readiness checks
 are sufficient; no extra integration tests are implied.

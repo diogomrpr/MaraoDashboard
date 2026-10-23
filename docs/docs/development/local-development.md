@@ -12,14 +12,14 @@ preparation installs the current working tree, creates safe entities and generat
 one dashboard at `/marao-dashboard`. Routine frontend preview syncs current frontend
 files to an already compatible installation and leaves successful changes installed.
 Agents working on this
-repository may connect only to `192.168.10.229`; the same tools let developers
+repository may connect only to `192.168.0.28`; the same tools let developers
 configure their own disposable instances. Never use a household or production
 instance, or exercise a real security or safety device.
 
 ## Install before handing off
 
 A completed software task includes installing all applicable current changes on
-the disposable test instance `192.168.10.229`. This is required even when the user
+the disposable test instance `192.168.0.28`. This is required even when the user
 will do all visual testing. Local builds and browser overrides are not deployment.
 Batch edits and normally sync once at the end; repeat only for a later change,
 a failed installation or a necessary diagnostic. Leave successful assets installed.
@@ -306,7 +306,7 @@ Releases run affected unit tests only through `npm run verify:publish` (or
 `verify:release` without an upgrade-report argument). Reuse integration testing
 from development, including preserved-install checks where needed for concrete
 migration/recovery risk. Before publishing every release, install its final package
-and version metadata on disposable `192.168.10.229`, preserving test configuration
+and version metadata on disposable `192.168.0.28`, preserving test configuration
 and helper state. Reuse an installation only when that exact candidate is already
 installed. Installation failure blocks publication; the installer's served-asset
 and readiness checks suffice. This installation does not authorize rerunning
@@ -393,7 +393,7 @@ acknowledgement and confirmation. Controls apply to mode and temperature request
 shift by half a degree while preserving the range gap; corrected modes report a
 different mode. Each fixture owns its state and pending jobs, which cancel on
 removal. These controls live only in `ha-test/`; use safe fixtures on
-`192.168.10.229`, never household equipment.
+`192.168.0.28`, never household equipment.
 
 ### Editor startup measurements
 

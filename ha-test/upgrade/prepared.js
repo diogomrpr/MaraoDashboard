@@ -49,8 +49,8 @@ function relativeFile(file) {
 
 function validatePreparedReceipt(receipt, config, candidate, now = Date.now(), { batch = false } = {}) {
   assertDisposableHaTarget(config, { requireSsh: true });
-  assert.equal(new URL(config.url).hostname, '192.168.10.229', 'Upgrade inspection requires the authorized disposable instance');
-  assert.equal(config.sshHost, '192.168.10.229', 'Upgrade inspection requires the authorized SSH target');
+  assert.equal(new URL(config.url).hostname, '192.168.0.28', 'Upgrade inspection requires the authorized disposable instance');
+  assert.equal(config.sshHost, '192.168.0.28', 'Upgrade inspection requires the authorized SSH target');
   assert.equal(receipt?.version, batch ? 2 : 1, 'Missing or unsupported prepared-install receipt');
   if (batch) {
     assert.equal(receipt.kind, 'prepared-browser-batch', 'Ordinary preparation is not upgrade evidence');

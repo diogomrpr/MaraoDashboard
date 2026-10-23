@@ -202,8 +202,8 @@ test('history loading gate holds only the exact safe native GET, preserves reque
   let handler, removed=false;const continued=[];
   const page={route:async(pattern,callback)=>{assert.equal(pattern,'**/api/history/period/**');handler=callback;},
     unroute:async(pattern,callback)=>{assert.equal(pattern,'**/api/history/period/**');assert.equal(callback,handler);removed=true;}};
-  const gate=await installHistoryLoadingGate(page,'http://192.168.10.229');
-  const safe='http://192.168.10.229/api/history/period/2026-10-18T00:00:00Z?filter_entity_id=sensor.marao_dashboard_test_history_loading';
+  const gate=await installHistoryLoadingGate(page,'http://192.168.0.28');
+  const safe='http://192.168.0.28/api/history/period/2026-10-18T00:00:00Z?filter_entity_id=sensor.marao_dashboard_test_history_loading';
   const route=(name,url=safe,method='GET')=>({request:()=>({url:()=>url,method:()=>method}),continue:async(...args)=>{assert.equal(args.length,0,'The gate must not replace native request details or payload');continued.push(name);}});
   const pending=handler(route('held'));
   assert.equal(gate.held,1);assert.deepEqual(continued,[]);
@@ -211,7 +211,7 @@ test('history loading gate holds only the exact safe native GET, preserves reque
     ['other-entity',safe.replace('history_loading','history_empty'),'GET'],
     ['combined-entities',safe+',sensor.other','GET'],
     ['duplicate-parameter',safe+'&filter_entity_id=sensor.other','GET'],
-    ['other-origin',safe.replace('192.168.10.229','example.invalid'),'GET'],
+    ['other-origin',safe.replace('192.168.0.28','example.invalid'),'GET'],
     ['other-path',safe.replace('/api/history/period/','/api/states/'),'GET'],
     ['other-method',safe,'POST'],
   ])await handler(route(name,url,method));

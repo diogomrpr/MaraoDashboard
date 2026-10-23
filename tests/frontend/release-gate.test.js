@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const filename = path.join(root, 'tests/verify-release.js');
-const config = { url: 'http://192.168.10.229:8123', disposable: true, sshHost: '192.168.10.229' };
+const config = { url: 'http://192.168.0.28:8123', disposable: true, sshHost: '192.168.0.28' };
 const candidate = { commit: 'a'.repeat(40), package_sha256: 'b'.repeat(64) };
 const coverage = JSON.parse(fs.readFileSync(path.join(root, 'ha-test/upgrade/coverage.json')));
 const report = () => ({ version: 2, kind: 'preserved-install-upgrade', operation_id: '12345678-1234-1234-1234-123456789abc', target: config.url,

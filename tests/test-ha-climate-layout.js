@@ -17,8 +17,8 @@ function hasNumericCard(value) {
 async function main() {
   const config = readConfig();
   assertDisposableHaTarget(config, { requireSsh: true });
-  assert.equal(new URL(config.url).hostname, '192.168.10.229');
-  assert.equal(config.sshHost, '192.168.10.229');
+  assert.equal(new URL(config.url).hostname, '192.168.0.28');
+  assert.equal(config.sshHost, '192.168.0.28');
   const requested = process.argv.indexOf('--scenario');
   const profiles = requested < 0 ? scenarios : scenarios.filter(s => s.name === process.argv[requested + 1]);
   assert.ok(profiles.length, 'Unknown mobile profile');

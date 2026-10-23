@@ -32,13 +32,13 @@ test('loopback proxy shapes actual response bytes across sources and excludes pl
  const originalFetch=globalThis.fetch;
  let fetches=0;
  globalThis.fetch=async url=>{
-  assert.equal(new URL(url).hostname,'192.168.10.229');fetches++;
+  assert.equal(new URL(url).hostname,'192.168.0.28');fetches++;
   const body=url.pathname.endsWith('playlist.m3u8')?'#EXTM3U\n#EXT-X-MAP:URI="/api/hls/synthetic/init.mp4"\n/api/hls/synthetic/segment/1.0.m4s\n':Buffer.alloc(2048);
   return new Response(body,{headers:{'content-type':'video/mp4','content-length':String(Buffer.byteLength(body))}});
  };
  let routeHandler;
  const context={route:async(_pattern,handler)=>{routeHandler=handler;},unroute:async()=>{}};
- const shaper=await cameraMediaShaper({url:'http://192.168.10.229:8123'},{bytesPerSecond:10000});
+ const shaper=await cameraMediaShaper({url:'http://192.168.0.28:8123'},{bytesPerSecond:10000});
  const request=options=>new Promise((resolve,reject)=>{
   http.get(options.url,{headers:options.headers},response=>{
    if(response.statusCode===200 && !options.url.includes('playlist.m3u8'))assert.equal(response.headers['content-length'],'2048');
@@ -50,12 +50,12 @@ test('loopback proxy shapes actual response bytes across sources and excludes pl
   await shaper.install(context);
   const options=[];
   for(const name of ['segment/1.0.m4s','segment/1.1.m4s','playlist.m3u8'])
-   await routeHandler({request:()=>({url:()=>`http://192.168.10.229:8123/api/hls/synthetic/${name}`,headers:()=>({})}),continue:async value=>options.push(value)});
+   await routeHandler({request:()=>({url:()=>`http://192.168.0.28:8123/api/hls/synthetic/${name}`,headers:()=>({})}),continue:async value=>options.push(value)});
   const started=performance.now();
   const results=await Promise.all(options.map(request));
   assert.deepEqual(results.slice(0,2).map(({bytes,status})=>({bytes,status})),[{bytes:2048,status:200},{bytes:2048,status:200}]);
   assert.equal(results[2].status,200);
-  assert.equal(results[2].body,'#EXTM3U\n#EXT-X-MAP:URI="http://192.168.10.229:8123/api/hls/synthetic/init.mp4"\nhttp://192.168.10.229:8123/api/hls/synthetic/segment/1.0.m4s\n');
+  assert.equal(results[2].body,'#EXTM3U\n#EXT-X-MAP:URI="http://192.168.0.28:8123/api/hls/synthetic/init.mp4"\nhttp://192.168.0.28:8123/api/hls/synthetic/segment/1.0.m4s\n');
   const media=shaper.records.filter(item=>item.media).flatMap(item=>item.deliveries).sort((a,b)=>a.at-b.at);
   let bytes=0;for(const delivery of media){bytes+=delivery.bytes;assert.ok(bytes<=(delivery.at-started)*10+50);}
   assert.equal(bytes,4096);

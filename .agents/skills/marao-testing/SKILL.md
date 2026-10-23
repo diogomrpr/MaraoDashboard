@@ -32,14 +32,14 @@ plan, or the coverage map into a requirement to run every available check.
    A plan does not require running its entire selection for routine development.
    Explicit focused/publication coverage still follows its command contract.
 5. Agent browser inspection is optional for routine work. If needed, use existing
-   preview/check helpers on disposable HA `192.168.10.229`; inspect the requested
+   preview/check helpers on disposable HA `192.168.0.28`; inspect the requested
    behavior once. Leave successful assets installed and restore temporary helpers.
    Stop once it works; do not add themes, devices, zoom or timing investigations
    without a concrete reason. If the user takes over testing, finish mandatory
    installation and cleanup, then hand off.
 6. Installation is required before a software task is done, even without browser
    checks: batch edits and normally sync the final applicable changes once to
-   disposable HA `192.168.10.229`. Use the lightweight `prepareFrontend()` helper
+   disposable HA `192.168.0.28`. Use the lightweight `prepareFrontend()` helper
    directly when compatible, without opening a browser; use `ha:sync` only when
    full preparation is required. Its asset/readiness checks confirm installation;
    no additional browser suite is implied. Local builds/browser overrides do not
@@ -68,7 +68,7 @@ output from the converter under test. Reuse suite-local setup and cleanup helper
 
 ## Browser execution and diagnosis
 
-- Only disposable HA `192.168.10.229` and safe fixtures are permitted. Follow the
+- Only disposable HA `192.168.0.28` and safe fixtures are permitted. Follow the
   [local workflow](../../../docs/docs/development/local-development.md) for private
   authentication and deployment. Existing live checks prepare the current build;
   do not add a second preparation or restart without a demonstrated need.

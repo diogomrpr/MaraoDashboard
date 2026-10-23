@@ -1132,8 +1132,8 @@ async function editablePageChecks(page, panel, client, config, originalBytes, sc
 
 async function main() {
   const config = readConfig();
-  assert.equal(new URL(config.url).hostname, "192.168.10.229");
-  assert.equal(config.sshHost, "192.168.10.229");
+  assert.equal(new URL(config.url).hostname, "192.168.0.28");
+  assert.equal(config.sshHost, "192.168.0.28");
   if (Object.hasOwn(process.env, 'MARAO_UPGRADE_RECEIPT')) await require('../ha-test/prepare').prepare(config);
   fs.mkdirSync(output, { recursive: true });
   const original = ssh(config, "cat " + quote(config.remoteConfigPath + "/dashboard/MaraoDashboard/dashboard.json"));

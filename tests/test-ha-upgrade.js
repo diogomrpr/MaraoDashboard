@@ -17,8 +17,8 @@ const quote = value => "'" + String(value).replace(/'/g, "'\\''") + "'";
 
 function plan(config) {
   assertDisposableHaTarget(config, { requireSsh: true });
-  assert.equal(new URL(config.url).hostname, '192.168.10.229');
-  assert.equal(config.sshHost, '192.168.10.229');
+  assert.equal(new URL(config.url).hostname, '192.168.0.28');
+  assert.equal(config.sshHost, '192.168.0.28');
   const expectations = JSON.parse(fs.readFileSync(path.join(fixtures, 'page-model-expectations.json')));
   const read = file => fs.readFileSync(path.join(fixtures, file), 'utf8');
   const rows = provenance.map(row => ({ baseline: row.tag, format: 'generator-json-0', source: read(row.fixture),

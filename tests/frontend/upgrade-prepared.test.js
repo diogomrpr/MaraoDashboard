@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process';
 
 const require = createRequire(import.meta.url);
 const { readPreparedReceipt, validatePreparedReceipt } = require('../../ha-test/upgrade/prepared');
-const config = { url: 'http://192.168.10.229:8123', disposable: true, sshHost: '192.168.10.229', remoteConfigPath: '/config' };
+const config = { url: 'http://192.168.0.28:8123', disposable: true, sshHost: '192.168.0.28', remoteConfigPath: '/config' };
 const candidate = { commit: 'a'.repeat(40), package_sha256: 'b'.repeat(64), frontend_fingerprint: 'c'.repeat(16) };
 const receipt = () => ({ version: 1, operation_id: '12345678-1234-1234-1234-123456789abc', target: config.url, remote_config_path: '/config', dashboard_key: 'marao-dashboard',
   entry_id: 'existing-entry', created_at: new Date().toISOString(), candidate: structuredClone(candidate),

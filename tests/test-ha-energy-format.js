@@ -217,8 +217,8 @@ async function inspectGallery(page, run, requests) {
 
 async function main() {
   const config = readConfig();
-  assert.equal(new URL(config.url).hostname, '192.168.10.229');
-  assert.equal(config.sshHost, '192.168.10.229');
+  assert.equal(new URL(config.url).hostname, '192.168.0.28');
+  assert.equal(config.sshHost, '192.168.0.28');
   await prepare(config);
   fs.mkdirSync(output, { recursive: true });
   const ws = await connect(config);

@@ -7,7 +7,7 @@ context: |
   do not reread all documentation or copy its policies into every artifact.
   Small repairs restoring documented behavior use the short path; new behavior,
   contracts, migrations and substantial cross-layer work use OpenSpec changes.
-  Agents may operate only disposable 192.168.10.229 with safe fixtures; keep secrets
+  Agents may operate only disposable 192.168.0.28 with safe fixtures; keep secrets
   and private evidence ignored. Preserve the self-contained runtime and saved data.
   Use the applicable marao-ha-integration, marao-ha-frontend and marao-testing
   skills. Capture task scope and select test:affected visual, behavior or focused
@@ -37,7 +37,7 @@ operations:
     guidance:
     - Follow AGENTS.md; record acceptance cases and affected shared consumers, capture the task baseline before editing, and preserve unrelated dirty/concurrent work.
     - Assess upgrade impact when formats, generated contracts or persistence change; preserve supported saved configurations and expected fixtures.
-    - "Implement related queued tasks together and complete the selected development tier. Retain early checks for dependent migrations/security. Keep disposable 192.168.10.229 current before completion: preview syncs frontend files to compatible HA and refreshes the browser; fresh/backend/fixture setup uses explicit ha:sync. Leave successful assets installed unless the project is reverted. Preserve safe helper cleanup and failed-operation recovery; watch runs only while open."
+    - "Implement related queued tasks together and complete the selected development tier. Retain early checks for dependent migrations/security. Keep disposable 192.168.0.28 current before completion: preview syncs frontend files to compatible HA and refreshes the browser; fresh/backend/fixture setup uses explicit ha:sync. Leave successful assets installed unless the project is reverted. Preserve safe helper cleanup and failed-operation recovery; watch runs only while open."
     - Compare implementation and evidence with requested outcomes. One current targeted UI inspection is sufficient; do not broaden or repeat without changed inputs, a failure or a concrete concern. Tooling-only work needs no HA visit; development scope cannot narrow publication.
   archive:
     guidance:

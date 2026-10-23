@@ -154,7 +154,7 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
       const url = new URL(item.url);
       // A header gives Playwright the exact originating XHR identity, including
       // concurrent/repeated requests to identical URLs. No media URL is changed.
-      if (location.hostname === '192.168.10.229' && url.origin === location.origin && url.pathname.startsWith('/api/hls/')) { this.setRequestHeader('X-Marao-Test-Xhr', String(item.id)); this.setRequestHeader('X-Marao-Test-Document', documentId); }
+      if (location.hostname === '192.168.0.28' && url.origin === location.origin && url.pathname.startsWith('/api/hls/')) { this.setRequestHeader('X-Marao-Test-Xhr', String(item.id)); this.setRequestHeader('X-Marao-Test-Document', documentId); }
       state.events.push({ ...item, kind: 'send', order: ++state.order, date: Date.now(), stack: new Error('native XHR send').stack });
     }
     return send.apply(this, args);

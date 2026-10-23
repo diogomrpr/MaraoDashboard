@@ -30,7 +30,7 @@ test('browser scope and parallel controls are explicit', () => {
 
 test('batch preparation happens once and its ordinary receipt cannot stand in for upgrade proof', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-batch-fixture-'));
-  const config = { url: 'http://192.168.10.229:8123', disposable: true, sshHost: '192.168.10.229', remoteConfigPath: '/config' };
+  const config = { url: 'http://192.168.0.28:8123', disposable: true, sshHost: '192.168.0.28', remoteConfigPath: '/config' };
   const expected = require('../test-ha-upgrade').plan(config).current;
   let preparations = 0, inspections = 0;
   try {

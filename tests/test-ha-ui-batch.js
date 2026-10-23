@@ -87,7 +87,7 @@ async function accessChecks(page, output, scenario, theme) {
   }
 }
 async function main() {
-  const config = readConfig(); assert.equal(new URL(config.url).hostname, '192.168.10.229');
+  const config = readConfig(); assert.equal(new URL(config.url).hostname, '192.168.0.28');
   await require('../ha-test/prepare').prepare(config);
   const output = require('./verification-browser').artifactDirectory('ui-batch');
   for (const { scenario, theme } of selectedRuns(parseArgs())) {

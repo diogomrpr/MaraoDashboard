@@ -7,11 +7,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 const { classifyCameraCancellations, installTrace, managedCameraLedger, sameDocumentHashNavigation } = createRequire(import.meta.url)('../camera-request-ledger');
-const url = 'http://192.168.10.229:8123/api/hls/fake-session/playlist.m3u8?_HLS_msn=8';
-const stack = 'Error\n at Hls.destroy (http://192.168.10.229:8123/frontend_latest/native-hls.js:12:34)';
+const url = 'http://192.168.0.28:8123/api/hls/fake-session/playlist.m3u8?_HLS_msn=8';
+const stack = 'Error\n at Hls.destroy (http://192.168.0.28:8123/frontend_latest/native-hls.js:12:34)';
 const entity = 'camera.marao_dashboard_test_camera';
 const fixture = () => ({ failures: [{ document: 'first-document', url, xhr: 1, type: 'xhr', error: 'net::ERR_ABORTED', started: 100, date: 200 }],
-  trace: { document: 'first-document', sessions: [{ entity, prefix: 'http://192.168.10.229:8123/api/hls/fake-session/' }], stops: [], events: [
+  trace: { document: 'first-document', sessions: [{ entity, prefix: 'http://192.168.0.28:8123/api/hls/fake-session/' }], stops: [], events: [
     { kind: 'send', id: 1, url, date: 100, stack },
     { kind: 'abort', id: 1, url, date: 199, stack, boundary: { id: 1, label: 'explicit visibility release', entities: [entity] } },
   ] } });
@@ -154,7 +154,7 @@ test('a native handoff followed by exact 69ms ineligible disposal proves cancell
       proof: { valid: false, reason: 'Owner replaced, disconnected or new native stream requested' },
       closedByRelease: { kind: 'marao-ineligible-release', release: 2, ownerRetained: true } }];
     value.trace.releases = [{ id: 2, date: 169, order: 20, wrapper: 11, host: 15, camera: 12, generation: 4, streamRequests: 1,
-      stack: 'Error\n at CameraPlayback.stop (http://192.168.10.229:8123/marao_dashboard_static/MaraoCamera.js:270:24)',
+      stack: 'Error\n at CameraPlayback.stop (http://192.168.0.28:8123/marao_dashboard_static/MaraoCamera.js:270:24)',
       currentHost: true, wasConnected: true, eligible: false, prefix,
       proof: { released: true, ownershipUnambiguous: true, originalCameraOrNull: true, camera: 12, generation: 4, hostDisconnected: true, playerReleased: true } }];
     value.trace.events[1].boundary = { kind: 'native-handoff', handoff: 8, entities: [entity] };
@@ -197,7 +197,7 @@ test('a native handoff followed by exact 69ms ineligible disposal proves cancell
 test('natural offscreen release requires exact Marao stop, ineligibility and actual current host disposal', () => {
   const released = () => {
     const value = fixture();
-    value.trace.releases = [{ id: 2, stack: 'Error\n at CameraPlayback.stop (http://192.168.10.229:8123/marao_dashboard_static/MaraoCamera.js:270:24)',
+    value.trace.releases = [{ id: 2, stack: 'Error\n at CameraPlayback.stop (http://192.168.0.28:8123/marao_dashboard_static/MaraoCamera.js:270:24)',
       currentHost: true, wasConnected: true, eligible: false, camera: 12, generation: 4, prefix: value.trace.sessions[0].prefix,
       proof: { released: true, ownershipUnambiguous: true, remainingConsumers: [], originalCameraOrNull: true, camera: 12, generation: 4, hostDisconnected: true, playerReleased: true } }];
     value.trace.events[1].boundary = { kind: 'marao-ineligible-release', release: 2, entities: [entity] };
@@ -207,11 +207,11 @@ test('natural offscreen release requires exact Marao stop, ineligibility and act
   for (const assetPath of ['marao_dashboard_static', 'api/marao_dashboard/frontend/5d7e0d282ab7c71c']) {
     const current = released(); current.trace.releases[0].stack = current.trace.releases[0].stack.replace('marao_dashboard_static', assetPath);
     assert.equal(classifyCameraCancellations(current.failures, current.trace).accepted.length, 1);
-    current.trace.releases[0].stack = current.trace.releases[0].stack.replace('192.168.10.229', 'other.test');
+    current.trace.releases[0].stack = current.trace.releases[0].stack.replace('192.168.0.28', 'other.test');
     assert.equal(classifyCameraCancellations(current.failures, current.trace).rejected.length, 1);
   }
   for (const change of [
-    receipt => { receipt.stack = 'Error\n at unrelated.stop (http://192.168.10.229:8123/other.js:1:1)'; },
+    receipt => { receipt.stack = 'Error\n at unrelated.stop (http://192.168.0.28:8123/other.js:1:1)'; },
     receipt => { receipt.eligible = true; }, receipt => { receipt.currentHost = false; }, receipt => { receipt.wasConnected = false; },
     receipt => { receipt.prefix = null; }, receipt => { receipt.prefix += 'wrong-session/'; }, receipt => { receipt.proof.hostDisconnected = false; }, receipt => { receipt.proof.playerReleased = false; },
     receipt => { receipt.proof.originalCameraOrNull = false; }, receipt => { receipt.proof.camera++; }, receipt => { receipt.proof.generation++; },
@@ -250,7 +250,7 @@ test('natural retirement is exact to the released prefix and does not retire an 
 });
 
 test('only changed hash on the same origin/path/query retains its document', () => {
-  const current = 'http://192.168.10.229:8123/marao-dashboard/card-test?mode=1#first';
+  const current = 'http://192.168.0.28:8123/marao-dashboard/card-test?mode=1#first';
   assert.equal(sameDocumentHashNavigation(current, '#second'), true);
   for (const target of [current, '?mode=2#first', '/marao-dashboard/overview', 'http://other.test/marao-dashboard/card-test?mode=1#second']) assert.equal(sameDocumentHashNavigation(current, target), false);
 });
@@ -268,11 +268,11 @@ test('managed context/browser close preserves failed-request diagnostics and sti
     let closed = false; const listeners = new Map();
     const browser = { close: async () => { closed = true; throw Error('original browser close failure'); } };
     const context = { addInitScript: async () => {}, browser: () => browser, close: async () => { closed = true; throw Error('original context close failure'); } };
-    const page = { on: (name, listener) => listeners.set(name, listener), isClosed: () => closed, url: () => 'http://192.168.10.229:8123/marao-dashboard/card-test',
+    const page = { on: (name, listener) => listeners.set(name, listener), isClosed: () => closed, url: () => 'http://192.168.0.28:8123/marao-dashboard/card-test',
       goto: async () => {}, evaluate: async (callback, data) => callback(data), waitForTimeout: async () => {}, waitForLoadState: async (state, options) => { assert.equal(state, 'networkidle'); assert.equal(options.timeout, 15000); }, locator: () => ({ evaluateAll: async callback => callback([card]) }) };
     try {
       await managedCameraLedger(context, page, { output: directory, scenario: 'iphone-normal', theme: 'light' });
-      listeners.get('requestfailed')({ url: () => 'http://192.168.10.229:8123/not-owned.js', resourceType: () => 'script', failure: () => ({ errorText: 'net::ERR_ABORTED' }), headers: () => ({}) });
+      listeners.get('requestfailed')({ url: () => 'http://192.168.0.28:8123/not-owned.js', resourceType: () => 'script', failure: () => ({ errorText: 'net::ERR_ABORTED' }), headers: () => ({}) });
       await assert.rejects(target === 'context' ? context.close() : browser.close(), error => error instanceof AggregateError
         && error.errors.some(item => item.message.includes('Unexpected non-camera request'))
         && error.errors.some(item => item.message.includes('original ' + target + ' close failure')));
@@ -289,11 +289,11 @@ test('managed checks leave native camera cancellation and HLS errors to manual v
   const browser = { close: async () => { closed = true; } };
   const context = { addInitScript: () => assert.fail('Manual camera acceptance must not instrument native transports'), browser: () => browser, close: async () => { closed = true; } };
   const page = { on: (name, listener) => listeners.set(name, listener), isClosed: () => closed,
-    url: () => 'http://192.168.10.229:8123/marao-dashboard/card-test', goto: async () => { navigated = true; },
+    url: () => 'http://192.168.0.28:8123/marao-dashboard/card-test', goto: async () => { navigated = true; },
     evaluate: () => assert.fail('Manual camera acceptance must not probe playback or force teardown') };
   try {
     const ledger = await managedCameraLedger(context, page, { output: directory, scenario: 'iphone-normal', theme: 'light' });
-    const url = 'http://192.168.10.229:8123/api/hls/private-session/playlist.m3u8';
+    const url = 'http://192.168.0.28:8123/api/hls/private-session/playlist.m3u8';
     listeners.get('requestfailed')({url: () => url, resourceType: () => 'xhr', failure: () => ({errorText:'net::ERR_ABORTED'}), headers: () => ({})});
     listeners.get('response')({url: () => url, status: () => 400});
     await page.goto('/marao-dashboard-editor'); assert.equal(navigated, true);
@@ -319,7 +319,7 @@ test('instrumentation handles grouped WebSocket replies and tags only same-origi
   }
   class DomNode { removeChild() {} insertBefore() {} }
   class DomElement extends DomNode { remove() {} }
-  const environment = vm.createContext({ window: {}, location: new URL('http://192.168.10.229:8123/marao-dashboard/card-test'), URL, WebSocket: Socket, XMLHttpRequest: Xhr, Node: DomNode, Element: DomElement, crypto: crypto.webcrypto, queueMicrotask, console: { warn: (...args) => warnings.push(args) } });
+  const environment = vm.createContext({ window: {}, location: new URL('http://192.168.0.28:8123/marao-dashboard/card-test'), URL, WebSocket: Socket, XMLHttpRequest: Xhr, Node: DomNode, Element: DomElement, crypto: crypto.webcrypto, queueMicrotask, console: { warn: (...args) => warnings.push(args) } });
   vm.runInContext('(' + installTrace.toString() + ')({subscriptions:true})', environment);
   const socket = new Socket(); socket.send(JSON.stringify([{ id: 7, type: 'unrelated' }, { id: 8, type: 'camera/stream', entity_id: entity }]));
   socket.receive({ data: JSON.stringify([{ id: 7, type: 'result', success: true }, { id: 8, type: 'result', success: true, result: { url } }]) });
@@ -359,9 +359,9 @@ function immediateHandoffFixture({ siblingSelection = false, boundary = null, pr
     emit(type) { for (const listener of [...this.listeners.get(type) || []]) listener({ type, target: this }); }
   }
   class NativeError extends Error { constructor(message) { super(message); this.stack = message + (message === 'Marao native host release'
-    ? `\n at CameraPlayback.stop (http://192.168.10.229:8123/${versioned ? 'api/marao_dashboard/frontend/5d7e0d282ab7c71c' : 'marao_dashboard_static'}/MaraoCamera.js:270:24)`
-    : '\n at repeat.update (http://192.168.10.229:8123/frontend_latest/native.js:1:1)'); } }
-  const environment = vm.createContext({ window: {}, location: new URL('http://192.168.10.229:8123/marao-dashboard/card-test'), URL,
+    ? `\n at CameraPlayback.stop (http://192.168.0.28:8123/${versioned ? 'api/marao_dashboard/frontend/5d7e0d282ab7c71c' : 'marao_dashboard_static'}/MaraoCamera.js:270:24)`
+    : '\n at repeat.update (http://192.168.0.28:8123/frontend_latest/native.js:1:1)'); } }
+  const environment = vm.createContext({ window: {}, location: new URL('http://192.168.0.28:8123/marao-dashboard/card-test'), URL,
     WebSocket: Socket, XMLHttpRequest: Xhr, Node: DomNode, Element: DomElement, crypto: crypto.webcrypto, queueMicrotask,
     Error: NativeError, Date: { now: () => now }, document: new DomElement('document'), getComputedStyle: node => ({ display: node.cssHidden ? 'none' : 'block', visibility: 'visible', opacity: node.parked ? '0' : '1' }),
     setTimeout: (callback, ms) => { const timer = { callback, ms }; timers.push(timer); return timer; },
@@ -369,7 +369,7 @@ function immediateHandoffFixture({ siblingSelection = false, boundary = null, pr
   vm.runInContext('(' + installTrace.toString() + ')()', environment);
   const state = environment.window.__maraoCameraRequestTrace;
   state.boundary = boundary;
-  state.sessions.push({ entity, prefix: 'http://192.168.10.229:8123/api/hls/fake-session/' });
+  state.sessions.push({ entity, prefix: 'http://192.168.0.28:8123/api/hls/fake-session/' });
   const wrapper = new DomElement('marao-card'), host = new DomElement('ha-camera-stream', wrapper);
   host.stateObj = { entity_id: entity };
   const rtc = new DomElement('ha-web-rtc-player', host), video = new DomElement('video', rtc); rtc.entityid = entity;
@@ -602,7 +602,7 @@ test('quality fallback cancellations require the exact retired host and a lower 
     value.trace.sessions[0].entity = high;
     value.trace.releases = [{ id: 1, entity: high, camera: 3, generation: 4, currentHost: true, wasConnected: true, eligible: true,
       prefix: value.trace.sessions[0].prefix,
-      stack: 'Error\n at CameraPlayback.stop (http://192.168.10.229:8123/marao_dashboard_static/MaraoCamera.js:20:1)\n at CameraPlayback.fallback (http://192.168.10.229:8123/marao_dashboard_static/MaraoCamera.js:10:1)',
+      stack: 'Error\n at CameraPlayback.stop (http://192.168.0.28:8123/marao_dashboard_static/MaraoCamera.js:20:1)\n at CameraPlayback.fallback (http://192.168.0.28:8123/marao_dashboard_static/MaraoCamera.js:10:1)',
       proof: { originalCameraOrNull: true, camera: 3, generation: 5, hostDisconnected: true, playerReleased: true,
         quality: { sameConfiguredEntity: true, sameDevice: true, lowerResolution: true, selected: low } } }];
     value.trace.events[1].boundary = { kind: 'marao-quality-release', release: 1, entities: [high] };

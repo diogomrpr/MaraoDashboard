@@ -143,7 +143,7 @@ async function main() {
   assert.ok(cpus.length && new Set(cpus).size === cpus.length && cpus.every(cpu => [1, 4].includes(cpu)), '--cpu accepts 1, 4 or 1,4');
   assert.ok(modes.every(mode => ['early', 'prepared'].includes(mode)), '--mode accepts early, prepared or both');
   assert.ok(Number.isInteger(preparedWaitMs) && preparedWaitMs >= 0 && preparedWaitMs <= 60000, 'Invalid preparation allowance');
-  const config = readConfig(); assert.equal(new URL(config.url).hostname, '192.168.10.229');
+  const config = readConfig(); assert.equal(new URL(config.url).hostname, '192.168.0.28');
   // Baseline and candidate use installed assets and native browser caching.
   const client = await connect(config), saved = await client.call({ type: 'marao_dashboard/config/get' });
   const fixture = fs.readFileSync(fixtureFile, 'utf8'), samples = [];

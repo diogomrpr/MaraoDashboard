@@ -223,7 +223,7 @@ async function nativeEditor(page,calls,theme) {
 }
 
 async function main() {
-  const config=readConfig();assert.equal(new URL(config.url).hostname,'192.168.10.229');await prepare(config);
+  const config=readConfig();assert.equal(new URL(config.url).hostname,'192.168.0.28');await prepare(config);
   const options=parseArgs();options.scenario||='iphone-normal';fs.mkdirSync(output,{recursive:true});
   const ws=await connect(config),before=(await ws.call({type:'marao_dashboard/config/get'})).config;
   try {
