@@ -449,9 +449,9 @@ test("card registration can be retried after the custom-element registry becomes
 
 test("dashboard waits for Home Assistant's settled registry before loading and registering cards", () => {
   const ready = dashboardSource.indexOf("await waitForHomeAssistantRegistry();");
-  const imports = dashboardSource.indexOf("await Promise.all([");
+  const imports = dashboardSource.indexOf("const cardsModule = await import(");
   const cards = dashboardSource.indexOf("registerMaraoCards();");
-  const events = dashboardSource.indexOf("registerMaraoCameraEventCards();");
+  const events = dashboardSource.indexOf("registerMaraoCameraEventCards()");
   assert.ok(ready >= 0 && ready < imports);
   assert.ok(imports < cards && cards < events);
   assert.match(dashboardSource, /customElements\?\.get\("home-assistant"\)/);

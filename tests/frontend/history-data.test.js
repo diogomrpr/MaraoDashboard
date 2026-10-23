@@ -110,3 +110,16 @@ test('Recorder statistics preserve exact changes, null gaps, interval coverage a
   const unaligned=statisticsBuckets([{start:hour/2,end:hour,change:3}],{range:{start:0,end:hour},period:'day',now:hour});
   assert.equal(unaligned.samples[0].value,null,'An interval starting mid-bucket cannot imply a complete baseline');
 });
+
+test('cached timezone boundaries and bucket layouts remain isolated from caller mutation', () => {
+  const original=periodRange('2026-03-29T12:00:00Z',0,'month','Europe/Lisbon');
+  const expected=[+original.start,+original.end];
+  original.start.setFullYear(2000);original.end.setFullYear(2000);
+  const range=periodRange('2026-03-29T12:00:00Z',0,'month','Europe/Lisbon');
+  assert.deepEqual([+range.start,+range.end],expected);
+  const options={range,period:'month',timeZone:'Europe/Lisbon'};
+  const first=energyBuckets([],options);first.samples[0].time=0;first.samples[0].value=123;
+  const second=energyBuckets([],options);
+  assert.equal(second.samples[0].time,expected[0]);assert.equal(second.samples[0].value,null);
+  assert.equal(second.samples.find(sample=>new Date(sample.time).getUTCDate()===29).end-second.samples.find(sample=>new Date(sample.time).getUTCDate()===29).time,23*hour);
+});

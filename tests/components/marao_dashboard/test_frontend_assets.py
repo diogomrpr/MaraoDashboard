@@ -58,3 +58,22 @@ async def test_asset_allowlist_and_partial_deployment(hass, hass_client_no_auth,
     assert response.status == 503
     assert response.headers["Cache-Control"] == "no-store"
     assert "version = 2" not in await response.text()
+
+
+async def test_text_asset_compression_negotiates_without_changing_contents(hass, hass_client_no_auth, tmp_path):
+    source = "export const labels = " + repr("Marao " * 5000) + ";"
+    (tmp_path / "MaraoDashboard.js").write_text(source)
+    client = await asset_client(hass, hass_client_no_auth, tmp_path)
+    version = hass.data[DOMAIN][ASSET_STATE]["fingerprint"]
+    url = frontend_asset_url(version, "MaraoDashboard.js")
+    for encoding in ("gzip", "deflate", "identity"):
+        response = await client.get(url, headers={"Accept-Encoding": encoding})
+        assert response.status == 200
+        assert await response.text() == source
+        assert response.headers["Vary"] == "Accept-Encoding"
+        assert "immutable" in response.headers["Cache-Control"]
+        if encoding == "identity":
+            assert "Content-Encoding" not in response.headers
+        else:
+            assert response.headers["Content-Encoding"] == encoding
+            assert int(response.headers["Content-Length"]) < len(source) // 5

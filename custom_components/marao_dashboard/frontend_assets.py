@@ -90,5 +90,12 @@ class FrontendAssetView(HomeAssistantView):
         if content is None:
             return web.Response(status=503, text="Marao frontend deployment changed; restart Home Assistant",
                                 headers=NO_STORE)
-        return web.Response(body=content, content_type=mimetypes.guess_type(filename)[0] or "application/octet-stream",
-                            headers={"Cache-Control": "public, max-age=2678400, immutable"})
+        response = web.Response(
+            body=content, content_type=mimetypes.guess_type(filename)[0] or "application/octet-stream",
+            headers={"Cache-Control": "public, max-age=2678400, immutable"},
+            zlib_executor_size=1024,
+        )
+        if Path(filename).suffix in {".js", ".css", ".json", ".svg"}:
+            response.headers["Vary"] = "Accept-Encoding"
+            response.enable_compression()
+        return response

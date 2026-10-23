@@ -169,9 +169,9 @@ test('neighbor prefetch waits for the selected chart to load and paint, and reus
     f.choose('week');await settle();
     assert.equal(calls.length,2,'changing unit shares the pending background request');
     finish(response(calls[1]));await settle();assert.equal(f.updates.at(-1).loading,false);
-    assert.equal(calls.length,4);
+    assert.equal(calls.length,3);
     f.choose('day');await settle();
-    assert.equal(calls.length,4,'returning to a freshly loaded unit reuses its first page');
+    assert.equal(calls.length,3,'returning to a freshly loaded unit reuses its first page');
   }finally{f.cleanup();}
 });
 
@@ -184,9 +184,13 @@ test('day, week and month load four neighbors each way, nearest first, without f
       if(period!=='day'){f.choose(period);await settle();}
       const current=periodRange(stamp,0,period,'Europe/Lisbon');
       const before=calls.length;await f.prefetch();
-      const expected=[];
+      const expected=[], seen=new Set(calls.slice(0,before).map(url=>url.split('/period/')[1].split('?')[0]));
       function addChunks(interval){
-        for(let from=+interval.start;from<Math.min(+interval.end,Date.parse(stamp));){expected.push(new Date(from).toISOString());from=Math.min(+periodRange(from,0,'day','Europe/Lisbon').end,+interval.end);}
+        for(let from=+interval.start;from<Math.min(+interval.end,Date.parse(stamp));){
+          const key=new Date(from).toISOString();
+          if(!seen.has(key)){expected.push(key);seen.add(key);}
+          from=Math.min(+periodRange(from,0,'day','Europe/Lisbon').end,+interval.end);
+        }
       }
       for(const unit of ['day','week','month'])if(unit!==period && !(period!=='day'&&unit==='day'))addChunks(periodRange(stamp,0,unit,'Europe/Lisbon'));
       for(let offset=-1;offset>=-4;offset--)addChunks(periodRange(current.start,offset,period,'Europe/Lisbon'));
@@ -203,7 +207,7 @@ test('day, week and month load four neighbors each way, nearest first, without f
       for(let step=0;step<4;step++){f.next.dispatchEvent(new Event('click'));await settle();}
       assert.equal(calls.length,filled,period+' forward neighbors are cached');
       for(let step=0;step<5;step++){f.previous.dispatchEvent(new Event('click'));await settle();}
-      assert.ok(calls.length>filled,period+' entries outside the bounded neighboring window are evicted');
+      assert.equal(+f.updates.at(-1).range.start,+periodRange(current.start,-5,period,'Europe/Lisbon').start,period+' navigation works beyond the prefetched window');
     }finally{f.cleanup();}
   }
 });
@@ -213,9 +217,9 @@ test('background errors do not change the selected chart, loop, or prevent a sel
   const f=controller(async(_method,url)=>{calls.push(url);if(calls.length===2)throw new Error('offline');return response(url);});
   try{
     await settle();const before=f.updates.length;
-    await f.prefetch();assert.equal(calls.length,27);assert.equal(f.updates.length,before);
-    await f.prefetch();assert.equal(calls.length,27);
-    f.choose('week');await settle();assert.equal(calls.length,30);
+    await f.prefetch();assert.equal(calls.length,22);assert.equal(f.updates.length,before);
+    await f.prefetch();assert.equal(calls.length,22);
+    f.choose('week');await settle();assert.equal(calls.length,22,'retry reuses daily data recovered by the month prefetch');
     assert.equal(f.updates.at(-1).error,'');assert.equal(f.updates.at(-1).loading,false);
   }finally{f.cleanup();}
 });
@@ -292,5 +296,34 @@ test('first pages for every unit stay cached while navigating another unit and s
     const warmed=calls.length;f.previous.dispatchEvent(new Event('click'));await settle();
     assert.equal(calls.length,warmed);
     f.choose('week');await settle();assert.equal(calls.length,warmed);
+  }finally{f.cleanup();}
+});
+
+test('daily chunks share in-flight reads across periods, expire live data and evict failures', async()=>{
+  const chunks=new Map(),calls=[];let finish,clock=Date.parse(stamp);
+  const hass={callApi:(_method,url)=>{calls.push(url);return calls.length===1?new Promise(resolve=>{finish=resolve;}):Promise.resolve(response(url));}};
+  const options={hass,ids:['sensor.house','sensor.fridge'],timeZone:'Europe/Lisbon',convert,chunks,now:clock};
+  const day=periodRange(stamp,0,'day','Europe/Lisbon');
+  const first=loadPowerPeriod({...options,range:day}), second=loadPowerPeriod({...options,range:day});
+  assert.equal(calls.length,1);finish(response(calls[0]));await Promise.all([first,second]);
+  await loadPowerPeriod({...options,range:periodRange(stamp,0,'week','Europe/Lisbon')});
+  assert.equal(calls.length,3,'three days in this week, with today reused');
+  await loadPowerPeriod({...options,range:day,now:clock+61000});assert.equal(calls.length,4);
+  const failed=new Map();let attempts=0;
+  const retry={...options,chunks:failed,range:day,hass:{callApi:async()=>{if(++attempts===1)throw Error('offline');return [];}}};
+  await assert.rejects(loadPowerPeriod(retry),/offline/);assert.equal(failed.size,0);
+  await loadPowerPeriod(retry);assert.equal(attempts,2);
+  for(let offset=-1;offset>=-70;offset--)await loadPowerPeriod({...options,range:periodRange(stamp,offset,'day','Europe/Lisbon')});
+  assert.ok(chunks.size<=64,'daily working cache is bounded');
+});
+
+test('daily reuse is invalidated when a source unit or availability changes',async()=>{
+  const calls=[],f=controller(async(_method,url)=>{calls.push(url);return response(url);});
+  try{
+    await settle();const old=f.options.hass;
+    const changed={...old,states:{...old.states,'sensor.house':{state:'1',attributes:{unit_of_measurement:'kW'}}}};
+    f.instance.update({hass:changed});await settle();assert.equal(calls.length,2);
+    f.instance.update({hass:{...changed,states:{...changed.states,'sensor.fridge':{state:'unavailable',attributes:{unit_of_measurement:'W'}}}}});await settle();
+    assert.equal(calls.length,3);assert.equal(new URL(calls.at(-1),'http://test/').searchParams.get('filter_entity_id'),'sensor.house');
   }finally{f.cleanup();}
 });

@@ -1,5 +1,8 @@
-const { bindNavbarRefresh, refreshFrontend } = await import(new URL(`./MaraoFrontendRefresh.js${new URL(import.meta.url).search}`, import.meta.url));
-const { createFrontendUpdates } = await import(new URL(`./MaraoFrontendUpdates.js${new URL(import.meta.url).search}`, import.meta.url));
+const [refreshModule, updatesModule] = await Promise.all([
+  'MaraoFrontendRefresh.js', 'MaraoFrontendUpdates.js',
+].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
+const { bindNavbarRefresh, refreshFrontend } = refreshModule;
+const { createFrontendUpdates } = updatesModule;
 let frontendUpdates, activeServices = 0;
 export function beginFrontendInteraction() {
   activeServices++;
@@ -142,7 +145,7 @@ export class MaraoNavbarCard extends BaseElement {
     if (!this._isSurface && !this.preview && ownerRoot(this)) { claimNavigation(this); return; }
     registerFullscreen(this); this._render();
     this._observer = new ResizeObserver(this._scheduleLayout);
-    for (const node of [this, this._view(), this.shadowRoot.querySelector('.bounds')]) if (node) this._observer.observe(node);
+    for (const node of [this, this._view(), this.shadowRoot.querySelector('.bounds'), this.shadowRoot.querySelector('.nav')]) if (node) this._observer.observe(node);
     for (const event of ['location-changed', 'popstate', 'hashchange']) window.addEventListener(event, this._locationChanged);
     window.addEventListener('resize', this._scheduleLayout);
     window.visualViewport?.addEventListener('resize', this._scheduleLayout);
@@ -160,7 +163,7 @@ export class MaraoNavbarCard extends BaseElement {
     if (this._surface) { queueMicrotask(() => syncNavigation(this._surface._navigationRecord)); return; }
     if (this._navigationRecord && !this._navigationRecord.root.isConnected) releaseNavigation(this._navigationRecord);
     this._refreshGesture?.destroy();
-    this._closeOverflow(false); this._clearDismissGesture(); this._observer?.disconnect(); cancelAnimationFrame(this._frame);
+    this._closeOverflow(false); this._clearDismissGesture(); this._observer?.disconnect(); cancelAnimationFrame(this._frame); this._frame = null;
     for (const event of ['location-changed', 'popstate', 'hashchange']) window.removeEventListener(event, this._locationChanged);
     window.removeEventListener('resize', this._scheduleLayout);
     window.visualViewport?.removeEventListener('resize', this._scheduleLayout);
@@ -168,11 +171,14 @@ export class MaraoNavbarCard extends BaseElement {
     unregisterFullscreen(this);
   }
   set hass(value) {
+    const previousThemes = this._hass?.themes, previousEditing = this._editing;
     this._hass = value;
     if (this._navigationRecord) cameraPreloader?.(this._navigationRecord);
     if (!this.preview) updateFrontendClient(value);
     if (this._surface && this._hostPath === window.location.pathname) { copyNavigationTheme(this, this._surface); this._surface.hass = value; }
+    this._syncContext();
     this._updateCurrent();
+    if (previousThemes !== value?.themes || previousEditing !== this._editing) this._scheduleLayout();
   }
   _root() {
     if (this._navigationRecord) return this._navigationRecord.root;
@@ -183,16 +189,18 @@ export class MaraoNavbarCard extends BaseElement {
   _view() { return this._root()?.shadowRoot?.querySelector('#view'); }
   _syncContext() {
     const editing = Boolean(this._root()?.lovelace?.editMode);
+    if (this._isSurface) this.hidden = Boolean(editing || this.preview);
     if (editing !== this._editing) { this._editing = editing; this._refreshGesture?.cancel(); this._closeOverflow(false); this._updateCurrent(); }
   }
   _locationChanged = () => { if (this._navigationRecord) syncNavigation(this._navigationRecord); this._refreshGesture?.cancel(); this._closeOverflow(false); this._updateCurrent(); this._scheduleLayout(); };
   _scheduleLayout = () => {
-    cancelAnimationFrame(this._frame);
-    this._frame = requestAnimationFrame(() => { if (this.isConnected) this._layout(); });
+    if (this._frame != null || !this.isConnected) return;
+    this._frame = requestAnimationFrame(() => { this._frame = null; if (this.isConnected) this._layout(); });
   };
   _layout() {
     const nav = this.shadowRoot?.querySelector('.nav'), bounds = this.shadowRoot?.querySelector('.bounds');
-    if (!this.isConnected || !nav || !bounds || !this.getClientRects().length) return;
+    if (!this.isConnected || !nav || !bounds) return;
+    if (!this.getClientRects().length) { applyFullscreen(); return; }
     const safe = bounds.getBoundingClientRect(), host = (this.preview ? this : this._view())?.getBoundingClientRect();
     const viewport = window.visualViewport;
     const left = Math.max(safe.left, host?.left ?? safe.left, viewport?.offsetLeft || 0);
@@ -205,9 +213,9 @@ export class MaraoNavbarCard extends BaseElement {
     const geometry = [left, right, top, safe.bottom, slots].map(value => Math.round(value * 2) / 2).join(':');
     if (this._geometry !== geometry) { this._refreshGesture?.cancel(); this._closeOverflow(false); }
     this._geometry = geometry; this._safeTop = top;
-    this.style.setProperty('--marao-navbar-left', `${(left + right) / 2}px`);
-    if (this.preview) this.style.setProperty('--marao-navbar-preview-left', `${(left + right) / 2 - host.left}px`);
-    this.style.setProperty('--marao-navbar-width', `${Math.max(68, right - left)}px`);
+    setStyle(this, '--marao-navbar-left', `${(left + right) / 2}px`);
+    if (this.preview) setStyle(this, '--marao-navbar-preview-left', `${(left + right) / 2 - host.left}px`);
+    setStyle(this, '--marao-navbar-width', `${Math.max(68, right - left)}px`);
     if (slots !== this._slots) { this._slots = slots; this._render(); }
     applyFullscreen();
   }
@@ -262,7 +270,7 @@ export class MaraoNavbarCard extends BaseElement {
       haptic('heavy'); this._open ? this._closeOverflow(true) : this._openOverflow();
     });
     this._updateCurrent();
-    if (this._observer) this._observer.observe(this.shadowRoot.querySelector('.bounds'));
+    if (this._observer) for (const selector of ['.bounds', '.nav']) this._observer.observe(this.shadowRoot.querySelector(selector));
     if (this.isConnected) this._layout();
   }
   _bindLinks(root) {
@@ -409,7 +417,7 @@ function copyNavigationTheme(host, surface) {
   const style = getComputedStyle(host);
   for (const key of ['--ha-card-background','--card-background-color','--primary-text-color','--primary-color','--text-primary-color','--icon-color','--active-text-color','--font-size-primary','--font-weight-primary','--primary-font-family']) {
     const value = style.getPropertyValue(key);
-    if (value) surface.style.setProperty(key, value); else surface.style.removeProperty(key);
+    if (value) setStyle(surface, key, value); else if (surface.style.getPropertyValue(key)) surface.style.removeProperty(key);
   }
 }
 function updateNavigation(record, config, host) {
@@ -424,7 +432,7 @@ function updateNavigation(record, config, host) {
 function releaseNavigation(record) {
   if (!record || record.released) return;
   record.released = true; navigationRecords.delete(record); navigationOwners.delete(record.root);
-  record.cameraPreload?.dispose(); record.observer?.disconnect(); record.surface.remove();
+  record.cameraPreload?.dispose(); record.observer?.disconnect(); cancelAnimationFrame(record.frame); record.surface.remove();
 }
 function syncNavigation(record) {
   if (!record || record.released) return;
@@ -462,7 +470,14 @@ function claimNavigation(host) {
       standalone:Boolean(host.nativeHost && !nativeDashboard(root))};
     surface._navigationRecord = record; navigationOwners.set(root, record); navigationRecords.add(record);
     updateNavigation(record, host._config, host); root.shadowRoot.prepend(surface);
-    record.observer = new MutationObserver(() => syncNavigation(record));
+    record.observer = new MutationObserver(() => {
+      if (record.frame != null) return;
+      record.frame = requestAnimationFrame(() => {
+        record.frame = null;
+        syncNavigation(record);
+        if (!record.released) record.surface._scheduleLayout();
+      });
+    });
     record.observer.observe(root.shadowRoot, {childList:true});
     const view = root.shadowRoot.querySelector('#view'); if (view) record.observer.observe(view, {childList:true, subtree:true});
   } else updateNavigation(record, host._config, host);
@@ -472,7 +487,9 @@ function claimNavigation(host) {
 }
 
 export const fullscreenUsers = new Set();
-let fullscreenTimer;
+function setStyle(node, property, value, priority = '') {
+  if (node.style.getPropertyValue(property) !== value || node.style.getPropertyPriority(property) !== priority) node.style.setProperty(property, value, priority);
+}
 const fullscreenOriginals = new Map();
 export function findElements(selector, root = document) {
   const found = [];
@@ -580,7 +597,7 @@ function applyFullscreen() {
         : property === "padding-bottom"
         ? `calc(${coveredBottom ? `${coveredBottom}px` : `calc(60px + ${safeArea("bottom")} + 12px)`} + 8px)`
         : safeArea(property.slice(8));
-      node.style.setProperty(property, property === "display" ? "none" : property === "flex-direction" ? "column"
+      setStyle(node, property, property === "display" ? "none" : property === "flex-direction" ? "column"
         : `max(${normal}, ${clearance})`, "important");
     }
   }
@@ -588,8 +605,7 @@ function applyFullscreen() {
 function registerFullscreen(element) {
   fullscreenUsers.add(element);
   applyFullscreen();
-  if (fullscreenTimer !== undefined) return;
-  fullscreenTimer = setInterval(() => { for (const record of navigationRecords) syncNavigation(record); applyFullscreen(); }, 1000);
+  if (fullscreenUsers.size > 1) return;
   window.addEventListener("location-changed", applyFullscreen);
   window.addEventListener("popstate", applyFullscreen);
 }
@@ -597,8 +613,6 @@ function unregisterFullscreen(element) {
   fullscreenUsers.delete(element);
   applyFullscreen();
   if (fullscreenUsers.size) return;
-  clearInterval(fullscreenTimer);
-  fullscreenTimer = undefined;
   window.removeEventListener("location-changed", applyFullscreen);
   window.removeEventListener("popstate", applyFullscreen);
 }

@@ -70,10 +70,17 @@ export function reduceSamples(samples, maxPoints = 240) {
   return result;
 }
 
+const calendarFormatters = new Map(), calendarBoundaries = new Map(), bucketPeriods = new Map();
+function remember(map, key, value, limit) {
+  if (map.size >= limit) map.delete(map.keys().next().value);
+  map.set(key, value);
+  return value;
+}
+
 export function periodRange(now, offset, period, timeZone = 'UTC') {
   const instant = +new Date(now);
   if (!Number.isFinite(instant) || !Number.isInteger(offset) || !['day', 'week', 'month'].includes(period)) throw new Error('Invalid history period');
-  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const formatter = calendarFormatters.get(timeZone) || remember(calendarFormatters, timeZone, new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }), 16);
   const civil = value => Object.fromEntries(formatter.formatToParts(new Date(value)).filter(part => ['year','month','day'].includes(part.type)).map(part => [part.type, Number(part.value)]));
   const current = civil(instant);
   if (period === 'week') {
@@ -86,13 +93,15 @@ export function periodRange(now, offset, period, timeZone = 'UTC') {
   if (period === 'month') endDate.setUTCMonth(endDate.getUTCMonth() + 1); else endDate.setUTCDate(endDate.getUTCDate() + (period === 'week' ? 7 : 1));
   const boundary = date => {
     const key = date.getUTCFullYear() * 10000 + (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
+    const cacheKey = `${timeZone}:${key}`;
+    if (calendarBoundaries.has(cacheKey)) return new Date(calendarBoundaries.get(cacheKey));
     let low = +date - 48 * 3600000, high = +date + 48 * 3600000;
     // Find the actual calendar boundary, including skipped/repeated local midnight.
     while (high - low > 1) {
       const middle = Math.floor((low + high) / 2), parts = civil(middle);
       if (parts.year * 10000 + parts.month * 100 + parts.day < key) low = middle; else high = middle;
     }
-    return new Date(high);
+    return new Date(remember(calendarBoundaries, cacheKey, high, 1024));
   };
   return { start: boundary(startDate), end: boundary(endDate) };
 }
@@ -100,12 +109,15 @@ export function periodRange(now, offset, period, timeZone = 'UTC') {
 function consumptionPeriods(range, period, timeZone) {
   const start = +new Date(range.start), end = +new Date(range.end);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || !['day', 'month'].includes(period)) throw new Error('Invalid energy period');
+  const key = `${timeZone}:${period}:${start}:${end}`;
+  if (bucketPeriods.has(key)) return bucketPeriods.get(key).map(sample => ({ ...sample }));
   const samples = [];
   for (let time = start; time < end;) {
     const next = Math.min(end, period === 'day' ? time + 3600000 : +periodRange(time, 0, 'day', timeZone).end);
     samples.push({ time, end: next, value: null });
     time = next;
   }
+  remember(bucketPeriods, key, samples.map(sample => ({ ...sample })), 64);
   return samples;
 }
 

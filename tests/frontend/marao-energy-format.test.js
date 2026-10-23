@@ -11,7 +11,7 @@ globalThis.navigationTranslations = (await import('../../custom_components/marao
 const dashboard=await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoRuntime.js', import.meta.url), 'utf8');
 const classes=dashboard.slice(dashboard.indexOf('function escapeHtml('),dashboard.indexOf('if (!customElements.get("marao-energy-period-card"))'));
 const {MaraoEnergyPeriodCard,energyTariff}=await import('data:text/javascript;base64,'+Buffer.from(`import {energyBuckets,statisticsBuckets,energyTotal,historyPeriodRange,historySamples,loadHistoryChart,energyFormatting,energyValue,energyHistoryValue,energyLabel,formatEnergyNumber,binaryState,cardProblem,problemStyle,problemLabel,showCardDetails,createHistoryPlaceholder,layoutState,focusRestorer,controlGridStyles,updateCardSurface} from "${uri}";const localize=key=>key;${classes};export {MaraoEnergyPeriodCard,energyTariff};`).toString('base64'));
-const sample=(value,unit,time=Date.now()-1000)=>({state:String(value),attributes:{unit_of_measurement:unit,friendly_name:'Reading'},last_changed:new Date(time).toISOString()});
+const sample=(value,unit,time=Date.now()-1000)=>({entity_id:'sensor.energy',state:String(value),attributes:{unit_of_measurement:unit,friendly_name:'Reading'},last_changed:new Date(time).toISOString()});
 const tick=()=>new Promise(resolve=>setTimeout(resolve, 10));
 const waitFor=async condition=>{
   const deadline=Date.now()+3000;
@@ -296,4 +296,37 @@ test('a derived cost summary uses the current period source without loading its 
   assert.match(card.shadowRoot.innerHTML,/≈ 2.00 EUR/);assert.equal(calls,0);
   card.hass={...card._hass,states:{'sensor.energy':sample('unavailable','Wh')}};
   assert.match(card.shadowRoot.innerHTML,/common.unavailable/);assert.doesNotMatch(card.shadowRoot.innerHTML,/≈ 2.00/);
+});
+
+test('energy fallback batches devices and maps recorder rows by entity rather than response order', async()=>{
+  const card=new MaraoEnergyPeriodCard();card._render=()=>{};card._load=()=>{};
+  card.setConfig({entity:'sensor.energy',popup:true,cost_per_kwh:0.25,sub_entities:[{entity_id:'sensor.fridge'},{entity_id:'sensor.empty'}]});
+  const states=Object.fromEntries(['sensor.energy','sensor.fridge','sensor.empty'].map(id=>[id,sample('2','kWh')]));
+  const house=[{...sample(1,'kWh'),entity_id:'sensor.energy'}],fridge=[{...sample(2,'kWh'),entity_id:'sensor.fridge'}];
+  const calls=[];
+  card._hass=hass(states,async(_method,url)=>{calls.push(new URL(url,'http://test/'));return [fridge,house];});
+  const range={start:new Date('2026-10-01'),end:new Date('2026-11-01')};
+  const result=await card._fetchPeriod(range);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].searchParams.get('filter_entity_id'),'sensor.energy,sensor.fridge,sensor.empty');
+  assert.equal(result.series['sensor.energy'].records,house);
+  assert.equal(result.series['sensor.fridge'].records,fridge);
+  assert.deepEqual(result.series['sensor.empty'].records,[]);
+  card._hass.callApi=async()=>{throw Error('offline');};
+  const failed=await card._fetchPeriod(range);
+  assert.equal(failed.failed,true);assert.ok(Object.values(failed.series).every(item=>item.error));
+});
+
+test('derived consumption reuses unchanged data and invalidates record or unit changes',()=>{
+  const card=new MaraoEnergyPeriodCard();card._render=()=>{};card._load=()=>{};
+  card.setConfig({entity:'sensor.energy',popup:true,period:'day'});
+  card._hass=hass({'sensor.energy':{...sample(2,'kWh'),attributes:{unit_of_measurement:'kWh',state_class:'total_increasing'}}});
+  const start=Date.parse('2026-10-01'),range={start:new Date(start),end:new Date(start+3600000)};
+  card._history=[sample(0,'kWh',start),sample(2,'kWh',start+3600000)];
+  const first=card._consumption('sensor.energy',{},range);
+  assert.equal(card._consumption('sensor.energy',{},range),first);
+  card._history=[sample(0,'kWh',start),sample(3,'kWh',start+3600000)];
+  const changed=card._consumption('sensor.energy',{},range);assert.equal(changed.total,3);assert.notEqual(changed,first);
+  assert.equal(card._consumption('sensor.energy',{display_unit:'Wh'},range).total,3000);
+  card._clearPeriodCache();assert.notEqual(card._consumption('sensor.energy',{},range),changed);
 });

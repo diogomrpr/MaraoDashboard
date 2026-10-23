@@ -9,13 +9,9 @@ async function waitForHomeAssistantRegistry() {
   }
 }
 await waitForHomeAssistantRegistry();
-const [cardsModule, cameraEventsModule] = await Promise.all([
-  import(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`),
-  import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`),
-]);
+const cardsModule = await import(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`);
 const { loadHistoryChart, createHistoryPlaceholder, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, fitNativeGrid, updateCardSurface, problemLabel, showCardDetails, layoutState, registerMaraoCards } = cardsModule;
 registerMaraoCards();
-cameraEventsModule.registerMaraoCameraEventCards();
 
 const MARAO_FONT_URL = "https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900";
 
@@ -1670,6 +1666,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
   _clearPeriodCache() {
     this._periodCache = new Map();
     this._periodContext = {};
+    this._consumptionCache = new Map();
   }
 
   _nearbyPeriods() {
@@ -1723,17 +1720,22 @@ class MaraoEnergyPeriodCard extends HTMLElement {
       const statistics = meters.length ? await hass.callWS({ type: 'recorder/statistics_during_period', statistic_ids: meters,
         start_time: start.toISOString(), end_time: end.toISOString(), period: config.period === 'month' ? 'day' : 'hour', units: { energy: 'kWh' }, types: ['change'] }) : {};
       if (context !== this._periodContext || this.isConnected === false) return {};
-      return Object.fromEntries(await Promise.all(usable.map(async entity => {
+      const missing = usable.filter(entity => !statistics[entity]?.length);
+      let records = {}, historyFailed = false;
+      if (missing.length) {
+        const query = new URLSearchParams({ filter_entity_id: missing.join(','), end_time: end.toISOString() });
+        try {
+          const response = await hass.callApi('GET', `history/period/${start.toISOString()}?${query}`);
+          records = Object.fromEntries((response || []).filter(items => items?.[0]?.entity_id).map(items => [items[0].entity_id, items]));
+        } catch { historyFailed = true; }
+      }
+      return Object.fromEntries(usable.map(entity => {
         if (statistics[entity]?.length) {
           const unit = metadata.find(item => item.statistic_id === entity)?.statistics_unit_of_measurement;
           return [entity, { statistics: statistics[entity], unit: energyValue(1, unit, { display_unit: 'kWh' })?.error ? unit : 'kWh' }];
         }
-        const query = new URLSearchParams({ filter_entity_id: entity, end_time: end.toISOString() });
-        try {
-          const response = await hass.callApi('GET', `history/period/${start.toISOString()}?${query}`);
-          return [entity, { records: Array.isArray(response?.[0]) ? response[0] : [] }];
-        } catch { return [entity, { error: true }]; }
-      })));
+        return [entity, historyFailed ? { error: true } : { records: records[entity] || [] }];
+      }));
     };
     try {
       const [series, price] = await Promise.all([loadHistory(), loadPrice()]);
@@ -1780,6 +1782,13 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const unavailable = historyEntityState(this._hass, { entity: entityId });
     if (unavailable) return { samples: [], total: null, reason: `common.${unavailable}` };
     if (series.error) return { samples: [], total: null, reason: 'timeline.history_unavailable' };
+    const records = series.statistics || (entityId === this._config.entity ? this._history : series.records);
+    const key = JSON.stringify([entityId, +range.start, +range.end, this._config.period,
+      this._hass?.config?.time_zone, state?.attributes?.state_class, state?.attributes?.unit_of_measurement,
+      variables.display_unit, variables.display_precision, series.unit, Math.floor(Date.now() / 60000)]);
+    this._consumptionCache ||= new Map();
+    const cached = this._consumptionCache.get(key);
+    if (cached && cached.records === records) return cached.result;
     let error = false;
     const options = { range, period: this._config.period, timeZone: this._hass?.config?.time_zone || 'UTC', stateClass: state?.attributes?.state_class,
       convert: (value, record) => {
@@ -1791,7 +1800,10 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const data = series.statistics ? statisticsBuckets(series.statistics, options)
       : energyBuckets(entityId === this._config.entity ? this._history : series.records || [], options);
     const unit = energyValue(0, state?.attributes?.unit_of_measurement, variables)?.unit || '';
-    return { ...data, unit, total: error ? null : energyTotal(data.samples), reason: error ? 'energy.format_error' : null };
+    const result = { ...data, unit, total: error ? null : energyTotal(data.samples), reason: error ? 'energy.format_error' : null };
+    if (this._consumptionCache.size >= 64) this._consumptionCache.delete(this._consumptionCache.keys().next().value);
+    this._consumptionCache.set(key, { records, result });
+    return result;
   }
 
   _breakdown(tariff, metric, range) {
@@ -2018,7 +2030,12 @@ window.MaraoDashboard = {
 
 console.info("%c Marao Dashboard loaded", "color: #d4b392; font-weight: 700;");
 
-await import(`./MaraoNativeCards.js${MARAO_RESOURCE_QUERY}`);
-const { registerCameraPreloader } = await import(`./MaraoNavigation.js${MARAO_RESOURCE_QUERY}`);
-const { syncCameraPreload } = await import(`./MaraoCameraPreload.js${MARAO_RESOURCE_QUERY}`);
-registerCameraPreloader(record => syncCameraPreload(record, {localize, haptic}));
+// Optional content must not delay registration of basic dashboard cards.
+await Promise.all([
+  import(`./MaraoNativeCards.js${MARAO_RESOURCE_QUERY}`),
+  import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`).then(module => module.registerMaraoCameraEventCards()),
+  Promise.all([
+    import(`./MaraoNavigation.js${MARAO_RESOURCE_QUERY}`),
+    import(`./MaraoCameraPreload.js${MARAO_RESOURCE_QUERY}`),
+  ]).then(([navigation, camera]) => navigation.registerCameraPreloader(record => camera.syncCameraPreload(record, {localize, haptic}))),
+]);

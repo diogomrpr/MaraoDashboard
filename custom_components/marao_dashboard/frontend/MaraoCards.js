@@ -1,9 +1,11 @@
-const { bindDropdown, dropdownStyles } = await import(new URL(`./MaraoDropdown.js${new URL(import.meta.url).search}`, import.meta.url));
-const { createHistoryPlaceholder, createPowerToolbar } = await import(new URL(`./MaraoHistoryLayout.js${new URL(import.meta.url).search}`, import.meta.url));
+const [dropdownModule, historyLayout, navigationModule, historyData] = await Promise.all([
+  'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js',
+].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
+const { bindDropdown, dropdownStyles } = dropdownModule;
+const { createHistoryPlaceholder, createPowerToolbar } = historyLayout;
 export { createHistoryPlaceholder };
-const { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic, navigate, fullscreenUsers, findElements, focusRestorer, focusableElements, deepActiveElement, FOCUSABLE, beginFrontendInteraction } = await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`, import.meta.url));
+const { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic, navigate, fullscreenUsers, findElements, focusRestorer, focusableElements, deepActiveElement, FOCUSABLE, beginFrontendInteraction } = navigationModule;
 export { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic, focusRestorer };
-const historyData = await import(new URL(`./MaraoHistoryData.js${new URL(import.meta.url).search}`, import.meta.url));
 let historyChartModule;
 let historyChartAttempt = 0;
 let historyEntryId = 0;

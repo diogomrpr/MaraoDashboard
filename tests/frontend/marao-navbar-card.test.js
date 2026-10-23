@@ -105,13 +105,17 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
   events.get("location-changed")();
   assert.equal(view.style.getPropertyValue("padding-top"), "max(8px, var(--safe-top))", "The main page uses the in-flow refresh row rather than extra top clearance");
   functions.registerFullscreen(second);
-  assert.equal(timers, 1);
+  assert.equal(timers, 0, "Fullscreen layout does not poll while idle");
   window.innerHeight = 844; navRect = {top: 740, height: 80};
   functions.applyFullscreen();
   assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(104px + 8px))");
   const stableBottom = view.style.getPropertyValue("padding-bottom");
   window.visualViewport = {offsetTop: 12, height: 800};
+  let writes = 0;
+  const setProperty = view.style.setProperty;
+  view.style.setProperty = (...args) => { writes++; return setProperty(...args); };
   functions.applyFullscreen();
+  assert.equal(writes, 0, "Unchanged layout does not rewrite view styles");
   assert.equal(view.style.getPropertyValue("padding-bottom"), stableBottom, "Viewport movement must not change scrollable page height");
   for (const offset of [-60, -12, 0, 24, 60, 0]) {
     window.visualViewport.offsetTop = offset; navRect.top = 740 + offset;

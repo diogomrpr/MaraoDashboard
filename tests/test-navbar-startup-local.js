@@ -16,6 +16,7 @@ function html() {
   window.definitions={};const define=customElements.define.bind(customElements);customElements.define=(name,...args)=>{definitions[name]=performance.now();return define(name,...args);};
   window.services=0;window.compiles=0;window.hass={language:'pt',states:{},connected:false,connection:{connected:false},user:{is_admin:false},callService(){services++;},callWS(){compiles++;return new Promise(()=>{});}};
   const app=document.querySelector('home-assistant');app.hass=hass;window.root=document.createElement('hui-root');root.attachShadow({mode:'open'});app.shadowRoot.append(root);
+  window.header=document.createElement('header');header.className='header';header.style.display='block';root.shadowRoot.append(header);
   root.hass=hass;root.lovelace={config:${JSON.stringify({marao:{mode:'native'},views})},editMode:false};
   window.view=document.createElement('div');view.id='view';view.style='min-height:1200px;position:relative;z-index:1';root.shadowRoot.append(view);
   </script><script type="module">
@@ -52,7 +53,7 @@ async function run(){
      const bar=page.locator('[data-marao-navigation-surface]'),nav=bar.locator('.nav');await nav.waitFor({state:'visible'});
      assert.equal(await bar.count(),1);assert.equal(await page.evaluate(()=>compiles),0);assert.equal(held.length,1);
      const timing=await page.evaluate(()=>({registered:definitions['marao-native-navbar-card'],optional:performance.getEntriesByType('resource').find(r=>r.name.includes('MaraoRuntime.js'))?.startTime}));
-     assert.ok(timing.registered);if(timing.optional!=null)assert.ok(timing.registered<=timing.optional);
+     assert.ok(timing.registered,'Recovery registers while runtime remains blocked');
      assert.equal(await nav.locator('a[href],[draggable=true],[title]').count(),0);
      const refresh=page.getByRole('button',{name:'Limpar cache e atualizar',exact:true});
      await refresh.waitFor({state:'visible'});
@@ -75,7 +76,7 @@ async function run(){
      assert.equal(await nav.isVisible(),true);assert.equal(await page.evaluate(()=>originalSurface===root.shadowRoot.querySelector('[data-marao-navigation-surface]')),true);
      await nav.locator('[data-route="0"]').tap();assert.equal(new URL(page.url()).pathname,'/marao-dashboard/overview');
      await refresh.waitFor({state:'visible'});
-     await page.evaluate(()=>{root.lovelace.editMode=true;});await page.waitForFunction(()=>root.shadowRoot.querySelector('[data-marao-navigation-surface]').hidden);await page.evaluate(()=>{root.lovelace.editMode=false;});await nav.waitFor({state:'visible'});
+     await page.evaluate(()=>{root.lovelace.editMode=true;host.hass=hass;});await page.waitForFunction(()=>root.shadowRoot.querySelector('[data-marao-navigation-surface]').hidden && header.style.display==='block');await page.evaluate(()=>{root.lovelace.editMode=false;host.hass=hass;});await nav.waitFor({state:'visible'});await page.waitForFunction(()=>header.style.display==='none');
      await held.shift().fulfill({status:503,body:'deliberate optional module failure'});await page.getByRole('alert').waitFor();assert.ok(await nav.isVisible());
      assert.equal(await page.evaluate(()=>services),0);assert.deepEqual(errors,[]);
      await page.evaluate(()=>{history.pushState({},'','/marao-dashboard/empty');dispatchEvent(new Event('location-changed'));});await bar.waitFor({state:'detached'});

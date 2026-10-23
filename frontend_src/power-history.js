@@ -8,40 +8,72 @@ export function powerStateAt(samples, time) {
   return samples[low - 1] || null;
 }
 
-export async function loadPowerPeriod({ hass, ids, range, timeZone, convert, isCurrent = () => true, now = Date.now() }) {
+async function readPowerChunk(hass, ids, from, end, convert) {
+  const query = new URLSearchParams({ filter_entity_id: ids.join(','), end_time: new Date(end).toISOString(), significant_changes_only: '0' });
+  const response = await hass.callApi('GET', `history/period/${new Date(from).toISOString()}?${query}`);
+  const series = Object.fromEntries(ids.map(id => [id, [{ time: from, value: null }]])), errors = {};
+  for (const records of response || []) {
+    const id = records[0]?.entity_id;
+    if (!Object.hasOwn(series, id)) continue;
+    try {
+      let unit;
+      const full = records.map(record => {
+        unit = record.attributes?.unit_of_measurement || unit;
+        return { ...record, attributes: { unit_of_measurement: unit } };
+      });
+      const samples = normalizeSamples(full, { convert: (value, record) => {
+        const reading = convert(value, record.attributes.unit_of_measurement);
+        if (!reading || reading.error) throw new Error('power.unit_error');
+        return reading.value;
+      } }).filter(sample => sample.time <= end);
+      const baseline = powerStateAt(samples, from);
+      const inside = samples.filter(sample => sample.time >= from);
+      if (baseline && baseline.time < from) inside.unshift({ time: from, value: baseline.value });
+      series[id] = reduceSamples(inside, 8192);
+    } catch { errors[id] = 'power.unit_error'; series[id] = []; }
+  }
+  return { series, errors };
+}
+
+export async function loadPowerPeriod({ hass, ids, range, timeZone, convert, isCurrent = () => true, now = Date.now(), chunks }) {
   const series = Object.fromEntries(ids.map(id => [id, []])), errors = {};
   const finish = Math.min(+range.end, +new Date(now));
   for (let from = +range.start; from < finish;) {
     if (!isCurrent()) return;
-    const end = Math.min(+periodRange(from, 0, 'day', timeZone).end, finish);
+    const dayEnd = +periodRange(from, 0, 'day', timeZone).end;
+    const end = Math.min(dayEnd, finish);
     const activeIds = ids.filter(id => !errors[id]);
     if (!activeIds.length) break;
-    const query = new URLSearchParams({ filter_entity_id: activeIds.join(','), end_time: new Date(end).toISOString(), significant_changes_only: '0' });
-    const response = await hass.callApi('GET', `history/period/${new Date(from).toISOString()}?${query}`);
-    if (!isCurrent()) return;
-    const seen = new Set();
-    for (const records of response || []) {
-      const id = records[0]?.entity_id;
-      if (!Object.hasOwn(series, id) || errors[id]) continue;
-      seen.add(id);
-      try {
-        let unit;
-        const full = records.map(record => {
-          unit = record.attributes?.unit_of_measurement || unit;
-          return { ...record, attributes: { unit_of_measurement: unit } };
-        });
-        const samples = normalizeSamples(full, { convert: (value, record) => {
-          const reading = convert(value, record.attributes.unit_of_measurement);
-          if (!reading || reading.error) throw new Error('power.unit_error');
-          return reading.value;
-        } }).filter(sample => sample.time <= end && sample.time < +range.end);
-        const baseline = powerStateAt(samples, from);
-        const inside = samples.filter(sample => sample.time >= from);
-        if (baseline && baseline.time < from) inside.unshift({ time: from, value: baseline.value });
-        series[id] = reduceSamples(normalizeSamples([...series[id], ...inside]), 8192);
-      } catch { errors[id] = 'power.unit_error'; series[id] = []; }
+    const key = JSON.stringify([timeZone, activeIds, from, Math.min(dayEnd, +range.end)]);
+    let entry = chunks?.get(key);
+    if (entry && entry.loadedAt < Math.min(dayEnd, +now - 60000)) { chunks.delete(key); entry = null; }
+    if (!entry) {
+      entry = { loadedAt: +now };
+      entry.promise = readPowerChunk(hass, activeIds, from, end, convert).then(result => {
+        if (Object.keys(result.errors).length && chunks?.get(key) === entry) chunks.delete(key);
+        if (chunks?.get(key) === entry) {
+          entry.points = Object.values(result.series).reduce((count, samples) => count + samples.length, 0);
+          let points = [...chunks.values()].reduce((count, item) => count + (item.points || 0), 0);
+          while (points > 131072 && chunks.size) {
+            const oldest = chunks.keys().next().value;
+            points -= chunks.get(oldest).points || 0;
+            chunks.delete(oldest);
+          }
+        }
+        return result;
+      }).catch(error => { if (chunks?.get(key) === entry) chunks.delete(key); throw error; });
+      if (chunks) {
+        // Period snapshots retain farther neighbors; bound extra daily working data.
+        if (chunks.size >= 64) chunks.delete(chunks.keys().next().value);
+        chunks.set(key, entry);
+      }
     }
-    for (const id of ids) if (!seen.has(id) && !errors[id]) series[id].push({ time: from, value: null });
+    const result = await entry.promise;
+    if (!isCurrent()) return;
+    for (const id of activeIds) {
+      if (result.errors[id]) { errors[id] = result.errors[id]; series[id] = []; }
+      else series[id] = reduceSamples(normalizeSamples([...series[id], ...result.series[id].filter(sample => sample.time < +range.end)]), 8192);
+    }
     from = end;
   }
   return { series, errors };
@@ -50,7 +82,7 @@ export async function loadPowerPeriod({ hass, ids, range, timeZone, convert, isC
 
 export function createPowerHistory(host, initial, createChart) {
   let options = initial, period = 'day', selectedStart, request = 0, destroyed = false, loading = false, loadedKey = '', data, error;
-  const cache = new Map(), events = new AbortController();
+  const cache = new Map(), chunks = new Map(), events = new AbortController();
   let probeTime, probeValues = {}, probing = false, pendingLive = {};
   let prefetchFrame, prefetchTimer, background;
   const { style, toolbar, picker, trigger, selectedLabel, menu, choices, previous, title, next, content } = createPowerToolbar(host, dropdownStyles);
@@ -101,7 +133,7 @@ export function createPowerHistory(host, initial, createChart) {
       selection: { time: probeTime, values: Object.fromEntries(Object.entries(probeValues).map(([id, item]) => [id, { ...item, value: Number.isFinite(item.value) ? display(item.value) : null }])) },
       onSelect: options.power_devices?.length ? selectTime : undefined, selectionKey: request,
       partialError: Boolean(Object.keys(data?.errors||{}).length || Object.values(probeValues).some(item=>item.failed)),
-      onRetry: () => { loadedKey = ''; cache.clear(); load(); } });
+      onRetry: () => { loadedKey = ''; cache.clear(); chunks.clear(); load(); } });
   };
   function captureLive() {
     const interval=range();
@@ -152,7 +184,7 @@ export function createPowerHistory(host, initial, createChart) {
     if (!entry) {
       entry = { backgroundRequest: ahead ? request : undefined };
       cache.set(key, entry);
-      entry.promise = loadPowerPeriod({ hass: options.hass, ids: usableIds(), range: interval, timeZone: zone(), now: now(),
+      entry.promise = loadPowerPeriod({ chunks, hass: options.hass, ids: usableIds(), range: interval, timeZone: zone(), now: now(),
         convert: (value, source) => options.convert(value, source, 'W'),
         isCurrent: () => !destroyed && cache.get(key) === entry && (loadedKey === key || entry.backgroundRequest === request) })
         .then(result => {
@@ -227,11 +259,11 @@ export function createPowerHistory(host, initial, createChart) {
   load();
   return {
     update(nextOptions) {
-      const priorIds = JSON.stringify(sources().map(source => source.entity_id));
+      const priorIds = JSON.stringify([zone(), sources().map(source => [source.entity_id, availability(source.entity_id), state(source.entity_id)?.attributes?.unit_of_measurement])]);
       options = { ...options, ...nextOptions };
-      if (priorIds !== JSON.stringify(sources().map(source => source.entity_id))) { loadedKey = ''; cache.clear(); }
+      if (priorIds !== JSON.stringify([zone(), sources().map(source => [source.entity_id, availability(source.entity_id), state(source.entity_id)?.attributes?.unit_of_measurement])])) { loadedKey = ''; cache.clear(); chunks.clear(); }
       captureLive();load();
     },
-    destroy() { if(destroyed)return; destroyed = true; request++; cancelPrefetch(); cache.clear(); probeTime=undefined; events.abort(); dropdown.destroy(); chart.destroy(); style.remove(); toolbar.remove(); content.remove(); },
+    destroy() { if(destroyed)return; destroyed = true; request++; cancelPrefetch(); cache.clear(); chunks.clear(); probeTime=undefined; events.abort(); dropdown.destroy(); chart.destroy(); style.remove(); toolbar.remove(); content.remove(); },
   };
 }
