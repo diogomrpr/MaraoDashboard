@@ -913,7 +913,7 @@ test("wallbox current card uses a large stepper and optional shortcuts", () => {
   };
   assert.equal((card.shadowRoot.innerHTML.match(/data-current-shortcut=/g) || []).length, 3);
   assert.match(card.shadowRoot.innerHTML, /class="number-stepper wallbox-stepper"/);
-  assert.match(card.shadowRoot.innerHTML, />22 A<\/output>/);
+  assert.match(card.shadowRoot.innerHTML, />22<small> A<\/small><\/output>/);
   assert.match(card.shadowRoot.innerHTML, /data-current-shortcut="12"/);
   assert.deepEqual(stateAppearance("hc_wallbox_current_card", "10", {}, card.hass), {
     background: "var(--ha-card-background,var(--card-background-color))",
@@ -922,7 +922,7 @@ test("wallbox current card uses a large stepper and optional shortcuts", () => {
     accent: "var(--primary-color)",
     unavailable: false,
   });
-  assert.match(card.shadowRoot.innerHTML, /<output class="number-value wallbox-value"[^>]*>22 A<\/output><div class="number-stepper wallbox-stepper"/);
+  assert.match(card.shadowRoot.innerHTML, /<output class="number-value wallbox-value"[^>]*>22<small> A<\/small><\/output><div class="number-stepper wallbox-stepper"/);
   assert.match(source, /\.number-stepper \{[^}]*min-width:84px;[^}]*width:auto;/);
   assert.match(source, /\.body\.wallbox-card \{[^}]*grid-template-areas:'value icon' 'title icon'/);
   assert.doesNotMatch(source, /\.climate-stepper \{[^}]*min-width:/);

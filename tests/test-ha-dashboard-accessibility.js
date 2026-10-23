@@ -217,6 +217,8 @@ async function inspectSafeAreaSheets(context, page, output, runName) {
 
 async function inspectFullscreenLifecycle(page) {
   for (const route of ['/config/dashboard', '/marao-dashboard-editor']) {
+    // The exhaustive gallery can fill the browser's resource timing buffer.
+    await page.evaluate(() => performance.clearResourceTimings());
     await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])').evaluate(navbar => {
       let root=navbar;while(root&&root.localName!=='hui-root')root=root.parentElement||root.getRootNode()?.host;
       window.__safeOwned={view:root.shadowRoot.querySelector('#view'),header:root.shadowRoot.querySelector('.header')};

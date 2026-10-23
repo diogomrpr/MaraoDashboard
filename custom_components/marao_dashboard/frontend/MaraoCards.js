@@ -204,7 +204,7 @@ function numberStepper(value, label, unit = "", className = "", disabled = false
   const decrease = localize("controls.decrease", hass, { name: label }, `Decrease ${label}`);
   const rangeAttribute = className === "climate-stepper" && String(value).includes("–") ? " data-number-range" : "";
   const wallbox = className === "wallbox-stepper";
-  const reading = `<output class="number-value${wallbox ? ' wallbox-value' : ''}"${rangeAttribute} aria-live="polite">${esc(value)}${wallbox && unit ? ' ' : ''}${esc(unit)}</output>`;
+  const reading = `<output class="number-value${wallbox ? ' wallbox-value' : ''}"${rangeAttribute} aria-live="polite">${esc(value)}${wallbox && unit ? `<small> ${esc(unit)}</small>` : esc(unit)}</output>`;
   const control = `<div class="number-stepper${className ? ` ${esc(className)}` : ""}" role="group" aria-label="${esc(label)}"><button type="button" data-number-step="increase" aria-label="${esc(increase)}" title="${esc(increase)}"${disabledAttribute}><ha-icon icon="mdi:chevron-up"></ha-icon></button>${wallbox ? '' : reading}<button type="button" data-number-step="decrease" aria-label="${esc(decrease)}" title="${esc(decrease)}"${disabledAttribute}><ha-icon icon="mdi:chevron-down"></ha-icon></button></div>`;
   return wallbox ? reading + control : control;
 }
@@ -902,7 +902,7 @@ function cardStyles() {
     .number-stepper button:active { background:var(--marao-icon-background,var(--opacity-contrast-100,rgba(0,0,0,.08))); }
     .number-stepper ha-icon { --mdc-icon-size:25px; }
     .number-value { max-width:100%; min-width:max-content; margin:0; padding:0; border:0; opacity:.72; color:inherit; background:transparent; font:inherit; font-size:var(--font-size-caption,.9375rem); font-weight:var(--font-weight-primary,700); line-height:1.2; overflow-wrap:anywhere; white-space:nowrap; text-align:center; }
-    .climate-stepper { height:100%; padding:3px; align-content:space-between; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); }
+    .climate-stepper { height:100%; max-width:100%; padding:3px; align-content:space-between; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); }
     .climate-stepper button { width:52px; height:48px; }
     .climate-stepper ha-icon { --mdc-icon-size:32px; }
     .climate-stepper .number-value { font-size:var(--font-size-primary,1.1875rem); opacity:1; }
@@ -983,6 +983,7 @@ function cardStyles() {
     .body.wallbox-card { grid-template-columns:minmax(0,1fr) 64px; grid-template-areas:'value icon' 'title icon' 'wallbox wallbox'; gap:12px 20px; padding:24px; min-height:160px; }
     .body.wallbox-card .wallbox-current-control { display:contents; }
     .body.wallbox-card .wallbox-value { grid-area:value; min-width:0; align-self:end; text-align:left; white-space:normal; overflow-wrap:anywhere; font-size:calc(3.5 * var(--font-size-primary,1.125rem)); font-weight:800; line-height:1.05; opacity:1; }
+    .wallbox-value small { font:inherit; font-size:var(--font-size-primary,1.125rem); }
     .body.wallbox-card .title { grid-area:title; align-self:start; font-size:var(--font-size-primary,1.125rem); font-weight:var(--font-weight-secondary,500); }
     .body.wallbox-card .wallbox-stepper { grid-area:icon; align-self:stretch; justify-self:end; align-content:space-between; min-width:64px; width:64px; max-width:100%; padding:8px; gap:8px; background:var(--ha-card-background,var(--card-background-color,#fff)); color:var(--primary-text-color,#141414); box-shadow:0 8px 28px rgba(0,0,0,.06); }
     .wallbox-stepper button { width:48px; height:48px; }
