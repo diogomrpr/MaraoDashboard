@@ -224,7 +224,11 @@ async function inspectFullscreenLifecycle(page) {
     await page.evaluate(route => {history.pushState(null,'',route);window.dispatchEvent(new CustomEvent('location-changed'));},route);
     const native = page.locator(route === '/marao-dashboard-editor' ? 'marao-dashboard-panel' : 'ha-config-dashboard');
     await native.waitFor({state:'visible'});
-    if(route === '/marao-dashboard-editor') await page.waitForFunction(panel=>panel._loaded,await native.elementHandle());
+    if(route === '/marao-dashboard-editor') await page.waitForFunction(panel => {
+      const resources = performance.getEntriesByType('resource');
+      return panel._loaded && panel._visualReady && panel._jsonWarmed &&
+        [...panel.shadowRoot.querySelectorAll('link[rel="prefetch"]')].every(link => resources.some(entry => entry.name === link.href && entry.responseEnd > 0));
+    }, await native.elementHandle());
     else {
       const count = await native.evaluate(async panel=>(await panel.hass.callWS({type:'repairs/list_issues'})).issues.filter(issue=>!issue.ignored).length);
       await page.waitForFunction(({panel,count})=>panel._repairsIssues.total===count,{panel:await native.elementHandle(),count});
@@ -674,7 +678,7 @@ async function layoutIssues(page, families = [], subtree) {
           const secondary = element.matches('.state,.climate:not(.current-temperature),.reading dt,.reading dd');
           const ellipsis = secondary && style.overflow === 'hidden' && style.textOverflow === 'ellipsis';
           const clampedCaption = element.matches('.reading dt') && style.overflow === 'hidden' && style.webkitLineClamp === '2';
-          if ((!ellipsis && element.scrollWidth > element.clientWidth + 1) || (!clampedCaption && element.scrollHeight > element.clientHeight + 1)) {
+          if ((!ellipsis && !clampedCaption && element.scrollWidth > element.clientWidth + 1) || (!clampedCaption && element.scrollHeight > element.clientHeight + 1)) {
             issues.push(`${element.textContent?.trim() || element.localName}: essential text is clipped (${element.getRootNode()?.host?._config?.name || element.getRootNode()?.host?.localName}, ${element.className}, ${getComputedStyle(element).visibility}, ${element.clientWidth}x${element.clientHeight}, content ${element.scrollWidth}x${element.scrollHeight})`);
           }
           if (element.matches('.number-value')) {

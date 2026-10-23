@@ -175,7 +175,8 @@ async function inspectGallery(page, run, requests) {
     }
     assert.equal(await period.evaluate(card=>card._detailOptions.bars),true);
     assert.equal(await period.evaluate(card=>card._detailOptions.samples.every(sample=>sample.value===null)),true,'Sparse readings without interval baselines must not invent consumption');
-    assert.equal(await period.locator('.history-plot').isVisible(),false);
+    assert.equal(await period.locator('.history-plot').isVisible(),true,'Empty history retains the chart footprint');
+    assert.equal(await canvas.isVisible(),false,'Unknown consumption must not draw bars');
     if (await period.evaluate(card=>card._config.period==='month')) {
       assert.equal(await period.locator('.history-reset').isDisabled(),true,'Month opens in full-month overview');
       await period.getByRole('button',{name:/^(Next day|Dia seguinte)$/}).click();
