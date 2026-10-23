@@ -2049,12 +2049,12 @@ async function main() {
       card.shadowRoot?.querySelector("ha-card")?.style.getPropertyValue("--marao-card-background"),
     ]).filter(([name]) => /^Climate · (Heat|Cool|Heat\/Cool|Auto|Dry|Fan|Off)$/.test(name))));
     const expectedClimatePalette = {
-      "Climate · Heat": "var(--color-red)",
+      "Climate · Heat": "var(--color-orange)",
       "Climate · Cool": "var(--color-blue)",
-      "Climate · Heat/Cool": "var(--color-purple)",
+      "Climate · Heat/Cool": "var(--color-lilac,var(--color-blue))",
       "Climate · Auto": "var(--color-gold)",
       "Climate · Dry": "var(--color-yellow)",
-      "Climate · Fan": "var(--color-green)",
+      "Climate · Fan": "var(--color-teal,var(--color-blue))",
       "Climate · Off": "",
     };
     if (JSON.stringify(climatePalette) !== JSON.stringify(expectedClimatePalette)) {
