@@ -105,6 +105,18 @@ async function loadingChecks(browser) {
     assert.ok(before.colorIcon.every(value=>value>=48),'Existing icon is a full touch target');
     assert.equal(await page.locator('#dimmer-card [data-light-color]').count(),0);
     assert.equal(requests.includes('/MaraoLightColor.js'),false,'Picker code must remain unloaded until opened');
+    for (const id of ['color-card', 'dimmer-card']) {
+      await page.locator(`#${id}`).evaluate(element => { const parent=element.parentNode; element.remove(); parent.append(element); });
+      const slider=page.locator(`#${id} input[type=range]`), box=await slider.boundingBox();
+      await page.mouse.move(box.x+box.width/2,box.y+24); await page.mouse.down();
+      assert.equal(await slider.evaluate(element=>element.getRootNode().host._sliderGesture?.input===element),true,'Reconnected card retains its slider gestures');
+      await page.mouse.move(box.x+box.width*.7,box.y+24);
+      assert.deepEqual(await services(),[],'Reconnected slider waits for release');
+      await page.mouse.up();
+      assert.equal((await services()).length,1,'Reconnected slider dispatches exactly once');
+      await clearCalls();
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));
+    }
     await icon.tap(); await wheel.waitFor({state:'visible'});
     assert.equal(requests.filter(url=>url==='/MaraoLightColor.js').length,1);
     assert.deepEqual(await services(),[],'Opening must not toggle or update the light');

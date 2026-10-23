@@ -66,7 +66,7 @@ async function checkPointerInteraction(page, context, config, example, calls, po
     // A real external update must refresh confirmed fill without replacing the held input.
     const statePresentation = () => original.evaluate((element) => {
       const root = element.getRootNode(), surface = root.querySelector('ha-card');
-      return surface?.hasAttribute('data-binary-state') ? { binary: true, active: surface.dataset.binaryState, label: root.querySelector('[role="img"][aria-label]')?.getAttribute('aria-label'), redundant: Boolean(root.querySelector('.state:not(.placeholder)')) }
+      return surface?.hasAttribute('data-binary-state') ? { binary: true, active: surface.dataset.binaryState, label: root.querySelector('[data-light-color]')?.getAttribute('aria-description') || root.querySelector('[role="img"][aria-label]')?.getAttribute('aria-label'), redundant: Boolean(root.querySelector('.state:not(.placeholder)')) }
         : { binary: false, label: root.querySelector('.state')?.textContent };
     });
     const activeState = await statePresentation();

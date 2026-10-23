@@ -1182,6 +1182,8 @@ export class MaraoCard extends BaseElement {
     for (const type of ["location-changed", "popstate"]) globalThis.window?.removeEventListener?.(type, this._cancelHiddenControls);
     globalThis.document?.removeEventListener?.("visibilitychange", this._cancelHiddenControls);
     this._clearAlarmPIN(); this._alarmSignature = ""; this._actionLive = false; this._actionError = ""; this._mediaError = ""; this._mediaURL = ""; this._actionRequest = (this._actionRequest || 0) + 1; this._climateConnected = false; this._subscribeClimate(); this._cancelHold(); this._cancelSliderGesture();
+    // Reconnecting unchanged markup must rebind the listeners removed below.
+    if (this._sliderControl) this._renderedMarkup = null;
     this._sliderControl?.destroy(); this._sliderControl = null;
   }
 
@@ -1943,8 +1945,8 @@ export class MaraoCard extends BaseElement {
             if (label && binary === null) label.textContent = entityStateLabel(state, entity, kind, this._hass);
             if (binary !== null) {
               if (card) card.dataset.binaryState = String(binary);
-              const accessible = this.shadowRoot.querySelector('.icon[role="img"],.binary-state[role="img"]');
-              accessible?.setAttribute('aria-label', `${this._label(entity, this._config, state)}: ${entityStateLabel(state, entity, kind, this._hass)}`);
+              const accessible = this.shadowRoot.querySelector('[data-light-color],.icon[role="img"],.binary-state[role="img"]');
+              accessible?.setAttribute(accessible.hasAttribute('data-light-color') ? 'aria-description' : 'aria-label', `${this._label(entity, this._config, state)}: ${entityStateLabel(state, entity, kind, this._hass)}`);
             }
             const appearance = stateAppearance(kind, text(state.state), this._config, this._hass);
             for (const [token, key] of [["--marao-card-background", "background"], ["--marao-card-text-color", "text"], ["--marao-icon-color", "icon"], ["--marao-icon-background", "iconBackground"], ["--marao-accent-color", "accent"]]) {
