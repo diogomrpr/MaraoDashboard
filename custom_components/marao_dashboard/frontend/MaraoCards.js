@@ -835,7 +835,7 @@ function cardStyles() {
     .body.with-climate-modes { grid-template-areas:'title title' 'state icon' 'climate icon' 'modes modes'; }
     .body.icon-only { display:flex; align-items:center; justify-content:center; gap:0; min-height:64px; padding:12px; }
     .body.icon-only .icon { grid-area:auto; align-self:auto; }
-    .history-control { position:relative; z-index:3; grid-column:1/-1; min-width:48px; min-height:48px; border:0; border-radius:12px; padding:8px 12px; background:var(--secondary-background-color); color:var(--primary-text-color); font:inherit; font-size:var(--font-size-secondary,1rem); overflow-wrap:anywhere; pointer-events:auto; }
+    .history-control { position:relative; z-index:3; grid-column:1/-1; min-width:48px; min-height:48px; border:0; border-radius:12px; padding:8px 12px; background:var(--secondary-background-color); color:var(--primary-text-color); font:inherit; font-family:var(--primary-font-family); font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-secondary,500); overflow-wrap:anywhere; pointer-events:auto; }
     .history-control:focus { outline:none; }
     .problem { grid-column:1/-1; grid-row:-1; display:flex; align-items:flex-start; gap:8px; min-width:0; max-width:100%; font-size:var(--font-size-secondary,1rem); line-height:1.25; }
     .binary-state { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
@@ -2286,9 +2286,9 @@ export class MaraoPopupCard extends BaseElement {
   _invalidateHistory() { this._close(false); this._historyContext = null; }
   openHistory(owner, opener) {
     if (this.preview || !owner.isConnected) return;
-    this._historyContext = { owner, opener, id: `${Date.now()}-${++historyEntryId}`, path: window.location.pathname, hash: window.location.hash, source: owner._graphEntity?.() };
+    this._historyContext = { owner, restoreFocus: focusRestorer(opener), id: `${Date.now()}-${++historyEntryId}`, path: window.location.pathname, hash: window.location.hash, source: owner._graphEntity?.() };
     owner._activeHistoryPopup = this;
-    this._openSheet(focusRestorer(opener));
+    this._openSheet(this._historyContext.restoreFocus);
     window.history.pushState({ ...window.history.state, maraoHistory: { id: this._historyContext.id } }, '', window.location.href);
     this._showHistory();
   }
@@ -2347,7 +2347,7 @@ export class MaraoPopupCard extends BaseElement {
     if (parent) { parent.hidden = false; parent.inert = false; }
     if (restore && this._overlay) {
       this._overlay.querySelector('.marao-popup-sheet').scrollTop = this._historyScroll || 0;
-      focusRestorer(this._historyContext?.opener)?.();
+      this._historyContext?.restoreFocus();
     }
   }
   _syncTheme() {

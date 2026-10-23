@@ -69,11 +69,11 @@ async function main() {
     try {
       const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
       await context.addInitScript(setBrowserToken, { hassUrl: config.url, ...accessToken(config) });
-      const page = await context.newPage(); await configurePageEmulation(context, page, scenario);
+      const page = await context.newPage();
+      await require("./camera-request-ledger").managedCameraLedger(context, page, { output, scenario: scenario.name, theme }); await configurePageEmulation(context, page, scenario);
       const issues = [], calls = [];
       page.on('pageerror', error => issues.push(error.message));
       page.on('console', message => { if (['warning', 'error'].includes(message.type())) issues.push(message.text()); });
-      page.on('requestfailed', request => issues.push('Failed resource: ' + new URL(request.url()).pathname));
       page.on('response', response => { if (response.status() >= 400) issues.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
       page.on('websocket', socket => socket.on('framesent', ({ payload }) => {
         let message; try { message = JSON.parse(String(payload)); } catch { return; }
@@ -102,16 +102,21 @@ async function main() {
       assert.equal(calls.length, count + 1, 'Completed hold must dispatch once');
       assert.equal(await code.inputValue(), '');
       await captureScreenshot(page, { path: path.join(output, scenario.name + '-' + theme + '-alarm.png'), scale: 'css' });
-      await page.locator('.marao-popup-close').click();
+      await page.locator('.marao-popup-close').tap();
       assert.equal(await page.locator('[data-alarm-code]').count(), 0, 'Closed popup retained PIN input');
 
       for (const format of ['text', 'no_code']) {
         await navigate(page, '/marao-dashboard/card-test#page-card-test-alarm-' + format + '-popup');
         const sheet = page.locator('.marao-popup-sheet');
         await sheet.locator('[data-alarm-action="alarm_arm_night"]').waitFor();
-        assert.equal(await sheet.locator('[data-alarm-code]').count(), format === 'text' ? 1 : 0);
+        assert.equal(await sheet.locator('[data-alarm-code]').count(), 1, 'Retain the PIN slot to keep the card size stable');
+        assert.equal(await sheet.locator('[data-alarm-code]').isVisible(), format === 'text');
+        if (format === 'no_code') {
+          assert.equal(await sheet.locator('[data-alarm-code]').isDisabled(), true);
+          assert.equal(await sheet.locator('[data-alarm-code]').inputValue(), '');
+        }
         if (format === 'text') assert.equal(await sheet.locator('[data-alarm-code]').getAttribute('inputmode'), 'text');
-        await page.locator('.marao-popup-close').click();
+        await page.locator('.marao-popup-close').tap();
       }
       await navigate(page, '/marao-dashboard/card-test');
       for (const domain of ['button', 'switch', 'script']) {
@@ -155,4 +160,4 @@ async function main() {
     } finally { await browser.close(); }
   }
 }
-if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
+if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });

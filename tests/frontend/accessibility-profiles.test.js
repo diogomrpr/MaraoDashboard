@@ -49,13 +49,13 @@ test('saved-page readiness requires the visible prefix and overflow toggle witho
     const card = { _config: { routes }, _visibleCount: visible, waitFor: async options => waits.push(['card', options.state]),
       evaluate: async callback => callback(card), locator: selector => ({
         waitFor: async options => waits.push([selector, options.state]),
-        count: async () => selector === '.nav a' ? visible : selector === '[data-overflow]' ? Number(count > visible) : 1,
+        count: async () => selector === '.nav [data-route]' ? visible : selector === '[data-overflow]' ? Number(count > visible) : 1,
       }) };
     await waitForNavbar({ locator: () => card });
     assert.deepEqual(waits, [['card', 'attached'], ['nav', 'attached'], ['nav', routes.length ? 'visible' : 'hidden']]);
     const locator = card.locator;
     if (visible) {
-      card.locator = selector => ({ ...locator(selector), count: selector === '.nav a' ? async () => 0 : locator(selector).count });
+      card.locator = selector => ({ ...locator(selector), count: selector === '.nav [data-route]' ? async () => 0 : locator(selector).count });
       await assert.rejects(waitForNavbar({ locator: () => card }), /Visible prefix differs/);
     }
     if (count > visible) {

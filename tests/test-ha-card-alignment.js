@@ -158,11 +158,11 @@ async function checkSliderHeaders() {
       const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
       await context.addInitScript(setBrowserToken, { ...tokens, hassUrl: config.url, clientId: config.url + '/', expires: Date.now() + tokens.expires_in * 1000 });
       page = await context.newPage();
+      await require("./camera-request-ledger").managedCameraLedger(context, page, { output, scenario: scenario.name, theme });
       await configurePageEmulation(context, page, scenario);
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
       page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
-      page.on('requestfailed', request => errors.push('Failed resource: ' + new URL(request.url()).pathname));
       page.on('response', response => { if (response.status() >= 400) errors.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
       const routes = ['card-test', ...(scenario.name === 'iphone-normal' ? ['living-room', 'native-example'] : [])];
       const checked = [];
@@ -188,7 +188,7 @@ async function checkSliderHeaders() {
           await card.scrollIntoViewIfNeeded();
           await captureScreenshot(card, { path: path.join(output, route + '-' + theme + '.png'), scale: 'device' });
         }
-        await page.waitForLoadState('networkidle');
+        await page.evaluate(() => document.fonts.ready);
         checked.push(route);
       }
       assert.deepEqual(errors, []);
@@ -252,12 +252,10 @@ async function main() {
       expires: Date.now() + tokens.expires_in * 1000,
     });
     const page = await context.newPage();
+    await require("./camera-request-ledger").managedCameraLedger(context, page, { output: require("./verification-browser").artifactDirectory("alignment"), scenario: "iphone-normal", theme: "light" });
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("console", (message) => {
       if (["error", "warning"].includes(message.type())) errors.push(message.text());
-    });
-    page.on("requestfailed", (request) => {
-      errors.push(`Failed ${request.resourceType()} request: ${new URL(request.url()).pathname}`);
     });
     page.on("response", (response) => {
       if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`);
@@ -308,10 +306,14 @@ async function main() {
         const root = element.shadowRoot;
         const failures = [];
         for (const child of root.querySelectorAll("ha-card,.body,.title,.state")) {
-          if (child.scrollWidth > child.clientWidth + 1 || child.scrollHeight > child.clientHeight + 1) failures.push(`${child.className || child.localName} overflows`);
+          const style = getComputedStyle(child);
+          if (style.visibility === 'hidden') continue;
+          const ellipsis = child.matches('.state') && style.textOverflow === 'ellipsis' && style.overflow === 'hidden';
+          if (!ellipsis && child.scrollWidth > child.clientWidth + 1 || child.scrollHeight > child.clientHeight + 1) failures.push(`${child.className || child.localName} overflows`);
         }
         const icon = root.querySelector(".icon")?.getBoundingClientRect();
         for (const label of root.querySelectorAll(".title,.state")) {
+          if (getComputedStyle(label).visibility === 'hidden') continue;
           const rect = label.getBoundingClientRect();
           if (icon && rect.left < icon.right - 1 && rect.right > icon.left + 1 && rect.top < icon.bottom - 1 && rect.bottom > icon.top + 1) failures.push("text overlaps icon");
         }

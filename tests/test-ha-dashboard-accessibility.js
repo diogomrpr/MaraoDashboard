@@ -244,7 +244,7 @@ async function inspectFullscreenLifecycle(page) {
       await visit(root);
     });
     // Native settings resolve integration icons after their first Lit render.
-    await page.waitForLoadState('networkidle');
+    await page.evaluate(() => document.fonts.ready);
     await page.waitForFunction(() => {
       const {view,header}=window.__safeOwned;
       return !view.style.getPropertyValue('padding-top') && !header.style.getPropertyValue('display');
@@ -740,7 +740,7 @@ async function frontendRegistrationIssues(page) {
     ]) {
       if (!globalThis.customElements?.get(name)) issues.push(`${name} was not registered`);
     }
-    const eventModuleUrl = resources.find((url) => /\/marao_dashboard_static\/MaraoFrigateEventsCard\.js\?/i.test(url));
+    const eventModuleUrl = resources.find((url) => /\/(?:marao_dashboard_static|api\/marao_dashboard\/frontend\/[a-f0-9]+)\/MaraoFrigateEventsCard\.js(?:\?|$)/i.test(url));
     if (eventModuleUrl) {
       try {
         const module = await import(eventModuleUrl);
@@ -1051,7 +1051,7 @@ async function waitForNavbar(page) {
   await card.waitFor({ state: 'attached' });
   await card.locator('nav').waitFor({ state: 'attached' });
   const routes = await card.evaluate(element => element._config.routes.length);
-  assert.equal(await card.locator('.nav a').count(), await card.evaluate(element => element._visibleCount), 'Visible prefix differs from layout partition');
+  assert.equal(await card.locator('.nav [data-route]').count(), await card.evaluate(element => element._visibleCount), 'Visible prefix differs from layout partition');
   assert.equal(await card.locator('[data-overflow]').count(), routes > await card.evaluate(element => element._visibleCount) ? 1 : 0);
   await card.locator('nav').waitFor({ state: routes ? 'visible' : 'hidden' });
 }
@@ -1262,12 +1262,12 @@ async function main() {
       if (errors.length || issues.length) throw new Error(`${runName} failed:\n${[...errors, ...issues].map((item) => `- ${item}`).join("\n")}`);
       }
       if (options.pages) for (const view of dashboard.views.filter(view => view.path !== 'card-test')) {
-        await page.waitForLoadState('networkidle');
+        await page.evaluate(() => document.fonts.ready);
         await page.evaluate(route => { history.pushState(null, '', route); window.dispatchEvent(new CustomEvent('location-changed')); }, '/marao-dashboard/' + view.path);
         await page.waitForFunction(({ root, expected }) => root.config?.views?.[root._curView]?.path === expected, {
           root: await page.locator('hui-root').elementHandle(), expected: view.path,
         });
-        await page.waitForLoadState('networkidle');
+        await page.evaluate(() => document.fonts.ready);
         await waitForNavbar(page);
         await applyVisualPreferences(page, scenario, theme);
         const prefix = path.join(output, runName + '-page-' + view.path);

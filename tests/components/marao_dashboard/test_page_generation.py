@@ -183,6 +183,22 @@ def test_duplicate_pages_same_entities_have_independent_names_options_and_popups
     assert "variables" not in source["pages"][0]["entities"][0]
 
 
+def test_direct_access_actions_do_not_gain_a_dangling_popup_reference():
+    source = {"config_version": 2, "name": "Test", "landing_page": "home", "pages": [{
+        "name": "Home", "path": "home", "entities": [{
+            "id": "lock", "entity_id": "lock.safe", "template": "hc_access_action_card",
+            "variables": {"action_service": "lock.lock"},
+        }],
+    }]}
+    before = deepcopy(source)
+    item = g._resolve_pages(source)["pages"][0]["_sections"][0]["ordered_cards"][0]
+    card = g._page_card(item, "marao-dashboard")
+    assert card["variables"]["action_service"] == "lock.lock"
+    assert "popup_hash" not in card["variables"]
+    assert g._page_card_popups(item) == []
+    assert source == before
+
+
 def test_configured_popup_reference_is_used_by_card_and_actual_popup():
     source = {"config_version": 2, "name": "Test", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [
         {"id": "camera", "entity_id": "camera.safe", "template": "hc_camera_card", "variables": {"popup_hash": "#my-camera"}},

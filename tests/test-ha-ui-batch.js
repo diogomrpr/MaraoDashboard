@@ -76,8 +76,10 @@ async function accessChecks(page, output, scenario, theme) {
       await host.evaluate(e => e.shadowRoot.querySelector('[data-regression]').remove());
     }
   }
-  await host.evaluate(e => { e.hass = { ...document.querySelector('home-assistant').hass, connected: false }; });
-  assert.equal(await host.locator('.track').getAttribute('aria-disabled'), 'true');
+  assert.equal(await host.evaluate(e => {
+    e.hass = { ...document.querySelector('home-assistant').hass, connected: false };
+    return e.shadowRoot.querySelector('.track').getAttribute('aria-disabled');
+  }), 'true');
   assert.deepEqual((await layoutIssues(page, [], await host.elementHandle())).filter(issue => /access (label|slide)/.test(issue)), []);
   if (['iphone-normal', 'narrow-320', 'iphone-bold-text-200'].includes(scenario.name)) await captureScreenshot(host, { path: path.join(output, `access-${scenario.name}-${theme}.png`), scale: 'css' });
   } finally {

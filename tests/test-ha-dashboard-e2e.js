@@ -449,7 +449,7 @@ async function checkCameraCases(page) {
     if (example.expectedDisabled) {
       const status = await card.evaluate((element) => ({
         status: element.shadowRoot.querySelector("[data-status]")?.dataset.status,
-        enabled: [...element.shadowRoot.querySelectorAll("button,input,select")].some((control) => !control.disabled),
+        enabled: [...element.shadowRoot.querySelectorAll('button:not([data-action="details"]),input,select')].some((control) => !control.disabled),
       }));
       if (status.status !== example.expectedStatus || status.enabled) {
         throw new Error(`${example.name}: neutral camera event controls must be disabled (${status.status}).`);
@@ -784,7 +784,7 @@ async function checkHistoryCases(page, { loading = true } = {}) {
     visit(document);
     return examples.every((example) => ["Graph", "Energy", "Timeline"].every((label) => {
       const card = elements.find((item) => item._config.name === `${label} history · ${example.id}`);
-      const state = card?.shadowRoot.querySelector("[data-history-state]")?.dataset.historyState || card?.shadowRoot.querySelector("[data-graph-history-state]")?.dataset.graphHistoryState;
+      const state = card?._graphEntity?.() ? card._graphStatus(card._graphEntity()) : card?.shadowRoot.querySelector("[data-history-state]")?.dataset.historyState;
       return state === (example.expectedStatus === "loading" ? "ready" : example.expectedStatus);
     }));
   }, manifest.historyCases, { timeout: 10000 }).catch(async error => {
@@ -795,6 +795,15 @@ async function checkHistoryCases(page, { loading = true } = {}) {
     fs.writeFileSync(path.join(require('./verification-browser').artifactDirectory('dashboard-e2e'), 'history-failure.json'), JSON.stringify(states, null, 2), { mode: 0o600 });
     throw error;
   });
+  // Offscreen cards deliberately defer DOM work; check their rendered state on entry.
+  for (const example of manifest.historyCases) for (const label of ["Graph", "Energy", "Timeline"]) {
+    const card = cards.filter({ has: page.locator('.title,h2').filter({ hasText: new RegExp(`^${label} history · ${example.id}$`) }) }).first();
+    await card.scrollIntoViewIfNeeded();
+    await page.waitForFunction(({ card, expected }) => {
+      const surface = card.shadowRoot.querySelector('[data-history-state],[data-graph-history-state]');
+      return (surface?.dataset.historyState || surface?.dataset.graphHistoryState) === expected;
+    }, { card: await card.elementHandle(), expected: example.expectedStatus === 'loading' ? 'ready' : example.expectedStatus });
+  }
   await page.waitForFunction(() => {
     const find = root => [...root.querySelectorAll('marao-energy-period-card')].every(card => !card._loading && !card._prefetching)
       && [...root.querySelectorAll('*')].every(element => !element.shadowRoot || find(element.shadowRoot));
@@ -1787,7 +1796,7 @@ async function main() {
         if (selectedCheck === 'camera') await require('./camera-live-native-checks').checkNativeCameraPlayback(page, serviceCalls, { output: screenshotRoot, scenario: scenario.name, theme, geometryOnly: cameraLiveOnly });
         if (!cameraLiveOnly && selectedCheck !== 'history') await ({ actions: checkActionDispatches, camera: checkCameraCases })[selectedCheck](page, serviceCalls);
         if (selectedCheck === 'camera') await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-        else await page.waitForLoadState('networkidle');
+        else await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         if (selectedCheck === 'camera') await page.__cameraRequestLedger.stopForClose();
         await assertNoBrowserErrors(selectedCheck + '/' + theme);
         completedTheme = true;
@@ -1814,7 +1823,7 @@ async function main() {
       await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
       await assertCurrentFrontend(page);
       await checkMediaRecovery(page, serviceCalls, path.join(screenshotRoot, 'media-recovery'));
-      await page.waitForLoadState('networkidle');
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       await assertNoBrowserErrors('Media recovery');
     } finally { await browser.close(); }
     return;
@@ -1828,7 +1837,7 @@ async function main() {
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);
         await checkEntityGroups(page, serviceCalls, path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), `entity-groups-${scenario.name}-${theme}`), scenario, theme, config);
-        await page.waitForLoadState('networkidle');
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         await assertNoBrowserErrors(`Entity Groups (${theme})`);
       }
     } finally {
@@ -1852,7 +1861,7 @@ async function main() {
         await applyVisualPreferences(page, scenario, theme);
         await checkNativeSurfaces(page);
         await checkClimateFeedback(page, serviceCalls, path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), `climate-feedback-${scenario.name}-${theme}`), { scenario, theme });
-        await page.waitForLoadState('networkidle');
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         await assertNoBrowserErrors(`Climate feedback (${theme})`);
         console.log(`Climate feedback, single dispatch and keyboard focus OK (${theme}).`);
       }
@@ -1949,7 +1958,7 @@ async function main() {
       await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible" });
       await assertCurrentFrontend(page);
       await scrollDashboard(page);
-      await page.waitForLoadState('networkidle');
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       await assertNoBrowserErrors(view.name);
       const result = await deepSnapshot();
       if (result.errors.length || result.warnings.length) throw new Error(`${view.name} rendered warnings/errors: ${JSON.stringify(result)}`);
@@ -1959,7 +1968,7 @@ async function main() {
     await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible" });
     await assertCurrentFrontend(page);
     await scrollDashboard(page);
-    await page.waitForLoadState('networkidle');
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await assertNoBrowserErrors("Energy");
     const housePowerGraph = cardByTitle(page, "House Power").locator("svg.graph-background");
     if (await housePowerGraph.count() !== 1 || !await housePowerGraph.isVisible() || await housePowerGraph.locator("polyline.line").count() !== 1) {

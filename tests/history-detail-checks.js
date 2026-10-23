@@ -131,8 +131,13 @@ async function checkDrillIn(page,graph,sheet,serviceCalls,startedCalls){
  await button.tap();await sheet.locator('.marao-history-content canvas').waitFor({state:'visible'});
  assert.equal(await page.locator('.marao-popup-overlay').count(),1);
  assert.equal(await page.evaluate(()=>__chartParent.hidden&&__chartParent.inert&&__chartChild.isConnected),true,'Drill-in detached the retained parent');
+ await page.evaluate(()=>{
+  __chartChild.setConfig({...__chartChild._config,name:'Retained graph updated'});
+  if(__chartInvoker.isConnected)throw Error('The focus regression must replace the original opener');
+ });
  await sheet.getByRole('button',{name:/^(Back|Voltar)$/,exact:true}).tap();await sheet.locator('.marao-history-content').waitFor({state:'detached'});
- assert.deepEqual(await page.evaluate(()=>({connected:__chartChild.isConnected,inert:__chartParent.inert,hidden:__chartParent.hidden,focus:__chartChild.shadowRoot.activeElement===__chartInvoker,scroll:Math.abs(window.__chartTemporaryPopup._overlay.querySelector('.marao-popup-sheet').scrollTop-__chartParentScroll)<=.75})),{connected:true,inert:false,hidden:false,focus:true,scroll:true});
+ await page.waitForFunction(()=>__chartChild.shadowRoot.activeElement===__chartChild.shadowRoot.querySelector('[data-history-open]'));
+ assert.deepEqual(await page.evaluate(()=>({connected:__chartChild.isConnected,inert:__chartParent.inert,hidden:__chartParent.hidden,focus:__chartChild.shadowRoot.activeElement===__chartChild.shadowRoot.querySelector('[data-history-open]'),scroll:Math.abs(window.__chartTemporaryPopup._overlay.querySelector('.marao-popup-sheet').scrollTop-__chartParentScroll)<=.75})),{connected:true,inert:false,hidden:false,focus:true,scroll:true});
  await page.goForward();await sheet.locator('.marao-history-content canvas').waitFor({state:'visible'});
  await page.goBack();await sheet.locator('.marao-history-content').waitFor({state:'detached'});
  const climate=sheet.locator('marao-card').filter({has:page.locator('.title').filter({hasText:/^Safe climate history$/})});

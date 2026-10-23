@@ -41,6 +41,7 @@ async function main() {
       const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
       await context.addInitScript(setBrowserToken, {hassUrl:config.url, ...accessToken(config)});
       page = await context.newPage();
+      await require("./camera-request-ledger").managedCameraLedger(context, page, { output, scenario: scenario.name, theme });
       page.setDefaultTimeout(15000);
       page.setDefaultNavigationTimeout(30000);
       const errors = [];
@@ -51,7 +52,6 @@ async function main() {
       }));
       page.on('pageerror', error => errors.push(error.message));
       page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
-      page.on('requestfailed', request => errors.push('Failed ' + new URL(request.url()).pathname));
       page.on('response', response => { if (response.status() >= 400) errors.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
       const results = [];
       if (engine === chromium) {
@@ -89,7 +89,7 @@ async function main() {
         assert.deepEqual(errors, []);
         fs.writeFileSync(path.join(output,name+'-covers.json'),JSON.stringify({results,errors},null,2),{mode:0o600});
         console.log(name + ': native cover summary touch scrolling OK');
-        await page.locator('.marao-popup-close').click();
+        await page.locator('.marao-popup-close').tap();
         if (process.argv.includes('--covers-only')) continue;
       }
       for (const route of ['overview#overview-maintenance', 'card-test#marao-dashboard-test-maintenance-popup']) {
@@ -122,7 +122,7 @@ async function main() {
         };
         results.push(await checkScroll(page, sheet, updatePopup, route));
         if (route.startsWith('overview') && scenario.name === 'iphone-normal') await page.screenshot({path:path.join(output,name+'-maintenance.png'),scale:'css'});
-        await page.locator('.marao-popup-close').click();
+        await page.locator('.marao-popup-close').tap();
         await sheet.waitFor({state:'detached'});
         if (route.startsWith('card-test')) {
           const scroller = await page.locator('marao-card').first().evaluateHandle(card => {

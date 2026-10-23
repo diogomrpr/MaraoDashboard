@@ -128,10 +128,10 @@ async function main() {
       const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
       try {
         await context.addInitScript(setBrowserToken, { hassUrl: config.url, ...accessToken(config) });
-        const page = await context.newPage(); await configurePageEmulation(context, page, scenario);
+        const page = await context.newPage();
+      await require("./camera-request-ledger").managedCameraLedger(context, page, { output, scenario: scenario.name, theme }); await configurePageEmulation(context, page, scenario);
         page.on('pageerror', error => errors.push(error.message));
         page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
-        page.on('requestfailed', request => errors.push('Failed resource: ' + new URL(request.url()).pathname));
         page.on('response', response => { if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); });
         page.on('websocket', socket => socket.on('framesent', ({ payload }) => {
           let message; try { message = JSON.parse(String(payload)); } catch { return; }
@@ -145,17 +145,17 @@ async function main() {
           await page.locator('marao-card .room-bottom').first().waitFor();
           await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
           await assertCurrentFrontend(page); await applyVisualPreferences(page, scenario, theme);
-          await page.waitForLoadState('networkidle');
+          await page.evaluate(() => document.fonts.ready);
           await checkRoomComposition(page);
           assert.deepEqual(await layoutIssues(page), [], view + ': layout defects');
           names[view] = await page.locator('marao-card').evaluateAll(cards => cards.filter(card => card._config?.template === 'hc_room_card').map(card => card._config.name));
           for (const [index, name] of names[view].entries()) await capture(page, namedCard(page, name), `${run}-${view}-${index}`, scenario, theme);
-          await page.waitForLoadState('networkidle');
+          await page.evaluate(() => document.fonts.ready);
         }
         await page.goto(config.url + '/marao-dashboard/card-test');
         await page.locator('[data-room-lights-off]').first().waitFor();
         await applyVisualPreferences(page, scenario, theme);
-        await actions(page, calls, run, scenario, theme); await page.waitForLoadState('networkidle');
+        await actions(page, calls, run, scenario, theme); await page.evaluate(() => document.fonts.ready);
         assert.deepEqual(errors, [], 'Browser diagnostics; inspect private receipt');
         fs.writeFileSync(path.join(output, run + '-receipt.json'), JSON.stringify({ run, names, errors, emulation: 'verified after scrolling before every capture', actions: 'one safe dispatch, strong haptic, current availability guards, decoration navigation' }, null, 2));
         console.log(run + ': room geometry, lighting actions and navigation passed.');
@@ -163,5 +163,5 @@ async function main() {
     } finally { await browser.close(); }
   }
 }
-if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
+if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
 module.exports = { capture, namedCard, setRoomOffline, visibleBounds };

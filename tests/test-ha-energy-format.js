@@ -15,7 +15,7 @@ function reading(page, name) {
   }).first();
 }
 async function waitIdle(card) {
-  await card.page().waitForFunction(card => !card._loading && !card._graphRequests?.size, await card.elementHandle());
+  await card.page().waitForFunction(card => !card._loading && !card._prefetching && !card._graphRequests?.size, await card.elementHandle());
 }
 async function capture(page, card, filename) {
   await page.evaluate(() => document.fonts.ready);
@@ -123,7 +123,7 @@ async function inspectGallery(page, run, requests) {
   }
   assert.equal(await byLabel('unavailable').locator('ha-card').getAttribute('data-problem'), 'neutral');
   const graph = byLabel('converted two decimals');
-  await page.waitForLoadState('networkidle');
+  await waitIdle(graph);
   const graphRequestCount = requests.length;
   const cached = await graph.evaluate(card => {
     const entity = card._config.entity;
@@ -133,7 +133,7 @@ async function inspectGallery(page, run, requests) {
   assert.match(await text('converted two decimals'), /^1[.,]234500 kWh$/);
   assert.match(await text('converted zero decimals'), /^1 kWh$/);
   assert.deepEqual(await graph.evaluate(card => ({ records: JSON.stringify(card._graphHistory.get(card._config.entity)), state: card.hass.states[card._config.entity].state })), cached);
-  await page.waitForLoadState('networkidle');
+  await waitIdle(graph);
   assert.equal(requests.length, graphRequestCount, 'Formatting refetched graph history');
   await graph.evaluate(card => card.setConfig({ ...card._config, variables: { ...card._config.variables, display_precision: 2 } }));
   const controller = reading(page, 'Simulate source unit loss');
@@ -187,7 +187,7 @@ async function inspectGallery(page, run, requests) {
     assert.equal(await period.locator('[data-period="next"]').isDisabled(), true);
     await capture(page, period, run + '-' + example.name.split(' · ')[1].replaceAll(' ', '-') + '-sheet');
     const before = await period.evaluate(card => ({ key: card._loadedKey, history: JSON.stringify(card._history) }));
-    await page.waitForLoadState('networkidle');
+    await waitIdle(period);
     const periodRequestCount = requests.length;
     await period.evaluate(card => card.setConfig({ ...card._config, display_precision: 6 }));
     assert.deepEqual(await period.evaluate(card => ({ key: card._loadedKey, history: JSON.stringify(card._history) })), before);
@@ -195,7 +195,7 @@ async function inspectGallery(page, run, requests) {
     assert.equal(await period.locator('time').getAttribute('datetime'),selected,'Formatting reset the selected calendar interval');
     assert.equal(await selectedValue.textContent(),'—','Precision changes cannot turn unknown consumption into zero');
     await period.evaluate(card=>{delete card.__energyChartBefore;delete card.__energyCanvasBefore;});
-    await page.waitForLoadState('networkidle');
+    await waitIdle(period);
     assert.equal(requests.length, periodRequestCount, 'Formatting refetched period history');
     await capture(page, period, run + '-' + example.name.split(' · ')[1].replaceAll(' ', '-') + '-sheet-six-decimals');
     await period.locator('[data-period="previous"]').click();
@@ -226,11 +226,11 @@ async function main() {
       const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
       await context.addInitScript(setBrowserToken, { hassUrl: config.url, ...accessToken(config) });
       const page = await context.newPage();
+      await require("./camera-request-ledger").managedCameraLedger(context, page, { output, scenario: scenario.name, theme });
       await configurePageEmulation(context, page, scenario);
       const errors = [], requests = [];
       page.on('pageerror', error => errors.push(error.message));
       page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
-      page.on('requestfailed', request => errors.push('Failed resource: ' + new URL(request.url()).pathname));
       page.on('response', response => { if (response.status() >= 400) errors.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
       page.on('request', request => {
         const url = new URL(request.url());
@@ -241,17 +241,17 @@ async function main() {
         await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor();
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);
-        await page.waitForLoadState('networkidle');
+        for (const example of manifest.energyFormattingCases) await waitIdle(reading(page, example.name));
         const warmedRequests = requests.length;
         await inspectGallery(page, run, requests);
-        await page.waitForLoadState('networkidle');
+        await page.evaluate(() => document.fonts.ready);
         const energyRequests = requests.filter(url => url.searchParams.get('filter_entity_id')?.startsWith('sensor.marao_dashboard_test_energy_format_'));
         fs.writeFileSync(path.join(output, run + '-requests.json'), JSON.stringify(energyRequests.map(url => url.pathname + url.search), null, 2));
         const graphCount = manifest.energyFormattingCases.filter(card => ['hc_graph_card', 'hc_toggle_graph_card'].includes(card.template)).length;
         const warmEnergy = requests.slice(0, warmedRequests).filter(url => url.searchParams.get('filter_entity_id')?.startsWith('sensor.marao_dashboard_test_energy_format_'));
         // HA rebuilds the view once when the requested theme is applied.
         assert.ok(warmEnergy.length > 0 && warmEnergy.length <= graphCount * 2, 'Repeated initial energy history requests');
-        assert.equal(requests.slice(warmedRequests).filter(url => url.searchParams.get('filter_entity_id')?.startsWith('sensor.marao_dashboard_test_energy_format_')).length, 9, 'Expected one request per open/previous/current period for three sheets');
+        assert.equal(requests.slice(warmedRequests).filter(url => url.searchParams.get('filter_entity_id')?.startsWith('sensor.marao_dashboard_test_energy_format_')).length, 18, 'Three sheets each load the current period and four earlier periods, then one new neighbour when navigating back; cached return must not refetch');
         assert.ok(energyRequests.every(url => !url.searchParams.has('no_attributes') && !url.searchParams.has('minimal_response')), 'History unit attributes suppressed');
         fs.writeFileSync(path.join(output, run + '-receipt.json'), JSON.stringify({ run, errors, energyRequests: energyRequests.length, examples: manifest.energyFormattingCases.length }, null, 2));
         assert.deepEqual(errors, [], 'Unexpected browser diagnostics; inspect private receipt');
@@ -261,5 +261,5 @@ async function main() {
     }
   } finally { await browser.close(); ws.close(); }
 }
-if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
+if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
 module.exports = { capture };

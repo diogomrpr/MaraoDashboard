@@ -83,6 +83,7 @@ function classifyCameraCancellations(failures, trace) {
 }
 
 function installTrace({ subscriptions = false, entities = ['camera.marao_dashboard_test_camera'] } = {}) {
+  Error.stackTraceLimit = 40;
   const documentId = [...crypto.getRandomValues(new Uint32Array(4))].map(value => value.toString(16)).join('-');
   const state = { document: documentId, events: [], sessions: [], stops: [], handoffs: [], releases: [], streamRequests: 0, streamCalls: [], order: 0, boundary: null, next: 0 };
   window.__maraoCameraRequestTrace = state;

@@ -2127,7 +2127,7 @@ def _resolve_pages(config, registry=None, *, validate_source_units=True):
                 variables = dict(source.get("variables") or {})
                 prefix = f"#page-{page['path']}-{entity['id']}"
                 popup_role = role in ("hc_media_card", "hc_camera_card", "hc_entity_group_card", "hc_scene_collection_card", "hc_energy_period_card", "hc_security_card")
-                if popup_role or entity_id and role != "hc_access_slide_action_card" and _is_access_entity(entity):
+                if popup_role or entity_id and role not in ("hc_access_slide_action_card", "hc_access_action_card") and _is_access_entity(entity):
                     variables.setdefault("popup_hash", prefix + "-popup")
                 if role == "hc_graph_card" and variables.get("history_popup"):
                     variables.setdefault("popup_hash", prefix + "-history")

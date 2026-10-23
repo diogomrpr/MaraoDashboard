@@ -26,7 +26,7 @@ def test_fixed_mixed_controls_keep_exact_order_options_and_preferred_columns(col
     assert view["cards"][0] == {"type": "custom:marao-control-grid", "columns": columns, "cards": [
         {"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.safe", "name": "Simple", "variables": {"enable_slider": False, "future": []}},
         {"type": "custom:marao-card", "template": "hc_cover_card", "entity": "cover.safe", "name": "Shade"},
-        {"type": "custom:marao-card", "template": "hc_access_action_card", "entity": "lock.safe", "name": "Lock", "variables": {"action_service": "lock.lock", "popup_hash": "#page-home-card-3-popup"}},
+        {"type": "custom:marao-card", "template": "hc_access_action_card", "entity": "lock.safe", "name": "Lock", "variables": {"action_service": "lock.lock"}},
     ]}
     assert source == before
 

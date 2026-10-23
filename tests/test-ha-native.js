@@ -217,7 +217,7 @@ async function editor(page, calls, theme) {
   await page.getByRole('button', { name: /Show visual editor|Mostrar editor visual/i }).tap();
   await visual.waitFor();
   assert.equal(calls.length, before, 'Editor preview dispatched a service');
-  await page.getByRole('button', { name: /Save|Guardar|Salvar/i, exact: true }).tap();
+  await page.getByRole('button', { name: /^(Save|Guardar|Salvar)$/i, exact: true }).tap();
   await page.getByRole('button', { name: /Done|Concluído|Concluir/i, exact: true }).tap();
   await waitCards(page);
 }
@@ -408,5 +408,5 @@ async function main() {
   console.log('Native editing acceptance passed; private scoped report: ' + reportFile);
 }
 
-if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
+if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
 module.exports = { fixtureDashboard };

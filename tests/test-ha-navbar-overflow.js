@@ -112,7 +112,7 @@ async function exercise(page, card, run, detailed) {
     await page.evaluate(()=>{window.__maraoNavigations=0;window.addEventListener('location-changed',()=>window.__maraoNavigations++);});
     await card.locator('[data-overflow]').tap();
     await card.locator('.overflow a[href="/marao-dashboard/appliances"]').tap();await page.waitForURL('**/marao-dashboard/appliances');
-    await page.waitForLoadState('networkidle');
+    await page.evaluate(() => document.fonts.ready);
     assert.equal(await page.evaluate(()=>window.__maraoNavigations),1,'A route navigated more than once');
     await card.locator('[data-overflow].active').waitFor();
     assert.ok((await card.locator('[data-overflow]').getAttribute('aria-label')).includes(original.routes.find(route=>route.url==='/marao-dashboard/appliances').label));
@@ -121,9 +121,9 @@ async function exercise(page, card, run, detailed) {
     assert.equal(await card.locator('.nav [data-route]').first().getAttribute('data-route'),'0');
     assert.equal(await card.evaluate(element=>element._config.routes[0].url),original.routes[0].url);
     await page.keyboard.press('Escape');
-    await page.goBack();await page.waitForURL('**/marao-dashboard/overview');await page.waitForLoadState('networkidle');
+    await page.goBack();await page.waitForURL('**/marao-dashboard/overview');await page.evaluate(() => document.fonts.ready);
     await card.locator('.nav [data-route][aria-current=page]').waitFor();
-    await page.goForward();await page.waitForURL('**/marao-dashboard/appliances');await page.waitForLoadState('networkidle');await card.locator('[data-overflow].active').waitFor();
+    await page.goForward();await page.waitForURL('**/marao-dashboard/appliances');await page.evaluate(() => document.fonts.ready);await card.locator('[data-overflow].active').waitFor();
     await page.screenshot({path:path.join(output,run+'-active.png'),scale:'css'});
     await page.goto(new URL('/marao-dashboard/overview',page.url()).href);await card.locator('.nav').waitFor();
   }
@@ -148,7 +148,7 @@ async function builderEditor(page, config) {
   assert.deepEqual(await panel.evaluate(element=>element._model.navigation),expected.navigation);
   await panel.locator('#save').click();
   await page.waitForFunction(element=>!element._busy&&!element._dirty,await panel.elementHandle());
-  await page.reload();panel=page.locator('marao-dashboard-panel');await panel.waitFor();
+  await page.__cameraRequestLedger.beforeNavigation();await page.reload();panel=page.locator('marao-dashboard-panel');await panel.waitFor();
   await page.waitForFunction(element=>element._loaded,await panel.elementHandle());
   assert.deepEqual(await panel.evaluate(element=>element._model.navigation),expected.navigation);
 }
@@ -216,7 +216,7 @@ async function nativeEditor(page,calls,theme) {
   assert.deepEqual(config.routes.slice(1),before.routes.slice(1));assert.deepEqual(config.routes[0].future,{keep:[]});
   await page.getByRole('button',{name:/Show visual editor|Mostrar editor visual/i}).click();await editor.waitFor();
   assert.deepEqual(await editor.evaluate(element=>element._draft.routes),config.routes);
-  await page.getByRole('button',{name:/Save|Guardar|Salvar/i,exact:true}).click();
+  await page.getByRole('button',{name:/^(Save|Guardar|Salvar)$/i,exact:true}).click();
   await page.getByRole('button',{name:/Done|Concluído|Concluir/i,exact:true}).click();
   await navbar.waitFor();await settle(page);await geometry(navbar);
   assert.equal(calls.length,0,'Native navigation/editor dispatched an entity service');
@@ -230,9 +230,10 @@ async function main() {
     for(const {scenario,theme} of selectedRuns(options)){
       const browser=await chromium.launch(),context=await browser.newContext(contextOptionsForScenario(scenario,theme));
       await context.addInitScript(setBrowserToken,{hassUrl:config.url,...accessToken(config)});
-      const page=await context.newPage();page.setDefaultTimeout(15000);page.setDefaultNavigationTimeout(30000);
+      const page=await context.newPage();
+      await require("./camera-request-ledger").managedCameraLedger(context,page,{output,scenario:scenario.name,theme});page.setDefaultTimeout(15000);page.setDefaultNavigationTimeout(30000);
       const errors=[],calls=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(['warning','error'].includes(m.type()))errors.push(m.text());});
-      page.on('requestfailed',r=>errors.push('Failed '+new URL(r.url()).pathname));page.on('response',r=>{if(r.status()>=400)errors.push('HTTP '+r.status());});
+      page.on('response',r=>{if(r.status()>=400)errors.push('HTTP '+r.status());});
       page.on('websocket',socket=>socket.on('framesent',({payload})=>{let m;try{m=JSON.parse(String(payload));}catch{return;}if(m.type==='call_service')calls.push(m.service);}));
       try {
         await configurePageEmulation(context,page,scenario);

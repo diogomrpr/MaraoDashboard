@@ -225,16 +225,24 @@ test('history checks release loading, await nearby prefetch and reject warm-cach
   const { manifest } = require('../../ha-test/cases');
   for (const repeated of [false, true]) {
     let settled = false, released = false, loadingReads = 0, record, releasedListener = false;
-    const elements = manifest.historyCases.flatMap(example => ['Graph', 'Energy', 'Timeline'].map(label => ({
-      _config: { name: `${label} history · ${example.id}` }, _hass: {},
-      shadowRoot: { querySelector: () => ({ dataset: { historyState: example.expectedStatus === 'loading' && settled ? 'ready' : example.expectedStatus } }) },
-    })));
+    const elements = manifest.historyCases.flatMap(example => ['Graph', 'Energy', 'Timeline'].map(label => {
+      const status = () => example.expectedStatus === 'loading' && settled ? 'ready' : example.expectedStatus;
+      const card = { _config: { name: `${label} history · ${example.id}` }, _hass: {}, visible: false };
+      if (label === 'Graph') { card._graphEntity = () => example.entity; card._graphStatus = status; }
+      card.shadowRoot = { querySelector: () => ({ dataset: { historyState: label === 'Graph' && !card.visible ? example.expectedStatus : status() } }) };
+      return card;
+    }));
     const environment = vm.createContext({ document: { querySelectorAll: selector => selector === '*' ? [] : elements }, URL,
       requestAnimationFrame: callback => callback() });
     const run = (callback, arg) => vm.runInContext('(' + callback.toString() + ')', environment)(arg);
     const page = {
       __historyLoadingGate: { release() { assert.equal(loadingReads,3); assert.equal(settled,false); released=true; } },
-      locator: () => ({ evaluateAll: async (callback, arg) => {
+      locator: () => ({ filter: ({ hasText, has }) => hasText ? { pattern: hasText } : {
+        first: () => {
+          const card = elements.find(element => has.pattern.test(element._config.name));
+          return { scrollIntoViewIfNeeded: async () => { card.visible = true; }, elementHandle: async () => card };
+        },
+      }, evaluateAll: async (callback, arg) => {
         if (typeof arg === 'string') { assert.equal(settled, false); loadingReads++; }
         else if (repeated) record({ url: () => 'http://homeassistant.test/api/history/period/current?filter_entity_id=' + manifest.historyCases[0].entity });
         return callback(elements, arg);
@@ -248,6 +256,7 @@ test('history checks release loading, await nearby prefetch and reject warm-cach
     if (repeated) await assert.rejects(() => checkHistoryCases(page), /Settled history requested again/);
     else await checkHistoryCases(page);
     assert.equal(settled, true); assert.equal(releasedListener, true);
+    assert.ok(elements.every(card => card.visible), 'Every deferred history surface is inspected after entering the viewport');
   }
 });
 

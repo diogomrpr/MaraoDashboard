@@ -512,6 +512,8 @@ def test_synthetic_live_remux_loops_with_clocked_monotonic_packets_and_closes(mo
 
         def __exit__(self, *_):
             closed.append("output")
+            assert stop.is_set()
+            assert self.sink.write(b"closing flush") == len(b"closing flush")
 
         def add_stream_from_template(self, template):
             assert template is video

@@ -37,7 +37,8 @@ def remux_live(stop: Event, chunks: Queue, source_file: Path = LIVE_FILE) -> Non
                     except Full:
                         continue
                 else:
-                    raise BrokenPipeError("Synthetic source consumer closed")
+                    # PyAV flushes on close after the consumer has disconnected.
+                    return len(data)
             return len(data)
 
         def writable(self):

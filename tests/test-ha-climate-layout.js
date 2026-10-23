@@ -39,11 +39,11 @@ async function main() {
         const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
         await context.addInitScript(setBrowserToken, { hassUrl: config.url, ...accessToken(config) });
         const page = await context.newPage();
+      await require("./camera-request-ledger").managedCameraLedger(context, page, { output, scenario: scenario.name, theme });
         await configurePageEmulation(context, page, scenario);
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
         page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
-        page.on('requestfailed', request => errors.push(`Failed resource: ${new URL(request.url()).pathname} (${request.failure()?.errorText || 'unknown transport error'})`));
         page.on('response', response => { if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); });
         const captures = [];
         for (const view of views) {
@@ -59,7 +59,7 @@ async function main() {
           await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
           await assertCurrentFrontend(page);
           await applyVisualPreferences(page, scenario, theme);
-          await page.waitForLoadState('networkidle');
+          await page.evaluate(() => document.fonts.ready);
           const cards = page.locator('marao-card');
           const selected = await cards.evaluateAll((elements, allowed) => elements.flatMap((card, index) => allowed.includes(card._config?.template) ? [{ index, name: card._config.name, template: card._config.template }] : []), [...templates]);
           for (const card of selected) {
@@ -109,7 +109,7 @@ async function main() {
             await page.locator('.marao-popup-close').tap();
             await sheet.waitFor({ state: 'detached' });
           }
-          await page.waitForLoadState('networkidle');
+          await page.evaluate(() => document.fonts.ready);
         }
         fs.writeFileSync(path.join(output, 'receipt.json'), JSON.stringify({ run, captures, errors }, null, 2) + '\n');
         assert.deepEqual(errors, [], 'Unexpected numeric layout browser diagnostics; inspect private evidence');
@@ -121,4 +121,4 @@ async function main() {
   } finally { client.close(); }
 }
 
-if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
+if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });

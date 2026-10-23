@@ -218,6 +218,8 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
     await page.waitForFunction(({ p, source }) => p._monaco.getValue() === source, { p: await panel.elementHandle(), source });
     await selectionReady();
     await panel.evaluate(p => { const input = p.shadowRoot.querySelector('#monaco textarea.inputarea'), data = new DataTransfer(); data.setData('text/plain', 'Pasted safe light'); input.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true })); });
+    await page.waitForFunction(({ p, expected }) => p._monaco.getValue() === expected,
+      { p: await panel.elementHandle(), expected: source.replace('Searchable first light', 'Pasted safe light') });
     assert.equal(await text(), source.replace('Searchable first light', 'Pasted safe light'));
     await page.keyboard.press(mac ? 'Meta+z' : 'Control+z');
     await page.waitForFunction(({ p, source }) => p._monaco.getValue() === source, { p: await panel.elementHandle(), source });
