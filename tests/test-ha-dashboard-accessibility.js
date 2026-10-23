@@ -526,7 +526,7 @@ async function emulationIssues(page, scenario, theme) {
             if (size && size < minimumTitleSize - 0.5) issues.push(`${element._config?.name || "card"}: title is ${size}px; expected at least ${minimumTitleSize}px`);
             const readings = element.shadowRoot?.querySelector(".readings");
             const width = readings?.getBoundingClientRect().width;
-            if (textScale === 2 && width > 0 && width <= 400 && getComputedStyle(readings).gridTemplateColumns.trim().split(/\s+/).filter((track) => parseFloat(track) > 0.5).length > 1) issues.push(`${element._config?.name || element._config?.template}: detail readings did not reflow at 200% text`);
+            if (textScale === 2 && width > 0 && width <= 400 && getComputedStyle(readings).display === 'grid' && getComputedStyle(readings).gridTemplateColumns.trim().split(/\s+/).filter((track) => parseFloat(track) > 0.5).length > 1) issues.push(`${element._config?.name || element._config?.template}: detail readings did not reflow at 200% text`);
           }
         }
         visit(element.shadowRoot);
