@@ -13,7 +13,7 @@ const [cardsModule, cameraEventsModule] = await Promise.all([
   import(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`),
   import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`),
 ]);
-const { loadHistoryChart, createHistoryPlaceholder, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, updateCardSurface, problemLabel, showCardDetails, layoutState, registerMaraoCards } = cardsModule;
+const { loadHistoryChart, createHistoryPlaceholder, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, fitNativeGrid, updateCardSurface, problemLabel, showCardDetails, layoutState, registerMaraoCards } = cardsModule;
 registerMaraoCards();
 cameraEventsModule.registerMaraoCameraEventCards();
 
@@ -852,26 +852,12 @@ class MaraoSlideToOpen extends HTMLElement {
   }
 
   _fitAccessGrid() {
-    // A fixed-size thumb and readable label cannot share a sub-100px grid cell.
-    for (let item = this; item; item = item.parentElement || item.getRootNode?.()?.host) {
-      if (item.localName === "marao-control-grid" || item.classList?.contains("control-grid")) return;
-      const grid = item.parentElement;
-      if (grid?.id !== 'root' || grid.getRootNode().host?.localName !== 'hui-grid-card') continue;
-      const root = grid.getRootNode(), columns = Number(root.host._config?.columns) || 3;
-      item.setAttribute('data-marao-access-grid-item', '');
-      this._accessGridItem = item;
-      if (!root.querySelector('style[data-marao-access-grid]')) {
-        const style = document.createElement('style'); style.dataset.maraoAccessGrid = '';
-        style.textContent = `:host{container:marao-access-grid / inline-size}@container marao-access-grid (max-width:${columns * 144 + (columns - 1) * 8}px){#root>[data-marao-access-grid-item]{grid-column:1/-1}}`;
-        root.append(style);
-      }
-      break;
-    }
+    this._accessGridItem = fitNativeGrid(this, 144);
   }
 
   disconnectedCallback() {
     this._detailsPopup?._close(false);
-    this._accessGridItem?.removeAttribute('data-marao-access-grid-item'); this._accessGridItem = null;
+    this._accessGridItem?.removeAttribute('data-marao-grid-144'); this._accessGridItem = null;
     for (const type of ["location-changed", "popstate"]) globalThis.window?.removeEventListener?.(type, this._cancelHiddenSlide);
     globalThis.document?.removeEventListener?.("visibilitychange", this._cancelHiddenSlide);
     this._actionLive = false;

@@ -146,8 +146,8 @@ test("loading and route/visibility changes cannot dispatch or retain alarm codes
 });
 
 test("strict slide routes every native opener once and rejects incompatible overrides", async () => {
-  const names = ["HTMLElement", "MARAO_SLIDE_INTENT_PX", "MARAO_SLIDE_COMPLETE_AT", "serviceConnectionReady", "serviceTargetReady", "accessOpenerService", "haptic", "callServiceWithNotification", "serviceOutcome"];
-  const values = [globalThis.HTMLElement, 10, .92, runtime.serviceConnectionReady, runtime.serviceTargetReady, accessOpenerService, () => {}, runtime.callServiceWithNotification, runtime.serviceOutcome];
+  const names = ["HTMLElement", "MARAO_SLIDE_INTENT_PX", "MARAO_SLIDE_COMPLETE_AT", "serviceConnectionReady", "serviceTargetReady", "accessOpenerService", "haptic", "callServiceWithNotification", "serviceOutcome", "fitNativeGrid"];
+  const values = [globalThis.HTMLElement, 10, .92, runtime.serviceConnectionReady, runtime.serviceTargetReady, accessOpenerService, () => {}, runtime.callServiceWithNotification, runtime.serviceOutcome, runtime.fitNativeGrid];
   const Slide = new Function(...names, dashboard.slice(dashboard.indexOf("class MaraoSlideToOpen"), dashboard.indexOf('if (!customElements.get("marao-slide-to-open"))')) + "; return MaraoSlideToOpen;")(...values);
   for (const [domain, service, state] of [["lock", "unlock", "locked"], ["cover", "open_cover", "closed"], ["button", "press", "2026-01-01"], ["switch", "turn_on", "off"], ["script", "turn_on", "off"]]) {
     const id = domain + ".safe", calls = [];
@@ -180,11 +180,13 @@ test("strict slide routes every native opener once and rejects incompatible over
   }
 });
 
-test('strict access hosts share one responsive grid rule across generated and native nesting', () => {
+test('native grids reflow ordinary and access cards without changing owned control grids', t => {
   const styles = [], attributes = new Set();
-  const document = { createElement: () => ({ dataset: {} }) };
-  const Slide = new Function('document', dashboard.slice(dashboard.indexOf('class MaraoSlideToOpen'), dashboard.indexOf('if (!customElements.get("marao-slide-to-open"))')) + '; return MaraoSlideToOpen;')(document);
-  const root = { host: { localName: 'hui-grid-card', _config: { columns: 2 } }, querySelector: () => styles[0], append: style => styles.push(style) };
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: () => ({ attributes: new Set(), setAttribute(name) { this.attributes.add(name); } }) };
+  t.after(() => { globalThis.document = previousDocument; });
+  const Slide = new Function('fitNativeGrid', dashboard.slice(dashboard.indexOf('class MaraoSlideToOpen'), dashboard.indexOf('if (!customElements.get("marao-slide-to-open"))')) + '; return MaraoSlideToOpen;')(runtime.fitNativeGrid);
+  const root = { host: { localName: 'hui-grid-card', _config: { columns: 2 } }, querySelector: selector => styles.find(style => style.attributes.has(selector.slice(6, -1))), append: style => styles.push(style) };
   const grid = { id: 'root', getRootNode: () => root };
   const item = { parentElement: grid, setAttribute: key => attributes.add(key) };
   for (const nested of [false, true]) {
@@ -192,7 +194,11 @@ test('strict access hosts share one responsive grid rule across generated and na
     if (nested) slide.getRootNode = () => ({ host: { parentElement: item } }); else slide.parentElement = item;
     slide._fitAccessGrid(); assert.equal(slide._accessGridItem, item);
   }
-  assert.ok(attributes.has('data-marao-access-grid-item'));
+  assert.ok(attributes.has('data-marao-grid-144'));
   assert.equal(styles.length, 1); assert.match(styles[0].textContent, /max-width:296px/);
   assert.match(styles[0].textContent, /grid-column:1\/-1/);
+  assert.equal(runtime.fitNativeGrid({ parentElement: item }, 76), item);
+  assert.equal(styles.length, 2);
+  assert.match(styles[1].textContent, /max-width:160px/);
+  assert.equal(runtime.fitNativeGrid({ parentElement: { localName: 'marao-control-grid', parentElement: item } }, 76), undefined);
 });

@@ -678,6 +678,7 @@ export function problemStyle(problem, appearance = null) {
 // Only presentation metadata survives loss of availability; readings never do.
 export function layoutState(owner, state = {}) {
   const keys = ['friendly_name', 'icon', 'unit_of_measurement', 'device_class', 'supported_features', 'supported_color_modes', 'hvac_modes', 'code_format', 'code_arm_required', 'options'];
+  if (state.state && !['unknown', 'unavailable'].includes(state.state)) owner._layoutMetadata = {};
   owner._layoutMetadata ||= {};
   for (const key of keys) if (state.attributes?.[key] != null) owner._layoutMetadata[key] = state.attributes[key];
   if (Object.keys(owner._layoutMetadata).every(key => state.attributes?.[key] === owner._layoutMetadata[key])) return state;
@@ -947,7 +948,7 @@ function cardStyles() {
     .vacuum-actions button { padding:10px 4px; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); }
     .body.room-card { display:flex; flex-direction:column; align-items:stretch; gap:8px; }
     .room-bottom { position:relative; display:flex; align-items:flex-end; min-height:48px; margin-top:auto; }
-    .room-artwork { --room-artwork-size:clamp(48px,65cqi,128px); position:absolute; right:calc(-1 * var(--room-edge-inset,14px)); bottom:calc(-1 * var(--room-edge-inset,14px)); width:calc(.8 * var(--room-artwork-size)); height:calc(.8 * var(--room-artwork-size)); overflow:hidden; color:var(--marao-icon-color,var(--icon-color)); opacity:.2; pointer-events:none; }
+    .room-artwork { --room-artwork-size:clamp(48px,65cqi,128px); position:absolute; right:calc(-1 * var(--room-edge-inset,14px)); bottom:calc(-1 * var(--room-edge-inset,14px)); width:calc(.8 * var(--room-artwork-size)); height:calc(.8 * var(--room-artwork-size)); max-height:calc(100% + var(--room-edge-inset,14px)); overflow:hidden; color:var(--marao-icon-color,var(--icon-color)); opacity:.2; pointer-events:none; }
     .room-artwork :is(ha-icon,ha-state-icon) { display:block; width:var(--room-artwork-size); height:var(--room-artwork-size); --mdc-icon-size:var(--room-artwork-size); }
     .room-lights-off { position:relative; z-index:3; box-sizing:border-box; display:flex; align-items:center; justify-content:center; flex:0 0 48px; width:48px; height:48px; padding:0; border:1px solid currentColor; border-radius:50%; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); pointer-events:auto; }
     .room-lights-off:disabled { opacity:.6; cursor:default; }
@@ -956,7 +957,7 @@ function cardStyles() {
     .marao-dropdown>button>span { min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
     .weather-card .readings { display:flex;overflow-x:auto;gap:12px }
     .weather-card .reading { flex:1 0 5em }
-    .reading dt { height:2.5em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical }
+    .reading dt { height:2.5em;overflow-wrap:anywhere;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical }
     .number-value { height:1.2em;white-space:nowrap!important;overflow:hidden }
     .body.media-app-card .problem { position:absolute;inset:8px;width:auto;margin:0;padding:0;background:transparent }
     button.graph-status { position:absolute;right:12px;bottom:12px;z-index:4 }
@@ -1062,6 +1063,21 @@ function trimHistory(records, start) {
   if (count) records.splice(0, count);
 }
 
+export function fitNativeGrid(card, minimumWidth) {
+  for (let item = card; item; item = item.parentElement || item.getRootNode?.()?.host) {
+    if (item.localName === 'marao-control-grid' || item.classList?.contains('control-grid')) return;
+    const grid = item.parentElement;
+    if (grid?.id !== 'root' || grid.getRootNode().host?.localName !== 'hui-grid-card') continue;
+    const root = grid.getRootNode(), columns = Number(root.host._config?.columns) || 3;
+    const marker = `data-marao-grid-${minimumWidth}`;
+    item.setAttribute(marker, '');
+    let style = root.querySelector(`style[${marker}]`);
+    if (!style) { style = document.createElement('style'); style.setAttribute(marker, ''); root.append(style); }
+    style.textContent = `:host{container:marao-native-grid / inline-size}@container marao-native-grid (max-width:${columns * minimumWidth + (columns - 1) * 8}px){#root>[${marker}]{grid-column:1/-1}}`;
+    return item;
+  }
+}
+
 export class MaraoCard extends BaseElement {
   constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._hass = null; this._sliderTargets = new Map(); this._sliderGesture = null; this._graphHistory = new Map(); this._graphRequests = new Map(); this._graphErrors = new Set(); this._holdTimer = null; this._holdFrame = null; this._holdActive = false; this._holdCompleted = false; }
   get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
@@ -1085,6 +1101,7 @@ export class MaraoCard extends BaseElement {
     this._cancelSliderGesture();
     if (historyIdentity(this._config) !== historyIdentity(config)) { this._graphRequests.clear(); this._graphHistory.clear(); this._graphErrors.clear(); this._graphData = null; this._ownedGraphRecords = null; } this._config = { ...config }; if (previousGraph !== this._graphEntity()) this._activeHistoryPopup?._invalidateHistory(); this._actionError = ""; this._mediaError = ""; this._mediaURL = ""; this._actionRequest = (this._actionRequest || 0) + 1; this._subscribeClimate(); this._observeGraph(); this._render(); }
   connectedCallback() {
+    this._nativeGridItem = fitNativeGrid(this, 76); // 48px control plus the normal 14px side insets.
     this._observeGraph();
     this._actionLive = true; this._climateConnected = true; this._subscribeClimate();
     this._cancelHiddenControls ||= event => {
@@ -1150,6 +1167,7 @@ export class MaraoCard extends BaseElement {
   }
   get hass() { return this._hass; }
   disconnectedCallback() {
+    this._nativeGridItem?.removeAttribute('data-marao-grid-76'); this._nativeGridItem = null;
     this._graphObserver?.disconnect(); this._graphObserver = null; this._graphVisible = undefined;
     this._detailsPopup?._close(false);
     this._sceneDropdown?.destroy(); this._sceneDropdown = null;

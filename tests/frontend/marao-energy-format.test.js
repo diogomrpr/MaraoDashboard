@@ -35,6 +35,18 @@ test('compatible units, finite guards, signed values and fixed localized precisi
   assert.equal(energyFormatting({display_precision:0}),true);assert.equal(energyFormatting({power_unit:'kW'}),false);
 });
 
+test('available readings cannot inherit a removed unit from layout metadata',()=>{
+  const card=new MaraoCard();card.setConfig({template:'hc_sensor_card',entity:'sensor.energy',variables:{display_unit:'kWh',display_precision:2}});
+  card.hass=hass({'sensor.energy':sample('42','Wh')});
+  assert.match(card.shadowRoot.innerHTML,/0.04 kWh/);
+  card.hass=hass({'sensor.energy':{state:'unavailable',attributes:{}}});
+  assert.equal(card._layoutMetadata.unit_of_measurement,'Wh');
+  card.hass=hass({'sensor.energy':{state:'42',attributes:{}}});
+  assert.equal(card._layoutMetadata.unit_of_measurement,undefined);
+  assert.match(card.shadowRoot.innerHTML,/data-problem="error"/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML,/0.04 kWh/);
+});
+
 test('only configured primary readings and switch secondary power change',()=>{
   const states={'sensor.energy':sample('1234.5','Wh'),'switch.load':sample('on'),'sensor.power':sample('1500','W'),'climate.room':{state:'heat',attributes:{current_temperature:21,temperature:22}}};
   for(const kind of ['hc_graph_card','hc_toggle_graph_card','hc_sensor_card','hc_base_card']){

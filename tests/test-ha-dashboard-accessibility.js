@@ -194,7 +194,7 @@ async function inspectSafeAreaSheets(context, page, output, runName) {
         if(e !== original) issues.push(`Rotation replaced the open sheet (original connected: ${original.isConnected}; original owner connected: ${window.__safeSheetOwner.isConnected}; owner open: ${window.__safeSheetOwner._open})`);
         if(bounds.top < (app.top || 0)-1 || bounds.left < (app.left || 0)-1 || bounds.right > innerWidth-(app.right || 0)+1)issues.push('Sheet overlaps a safe edge');
         if(close.width < 48 || close.height < 48 || close.top < bounds.top || close.right > bounds.right)issues.push('Close control is not contained');
-        if(kind === 'tall' && Math.abs(bounds.top-(app.top || 0))>1)issues.push('Tall sheet does not use available height');
+        if(kind === 'tall' && Math.abs(bounds.top-Math.max(50,app.top || 0))>1)issues.push('Tall sheet does not use available height');
         if(kind === 'fixed' && Math.abs(bounds.height-innerHeight/2)>1)issues.push('Fixed sheet lost its configured height');
         if(kind === 'auto' && getComputedStyle(e).paddingTop !== '0px')issues.push('Short sheet acquired duplicate top padding');
         const column=window.__safeSheetOwner._viewOwner?.view.shadowRoot.querySelector('#columns > div:first-child');

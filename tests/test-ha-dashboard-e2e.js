@@ -1113,6 +1113,8 @@ async function checkDisconnected(browser, config, functionalCompleted = false) {
     transportEvents.push("Home Assistant WebSocket closed during outage");
     await page.waitForFunction(() => document.querySelector("home-assistant")?.hass?.connected === false);
     for (const title of ["Switch + graph", "Light + slider", "Number", "Arm away · hold", "Open-only door"]) {
+      await cardByTitle(page, title).scrollIntoViewIfNeeded();
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
       const disabled = await cardByTitle(page, title).locator('button:not([data-card-details]):not([data-problem-details]),input,select,[role="slider"]').evaluateAll((controls) =>
         controls.length > 0 && controls.every((control) => control.disabled || control.getAttribute("aria-disabled") === "true")
       );
