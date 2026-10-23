@@ -1477,10 +1477,8 @@ class MaraoStateTimelineCard extends HTMLElement {
       window.MaraoDashboard?.haptic?.("heavy");
       this._loadHistory();
     });
-    if (segments.length) {
-      this._bindTracking();
-      this._spaceTicks();
-    }
+    if (segments.length) this._bindTracking();
+    this._spaceTicks();
   }
 
   _spaceTicks() {

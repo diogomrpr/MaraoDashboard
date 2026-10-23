@@ -147,6 +147,18 @@ function create(Card, popup = true) {
   return card;
 }
 
+test('timeline spaces time labels even when history is empty', () => {
+  const card = create(MaraoStateTimelineCard, false);
+  let spaced = 0;
+  card._spaceTicks = () => spaced++;
+  card._history = [];
+  card._range = { start: Date.now() - 86400000, end: Date.now() };
+  card._hass = { states: { 'sensor.history': state() } };
+  card._render();
+  assert.match(card.shadowRoot.innerHTML, /class="tick first"/);
+  assert.equal(spaced, 1);
+});
+
 for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) test(`${Card.name} keeps unchanged content mounted on background updates`, () => {
   const card = create(Card, false), reported = state();
   card.hass = { states: { 'sensor.history': reported } };
