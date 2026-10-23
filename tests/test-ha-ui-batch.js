@@ -89,7 +89,7 @@ async function main() {
   await require('../ha-test/prepare').prepare(config);
   const output = require('./verification-browser').artifactDirectory('ui-batch');
   for (const { scenario, theme } of selectedRuns(parseArgs())) {
-    const browser = await chromium.launch(); let page;
+    const browser = await chromium.launch(); let page, failure;
     try {
       const context = await browser.newContext(contextOptionsForScenario(scenario, theme));
       await context.addInitScript(setBrowserToken, { hassUrl: config.url, ...accessToken(config) });
@@ -137,10 +137,10 @@ async function main() {
       await cameraLedger.assert(); assert.deepEqual(errors, []);
       fs.writeFileSync(path.join(output, `${scenario.name}-${theme}.json`), JSON.stringify({ passed: true, scenario: scenario.name, theme }), { mode: 0o600 });
       console.log(`Battery/access focused checks: ${scenario.name}/${theme} passed.`);
-    } catch (error) { if (page) await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-failure.png`), scale: 'css' }); throw error; }
-    finally { await browser.close(); }
+    } catch (error) { failure = error; if (page) await captureScreenshot(page, { path: path.join(output, `${scenario.name}-${theme}-failure.png`), scale: 'css' }); throw error; }
+    finally { try { await browser.close(); } catch (cleanup) { if (failure) throw new AggregateError([failure, cleanup], 'UI check and cleanup failed'); throw cleanup; } }
   }
 }
-if (require.main === module) main().catch(error => { console.error(error.stack || error.message); process.exitCode = 1; });
+if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
 
 module.exports = { main, accessChecks, batteryChecks };

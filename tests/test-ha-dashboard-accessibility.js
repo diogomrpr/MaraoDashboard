@@ -660,7 +660,7 @@ async function layoutIssues(page, families = [], subtree) {
         }
         if (owned && element.matches?.(".title,.state,.climate,.current-temperature,.number-value,.value,.empty,h1,h2,.message,.climate-mode,.legend span,.meta strong,.detail-meta strong,.reading dt,.reading dd,.header-date,.media-summary,.alarm-body label,[data-alarm-action]:not(:disabled)")) {
           if (element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1) {
-            issues.push(`${element.textContent?.trim() || element.localName}: essential text is clipped`);
+            issues.push(`${element.textContent?.trim() || element.localName}: essential text is clipped (${element.getRootNode()?.host?._config?.name || element.getRootNode()?.host?.localName}, ${element.className}, ${getComputedStyle(element).visibility}, ${element.clientWidth}x${element.clientHeight}, content ${element.scrollWidth}x${element.scrollHeight})`);
           }
           if (element.matches('.number-value')) {
             const track = element.closest('.number-stepper')?.getBoundingClientRect();

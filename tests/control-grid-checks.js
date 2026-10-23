@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { expect } = require('playwright/test');
 const path = require('node:path');
 const fs = require('node:fs');
 const { capture: captureScreenshot } = require('./verification-browser');
@@ -76,18 +77,19 @@ async function controlGridChecks(page, output, scenario, theme, transitions = tr
     const original = await last.evaluate(card => card._actionError);
     try {
       await last.evaluate(card => { card._actionError = 'Safe fixture: the requested action could not be completed. '.repeat(8); card._render(); });
-      await check(); assert.ok((await measure()).cells[0].height > before.cells[0].height, 'Problem content must grow every row');
+      await check(); assert.ok(Math.abs((await measure()).cells[0].height - before.cells[0].height) <= .5, 'Problem content must preserve every row height');
+      assert.equal(await last.locator('[data-problem-details]').count(), 1, 'Full error details remain available');
     } finally { await last.evaluate((card, error) => { card._actionError = error; card._render(); }, original); }
-    await check(); assert.ok(Math.abs((await measure()).cells[0].height - before.cells[0].height) <= .5, 'Clearing errors restores necessary height');
+    await check(); assert.ok(Math.abs((await measure()).cells[0].height - before.cells[0].height) <= .5, 'Clearing errors preserves row height');
     const input = grid.locator('input[data-slider-key]').first(), originalInput = await input.elementHandle();
     await input.dispatchEvent('pointerdown', { pointerId: 9, pointerType: 'touch' });
     await grid.evaluate(element => { element.hass = { ...document.querySelector('home-assistant').hass }; });
     assert.equal(await input.evaluate((current, original) => current === original, originalInput), true, 'HA update replaced a mounted range');
     await input.dispatchEvent('pointercancel', { pointerId: 9, pointerType: 'touch' });
     const originalWidth = await grid.evaluate(element => { const old = element.style.width; element.style.width = '180px'; return old; });
-    await check(); assert.equal((await measure()).columns, 1);
-    await grid.evaluate((element, width) => { element.style.width = width; }, originalWidth); await check();
-    assert.equal((await measure()).columns, before.columns, 'Preferred columns did not restore');
+    await expect.poll(async () => (await measure()).columns, { timeout: 5000 }).toBe(1); await check();
+    await grid.evaluate((element, width) => { element.style.width = width; }, originalWidth);
+    await expect.poll(async () => (await measure()).columns, { timeout: 5000, message: 'Preferred columns did not restore' }).toBe(before.columns); await check();
     // Group and generated access sheets retain keyed/native children and safe gestures.
     for (const pattern of [/^Entity Group · light all$/, /^Entity Group · cover all$/, /^Lock · locked$/]) {
       const card = page.locator('marao-card').filter({ has: page.locator('.title', { hasText: pattern }) }).first();

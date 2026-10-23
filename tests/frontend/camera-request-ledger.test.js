@@ -254,7 +254,7 @@ test('managed context/browser close preserves failed-request diagnostics and sti
     const browser = { close: async () => { closed = true; throw Error('original browser close failure'); } };
     const context = { addInitScript: async () => {}, browser: () => browser, close: async () => { closed = true; throw Error('original context close failure'); } };
     const page = { on: (name, listener) => listeners.set(name, listener), isClosed: () => closed, url: () => 'http://192.168.0.28:8123/marao-dashboard/card-test',
-      goto: async () => {}, evaluate: async (callback, data) => callback(data), waitForTimeout: async () => {}, locator: () => ({ evaluateAll: async callback => callback([card]) }) };
+      goto: async () => {}, evaluate: async (callback, data) => callback(data), waitForTimeout: async () => {}, waitForLoadState: async (state, options) => { assert.equal(state, 'networkidle'); assert.equal(options.timeout, 15000); }, locator: () => ({ evaluateAll: async callback => callback([card]) }) };
     try {
       await managedCameraLedger(context, page, { output: directory, scenario: 'iphone-normal', theme: 'light' });
       listeners.get('requestfailed')({ url: () => 'http://192.168.0.28:8123/not-owned.js', resourceType: () => 'script', failure: () => ({ errorText: 'net::ERR_ABORTED' }), headers: () => ({}) });
@@ -277,7 +277,7 @@ test('managed goto checkpoints real document reloads while retaining hash-only d
   let current = 'http://192.168.0.28:8123/marao-dashboard/card-test', released = 0, closed = false;
   const browser = { close: async () => { closed = true; } };
   const context = { addInitScript: async () => {}, browser: () => browser, close: async () => { closed = true; } };
-  const page = { on() {}, isClosed: () => closed, url: () => current, evaluate: async (callback, data) => callback(data), waitForTimeout: async () => {},
+  const page = { on() {}, isClosed: () => closed, url: () => current, evaluate: async (callback, data) => callback(data), waitForTimeout: async () => {}, waitForLoadState: async (state, options) => { assert.equal(state, 'networkidle'); assert.equal(options.timeout, 15000); },
     locator: () => ({ evaluateAll: async () => { released++; } }),
     goto: async value => { const after = new URL(value, current).href; if (!sameDocumentHashNavigation(current, after)) window.__maraoCameraRequestTrace = blank('document-two'); current = after; } };
   try {
@@ -349,7 +349,7 @@ function immediateHandoffFixture({ siblingSelection = false, boundary = null, pr
     : '\n at repeat.update (http://192.168.0.28:8123/frontend_latest/native.js:1:1)'); } }
   const environment = vm.createContext({ window: {}, location: new URL('http://192.168.0.28:8123/marao-dashboard/card-test'), URL,
     WebSocket: Socket, XMLHttpRequest: Xhr, Node: DomNode, Element: DomElement, crypto: crypto.webcrypto, queueMicrotask,
-    Error: NativeError, Date: { now: () => now }, document: new DomElement('document'), getComputedStyle: node => ({ display: node.cssHidden ? 'none' : 'block', visibility: 'visible' }),
+    Error: NativeError, Date: { now: () => now }, document: new DomElement('document'), getComputedStyle: node => ({ display: node.cssHidden ? 'none' : 'block', visibility: 'visible', opacity: node.parked ? '0' : '1' }),
     setTimeout: (callback, ms) => { const timer = { callback, ms }; timers.push(timer); return timer; },
     clearTimeout: timer => { const index = timers.indexOf(timer); if (index >= 0) timers.splice(index, 1); } });
   vm.runInContext('(' + installTrace.toString() + ')()', environment);
@@ -364,6 +364,7 @@ function immediateHandoffFixture({ siblingSelection = false, boundary = null, pr
   if (preloaded) {
     const root = new DomElement('hui-root'); wrapper.parentNode = root;
     wrapper.hasAttribute = name => name === 'data-marao-camera-preload';
+    wrapper.getAttribute = name => name === 'aria-hidden' && wrapper.parked ? 'true' : null;
     root.shadowRoot = { querySelector: () => ({ _navigationRecord: { cameraPreload: { sessions: new Map([[entity, { host: wrapper, playback: camera }]]) } } }) };
     delete wrapper._camera;
   }
@@ -375,7 +376,7 @@ function immediateHandoffFixture({ siblingSelection = false, boundary = null, pr
     rtc.querySelectorAll = selector => selector === 'video' ? [video] : [];
   }
   hls.remove();
-  return { environment, state, camera, host, rtc, siblingVideo: video, timers, DomElement,
+  return { environment, state, camera, host, wrapper, rtc, siblingVideo: video, timers, DomElement,
     selectSibling() { rtc.cssHidden = false; camera.video = video; },
     async media(milliseconds, type = 'timeupdate') { now = milliseconds; video.emit(type); await new Promise(resolve => setImmediate(resolve)); },
     async release(milliseconds) { now = milliseconds; camera.generation++; camera.video = null; camera.eligible = () => false; host.remove(); camera.player = null; camera.attempt = false; await new Promise(resolve => setImmediate(resolve)); },
@@ -405,6 +406,23 @@ test('dashboard-owned preload handoffs require the actual retained playback and 
   invalid.camera.generation++;
   await invalid.tick(300);
   assert.equal(invalid.state.handoffs[0].proof.valid, false);
+});
+
+test('only a parked preload may prove an advancing native handoff before visible playback', async () => {
+  for (const parked of [true, false]) {
+    const fixture = immediateHandoffFixture({ preloaded: true });
+    fixture.wrapper.parked = parked; fixture.camera.state = 'loading';
+    await new Promise(resolve => setImmediate(resolve));
+    await fixture.tick(300);
+    if (parked) {
+      assert.equal(fixture.state.handoffs[0].proof.valid, true);
+      assert.equal(fixture.state.handoffs[0].proof.parkedPreload, true);
+      assert.equal(fixture.state.handoffs[0].proof.playbackState, 'loading');
+    } else {
+      await fixture.tick(5001);
+      assert.equal(fixture.state.handoffs[0].proof.valid, false);
+    }
+  }
 });
 
 test('an unrelated camera release boundary retains exact native handoff evidence and restores its outer scope', async () => {

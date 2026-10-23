@@ -325,6 +325,7 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
           if (!proof.connected || camera?.player !== host || camera.generation !== receipt.generation || restarted) { receipt.proof = { ...proof, valid: false, reason: 'Owner replaced, disconnected or new native stream requested' }; break; }
           const siblingVisible = candidate && visibleWithin(candidate.video, host), retiringHidden = !retiring.isConnected || !visibleWithin(retiringVideo, host);
           const sameSiblingHost = candidate && candidate.sibling.isConnected && candidate.sibling.entityid === host.stateObj.entity_id && ancestor(candidate.sibling, 'ha-camera-stream') === host;
+          const parkedPreload = wrapper.hasAttribute?.('data-marao-camera-preload') && wrapper.getAttribute?.('aria-hidden') === 'true' && getComputedStyle(wrapper).opacity === '0';
           const retained = identity(camera.video) === receipt.activeVideo;
           const selected = receipt.retiringVideo === receipt.activeVideo && receipt.activeTransport === 'ha-hls-player' && candidate && camera.video === candidate.video && sameSiblingHost && siblingVisible && retiringHidden;
           receipt.selectionSamples.push({ elapsedMs: Date.now() - receipt.date, source, phase: state.boundary?.label || state.boundary?.kind || 'native handoff observation',
@@ -334,8 +335,8 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
           if (camera.state === 'live' && !retained && !(candidate && camera.video === candidate.video && receipt.retiringVideo === receipt.activeVideo)) { receipt.proof = { ...proof, valid: false, reason: 'Winning video changed without a preexisting native sibling' }; break; }
           if ((retained || selected) && camera.video?.isConnected && visibleWithin(camera.video, host) && !camera.video.paused && camera.video.readyState >= 2) {
             if (video !== camera.video) { video = camera.video; started = video.currentTime; stableSince = Date.now(); }
-            if (Date.now() < deadline && camera.state === 'live' && Date.now() - stableSince >= 250 && video.currentTime > started + .15) { receipt.proof = { ...proof, valid: true, video: identity(video), advanced: video.currentTime - started,
-              selection: selected ? 'preexisting-web-rtc' : 'retained', siblingTransport: identity(candidate?.sibling), siblingVisible: Boolean(siblingVisible), retiringHidden, sameSiblingHost: Boolean(sameSiblingHost) }; break; }
+            if (Date.now() < deadline && (camera.state === 'live' || parkedPreload && camera.state === 'loading') && Date.now() - stableSince >= 250 && video.currentTime > started + .15) { receipt.proof = { ...proof, valid: true, video: identity(video), advanced: video.currentTime - started,
+              parkedPreload: Boolean(parkedPreload), playbackState: camera.state, selection: selected ? 'preexisting-web-rtc' : 'retained', siblingTransport: identity(candidate?.sibling), siblingVisible: Boolean(siblingVisible), retiringHidden, sameSiblingHost: Boolean(sameSiblingHost) }; break; }
           } else { video = null; }
           await nextSample((retained || selected) && camera.video?.isConnected ? camera.video : null);
         } while (!receipt.proof);
@@ -412,6 +413,8 @@ async function cameraRequestLedger(context, { output, scenario, theme }) {
           if (cards.some(card => card._camera?.player)) throw Error('Camera session survived final context release');
         });
       }, {entities: SAFE_ENTITIES});
+      // The shell is gone; finish its finite fetches before navigation aborts them.
+      await page.waitForLoadState('networkidle', { timeout: 15000 });
       stoppedForClose = true;
       await ledger.assert();
     },
