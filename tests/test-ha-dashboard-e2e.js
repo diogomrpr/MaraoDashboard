@@ -751,29 +751,20 @@ async function installHistoryLoadingGate(page, baseUrl) {
 async function checkHistoryCases(page, { loading = true } = {}) {
   const cards = page.locator("marao-card,marao-energy-period-card,marao-state-timeline-card");
   if (loading) try {
-    await page.waitForFunction(() => {
-      const mounted = new Set();
+    await page.waitForFunction((names) => {
+      const mounted = new Map();
       const visit = (root) => {
         root.querySelectorAll("marao-card,marao-energy-period-card,marao-state-timeline-card").forEach((card) => {
-          if (card.shadowRoot?.querySelector("[data-history-state],[data-graph-history-state]")) mounted.add(card._config.name);
+          const surface = card.shadowRoot?.querySelector("[data-history-state],[data-graph-history-state]");
+          if (surface) mounted.set(card._config?.name, surface.dataset.historyState || surface.dataset.graphHistoryState);
         });
         root.querySelectorAll("*").forEach((element) => { if (element.shadowRoot) visit(element.shadowRoot); });
       };
       visit(document);
-      return ["Graph", "Energy", "Timeline"].every((label) => mounted.has(`${label} history · loading`));
-    });
-    for (const example of manifest.historyCases) {
-      for (const label of ["Graph", "Energy", "Timeline"]) {
-        const name = `${label} history · ${example.id}`;
-        if (example.expectedStatus === "loading") {
-          const state = await cards.evaluateAll((elements, name) => {
-            const root = elements.find((card) => card._config.name === name)?.shadowRoot;
-            return root?.querySelector("[data-history-state]")?.dataset.historyState || root?.querySelector("[data-graph-history-state]")?.dataset.graphHistoryState;
-          }, name);
-          if (state !== "loading") throw new Error(`${name}: expected a visible loading state, found ${state}.`);
-        }
-      }
-    }
+      if (!names.every(name => mounted.has(name))) return false;
+      for (const name of names) if (mounted.get(name) !== 'loading') throw new Error(`${name}: expected a visible loading state, found ${mounted.get(name)}.`);
+      return true;
+    }, manifest.historyCases.filter(example => example.expectedStatus === 'loading').flatMap(example => ["Graph", "Energy", "Timeline"].map(label => `${label} history · ${example.id}`)));
   } finally { page.__historyLoadingGate?.release(); }
   await page.waitForFunction((examples) => {
     const elements = [];

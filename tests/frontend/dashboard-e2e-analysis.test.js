@@ -221,38 +221,47 @@ test('history loading gate holds only the exact safe native GET, preserves reque
   await gate.dispose();assert.equal(removed,true);
 });
 
-test('history checks release loading, await nearby prefetch and reject warm-cache retry loops', async () => {
+test('history checks atomically await mounted loading surfaces, reject other states and retain prefetch/retry checks', async () => {
   const { manifest } = require('../../ha-test/cases');
-  for (const repeated of [false, true]) {
-    let settled = false, released = false, loadingReads = 0, record, releasedListener = false;
+  for (const { repeated = false, badState } of [{}, { repeated: true }, { badState: 'ready' }, { badState: 'error' }]) {
+    let settled = false, released = false, mounted = false, loadingChecks = 0, record, releasedListener = false;
     const elements = manifest.historyCases.flatMap(example => ['Graph', 'Energy', 'Timeline'].map(label => {
-      const status = () => example.expectedStatus === 'loading' && settled ? 'ready' : example.expectedStatus;
+      const status = () => example.expectedStatus === 'loading' && (settled || badState && label === 'Energy') ? badState || 'ready' : example.expectedStatus;
       const card = { _config: { name: `${label} history · ${example.id}` }, _hass: {}, visible: false };
       if (label === 'Graph') { card._graphEntity = () => example.entity; card._graphStatus = status; }
-      card.shadowRoot = { querySelector: () => ({ dataset: { historyState: label === 'Graph' && !card.visible ? example.expectedStatus : status() } }) };
+      card.shadowRoot = { querySelector: () => example.expectedStatus === 'loading' && !mounted ? null : ({ dataset: { historyState: label === 'Graph' && !card.visible ? example.expectedStatus : status() } }) };
       return card;
     }));
     const environment = vm.createContext({ document: { querySelectorAll: selector => selector === '*' ? [] : elements }, URL,
       requestAnimationFrame: callback => callback() });
     const run = (callback, arg) => vm.runInContext('(' + callback.toString() + ')', environment)(arg);
     const page = {
-      __historyLoadingGate: { release() { assert.equal(loadingReads,3); assert.equal(settled,false); released=true; } },
+      __historyLoadingGate: { release() { assert.equal(loadingChecks,1); assert.equal(settled,false); released=true; } },
       locator: () => ({ filter: ({ hasText, has }) => hasText ? { pattern: hasText } : {
         first: () => {
           const card = elements.find(element => has.pattern.test(element._config.name));
           return { scrollIntoViewIfNeeded: async () => { card.visible = true; }, elementHandle: async () => card };
         },
       }, evaluateAll: async (callback, arg) => {
-        if (typeof arg === 'string') { assert.equal(settled, false); loadingReads++; }
-        else if (repeated) record({ url: () => 'http://homeassistant.test/api/history/period/current?filter_entity_id=' + manifest.historyCases[0].entity });
+        assert.notEqual(typeof arg, 'string', 'Loading state must not be read after its mounted-state observation');
+        if (repeated) record({ url: () => 'http://homeassistant.test/api/history/period/current?filter_entity_id=' + manifest.historyCases[0].entity });
         return callback(elements, arg);
       } }),
-      waitForFunction: async (callback, arg) => { if (released) settled = true; assert.equal(run(callback, arg), true); },
+      waitForFunction: async (callback, arg) => {
+        if (released) settled = true;
+        else { assert.equal(run(callback, arg), false, 'Missing history surfaces must wait for mounting'); mounted = true; loadingChecks++; }
+        assert.equal(run(callback, arg), true);
+      },
       waitForLoadState: async () => assert.fail('Continuous camera streams must not block history readiness'),
       on: (event, callback) => { assert.equal(event, 'request'); record = callback; },
       off: (event, callback) => { assert.equal(event, 'request'); assert.equal(callback, record); releasedListener = true; },
       evaluate: async (callback, arg) => run(callback, arg),
     };
+    if (badState) {
+      await assert.rejects(() => checkHistoryCases(page), new RegExp(`Energy history · loading: expected a visible loading state, found ${badState}`));
+      assert.equal(released, true); assert.equal(settled, false);
+      continue;
+    }
     if (repeated) await assert.rejects(() => checkHistoryCases(page), /Settled history requested again/);
     else await checkHistoryCases(page);
     assert.equal(settled, true); assert.equal(releasedListener, true);
