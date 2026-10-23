@@ -28,7 +28,7 @@ async function checkScroll(page, target, update, name) {
 
 async function main() {
   const config = readConfig();
-  assert.equal(new URL(config.url).hostname, '192.168.0.28', 'Disposable instance only');
+  assert.equal(new URL(config.url).hostname, '192.168.10.229', 'Disposable instance only');
   const engine = process.argv.includes('--webkit') ? webkit : chromium;
   const options = parseArgs(); options.scenario ||= 'iphone-normal';
   await prepare(config);

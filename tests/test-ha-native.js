@@ -228,7 +228,7 @@ async function editor(page, calls, theme) {
 
 async function main() {
   const config = readConfig(); assertDisposableHaTarget(config, { requireSsh: true });
-  assert.equal(new URL(config.url).hostname, '192.168.0.28');
+  assert.equal(new URL(config.url).hostname, '192.168.10.229');
   await prepare(config);
   const options = parseArgs();
   // A normal run covers one representative layout in both themes. Larger scope

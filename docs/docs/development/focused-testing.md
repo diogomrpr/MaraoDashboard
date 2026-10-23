@@ -28,7 +28,7 @@ Documentation/instruction-only changes need diff and changed-link review only.
 
 Mandatory installation is separate from optional visual verification: before a
 software task is called done, install its final applicable changes on disposable
-HA `192.168.0.28`. Batch edits and sync once at handoff using the
+HA `192.168.10.229`. Batch edits and sync once at handoff using the
 [fastest compatible path](local-development.md#install-before-handing-off).
 Browser overrides are not installation. Instruction/documentation-only edits need
 no deployment. A failed sync means not ready for user testing.
@@ -166,7 +166,7 @@ Explicit integration checks use the selected contracts and shared consumers.
 Version hooks, automatic CI and publication use unit tests only; a release request
 does not request integration, full-suite or parallel execution.
 Every release still requires installing its final candidate, including version
-metadata, on disposable `192.168.0.28` before publication. Preserve test settings
+metadata, on disposable `192.168.10.229` before publication. Preserve test settings
 and helper state, reuse an exact matching installation, and confirm it through
 normal asset/readiness checks. A failed installation blocks publication; it does
 not trigger an integration-test campaign.
@@ -324,4 +324,4 @@ This path does not prepare or replace the disposable HA dashboard. Unit bridge
 adapters and browser engines do not establish physical Companion-app behavior or
 haptic strength; record actual app/device inspection separately when available.
 Final HA inspection verifies installed asset identities and exact preservation on
-`192.168.0.28`, with private backups and without resetting an existing demo layout.
+`192.168.10.229`, with private backups and without resetting an existing demo layout.

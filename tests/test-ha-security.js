@@ -60,7 +60,7 @@ async function touch(page, target, duration = 0, end) {
 
 async function main() {
   const config = readConfig(); assertDisposableHaTarget(config);
-  assert.equal(new URL(config.url).hostname, '192.168.0.28');
+  assert.equal(new URL(config.url).hostname, '192.168.10.229');
   await prepare(config);
   await api(config, 'POST', '/api/services/button/press', { entity_id: 'button.marao_dashboard_test_opener' });
   fs.mkdirSync(output, { recursive: true, mode: 0o700 });

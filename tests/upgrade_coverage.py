@@ -74,7 +74,7 @@ def required_runs(manifest: dict, formats: list[str]) -> set[tuple]:
 
 def validate_execution(manifest: dict, report: dict, candidate: dict, formats: list[str], baselines: list[str], target: str) -> None:
     origin = urlsplit(target)
-    require(origin.scheme in ("http", "https") and origin.hostname == "192.168.0.28"
+    require(origin.scheme in ("http", "https") and origin.hostname == "192.168.10.229"
             and not origin.username and not origin.password and not origin.query and not origin.fragment
             and origin.path in ("", "/"), "Upgrade evidence requires the authorized disposable origin")
     require(report.get("version") == 2 and report.get("candidate") == candidate, "Missing or stale candidate-specific upgrade evidence")
@@ -114,6 +114,6 @@ if __name__ == "__main__":
         provenance = json.loads((ROOT / "ha-test/upgrade/fixtures/provenance.json").read_text())
         baselines = ["v0.2.0", *[row["tag"] for row in provenance], "predecessor-format-1", "current-format-2"]
         config = json.loads((ROOT / "ha-test/local.json").read_text())
-        require(config.get("disposable") is True and config.get("sshHost") == "192.168.0.28", "Upgrade evidence requires the authorized disposable configuration")
+        require(config.get("disposable") is True and config.get("sshHost") == "192.168.10.229", "Upgrade evidence requires the authorized disposable configuration")
         validate_execution(manifest, json.loads(args.report.read_text()), json.loads(args.candidate.read_text()), ["native-storage-0", "generator-json-0", "generator-json-1", "generator-json-2"], baselines, config["url"].rstrip("/"))
     print("Upgrade coverage inventory checked; this does not establish a live upgrade pass.")

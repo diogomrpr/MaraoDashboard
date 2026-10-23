@@ -10,7 +10,7 @@ function environment(t, overrides = {}) {
   const doc = new EventTarget(); doc.visibilityState = 'visible'; doc.defaultView = host;
   const urls = [], statuses = [], warnings = [], requests = [];
   host.document = doc; host.navigator = {};
-  host.location = { href: 'http://192.168.0.28:8123/marao-dashboard/rooms?external_auth=1&keep=a%20b#detail', origin: 'http://192.168.0.28:8123', pathname: '/marao-dashboard/rooms',
+  host.location = { href: 'http://192.168.10.229:8123/marao-dashboard/rooms?external_auth=1&keep=a%20b#detail', origin: 'http://192.168.10.229:8123', pathname: '/marao-dashboard/rooms',
     replace(url) { urls.push(url); host.dispatchEvent(new Event('pagehide')); } };
   host.fetch = async (...args) => { requests.push(args); return { ok: true }; };
   host.console = { warn: (...args) => warnings.push(args) };

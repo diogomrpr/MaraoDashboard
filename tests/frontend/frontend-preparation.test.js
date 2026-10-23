@@ -26,7 +26,7 @@ function fixture(t) {
   }
   write(root, '/frontend_src/editor.js', '// editor');
   for (const file of ['/dashboard/MaraoDashboard/dashboard.json', '/dashboard/MaraoDashboard/main/dashboard.yaml', '/dashboard/MaraoDashboard/.history/entry.json', '/packages/helpers.yaml', '/configuration.yaml', '/custom_components/safe_fixture/provider.py']) write(remote, file, 'preserve exactly ' + file);
-  const config = { url: 'http://192.168.0.28:8123', sshHost: '192.168.0.28', sshPort: 22, disposable: true, remoteConfigPath: remote };
+  const config = { url: 'http://192.168.10.229:8123', sshHost: '192.168.10.229', sshPort: 22, disposable: true, remoteConfigPath: remote };
   const receipt = { target: targetKey(config), backend: 'backend-before', frontend: 'frontend-before', fixtures: 'fixtures-before', dashboard: 'dashboard-before', custom: { retained: true } };
   write(remote, '/.marao-test-deployment.json', JSON.stringify(receipt));
   const bin = path.join(directory, 'bin'); fs.mkdirSync(bin);

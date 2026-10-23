@@ -17,7 +17,7 @@ function readReleaseReport(filename) {
 
 function validateReleaseReport(report, config, candidate, coverage, now = Date.now()) {
   assertDisposableHaTarget(config, { requireSsh: true });
-  assert.equal(new URL(config.url).hostname, '192.168.0.28', 'Release verification requires the authorized disposable instance.');
+  assert.equal(new URL(config.url).hostname, '192.168.10.229', 'Release verification requires the authorized disposable instance.');
   assert.equal(report?.version, 2, 'Unsupported upgrade report.');
   assert.ok(!report.failure, 'The upgrade operation failed.');
   assert.equal(report.kind, 'preserved-install-upgrade', 'Missing preserved-install upgrade evidence.');
@@ -66,7 +66,7 @@ function validateScopedUpgrade(report, config, candidate, scope) {
   assert.equal(report.version, 3);
   assert.equal(report.kind, 'preserved-install-upgrade-scoped');
   assertDisposableHaTarget(config, { requireSsh: true });
-  assert.equal(new URL(config.url).hostname, '192.168.0.28');
+  assert.equal(new URL(config.url).hostname, '192.168.10.229');
   assert.equal(report.target, config.url);
   assert.deepEqual(report.candidate, candidate, 'Candidate changed since preserved upgrade');
   assert.ok(!report.failure && report.verified_cleanup, 'Upgrade failed or cleanup is incomplete');

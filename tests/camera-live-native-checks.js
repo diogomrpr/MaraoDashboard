@@ -126,7 +126,7 @@ function removeNativeDuplicates(card) {
 }
 
 async function checkNativeCameraPlayback(page, serviceCalls, { output, scenario = 'iphone-normal', theme = 'light', geometryOnly = false, observeFailureMs = 0 } = {}) {
-  assert.equal(new URL(page.url()).hostname, '192.168.0.28', 'Disposable native camera proof only');
+  assert.equal(new URL(page.url()).hostname, '192.168.10.229', 'Disposable native camera proof only');
   const entity = 'camera.marao_dashboard_test_camera';
   const card = cameraCardByName(page, geometryOnly ? 'Front Door Camera · automatic live video' : 'Camera · automatic live video + events');
   assert.equal(await card.evaluate(card => card._config.entity), entity, 'Only safe synthetic camera media may be inspected');

@@ -20,7 +20,7 @@ function fixture() {
     if (result.status) throw Error('Private recovery command failed');
     return result;
   };
-  const config = { url: 'http://192.168.0.28:8123', remoteConfigPath: root };
+  const config = { url: 'http://192.168.10.229:8123', remoteConfigPath: root };
   return { root, paths, config, run, tool: nativeBackup(config, crypto.randomUUID(), paths, { run }), close: () => fs.rmSync(root, { recursive: true, force: true }) };
 }
 

@@ -13,8 +13,8 @@ let builtEditor;
 
 function assertTarget(config) {
   client.assertDisposableHaTarget(config, { requireSsh: true });
-  assert.equal(new URL(config.url).hostname, '192.168.0.28', 'Frontend preview is restricted to disposable 192.168.0.28');
-  assert.equal(config.sshHost, '192.168.0.28');
+  assert.equal(new URL(config.url).hostname, '192.168.10.229', 'Frontend preview is restricted to disposable 192.168.10.229');
+  assert.equal(config.sshHost, '192.168.10.229');
   assert.ok(path.posix.isAbsolute(config.remoteConfigPath) && config.remoteConfigPath !== '/' && !config.remoteConfigPath.split('/').includes('..'), 'Invalid disposable configuration directory');
 }
 

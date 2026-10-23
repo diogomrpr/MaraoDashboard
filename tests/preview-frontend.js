@@ -174,7 +174,7 @@ async function main(argv = process.argv.slice(2)) {
   const { chromium } = require('playwright');
   const { contextOptionsForScenario, configurePageEmulation } = require('./test-ha-dashboard-accessibility');
   const prepared = await prepareFrontend();
-  assert.equal(new URL(prepared.config.url).hostname, '192.168.0.28', 'Preview is restricted to the disposable instance.');
+  assert.equal(new URL(prepared.config.url).hostname, '192.168.10.229', 'Preview is restricted to the disposable instance.');
   const route = options.inspection.editor ? '/marao-dashboard-editor' : '/marao-dashboard/' + previewRoute(prepared.dashboard, options.inspection.families);
   const output = require('./verification-browser').artifactDirectory('frontend-preview/' + Date.now());
   const browser = await chromium.launch({ headless: options.once });

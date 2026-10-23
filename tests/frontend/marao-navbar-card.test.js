@@ -81,7 +81,7 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
   });
   const first = navbar(), second = navbar();
   const events = new Map();
-  const window = { location: { href: "http://192.168.0.28/marao-dashboard/overview", pathname: "/marao-dashboard/overview" },
+  const window = { location: { href: "http://192.168.10.229/marao-dashboard/overview", pathname: "/marao-dashboard/overview" },
     addEventListener: (key, callback) => events.set(key, callback), removeEventListener: key => events.delete(key),
   };
   let timers = 0;

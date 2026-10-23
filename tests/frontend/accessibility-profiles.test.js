@@ -189,7 +189,7 @@ test('WebKit normal playback uses native context touch and records its actual li
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-webkit-visits-'));
   const previous = process.env.MARAO_TEST_ARTIFACT_ROOT;
   process.env.MARAO_TEST_ARTIFACT_ROOT = directory;
-  const frame = { url: () => 'http://192.168.0.28:8123/marao-dashboard/card-test' };
+  const frame = { url: () => 'http://192.168.10.229:8123/marao-dashboard/card-test' };
   let record;
   const page = { on: (type, callback) => { assert.equal(type, 'framenavigated'); record = callback; }, mainFrame: () => frame };
   try {

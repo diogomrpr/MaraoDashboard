@@ -53,12 +53,12 @@ def execution():
     runs = [dict(check=check, format=format_, profile=profile, theme=theme, passed=True) for check, format_, profile, theme in checker["required_runs"](MANIFEST, formats)]
     installed = [dict(baseline=baseline, assertion=assertion, passed=True) for baseline in baselines for assertion in MANIFEST["required_install_assertions"] if assertion != "baseline-package-health"]
     installed.append(dict(baseline="v0.5.1", assertion="baseline-package-health", passed=True))
-    return candidate, formats, baselines, dict(version=2, candidate=candidate, target="http://192.168.0.28:8123", formats=formats, baselines=baselines, runs=runs, install_assertions=installed)
+    return candidate, formats, baselines, dict(version=2, candidate=candidate, target="http://192.168.10.229:8123", formats=formats, baselines=baselines, runs=runs, install_assertions=installed)
 
 
 def test_complete_mock_execution_requires_every_historical_format_profile_and_cleanup():
     candidate, formats, baselines, report = execution()
-    checker["validate_execution"](MANIFEST, report, candidate, formats, baselines, "http://192.168.0.28:8123")
+    checker["validate_execution"](MANIFEST, report, candidate, formats, baselines, "http://192.168.10.229:8123")
 
 
 def test_shared_browser_scope_keeps_the_matrix_and_each_targeted_format():
@@ -91,16 +91,16 @@ def test_incomplete_or_stale_execution_fails(change, message):
     candidate, formats, baselines, report = execution()
     change(report)
     with pytest.raises(ValueError, match=message):
-        checker["validate_execution"](MANIFEST, report, candidate, formats, baselines, "http://192.168.0.28:8123")
+        checker["validate_execution"](MANIFEST, report, candidate, formats, baselines, "http://192.168.10.229:8123")
 
 
 def test_execution_target_uses_the_configured_origin_without_allowing_another_instance():
     candidate, formats, baselines, report = execution()
-    report["target"] = "https://192.168.0.28:8443"
+    report["target"] = "https://192.168.10.229:8443"
     checker["validate_execution"](MANIFEST, report, candidate, formats, baselines, report["target"])
     with pytest.raises(ValueError, match="another target"):
-        checker["validate_execution"](MANIFEST, report, candidate, formats, baselines, "http://192.168.0.28:8123")
-    for target in ["https://192.168.0.29:8443", "https://192.168.0.28/dashboard", "https://user@192.168.0.28", "https://192.168.0.28?value=1"]:
+        checker["validate_execution"](MANIFEST, report, candidate, formats, baselines, "http://192.168.10.229:8123")
+    for target in ["https://192.168.0.29:8443", "https://192.168.10.229/dashboard", "https://user@192.168.10.229", "https://192.168.10.229?value=1"]:
         report["target"] = target
         with pytest.raises(ValueError, match="authorized disposable"):
             checker["validate_execution"](MANIFEST, report, candidate, formats, baselines, target)

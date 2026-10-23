@@ -45,7 +45,7 @@ or action logic.
 ## Safe development environment
 
 Agents may deploy and test only against the disposable local Home Assistant at
-`192.168.0.28`. Portable developer tooling accepts other explicitly disposable
+`192.168.10.229`. Portable developer tooling accepts other explicitly disposable
 targets, but that does not change the agent restriction. The URL, administrator
 long-lived token, disposable acknowledgement, and SSH configuration belong in
 ignored `ha-test/local.json`; private keys and generated reports stay ignored.
@@ -139,12 +139,12 @@ check only the affected path.
 ### Development inspection and stopping condition
 
 If an agent browser check is needed, use `ha:preview -- --component <ids> --watch`
-on disposable HA `192.168.0.28`. Use one representative existing case, current
+on disposable HA `192.168.10.229`. Use one representative existing case, current
 assets and the requested interaction. Extra layouts or themes need a concrete
 reason. Do not repeat a working check for reassurance.
 
 Stop when the requested behavior works, essential checks pass and all applicable
-final changes are installed on disposable HA `192.168.0.28`. Installation is
+final changes are installed on disposable HA `192.168.10.229`. Installation is
 mandatory even when the user handles visual testing. Batch edits and use one final
 sync through the [fastest compatible path](local-development.md#install-before-handing-off),
 without a mandatory extra browser visit. If installation fails, say not installed

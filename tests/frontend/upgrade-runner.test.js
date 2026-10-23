@@ -13,7 +13,7 @@ const { readKnownFailure, undeliveredFix, validateKnownFailure } = require('../n
 const { assertHistoricalBindings, historicalEntityAliases, historicalEntities, isolateHistoricalText } = require('../../ha-test/upgrade/prepared');
 const { referencedEntities } = require('../../ha-test/prepare');
 const YAML = require('yaml');
-const config = { url: 'http://192.168.0.28:8123', disposable: true, sshHost: '192.168.0.28' };
+const config = { url: 'http://192.168.10.229:8123', disposable: true, sshHost: '192.168.10.229' };
 
 test('restart readiness waits for active Supervisor Core jobs, closes connections and supports unsupervised Core', async () => {
   const { activeCoreJob } = require('../../ha-test/prepare');

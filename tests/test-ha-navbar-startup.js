@@ -8,7 +8,7 @@ const {accessToken,setBrowserToken,assertCurrentFrontend,connect}=require('../ha
 const {artifactDirectory}=require('./verification-browser');
 async function run(){
  const prepared=await prepare(),{config,version}=prepared;
- assert.equal(new URL(config.url).hostname,'192.168.0.28');
+ assert.equal(new URL(config.url).hostname,'192.168.10.229');
  const ws=await connect(config),digest=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
  const saved=async()=>{
   const value=await ws.call({type:'marao_dashboard/config/get'});

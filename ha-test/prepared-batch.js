@@ -41,8 +41,8 @@ function readBatchSnapshot(config, request, ssh) {
 async function prepareBatch(directory, dependencies = {}) {
   const { prepare, ssh, patchPackages } = dependencies.prepare || require('./prepare');
   const config = (dependencies.readConfig || readConfig)();
-  assert.equal(new URL(config.url).hostname, '192.168.0.28');
-  assert.equal(config.sshHost, '192.168.0.28');
+  assert.equal(new URL(config.url).hostname, '192.168.10.229');
+  assert.equal(config.sshHost, '192.168.10.229');
   await prepare(config);
   const client = await (dependencies.connect || connect)(config);
   try {

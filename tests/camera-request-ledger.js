@@ -6,9 +6,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const SAFE_ENTITY = 'camera.marao_dashboard_test_camera';
 const SAFE_ENTITIES = [SAFE_ENTITY, 'camera.marao_dashboard_test_netatmo', ...['slow','adaptive','adaptive_hls'].flatMap(source=>['high','medium','low'].map(quality=>SAFE_ENTITY+'_'+source+'_'+quality))];
-const nativeCaller = stack => /https?:\/\/192\.168\.0\.28(?::\d+)?\/frontend_(?:latest|es5)\/[^\s)]+\.js:\d+(?::\d+)?/.test(stack || '');
+const nativeCaller = stack => /https?:\/\/192\.168\.10\.229(?::\d+)?\/frontend_(?:latest|es5)\/[^\s)]+\.js:\d+(?::\d+)?/.test(stack || '');
 const nativeTeardown = stack => nativeCaller(stack) && /\b(?:stopLoad|destroy|destroyInternalLoaders|_cleanUp|onMediaDetaching)\b/.test(stack);
-const maraoStopCaller = stack => /(?:CameraPlayback\.stop|(?:^|\n)stop@)[^\n]*https?:\/\/192\.168\.0\.28(?::\d+)?\/(?:marao_dashboard_static|api\/marao_dashboard\/frontend\/[a-f0-9]+)\/MaraoCamera\.js[^\s)]*/.test(stack || '');
+const maraoStopCaller = stack => /(?:CameraPlayback\.stop|(?:^|\n)stop@)[^\n]*https?:\/\/192\.168\.10\.229(?::\d+)?\/(?:marao_dashboard_static|api\/marao_dashboard\/frontend\/[a-f0-9]+)\/MaraoCamera\.js[^\s)]*/.test(stack || '');
 
 function provedNativeHandoff(receipt, prefix) {
   const proof = receipt?.proof;
@@ -154,7 +154,7 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
       const url = new URL(item.url);
       // A header gives Playwright the exact originating XHR identity, including
       // concurrent/repeated requests to identical URLs. No media URL is changed.
-      if (location.hostname === '192.168.0.28' && url.origin === location.origin && url.pathname.startsWith('/api/hls/')) { this.setRequestHeader('X-Marao-Test-Xhr', String(item.id)); this.setRequestHeader('X-Marao-Test-Document', documentId); }
+      if (location.hostname === '192.168.10.229' && url.origin === location.origin && url.pathname.startsWith('/api/hls/')) { this.setRequestHeader('X-Marao-Test-Xhr', String(item.id)); this.setRequestHeader('X-Marao-Test-Document', documentId); }
       state.events.push({ ...item, kind: 'send', order: ++state.order, date: Date.now(), stack: new Error('native XHR send').stack });
     }
     return send.apply(this, args);
@@ -215,7 +215,7 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
       const receipt = { id: state.releases.length + 1, stack, date: Date.now(), order: ++state.order, wrapper: identity(wrapper), host: identity(node), camera: identity(camera), generation: camera.generation,
         entity: node.stateObj.entity_id, configured: camera.entity, currentHost: camera.player === node, wasConnected: node.isConnected, eligible: camera.eligible(), streamRequests: state.streamRequests, ownStreamRequests: camera.streamRequests, ...currentPrefix(node) };
       state.releases.push(receipt);
-      const stop = /(?:CameraPlayback\.stop|(?:^|\n)stop@)[^\n]*https?:\/\/192\.168\.0\.28(?::\d+)?\/(?:marao_dashboard_static|api\/marao_dashboard\/frontend\/[a-f0-9]+)\/MaraoCamera\.js[^\s)]*/.test(stack);
+      const stop = /(?:CameraPlayback\.stop|(?:^|\n)stop@)[^\n]*https?:\/\/192\.168\.10\.229(?::\d+)?\/(?:marao_dashboard_static|api\/marao_dashboard\/frontend\/[a-f0-9]+)\/MaraoCamera\.js[^\s)]*/.test(stack);
       if (!stop) return invoke();
       const qualityRelease = /(?:CameraPlayback\.fallback|fallback@)/.test(stack);
       state.boundary = { kind: qualityRelease ? 'marao-quality-release' : 'marao-ineligible-release', release: receipt.id, entities: [receipt.entity], date: receipt.date };
@@ -264,7 +264,7 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
     const transport = transports[0], host = ancestor(transport, 'ha-camera-stream'), wrapper = cameraWrapper(host);
     if (!wrapper || !entities.includes(host?.stateObj?.entity_id)) return invoke();
     const stack = new Error('native HLS DOM disconnect').stack;
-    const native = /https?:\/\/192\.168\.0\.28(?::\d+)?\/frontend_(?:latest|es5)\/[^\s)]+\.js:\d+(?::\d+)?/.test(stack);
+    const native = /https?:\/\/192\.168\.10\.229(?::\d+)?\/frontend_(?:latest|es5)\/[^\s)]+\.js:\d+(?::\d+)?/.test(stack);
     const publicUrl = typeof transport.url === 'string' ? transport.url : null;
     const prefixes = [...new Set(state.sessions.filter(session => session.entity === transport.entityid).map(session => session.prefix))];
     let prefix = prefixes.length === 1 ? prefixes[0] : null;

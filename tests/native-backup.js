@@ -5,7 +5,7 @@ const { ssh } = require('../ha-test/prepare');
 const quote = value => "'" + String(value).replace(/'/g, "'\\''") + "'";
 
 function nativeBackup(config, operation, paths, { run = ssh } = {}) {
-  assert.equal(new URL(config.url).hostname, '192.168.0.28');
+  assert.equal(new URL(config.url).hostname, '192.168.10.229');
   assert.match(operation, /^[a-f0-9-]{36}$/);
   for (const file of paths) assert.ok(file && !file.startsWith('/') && !file.split('/').includes('..'));
   const root = config.remoteConfigPath;

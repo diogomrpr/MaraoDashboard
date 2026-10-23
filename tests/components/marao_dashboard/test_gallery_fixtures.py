@@ -641,7 +641,7 @@ async def test_synthetic_live_endpoint_rejects_external_and_limits_physical_loop
 
     fixture = load_fixture("marao_test_camera/live.py")
     view = fixture.FixtureLiveView()
-    request = SimpleNamespace(transport=SimpleNamespace(get_extra_info=lambda _: ("192.168.0.28", 12345)))
+    request = SimpleNamespace(transport=SimpleNamespace(get_extra_info=lambda _: ("192.168.10.229", 12345)))
     with pytest.raises(web.HTTPForbidden):
         await view.get(request)
     assert view._active == 0

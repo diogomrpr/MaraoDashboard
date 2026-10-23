@@ -24,7 +24,7 @@ test('scoped evidence rejects omitted consumers, changed inputs, target drift an
   const plan = { base: 'base', head: 'candidate', mode: 'affected', components: ['cover', 'fan', 'light', 'slider'], checks: [{ id: 'slider' }] };
   const report = { version: 3, kind: 'scoped-verification', passed: true, verified_cleanup: true, base: 'base', head: 'candidate',
     mode: 'affected', components: plan.components, required: ['slider'], results: [{ id: 'slider', passed: true, input_sha256: 'current' }],
-    completed_at: new Date().toISOString(), target: 'http://192.168.0.28:8123' };
+    completed_at: new Date().toISOString(), target: 'http://192.168.10.229:8123' };
   const validate = value => validateEvidence(value, plan, { slider: 'current' }, { target: report.target, exactCommit: true });
   assert.equal(validate(report), report);
   for (const patch of [{ components: ['light'] }, { required: [] }, { verified_cleanup: false }, { mode: 'full' }, { head: 'other' },
@@ -33,7 +33,7 @@ test('scoped evidence rejects omitted consumers, changed inputs, target drift an
 });
 
 test('scoped migration proof independently requires every affected baseline and recovery assertion', () => {
-  const config = { url: 'http://192.168.0.28:8123', disposable: true, sshHost: '192.168.0.28', remoteConfigPath: '/config' };
+  const config = { url: 'http://192.168.10.229:8123', disposable: true, sshHost: '192.168.10.229', remoteConfigPath: '/config' };
   const candidate = { commit: 'candidate' }, scope = { components: ['migration'] };
   const selected = scopedPlan(config, scope.components);
   assert.equal(selected.baselines.length, 7);

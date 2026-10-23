@@ -53,7 +53,7 @@ of an ordinary backend change. Live checks use the
 [local development workflow](../../../docs/docs/development/local-development.md).
 
 Before reporting a software task done, install all applicable final changes on
-disposable HA `192.168.0.28`, even when the user handles visual testing. Batch
+disposable HA `192.168.10.229`, even when the user handles visual testing. Batch
 backend/fixture changes into one `npm run ha:sync` and one necessary restart near
 handoff; use lightweight frontend sync for compatible frontend-only changes.
 Leave successful assets installed. The installation's current-asset/readiness

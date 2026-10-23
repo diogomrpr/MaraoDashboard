@@ -108,7 +108,7 @@ test('reload cancellation evidence cannot hide a new request failure', () => {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-preview-diagnostics-'));
   const page = new EventEmitter(), reported = [];
   const diagnostics = monitorDiagnostics(page, output, message => reported.push(message));
-  const request = () => ({ url: () => 'http://192.168.0.28/asset.js?private=hidden', failure: () => ({ errorText: 'net::ERR_ABORTED' }) });
+  const request = () => ({ url: () => 'http://192.168.10.229/asset.js?private=hidden', failure: () => ({ errorText: 'net::ERR_ABORTED' }) });
   try {
     const prior = request(); page.emit('request', prior);
     diagnostics.willReload();

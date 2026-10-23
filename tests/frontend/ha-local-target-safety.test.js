@@ -21,7 +21,7 @@ test("test client rejects closed connections and a fresh session can fetch state
   }
   globalThis.WebSocket = Socket;
   try {
-    const config = { url: "http://192.168.0.28:8123" };
+    const config = { url: "http://192.168.10.229:8123" };
     const stale = await connect(config);
     const pending = assert.rejects(stale.call({ type: "get_states" }), /connection closed/);
     sockets[0].close(); await pending;
@@ -38,7 +38,7 @@ test("test client rejects closed connections and a fresh session can fetch state
 
 test("browser authentication is confined to the configured top-level HA HTML document", () => {
   const previous = Object.fromEntries(["window", "location", "document", "localStorage"].map(key => [key, globalThis[key]]));
-  const tokens = { hassUrl: "http://192.168.0.28:8123", access_token: "fixture-only" };
+  const tokens = { hassUrl: "http://192.168.10.229:8123", access_token: "fixture-only" };
   const writes = [];
   try {
     const top = {}; top.top = top;
@@ -63,7 +63,7 @@ test("browser authentication is confined to the configured top-level HA HTML doc
 });
 
 test("configured disposable targets are portable and must explicitly opt in", () => {
-  for (const url of ["http://192.168.0.28:8123", "http://ha-test.local:8123", "https://test.example.org"]) {
+  for (const url of ["http://192.168.10.229:8123", "http://ha-test.local:8123", "https://test.example.org"]) {
     assert.doesNotThrow(() => assertDisposableHaTarget({ url, disposable: true, sshHost: new URL(url).hostname }, { requireSsh: true }));
   }
   for (const disposable of [undefined, false, "true"]) {

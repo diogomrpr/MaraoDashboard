@@ -65,12 +65,12 @@ keep future work in changes and archive only completed, verified work.
 ## Environment and privacy
 
 - The only Home Assistant instance agents may modify or test is the disposable
-  local instance at `192.168.0.28`. Never connect to, deploy to, or operate a
+  local instance at `192.168.10.229`. Never connect to, deploy to, or operate a
   live or production Home Assistant instance.
 - Development tools accept a developer-configured disposable instance through
   ignored `ha-test/local.json` (URL, long-lived administrator token, explicit
   disposable acknowledgement, and SSH connection). This portability does not
-  authorize agents to use any target other than `192.168.0.28`.
+  authorize agents to use any target other than `192.168.10.229`.
 - Exercise physical-action flows only with gallery helpers, templates, or other
   safe fake entities. Never actuate a real lock, door, gate, alarm, camera
   privacy control, or other security/safety device.
@@ -111,7 +111,7 @@ keep future work in changes and archive only completed, verified work.
 ## Test installation is part of done
 
 - Before saying a software change is done or ready for the user to test, install
-  all applicable current changes on disposable Home Assistant `192.168.0.28`.
+  all applicable current changes on disposable Home Assistant `192.168.10.229`.
   This is mandatory even when browser inspection and further testing are handed
   to the user. Local edits, package builds and browser request overrides are not
   installation. Never install to production.
@@ -196,7 +196,7 @@ keep future work in changes and archive only completed, verified work.
   version hooks also run unit tests only. Retain applicable exact-commit
   hassfest/HACS validation as package metadata checks.
 - Before publishing every release, install the final release candidate, including
-  its version metadata, on disposable Home Assistant `192.168.0.28`. A release
+  its version metadata, on disposable Home Assistant `192.168.10.229`. A release
   request authorizes this installation. Batch it once after final code and version
   edits; if the exact candidate is already installed, verify and reuse that
   installation. Preserve test configuration and helper state. Installation failure

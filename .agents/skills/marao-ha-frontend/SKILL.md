@@ -67,7 +67,7 @@ playback acceptance is satisfied. Do not add automation, layout/theme matrices,
 fixtures or timing investigations without a reported defect, concrete risk or
 explicit request.
 
-Install the final applicable changes on disposable HA `192.168.0.28` before calling
+Install the final applicable changes on disposable HA `192.168.10.229` before calling
 the task done, even when the user handles all visual testing. Batch edits and
 normally sync once at the end. Use `prepareFrontend()` from
 `ha-test/prepare-frontend.js` for compatible frontend-only sync without a browser;

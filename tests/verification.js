@@ -247,8 +247,8 @@ async function runPlan(plan, options = {}) {
   try {
     if (plan.checks.some(check => check.kind !== 'offline')) {
       const config = require('../ha-test/client').readConfig();
-      assert.equal(new URL(config.url).hostname, '192.168.0.28', 'Only the authorized disposable instance is allowed');
-      assert.equal(config.sshHost, '192.168.0.28');
+      assert.equal(new URL(config.url).hostname, '192.168.10.229', 'Only the authorized disposable instance is allowed');
+      assert.equal(config.sshHost, '192.168.10.229');
       report.target = config.url;
       // Validate prerequisites before builds, deployment or expensive browser work.
       if (plan.checks.some(check => check.id === 'preserved-upgrade')) {
