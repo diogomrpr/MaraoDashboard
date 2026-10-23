@@ -305,6 +305,55 @@ test('managed checks leave native camera cancellation and HLS errors to manual v
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
+test('managed navigation and close drain ordinary finite requests without waiting for camera or persistent transports', async () => {
+  for (const action of ['navigation', 'context', 'browser']) {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-finite-requests-'));
+    const listeners = new Map(); let completed = false, closed = false;
+    const browser = { close: async () => { completed = closed = true; } };
+    const context = { addInitScript: () => assert.fail('No camera instrumentation'), browser: () => browser, close: async () => { completed = closed = true; } };
+    const page = { on: (name, listener) => listeners.set(name, listener), isClosed: () => closed,
+      url: () => 'http://192.168.0.28:8123/marao-dashboard/card-test', goto: async () => { completed = true; },
+      evaluate: () => assert.fail('No camera probe or forced teardown') };
+    const request = (pathname, type = 'fetch') => ({ url: () => 'http://192.168.0.28:8123' + pathname, resourceType: () => type });
+    try {
+      await managedCameraLedger(context, page, { output: directory, scenario: action, theme: 'light' });
+      const history = request('/api/history/period/2026-10-22'), asset = request('/marao_dashboard_static/MaraoHistoryChart.js', 'script');
+      for (const item of [history, request('/api/hls/session/playlist.m3u8', 'xhr'), request('/api/camera_proxy_stream/camera.safe'), request('/api/websocket', 'websocket'), request('/events', 'eventsource')]) listeners.get('request')(item);
+      const result = action === 'navigation' ? page.goto('/marao-dashboard-editor') : action === 'context' ? context.close() : browser.close();
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(completed, false, 'The test must leave in-flight history requests alive');
+      listeners.get('request')(asset);
+      listeners.get('requestfinished')(history);
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(completed, false, 'Requests started during the drain must also finish');
+      listeners.get('requestfinished')(asset);
+      await result;
+      assert.equal(completed, true);
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  }
+});
+
+test('a failed finite request during the navigation drain stays a raw blocking failure', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-finite-failure-'));
+  const listeners = new Map(); let navigated = false;
+  const browser = { close: async () => {} };
+  const context = { addInitScript: () => assert.fail('No camera instrumentation'), browser: () => browser, close: async () => {} };
+  const page = { on: (name, listener) => listeners.set(name, listener), isClosed: () => false,
+    url: () => 'http://192.168.0.28:8123/marao-dashboard/card-test', goto: async () => { navigated = true; } };
+  try {
+    await managedCameraLedger(context, page, { output: directory, scenario: 'failure', theme: 'light' });
+    const request = { url: () => 'http://192.168.0.28:8123/api/history/period/2026-10-22', resourceType: () => 'fetch', failure: () => ({ errorText: 'net::ERR_CONNECTION_RESET' }), headers: () => ({}) };
+    listeners.get('request')(request);
+    const result = page.goto('/marao-dashboard-editor');
+    listeners.get('requestfailed')(request);
+    await assert.rejects(result, /Unexpected non-camera request failures/);
+    assert.equal(navigated, false);
+    const saved = JSON.parse(fs.readFileSync(path.join(directory, 'camera-requests-failure-light.json')));
+    assert.equal(saved.failures.length, 1); assert.equal(saved.rejected.length, 1);
+    assert.equal(saved.failures[0].error, 'net::ERR_CONNECTION_RESET');
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('instrumentation handles grouped WebSocket replies and tags only same-origin HLS XHR', () => {
   const warnings = [];
   class Socket {

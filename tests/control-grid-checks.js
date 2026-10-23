@@ -25,18 +25,38 @@ function gridGeometryIssues({ cells, gap, width, columns, order }, expectedOrder
   }
   return [...new Set(issues)];
 }
-async function measureGrid(grid) {
-  return grid.evaluate(element => {
-    const host = element.shadowRoot.querySelector('.control-grid'), bounds = host.getBoundingClientRect(), style = getComputedStyle(host);
+async function measureGrid(grid, fault) {
+  return grid.evaluate((element, fault) => {
+    const host = element.shadowRoot.querySelector('.control-grid'), last = host.lastElementChild;
+    const surface = fault && last.shadowRoot.querySelector('ha-card');
+    const original = fault && { marker: last.hasAttribute('data-marao-standard-control'), style: surface.getAttribute('style') };
+    let regression;
+    if (fault === 'marker') last.removeAttribute('data-marao-standard-control');
+    if (fault === 'rows') {
+      surface.style.minHeight = `${Math.ceil(host.firstElementChild.getBoundingClientRect().height) + 64}px`;
+      regression = document.createElement('style');
+      regression.textContent = '.control-grid{grid-template-rows:none!important;grid-auto-rows:auto!important}';
+      element.shadowRoot.append(regression);
+    }
+    if (fault === 'surface') surface.style.cssText = 'min-height:0;height:100px;align-self:start';
     const find = root => root.querySelector('marao-card') || [...root.querySelectorAll('*')].map(node => node.shadowRoot && find(node.shadowRoot)).find(Boolean);
-    return { width: bounds.width, gap: parseFloat(style.gap), columns: style.gridTemplateColumns.split(' ').length,
-      order: element._config.cards.map(card => card.name), cells: [...host.children].map(child => {
-        const card = child.localName === 'marao-card' ? child : find(child.shadowRoot), surface = card.shadowRoot.querySelector('ha-card');
-        const c = child.getBoundingClientRect(), s = surface.getBoundingClientRect();
-        return { width: c.width, height: c.height, top: c.top, left: c.left, marker: surface.classList.contains('control-surface') && card.hasAttribute('data-marao-standard-control'),
-          surface: { height: s.height, right: s.right - bounds.left, left: s.left - bounds.left } };
-      }) };
-  });
+    try {
+      const bounds = host.getBoundingClientRect(), style = getComputedStyle(host);
+      return { width: bounds.width, gap: parseFloat(style.gap), columns: style.gridTemplateColumns.split(' ').length,
+        order: element._config.cards.map(card => card.name), cells: [...host.children].map(child => {
+          const card = child.localName === 'marao-card' ? child : find(child.shadowRoot), surface = card.shadowRoot.querySelector('ha-card');
+          const c = child.getBoundingClientRect(), s = surface.getBoundingClientRect();
+          return { width: c.width, height: c.height, top: c.top, left: c.left, marker: surface.classList.contains('control-surface') && card.hasAttribute('data-marao-standard-control'),
+            surface: { height: s.height, right: s.right - bounds.left, left: s.left - bounds.left } };
+        }) };
+    } finally {
+      if (fault) {
+        last.toggleAttribute('data-marao-standard-control', original.marker);
+        if (original.style === null) surface.removeAttribute('style'); else surface.setAttribute('style', original.style);
+        regression?.remove();
+      }
+    }
+  }, fault);
 }
 async function controlGridChecks(page, output, scenario, theme, transitions = true) {
   const names = ['Grid · simple light', 'Grid · brightness', 'Grid · cover', 'Grid · lock', 'Grid · hidden icon', 'Grid · hidden title', 'Grid · guarded lock', 'Grid · door summary', 'Grid · front entrance opening control with a deliberately long later-row title'];
@@ -49,29 +69,9 @@ async function controlGridChecks(page, output, scenario, theme, transitions = tr
   if (transitions) {
     const before = await measure();
     for (const fault of ['marker', 'rows', 'surface']) {
-      const originalRows = await grid.evaluate((element, fault) => {
-        const host = element.shadowRoot.querySelector('.control-grid'), last = host.lastElementChild;
-        const originalRows = host.style.gridTemplateRows;
-        if (fault === 'marker') last.removeAttribute('data-marao-standard-control');
-        if (fault === 'rows') {
-          // Make the last row intrinsically taller so this mutation cannot pass
-          // merely because the current labels happen to need equal heights.
-          last.shadowRoot.querySelector('ha-card').style.minHeight = `${Math.ceil(host.firstElementChild.getBoundingClientRect().height) + 64}px`;
-          // The resize observer legitimately recomputes inline row templates.
-          // Hold the deliberate regression for the measurement without disabling it.
-          const style = document.createElement('style'); style.dataset.gridRowsRegression = '';
-          style.textContent = '.control-grid{grid-template-rows:none!important;grid-auto-rows:auto!important}';
-          element.shadowRoot.append(style);
-        }
-        if (fault === 'surface') last.shadowRoot.querySelector('ha-card').style.cssText = 'min-height:0;height:100px;align-self:start';
-        return originalRows;
-      }, fault);
-      try { const mutated = await measure(); assert.ok(gridGeometryIssues(mutated, names).length, fault + ' negative fixture must fail: ' + JSON.stringify(mutated.cells.map(cell => ({height:cell.height,surface:cell.surface.height})))); }
-      finally {
-        await grid.evaluate((element, rows) => { const host = element.shadowRoot.querySelector('.control-grid'), last = host.lastElementChild;
-          host.style.gridTemplateRows = rows; host.style.removeProperty('grid-auto-rows'); last.setAttribute('data-marao-standard-control', ''); last.shadowRoot.querySelector('ha-card').removeAttribute('style'); }, originalRows);
-        await grid.evaluate(element => element.shadowRoot.querySelector('[data-grid-rows-regression]')?.remove());
-      }
+      // Measure before a live HA update can repair the deliberate regression.
+      const mutated = await measureGrid(grid, fault);
+      assert.ok(gridGeometryIssues(mutated, names).length, fault + ' negative fixture must fail: ' + JSON.stringify(mutated.cells.map(cell => ({height:cell.height,surface:cell.surface.height}))));
     }
     const last = grid.locator('marao-card').last();
     const original = await last.evaluate(card => card._actionError);

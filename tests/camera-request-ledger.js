@@ -360,7 +360,7 @@ function isManualCameraTransport(url) {
 
 async function cameraRequestLedger(context, { output, scenario, theme, manualTransport = false }) {
   if (!manualTransport) await context.addInitScript(installTrace, { subscriptions: process.env.MARAO_CAMERA_SUBSCRIPTION_DIAGNOSTIC === '1', entities: SAFE_ENTITIES });
-  let page, sequence = 0, lastTrace, stoppedForClose = false; const failures = [], manualResponses = [], starts = new WeakMap(), documents = new Map();
+  let page, sequence = 0, lastTrace, stoppedForClose = false; const failures = [], manualResponses = [], starts = new WeakMap(), documents = new Map(), pending = new Map();
   const safe = value => {
     if (Array.isArray(value)) return value.map(safe);
     if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, (key === 'url' || key === 'prefix') && typeof item === 'string'
@@ -372,12 +372,24 @@ async function cameraRequestLedger(context, { output, scenario, theme, manualTra
     isClosed() { return page.isClosed(); },
     attach(subject) {
       page = subject; page.__cameraRequestLedger = ledger;
-      page.on('request', request => starts.set(request, Date.now()));
+      page.on('request', request => {
+        starts.set(request, Date.now());
+        if (manualTransport && !isManualCameraTransport(request.url()) && !['websocket', 'eventsource'].includes(request.resourceType())) {
+          let resolve;
+          const promise = new Promise(done => { resolve = done; });
+          pending.set(request, { promise, resolve });
+        }
+      });
+      const finished = request => { const item = pending.get(request); pending.delete(request); item?.resolve(); };
+      page.on('requestfinished', finished);
       if (manualTransport) page.on('response', response => {
         if (isManualCameraTransport(response.url()) && response.status() >= 400) manualResponses.push({ url: response.url(), status: response.status() });
       });
-      page.on('requestfailed', request => failures.push({ url: request.url(), type: request.resourceType(), error: request.failure()?.errorText || 'unknown error',
-        xhr: Number(request.headers()['x-marao-test-xhr']) || null, document: request.headers()['x-marao-test-document'] || null, started: starts.get(request), date: Date.now() }));
+      page.on('requestfailed', request => {
+        failures.push({ url: request.url(), type: request.resourceType(), error: request.failure()?.errorText || 'unknown error',
+          xhr: Number(request.headers()['x-marao-test-xhr']) || null, document: request.headers()['x-marao-test-document'] || null, started: starts.get(request), date: Date.now() });
+        finished(request);
+      });
     },
     async checkpoint() {
       if (manualTransport) return null;
@@ -423,7 +435,17 @@ async function cameraRequestLedger(context, { output, scenario, theme, manualTra
       assert.equal(observerErrors.length, 0, `Native handoff proof observer failed: ${JSON.stringify(safe(observerErrors))}`);
     },
     async stopForClose() {
-      if (manualTransport) return ledger.assert();
+      if (manualTransport) {
+        // Test-owned navigation must not abort ordinary history or asset fetches.
+        let timer;
+        try {
+          await Promise.race([
+            (async () => { while (pending.size) await Promise.all([...pending.values()].map(item => item.promise)); })(),
+            new Promise((_, reject) => { timer = setTimeout(() => reject(Error(`Finite requests did not finish before navigation: ${JSON.stringify(safe([...pending.keys()].map(request => ({ url: request.url(), type: request.resourceType() }))))}`)), 15000); }),
+          ]);
+        } finally { clearTimeout(timer); }
+        return ledger.assert();
+      }
       if (!await ledger.checkpoint()) return ledger.assert();
       if (stoppedForClose) return ledger.assert();
       await ledger.boundary('final context release', async () => {
