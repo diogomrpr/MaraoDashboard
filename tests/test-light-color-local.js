@@ -55,6 +55,24 @@ async function loadingChecks(browser) {
     await page.route('**/MaraoLightColor.js*',async route=>{await gate; await route.continue();});
     await loadingFixture(page); await page.locator('[data-light-color]').tap();
     await page.locator('.marao-light-color-content [aria-busy=true]').waitFor({state:'visible'});
+    await page.evaluate(()=>{ window.recoveredHass=card.hass; card.hass={...card.hass,states:{'light.synthetic':{state:'unavailable',attributes:{}}}}; });
+    release();
+    await page.locator('.light-color-wheel').waitFor({state:'visible'});
+    assert.equal(await page.locator('.light-color-wheel').isDisabled(),true,'Availability loss during loading keeps disabled controls visible');
+    assert.equal(await page.locator('.light-brightness input').isVisible(),true,'Loading retains the opening brightness layout');
+    await page.evaluate(()=>{ card.hass=recoveredHass; });
+    assert.equal(await page.locator('.light-color-wheel').isDisabled(),false,'Recovered light controls become usable');
+    assert.deepEqual(await page.evaluate(()=>calls),[],'Availability changes must not act on the light');
+    await page.getByRole('button',{name:'Close popup',exact:true}).tap();
+  } finally { release(); await delayedContext.close(); }
+
+  const closedContext=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+  const closedGate=new Promise(resolve=>{release=resolve;});
+  try {
+    const page=await closedContext.newPage();
+    await page.route('**/MaraoLightColor.js*',async route=>{await closedGate; await route.continue();});
+    await loadingFixture(page); await page.locator('[data-light-color]').tap();
+    await page.locator('.marao-light-color-content [aria-busy=true]').waitFor({state:'visible'});
     await page.getByRole('button',{name:'Close popup',exact:true}).tap();
     await page.locator('.marao-popup-overlay').waitFor({state:'detached'});
     release();
@@ -63,7 +81,7 @@ async function loadingChecks(browser) {
     assert.equal(await page.locator('.light-color-picker').count(),0,'A late module must not mount detached controls');
     assert.deepEqual(await page.evaluate(()=>calls),[],'Closing while loading must not act on the light');
     assert.equal(await page.evaluate(()=>[...document.body.children].some(element=>element.inert)),false,'Closing while loading restores the background');
-  } finally { release(); await delayedContext.close(); }
+  } finally { release(); await closedContext.close(); }
 }
 
 (async () => {

@@ -2380,7 +2380,9 @@ export class MaraoPopupCard extends BaseElement {
       const module = await (color ? loadLightColorPicker() : loadHistoryChart());
       if (host !== this._historyHost || context !== this._historyContext || !context.owner.isConnected || context.path !== window.location.pathname || context.hash !== window.location.hash || context.source !== this._detailSource(context)) return;
       host.replaceChildren();
-      this._historyChart = color ? module.createLightColorPicker(host, context.owner._lightColorOptions()) : module.createHistoryChart(host, context.owner._historyOptions());
+      // Retain the opening layout if availability changes during the lazy import.
+      this._historyChart = color ? module.createLightColorPicker(host, options) : module.createHistoryChart(host, context.owner._historyOptions());
+      if (color) this._historyChart.update(context.owner._lightColorOptions());
     } catch (error) {
       if (host !== this._historyHost || context !== this._historyContext) return;
       this._historyFailed = true;
