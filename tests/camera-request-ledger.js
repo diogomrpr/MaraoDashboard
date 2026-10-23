@@ -5,10 +5,10 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const SAFE_ENTITY = 'camera.marao_dashboard_test_camera';
-const SAFE_ENTITIES = [SAFE_ENTITY, ...['slow','adaptive','adaptive_hls'].flatMap(source=>['high','medium','low'].map(quality=>SAFE_ENTITY+'_'+source+'_'+quality))];
+const SAFE_ENTITIES = [SAFE_ENTITY, 'camera.marao_dashboard_test_netatmo', ...['slow','adaptive','adaptive_hls'].flatMap(source=>['high','medium','low'].map(quality=>SAFE_ENTITY+'_'+source+'_'+quality))];
 const nativeCaller = stack => /https?:\/\/192\.168\.0\.28(?::\d+)?\/frontend_(?:latest|es5)\/[^\s)]+\.js:\d+(?::\d+)?/.test(stack || '');
 const nativeTeardown = stack => nativeCaller(stack) && /\b(?:stopLoad|destroy|destroyInternalLoaders|_cleanUp|onMediaDetaching)\b/.test(stack);
-const maraoStopCaller = stack => /(?:CameraPlayback\.stop|(?:^|\n)stop@)[^\n]*https?:\/\/192\.168\.0\.28(?::\d+)?\/marao_dashboard_static\/MaraoCamera\.js[^\s)]*/.test(stack || '');
+const maraoStopCaller = stack => /(?:CameraPlayback\.stop|(?:^|\n)stop@)[^\n]*https?:\/\/192\.168\.0\.28(?::\d+)?\/(?:marao_dashboard_static|api\/marao_dashboard\/frontend\/[a-f0-9]+)\/MaraoCamera\.js[^\s)]*/.test(stack || '');
 
 function provedNativeHandoff(receipt, prefix) {
   const proof = receipt?.proof;
@@ -214,7 +214,7 @@ function installTrace({ subscriptions = false, entities = ['camera.marao_dashboa
       const receipt = { id: state.releases.length + 1, stack, date: Date.now(), order: ++state.order, wrapper: identity(wrapper), host: identity(node), camera: identity(camera), generation: camera.generation,
         entity: node.stateObj.entity_id, configured: camera.entity, currentHost: camera.player === node, wasConnected: node.isConnected, eligible: camera.eligible(), streamRequests: state.streamRequests, ownStreamRequests: camera.streamRequests, ...currentPrefix(node) };
       state.releases.push(receipt);
-      const stop = /(?:CameraPlayback\.stop|(?:^|\n)stop@)[^\n]*https?:\/\/192\.168\.0\.28(?::\d+)?\/marao_dashboard_static\/MaraoCamera\.js[^\s)]*/.test(stack);
+      const stop = /(?:CameraPlayback\.stop|(?:^|\n)stop@)[^\n]*https?:\/\/192\.168\.0\.28(?::\d+)?\/(?:marao_dashboard_static|api\/marao_dashboard\/frontend\/[a-f0-9]+)\/MaraoCamera\.js[^\s)]*/.test(stack);
       if (!stop) return invoke();
       const qualityRelease = /(?:CameraPlayback\.fallback|fallback@)/.test(stack);
       state.boundary = { kind: qualityRelease ? 'marao-quality-release' : 'marao-ineligible-release', release: receipt.id, entities: [receipt.entity], date: receipt.date };

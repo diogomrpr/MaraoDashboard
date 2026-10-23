@@ -38,6 +38,15 @@ test('unowned, uncommanded, ambiguous, non-native, image and real network failur
   ];
   for (const mutate of mutations) { const value = fixture(); mutate(value); const result = classifyCameraCancellations(value.failures, value.trace); assert.equal(result.rejected.length, 1); assert.equal(result.accepted.length, 0); }
 });
+test('the Netatmo fixture requires the same exact cancellation evidence and cannot admit arbitrary cameras', () => {
+  for (const entity of ['camera.marao_dashboard_test_netatmo', 'camera.other_netatmo']) {
+    const value = fixture();
+    value.trace.sessions[0].entity = entity;
+    value.trace.events[1].boundary.entities = [entity];
+    assert.equal(classifyCameraCancellations(value.failures, value.trace).accepted.length, entity === 'camera.marao_dashboard_test_netatmo' ? 1 : 0);
+  }
+});
+
 test('exact request header identity distinguishes repeated URLs and retains repeated native abort calls', () => {
   const { failures, trace } = fixture();
   trace.events.push({ ...trace.events[0], id: 2 }, { ...trace.events[1], id: 2 }, { ...trace.events[1] });
@@ -195,6 +204,12 @@ test('natural offscreen release requires exact Marao stop, ineligibility and act
     return value;
   };
   const value = released(); assert.equal(classifyCameraCancellations(value.failures, value.trace).accepted.length, 1);
+  for (const assetPath of ['marao_dashboard_static', 'api/marao_dashboard/frontend/5d7e0d282ab7c71c']) {
+    const current = released(); current.trace.releases[0].stack = current.trace.releases[0].stack.replace('marao_dashboard_static', assetPath);
+    assert.equal(classifyCameraCancellations(current.failures, current.trace).accepted.length, 1);
+    current.trace.releases[0].stack = current.trace.releases[0].stack.replace('192.168.0.28', 'other.test');
+    assert.equal(classifyCameraCancellations(current.failures, current.trace).rejected.length, 1);
+  }
   for (const change of [
     receipt => { receipt.stack = 'Error\n at unrelated.stop (http://192.168.0.28:8123/other.js:1:1)'; },
     receipt => { receipt.eligible = true; }, receipt => { receipt.currentHost = false; }, receipt => { receipt.wasConnected = false; },
@@ -331,7 +346,7 @@ test('instrumentation handles grouped WebSocket replies and tags only same-origi
   }
 });
 
-function immediateHandoffFixture({ siblingSelection = false, boundary = null, preloaded = false } = {}) {
+function immediateHandoffFixture({ siblingSelection = false, boundary = null, preloaded = false, versioned = false } = {}) {
   let now = 0; const timers = [];
   class Socket { addEventListener() {} send() {} }
   class Xhr { open() {} send() {} abort() {} setRequestHeader() {} }
@@ -345,7 +360,7 @@ function immediateHandoffFixture({ siblingSelection = false, boundary = null, pr
     emit(type) { for (const listener of [...this.listeners.get(type) || []]) listener({ type, target: this }); }
   }
   class NativeError extends Error { constructor(message) { super(message); this.stack = message + (message === 'Marao native host release'
-    ? '\n at CameraPlayback.stop (http://192.168.0.28:8123/marao_dashboard_static/MaraoCamera.js:270:24)'
+    ? `\n at CameraPlayback.stop (http://192.168.0.28:8123/${versioned ? 'api/marao_dashboard/frontend/5d7e0d282ab7c71c' : 'marao_dashboard_static'}/MaraoCamera.js:270:24)`
     : '\n at repeat.update (http://192.168.0.28:8123/frontend_latest/native.js:1:1)'); } }
   const environment = vm.createContext({ window: {}, location: new URL('http://192.168.0.28:8123/marao-dashboard/card-test'), URL,
     WebSocket: Socket, XMLHttpRequest: Xhr, Node: DomNode, Element: DomElement, crypto: crypto.webcrypto, queueMicrotask,
@@ -605,4 +620,14 @@ test('quality fallback cancellations require the exact retired host and a lower 
     const value = quality(); mutate(value.trace.releases[0]);
     assert.equal(classifyCameraCancellations(value.failures, value.trace).rejected.length, 1);
   }
+});
+
+
+test('instrumentation recognizes offscreen release from the versioned frontend route', async () => {
+  const fixture = immediateHandoffFixture({ versioned: true });
+  await fixture.tick(300);
+  await fixture.release(400);
+  assert.equal(fixture.state.releases.length, 1);
+  assert.equal(fixture.state.releases[0].proof.released, true);
+  assert.equal(fixture.state.releases[0].eligible, false);
 });

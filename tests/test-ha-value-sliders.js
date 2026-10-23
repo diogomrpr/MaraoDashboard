@@ -66,7 +66,7 @@ async function checkPointerInteraction(page, context, config, example, calls, po
     // A real external update must refresh confirmed fill without replacing the held input.
     const statePresentation = () => original.evaluate((element) => {
       const root = element.getRootNode(), surface = root.querySelector('ha-card');
-      return surface?.hasAttribute('data-binary-state') ? { binary: true, active: surface.dataset.binaryState, label: root.querySelector('[role="img"][aria-label]')?.getAttribute('aria-label'), redundant: Boolean(root.querySelector('.state')) }
+      return surface?.hasAttribute('data-binary-state') ? { binary: true, active: surface.dataset.binaryState, label: root.querySelector('[role="img"][aria-label]')?.getAttribute('aria-label'), redundant: Boolean(root.querySelector('.state:not(.placeholder)')) }
         : { binary: false, label: root.querySelector('.state')?.textContent };
     });
     const activeState = await statePresentation();
@@ -116,7 +116,7 @@ async function checkPointerInteraction(page, context, config, example, calls, po
     await move(60);
     if (touch) await touch.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
     else { await input.dispatchEvent('pointercancel', { pointerId: 1 }); await page.mouse.up(); }
-    await page.waitForLoadState('networkidle');
+    await page.waitForFunction((card) => !card._sliderGesture, host);
     const state = await api(config, 'GET', `/api/states/${example.entity}`);
     if (count() !== cancelBefore || Math.abs(fixtureValue(state) - 50) > 1) throw new Error(`${example.name}/${pointer}: cancellation dispatched a partial target`);
   } catch (error) {
@@ -152,6 +152,7 @@ async function main() {
   fs.mkdirSync(output, { recursive: true });
   const cases = concreteCases().filter((entry) => entry.sliderPercentage !== undefined);
   const browser = await chromium.launch();
+  let failure;
   try {
     const options = parseArgs();
     for (const { scenario, theme } of selectedRuns(options)) {
@@ -224,7 +225,7 @@ async function main() {
         }
         const defaults = await page.evaluate(() => window.__maraoRangeTouchDefaults);
         if (!defaults.length || defaults.some(Boolean)) throw new Error('popup scroll guard cancelled native range touch movement');
-        await page.locator('.marao-popup-close').click();
+        await page.locator('.marao-popup-close').tap();
         await page.locator('.marao-popup-sheet').waitFor({ state: 'detached' });
       }
       if (options.screenshots !== 'failure' && ['iphone-normal', 'android-normal', 'iphone-bold-text-200', 'android-page-zoom-200'].includes(scenario.name)) {
@@ -248,7 +249,6 @@ async function main() {
           // The Home lighting popup intentionally includes only active members.
           await api(config, 'POST', '/api/services/input_boolean/turn_on', { entity_id: fixtureLight });
           for (const view of ['card-test#marao-dashboard-test-lights-popup', 'card-test#marao-dashboard-test-blinds-popup', 'living-room', 'overview#overview-lights', 'overview#overview-blinds']) {
-            await page.waitForLoadState('networkidle');
             await page.goto(`${config.url}/marao-dashboard/${view}`, { waitUntil: 'domcontentloaded' });
             await page.locator(view.includes('#') ? '.marao-popup-sheet input[type="range"]' : 'marao-card input[type="range"]').first().waitFor({ state: 'attached' });
             await applyVisualPreferences(page, scenario, theme);
@@ -274,7 +274,6 @@ async function main() {
           await restoreHelperStates(config, { [fixtureLight]: baseline.state });
         }
       }
-      await page.waitForLoadState('networkidle');
       await cameraLedger.stopForClose();
       if (errors.length) throw new Error(`${run}: browser warnings/errors: ${errors.join('; ')}`);
       fs.writeFileSync(path.join(output, `${run}.json`), JSON.stringify(readings, null, 2));
@@ -282,11 +281,15 @@ async function main() {
       await context.close();
     }
   } catch (error) {
+    failure = error;
     const page = browser.contexts().at(-1)?.pages().at(-1);
     if (page && !page.isClosed()) await captureScreenshot(page, { path: path.join(output, 'value-sliders-failure.png'), scale: 'css' });
     throw error;
-  } finally { await browser.close(); }
+  } finally {
+    try { await browser.close(); }
+    catch (cleanup) { if (failure) throw new AggregateError([failure, cleanup], 'Slider check and cleanup failed'); throw cleanup; }
+  }
 }
 
-if (require.main === module) main().catch((error) => { console.error(error.message || error); process.exitCode = 1; });
+if (require.main === module) main().catch((error) => { console.error(error); process.exitCode = 1; });
 module.exports = { checkPointerInteraction, checkNativeThumbReset };
