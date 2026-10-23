@@ -216,9 +216,12 @@ async function inspectSafeAreaSheets(context, page, output, runName) {
 }
 
 async function inspectFullscreenLifecycle(page) {
+  const prefetches = new Set();
+  const started = request => { if (/prefetch/.test(request.headers()['sec-purpose'] || request.headers().purpose || '')) prefetches.add(request); };
+  const finished = request => prefetches.delete(request);
+  page.on('request', started); page.on('requestfinished', finished); page.on('requestfailed', finished);
+  try {
   for (const route of ['/config/dashboard', '/marao-dashboard-editor']) {
-    // The exhaustive gallery can fill the browser's resource timing buffer.
-    await page.evaluate(() => performance.clearResourceTimings());
     await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])').evaluate(navbar => {
       let root=navbar;while(root&&root.localName!=='hui-root')root=root.parentElement||root.getRootNode()?.host;
       window.__safeOwned={view:root.shadowRoot.querySelector('#view'),header:root.shadowRoot.querySelector('.header')};
@@ -226,11 +229,7 @@ async function inspectFullscreenLifecycle(page) {
     await page.evaluate(route => {history.pushState(null,'',route);window.dispatchEvent(new CustomEvent('location-changed'));},route);
     const native = page.locator(route === '/marao-dashboard-editor' ? 'marao-dashboard-panel' : 'ha-config-dashboard');
     await native.waitFor({state:'visible'});
-    if(route === '/marao-dashboard-editor') await page.waitForFunction(panel => {
-      const resources = performance.getEntriesByType('resource');
-      return panel._loaded && panel._visualReady && panel._jsonWarmed &&
-        [...panel.shadowRoot.querySelectorAll('link[rel="prefetch"]')].every(link => resources.some(entry => entry.name === link.href && entry.responseEnd > 0));
-    }, await native.elementHandle());
+    if(route === '/marao-dashboard-editor') await page.waitForFunction(panel => panel._loaded && panel._visualReady && panel._jsonWarmed, await native.elementHandle());
     else {
       const count = await native.evaluate(async panel=>(await panel.hass.callWS({type:'repairs/list_issues'})).issues.filter(issue=>!issue.ignored).length);
       await page.waitForFunction(({panel,count})=>panel._repairsIssues.total===count,{panel:await native.elementHandle(),count});
@@ -255,6 +254,9 @@ async function inspectFullscreenLifecycle(page) {
       const {view,header}=window.__safeOwned;
       return !view.style.getPropertyValue('padding-top') && !header.style.getPropertyValue('display');
     });
+    const deadline = Date.now() + 15000;
+    while (prefetches.size && Date.now() < deadline) await page.waitForTimeout(50);
+    if (prefetches.size) throw new Error('Editor prefetch requests did not finish before route disposal');
     await page.evaluate(() => {history.pushState(null,'','/marao-dashboard/card-test');window.dispatchEvent(new CustomEvent('location-changed'));});
     await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])').waitFor({state:'visible'});
     await page.waitForFunction(() => {
@@ -262,6 +264,9 @@ async function inspectFullscreenLifecycle(page) {
       let root=find(document);while(root&&root.localName!=='hui-root')root=root.parentElement||root.getRootNode()?.host;
       return root?.shadowRoot.querySelector('.header')?.style.display==='none';
     });
+  }
+  } finally {
+    page.off('request', started); page.off('requestfinished', finished); page.off('requestfailed', finished);
   }
 }
 
