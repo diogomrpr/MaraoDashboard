@@ -443,7 +443,8 @@ async function cameraRequestLedger(context, { output, scenario, theme, manualTra
         try {
           await Promise.race([
             (async () => { while (pending.size) await Promise.all([...pending.values()].map(item => item.promise)); })(),
-            new Promise((_, reject) => { timer = setTimeout(() => reject(Error(`Finite requests did not finish before navigation: ${JSON.stringify(safe([...pending.keys()].map(request => ({ url: request.url(), type: request.resourceType() }))))}`)), 15000); }),
+            // The gallery's delayed history responses also wait for a shared HTTP connection.
+            new Promise((_, reject) => { timer = setTimeout(() => reject(Error(`Finite requests did not finish before navigation: ${JSON.stringify(safe([...pending.keys()].map(request => ({ url: request.url(), type: request.resourceType(), age_ms: Date.now() - starts.get(request) }))))}`)), 30000); }),
           ]);
         } finally { clearTimeout(timer); }
         return ledger.assert();
