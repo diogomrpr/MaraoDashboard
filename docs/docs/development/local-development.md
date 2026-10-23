@@ -79,6 +79,9 @@ the editor and stages the validated integration under
    dashboard generation, integration reloads, and restart actions.
 3. Configure key-based SSH access and accept the instance's verified host key.
    The SSH account must be able to write its Home Assistant configuration directory.
+   Preserved-upgrade checks also require `python3` in that SSH environment. If
+   using an SSH add-on, include Python in its persistent additional packages;
+   packages installed only in the running container may disappear on restart.
 4. Copy `ha-test/local.example.json` to `ha-test/local.json`. Set its URL, token,
    SSH details, and configuration directory. Set `disposable` to `true` only
    after verifying this is the test instance.
