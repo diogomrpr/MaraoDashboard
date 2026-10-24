@@ -2568,8 +2568,7 @@ def _room_entity_card(entity: dict[str, Any]) -> dict[str, Any]:
     if entity.get("template") == "hc_access_action_card":
         variables = entity.get("variables") or {}
         service = variables.get("action_service") or ("lock.lock" if entity["entity_id"].startswith("lock.") else "cover.close_cover")
-        return _entity_card({**entity, "variables": {**variables, "action_service": service,
-            "action_label_key": variables.get("action_label_key", "common.lock" if service == "lock.lock" else "common.close")}})
+        return _entity_card({**entity, "variables": {**variables, "action_service": service}})
     if entity.get("template") == "hc_access_hold_action_card" and not _is_access_entity(entity):
         return _page_action_card(entity)
     if entity.get("template") == "hc_access_slide_action_card":
