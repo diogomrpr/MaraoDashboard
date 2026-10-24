@@ -5,128 +5,18 @@ parent: Usage
 nav_order: 4
 ---
 
-# Native dashboard editing
+# Standalone native authoring retired
 
-Marao supports its existing builder and Home Assistant's normal dashboard editor.
-Their dashboards are independent: editing one never synchronizes or replaces the other.
-Native editing requires Home Assistant 2026.6 or later and the Marao integration.
+Marao now supports one authoring workflow: its visual/JSON builder and generator.
+Use [the dashboard builder](index.md) to edit and generate Marao dashboards.
 
-## Create a native dashboard
+The Community starter, Marao entries in Home Assistant's card picker, standalone
+configuration forms, `custom:marao-native-*` wrappers and the `native/card` and
+`native/starter` WebSocket commands have been removed. Existing standalone
+dashboards remain saved and independently owned, but removed card types no
+longer render. There is no automatic conversion or compatibility renderer.
 
-1. Open **Settings → Dashboards → Add dashboard**.
-2. Select **Marao** under Community dashboards.
-3. Choose a name and an unused route. The suggested name is **Marao Native**.
-4. Open the starter and use its administrator **Edit dashboard** pencil.
-5. Select **Take control** in Home Assistant's dialog.
-
-Before Take control, the starter is generated from eligible entities and areas.
-Take control saves the displayed Home, Rooms and room-detail pages as ordinary
-Sections views. Afterward, additions, removals, order and empty pages belong to
-Home Assistant. Registry changes and Marao restarts do not refill them.
-
-The starter applies the **Marao Dashboard** theme and floating navbar. Its pencil
-is separate from navigation entries. The navbar stays in one row and places
-additional destinations in a matching vertical menu above its rightmost toggle.
-The native route editor accepts the complete ordered list without a count limit;
-preview shows the available-width partition without navigation or shell effects. While editing, Home Assistant's
-toolbar returns. Cards added to other dashboards do not change their native shell.
-
-## Add and edit cards
-
-Use **Add card** and select a named Marao card, or choose an entity and its compatible
-Marao suggestion. Names, icons, bindings and supported options have visual controls.
-Advanced options retain native structured command data; unknown fields remain
-available through Home Assistant's YAML tab and survive ordinary visual edits.
-
-Media remotes and apps, group members and filters, vacuum actions, appliance
-bindings, camera providers, energy units/precision, charging presets and navigation
-can be configured without the Marao builder. Ordered lists have Add, Remove and
-Move up/down controls. Removing every member or app retains an explicit empty list.
-
-Native cards automatically own their detail sheets, including climate modes,
-alarm controls, access actions, camera events, media controls and history.
-Duplicate instances have independent sheets. Deliberately supplied popup hashes
-remain external references: configure their matching popup separately.
-
-Graph-enabled native cards expose the same separate **History** (**Histórico**)
-control as generated cards. Inspecting readings sends no entity command. History
-inside a sheet keeps one modal layer, and Back restores its parent controls and
-scroll position. Energy sheets retain their day/month navigation in Home
-Assistant's time zone, with hourly/daily consumption bars and an optional ordered
-**Energy breakdown** of energy and cost sensors. The editor also accepts a
-price-per-kWh override and calculated-cost display; derived costs are estimates.
-
-Editor previews cannot dispatch device services or activate the fullscreen shell.
-Normal controls retain authoritative HA state, strict access slides, security holds,
-availability guards and transient masked alarm codes. Alarm codes are never card settings.
-
-    type: custom:marao-native-media-card
-    entity: media_player.living_room
-    apple_tv:
-      remote_entity: remote.living_room
-      apps:
-        - source: TV
-          name: Television
-          icon: mdi:television
-    variables:
-      md_show_background_art: true
-
-Existing generic Marao types and public md_* template keys continue to work.
-There is no automatic conversion or copying of an existing builder dashboard.
-Native starter ownership is recorded as `marao: {mode: native, version: 1}`.
-Builder generation, setup repair and history restoration refuse native destinations.
-
-## Example with the standard Home Assistant shell
-
-The [safe native dashboard example](https://github.com/diogomrpr/MaraoDashboard/blob/main/ha-test/examples/native-dashboard.yaml)
-contains Home, Devices and Energy Sections views with 20 Marao cards. It demonstrates
-light and climate controls, media remotes/apps, groups, appliance bindings, automatic
-detail sheets, energy history and charging presets using disposable demo entities.
-Each view also includes a native Marao Navbar card with Home, Devices and Energy
-links. It keeps Home Assistant's standard toolbar, view tabs and dashboard editor.
-Add **Marao Navbar** from the card picker and edit its ordered routes visually.
-
-Hold the horizontal navbar or one of its icons for **three seconds** to refresh
-the frontend on this device. Progress appears during the hold. Releasing early,
-moving away, scrolling or leaving the app cancels; ordinary taps still navigate.
-The same gesture works on generated Marao dashboards and on the More toggle;
-the vertical overflow menu retains its normal scrolling and route selection.
-The hold covers the entire horizontal pill, including gaps, padding and nested
-icons. Horizontal destinations use buttons so holding them does not invoke a
-link URL preview. Ordinary short taps still navigate immediately.
-Pressed icons and overflow controls retain their rounded appearance without an
-extra rectangular browser highlight; the selected route keeps its circular fill.
-
-Navigation and reload initialize before optional card modules and do not wait
-for native-card compilation. The configured bar stays available during
-same-dashboard page replacement or content failure. Leaving its context, deleting
-it or explicitly emptying navigation removes it; editor and modal protections
-still apply. Availability starts after Home Assistant supplies its shell and
-saved configuration.
-
-Refresh keeps sign-in, settings and the current page. Save or discard unsaved
-edits first; editor previews and modal backgrounds cannot trigger it. iOS uses
-native frontend cache reset when available, with web recovery as a fallback.
-Android, browsers and other compatible hosts use available frontend web-cache
-cleanup and a fresh reload. This does not erase all browser/OS caches or restart
-Home Assistant. If the server cannot be reached, a readable message offers retry
-by holding again without removing usable cached files.
-
-Paste the example into an ordinary storage dashboard's raw configuration editor.
-Replace its demo entities with your own bindings and update the navigation card
-and navbar destinations to your dashboard route. Individual cards can then be
-configured in the visual editor.
-The example belongs in `ha-test/`; it is not included in the shipped integration.
-
-## Read-only compilation
-
-Authenticated `marao_dashboard/native/card` requests take explicit card configuration,
-a live instance ID, dashboard route, language and referenced entity metadata.
-They return the shared runtime card and its automatic detail sheets.
-Rendering requests use `validate_units: false` so a previously saved energy card
-can display the existing neutral fallback when source unit metadata disappears.
-Editor requests use the default strict unit validation before accepting a change.
-`marao_dashboard/native/starter` takes title, route, language, entity and area
-metadata obtained through native HA APIs and returns an expanded Lovelace configuration.
-Neither command writes files/storage/history or reads the saved builder dashboard.
-The integration continues to require administrator access for builder writes and restore.
+Setup, generation and history restoration continue to protect independent
+dashboard registrations and stored configuration. Historical storage-backed
+generator conversion and recovery remain supported. Home Assistant's camera
+player and cards embedded through Marao's builder remain available.

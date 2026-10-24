@@ -1,6 +1,6 @@
 import { bindCardDrag } from "./editor-drag.js";
 import "./panel.css";
-import { cameraTitleFields, formData, patchForm, same as sameFormValue } from "./native-model.js";
+import { cameraTitleFields, formData, patchForm, sameFormValue } from "./editor-model.js";
 
 import {
   cardForEntity,
@@ -1542,10 +1542,10 @@ class MaraoDashboardPanel extends HTMLElement {
     if (camera) Object.assign(data, titleData);
     let collection = clone(existing?.entities || []);
     if (selected.scene_collection) data.scene_entities = this._entityIds(collection);
-    for (const field of this._expandedFields(selected.variables)) data[`var__${field.key}`] = this._readVariable(existing?.variables, field);
+    for (const field of this._expandedFields(selected.variables)) data[`var__${field.key}`] = !existing && field.key === "alarm_layout" ? "dropdown" : this._readVariable(existing?.variables, field);
     const initialData = clone(data);
     const content = dialog.querySelector(".dialog-content");
-    const variables = this._expandedFields(selected.variables);
+    const variables = this._expandedFields(selected.variables).map(field => selected.id === "md_fan_card" && field.key === "enable_slider" && data.entity_id.startsWith("cover.") ? {...field,label:"Opening slider"} : field);
     const basic = variables.filter((field) => !field.advanced && !['energy_sub_entities','power_devices'].includes(field.kind));
     const advanced = variables.filter((field) => field.advanced && !['energy_sub_entities','power_devices'].includes(field.kind));
     content.innerHTML = `<div id="card-form"></div><div id="summary" class="summary"></div>${selected.scene_collection ? '<div id="scene-order"></div>' : ''}${selected.id === 'md_energy_period_card' ? '<div id="energy-breakdown"></div>' : ''}${selected.id === 'md_graph_card' ? '<div id="power-devices"></div>' : ''}${selected.id === 'md_media_card' ? `<ha-button data-media-options>${this._l('Apple TV options')}</ha-button>` : ''}${advanced.length ? `<ha-expansion-panel id="advanced-panel" outlined><div slot="header">${this._t("advanced")}</div><div id="advanced-form" class="advanced-form"></div></ha-expansion-panel>` : ""}<div class="dialog-actions"><ha-button data-close>${this._t("cancel")}</ha-button><ha-button data-save appearance="filled">${existing ? this._t("update") : this._t("create")}</ha-button></div>`;
@@ -1568,6 +1568,11 @@ class MaraoDashboardPanel extends HTMLElement {
     if (selected.id === 'md_media_card') content.querySelector('[data-media-options]').addEventListener('click', () => this._openMediaOptions({ entity_id: data.entity_id, apple_tv: appleTV }, value => { appleTV = value; }));
     const changed = (value) => {
       Object.assign(data, value);
+      if (selected.id === 'md_fan_card') {
+        const form = content.querySelector('#card-form ha-form');
+        const label = this._l(data.entity_id.startsWith('cover.') ? 'Opening slider' : 'Speed slider');
+        if (form?.schema?.some(field => field.name === 'var__enable_slider' && field.label !== label)) form.schema = form.schema.map(field => field.name === 'var__enable_slider' ? {...field,label} : field);
+      }
       if (selected.scene_collection) { collection = mergeEntityValues(collection, data.scene_entities || []); renderCollection(); }
       this._renderSummary(content.querySelector("#summary"), shortcut ? data.page : data.entity_id, selected, roomIndex, cardIndex, kind); this._refreshEnergyFields(content, selected.id === "md_switch_card" ? data.var__power_entity : data.entity_id);
     };
@@ -2003,7 +2008,7 @@ class MaraoDashboardPanel extends HTMLElement {
 
   _variableSchema(field, sourceId) {
     let selector = { text: {} };
-    if (field.kind === "select") selector = { select: { mode: 'dropdown', options: field.options.map(value => ({ value, label: this._l(({ auto: 'Automatic', popup: 'Popup', slide: 'Slide to open', close: 'Close or lock', hold: 'Security hold' })[value] || value) })) } };
+    if (field.kind === "select") selector = { select: { mode: 'dropdown', options: field.options.map(value => ({ value, label: this._l(({ auto: 'Automatic', popup: 'Popup', slide: 'Slide to open', close: 'Close or lock', hold: 'Security hold', dropdown: 'Dropdown', grid: 'Grid' })[value] || value) })) } };
     if (field.kind === "boolean") selector = { boolean: {} };
     if (field.kind === "entity") selector = { entity: { domain: field.domains || [], multiple: Boolean(field.multiple) } };
     if (field.kind === "energy_period") selector = { select: { mode: 'dropdown', options: [{ value: 'day', label: this._l('Day') }, { value: 'month', label: this._l('Month') }] } };

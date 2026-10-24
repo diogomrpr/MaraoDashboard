@@ -1767,3 +1767,59 @@ def test_legacy_custom_climate_hash_remains_usable_in_distinct_owning_views(tmp_
     preview = generator.materialize_overview_groups(source)
     assert preview["overview"]["entity_groups"][0]["entities"] == source["rooms"][0]["entities"]
     write_dashboard(preview, tmp_path)
+
+
+def test_alarm_layout_forwarding_is_additive_and_validation_is_shared():
+    from copy import deepcopy
+    from custom_components.marao_dashboard.generator import _alarm_popup
+    from custom_components.marao_dashboard.page_model import validate_pages
+    from custom_components.marao_dashboard.editor import EDITOR_CATALOG
+    templates = {card["id"]: card["domains"] for card in EDITOR_CATALOG["cards"]}
+    for layout in (None, "dropdown", "grid", "invalid"):
+        card = {"id": "alarm", "template": "md_security_card", "entity_id": "alarm_control_panel.safe", "name": "Alarm", "variables": {"future": 42}}
+        if layout is not None:
+            card["variables"]["alarm_layout"] = layout
+        original = deepcopy(card)
+        config = {"name": "Safe", "config_version": 2, "pages": [{"path": "home", "name": "Home", "entities": [card]}], "landing_page": "home"}
+        if layout == "invalid":
+            with pytest.raises(ValueError, match="dropdown or grid"):
+                validate_pages(config, templates)
+            continue
+        validate_pages(config, templates)
+        child = _alarm_popup(card)["cards"][0]
+        assert child.get("variables", {}) == ({"alarm_layout": layout} if layout else {})
+        assert card == original
+
+
+def test_exhaust_defaults_explicit_choices_and_blinds_membership_preserve_source():
+    from copy import deepcopy
+    from custom_components.marao_dashboard.generator import _domain_template, _entity_card, _legacy_overview_groups
+    damper = {"entity_id": "cover.airflow", "device_class": "damper", "name": "Airflow"}
+    assert _domain_template(damper) == "md_fan_card"
+    assert _entity_card(damper)["template"] == "md_fan_card"
+    explicit = {**damper, "template": "md_cover_card", "variables": {"future": 42}}
+    assert _entity_card(explicit)["template"] == "md_cover_card"
+    shutter = {"entity_id": "cover.blind", "template": "md_fan_card", "variables": {"enable_slider": False, "future": 42}}
+    original = deepcopy(shutter)
+    assert _entity_card(shutter)["variables"] == original["variables"]
+    assert shutter == original
+    ordinary = {"entity_id": "cover.window"}
+    config = {"rooms": [{"name": "Room", "entities": [damper, shutter, ordinary], "entities_by_domain": {"cover": [damper, shutter, ordinary]}}]}
+    groups = _legacy_overview_groups(config)
+    assert next(group for group in groups if group["entity_type"] == "cover")["entities"] == ["cover.window"]
+    with pytest.raises(ValueError, match="access card"):
+        _entity_card({**shutter, "device_class": "garage"})
+    with pytest.raises(ValueError, match="access card"):
+        _entity_card({**shutter, "name": "Door"})
+
+
+def test_cover_group_uses_one_ventilation_filter_without_rewriting_explicit_members():
+    from copy import deepcopy
+    from custom_components.marao_dashboard.generator import _resolve_entity_group, _entity_group_card, _entity_group_popup
+    group = {"id": "blinds", "name": "Blinds", "template": "md_entity_group_card", "entity_type": "cover", "popup_filter": "all", "entities": ["cover.damper", {"entity_id": "cover.shutter", "template": "md_fan_card"}, {"entity_id": "cover.explicit", "template": "md_cover_card"}]}
+    original = deepcopy(group)
+    resolved = _resolve_entity_group(group, [{"entity_id": "cover.damper", "device_class": "damper"}, {"entity_id": "cover.explicit", "device_class": "damper"}], set())
+    assert _entity_group_card(resolved)["variables"]["summary_entities"] == ["cover.explicit"]
+    popup = _entity_group_popup(resolved)
+    assert popup["entity_group"]["entities"] == ["cover.explicit"]
+    assert group == original

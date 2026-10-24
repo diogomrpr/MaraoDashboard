@@ -67,24 +67,27 @@ Generation SHALL render every saved page from one editable collection, including
 - **WHEN** the administrator removes its room entry before legacy conversion, saves and regenerates again
 - **THEN** it remains absent from that room, its derived summaries and popups and default Security/Media lists
 - **AND** current or future HA area membership does not reinsert it
+
 #### Scenario: Other explicit references remain
 - **WHEN** an entity is removed from one room but explicitly configured in another room, an independently configured page or a raw/protected card
 - **THEN** those independent references remain rather than being silently deleted
 
 ### Requirement: Room and custom-page card layouts
-Every page SHALL support automatic domain grouping or a fixed grid that preserves mixed card/shortcut order and appends raw cards. Ordered sections SHALL additionally support independently configured one-through-six-column layouts on one page, preserving section and card order. Required entity popups and the shared navbar/footer SHALL be generated once per page. Legacy full-width and multi-column template composition SHALL survive conversion.
+Every page SHALL support automatic domain grouping or a fixed grid preserving mixed card/shortcut order and appended raw cards. Ordered sections SHALL support independent one-through-six-column layouts and section-wide equal owned-card heights. Section/card order, automatic composition and legacy full-width layouts SHALL survive conversion. Popups and the shared navbar/footer SHALL be generated once after section content.
 
 #### Scenario: A custom page specifies two columns
 - **WHEN** its ordered entity, shortcut and raw-card configuration is generated
-- **THEN** one two-column grid preserves that order before the popup/footer content
+- **THEN** one preferred two-column section preserves that order before popup/footer content
+- **AND** owned content-card surfaces share its common height with responsive reflow when needed
 
 #### Scenario: A page uses several layout sections
-- **WHEN** a full-width metric, two-column controls and another full-width card are saved in that order
-- **THEN** generation preserves their widths and order and places popups/footer after all sections
+- **WHEN** a full-width metric, two-column controls and another full-width card are saved as separate sections in that order
+- **THEN** generation preserves their composition and order, with popups/footer after all sections
+- **AND** each section calculates its common owned-card height independently
 
 #### Scenario: A group appears between an entity and a shortcut
 - **WHEN** the fixed-column page is generated
-- **THEN** that mixed order is preserved and the group popup is available on the same page
+- **THEN** mixed order is preserved, each owned surface participates in that section's sizing and the group popup remains available on the same page
 
 ### Requirement: Guided product page composition
 Starter-created editable cards SHALL retain Security alarm/access/actions; Energy house power, daily/monthly energy/cost, optional-toggle loads, appliances and history sheets; Wallbox status, power/max-current readings, shared current input, up to three presets and pause/resume; and Media players/popups. Names, icons, bindings and supported options SHALL be individually configurable on any page. Composition SHALL come from saved cards rather than page-role defaults.
@@ -154,10 +157,7 @@ content cleared. Unrelated files SHALL remain intact.
 - **THEN** the custom cards survive while obsolete generated content is cleared
 
 ### Requirement: Navigation composition and entity-free links
-Generated navigation SHALL target the active dashboard root, use at most five
-navbar entries, and include the shared bottom spacer exactly once. Custom room
-cards SHALL precede the footer. Room/page shortcuts SHALL work without fabricated
-entity dependencies; `action: none` headings SHALL be noninteractive.
+Generated navigation SHALL target the active dashboard root, preserve the complete configured route list without a product-level count cap, and include the shared bottom spacer exactly once. Custom room cards SHALL precede the footer. Room/page shortcuts SHALL work without fabricated entity dependencies; `action: none` headings SHALL be noninteractive. Screen overflow SHALL NOT truncate or rewrite generated route data.
 
 #### Scenario: An empty room is configured
 - **WHEN** its room shortcut is activated
@@ -165,15 +165,15 @@ entity dependencies; `action: none` headings SHALL be noninteractive.
 
 #### Scenario: Explicit navbar pages are ordered
 - **WHEN** `navigation` contains page paths or objects with `page`
-- **THEN** they replace automatic routes in their configured order, subject to the five-entry limit
+- **THEN** they replace automatic routes in their configured order without a product-level entry-count limit
 
 #### Scenario: No navbar selection is supplied
 - **WHEN** navigation is generated
-- **THEN** the first five available generated pages are selected automatically
+- **THEN** the first five available generated pages are selected automatically, preserving the established legacy default rather than expanding existing menus on upgrade
 
 #### Scenario: Legacy URL entries are supplied without explicit page entries
 - **WHEN** navigation is generated
-- **THEN** label/URL entries append to automatic routes and the combined five-entry limit is validated
+- **THEN** label/URL entries append to automatic routes and the full combined valid list is preserved without count-based rejection
 
 ### Requirement: Configuration-driven actions and localization
 Generated actions SHALL pass native numeric/service data rather than executable
@@ -251,7 +251,7 @@ generated content until explicitly added to the saved document.
 - **THEN** it produces no additional card or popup for that entity
 
 ### Requirement: Universal page routes and landing selection
-All saved pages SHALL have unique editable paths and a valid configured landing page. Renaming a page SHALL update owned navbar, shortcut and generated-popup references. Navbar routes SHALL remain rooted at the active dashboard and limited to five entries; unpinned saved pages SHALL still be generated. Deleted pages SHALL NOT return from defaults, registry discovery or template metadata.
+All saved pages SHALL have unique editable paths and a valid configured landing page. Renaming a page SHALL update owned navbar, shortcut and generated-popup references. Navbar routes SHALL remain rooted at the active dashboard with no product-level entry-count cap; unpinned saved pages SHALL still be generated. Deleted pages SHALL NOT return from defaults, registry discovery or template metadata.
 
 #### Scenario: A former built-in page path changes
 - **WHEN** Home or Energy receives a new valid path
@@ -259,11 +259,16 @@ All saved pages SHALL have unique editable paths and a valid configured landing 
 
 #### Scenario: There are more than five pages
 - **WHEN** configuration is generated with five selected navbar entries
-- **THEN** every saved page remains reachable through its valid route or configured shortcut while only the selected five appear in the navbar
+- **THEN** every saved page remains reachable through its valid route or configured shortcut while only the selected five are included in navbar route data
 
 #### Scenario: The landing page is missing
 - **WHEN** configuration is planned
 - **THEN** validation rejects the source before replacing the usable dashboard
+
+#### Scenario: A long explicit navigation list is generated
+- **WHEN** the administrator selects more routes than fit the screen
+- **THEN** every selected entry reaches the navbar once in configured order and the shared renderer provides overflow
+- **AND** generated output does not persist the current device's visible partition
 
 ### Requirement: Template creation independent of runtime generation
 Templates SHALL create ordinary editable page data once. Runtime generation SHALL consume that saved data without requiring a template identifier or refilling removed cards. Room associations and template origin SHALL NOT authorize ongoing entity discovery. Empty pages SHALL remain valid when another or the same empty page provides a valid landing route.
@@ -275,3 +280,99 @@ Templates SHALL create ordinary editable page data once. Runtime generation SHAL
 #### Scenario: Every card is removed from a page
 - **WHEN** it is saved and the integration reloads
 - **THEN** the empty page remains empty and no default cards are restored
+
+### Requirement: Owned alarm sheets and additive opener descriptors
+Generated alarm cards SHALL receive independently identified Marao sheets unless an explicit authored action overrides the generated interaction. Opener descriptors SHALL retain format-2 configuration and existing lock/cover defaults. Existing selections, unknown fields, raw cards and protected custom YAML SHALL survive generation.
+
+#### Scenario: Two pages use one alarm
+- **WHEN** both pages are generated
+- **THEN** each receives its own valid sheet link without storing a code
+
+#### Scenario: An alarm has an explicit authored action
+- **WHEN** its dashboard is regenerated
+- **THEN** that action remains authoritative
+
+### Requirement: Expanded native starter generation
+The native starter SHALL share eligible entity selection and card composition with the current builder, produce ordinary Sections views without includes or nested strategies, and use its own actual dashboard root.
+
+#### Scenario: Discovery has no eligible entities
+- **WHEN** the native starter is generated
+- **THEN** it has a valid empty landing view without fixture entities or warning cards
+
+### Requirement: Overflow navigation preserves saved installations
+Removing route-count limits SHALL preserve existing source shapes, selections, order, labels, icons, destinations, empty lists, unknown fields and ownership. Setup, registry changes and upgrades SHALL NOT pin existing unpinned pages or rewrite automatic defaults. Explicit longer lists SHALL survive save, reload, generation and compatible history restoration through existing backup/recovery paths.
+
+#### Scenario: An existing dashboard is upgraded
+- **WHEN** setup or generation processes its saved zero-through-five-entry selection
+- **THEN** its selection and page contents remain unchanged, including unpinned pages and protected custom YAML
+- **AND** history archives remain immutable
+
+#### Scenario: A long list is saved and restored
+- **WHEN** a list longer than six entries is explicitly saved, reloaded, regenerated and restored from compatible history
+- **THEN** every entry and its configured order/options remain intact without truncation or device-dependent persistence
+
+#### Scenario: A native dashboard is already stored
+- **WHEN** builder setup, generation or history restoration runs
+- **THEN** native-owned dashboards remain excluded from builder writes
+- **AND** the overflow feature does not copy or synchronize their saved selections with the builder
+
+### Requirement: Uniform eligible control-grid generation
+Each Marao-owned logical section SHALL retain one shared height boundary for all supported owned content-card families. Eligibility SHALL follow card role and ownership, not state or slider presence. A flat page SHALL retain its implicit section boundary. Fixed and automatic composition SHALL preserve saved order, group widths and columns. Raw siblings SHALL NOT disable equality for owned cards or have their internals rewritten.
+
+#### Scenario: A fixed section mixes standard controls
+- **WHEN** it contains lights with/without sliders, a cover and lock/open/close actions
+- **THEN** one section retains their exact saved order and shares their required height across all rows
+- **AND** no device subgroup or missing control creates an artificial height boundary
+
+#### Scenario: A section has raw or large-panel content
+- **WHEN** a section contains a chart, camera, detailed climate panel or raw card
+- **THEN** it retains the original card configurations, order and configured composition
+- **AND** owned content cards share the necessary section height without relocating detailed panels or restyling third-party surfaces
+
+#### Scenario: Automatic grouping is explicitly selected
+- **WHEN** one saved section omits fixed columns
+- **THEN** its existing domain ordering, assigned group widths and group starts remain within one logical height boundary
+- **AND** the resulting domain groups do not calculate unrelated card heights
+
+#### Scenario: An access popup contains open and close actions
+- **WHEN** a generated access popup contains opening/unlocking and closing/locking controls
+- **THEN** its owned content grid has one common height independent of the page section that opened it
+- **AND** action targets, safety gestures, popup focus, scrolling and navbar clearance remain correct
+
+#### Scenario: A native or manual dashboard contains the same controls
+- **WHEN** cards render independently or inside an explicitly authored Marao section grid
+- **THEN** the compact intrinsic renderer is shared and that owned grid provides equal rows
+- **AND** unrelated user-authored Home Assistant containers retain their native ownership and composition
+
+#### Scenario: An old grid configuration is loaded
+- **WHEN** an existing supported Marao control-grid configuration contains its original columns and cards
+- **THEN** it remains valid and renders its original children/order with compact sizing and grid-wide equality
+- **AND** no persisted setting or format conversion is needed to retain it
+
+#### Scenario: Structural cards accompany content
+- **WHEN** a page contains title headings, popup definitions and the shared navbar
+- **THEN** those structures retain their existing roles and references outside equal-height content sizing
+- **AND** zero-height popup/navbar hosts cannot determine section height
+
+### Requirement: Control-grid source and output preservation
+Section presentation changes SHALL preserve source format, columns, selections, deletions, explicit emptiness, order, names/options, unknown fields, raw cards, references, protected YAML and unrelated HA settings. Previews/dry runs SHALL remain read-only. Writes SHALL use existing preflight, exact backups, atomic replacement and recovery. Rollback SHALL restore matching package, source and owned output together.
+
+#### Scenario: A released configuration is regenerated
+- **WHEN** a supported released source is planned and generated with the new package
+- **THEN** independently specified expected source, children, options, references, raw/protected content and ownership paths remain preserved
+- **AND** only the expected owned section wrappers/layout metadata and presentation differ, without discovery, starter reset or archive rewriting
+
+#### Scenario: An empty or incompatible source is encountered
+- **WHEN** a section is explicitly empty or source is invalid, ambiguous or from an unsupported newer format
+- **THEN** emptiness remains empty or planning fails before writes
+- **AND** no placeholder, default population or replacement dashboard is created
+
+#### Scenario: Publication replaces an installed package
+- **WHEN** a version containing changed section wrappers or metadata is prepared for publication
+- **THEN** affected unit tests and applicable metadata validation run, reusing development preservation and recovery results without a new integration report
+- **AND** the final candidate is installed on disposable 192.168.0.28 before publication; a downgrade restores matching package and exact saved source/output together
+
+#### Scenario: A write fails or another editor changes the source
+- **WHEN** generation is interrupted, recovery encounters a failure or unrelated concurrent edits appear
+- **THEN** exact recovery data remains available, unrelated changes are protected and rollback failures are reported
+- **AND** preview and dry-run paths do not alter the prepared installation

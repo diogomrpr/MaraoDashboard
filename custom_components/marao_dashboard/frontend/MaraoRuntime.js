@@ -476,6 +476,9 @@ const TRANSLATIONS = {
     "alarm.disarm": "Disarm",
     "alarm.code": "Alarm code",
     "alarm.code_required": "Enter a valid alarm code",
+    "alarm.invalid_layout": "Alarm layout must be dropdown or grid.",
+    "controls.opening": "Opening",
+    "fan.access_restricted": "Use an access card for doors, garages and gates.",
     "alarm.request_failed": "Alarm request failed",
     "security.armed_home": "Armed Home",
     "security.armed_away": "Armed Away",
@@ -705,6 +708,9 @@ const TRANSLATIONS = {
     "alarm.disarm": "Desarmar",
     "alarm.code": "Código do alarme",
     "alarm.code_required": "Introduza um código de alarme válido",
+    "alarm.invalid_layout": "A disposição do alarme deve ser lista pendente ou grelha.",
+    "controls.opening": "Abertura",
+    "fan.access_restricted": "Utilize um cartão de acesso para portas, garagens e portões.",
     "alarm.request_failed": "Falha no pedido ao alarme",
     "security.armed_home": "Armado em casa",
     "security.armed_away": "Armado fora",
@@ -907,11 +913,18 @@ class MaraoSlideToOpen extends HTMLElement {
     return this.getAttribute("state") || this._hassInstance()?.states?.[this._entityId()]?.state;
   }
 
+  _alarmOwner() {
+    const owner = this.getRootNode()?.host;
+    return owner?._config?.template === 'md_alarm_controls_card' && owner._config.variables?.alarm_layout === 'grid'
+      && this._entityId()?.startsWith('alarm_control_panel.') ? owner : null;
+  }
+
   _disabled() {
     const hass = this._hassInstance();
-    return this._sending || !hass?.states?.[this._entityId()] || !this._state()
+    const alarm = this._alarmOwner();
+    return this._sending || alarm && (alarm._alarmBusy || alarm._actionLive === false || this._state() === 'disarmed') || !hass?.states?.[this._entityId()] || !this._state()
       || !serviceConnectionReady(hass) || !serviceTargetReady(hass, this._entityId())
-      || !accessOpenerService(this._entityId(), this._openerOptions().action_service);
+      || !alarm && !accessOpenerService(this._entityId(), this._openerOptions().action_service);
   }
 
   _openerOptions() {
@@ -919,6 +932,7 @@ class MaraoSlideToOpen extends HTMLElement {
   }
 
   _label() {
+    if (this._alarmOwner()) return window.MaraoDashboard?.localize?.('alarm.disarm', this._hassInstance()) || 'Disarm';
     if (this._state() === "opening") {
       return window.MaraoDashboard?.localize?.("common.opening", this._hassInstance()) || "Opening";
     }
@@ -1200,6 +1214,13 @@ class MaraoSlideToOpen extends HTMLElement {
     const entityId = this._entityId();
     const hass = this._hassInstance();
     if (!entityId || !hass || this._disabled() || this._actionLive === false) return;
+    const alarm = this._alarmOwner();
+    if (alarm) {
+      this._sending = true;
+      try { await alarm._sendAlarm('alarm_disarm', 'slide'); }
+      finally { this._sending = false; if (this.isConnected) this._render(); }
+      return;
+    }
     const [domain, service] = accessOpenerService(entityId, this._openerOptions().action_service).split(".");
     this._sending = true;
     this._animateCompletion();
@@ -1544,12 +1565,6 @@ class MaraoStateTimelineCard extends HTMLElement {
 
 if (!customElements.get("marao-state-timeline-card")) {
   customElements.define("marao-state-timeline-card", MaraoStateTimelineCard);
-  window.customCards = window.customCards || [];
-  window.customCards.push({
-    type: "marao-state-timeline-card",
-    name: "Marao State Timeline",
-    description: "A 24-hour entity state timeline.",
-  });
 }
 
 function energyTariff(config, hass, preferences) {
@@ -1642,11 +1657,28 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     this._load();
   }
 
-  connectedCallback() { this._load(); }
+  connectedCallback() { this._load(); this._scheduleRefresh(); }
+
+  _scheduleRefresh() {
+    clearTimeout(this._refreshTimer);
+    if (!this.isConnected || this.preview) return;
+    this._refreshTimer = setTimeout(() => {
+      if (!this.preview && document.visibilityState !== 'hidden' && !historyEntityState(this._hass, this._config) && !this._loading) {
+        const key = this._range().start.toISOString();
+        const cached = this._periodCache.get(key)?.result;
+        if (key !== this._loadedKey || cached && !cached.failed && Date.now() - cached.loadedAt >= 60000) {
+          this._loadedKey = '';
+          this._load();
+        }
+      }
+      this._scheduleRefresh();
+    }, 60000);
+  }
 
   getCardSize() { return this._config?.popup ? 5 : 2; }
 
   disconnectedCallback() {
+    clearTimeout(this._refreshTimer);
     this._detailsPopup?._close(false);
     queueMicrotask(() => { if (!this.isConnected) { this._detailGeneration = (this._detailGeneration || 0) + 1; this._detailChart?.destroy(); this._detailChart = null; this._detailLoading = false; this._loadId++; this._clearPeriodCache(); this._loading = false; this._loadedKey = ''; } });
   }
@@ -1728,16 +1760,15 @@ class MaraoEnergyPeriodCard extends HTMLElement {
 
   async _fetchPeriod({ start, end }) {
     const config = this._config, hass = this._hass, context = this._periodContext;
-    const ids = [...new Set([config.entity, ...(config.sub_entities || []).flatMap(item => [item.entity_id, item.cost_entity]).filter(Boolean)])];
+    const ids = [...new Set([config.entity, ...(config.popup ? config.sub_entities || [] : []).flatMap(item => [item.entity_id, item.cost_entity]).filter(Boolean)])];
     const usable = ids.filter(entity => !historyEntityState(hass, { entity }));
-    const needsPrice = config.calculate_cost || (config.sub_entities || []).some(item => !item.cost_entity);
+    const needsPrice = config.calculate_cost || config.popup && (config.sub_entities || []).some(item => !item.cost_entity);
     const loadPrice = async () => {
       if (!needsPrice || config.cost_per_kwh !== undefined || !hass.callWS) return {};
       try { return { preferences: await (context.price ||= hass.callWS({ type: 'energy/get_prefs' })) }; }
       catch (error) { context.price = null; return { priceError: error?.code !== 'not_found' }; }
     };
     const loadHistory = async () => {
-      if (!config.popup) return {};
       const metadata = hass.callWS ? await (context.metadata ||= hass.callWS({ type: 'recorder/get_statistics_metadata', statistic_ids: usable })) : [];
       if (context !== this._periodContext || this.isConnected === false) return {};
       const meters = metadata.filter(item => item.has_sum).map(item => item.statistic_id);
@@ -1771,7 +1802,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
   }
 
   async _load() {
-    if (this.isConnected === false || (!this._config?.popup && !this._config?.calculate_cost) || historyEntityState(this._hass, this._config)) return;
+    if (this.isConnected === false || this.preview || globalThis.document?.visibilityState === "hidden" || !this._config || historyEntityState(this._hass, this._config)) return;
     const range = this._range(), key = range.start.toISOString();
     if (this._loadedKey === key) return;
     this._loadedKey = key;
@@ -1782,7 +1813,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     }
     const cached = this._periodCache.get(key)?.result;
     // The open period is still accumulating; refresh it on return after a minute.
-    if (cached?.failed || cached && key === this._range(0).start.toISOString() && Date.now() - cached.loadedAt > 60000) this._periodCache.delete(key);
+    if (cached?.failed || cached && key === this._range(0).start.toISOString() && Date.now() - cached.loadedAt >= 60000) this._periodCache.delete(key);
     const entry = this._requestPeriod(range);
     if (!entry.result) {
       this._loading = true;
@@ -1875,7 +1906,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const formatting = energyFormatting(this._config);
     const reading = formatting ? energyValue(entity?.state, entity?.attributes?.unit_of_measurement, this._config) : null;
     const history = unavailable ? {values: [], error: false} : this._values();
-    const consumption = this._config.popup && !unavailable ? this._consumption(this._config.entity) : { samples: [], total: null };
+    const consumption = !unavailable ? this._consumption(this._config.entity) : { samples: [], total: null };
     const tariff = energyTariff(this._config, this._hass, this._preferences);
     const costMode = this._config.calculate_cost;
     const costValue = value => { const kwh = energyValue(value, consumption.unit || entity?.attributes?.unit_of_measurement, { display_unit: 'kWh' }); return kwh && !kwh.error && tariff.value != null ? kwh.value * tariff.value : null; };
@@ -1883,10 +1914,10 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const formatError = reading?.error || history.error || consumption.reason === "energy.format_error" || costMode && energyValue(1, entity?.attributes?.unit_of_measurement, { display_unit: 'kWh' })?.error ? localize("energy.format_error", this._hass) : "";
     const problem = cardProblem(this._config, this._hass, { contentError: formatError || priceProblem || (this._error ? localize("timeline.history_unavailable", this._hass) : ""), loading: this._loading });
     const values = consumption.samples.filter(record => Number.isFinite(record.value));
-    let current = !this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass) : reading ? energyLabel(reading, this._config, this._hass) : entity?.state && Number.isFinite(Number(entity.state)) ? entity.state : "—";
-    if (costMode && !unavailable && this._hass?.states) {
-      const amount = energyValue(entity?.state, entity?.attributes?.unit_of_measurement, { display_unit: 'kWh' });
-      current = amount && !amount.error && tariff.value != null ? `≈ ${energyLabel({ value: amount.value * tariff.value, unit: tariff.currency }, this._config, this._hass)}` : '—';
+    let current = !this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass) : '—';
+    if (!unavailable && !this._loading && consumption.total != null) {
+      const amount = costMode ? costValue(consumption.total) : consumption.total;
+      if (amount != null) current = `${costMode || consumption.limited ? '≈ ' : ''}${energyLabel({ value: amount, unit: costMode ? tariff.currency : consumption.unit }, this._config, this._hass)}`;
     }
     const period = this._periodLabel();
     const range = this._range();
@@ -1901,10 +1932,10 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const status = formatError || priceProblem || (!this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass)
       : this._loading ? localize("timeline.loading", this._hass)
         : this._error ? localize("timeline.history_unavailable", this._hass) : localize("energy.no_data", this._hass));
-    const historyState = !this._hass?.states ? "loading" : unavailable || (this._loading ? "loading" : this._error || formatError || priceProblem ? "error" : values.length || !this._config.popup ? "ready" : "empty");
+    const historyState = !this._hass?.states ? "loading" : unavailable || (this._loading ? "loading" : this._error || formatError || priceProblem ? "error" : values.length ? "ready" : "empty");
     const body = this._config.popup
       ? `<h2>${escapeHtml(title)}</h2><div class="period-nav"><button data-period="previous" aria-label="${escapeHtml(previous)}"${disabled ? " disabled" : ""}><ha-icon icon="mdi:chevron-left" aria-hidden="true"></ha-icon></button><strong>${escapeHtml(period)}</strong><button data-period="next" aria-label="${escapeHtml(next)}"${disabled || this._offset >= 0 ? " disabled" : ""}><ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon></button></div><div class="chart" aria-label="${escapeHtml(`${title} ${period}`)}"><span class="empty" role="status">${escapeHtml(status)}</span></div>`
-      : `<span class="value${problem && problem.kind !== "loading" ? " placeholder" : ""}">${escapeHtml(problem ? "—" : String(current))}</span><span class="period">${escapeHtml(problem && problem.kind !== "loading" ? problemLabel(problem, this._hass) : period)}</span>`;
+      : `<span class="value${problem && problem.kind !== "loading" ? " placeholder" : ""}">${escapeHtml(problem ? "—" : String(current))}</span><span class="period">${escapeHtml(problem && problem.kind !== "loading" ? problemLabel(problem, this._hass) : !this._loading && consumption.total == null ? localize("energy.no_data", this._hass) : period)}</span>`;
     const surfaceTag = this._config.popup ? "div" : "button";
     const surfaceAttributes = this._config.popup ? "" : ` type="button" aria-label="${escapeHtml(`${title}${formatting ? ` ${current}` : ""}`)}"${this.preview || unavailable ? ' disabled aria-disabled="true"' : ""}`;
     const markup = `<style>
@@ -1959,8 +1990,6 @@ class MaraoEnergyPeriodCard extends HTMLElement {
 
 if (!customElements.get("marao-energy-period-card")) {
   customElements.define("marao-energy-period-card", MaraoEnergyPeriodCard);
-  window.customCards = window.customCards || [];
-  window.customCards.push({ type: "marao-energy-period-card", name: "Marao Energy Period", description: "Period-aware energy value and history graph." });
 }
 
 function installPopupScrollGuard() {
@@ -2056,7 +2085,6 @@ console.info("%c Marao Dashboard loaded", "color: #d4b392; font-weight: 700;");
 
 // Optional content must not delay registration of basic dashboard cards.
 await Promise.all([
-  import(`./MaraoNativeCards.js${MARAO_RESOURCE_QUERY}`),
   import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`).then(module => module.registerMaraoCameraEventCards()),
   Promise.all([
     import(`./MaraoNavigation.js${MARAO_RESOURCE_QUERY}`),

@@ -88,9 +88,6 @@ const localize = navigationLocalize;
 export function ownerRoot(element) {
   for (let node = element; node; node = node.parentElement || node.getRootNode?.().host) if (node.localName === 'hui-root') return node;
 }
-export function nativeDashboard(root) {
-  return root?.lovelace?.config?.marao?.mode === 'native' || root?.lovelace?.rawConfig?.marao?.mode === 'native' || root?.lovelace?.rawConfig?.strategy?.type === 'custom:marao-starter';
-}
 export function haptic(value = "heavy") {
   if (!value) return;
   globalThis.window?.dispatchEvent?.(new CustomEvent("haptic", { detail: value }));
@@ -152,7 +149,7 @@ export class MaraoNavbarCard extends BaseElement {
     window.visualViewport?.addEventListener('scroll', this._scheduleLayout);
     this._layout();
   }
-  get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
+  get preview() { return Boolean(this._preview); }
   set preview(value) {
     this._preview = Boolean(value);
     if (this._config && this._renderedPreview !== this.preview) { this._closeOverflow(false); this._render(); }
@@ -205,8 +202,7 @@ export class MaraoNavbarCard extends BaseElement {
     const viewport = window.visualViewport;
     const left = Math.max(safe.left, host?.left ?? safe.left, viewport?.offsetLeft || 0);
     const right = Math.min(safe.right, host?.right ?? safe.right, (viewport?.offsetLeft || 0) + (viewport?.width || innerWidth));
-    const edit = this.nativeOwner?.shadowRoot?.querySelector('.native-edit')?.getBoundingClientRect();
-    const top = Math.max(safe.top, this.preview ? 0 : host?.top || 0, viewport?.offsetTop || 0, edit ? edit.bottom + 8 : 0);
+    const top = Math.max(safe.top, this.preview ? 0 : host?.top || 0, viewport?.offsetTop || 0);
     const style = getComputedStyle(nav), size = nav.querySelector('a,button')?.getBoundingClientRect().width || 48;
     const gap = parseFloat(style.columnGap) || 0, padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
     const { slots } = navbarPartition(this._config.routes || [], right - left, size, gap, padding);
@@ -407,7 +403,7 @@ function configuredNavbar(root) {
   if (!view) return undefined;
   const find = value => {
     if (!value || typeof value !== 'object') return null;
-    if (['custom:marao-navbar-card', 'custom:marao-native-navbar-card'].includes(value.type)) return value;
+    if (value.type === 'custom:marao-navbar-card') return value;
     for (const child of [...(Array.isArray(value.cards) ? value.cards : []), ...(Array.isArray(value.sections) ? value.sections : [])]) { const found = find(child); if (found) return found; }
     return null;
   };
@@ -424,7 +420,7 @@ function copyNavigationTheme(host, surface) {
 function updateNavigation(record, config, host) {
   if (!record || record.released) return;
   const surface = record.surface;
-  if (host) { record.host = host; surface.nativeHost = host.nativeHost; surface.nativeOwner = host.nativeOwner; copyNavigationTheme(host, surface); }
+  if (host) { record.host = host; copyNavigationTheme(host, surface); }
   config = {...config, type:'custom:marao-navbar-card'};
   const identity = JSON.stringify(config);
   if (record.identity !== identity) { surface.setConfig(config); record.identity = identity; }
@@ -439,7 +435,6 @@ function syncNavigation(record) {
   if (!record || record.released) return;
   const {root, surface, host} = record;
   if (!root.isConnected || window.location.pathname.split('/')[1] !== record.dashboard) { releaseNavigation(record); return; }
-  if (record.standalone && !host?.isConnected && window.location.pathname === host?._hostPath) { releaseNavigation(record); return; }
   const view = root.shadowRoot.querySelector('#view');
   if (record.observer && record.view !== view) {
     record.observer.disconnect(); record.observer.observe(root.shadowRoot, {childList:true});
@@ -467,8 +462,7 @@ function claimNavigation(host) {
   if (!record) {
     const surface = document.createElement('marao-navbar-card'); surface._isSurface = true;
     surface.setAttribute('data-marao-navigation-surface', ''); surface.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:1px;pointer-events:none;z-index:1001';
-    record = {root, surface, dashboard:window.location.pathname.split('/')[1], host,
-      standalone:Boolean(host.nativeHost && !nativeDashboard(root))};
+    record = {root, surface, dashboard:window.location.pathname.split('/')[1], host};
     surface._navigationRecord = record; navigationOwners.set(root, record); navigationRecords.add(record);
     updateNavigation(record, host._config, host); root.shadowRoot.prepend(surface);
     record.observer = new MutationObserver(() => {
@@ -547,17 +541,9 @@ function applyFullscreen() {
     let root = navbar;
     while (root && root.localName !== "hui-root") root = root.parentElement || root.getRootNode()?.host;
     if (navbar.preview || root?.lovelace?.editMode) continue;
-    const nativeDashboard = root?.lovelace?.config?.marao?.mode === "native" || root?.lovelace?.rawConfig?.marao?.mode === "native"
-      || root?.lovelace?.rawConfig?.strategy?.type === "custom:marao-starter";
     activeNavbars.add(navbar);
     const view = root?.shadowRoot?.querySelector("#view");
     const pageFlow = navbarMainPage(root?.lovelace?.config || root?.lovelace?.rawConfig, window.location) ? ["flex-direction"] : [];
-    if (navbar.nativeHost && !nativeDashboard) {
-      // An individually added floating navbar needs room at the bottom while
-      // retaining the ordinary Home Assistant toolbar and view shell.
-      if (view && !owned.has(view)) owned.set(view, ["padding-bottom", ...pageFlow]);
-      continue;
-    }
     for (const header of root?.shadowRoot?.querySelectorAll("app-header, ha-app-layout > header, .header") || []) owned.set(header, ["display"]);
     if (view) {
       owned.set(view, ["padding-top", "padding-right", "padding-left", "padding-bottom", ...pageFlow]);

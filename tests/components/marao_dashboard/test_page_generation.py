@@ -39,8 +39,7 @@ def test_cache_reset_option_preserves_legacy_defaults_and_explicit_choices(versi
     {"entity_id": "sensor.heating_energy", "name": "Heating", "cost_entity": "sensor.heating_cost", "future": []},
     {"entity_id": "sensor.lighting_energy", "name": ""},
 ]])
-def test_energy_breakdown_and_tariff_survive_page_and_native_generation(members):
-    from custom_components.marao_dashboard.native import compile_card
+def test_energy_breakdown_and_tariff_survive_page_generation(members):
 
     options = {"period": "month", "calculate_cost": True, "cost_per_kwh": 0, "sub_entities": members, "future": {"keep": []}}
     descriptor = {"template": "md_energy_period_card", "entity_id": "sensor.energy", "variables": options}
@@ -49,16 +48,14 @@ def test_energy_breakdown_and_tariff_survive_page_and_native_generation(members)
     registry = [{"entity_id": "sensor.energy", "unit_of_measurement": "kWh"}, {"entity_id": "sensor.heating_energy", "unit_of_measurement": "Wh"},
                 {"entity_id": "sensor.heating_cost", "unit_of_measurement": "EUR"}]
     item = g._resolve_pages(source, registry)["pages"][0]["_sections"][0]["ordered_cards"][0]
-    native = compile_card({"type": "custom:marao-native-energy-period-card", "entity": "sensor.energy", "variables": options}, "energy", "marao-dashboard", registry)
-    for card in [g._page_card(item, "marao-dashboard"), g._page_card_popups(item)[0]["cards"][0], native["card"], native["popups"][0]["cards"][0]]:
+    for card in [g._page_card(item, "marao-dashboard"), g._page_card_popups(item)[0]["cards"][0]]:
         assert card["sub_entities"] == members
         assert card["calculate_cost"] is True
         assert card["cost_per_kwh"] == 0
-    for popup in [g._page_card_popups(item)[0], native["popups"][0]]:
+    for popup in [g._page_card_popups(item)[0]]:
         assert popup["height"] == "auto"
         assert popup["max_height"] == "100%"
     assert source == original
-    assert native["card"]["variables"]["future"] == {"keep": []}
     legacy = {"entity_id": "sensor.energy"}
     assert "sub_entities" not in g._energy_period_card(legacy, "Energy", "day", "mdi:flash", None)
 
@@ -430,8 +427,7 @@ def test_camera_preload_option_preserves_source_and_rejects_non_booleans(preload
     {"entity_id": "sensor.kitchen", "name": "Kitchen", "future": {"keep": []}},
     {"entity_id": "sensor.heating", "name": ""},
 ]])
-def test_power_history_popup_preserves_devices_across_canonical_native_and_legacy_paths(members):
-    from custom_components.marao_dashboard.native import compile_card
+def test_power_history_popup_preserves_devices_across_canonical_and_legacy_paths(members):
     options = {"history_popup": True, "power_devices": members, "display_unit": "kW", "display_precision": 2, "future": []}
     descriptor = {"template": "md_graph_card", "entity_id": "sensor.house", "name": "House", "variables": options}
     source = {"config_version": 2, "name": "Power", "landing_page": "energy", "pages": [{"name": "Energy", "path": "energy", "entities": [descriptor]}]}
@@ -439,14 +435,11 @@ def test_power_history_popup_preserves_devices_across_canonical_native_and_legac
     registry = [{"entity_id": "sensor.house", "unit_of_measurement": "W"}, {"entity_id": "sensor.kitchen", "unit_of_measurement": "kW"}, {"entity_id": "sensor.heating", "unit_of_measurement": "W"}]
     item = g._resolve_pages(source, registry)["pages"][0]["_sections"][0]["ordered_cards"][0]
     canonical = g._page_card_popups(item)[0]
-    native = compile_card({"type": "custom:marao-native-graph-card", "entity": "sensor.house", "name": "House", "variables": options}, "power", "marao-dashboard", registry)
     legacy = g._energy_popups({"pages": {"energy": {"house_power": descriptor}}})["energy_house_power"]
     expected = {"type": "custom:marao-power-history-card", "entity": "sensor.house", "name": "House", "power_devices": members, "display_unit": "kW", "display_precision": 2}
-    for popup in [canonical, native["popups"][0], legacy]:
+    for popup in [canonical, legacy]:
         assert popup["cards"] == [expected]
     assert source == before
-    assert native["card"]["variables"]["future"] == []
-    assert native["card"]["tap_action"]["navigation_path"] == native["popups"][0]["hash"]
 
 
 @pytest.mark.parametrize("devices,message", [
@@ -467,16 +460,15 @@ def test_power_history_device_validation_preserves_rejected_source(devices, mess
 
 
 def test_power_history_rejects_known_energy_devices_and_keeps_non_power_graphs_working():
-    from custom_components.marao_dashboard.native import compile_card
-    config = {"type": "custom:marao-native-graph-card", "entity": "sensor.house", "variables": {"history_popup": True, "power_devices": [{"entity_id": "sensor.kitchen"}]}}
-    before = deepcopy(config)
+    options = {"history_popup": True, "power_devices": [{"entity_id": "sensor.kitchen"}]}
+    source = {"name": "Power", "config_version": 2, "landing_page": "home", "pages": [{"path": "home", "name": "Home", "entities": [{"template": "md_graph_card", "entity_id": "sensor.house", "variables": options}]}]}
+    before = deepcopy(source)
     with pytest.raises(ValueError, match="require power sensors"):
-        compile_card(config, "power", "marao-dashboard", [{"entity_id": "sensor.house", "unit_of_measurement": "W"}, {"entity_id": "sensor.kitchen", "unit_of_measurement": "kWh"}])
-    assert config == before
-    compatible = compile_card(config, "power", "marao-dashboard", validate_units=False)
-    assert compatible["popups"][0]["cards"][0]["power_devices"] == config["variables"]["power_devices"]
-    other = compile_card({"type": "custom:marao-native-graph-card", "entity": "sensor.humidity", "variables": {"history_popup": True}}, "humidity", "marao-dashboard", [{"entity_id": "sensor.humidity", "unit_of_measurement": "%"}])
-    assert other["popups"][0]["cards"][0]["template"] == "md_graph_card"
+        g._resolve_pages(source, [{"entity_id": "sensor.house", "unit_of_measurement": "W"}, {"entity_id": "sensor.kitchen", "unit_of_measurement": "kWh"}])
+    assert source == before
+    g._resolve_pages(source, validate_source_units=False)
+    humidity = {"entity_id": "sensor.humidity", "template": "md_graph_card", "name": "Humidity", "variables": {"history_popup": True, "popup_hash": "#humidity"}}
+    assert g._page_card_popups(humidity)[0]["cards"][0]["template"] == "md_graph_card"
 
 
 def test_power_device_option_remains_opaque_on_unrelated_card_families():
@@ -502,8 +494,5 @@ def test_unified_access_page_modes_resolve_without_rewriting_authored_configurat
 
 
 def test_explicit_popup_on_open_only_door_offers_only_supported_opening_control():
-    from custom_components.marao_dashboard.native import compile_card, native_type
-    result = compile_card({"type": native_type("md_access_card"), "entity": "cover.safe", "variables": {"access_mode": "popup"}},
-                          "native-door", "marao-dashboard", [{"entity_id": "cover.safe", "supported_features": 1, "device_class": "door"}])
-    assert result["card"]["template"] == "md_access_card"
-    assert len(result["popups"][0]["cards"][0]["cards"]) == 1
+    entity = {"template": "md_access_card", "entity_id": "cover.safe", "supported_features": 1, "device_class": "door", "variables": {"access_mode": "popup"}}
+    assert len(g._access_popup(entity)["cards"][0]["cards"]) == 1

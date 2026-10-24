@@ -73,18 +73,18 @@ workarounds SHALL NOT be introduced.
   runtime behavior, with corresponding documented and safe gallery examples
 
 ### Requirement: Focused checks and final visual inspection
-Iteration and publication SHALL batch related tasks and use proportionate verification for changed contracts and shared consumers. Presentation-only development SHALL finish with current targeted visual inspection; behavior changes SHALL add the smallest covering behavioral check. Publication SHALL retain release-wide affected checks. Dependent migrations and security controls SHALL be checked early. UI batches SHALL finish with representative visual and interactive inspection. Compatible checks SHALL share visits and validated evidence SHALL be reusable without omitting required coverage. Full-suite execution and parallel test jobs SHALL require explicit user requests.
+Iteration SHALL batch related tasks and use the smallest check demonstrating the requested result. Presentation-only work SHALL permit code review and a short manual watch list; agent browser inspection SHALL be optional. Nontrivial logic SHALL receive a small relevant check. Concrete security, data-loss, migration or recovery risks SHALL receive focused assertions.
 
 #### Scenario: Related queued tasks affect the same shared component
 - **WHEN** their implementation is being completed together
-- **THEN** the batch receives its selected development tier and combined final visual inspection
+- **THEN** the batch receives the smallest relevant check and a feature-specific manual watch list
 - **AND** the release uses the union of implemented features and affected shared consumers rather than automatically checking unrelated capabilities
 - **AND** focused repairs precede final scoped verification and applicable exact-commit CI
-- **AND** compatible UI changes deploy together before final inspection of representative components and relevant difficult text/zoom layouts
+- **AND** compatible UI changes install together before handoff; agent inspection is optional for presentation-only work
 
 #### Scenario: Final inspection finds another defect
 - **WHEN** an affected card fails visual or interaction inspection
-- **THEN** its root cause is repaired, only checks affected by the correction rerun, and targeted inspection repeats
+- **THEN** its shared root is repaired and the smallest check covering the observed defect runs
 
 #### Scenario: Only development specifications change
 - **WHEN** no application or card behavior can be affected
@@ -92,7 +92,7 @@ Iteration and publication SHALL batch related tasks and use proportionate verifi
 
 #### Scenario: The user requests a release without comprehensive tests
 - **WHEN** the implemented changes are ready for publication
-- **THEN** only their relevant checks and component consumers are required
+- **THEN** only their relevant unit tests and applicable metadata validation are required
 - **AND** release preparation does not implicitly authorize the full suite or parallel test execution
 
 #### Scenario: A shared layout is independent of theme colors
@@ -105,18 +105,23 @@ Iteration and publication SHALL batch related tasks and use proportionate verifi
 #### Scenario: A repaired batch has valid completed coverage
 - **WHEN** the contributor explicitly supplies prior private evidence for reuse
 - **THEN** required checks are recomputed and only failed, missing or invalidated cases execute again
-- **AND** reuse never replaces required cleanup, final affected-card inspection or applicable publication validation
+- **AND** reuse never replaces required cleanup, requested inspection or applicable publication validation
 
 #### Scenario: Presentation-only development is complete
 - **WHEN** the latest applicable project assets are installed on the disposable instance, show the requested result and relevant diagnostics are clear
-- **THEN** targeted visual inspection is sufficient without an automated matrix or a second duplicate inspection
-- **AND** only layout variants relevant to the edit are inspected
+- **THEN** code review and a short manual watch list are sufficient; agent browser inspection is optional
+- **AND** any selected inspection covers only layouts relevant to the edit
 - **AND** the agent stops without broadening checks for reassurance
 
 #### Scenario: Behavior or a sensitive contract changes
 - **WHEN** an edit changes events, state, gestures, security, saved data or installation
-- **THEN** the smallest relevant behavioral assertions accompany direct inspection
+- **THEN** the smallest relevant assertions demonstrate nontrivial behavior or the concrete sensitive risk
 - **AND** security dispatch/cancellation and data preservation/recovery are not replaced by visibility
+
+#### Scenario: Additional focused checks and final visual inspection contracts
+- **WHEN** a contributor selects development or publication verification
+- **THEN** Publication SHALL run affected unit tests and applicable metadata checks, reusing development integration results.
+- **AND** Broader integration, comprehensive suites and parallel tests SHALL require explicit user requests.
 
 ### Requirement: Observed defects remain visible
 Warnings, error cards, console exceptions, failed resources, repeated requests
@@ -135,7 +140,7 @@ root. Assertions SHALL NOT be suppressed to make verification appear successful.
 - **AND** existing HLS and cancellation findings do not block release; non-camera failures and camera code/data/security checks retain their contracts
 
 ### Requirement: Persistent default verification command
-The repository SHALL save one affected-check command and document it in the agent contract and development guidance. The command SHALL expose visual, behavior and focused development tiers with explicit task scope. Existing invocations, version hooks, publication gates and automatic CI SHALL retain focused affected coverage. Development-only scope or reports SHALL NOT satisfy publication gates. Full-suite and parallel options SHALL be explicit; no automatic fallback or hidden hook SHALL invoke them.
+The repository SHALL save one affected-check command and document it in the agent contract and development guidance. Routine test commands, version hooks, publication gates and automatic CI SHALL follow the affected-only policy. Full-suite and parallel options SHALL be explicit; no automatic fallback or hidden hook SHALL invoke them.
 
 #### Scenario: A later agent starts an implementation
 - **WHEN** the agent reads the repository instructions
@@ -204,7 +209,7 @@ Before reporting completion, contributors SHALL compare the requested objective 
 - **AND** the review does not automatically repeat tests or expand into comprehensive testing
 
 ### Requirement: Keep the disposable installation current
-Before completing a project batch, contributors SHALL ensure disposable HA has the latest applicable project changes. Successful assets SHALL remain installed after inspection, preview failure or closure. Cleanup SHALL NOT revert the package unless the project was reverted. Safe helper restoration and failed-operation recovery SHALL remain required. Watch SHALL update only while running.
+Before reporting software changes ready for testing, contributors SHALL install all applicable final changes on disposable `192.168.0.28`. Compatible frontend-only changes SHALL use direct `prepareFrontend()` synchronization or an already needed preview; initial setup, backend, fixture or generated-configuration changes SHALL use full preparation.
 
 #### Scenario: Frontend inspection finishes
 - **WHEN** the current frontend batch has synchronized successfully
@@ -221,6 +226,13 @@ Before completing a project batch, contributors SHALL ensure disposable HA has t
 - **THEN** the disposable installation is synchronized to that project state
 - **AND** a routine test cleanup alone is not treated as a project revert
 
+#### Scenario: Additional keep the disposable installation current contracts
+- **WHEN** a software batch is installed or handed off for testing
+- **THEN** Successful current-asset/readiness checks SHALL confirm installation without another browser campaign.
+- **AND** Documentation and test-tool-only changes with no runtime effect SHALL need no redeployment.
+- **AND** Successful assets SHALL remain installed; safe helper restoration and failed-operation recovery SHALL remain required.
+- **AND** A blocked or failed installation SHALL be reported as not installed / not ready for test.
+
 ### Requirement: Current-task verification scope
 Development SHALL support a private starting snapshot of tracked and nonignored untracked file identities, including existing dirty content. Subsequent scope SHALL include additions, modifications and deletions since that snapshot. Explicit reviewed subsets SHALL disclose excluded changes. Release comparison SHALL remain independent and cover the whole candidate.
 
@@ -233,3 +245,38 @@ Development SHALL support a private starting snapshot of tracked and nonignored 
 - **WHEN** a contributor declares a reviewed subset of the task delta
 - **THEN** omitted changed files are reported as unverified by this task
 - **AND** neither that subset nor the task snapshot can narrow publication checks
+
+### Requirement: Upgrade impact is part of every change
+Contributors SHALL assess compatibility with saved released configurations before
+changing persisted JSON, defaults, generated structures, component keys or public
+contracts. Each relevant change SHALL record either preserved compatibility or
+an explicit versioned migration with preservation, recovery and focused checks.
+Resetting a user dashboard or requiring unexplained manual JSON repair SHALL NOT
+substitute for migration.
+
+#### Scenario: A task changes a saved option or room-membership rule
+- **WHEN** its proposal/design and implementation are prepared
+- **THEN** they identify prior formats, intended transformations, preserved user choices and recovery behavior
+- **AND** the migration step and historical expectations are updated in the same change
+
+#### Scenario: A presentation-only change keeps old configuration valid
+- **WHEN** upgrade impact is assessed
+- **THEN** the change records why no schema migration is necessary without bumping format versions merely for a new package release
+
+### Requirement: Unit-only release default
+Release preparation, version hooks and automatic Tests CI SHALL run only affected
+Node/Python unit tests across the candidate. They SHALL reuse integration testing
+from development without requiring fresh browser, camera, geometry, mobile or
+preserved-install evidence. Additional integration or full testing SHALL require
+an explicit user request. Known failures SHALL remain reported as failures.
+Applicable exact-commit hassfest/HACS metadata checks SHALL remain available.
+
+#### Scenario: A tested camera or migration change is released
+- **WHEN** the user requests an ordinary release
+- **THEN** affected unit tests run without additional integration tests or browser launch
+- **AND** no new integration report or historical-upgrade campaign is required; the final candidate and version metadata are installed once on disposable 192.168.0.28 before publication, reusing an exact matching installation
+
+#### Scenario: The user explicitly requests further changed-feature testing
+- **WHEN** additional integration testing is explicitly requested
+- **THEN** the existing affected-component commands remain available
+- **AND** the full registered suite runs only on an explicit comprehensive request

@@ -420,7 +420,7 @@
     "md_alarm_controls_card": {
       "checks": [
         "page-generation",
-        "native-cards-runtime",
+        "builder-forms-runtime",
         "security-runtime",
         "content"
       ],
@@ -430,7 +430,7 @@
       "checks": [
         "page-generation",
         "page-model",
-        "native-cards-runtime",
+        "builder-forms-runtime",
         "content"
       ],
       "options": [
@@ -442,7 +442,7 @@
       "checks": [
         "page-generation",
         "page-model",
-        "native-cards-runtime",
+        "builder-forms-runtime",
         "content"
       ],
       "options": [
@@ -461,7 +461,7 @@
       "checks": [
         "page-generation",
         "page-model",
-        "native-cards-runtime",
+        "builder-forms-runtime",
         "content"
       ],
       "options": []
@@ -469,7 +469,7 @@
     "md_access_action_card": {
       "checks": [
         "page-generation",
-        "native-cards-runtime",
+        "builder-forms-runtime",
         "gesture-runtime",
         "content"
       ],
@@ -769,9 +769,9 @@
       "assertion": "test_sections_keep_all_owned_families_and_structural_raw_boundaries",
       "scope": "candidate"
     },
-    "native-cards-runtime": {
-      "file": "tests/frontend/marao-native.test.js",
-      "assertion": "editing a controlled field preserves unknown/empty/order data",
+    "builder-forms-runtime": {
+      "file": "tests/frontend/editor-panel.test.js",
+      "assertion": "builder camera title controls share defaults and preserve retired options and untouched values",
       "scope": "candidate"
     },
     "security-runtime": {
@@ -1455,7 +1455,7 @@
         "navbar-press-without-rectangular-highlight",
         "ordinary-tap-and-overflow",
         "cancelled-and-incomplete-hold",
-        "generated-and-native-host",
+        "generated-dashboard-host",
         "dirty-and-inert-host",
         "native-reset-and-web-fallback",
         "http-without-cache-apis",

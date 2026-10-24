@@ -17,7 +17,8 @@ ROOT = Path(__file__).resolve().parents[3]
 
 async def test_open_only_door_advertises_only_safe_open_action():
     config = yaml.safe_load((ROOT / "ha-test/marao_dashboard_card_test_helpers.yaml").read_text())
-    assert config["cover"] == [{"platform": "marao_test_cover", "name": "Marao Dashboard Test Open Only Door"}]
+    assert config["cover"][0] == {"platform": "marao_test_cover", "name": "Marao Dashboard Test Open Only Door"}
+    assert config["cover"][1]["device_class"] == "damper"
     assert not any(cover.get("unique_id") == "marao_dashboard_test_open_only_door"
                    for block in config["template"] for cover in block.get("cover", []))
     from unittest.mock import AsyncMock
@@ -693,3 +694,21 @@ async def test_synthetic_live_endpoint_bounds_queue_and_joins_on_native_disconne
     await view.get(request)
     assert observed["stop"].is_set() and observed["joined"]
     assert view._active == 0
+
+
+def test_open_only_exhaust_is_in_memory_and_has_no_position_or_close_capability():
+    fixture = load_fixture("marao_test_cover/cover.py")
+    for state in ("closed", "open", "unknown", "unavailable"):
+        valve = fixture.MaraoTestOpenOnlyExhaust({"name": "Safe exhaust", "initial_state": state})
+        assert valve.device_class == "damper" and valve.supported_features == 1
+        assert valve.current_cover_position is None
+        assert valve.is_closed is (None if state == "unknown" else state == "closed")
+        assert valve.available == (state != "unavailable")
+
+
+async def test_cover_templates_follow_home_assistant_action_pairing(hass):
+    from homeassistant.components.template.cover import COVER_YAML_SCHEMA
+    source = yaml.safe_load((ROOT / "ha-test/marao_dashboard_card_test_helpers.yaml").read_text())
+    for block in source["template"]:
+        for cover in block.get("cover", []):
+            COVER_YAML_SCHEMA(cover)

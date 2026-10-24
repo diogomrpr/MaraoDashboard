@@ -206,6 +206,8 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                 if card.get("variables") is not None and not isinstance(card["variables"], dict):
                     raise ValueError("Card options must be an object")
                 options = card.get("variables") or {}
+                if role in ("md_security_card", "md_alarm_controls_card") and "alarm_layout" in options and options["alarm_layout"] not in ("dropdown", "grid"):
+                    raise ValueError("Alarm layout must be dropdown or grid.")
                 if role == "md_graph_card":
                     validate_power_devices(options, options.get("graph_entity") or entity)
                 if role == "md_vacuum_card":
@@ -213,6 +215,8 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                         action = options.get(key)
                         if isinstance(action, dict) and "data" in action and not isinstance(action["data"], dict):
                             raise ValueError("Vacuum action data must be an object")
+                if role == 'md_fan_card' and str(entity).startswith('cover.') and (card.get('device_class') in ('door','garage','gate') or any(token in f"{entity} {card.get('name') or ''}".lower() for token in ('door','garage','gate'))):
+                    raise ValueError("Use an access card for doors, garages and gates.")
                 role = access_template(card)
                 if role == "md_access_action_card" and options.get("access_mode") == "close" and any(key in card and (not isinstance(card[key], dict) or card[key].get("action", "none") != "none") for key in ("tap_action", "hold_action", "double_tap_action")):
                     raise ValueError("Close and lock cards use their explicit safe service")

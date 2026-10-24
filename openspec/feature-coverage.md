@@ -163,14 +163,14 @@ section transfers, cancellation, native input, layout and explicit moves.
 checks stable sheets/raw/protected content. Source format and save/history APIs
 are unchanged; live persistence probes retain exact backups and verify cleanup.
 
-Navbar overflow keeps complete saved navigation lists and uses the shared renderer in generated, native and bounded-preview hosts. [The implementation checklist](changes/support-navbar-overflow/tasks.md), [independent route expectations](../tests/frontend/navbar-overflow.fixture.json), [configuration/history checks](../tests/components/marao_dashboard/test_navbar_overflow.py) and [mobile overflow checks](../tests/test-ha-navbar-overflow.js) cover partitioning, dismissal, focus, read-only interaction and preserved order. Release preparation requires scoped navigation/native/generator preserved-install proof.
+Navbar overflow keeps complete saved navigation lists and uses the shared renderer in generated and bounded-preview hosts. [The implementation checklist](changes/support-navbar-overflow/tasks.md), [independent route expectations](../tests/frontend/navbar-overflow.fixture.json), [configuration/history checks](../tests/components/marao_dashboard/test_navbar_overflow.py) and [mobile overflow checks](../tests/test-ha-navbar-overflow.js) cover partitioning, dismissal, focus, read-only interaction and preserved order. Release preparation requires scoped navigation/generator preservation checks when explicitly requested.
 
 - Battery group severity: `entityGroupState.minimumReading`, shared battery palette and problem composition; focused `battery-groups` scope covers boundaries, recovery, safe live helpers and popup reachability.
 - Access label geometry: shared `MaraoSlideToOpen`, focused `access-label` scope covers actual same-row text/thumb geometry at narrow/wide widths, both languages and the selected mobile text profiles.
 - Visual editor rendering: focused `editor-rendering` scope covers section-local mutation, landing-only initial mounting, independent page expansion, complete unopened source preservation, current coordinates and JSON/drag continuity. Paired timing is private and bound to installed asset hashes.
 
 - Uniform controls: the `control-grid` scope covers shared 174px minimum surfaces,
-  equal rows, responsive preferred columns, native/group hosts and preserved
+  equal rows, responsive preferred columns, generated/group hosts and preserved
   raw/automatic generation. Publication requires affected-format preserved-install
   proof when generated container types change.
 - Factored verification retains reviewed geometry/behavior in one reference theme
@@ -206,8 +206,8 @@ proof are recorded in each change's implementation record, not inferred here.
 
 - Navbar frontend refresh uses the shared `MaraoNavbarCard` gesture and versioned
   `MaraoFrontendRefresh.js` recovery module. The early `MaraoNavigation.js` and
-  lean native navbar register before the deferred `MaraoRuntime.js` content graph.
-  `test-navbar-startup-local.js` checks blocked/failed content, zero native navbar
+  shared navbar register before the deferred `MaraoRuntime.js` content graph.
+  `test-navbar-startup-local.js` checks blocked/failed content, zero backend navbar
   compilation, all horizontal hold target families, view continuity and teardown.
   The `frontend-refresh` scope covers
   generated/native ownership, cancellation, native no-op fallback, Android
@@ -219,6 +219,17 @@ proof are recorded in each change's implementation record, not inferred here.
   columns at 282px/322px/346px section widths and actual 320px/360px/384px
   normal/bold Rooms pages. Opt-in 384px profiles do not expand unrelated matrices. Existing narrow,
   enlarged-text, zoom, landscape, alignment and safe-gesture checks remain.
-- Minimal camera presentation: `camera` plus shared native/model checks cover
+- Minimal camera presentation: `camera` plus shared builder/model checks cover
   the optional wrapping top title, exact `show_name` preservation, quiet healthy
   playback and conditional in-media recovery without replacing the native player.
+
+Alarm layouts share `md_alarm_controls_card`: dropdown commits, grid disarm slides, legacy holds and code/access isolation are checked in [security tests](../tests/frontend/marao-security.test.js); additive child forwarding is checked in `test_generator.py::test_alarm_layout_forwarding_is_additive_and_validation_is_shared`.
+
+Standalone native authoring is retired. `camera-editor` now selects builder form
+and generated configuration checks; `retired-authoring` selects retired API/asset
+and independent ownership assertions. `native_storage` conversion, recovery,
+Home Assistant player and native gesture checks remain supported. Shared form
+preservation lives in `editor-panel.test.js`; generated power/energy/access
+configuration checks live in `test_page_generation.py`; isolated marker/alias
+and collision assertions live in `test_retired_authoring.py`. The backup helper
+retains its historical name because JSON and drag/overflow checks still use it.

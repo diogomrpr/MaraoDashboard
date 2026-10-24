@@ -342,7 +342,7 @@ async function prepare(config = readConfig(), { dryRun = false } = {}) {
     }
     const fixtureSource = () => fingerprint(__dirname, (file) =>
       file.startsWith("custom_components/") || file.startsWith("dashboard/") ||
-      ["cases.js", "cases.json", "native-cases.js", "marao_dashboard_card_test_helpers.yaml", "marao_dashboard_test_dashboard.json"].includes(file));
+      ["cases.js", "cases.json", "marao_dashboard_card_test_helpers.yaml", "marao_dashboard_test_dashboard.json"].includes(file));
     const fixtureVersion = fixtureSource();
     const fixture = stageFixtures(integrationRoot, path.join(stagingDirectory, "deploy"));
     for (const domain of fixture.domains) {

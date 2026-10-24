@@ -79,8 +79,8 @@ disposable installation and refreshes the real HA page with native controls/icon
 the smallest representative existing view containing the selected visible runtime
 families, falling back to Cases; the dashboard editor uses its fixed route.
 Generic shared scopes require a representative
-`--family <template IDs>`; inspect editor and runtime scopes separately. Native
-card-editor changes use the existing focused native-editor workflow.
+`--family <template IDs>`; inspect editor and runtime scopes separately. Camera form changes use the visual builder editor scope. Standalone native
+authoring is retired.
 Frontend sync reloads Marao when files changed. It does not reset helpers, explicitly
 generate dashboards or restart HA; normal entry lifecycle may update generated
 output/history. Missing or incompatible setup requires explicit `npm run ha:sync`.
@@ -140,7 +140,7 @@ unreviewed contracts retain additional combinations. Distinct text versus zoom,
 native gestures, safety, preservation and cold loads remain covered. Compatible
 gallery cases share visits; editor alignment aliases narrow-320 rendering/drag.
 
-`--component control-grid` selects shared sizing, generated/native/group hosts,
+`--component control-grid` selects shared sizing, generated/group hosts,
 preservation, alignment and safe slider/access checks. Generated container types
 change, so development may check preserved-install behavior with
 `npm run test:ha:upgrade -- --scope control-grid`.

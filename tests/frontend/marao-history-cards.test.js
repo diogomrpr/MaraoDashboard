@@ -243,13 +243,15 @@ for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) {
   });
 }
 
-test("energy summary renders authoritative values without requesting history or navigating when disabled", () => {
+test("energy summary requests recorded consumption and cannot navigate when disabled", async () => {
   const card = create(MaraoEnergyPeriodCard, false);
   let calls = 0;
-  const hass = { states: { "sensor.history": state("0") }, callApi() { calls += 1; } };
+  const hass = { states: { "sensor.history": state("0") }, async callApi() { calls += 1; return []; } };
   card.hass = hass;
-  assert.match(card.shadowRoot.innerHTML, /class="value">0</);
-  assert.equal(calls, 0);
+  await tick();
+  assert.match(card.shadowRoot.innerHTML, /energy.no_data/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /class="value">0</);
+  assert.equal(calls, 1);
   card.shadowRoot.querySelector(".surface").click();
   assert.equal(navigations, 1);
   card.hass = { ...hass, connected: false };
@@ -267,10 +269,10 @@ test("energy summary keeps the restored popup invoker focused through the next H
   original.focus();
   card.hass = { ...card._hass, states: { "sensor.history": state("22") } };
   const replacement = card.shadowRoot.querySelector(".surface");
-  assert.notEqual(replacement, original);
-  assert.equal(original.isConnected, false);
+  assert.equal(replacement, original);
+  assert.equal(original.isConnected, true);
   assert.equal(card.shadowRoot.activeElement, replacement);
-  assert.match(card.shadowRoot.innerHTML, /class="value">22</);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /class="value">22</);
 });
 
 test('energy prefetch waits for the first period to load and paint', async () => {
@@ -462,6 +464,7 @@ for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) {
     card.connectedCallback();
     assert.equal(calls, Card === MaraoEnergyPeriodCard && !fail ? 2 : 1);
     assert.match(card.shadowRoot.innerHTML, new RegExp(`data-history-state="${fail ? 'error' : 'empty'}"`));
+    card.isConnected = false; card.disconnectedCallback?.();
   });
   test(`${Card.name} discards history completed while removed`, async () => {
     const card = create(Card);
@@ -476,3 +479,31 @@ for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) {
     assert.equal(card._loadedKey, '');
   });
 }
+
+
+test('energy summary refresh is bounded, rolls periods over and stops in hidden pages, previews and removal', async t => {
+  t.mock.timers.enable({apis:['setTimeout','Date'],now:Date.parse('2026-10-24T23:59:00Z')});
+  const previousDocument=globalThis.document;
+  globalThis.document={visibilityState:'visible'};
+  const card=create(MaraoEnergyPeriodCard,false);
+  card.isConnected=true;
+  card._hass={connected:true,states:{'sensor.history':state()},config:{time_zone:'UTC'}};
+  let calls=0;
+  card._fetchPeriod=async()=>{calls++;return {series:{},failed:false};};
+  try {
+    card.connectedCallback();
+    await Promise.resolve();await Promise.resolve();
+    assert.equal(calls,1);
+    const old=card._loadedKey;
+    t.mock.timers.tick(60000);await Promise.resolve();await Promise.resolve();
+    assert.equal(calls,2);assert.notEqual(card._loadedKey,old);
+    globalThis.document.visibilityState='hidden';
+    t.mock.timers.tick(60000);assert.equal(calls,2);
+    globalThis.document.visibilityState='visible';
+    t.mock.timers.tick(60000);await Promise.resolve();await Promise.resolve();
+    assert.equal(calls,3);
+    card.preview=true;t.mock.timers.tick(60000);assert.equal(calls,3);
+    card.isConnected=false;card.disconnectedCallback();
+    t.mock.timers.tick(60000);assert.equal(calls,3);
+  } finally {card.isConnected=false;card.disconnectedCallback();globalThis.document=previousDocument;}
+});

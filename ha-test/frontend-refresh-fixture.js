@@ -17,12 +17,11 @@ function documentHTML(version) {
   localStorage.setItem('fixture-sign-in',localStorage.getItem('fixture-sign-in')||'retained');localStorage.setItem('fixture-preferences','retained');
   </script><script type="module">
   const cards=await import('/marao_dashboard_static/MaraoCards.js?v=${version}');cards.registerMaraoCards();
-  await import('/marao_dashboard_static/MaraoNativeCards.js?v=${version}');
-  const search=new URLSearchParams(location.search),native=search.has('native');window.kind=native?'native':'generated';
+  window.kind='generated';
   window.routes=Array.from({length:8},(_,i)=>({url:'/marao-dashboard/'+(i?'page-'+i:'rooms'),label:i?'Destination '+i:'Rooms',icon:'mdi:home'}));
   window.navConfig={type:'custom:marao-navbar-card',routes};
   window.hass={connected:true,connection:{connected:true},language:'en',states:{},user:{is_admin:false},callService(){services++;throw Error('Unexpected service');},callWS:async()=>({card:navConfig,popups:[]})};
-  window.card=document.createElement(native?'marao-native-navbar-card':'marao-navbar-card');card.setConfig(native?{type:'custom:marao-native-navbar-card',routes}:navConfig);card.hass=hass;document.body.append(card);
+  window.card=document.createElement('marao-navbar-card');card.setConfig(navConfig);card.hass=hass;document.body.append(card);
   window.ready=true;
   </script></body></html>`;
 }

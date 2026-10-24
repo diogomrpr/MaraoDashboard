@@ -6,7 +6,7 @@ const { chromium, webkit } = require('playwright');
 const { artifactDirectory } = require('./verification-browser');
 const frontend = path.resolve(__dirname, '../custom_components/marao_dashboard/frontend');
 const routes = Array.from({length:8}, (_, i) => ({url:'/marao-dashboard/' + (i === 0 ? 'overview' : i === 1 ? 'rooms' : 'page-' + i),label:'Route ' + i,icon:'mdi:home'}));
-const navbar = {type:'custom:marao-native-navbar-card',routes,native:true,future:{keep:[]}};
+const navbar = {type:'custom:marao-navbar-card',routes,future:{keep:[]}};
 const views = routes.map(route => ({path:route.url.split('/').at(-1),cards:[navbar]}));
 views.push({path:'empty', cards:[]});
 function html() {
@@ -17,11 +17,11 @@ function html() {
   window.services=0;window.compiles=0;window.hass={language:'pt',states:{},connected:false,connection:{connected:false},user:{is_admin:false},callService(){services++;},callWS(){compiles++;return new Promise(()=>{});}};
   const app=document.querySelector('home-assistant');app.hass=hass;window.root=document.createElement('hui-root');root.attachShadow({mode:'open'});app.shadowRoot.append(root);
   window.header=document.createElement('header');header.className='header';header.style.display='block';root.shadowRoot.append(header);
-  root.hass=hass;root.lovelace={config:${JSON.stringify({marao:{mode:'native'},views})},editMode:false};
+  root.hass=hass;root.lovelace={config:${JSON.stringify({views})},editMode:false};
   window.view=document.createElement('div');view.id='view';view.style='min-height:1200px;position:relative;z-index:1';root.shadowRoot.append(view);
   </script><script type="module">
   await import('/marao_dashboard_static/MaraoDashboard.js?v=bootstrap-test');
-  window.host=document.createElement('marao-native-navbar-card');host.setConfig(${JSON.stringify(navbar)});host.hass=hass;view.append(host);window.ready=true;
+  window.host=document.createElement('marao-navbar-card');host.setConfig(${JSON.stringify(navbar)});host.hass=hass;view.append(host);window.ready=true;
   </script>`;
 }
 async function hold(page, locator, milliseconds=3100, padding=false) {
@@ -52,7 +52,7 @@ async function run(){
      await page.goto(`http://127.0.0.1:${server.address().port}/marao-dashboard/overview`);await page.waitForFunction(()=>window.ready);
      const bar=page.locator('[data-marao-navigation-surface]'),nav=bar.locator('.nav');await nav.waitFor({state:'visible'});
      assert.equal(await bar.count(),1);assert.equal(await page.evaluate(()=>compiles),0);assert.equal(held.length,1);
-     const timing=await page.evaluate(()=>({registered:definitions['marao-native-navbar-card'],optional:performance.getEntriesByType('resource').find(r=>r.name.includes('MaraoRuntime.js'))?.startTime}));
+     const timing=await page.evaluate(()=>({registered:definitions['marao-navbar-card'],optional:performance.getEntriesByType('resource').find(r=>r.name.includes('MaraoRuntime.js'))?.startTime}));
      assert.ok(timing.registered,'Recovery registers while runtime remains blocked');
      assert.equal(await nav.locator('a[href],[draggable=true],[title]').count(),0);
      const refresh=page.getByRole('button',{name:'Limpar cache e atualizar',exact:true});
@@ -81,7 +81,7 @@ async function run(){
      assert.equal(await page.evaluate(()=>services),0);assert.deepEqual(errors,[]);
      await page.evaluate(()=>{history.pushState({},'','/marao-dashboard/empty');dispatchEvent(new Event('location-changed'));});await bar.waitFor({state:'detached'});
      assert.equal(await page.evaluate(()=>root.shadowRoot.querySelector('#view').style.getPropertyValue('padding-bottom')),'');
-     results.push({engine:engine.name(),holds:targets.length,criticalReadyWithBlockedRuntime:true,tapRefresh:true,nativeCompiles:0,viewContinuity:true,emptyCleanup:true,errors});
+     results.push({engine:engine.name(),holds:targets.length,criticalReadyWithBlockedRuntime:true,tapRefresh:true,generatedNavigation:true,viewContinuity:true,emptyCleanup:true,errors});
    }finally{await context.close();await browser.close();}
  }}finally{await new Promise(resolve=>server.close(resolve));}
  fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({results},null,2));console.log(JSON.stringify({output,results}));

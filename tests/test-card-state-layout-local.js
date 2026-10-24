@@ -81,21 +81,7 @@ const server = http.createServer((request, response) => {
         details.push({family:variant.bars?'energy-detail':variant.power?'power-detail':'history-detail',placeholder,loading,ready,error,unavailable});
         renderer.destroy(); parent.replaceChildren();
       }
-      const { MaraoNativeCard } = await import('/MaraoNativeCards.js');
-      const { catalog } = await import('/MaraoNativeCatalog.js');
-      for (const family of ['climate','sensor']) {
-        const spec = catalog.cards.find(item=>item.id==='md_'+family+'_card');
-        class Native extends MaraoNativeCard { static spec = spec; }
-        customElements.define('test-native-'+family,Native);
-        const card = new Native(); card.setConfig({type:spec.type,name:'Safe native '+family,entity:family+'.safe',variables:{show_mode_buttons:true}});parent.append(card);
-        let resolve; const hass={connected:true,language:'en',states:{[family+'.safe']:{state:family==='sensor'?'40':'heat',attributes:{friendly_name:'Safe native '+family,current_temperature:20,temperature:21,hvac_modes:['off','heat']}}},callWS:()=>new Promise(done=>resolve=done)};
-        card.hass=hass; const loading = measure();
-        resolve({card:{type:'custom:marao-card',template:spec.id,name:card._config.name,entity:card._config.entity,variables:card._config.variables},popups:[]});
-        await new Promise(done=>requestAnimationFrame(done)); const ready=measure();
-        card.hass={...hass,states:{[family+'.safe']:{state:'unavailable',attributes:{}}}}; const unavailable=measure();
-        card._status('A detailed compilation failure '.repeat(30),true); const error=measure();
-        details.push({family:'native-'+family,loading,ready,unavailable,error});parent.replaceChildren();
-      }
+
       const popup = new MaraoPopupCard();
       popup.setConfig({hash:'#safe-layout',title:'Safe popup',cards:[{type:'custom:marao-card',template:'md_sensor_card',entity:'sensor.safe',name:'Safe sensor'}]});
       popup.hass={states:{'sensor.safe':{state:'40'}}};document.body.append(popup);popup._openSheet();

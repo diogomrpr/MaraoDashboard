@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
 import * as model from "../../frontend_src/editor-model.js";
-import * as nativeModel from "../../frontend_src/native-model.js";
 import { PT_LABELS, MOVE_PT_LABELS } from "../../frontend_src/editor-labels.js";
 import { prepareJson } from '../../frontend_src/json-preparation.js';
 
@@ -12,8 +11,8 @@ let Panel;
 let confirmations;
 const context = vm.createContext({
   ...model,
-  cameraTitleFields: nativeModel.cameraTitleFields, formData: nativeModel.formData,
-  patchForm: nativeModel.patchForm, sameFormValue: nativeModel.same,
+  cameraTitleFields: model.cameraTitleFields, formData: model.formData,
+  patchForm: model.patchForm, sameFormValue: model.sameFormValue,
   performance, URL, AbortController, setTimeout, clearTimeout,
   document: { hidden: false },
   requestAnimationFrame: callback => callback(),

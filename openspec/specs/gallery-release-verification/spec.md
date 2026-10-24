@@ -20,7 +20,7 @@ paid browser service or weakened sandbox is required for this workflow.
 ### Requirement: Current-workspace disposable preparation
 Ignored `ha-test/local.json` SHALL supply URL, administrator token, explicit
 disposable acknowledgement and SSH connection. `ha:sync:dry-run` SHALL report the
-plan without writes or HA contact. Full preparation SHALL build/deploy the current workspace, install safe fixtures, generate one dashboard and verify readiness. Frontend development preview SHALL synchronize only frontend files to an existing compatible installation, reload Marao when changed and verify served identities. It SHALL NOT reset helpers, explicitly invoke dashboard generation or restart HA. Normal entry reload SHALL retain its existing lifecycle, including applicable generated-output/history updates.
+plan without writes or HA contact. Full preparation SHALL build/deploy the current workspace, install safe fixtures, generate one dashboard and verify readiness.
 
 #### Scenario: A frontend-only change is prepared
 - **WHEN** the focused development preview prepares current workspace assets on the allowed disposable instance
@@ -32,6 +32,12 @@ plan without writes or HA contact. Full preparation SHALL build/deploy the curre
 #### Scenario: Integration or fixture Python changes
 - **WHEN** preparation detects restart-bound code
 - **THEN** it restarts the disposable HA and waits for readiness before tests continue
+
+#### Scenario: Additional current-workspace disposable preparation contracts
+- **WHEN** a contributor prepares the allowed disposable instance
+- **THEN** Frontend development preview SHALL synchronize only frontend files to an existing compatible installation, reload Marao when changed and verify served identities.
+- **AND** It SHALL NOT reset helpers, explicitly invoke dashboard generation or restart HA.
+- **AND** Normal entry reload SHALL retain its existing lifecycle, including applicable generated-output/history updates.
 
 ### Requirement: One exhaustive gallery with realistic counterparts
 The disposable dashboard SHALL remain at `/marao-dashboard`, with Cases at
@@ -47,27 +53,33 @@ a representative realistic-page example. Equivalent value permutations need not 
 - **AND** both Cases and its realistic product placement exercise it
 
 ### Requirement: Meaningful focused checks
-Development SHALL use the reviewed visual, behavior or focused tier for the changed contract and shared consumers. Presentation-only development SHALL require targeted current visual inspection, with relevant difficult layouts. Behavior SHALL add the smallest covering assertions. Publication SHALL retain affected unit/static/browser coverage, including applicable alignment and slider checks. Test-only and documentation-only changes SHALL not trigger unrelated application suites or device actions. Visibility checks SHALL NOT replace required action, security, migration or recovery assertions.
+Development SHALL use the smallest check demonstrating the requested result. Presentation-only work SHALL permit code review and a short manual watch list, with agent browser inspection optional. Nontrivial logic SHALL use a small targeted assertion where useful. Concrete security, data-loss, migration and recovery risks SHALL receive focused checks.
 
 #### Scenario: A shared icon-only media layout is edited
-- **WHEN** its focused verification runs
-- **THEN** presentation-only development inspects representative affected alignment and relevant difficult layouts
-- **AND** publication retains the runner's 0.5 CSS-pixel alignment tolerance
+- **WHEN** the user explicitly requests focused integration verification
+- **THEN** relevant alignment checks use the runner's 0.5 CSS-pixel tolerance
+- **AND** presentation-only development may instead finish with code review and a short manual watch list
 
 #### Scenario: A card label changes without persistence or gesture changes
 - **WHEN** the selected verification runs
-- **THEN** development inspects the rendered localized label and only text layouts relevant to the edit
+- **THEN** code review and a short localized-label watch list are sufficient, with optional targeted inspection
 - **AND** unrelated camera, slider, reconnect, editor-save and historical live-upgrade checks do not execute
 
+#### Scenario: Additional meaningful focused checks contracts
+- **WHEN** development, integration or publication checks are selected
+- **THEN** Explicitly requested integration verification of icon-only/shared action geometry SHALL select relevant alignment checks; changed sliders SHALL select relevant slider checks within that requested scope.
+- **AND** Visibility SHALL NOT replace dispatch or data-preservation assertions.
+- **AND** Publication SHALL use affected unit tests and applicable metadata validation, reusing development integration evidence.
+
 ### Requirement: Mobile release matrix
-Default release verification SHALL select mobile profiles for affected UI contracts, preserving isolated touch/device settings, typography and native HA compatibility. Layout coverage SHALL include affected cards at 320px and relevant text/zoom, theme, portrait and landscape conditions. Theme-independent geometry SHALL use one reference theme with representative appearance/state coverage in both themes. The full matrix SHALL remain available only through explicit comprehensive verification.
+Explicitly requested integration verification SHALL select mobile profiles for affected UI contracts, preserving isolated touch/device settings, typography and native HA compatibility. Layout coverage SHALL include affected cards at 320px and relevant text/zoom, theme, portrait and landscape conditions. Theme-independent geometry SHALL use one reference theme with representative appearance/state coverage in both themes.
 
 #### Scenario: A release mobile run inspects every view and popup
 - **WHEN** explicitly requested comprehensive checks encounter scrolling cards or opening sheets
 - **THEN** the selected typography, theme, touch and safe-area profile remains applied
 
 #### Scenario: A scoped release changes a popup layout
-- **WHEN** default release checks execute
+- **WHEN** the user explicitly requests affected popup integration checks
 - **THEN** only affected popup families and representative difficult mobile profiles are inspected
 - **AND** unchanged views and all 26 combinations are not automatically traversed
 
@@ -85,6 +97,10 @@ Default release verification SHALL select mobile profiles for affected UI contra
 - **WHEN** a layout change selects enlarged-text and zoom coverage
 - **THEN** 200% text and 200% browser zoom remain distinct cases
 - **AND** selected normal, bold and bold-plus-200% text cases are not removed merely because one enlarged case passes
+
+#### Scenario: Additional mobile release matrix contracts
+- **WHEN** the user explicitly requests mobile integration verification
+- **THEN** The full matrix SHALL remain available only through explicit comprehensive verification.
 
 ### Requirement: Interaction and resource verification
 Selected browser checks SHALL verify the changed contract: relevant cold loads, scrolling, safe-area/navbar clearance, popup focus/scroll/close, availability/errors, external state changes, single dispatch and gesture cancellation. Connection changes SHALL retain native warning and exception assertions. Failures SHALL retain screenshots and raw diagnostics; success captures SHALL be representative unless exhaustive captures were explicitly requested.
@@ -122,10 +138,10 @@ test dependencies and secrets. Test providers SHALL never overwrite real provide
 - **THEN** packaging fails instead of shipping it
 
 ### Requirement: Publication gate and exact-commit CI
-Pushes, tags and releases SHALL require successful checks for all affected changes and applicable exact-commit CI, including relevant packaging, assets, hassfest and HACS. Publication SHALL NOT implicitly require full-suite, full-matrix or unrelated preserved-install checks. Failed selected checks and known relevant violations SHALL block publication. Valid scoped evidence SHALL be reusable for unchanged inputs; approved native exceptions SHALL remain explicit and time-limited.
+Push, tag and release verification SHALL require only affected unit tests across the complete change set and applicable exact-commit Tests/hassfest/HACS validation. Integration/browser/mobile/upgrade checks SHALL be reused from development without fresh report requirements and SHALL run at release only on explicit request. Publication SHALL NOT implicitly require the full suite, full mobile matrix or unrelated preserved-install checks.
 
 #### Scenario: The native reconnect check still fails for a future release
-- **WHEN** changed connection behavior selects that check during publication preparation
+- **WHEN** the user explicitly requests connection integration checks during publication preparation
 - **THEN** raw assertions and native evidence are retained
 - **AND** only the explicitly approved stale-unsubscribe exception applies while its stable upstream fix remains unavailable
 
@@ -138,6 +154,11 @@ Pushes, tags and releases SHALL require successful checks for all affected chang
 - **WHEN** publication evidence is checked
 - **THEN** stale proof is rejected and the affected scope is recomputed
 - **AND** only invalidated relevant checks rerun before evidence is bound to the final commit
+
+#### Scenario: Additional publication gate and exact-commit CI contracts
+- **WHEN** a push, tag or release is prepared
+- **THEN** Failed selected checks and known relevant violations SHALL block publication.
+- **AND** Valid scoped evidence SHALL be reusable for unchanged inputs; an approved native exception SHALL remain explicit and time-limited.
 
 ### Requirement: Honest evidence and limits
 Reports SHALL identify selected and excluded features, components, checks, profiles, baselines, execution mode, results and durations. Focused evidence SHALL NOT be labeled full-suite success. Reports SHALL distinguish automated Chromium profiles from actual phones/Safari. VoiceOver, TalkBack, OS high contrast, desktop acceptance and real-device actuation remain outside acceptance; physical haptic strength SHALL NOT be claimed from browser automation.
@@ -164,7 +185,7 @@ A saved affected-check command SHALL derive scope from an explicit comparison ba
 - **AND** the plan cannot silently omit mapped dependencies
 
 ### Requirement: Explicit comprehensive verification
-The complete registered suite SHALL remain available through an explicit full-suite command, including unit/static checks, browser interactions, all mobile profiles and historical preservation/recovery scenarios. Routine commands, release requests, hooks and automatic CI SHALL NOT invoke comprehensive verification implicitly. Full-suite prerequisites SHALL be checked before expensive work; unavailable required checks SHALL fail rather than be skipped or reported successful.
+The complete registered suite SHALL remain available through an explicit full-suite command, including unit/static checks, browser interactions, mobile profiles and historical preservation/recovery scenarios, permanently excluding synthetic camera playback/transport, HLS, handoff and cancellation checks reserved for manual testing. Routine commands, release requests, hooks and automatic CI SHALL NOT invoke comprehensive verification implicitly.
 
 #### Scenario: Only a routine test or release is requested
 - **WHEN** the default command, version hook or automatic CI executes
@@ -174,6 +195,10 @@ The complete registered suite SHALL remain available through an explicit full-su
 - **WHEN** comprehensive verification is launched with parallel mode
 - **THEN** all registered checks are included and safe independent jobs overlap
 - **AND** conflicts and required preparation remain serialized
+
+#### Scenario: Additional explicit comprehensive verification contracts
+- **WHEN** routine or comprehensive verification is requested
+- **THEN** Full-suite prerequisites SHALL be checked before expensive work; unavailable required checks SHALL fail rather than be skipped or reported successful.
 
 ### Requirement: Safe optional parallel verification
 Verification SHALL run serially by default. Explicit parallel mode SHALL use bounded concurrency, isolated browser contexts, private job-specific artifacts and separate process results. Shared builds, deployment, dashboard writes, restarts, helper mutations and recovery SHALL be serialized unless isolation is established. Cleanup failures and failed jobs SHALL remain failures; preparation SHALL occur once per compatible batch.
@@ -188,20 +213,25 @@ Verification SHALL run serially by default. Explicit parallel mode SHALL use bou
 - **AND** fixture restoration completes before later jobs start
 
 ### Requirement: Change-scoped preserved-install verification
-Live preserved-install checks SHALL be required only when changes affect persisted data, migration, generated-output ownership or installation/upgrade behavior. They SHALL cover affected formats, independent expected data, relevant recovery and verified cleanup on the final candidate. UI-only releases SHALL NOT automatically replay historical upgrades. Comprehensive coverage SHALL remain explicit; fresh fixtures SHALL NOT replace required preserved-install proof.
+Development checks for concrete persisted-data, migration, generated-ownership or installation risks SHALL cover affected expected data and recovery. Live preserved-install checks SHALL be scoped to a concrete upgrade risk or an explicit user request. Release preparation SHALL reuse development results without requiring a fresh integration report.
 
 #### Scenario: A change affects every supported format conversion
-- **WHEN** the release scope is selected
-- **THEN** preservation and recovery checks cover every affected supported baseline
+- **WHEN** development checks or explicitly requested upgrade verification are selected
+- **THEN** preservation and recovery checks cover the affected supported inputs
 - **AND** browser checks remain limited to the changed features unless comprehensive verification was explicitly requested
 
 #### Scenario: A release changes only a card's visual presentation
 - **WHEN** no persistence, ownership or installation path changed
-- **THEN** relevant card checks satisfy the scoped gate without a mandatory historical upgrade replay
+- **THEN** affected unit tests and applicable metadata checks satisfy the publication gate, with final-candidate installation but no mandatory historical upgrade replay
 
 #### Scenario: A selected historical replay fails or cleanup is incomplete
 - **WHEN** release evidence is evaluated
 - **THEN** publication fails and private backup/recovery evidence is retained
+
+#### Scenario: Additional change-scoped preserved-install verification contracts
+- **WHEN** a concrete upgrade risk or explicit upgrade request is assessed
+- **THEN** Explicitly requested upgrade verification SHALL preserve the existing installation, exact backups and test configuration; fresh fixture preparation SHALL NOT replace preservation evidence.
+- **AND** Comprehensive coverage SHALL remain explicit.
 
 ### Requirement: Compatible browser visits
 Affected verification SHALL share compatible page visits and deduplicate equivalent delegated checks while preserving every required logical assertion and relevant cold-load check. Shared visits SHALL retain diagnostics, restore mutated state between checks and remain serial by default. Incompatible saves, helper mutations or restoration SHALL keep exclusive execution and verified cleanup.
@@ -222,7 +252,7 @@ Affected verification SHALL share compatible page visits and deduplicate equival
 - **AND** failed cleanup fails the visit and prevents reuse of its results
 
 ### Requirement: Reusable completed checks
-Affected verification SHALL support explicit reuse of completed checks from private evidence after validating freshness, coverage, dependency identities, execution conditions and cleanup. The current required scope SHALL be computed independently. Failed, missing, stale, unsupported or invalidated checks SHALL execute again. Publication SHALL bind the combined validated proof to the clean current candidate without altering its source reports.
+Affected verification SHALL support explicit reuse of completed checks from private evidence after validating freshness, coverage, dependency identities, execution conditions and cleanup. The current required scope SHALL be computed independently. Failed, missing, stale, unsupported or invalidated checks SHALL execute again.
 
 #### Scenario: A batch fails after an independent successful check
 - **WHEN** reuse is requested and the source batch has verified cleanup and a matching successful result
@@ -251,7 +281,11 @@ Affected verification SHALL support explicit reuse of completed checks from priv
 #### Scenario: Publication includes reused checks
 - **WHEN** all current required cases pass through fresh execution or validated reuse
 - **THEN** the final report identifies each reused source result and binds all validated coverage to the clean final commit
-- **AND** applicable exact-commit CI, conditional preserved-install proof and the approved exception expiry checks remain required
+- **AND** applicable exact-commit CI and approved exception expiry checks remain required; new preserved-install proof is not an ordinary release prerequisite
+
+#### Scenario: Additional reusable completed checks contracts
+- **WHEN** completed private evidence is supplied for reuse
+- **THEN** Publication SHALL run its unit gate across the complete candidate and reuse development integration results without requiring new reports; validating an explicitly supplied report SHALL preserve its source evidence.
 
 ### Requirement: Measurable scoped execution
 Private scoped reports SHALL distinguish logical coverage from physical visits, fresh executions and reused results. They SHALL record selection and equivalence reasons, per-check durations, total wall time and capture counts. Reused results SHALL retain original execution time and provenance separately from current validation time. Reports SHALL preserve failures and representative successes without claiming unexecuted coverage or unmeasured speedups.
@@ -297,3 +331,55 @@ Development SHALL offer persistent preview of selected components on the real di
 #### Scenario: A selected component is absent
 - **WHEN** the requested preview has no matching rendered component
 - **THEN** it reports missing scope rather than claiming a successful inspection
+
+### Requirement: Historical upgrade fixtures and expected JSON
+Upgrade coverage SHALL retain provenance-backed fixtures for every supported
+released JSON format, including direct skipped-version upgrades. It SHALL assert
+persisted current-format JSON against independently specified expected
+transformations and preserved user data. No-op, repeat restart/generation,
+failed/interrupted migration and legacy history restoration SHALL be covered.
+Missing expected coverage SHALL fail rather than silently skip.
+
+#### Scenario: A customized historical dashboard upgrades
+- **WHEN** the candidate starts with its saved older JSON, generated files and existing entry
+- **THEN** the saved result has the expected format version and transformations
+- **AND** names, order, selections/deletions, explicit emptiness, options, unknown fields, raw cards and protected custom YAML are preserved as specified
+
+#### Scenario: An unchanged schema upgrades
+- **WHEN** the previous release's current-format configuration needs no JSON conversion
+- **THEN** its source is preserved and new assets/generated compatibility are verified without a gratuitous schema increment
+
+#### Scenario: Migration is rerun or deliberately fails
+- **WHEN** the scenario restarts/regenerates repeatedly or injects a validation/write/interruption failure using fixtures
+- **THEN** idempotence, unchanged invalid/newer inputs and recoverable exact prior data are verified without false success
+
+### Requirement: Private isolated upgrade execution and recovery
+Upgrade execution SHALL use only disposable `192.168.0.28` and safe fixtures,
+with private backups and evidence. It SHALL preserve the pre-test environment,
+modify only declared test-owned state, and restore that environment on success
+or failure. Cleanup failure SHALL fail the gate and retain recovery instructions.
+The scenario SHALL NOT upgrade HA itself, install third-party cards or overwrite
+real providers. Only one test dashboard root SHALL be active.
+
+#### Scenario: A historical upgrade scenario completes or aborts
+- **WHEN** its cleanup runs
+- **THEN** prior test configuration, owned files/registrations and fixture state are restored and verified
+- **AND** failures remain reported with private recovery artifacts rather than being converted into success
+
+### Requirement: Unit-only release default
+Release preparation, version hooks and automatic Tests CI SHALL run only affected
+Node/Python unit tests across the candidate. They SHALL reuse integration testing
+from development without requiring fresh browser, camera, geometry, mobile or
+preserved-install evidence. Additional integration or full testing SHALL require
+an explicit user request. Known failures SHALL remain reported as failures.
+Applicable exact-commit hassfest/HACS metadata checks SHALL remain available.
+
+#### Scenario: A tested camera or migration change is released
+- **WHEN** the user requests an ordinary release
+- **THEN** affected unit tests run without additional integration tests or browser launch
+- **AND** no new integration report or historical-upgrade campaign is required; the final candidate and version metadata are installed once on disposable 192.168.0.28 before publication, reusing an exact matching installation
+
+#### Scenario: The user explicitly requests further changed-feature testing
+- **WHEN** additional integration testing is explicitly requested
+- **THEN** the existing affected-component commands remain available
+- **AND** the full registered suite runs only on an explicit comprehensive request

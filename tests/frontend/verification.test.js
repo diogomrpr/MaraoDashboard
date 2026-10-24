@@ -45,7 +45,7 @@ test('frontend refresh scope covers recovery, native/navbar ownership and alignm
     'ha-test/cases.json', 'ha-test/frontend-refresh-fixture.js'], ['frontend-refresh']);
   assert.deepEqual(selection.components, ['frontend-refresh']);
   const checks = checksFor(selection);
-  for (const name of ['frontend-refresh', 'marao-navbar-card', 'marao-native', 'gallery-cases']) assert.ok(checks.some(check => check.id.startsWith('unit:' + name)));
+  for (const name of ['frontend-refresh', 'marao-navbar-card', 'gallery-cases']) assert.ok(checks.some(check => check.id.startsWith('unit:' + name)));
   assert.ok(checks.some(check => check.command.includes('--frontend-refresh') && check.command.includes('tests/test-ha-card-alignment.js')));
   assert.ok(checks.every(check => check.kind === 'offline'), 'Local browser fixtures must not reset the preserved HA dashboard');
   assert.ok(!checks.some(check => /mobile-matrix|preserved-upgrade|native-reconnect|editor-assets/.test(check.id)));
@@ -209,12 +209,11 @@ test('UI batch selection keeps bounded runtime and editor consumers without hist
   for (const c of checks.filter(c => c.command.includes('tests/test-ha-editor.js'))) assert.ok(c.inputs.includes('tests/editor-rendering-checks.js'));
 });
 
-test('reviewed camera title forms retain native acceptance without unrelated native-card geometry or JSON preload matrices', () => {
-  const files=['frontend_src/native-model.js','frontend_src/MaraoNativeCardEditor.js','frontend_src/editor-labels.js','custom_components/marao_dashboard/frontend/MaraoDashboardEditorLabels.js'];
+test('camera title forms select the supported builder and exclude retired native authoring', () => {
+  const files=['frontend_src/editor-model.js','frontend_src/editor-labels.js','custom_components/marao_dashboard/frontend/MaraoDashboardEditorLabels.js'];
   const scope=selectComponents(files,['camera','editor-ui']);
-  assert.ok(scope.components.includes('camera-editor'));assert.ok(!scope.components.includes('native'));assert.ok(!scope.components.includes('editor-preload'));
-  const checks=checksFor(scope);assert.ok(checks.some(c=>c.id==='native-editor'));assert.ok(checks.some(c=>c.id==='unit:marao-native'));assert.ok(checks.some(c=>c.id==='python:test_native'));
-  assert.ok(!checks.some(c=>c.id.startsWith('layout:')||c.id.startsWith('editor-preload:')));
-  assert.ok(selectComponents(['frontend_src/native-model.js']).components.includes('native'),'Unreviewed shared edits retain conservative native scope');
-  assert.ok(checksFor(selectComponents(['frontend_src/native-model.js'],['native'])).some(c=>c.id==='layout:android-normal'));
+  assert.ok(scope.components.includes('camera-editor'));assert.ok(!scope.components.includes('editor-preload'));
+  const checks=checksFor(scope);
+  assert.ok(checks.some(c=>c.id==='unit:editor-panel'));
+  assert.ok(!checks.some(c=>/native-editor|marao-native|python:test_native$/.test(c.id)));
 });

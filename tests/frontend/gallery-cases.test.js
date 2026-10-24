@@ -92,24 +92,6 @@ test('standalone security holds use the PIN-free helper and preserve PIN-require
   assert.notEqual(coded.code_arm_required, false);
 });
 
-test('every published native family has a canonical safe example and a realistic page', () => {
-  const native = require('../../ha-test/native-cases.js').nativeCases(view, manifest, require('../../ha-test/cases.js').walkCards);
-  const catalog = JSON.parse(fs.readFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoNativeCatalog.js', import.meta.url), 'utf8').replace(/^export const catalog = /, '').trim().replace(/;$/, ''));
-  for (const spec of catalog.cards.filter(card => !card.runtime_type)) {
-    const card = native.find(card => card.type === spec.type);
-    assert.ok(card, spec.id);
-    if (spec.domains.length && !spec.entity_optional) assert.ok(spec.domains.includes(card.entity?.split('.')[0]), spec.id + ' needs its own compatible example');
-  }
-  const page = require('../../ha-test/marao_dashboard_test_dashboard.json').pages.find(page => page.path === 'native-example');
-  assert.equal(page.sections.flatMap(section => section.cards || []).filter(card => card.type?.startsWith('custom:marao-native-')).length, 4);
-  assert.ok(native.some(card => card.name === 'Native media duplicate'));
-  assert.ok(native.some(card => card.type === 'custom:marao-native-entity-group-card' && card.entities.length === 0));
-  const prefixed = { ...view, cards: [
-    { template: 'md_entity_group_card', entity_type: 'light', entities: [] }, ...view.cards,
-  ] };
-  assert.deepEqual(require('../../ha-test/native-cases.js').nativeCases(prefixed, manifest, require('../../ha-test/cases.js').walkCards), native);
-});
-
 test('native surface stability uses the existing safe climate gallery and rejects missing coverage', () => {
   const example = manifest.nativeSurfaceCase;
   assert.ok(manifest.climateFeedbackCases.some(card => card.name === example.name && card.entity === example.entity));
@@ -364,7 +346,7 @@ test('whole-card problem examples resolve safe targets and retain realistic reco
 
 test('value sliders have independent minimum, middle and maximum fixtures', () => {
   const cases = concreteCases().filter((entry) => entry.sliderPercentage !== undefined);
-  assert.equal(cases.length, 9);
+  assert.equal(cases.length, 12);
   for (const example of cases) {
     const domain = example.entity.split('.')[0];
     const fixture = helpers.template.flatMap(block => block[domain] || []).find(entry => entry.default_entity_id === example.entity);
@@ -549,7 +531,7 @@ test('weather fixtures use the native domain and condition including neutral sta
 test('energy formatting cases use safe readings and carry period choices into their sheets', () => {
   const ids = fixtureIds(helpers);
   const cases = manifest.energyFormattingCases;
-  assert.equal(cases.length, 19);
+  assert.equal(cases.length, 21);
   for (const example of cases) {
     assert.ok(ids.has(example.entity), example.name);
     assert.ok(view.cards.some(card => card.name === example.name && card.entity === example.entity));

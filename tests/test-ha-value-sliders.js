@@ -13,9 +13,10 @@ async function checkPointerInteraction(page, context, config, example, calls, po
   if (!example.entity.startsWith(`${example.source.split('.')[0]}.marao_dashboard_test_case_`)) throw new Error('Pointer checks require a safe gallery fixture');
   const selector = `${scope} input[data-slider-key="${example.template}:${example.entity}"]`;
   const input = page.locator(selector);
-  const expected = { md_light_card: 'turn_on', md_fan_card: 'set_percentage', md_cover_card: 'set_cover_position' }[example.template];
-  const field = { md_light_card: 'brightness_pct', md_fan_card: 'percentage', md_cover_card: 'position' }[example.template];
-  const fixtureValue = (state) => example.template === 'md_light_card' ? state.attributes.brightness * 100 / 255 : example.template === 'md_fan_card' ? state.attributes.percentage : state.attributes.current_position;
+  const domain = example.entity.split('.')[0];
+  const expected = {light:'turn_on',fan:'set_percentage',cover:'set_cover_position'}[domain];
+  const field = {light:'brightness_pct',fan:'percentage',cover:'position'}[domain];
+  const fixtureValue = (state) => domain === 'light' ? state.attributes.brightness * 100 / 255 : domain === 'fan' ? state.attributes.percentage : state.attributes.current_position;
   const count = () => calls.filter((call) => call.entities.includes(example.entity)).length;
   const touch = pointer === 'touch' ? await context.newCDPSession(page) : null;
   let box;
@@ -100,7 +101,7 @@ async function checkPointerInteraction(page, context, config, example, calls, po
     await end();
     await page.waitForFunction((card) => !card._sliderGesture && Math.abs(Number(card.shadowRoot.querySelector('input[type="range"]')?.dataset.sliderCurrent) - 75) < 1, host);
     const completed = calls.filter((call) => call.entities.includes(example.entity)).slice(before);
-    if (completed.length !== 1 || completed[0].service !== expected) throw new Error(`${example.name}/${pointer}: completion did not dispatch exactly once`);
+    if (completed.length !== 1 || completed[0].service !== expected || completed[0].domain !== domain) throw new Error(`${example.name}/${pointer}: completion did not dispatch exactly once`);
     await api(config, 'POST', `/api/services/${example.source.split('.')[0]}/${expected}`, { entity_id: example.entity, [field]: 50 });
     await page.waitForFunction((card) => Math.abs(Number(card.shadowRoot.querySelector('input[type="range"]')?.dataset.sliderCurrent) - 50) < 1, host);
     const outsideBefore = count();
@@ -171,7 +172,7 @@ async function main() {
         try { message = JSON.parse(String(payload)); } catch { return; }
         if (message.type !== 'call_service') return;
         const entities = message.target?.entity_id ?? message.service_data?.entity_id ?? [];
-        calls.push({ service: message.service, entities: Array.isArray(entities) ? entities : [entities] });
+        calls.push({ domain:message.domain, service: message.service, entities: Array.isArray(entities) ? entities : [entities] });
       }));
       const run = `${scenario.name}-${theme}`;
       await page.goto(`${config.url}/marao-dashboard/card-test?marao_sliders=${run}`, { waitUntil: 'domcontentloaded' });

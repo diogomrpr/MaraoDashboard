@@ -189,10 +189,10 @@ EDITOR_CATALOG: dict[str, Any] = {
         },
         {
             "id": "md_fan_card",
-            "label": "Fan",
+            "label": "Fan / exhaust valve",
             "icon": "mdi:fan",
-            "domains": ["fan"],
-            "description": "Control a fan and optionally show its percentage slider.",
+            "domains": ["fan", "cover"],
+            "description": "Control fan speed or cover-backed exhaust opening with native commands.",
             "variables": [
                 _field("enable_slider", "Speed slider", "boolean", default=True),
                 *COMMON_CARD_FIELDS,
@@ -466,6 +466,8 @@ EDITOR_CATALOG["cards"].extend([
 ])
 
 for _card in EDITOR_CATALOG["cards"]:
+    if _card["id"] in ("md_security_card", "md_alarm_controls_card"):
+        _card["variables"].insert(0, {**_field("alarm_layout", "Alarm layout", "select", description="Unset keeps the existing row and security holds."), "options": ["dropdown", "grid"]})
     if _card["id"] in ("md_access_card", "md_access_slide_action_card", "md_access_hold_action_card", "md_access_action_card"):
         _card["hidden"] = _card["id"] != "md_access_card"
         _card["label"] = "Access"
@@ -497,6 +499,8 @@ def page_templates(config: dict[str, Any], entities: list[dict[str, Any]]) -> di
         return next((entity["entity_id"] for entity in available if entity["entity_id"].startswith(domain + ".")
                      and (not suffix or entity["entity_id"].endswith(suffix)) and (not device_class or entity.get("device_class") == device_class)), None)
 
+    from .generator import _domain_template
+
     weather = first("weather")
     home_sections = [{"columns": 1, "entities": [{"template": "md_weather_card", "entity_id": weather, "variables": {"show_forecast": True}}]}] if weather else []
     groups = []
@@ -504,7 +508,7 @@ def page_templates(config: dict[str, Any], entities: list[dict[str, Any]]) -> di
                                       ("cover", "cover", "overview.blinds", "mdi:window-shutter"),
                                       ("climate", "climate", "overview.climate", "mdi:thermostat"),
                                       ("battery", "sensor", "overview.maintenance", "mdi:wrench")):
-        members = [entity["entity_id"] for entity in available if entity["entity_id"].startswith(domain + ".") and (kind != "battery" or entity.get("device_class") == "battery")]
+        members = [entity["entity_id"] for entity in available if entity["entity_id"].startswith(domain + ".") and (kind != "battery" or entity.get("device_class") == "battery") and (kind != "cover" or entity.get("template") == "md_cover_card" or (entity.get("template") or _domain_template(entity)) != "md_fan_card")]
         if members:
             groups.append({"template": "md_entity_group_card", "id": "starter-" + kind, "name": GENERATOR_TRANSLATIONS["en"][label], "name_key": label,
                            "icon": icon, "entity_type": kind, "popup_filter": "active" if kind == "light" else "all", "entities": members})
@@ -563,7 +567,7 @@ def page_templates(config: dict[str, Any], entities: list[dict[str, Any]]) -> di
                 players.append({**deepcopy(app), "template": "md_media_app_card", "entity_id": entity["entity_id"],
                                 "name": app.get("name") or app["source"], "variables": {"app_source": app["source"]}})
                 players[-1].pop("source", None)
-    security = [bound("md_security_card", "Alarm", first("alarm_control_panel"), name_key="security.alarm")]
+    security = [bound("md_security_card", "Alarm", first("alarm_control_panel"), name_key="security.alarm", variables={"alarm_layout": "dropdown"})]
     security.extend(bound("md_access_card", entity.get("name") or _friendly_name(entity["entity_id"]), entity["entity_id"])
                     for entity in available if _is_access_entity(entity))
     security.extend(bound("md_access_hold_action_card", entity.get("name") or _friendly_name(entity["entity_id"]), entity["entity_id"])

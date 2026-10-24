@@ -12,7 +12,7 @@ globalThis.navigationTranslations = (await import('../../custom_components/marao
 const dashboard = await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url), "utf8");
 const runtime = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
 const { MaraoCard, alarmActions, alarmCodeRequired, accessOpenerService } = runtime;
-const { validateConfig, normalizeConfig, serializeConfig } = await import('../../frontend_src/editor-model.js');
+const { validateConfig, normalizeConfig, serializeConfig, cardForEntity } = await import('../../frontend_src/editor-model.js');
 const entity = "alarm_control_panel.safe";
 const reported = (state = "disarmed", attributes = {}) => ({ state, attributes: { supported_features: 55, ...attributes } });
 function alarm(t, hass) {
@@ -72,14 +72,14 @@ test("alarm code validation, cleanup, single dispatch and authoritative state su
   const card = alarm(t, { states: { [entity]: state }, callService: (...args) => { calls.push(args); return new Promise(resolve => { finish = resolve; }); } });
   assert.match(card.shadowRoot.innerHTML, /type="password" inputmode="numeric"/);
   card._alarmPIN = "text";
-  await card._sendAlarm("alarm_disarm", true);
+  await card._sendAlarm("alarm_disarm", "hold");
   assert.equal(calls.length, 0); assert.equal(card._alarmPIN, "");
   card._alarmPIN = "1357";
   await card._sendAlarm("alarm_disarm");
   assert.equal(calls.length, 0);
-  const pending = card._sendAlarm("alarm_disarm", true);
+  const pending = card._sendAlarm("alarm_disarm", "hold");
   assert.equal(card._alarmPIN, "");
-  await card._sendAlarm("alarm_disarm", true);
+  await card._sendAlarm("alarm_disarm", "hold");
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].slice(0, 3), ["alarm_control_panel", "alarm_disarm", { entity_id: entity, code: "1357" }]);
   assert.equal(state.state, "armed_away");
@@ -137,7 +137,7 @@ test("alarm holds cancel on release/outside and complete once with border progre
 test("loading and route/visibility changes cannot dispatch or retain alarm codes", async t => {
   let calls = 0;
   const card = alarm(t, { callService: async () => { calls++; } });
-  await card._sendAlarm("alarm_disarm", true);
+  await card._sendAlarm("alarm_disarm", "hold");
   assert.equal(calls, 0);
   assert.match(card.shadowRoot.innerHTML, /data-alarm-action="alarm_disarm"[^>]* disabled/);
   card._alarmPIN = "discard"; card._holdActive = true;
@@ -149,11 +149,16 @@ test("strict slide routes every native opener once and rejects incompatible over
   const names = ["HTMLElement", "MARAO_SLIDE_INTENT_PX", "MARAO_SLIDE_COMPLETE_AT", "serviceConnectionReady", "serviceTargetReady", "accessOpenerService", "haptic", "callServiceWithNotification", "serviceOutcome", "fitNativeGrid"];
   const values = [globalThis.HTMLElement, 10, .92, runtime.serviceConnectionReady, runtime.serviceTargetReady, accessOpenerService, () => {}, runtime.callServiceWithNotification, runtime.serviceOutcome, runtime.fitNativeGrid];
   const Slide = new Function(...names, dashboard.slice(dashboard.indexOf("class MaraoSlideToOpen"), dashboard.indexOf('if (!customElements.get("marao-slide-to-open"))')) + "; return MaraoSlideToOpen;")(...values);
-  for (const [domain, service, state] of [["lock", "unlock", "locked"], ["cover", "open_cover", "closed"], ["button", "press", "2026-01-01"], ["switch", "turn_on", "off"], ["script", "turn_on", "off"]]) {
+  for (const [domain, service, state] of [["alarm_control_panel", "alarm_disarm", "armed_away"], ["lock", "unlock", "locked"], ["cover", "open_cover", "closed"], ["button", "press", "2026-01-01"], ["switch", "turn_on", "off"], ["script", "turn_on", "off"]]) {
     const id = domain + ".safe", calls = [];
     const slide = new Slide(); slide.attributes = { entity: id }; slide._render = () => {}; slide._setProgress = value => { slide._progress = Math.max(0, Math.min(1, value)); }; slide._animateCompletion = () => {};
     const hass = { states: { [id]: { state } }, callService: async (...args) => { calls.push(args); } };
     Object.defineProperty(slide, 'hass', { value: hass, writable: true, configurable: true });
+    if (domain === 'alarm_control_panel') {
+      const owner = new MaraoCard(); owner.setConfig({template:'md_alarm_controls_card',entity:id,variables:{alarm_layout:'grid'}});
+      owner.hass = hass; owner._actionLive = true;
+      slide.getRootNode = () => ({host:owner});
+    }
     slide.connectedCallback();
     assert.equal(Object.hasOwn(slide, 'hass'), false, 'Pre-registration assignments must not shadow the setter');
     assert.equal(slide._hass, hass);
@@ -230,4 +235,84 @@ test("legacy access aliases retain strict slide controls without mutating saved 
   assert.equal(card._config.variables.md_background_color, "#123456");
   assert.match(card.shadowRoot.innerHTML, /marao-slide-to-open/);
   assert.deepEqual(config, before);
+});
+
+
+test('alarm layout confirmation cannot cross layouts or bypass live and code guards', async t => {
+  for (const layout of ['dropdown','grid']) {
+    const calls=[];
+    const card=alarm(t,{states:{[entity]:reported('armed_away',{code_format:'number'})},callService:async(...args)=>calls.push(args)});
+    card.setConfig({template:'md_alarm_controls_card',entity,variables:{alarm_layout:layout}});
+    const confirmation=layout==='dropdown'?'dropdown':'slide';
+    card._alarmPIN='1234';
+    await card._sendAlarm('alarm_disarm','hold');assert.equal(calls.length,0);
+    await card._sendAlarm('alarm_disarm',confirmation);assert.equal(calls.length,1);
+    assert.deepEqual(calls[0].slice(0,3),['alarm_control_panel','alarm_disarm',{entity_id:entity,code:'1234'}]);
+    await card._sendAlarm('alarm_disarm',confirmation);assert.equal(calls.length,1);
+    card.hass={...card._hass,connected:false};card._alarmPIN='1234';
+    await card._sendAlarm('alarm_disarm',confirmation);assert.equal(calls.length,1);
+    assert.equal(accessOpenerService(entity,'alarm_control_panel.alarm_disarm'),'');
+  }
+  const card=new MaraoCard();
+  assert.throws(()=>card.setConfig({template:'md_security_card',entity,variables:{alarm_layout:'row'}}),/dropdown or grid/);
+});
+
+
+test('alarm layout validation and serialization preserve omission, names and unknown fields',()=>{
+  const catalog={cards:[{id:'md_security_card',domains:['alarm_control_panel']}]};
+  for(const layout of [undefined,'dropdown','grid','invalid']) {
+    const config={config_version:2,name:'Safe',landing_page:'home',pages:[{path:'home',name:'Home',entities:[{id:'alarm',template:'md_security_card',entity_id:entity,name:'My alarm',variables:{future:true,...(layout===undefined?{}:{alarm_layout:layout})}}]}]};
+    assert.deepEqual(serializeConfig(normalizeConfig(config)),config);
+    const errors=validateConfig(config,2,undefined,{},catalog);
+    if(layout==='invalid') assert.match(errors.join(' '),/dropdown or grid/);else assert.deepEqual(errors,[]);
+  }
+});
+
+
+test('ventilation uses the native value, capability and command while retaining zero and refusing access covers',async()=>{
+  for(const domain of ['fan','cover']) {
+    const id=`${domain}.ventilation`, calls=[],card=new MaraoCard();
+    const state={state:domain==='cover'?'open':'on',attributes:{supported_features:7,current_position:35,percentage:60}};
+    card.setConfig({template:'md_fan_card',entity:id});
+    card.hass={states:{[id]:state},callService:async(...args)=>calls.push(args)};
+    assert.equal(card._sliderCurrent('md_fan_card',state.attributes),domain==='cover'?35:60);
+    assert.match(card._range(id,state,'md_fan_card'),/type="range"/);
+    await card._setRange(id,'md_fan_card',70);
+    assert.deepEqual(calls[0].slice(0,3),[domain,domain==='cover'?'set_cover_position':'set_percentage',{entity_id:id,[domain==='cover'?'position':'percentage']:70}]);
+    if(domain==='cover') {
+      await card._coverAction(id,'open_cover');await card._coverAction(id,'close_cover');
+      assert.deepEqual(calls.slice(1).map(call=>call.slice(0,2)),[['cover','open_cover'],['cover','close_cover']]);
+      assert.doesNotMatch(card.shadowRoot.innerHTML,/data-card-action/);
+    }
+    const key=domain==='cover'?'current_position':'percentage';
+    for(const invalid of [undefined,null,'',' ',false,'invalid',-1,101]) {
+      state.attributes[key]=invalid;
+      assert.equal(card._range(id,state,'md_fan_card'),'');
+    }
+    state.attributes[key]=0;assert.match(card._range(id,state,'md_fan_card'),/type="range"/);
+    state.attributes.supported_features=0;
+    assert.equal(card._range(id,state,'md_fan_card'),'');
+    const count=calls.length;await card._setRange(id,'md_fan_card',80);assert.equal(calls.length,count);
+    if(domain==='cover') {
+      for(const attributes of [{device_class:'door'},{friendly_name:'Garage vent'}]) {
+        state.attributes={...attributes,current_position:0,supported_features:7};card.hass={...card._hass,states:{[id]:{...state}}};
+        await card._setRange(id,'md_fan_card',80);await card._coverAction(id,'open_cover');
+        assert.equal(calls.length,count);assert.match(card.shadowRoot.innerHTML,/Use an access card/);
+      }
+    }
+  }
+  const card=new MaraoCard();card.setConfig({template:'md_light_card',entity:'light.safe'});
+  assert.equal(card._sliderCurrent('md_light_card',{brightness:255}),100);
+  assert.equal(card._sliderCurrent('md_cover_card',{current_position:null}),null);
+});
+
+test('damper defaults and explicit ventilation selections survive metadata refresh and round trips',()=>{
+  const catalog={cards:[{id:'md_fan_card',domains:['fan','cover']},{id:'md_cover_card',domains:['cover']},{id:'md_access_card',domains:['cover','lock']}]};
+  assert.equal(cardForEntity(catalog,{entity_id:'cover.airflow',device_class:'damper'}).id,'md_fan_card');
+  assert.equal(cardForEntity(catalog,{entity_id:'cover.blind',device_class:'shutter'}).id,'md_cover_card');
+  assert.equal(cardForEntity(catalog,{entity_id:'cover.garage_vent',device_class:'damper'}).id,'md_access_card');
+  const config={config_version:2,name:'Ventilation',landing_page:'room',pages:[{path:'room',name:'Room',entities:[{id:'valve',entity_id:'cover.airflow',template:'md_fan_card',variables:{enable_slider:false,future:42}}]}]};
+  assert.deepEqual(serializeConfig(normalizeConfig(config)),config);
+  assert.deepEqual(validateConfig(config,2,[{entity_id:'cover.airflow',device_class:'shutter'}],{},catalog),[]);
+  assert.match(validateConfig(config,2,[{entity_id:'cover.airflow',device_class:'gate'}],{},catalog).join(' '),/access card/);
 });

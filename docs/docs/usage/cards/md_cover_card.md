@@ -47,3 +47,5 @@ normal width. Keep full-width cameras, charts and detailed panels in separate
 explicit sections. Automatic mode retains domain grouping, and raw/non-control
 sections retain their existing layout. Manual/native cards share the minimum;
 place eligible cards inside `custom:marao-control-grid` for whole-grid equality.
+
+For ventilation dampers or shutters used as exhaust valves, see [Fan / exhaust valve](md_fan_card.md). This preserves the cover entity and its normalized opening direction; access covers must use Access controls.

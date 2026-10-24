@@ -23,7 +23,6 @@ function parseArgs(argv = process.argv.slice(2)) {
   if (!options.components.length) throw new Error('Preview requires --component; there is no implicit full-gallery preview.');
   if (options.watch && options.once) throw new Error('--watch and --once cannot be combined.');
   const inspection = inspectionFor(selectComponents([], options.components));
-  if (inspection.components.includes('camera-editor')) throw new Error('Native card editors require their focused native-editor workflow; a runtime card preview cannot validate that editor.');
   if (options.families.length) {
     const allowed = new Set([...components.native.templates, 'marao-navbar-card']);
     for (const family of options.families) {

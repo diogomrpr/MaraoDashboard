@@ -54,7 +54,7 @@ Unknown/unavailable cards SHALL remain neutral regardless of custom active color
 - **THEN** the configured unit and readable value appear alongside the switch's own state/control
 
 ### Requirement: Climate mode and target controls
-Climate SHALL separate mode, measured temperature and numeric target, with unitless values and mode-aware colors. One supported mode SHALL turn on directly; multiple modes SHALL open a sheet with the normal climate card and localized large buttons in two columns. Graph/mode/setpoint options SHALL be honored. Requested targets/modes SHALL appear by the next frame, without waiting for acknowledgement, and remain pending until reconciled. Temperature/activity SHALL remain HA-reported.
+Climate SHALL separate mode, measured temperature and numeric target, with unitless values and mode-aware colors. One supported mode SHALL turn on directly; multiple modes SHALL open a sheet with the normal climate card and a localized themed mode dropdown. Graph/mode/setpoint options SHALL be honored. Requested targets/modes SHALL appear by the next frame, without waiting for acknowledgement, and remain pending until reconciled. Temperature/activity SHALL remain HA-reported.
 
 #### Scenario: A multi-mode climate card is activated
 - **WHEN** the entity exposes more than one supported mode
@@ -80,20 +80,30 @@ Climate SHALL separate mode, measured temperature and numeric target, with unitl
 - **AND** the control does not wait for service acknowledgement or entity confirmation
 
 ### Requirement: Scene and current option counts
-Scene cards SHALL derive all choices from `input_select`/`select` options, mark
-the authoritative current option and dispatch one native select action per choice.
-Overview scene entities SHALL instead dispatch `scene.turn_on`; configured toggle
-entities SHALL use their explicit toggle behavior. Wallbox current SHALL retain
-its shared numeric control and up to three configured shortcuts. Layouts SHALL
-tolerate materially distinct option counts and wrapped labels.
+Scene cards SHALL derive all choices from `input_select`/`select` options, display them in a compact dropdown, mark the authoritative current option and dispatch one native select action per completed choice. Overview scene entities SHALL instead dispatch `scene.turn_on`; configured toggle entities SHALL use their explicit toggle behavior. Wallbox current SHALL retain its shared numeric control and up to three configured shortcuts.
 
 #### Scenario: A selector has one or five options
 - **WHEN** its scene card renders
-- **THEN** actual options appear as usable semantic buttons without numbered hard-coded option variables
+- **THEN** all options appear inside one Marao themed dropdown with the current option selected
+- **AND** the card height does not grow with the option count
 
 #### Scenario: An overview scene entity is activated
 - **WHEN** the available configured `scene.*` button is pressed
 - **THEN** one `scene.turn_on` action targets that scene rather than a select-option action
+
+#### Scenario: A selector has many options
+- **WHEN** a selector has 200 options
+- **THEN** every option remains available through the dropdown without showing 200 option buttons in the collapsed card
+
+#### Scenario: The themed dropdown is opened
+- **WHEN** the user opens a selector
+- **THEN** a themed scrollable menu appears above card clipping boundaries with the reported option marked
+- **AND** Escape or outside input closes it, with keyboard navigation available
+- **AND** ordinary state updates preserve the attached menu and its scroll position
+
+#### Scenario: Additional scene and current option counts contracts
+- **WHEN** a selector, scene, toggle or Wallbox current card is configured
+- **THEN** Select dropdowns SHALL tolerate many options without expanding the card to show them all, and SHALL remain disabled when unknown, unavailable or disconnected.
 
 ### Requirement: Access classification and open-only doors
 Generated lock and door/garage/gate cover controls SHALL use access presentation
@@ -108,18 +118,35 @@ remain separate from strict access-open controls.
 ### Requirement: Media and Apple TV controls
 Media SHALL show localized player state and optional readable background artwork,
 with generated generic playback or Apple TV popups. Apple TV SHALL support configured
-remote, optional volume remote and two-column app shortcuts. Icon-only controls
-SHALL retain semantic names. Relative rewind/forward SHALL compute authoritative
-position plus elapsed playback, then clamp to duration and send numeric data.
-App cards SHALL use `hc_media_app_card` and select the configured source.
-App shortcuts SHALL show full-card square app artwork without a visible title or
-normal player-state line, retaining semantic app names and visible problem reasons.
-Bundled brand artwork SHALL include MEO (also recognized as MEO Go); unknown apps
-SHALL retain their configured icon. Saved source values and custom names remain unchanged.
+remote, optional volume remote and compact app shortcuts in three preferred columns,
+reflowing on hosts too narrow for the existing 80px logo-cell minimum. Icon-only controls
+SHALL retain semantic names.
 
 #### Scenario: Rewind is requested near the start of playback
 - **WHEN** the relative offset would be negative
 - **THEN** exactly one seek uses a numeric target clamped to zero
+
+#### Scenario: A media popup contains six app shortcuts
+- **WHEN** the popup has room for three 80px app cells and their gaps
+- **THEN** its six shortcuts form two rows using the shared responsive app layout
+- **AND** their names, source values, order and launch actions remain intact
+
+#### Scenario: App shortcuts respond as buttons
+- **WHEN** an enabled shortcut is hovered with a pointer
+- **THEN** it shows a hand cursor, a themed edge over its artwork and a slight lift
+- **WHEN** an enabled shortcut is pressed with pointer or touch input
+- **THEN** it shows the themed edge and a short compression, while disabled shortcuts receive no interactive treatment
+
+#### Scenario: Additional media and Apple TV controls contracts
+- **WHEN** a configured media player or app shortcut is rendered or activated
+- **THEN** Relative rewind/forward SHALL compute authoritative
+position plus elapsed playback, then clamp to duration and send numeric data.
+- **AND** App cards SHALL use `hc_media_app_card` and select the configured source.
+- **AND** App shortcuts SHALL show full-card square app artwork without a visible title or
+normal player-state line, retaining semantic app names and visible problem reasons.
+- **AND** Bundled brand artwork SHALL include MEO (also recognized as MEO Go); unknown apps
+SHALL retain their configured icon.
+- **AND** Saved source values and custom names remain unchanged.
 
 ### Requirement: Remote short and long commands
 Supported remote buttons SHALL distinguish short activation from a completed
@@ -212,13 +239,11 @@ The room navigation surface SHALL remain separate from its lights-off button. Na
 Entity Groups SHALL summarize all deduplicated configured members independently
 of popup filtering, using authoritative HA state. Lights, covers and thermostats
 SHALL retain active counts and localized inactive labels. Batteries SHALL retain
-a numeric percentage and indicate low-battery and unavailable counts. Groups
-SHALL remain usable with any usable member; fully unknown/unavailable groups
-SHALL be disabled neutral, with readable status rather than color alone.
+a numeric percentage and indicate low-battery counts. Partial member availability SHALL remain inspectable in the member sheet without an unavailable-count row on the aggregate tile.
 
 #### Scenario: An unavailable primary member has an active secondary
 - **WHEN** a light, cover or thermostat group renders
-- **THEN** the secondary contributes to the count, partial availability is readable and the popup remains reachable
+- **THEN** the secondary contributes to the usable count, member availability remains readable in the popup and the popup remains reachable
 
 #### Scenario: Numeric battery readings and secondary warnings coexist
 - **WHEN** the first configured usable battery reads 75% and a secondary reads 10%
@@ -233,6 +258,12 @@ SHALL be disabled neutral, with readable status rather than color alone.
 - **WHEN** HA state is loading or the connection is disconnected
 - **THEN** loading is distinguished from inactive state, physical actions are disabled and the native connection warning remains authoritative
 
+#### Scenario: Additional entity group summaries contracts
+- **WHEN** a configured group renders its current member states
+- **THEN** Groups
+SHALL remain usable with any usable member; fully unknown/unavailable groups
+SHALL be disabled neutral, with readable status rather than color alone.
+
 ### Requirement: Entity group live popup filtering
 All entities mode SHALL list every deduplicated member in configured order,
 including disabled unknown/unavailable entries. Active only SHALL list only
@@ -243,7 +274,7 @@ localized explanation without altering saved membership.
 
 #### Scenario: A lighting group lists active members
 - **WHEN** lights are on, off and unavailable and the filter is Active only
-- **THEN** only on lights appear and the summary still reports the unavailable count
+- **THEN** only on lights appear and the summary retains its normal usable count and palette without an unavailable-count row
 - **AND** switching to All entities reveals off lights and disabled unavailable entries
 
 #### Scenario: Covers and thermostats use domain-aware activity
@@ -254,7 +285,7 @@ localized explanation without altering saved membership.
 #### Scenario: Battery groups filter maintenance attention
 - **WHEN** Active only is configured for battery sensors
 - **THEN** valid numeric percentages below 20 appear while readings of 20 or higher do not
-- **AND** missing, unknown, unavailable and invalid readings are excluded from active rows and identified through summary availability status
+- **AND** missing, unknown, unavailable and invalid readings are excluded from active rows and identified through member-sheet availability status, with neutral aggregate status when no usable member remains
 
 #### Scenario: The last active member becomes inactive
 - **WHEN** its authoritative HA state changes while the popup is open
@@ -394,8 +425,7 @@ Semantically binary cards SHALL omit redundant normal-state text and use distinc
 backgrounds, configured or native icons and localized accessible state, without an additional round on/off badge. Normal room
 lighting alone SHALL use background and accessible state without a visible
 count/status or marker under the approved exception. Classification SHALL follow
-domain meaning. Loading, transitions, problems, actions, useful readings, other
-counts, metadata and substantive custom labels SHALL remain visible.
+domain meaning.
 
 #### Scenario: A light changes between off and on
 - **WHEN** Home Assistant reports either normal light state
@@ -409,7 +439,7 @@ counts, metadata and substantive custom labels SHALL remain visible.
 
 #### Scenario: A configured icon is static or hidden
 - **WHEN** a binary card other than normal room lighting uses the same configured icon in both states or hides its icon
-- **THEN** no extra round on/off badge is rendered and localized accessible state remains available
+- **THEN** no extra round on/off badge is rendered, another existing visible non-color cue distinguishes state, and localized accessible state remains available
 - **AND** the card does not add a redundant visible on/off sentence
 
 #### Scenario: A binary access entity has a stable state
@@ -424,7 +454,7 @@ counts, metadata and substantive custom labels SHALL remain visible.
 
 #### Scenario: A summary contains useful counts or a partial problem
 - **WHEN** a room or navigation summary has active-member counts, numeric readings or unavailable members
-- **THEN** those readings, non-lighting counts and partial-problem details remain visible
+- **THEN** those readings and useful non-lighting counts remain visible; group member-availability details remain in the member sheet, while room availability problems retain their required visible neutral treatment
 - **AND** normal room lighting counts/status remain accessible without an automatic visible row or binary marker
 - **AND** only a redundant normal binary line such as All off is omitted
 
@@ -443,3 +473,175 @@ counts, metadata and substantive custom labels SHALL remain visible.
 - **THEN** any on light selects the active background and all off or no lights selects the inactive background, without an automatic lighting-status/count row or binary marker
 - **AND** localized accessible lighting state, useful non-lighting readings and explicit action labels remain
 - **AND** availability and reported problems still receive visible non-color reasons and take priority over normal lighting
+
+#### Scenario: Additional concise normal binary-state presentation contracts
+- **WHEN** a card renders binary, transitional or exceptional state
+- **THEN** Loading, transitions, problems, actions, useful readings, other
+counts, metadata and substantive custom labels SHALL remain visible.
+
+### Requirement: Capability-aware alarm controls
+An alarm sheet SHALL display authoritative state and only advertised arming modes. Disarm and custom bypass SHALL require a completed 1.2-second hold; other arming modes SHALL use explicit taps. Unsupported, unknown, unavailable and disconnected targets SHALL not dispatch actions.
+
+#### Scenario: A panel supports Away and Night
+- **WHEN** its alarm sheet opens
+- **THEN** Away, Night and Disarm are offered without unsupported modes
+
+#### Scenario: A disarm hold is cancelled
+- **WHEN** the user releases early, moves outside, closes the sheet or loses availability
+- **THEN** no disarm service is called
+
+### Requirement: Transient alarm PIN
+Required numeric or text codes SHALL use a masked field, remain only in memory and clear after an attempt, closing, target change or disconnection. Codes SHALL not enter saved JSON, generated YAML, notifications or logs. Reported service errors SHALL remain readable without exposing entered codes.
+
+#### Scenario: An alarm rejects a entered code
+- **WHEN** a completed action receives an error
+- **THEN** the code is cleared and a readable error appears without retry or false state confirmation
+
+### Requirement: Imported appliance action and warning semantics
+Dishwasher warnings SHALL recognize configured sensor attention states as well as binary on/off values. Vacuum segment actions SHALL retain explicitly supplied native command data and always target the selected vacuum. Absent command data SHALL retain the existing shorthand.
+
+#### Scenario: The original refill sensor reports confirmed
+- **WHEN** a configured salt sensor reports confirmed
+- **THEN** the dishwasher displays its warning and attention surface
+
+#### Scenario: An imported vacuum uses structured segment parameters
+- **WHEN** its segment action is activated
+- **THEN** its native command and params structure is dispatched once to the selected vacuum
+
+### Requirement: Standalone native detail parity
+Native cards SHALL own automatic detail sheets with existing media, climate, alarm, access, camera, group and history behavior. Duplicate cards SHALL have independent automatic sheets; explicit external popup references SHALL not create extra sheets.
+
+#### Scenario: Duplicate media cards open details
+- **WHEN** differently configured instances are opened
+- **THEN** each exposes its own remote and app options without popup collisions
+
+### Requirement: Inert native previews
+Native previews and edit mode SHALL prevent service dispatch and fullscreen effects while preserving readable authoritative state. Published security gestures and transient PIN clearing SHALL remain unchanged outside previews.
+
+#### Scenario: An access control is previewed
+- **WHEN** gestures are attempted in an editor preview
+- **THEN** no physical service is dispatched and the native editor remains usable
+
+### Requirement: Worst-level battery group colors
+Battery-group summary tiles SHALL derive their normal background from the lowest valid percentage across all deduplicated configured members. They SHALL use the existing battery palette: red below 20, yellow from 20 to below 80, and green from 80 through 100. Aggregation SHALL be independent of member order, popup filtering, group name and the displayed first-usable percentage. Existing problem priorities apply with the critical-battery partial-availability composition.
+
+#### Scenario: A secondary battery is critical
+- **WHEN** a battery group contains a first usable reading of 75% and another reading of 10%
+- **THEN** its summary tile uses the same threshold-red background as an ordinary 10% battery card
+- **AND** its existing 75% summary reading and one-low-battery indication remain unchanged
+
+#### Scenario: The worst level crosses a threshold
+- **WHEN** authoritative member updates move the minimum valid reading through 0, just below 20, 20, just below 80, 80 and 100
+- **THEN** the tile updates red, red, yellow, yellow, green and green respectively
+- **AND** an equally low secondary member keeps the lower-severity transition from occurring prematurely
+
+#### Scenario: Order or popup filtering changes
+- **WHEN** the same battery members are reordered or the popup changes between All entities and Active only
+- **THEN** the tile's severity color remains based on every configured member
+- **AND** an inactive yellow or green member is not treated as absent from aggregation
+
+#### Scenario: Separate battery groups are displayed
+- **WHEN** Maintenance and another named battery group have different selections, or the same group appears in another host
+- **THEN** each tile uses its own members' worst valid level through the shared behavior
+- **AND** opening a tile still opens its configured popup without actuating any member
+
+### Requirement: Battery severity preserves valid data semantics
+Worst-level coloring SHALL use the existing valid numeric percentage range of 0 through 100. Missing, unknown, unavailable, empty, nonnumeric and out-of-range states SHALL NOT become zero or contribute a fabricated severity. Color calculation SHALL preserve existing numeric summary readings, deduplicated counts, member options, selection, generated references and live popup behavior.
+
+#### Scenario: A valid zero and an invalid reading coexist
+- **WHEN** one member reports 0 and another reports an invalid battery state
+- **THEN** zero contributes a real critical level and the invalid member contributes to availability reporting only
+- **AND** neither reading is discarded or converted into the other
+
+#### Scenario: No valid reading exists
+- **WHEN** every configured member is missing, unknown, unavailable or invalid
+- **THEN** the existing neutral disabled status is shown without a fabricated battery percentage or red threshold color
+- **AND** a deliberately empty group retains its existing localized empty presentation
+
+#### Scenario: A configured member is removed
+- **WHEN** a critical battery is explicitly removed from a group's saved selection
+- **THEN** subsequent summary color reflects the remaining configured members
+- **AND** rendering, popup filtering and later registry changes do not add the removed member again
+
+### Requirement: Compact light color entry points
+Color-capable and temperature-capable light cards SHALL open a picker from their existing icon circle, with a small palette indicator inside unchanged dimensions. They SHALL add no dashboard rows or card height. Default card-body taps and brightness controls SHALL retain their existing behavior, and picker activation SHALL never also trigger the card action.
+
+#### Scenario: A capable light icon is activated
+- **WHEN** the user activates the existing light icon circle
+- **THEN** its color picker opens without toggling the light or resizing the card
+- **AND** the card retains its state-based background unless use_light_color is explicitly enabled and valid authoritative color is available
+
+#### Scenario: An ordinary light has no color or temperature controls
+- **WHEN** an on/off-only or brightness-only light is rendered
+- **THEN** its existing card behavior remains unchanged and it gains no picker entry point
+
+### Requirement: Compatible light picker hold gesture
+A 600 ms hold on a capable light card SHALL open the picker unless a hold action is explicitly configured. Scrolling, movement indicating scrolling, cancellation or loss of availability SHALL cancel the hold. Explicit tap and hold actions, including an explicit no-op hold, and hidden-icon settings SHALL remain preserved.
+
+#### Scenario: A default hold completes
+- **WHEN** the user holds a usable capable light card for 600 ms without scrolling
+- **THEN** the picker opens once and neither release nor its synthesized click toggles the light
+
+#### Scenario: Scrolling begins during the hold
+- **WHEN** a card press becomes a scroll gesture before the hold completes
+- **THEN** no picker or light action is dispatched
+
+#### Scenario: Existing actions or hidden icons are configured
+- **WHEN** a light card has an explicit hold action, custom tap action or hidden icon
+- **THEN** those settings remain unchanged without a migration
+- **AND** a hidden icon stays hidden, an explicit hold retains its action, and a body tap retains its configured action
+
+### Requirement: Shared capability-aware light picker
+The same light picker behavior SHALL apply to generated, native, dashboard and popup light cards. It SHALL derive controls from Home Assistant's reported light capabilities and temperature limits. It SHALL offer a color wheel where color is supported, a warm-to-cool slider where temperature is supported, the shared brightness control and a concise off indication.
+
+#### Scenario: Supported capabilities differ
+- **WHEN** a light reports color support, temperature support or both
+- **THEN** the popup exposes only its supported color controls and uses the reported temperature bounds
+
+#### Scenario: The selected light is off
+- **WHEN** its picker opens while Home Assistant reports the light off
+- **THEN** a concise localized off indication appears and opening sends no service call
+
+### Requirement: Light picker availability and errors
+Picker controls SHALL follow Home Assistant's reported state after adjustment. Missing, unknown, unavailable or disconnected targets SHALL disable controls and cancel active adjustment. Reported service failures SHALL remain readable through the shared error handling rather than silently retrying or claiming a successful change.
+
+#### Scenario: Availability is lost during adjustment
+- **WHEN** the target disconnects or becomes unknown or unavailable before release
+- **THEN** controls disable and no partial adjustment is sent
+
+#### Scenario: A service rejects an adjustment
+- **WHEN** Home Assistant reports an error for the completed adjustment
+- **THEN** the user sees a readable error and the displayed light state follows the authoritative report
+
+### Requirement: Optional light-color card background
+Individual light cards SHALL expose a boolean `use_light_color` option in generator and native editors, disabled when omitted. Enabled on lights SHALL use valid HA-reported RGB with contrasting text and icons. Other states SHALL retain existing neutral/problem presentation. Missing color data SHALL fall back to the state palette. Configuration SHALL preserve explicit false and unrelated options.
+
+#### Scenario: Light color changes
+- **WHEN** an enabled on light reports a new color or white temperature
+- **THEN** its card background follows HA's converted RGB without adding rows or changing size
+
+#### Scenario: Existing card is opened
+- **WHEN** the option is absent or false
+- **THEN** the existing configured active color remains unchanged
+
+### Requirement: White-temperature scale
+The white-temperature slider SHALL retain its warm-to-cool gradient and independent thumb without a progress fill. Brightness SHALL retain its current-value fill.
+
+#### Scenario: Temperature is adjusted
+- **WHEN** the user drags the temperature thumb
+- **THEN** the full gradient remains visible and the existing single-update-on-release behavior remains unchanged
+
+### Requirement: Unified access card settings
+The builder SHALL offer one Access family whose settings select automatic, popup, inline opening slide, close/lock tap or security hold. Generated, native and raw runtime instances SHALL share supported behavior. Unsupported entity/mode combinations SHALL report an error. Opening/unlocking SHALL retain strict slide safeguards and risky security actions SHALL retain the 1.2-second hold.
+
+#### Scenario: An administrator chooses an inline opening card
+- **WHEN** a lock Access card selects slide behavior
+- **THEN** it renders the existing strict opening slider and generates no unused popup
+
+#### Scenario: An administrator chooses a popup
+- **WHEN** a lock or access cover selects popup behavior
+- **THEN** it opens its guided opening and closing controls
+
+#### Scenario: Existing access aliases are loaded
+- **WHEN** saved access opener, close/lock or security action cards have no new behavior setting
+- **THEN** their original behavior and authored options remain unchanged, and their editor exposes the unified behavior setting

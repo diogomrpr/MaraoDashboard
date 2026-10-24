@@ -394,41 +394,6 @@ def _register_websocket_commands(hass: HomeAssistant) -> None:
             )
             connection.send_result(msg["id"], restored)
 
-    from .native import compile_card, compile_starter
-
-    @websocket_api.websocket_command({
-        "type": "marao_dashboard/native/card", vol.Required("config"): dict,
-        vol.Required("instance"): str, vol.Required("url_path"): str,
-        vol.Optional("entities", default=list): list, vol.Optional("language", default="en"): str,
-        vol.Optional("validate_units", default=True): bool,
-    })
-    @websocket_api.async_response
-    async def websocket_native_card(hass, connection, msg):
-        try:
-            result = await hass.async_add_executor_job(
-                compile_card, msg["config"], msg["instance"], msg["url_path"], msg["entities"], msg["language"], msg["validate_units"])
-        except (ValueError, TypeError, KeyError) as err:
-            connection.send_error(msg["id"], "invalid_config", str(err))
-            return
-        connection.send_result(msg["id"], result)
-
-    @websocket_api.websocket_command({
-        "type": "marao_dashboard/native/starter", vol.Required("title"): str,
-        vol.Required("url_path"): str, vol.Required("entities"): list,
-        vol.Optional("areas", default=list): list, vol.Optional("language", default="en"): str,
-    })
-    @websocket_api.async_response
-    async def websocket_native_starter(hass, connection, msg):
-        try:
-            result = await hass.async_add_executor_job(
-                compile_starter, msg["title"], msg["url_path"], msg["entities"], msg["areas"], msg["language"])
-        except (ValueError, TypeError, KeyError) as err:
-            connection.send_error(msg["id"], "invalid_config", str(err))
-            return
-        connection.send_result(msg["id"], result)
-
-    websocket_api.async_register_command(hass, websocket_native_card)
-    websocket_api.async_register_command(hass, websocket_native_starter)
     websocket_api.async_register_command(hass, websocket_get_config)
     websocket_api.async_register_command(hass, websocket_generate_config)
     websocket_api.async_register_command(hass, websocket_restore_history)
@@ -700,7 +665,7 @@ def _generate_dashboard_from_path(hass, config_path, dashboard_key, dry_run, reg
 
 def _assert_builder_destination(hass, key):
     """Refuse native storage destinations before any builder mutation."""
-    from .native import native_owned
+    from .native_storage import native_owned
     from .native_storage import _read_native_document
     lovelace = hass.data.get(LOVELACE_DATA)
     dashboard = lovelace.dashboards.get(key) if lovelace else None

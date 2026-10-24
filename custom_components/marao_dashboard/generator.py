@@ -634,6 +634,8 @@ def _legacy_overview_groups(config, language="en"):
         ("battery", "overview-maintenance", "overview.maintenance", "mdi:wrench"),
     ]:
         members = _battery_entities(config) if kind == "battery" else _all_entities(config, kind)
+        if kind == "cover":
+            members = [member for member in members if (member.get("template") or _domain_template(member)) != "md_fan_card"]
         if members:
             selected = [deepcopy(sources.get(member["entity_id"], {"entity_id": member["entity_id"]})) for member in members]
             groups.append({"template": "md_entity_group_card", "id": group_id, "name": _t(language, key), "icon": icon,
@@ -690,7 +692,7 @@ def _resolve_entity_group(group, registry, used_ids, *, legacy_overview=False, c
         raise ValueError(f"Entity Group entities must be a list: {group_id}")
     metadata = {item["entity_id"]: item for item in registry}
     selected = {}
-    templates = {"light": {"md_light_card", "md_base_card"}, "cover": {"md_cover_card", "md_access_card"},
+    templates = {"light": {"md_light_card", "md_base_card"}, "cover": {"md_cover_card", "md_access_card", "md_fan_card"},
                  "climate": {"md_climate_card"}, "battery": {"md_battery_card", "md_sensor_card", "md_base_card"}}
     for member in members:
         source = {"entity_id": member} if isinstance(member, str) else canonical_card(member)
@@ -711,7 +713,12 @@ def _resolve_entity_group(group, registry, used_ids, *, legacy_overview=False, c
             and not ((legacy_overview or canonical_page) and group_id == "overview-maintenance" and "battery" in entity_id)
         ) or (source.get("template") is not None and (not isinstance(source["template"], str) or source["template"] not in templates[kind])):
             raise ValueError(f"Entity Group has an incompatible member: {group_id}, {entity_id}")
-        selected[entity_id] = {**(live or {}), **selected.get(entity_id, {}), **source}
+        resolved_member = {**(live or {}), **selected.get(entity_id, {}), **source}
+        if kind == "cover" and (resolved_member.get("template") or _domain_template(resolved_member)) == "md_fan_card":
+            if _is_access_entity(resolved_member):
+                raise ValueError("Use an access card for doors, garages and gates.")
+            continue
+        selected[entity_id] = resolved_member
         selected[entity_id]["name"] = source.get("name") or selected[entity_id].get("name") or _friendly_name(entity_id)
     used_ids.add(group_id)
     return {**group, "popup_filter": popup_filter, "entities": list(selected.values())}
@@ -826,6 +833,8 @@ def _resolve_entity_container(
         live = metadata.get(entity_id, {})
         collected[entity_id] = {**live, **selected}
         collected[entity_id]["name"] = selected.get("name") or live.get("name") or _friendly_name(entity_id)
+        if collected[entity_id].get("template") == "md_fan_card" and _is_access_entity(collected[entity_id]):
+            raise ValueError("Use an access card for doors, garages and gates.")
     units = {entity["entity_id"]: entity.get("unit_of_measurement") for entity in registry}
     for entity_id, entity in collected.items():
         # Source units are live metadata, never saved overrides or legacy labels.
@@ -2142,6 +2151,8 @@ def _resolve_pages(config, registry=None, *, validate_source_units=True):
                 role = source.get("template") or ("md_navigation_card" if source.get("page") else _domain_template(entity) if domain in DOMAIN_TEMPLATES else defaults.get(domain))
                 if not role:
                     raise ValueError(f"Page {page['name']}: choose a supported template for {entity_id}")
+                if role == "md_fan_card" and _is_access_entity(entity):
+                    raise ValueError("Use an access card for doors, garages and gates.")
                 role = access_template({**entity, "template": role})
                 entity["template"] = role
                 entity["_page_instance"] = page["id"] if page.get("id") else page["path"]
@@ -2524,6 +2535,8 @@ def _entity_card(entity: dict[str, Any]) -> dict[str, Any]:
     entity = canonical_card(entity)
     domain = entity["entity_id"].split(".", 1)[0]
     template = entity.get("template") or _domain_template(entity)
+    if template == "md_fan_card" and _is_access_entity(entity):
+        raise ValueError("Use an access card for doors, garages and gates.")
     variables = dict(
         entity.get("variables") if isinstance(entity.get("variables"), dict) else {}
     )
@@ -2558,6 +2571,8 @@ def _entity_card(entity: dict[str, Any]) -> dict[str, Any]:
 def _domain_template(entity: dict[str, Any]) -> str:
     if _is_access_entity(entity):
         return "md_access_card"
+    if entity["entity_id"].startswith("cover.") and entity.get("device_class") == "damper":
+        return "md_fan_card"
     return _sensor_template(entity) or DOMAIN_TEMPLATES[entity["entity_id"].split(".", 1)[0]]
 
 
@@ -2566,7 +2581,9 @@ def _alarm_popup(entity: dict[str, Any]) -> dict[str, Any]:
     popup_hash = (entity.get("variables") or {}).get("popup_hash") or f"#alarm-{make_slug(entity['entity_id'].replace('.', '-'))}"
     return {**_popup_header(popup_hash, entity["entity_id"], name, "mdi:shield-home"),
             "cards": [{"type": "custom:marao-card", "template": "md_alarm_controls_card",
-                       "entity": entity["entity_id"], "name": name}]}
+                       "entity": entity["entity_id"], "name": name,
+                       **({"variables": {"alarm_layout": entity["variables"]["alarm_layout"]}}
+                          if "alarm_layout" in (entity.get("variables") or {}) else {})}]}
 
 
 def _room_entity_card(entity: dict[str, Any]) -> dict[str, Any]:

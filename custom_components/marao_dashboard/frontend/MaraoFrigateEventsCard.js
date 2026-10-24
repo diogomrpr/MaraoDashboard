@@ -982,24 +982,7 @@ export function registerMaraoCameraEventCards() {
     globalThis.customElements.define("marao-camera-events-card", MaraoCameraEventsCard);
   }
 
-  if (globalThis.window) {
-    const registrationLanguage = globalThis.document?.documentElement?.lang;
-    window.customCards = window.customCards || [];
-    if (!window.customCards.some((card) => card.type === "marao-frigate-events-card")) {
-      window.customCards.push({
-        type: "marao-frigate-events-card",
-        name: localize("camera_events.card.frigate_name", registrationLanguage, {}, "Marão Frigate Events Card"),
-        description: localize("camera_events.card.frigate_description", registrationLanguage, {}, "Recent Frigate events for a camera"),
-      });
-    }
-    if (!window.customCards.some((card) => card.type === "marao-camera-events-card")) {
-      window.customCards.push({
-        type: "marao-camera-events-card",
-        name: localize("camera_events.card.name", registrationLanguage, {}, "Marão Camera Events Card"),
-        description: localize("camera_events.card.description", registrationLanguage, {}, "Recent Frigate or UniFi Protect events for a camera"),
-      });
-    }
-  }
+
 }
 
 registerMaraoCameraEventCards();

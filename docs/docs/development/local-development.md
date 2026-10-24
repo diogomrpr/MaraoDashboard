@@ -176,8 +176,8 @@ npm run ha:preview -- --component slider-headers --watch --scenario iphone-norma
 The preview stays open with only selected components in scope. For generic shared
 scopes such as actions, labels, connection or scroll, also choose a representative
 consumer with `--family <template IDs>`; the family must belong to the scope.
-Inspect editor and runtime-card scopes separately. Native card-editor changes use
-the existing focused native-editor workflow; a runtime preview cannot validate them.
+Inspect editor and runtime-card scopes separately. Camera form changes use the visual builder editor scope. Standalone native
+authoring has been retired; generated runtime previews remain separate.
 `--watch` serializes and debounces frontend edits, syncs their files to HA and
 refreshes the browser; it does not attempt to replace already registered
 custom elements in place. Use `--once` for a bounded
@@ -506,7 +506,7 @@ buttons must retain their 48-pixel touch targets.
 ### Navigation startup boundary
 
 `MaraoDashboard.js` retains its public versioned entry URL. It registers
-`MaraoNavigation.js` and the lean native navbar before requesting optional
+`MaraoNavigation.js` and its shared navbar before requesting optional
 `MaraoRuntime.js` content. Navbar state comes from existing view configuration;
 no server card compilation, entity metadata or persisted route cache is required.
 The stable HA-root surface survives view replacement and is released on exit or

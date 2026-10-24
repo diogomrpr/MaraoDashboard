@@ -5,6 +5,45 @@ export function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+export const sameFormValue = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+export const getPath = (value, path) => path.split(".").reduce((item, key) => item?.[key], value);
+export const cameraTitleFields = () => [
+  { path: "name", label: "Title", kind: "text" },
+  { path: "show_name", label: "Show title", kind: "boolean", default: true },
+];
+
+export function patchPath(config, path, value) {
+  const result = structuredClone(config);
+  const keys = path.split(".");
+  let owner = result;
+  for (const key of keys.slice(0, -1)) {
+    if (!owner[key] || typeof owner[key] !== "object" || Array.isArray(owner[key])) owner[key] = {};
+    owner = owner[key];
+  }
+  if (value === undefined) delete owner[keys.at(-1)];
+  else owner[keys.at(-1)] = structuredClone(value);
+  return result;
+}
+
+export function patchForm(config, fields, previous, next) {
+  let result = config;
+  for (const field of fields) {
+    const key = field.path;
+    if (sameFormValue(previous[key], next[key])) continue;
+    let value = next[key];
+    if (["energy_unit", "energy_precision"].includes(field.kind) && ["", "auto", undefined].includes(value)) value = undefined;
+    else if (field.kind === "energy_precision" && value !== undefined) value = Number(value);
+    result = patchPath(result, key, value);
+  }
+  return result;
+}
+
+export function formData(config, fields) {
+  return Object.fromEntries(fields.map(field => [field.path, getPath(config, field.path) ??
+    (["energy_unit", "energy_precision"].includes(field.kind) ? "auto" : field.default)]));
+}
+
+
 export function newEntityGroupId() {
   return 'group-' + Array.from(crypto.getRandomValues(new Uint32Array(4)), value => value.toString(16).padStart(8, '0')).join('');
 }
@@ -377,6 +416,9 @@ export function mergeEntityValues(existing, entityIds) {
 export function cardForEntity(catalog, entity) {
   if (!entity) return null;
   const domain = entity.domain || entity.entity_id?.split(".", 1)[0];
+  const access = domain === 'cover' && (['door','garage','gate'].includes(entity.device_class) || /door|garage|gate/.test(`${entity.entity_id} ${entity.name || ''}`.toLowerCase()));
+  if (access) return catalog.cards.find(card => card.id === 'md_access_card') || null;
+  if (domain === 'cover' && entity.device_class === 'damper') return catalog.cards.find(card => card.id === 'md_fan_card') || null;
   const special = catalog.cards.find(
     (card) =>
       card.device_classes?.includes(entity.device_class) && card.domains.includes(domain),
@@ -507,6 +549,10 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
     const domain = typeof entity === "string" ? entity.split(".")[0] : undefined;
     const template = item.template || ({sensor: "md_sensor_card", switch: "md_switch_card", input_boolean: "md_switch_card"})[domain];
     const options = direct ? item : item.variables;
+    if (template === 'md_fan_card' && domain === 'cover') {
+      const live = (entities || []).find(value => value.entity_id === entity);
+      if (['door','garage','gate'].includes(live?.device_class || item.device_class) || /door|garage|gate/.test(`${entity} ${item.name || ''} ${live?.name || ''}`.toLowerCase())) errors.push('Use an access card for doors, garages and gates.');
+    }
     if (template==='md_graph_card' && (!item.type || item.type==='custom:marao-card') && options && Object.hasOwn(options,'power_devices')) {
       errors.push(...validatePowerDevices(options, options.graph_entity || entity));
       if (Array.isArray(options.power_devices) && options.power_devices.length && Object.keys(units).length) {
@@ -619,6 +665,7 @@ export function validatePages(config, catalog) {
         if (['name', 'icon'].some(key => card[key] != null && typeof card[key] !== 'string')) errors.push('Card name and icon must be strings.');
         if (card.variables != null && !object(card.variables)) errors.push('Card options must be an object.');
         const options = object(card.variables) ? card.variables : {};
+        if (["md_security_card", "md_alarm_controls_card"].includes(card.template) && Object.hasOwn(options, "alarm_layout") && !["dropdown", "grid"].includes(options.alarm_layout)) errors.push("Alarm layout must be dropdown or grid.");
         if (card.template === 'md_vacuum_card' && ['action_1', 'action_2', 'action_3'].some(key => object(options[key]) && Object.hasOwn(options[key], 'data') && !object(options[key].data))) errors.push('Vacuum action data must be an object');
         let accessRole = card.template;
         if (['md_access_card', 'md_access_slide_action_card', 'md_access_action_card', 'md_access_hold_action_card'].includes(accessRole)) {
@@ -686,7 +733,7 @@ export function validatePages(config, catalog) {
 export function entityGroupMemberCompatible(kind, member, metadata, legacyBattery = false) {
   member = canonicalCard(member);
   const domain = member.entity_id?.split('.')[0];
-  const templates = { light: ['md_light_card', 'md_base_card'], cover: ['md_cover_card', 'md_access_card'],
+  const templates = { light: ['md_light_card', 'md_base_card'], cover: ['md_cover_card', 'md_access_card', 'md_fan_card'],
     climate: ['md_climate_card'], battery: ['md_battery_card', 'md_sensor_card', 'md_base_card'] };
   return Boolean(Object.hasOwn(templates, kind) && domain === (kind === 'battery' ? 'sensor' : kind)
     && (!member.template || templates[kind].includes(member.template))

@@ -8,9 +8,17 @@ parent: Cards
 # Security Card
 
 The `md_security_card` shows Home Assistant's alarm state and opens a Marao sheet
-with the arming modes supported by your panel. Ordinary arming uses an explicit
-tap. Disarming and arming with bypass require a 1.2-second hold with visible
-border progress. Releasing early or moving outside cancels the action.
+with the arming modes supported by your panel. New cards use Dropdown: committing
+an option sends that action once, including Disarm and bypass, without a hold.
+Opening, browsing, dismissal and selecting the current mode send nothing.
+
+Choose Grid for two columns of arming modes and a full-width Disarm slide below.
+Ordinary arming uses a tap; bypass retains a 1.2-second hold. Disarm requires a
+complete horizontal slide and release. Partial, vertical or cancelled slides send
+nothing. Required codes apply to both layouts.
+
+Existing cards without a layout retain the horizontal row, with holds for Disarm
+and bypass. Loading or saving an existing card does not change that choice.
 
 
 ![Security Card Light](../../../assets/images/cards/md_security_card/securitycard_light.png)
@@ -27,6 +35,7 @@ border progress. Releasing early or moving outside cancels the action.
 
 | Variable | Default | Required | Description|
 |----------|---------|----------|------------|
+| alarm_layout | Existing row if omitted | No | `dropdown` or `grid`; new builder cards use `dropdown`. |
 | popup_hash | Generated | No | Sheet identity; generated dashboards assign one per card. |
 | icon_color | var(--color-blue) | No | Color of the icon |
 

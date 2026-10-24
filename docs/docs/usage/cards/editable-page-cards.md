@@ -22,7 +22,7 @@ for page creation, landing selection and navbar pins.
 | Access opener (`md_access_slide_action_card`) | Explicit lock, cover, button, switch or script target. A completed strict slide uses native unlock/open/press/turn-on; ordinary button/switch defaults do not change. |
 | Security action (`md_access_hold_action_card`) | Selected native button, switch or input boolean; a completed 1.2-second hold presses or toggles that exact target once. |
 | Reading (`md_base_card`) | Numeric sensor; name, icon, custom label/color and compatible display unit/precision. |
-| Energy period (`md_energy_period_card`) | Numeric sensor; `period` is `day` or `month`, with independent name/icon and reading format. The summary and history sheet share those settings. |
+| Energy period (`md_energy_period_card`) | Numeric sensor; `period` is `day` or `month`, with independent name/icon and reading format. The summary and history sheet share those settings and show recorded period consumption, not the lifetime reading. |
 | Media app (`md_media_app_card`) | Media player and nonempty `app_source`; name/icon. A tap selects that source once. |
 
 Required bindings must be selected or the draft card removed before saving.
@@ -60,3 +60,16 @@ contracts remain unchanged. Use fixed-column sections for a continuous mixed
 control grid; full-width panels belong in separate explicit sections. Raw and
 automatic layouts retain their saved composition. Manual/native cards share the
 minimum; `custom:marao-control-grid` provides equal rows throughout one container.
+
+### One energy meter for today and this month
+
+Use the same cumulative energy sensor with `period: day` and `period: month`.
+For example, a meter reading 10250 kWh with boundary readings of 10240 kWh today
+and 10000 kWh this month shows 10 kWh and 250 kWh. No Utility Meter is required.
+Recorder sum statistics are preferred (`total` or `total_increasing` sources);
+otherwise recorded counter history must establish the period baseline. Resets
+are handled using the source's state class. Statistics can lag the live reading.
+Missing history stays empty; partial recorded totals show an approximation mark.
+Calculated cost uses that period consumption, while dedicated cost sources retain
+precedence. Visible connected cards refresh at most once a minute and follow HA's
+local calendar boundaries. Popup period navigation does not change the tile.

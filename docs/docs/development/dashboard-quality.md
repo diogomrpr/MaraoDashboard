@@ -753,8 +753,11 @@ items, timelines, chart plots/statistics and configured device rows keep their
 normal slots while data loads or fails. Do not retain stale measurements to fill
 those slots. Only presentation metadata such as names and capability descriptors
 may survive missing attributes; service dispatch still checks the live entity.
-Weather forecasts use one horizontally scrolling strip. Alarm actions use a
-horizontal row and retain the code-entry slot. Camera events use a bounded,
+Weather forecasts use one horizontally scrolling strip. Alarm actions retain the
+code-entry slot in all layouts. An omitted alarm layout preserves the horizontal
+row and held Disarm/bypass; configured Dropdown commits actions without a hold,
+while Grid uses two arming columns, held bypass and a full-width strict Disarm
+slide. These are alarm-specific exceptions to the general security-hold rule. Camera events use a bounded,
 internally scrolling viewer with fixed-aspect media, so initial loading, filters,
 empty results and playback errors do not move the rest of the popup. Lazy loading
 still adds events to that viewer. Native compilation uses the corresponding card

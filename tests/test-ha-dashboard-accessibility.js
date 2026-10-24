@@ -411,7 +411,7 @@ async function applyVisualPreferences(page, scenario, theme, subtree) {
     await page.waitForLoadState("domcontentloaded");
     await page.waitForFunction(() => {
       if (!document.querySelector?.('home-assistant')) return true;
-      if (!customElements.get('marao-native-base-card')) return false;
+      if (!customElements.get('marao-card')) return false;
       const pending = root => [...(root?.children || [])].some(element =>
         element.localName === 'hui-error-card' && /^Custom element doesn't exist: marao-/.test(element.config?.message || '')
         || pending(element.shadowRoot) || pending(element));
@@ -433,13 +433,7 @@ async function applyVisualPreferences(page, scenario, theme, subtree) {
       apply(element);
       if (settle) {
         await element.updateComplete; await element._ready;
-        if (element.localName?.startsWith('marao-native-')) {
-          const deadline = Date.now() + 10000;
-          while (element._loading) {
-            if (Date.now() > deadline) throw new Error('Native card compilation did not settle');
-            await new Promise(requestAnimationFrame);
-          }
-        }
+
       }
       apply(element);
       await Promise.all([...element.children, ...(element.shadowRoot?.children || [])].map(visit));

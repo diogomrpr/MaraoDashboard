@@ -247,6 +247,9 @@ vacuum:
 cover:
   - platform: marao_test_cover
     name: Marao Dashboard Test Open Only Door
+  - platform: marao_test_cover
+    name: Marao Dashboard Test Exhaust Open Only
+    device_class: damper
 
 climate:
   - platform: marao_test_climate
@@ -509,6 +512,47 @@ template:
               entity_id: input_number.marao_dashboard_test_cover_position
             data:
               value: "{{ position }}"
+      - name: Marao Dashboard Test Exhaust Valve
+        default_entity_id: cover.marao_dashboard_test_exhaust_valve
+        unique_id: marao_dashboard_test_exhaust_valve
+        device_class: damper
+        state: "{{ 'open' if states('input_number.marao_dashboard_test_cover_position') | int > 0 else 'closed' }}"
+        position: "{{ states('input_number.marao_dashboard_test_cover_position') | int }}"
+        open_cover:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_cover_position
+            data:
+              value: 100
+        close_cover:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_cover_position
+            data:
+              value: 0
+        set_cover_position:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_cover_position
+            data:
+              value: "{{ position }}"
+      - name: Marao Dashboard Test Exhaust Binary
+        default_entity_id: cover.marao_dashboard_test_exhaust_binary
+        unique_id: marao_dashboard_test_exhaust_binary
+        device_class: shutter
+        state: "{{ 'open' if states('input_number.marao_dashboard_test_cover_position') | int > 0 else 'closed' }}"
+        open_cover:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_cover_position
+            data:
+              value: 100
+        close_cover:
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.marao_dashboard_test_cover_position
+            data:
+              value: 0
       - name: Marao Dashboard Test Garage Door
         default_entity_id: cover.marao_dashboard_test_garage_door
         unique_id: marao_dashboard_test_garage_door

@@ -2,7 +2,6 @@ const esbuild = require("esbuild");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { spawnSync } = require("child_process");
 
 const repoRoot = path.resolve(__dirname, "..");
 const frontendRoot = path.join(repoRoot, "custom_components", "marao_dashboard", "frontend");
@@ -19,10 +18,6 @@ const generatedFiles = [
   "MaraoDashboardJsonEditor.css",
   "MaraoDashboardEditorWorker.js",
   "MaraoDashboardJsonWorker.js",
-  "MaraoNativeCatalog.js",
-  "MaraoNativeCardEditor.js",
-  "MaraoNativeCards.js",
-  "MaraoNativeNavbar.js",
   "MaraoHistoryData.js",
   "MaraoHistoryChart.js",
   "ChartJS.LICENSE.txt",
@@ -45,19 +40,11 @@ function listFiles(root, prefix = "") {
 async function build() {
   const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), "marao-editor-"));
   try {
-    const python = process.env.PYTHON || (fs.existsSync(path.join(repoRoot, ".venv/bin/python")) ? path.join(repoRoot, ".venv/bin/python") : "python3");
-    const catalog = spawnSync(python, ["-c", "import json; from custom_components.marao_dashboard.native import native_catalog; print(json.dumps(native_catalog(), ensure_ascii=False, sort_keys=True))"], { cwd: repoRoot, encoding: "utf8" });
-    if (catalog.status !== 0) throw new Error("Cannot generate native catalog: " + catalog.stderr);
-    const catalogSource = "export const catalog = " + catalog.stdout.trim() + ";\n";
-    fs.writeFileSync(path.join(outputRoot, "MaraoNativeCatalog.js"), catalogSource);
     const result = await esbuild.build({
       entryPoints: {
         MaraoLovelaceEditor: path.join(repoRoot, "frontend_src", "lovelace-editor.js"),
         MaraoDashboardPanel: path.join(repoRoot, "frontend_src", "MaraoDashboardPanel.js"),
         MaraoDashboardEditorLabels: path.join(repoRoot, "frontend_src", "editor-labels.js"),
-        MaraoNativeCardEditor: path.join(repoRoot, "frontend_src", "MaraoNativeCardEditor.js"),
-        MaraoNativeCards: path.join(repoRoot, "frontend_src", "MaraoNativeCards.js"),
-        MaraoNativeNavbar: path.join(repoRoot, "frontend_src", "MaraoNativeNavbar.js"),
         MaraoHistoryData: path.join(repoRoot, "frontend_src", "history-data.js"),
         MaraoHistoryChart: path.join(repoRoot, "frontend_src", "history-chart.js"),
         MaraoDashboardJsonEditor: path.join(repoRoot, "frontend_src", "json-editor.js"),

@@ -166,11 +166,7 @@ state text SHALL NOT hide the reason. No entity problem SHALL be invented for en
 - **AND** text, icons, controls and boundaries retain required contrast in both themes
 
 ### Requirement: Partial problems preserve usable content
-Multi-entity cards SHALL indicate partial problems across the whole surface and
-identify affected members or controls without removing valid readings, counts or
-navigation. Actions SHALL keep actual-target availability checks. Partial
-availability SHALL NOT be presented as total unavailability; a complete
-availability problem SHALL use the appropriate neutral disabled treatment.
+Multi-entity cards SHALL retain usable readings and navigation while guarding actions against their actual targets. Room-light availability problems SHALL retain visible neutral problem treatment and disable All off unless every configured light is usable.
 
 #### Scenario: One member of a room or glance card is unavailable
 - **WHEN** another configured member remains usable
@@ -182,6 +178,11 @@ availability problem SHALL use the appropriate neutral disabled treatment.
 - **WHEN** no represented member is usable
 - **THEN** the card changes from partial-warning treatment to neutral complete-availability treatment
 - **AND** entity-dependent actions remain disabled
+
+#### Scenario: Additional partial problems preserve usable content contracts
+- **WHEN** a multi-entity card has usable and unavailable members
+- **THEN** Partially usable Entity Groups and legacy summary tiles SHALL retain normal counts/palettes and expose individual member availability in their sheets without adding aggregate unavailable-count rows.
+- **AND** Complete unavailability or disconnection SHALL use neutral disabled treatment.
 
 ### Requirement: Reported action errors belong to their card
 A reported service failure SHALL give the initiating card whole-card error
@@ -205,3 +206,83 @@ silent retries or global optimistic state machine SHALL be added.
 - **WHEN** a removed or reconfigured card receives a late error response
 - **THEN** the obsolete response does not mark the new card content failed
 - **AND** existing error reporting is preserved without duplicate notifications or redispatch
+
+### Requirement: Strict service-based access openers
+Explicit button, switch and script access openers SHALL use the same strict slide as locks and covers. Completion SHALL dispatch the selected entity's native press, turn-on, unlock or open service once. Taps, vertical intent, incomplete travel, cancellation and unusable targets SHALL dispatch nothing; generic entity defaults SHALL remain unchanged.
+
+#### Scenario: A building-door button slide completes
+- **WHEN** horizontal intent and valid completion are established and the target remains usable
+- **THEN** button.press is dispatched once to that exact button
+
+#### Scenario: A script opener is unavailable
+- **WHEN** the script becomes unavailable before completion
+- **THEN** the slide cancels without calling script.turn_on
+
+### Requirement: Critical battery color survives partial availability
+A battery-group summary with a known valid level below 20 SHALL retain its battery-red surface during partial member unavailability. This combined presentation SHALL keep the low-battery cue visible and the popup reachable, with localized unavailable-member detail in the member sheet rather than an aggregate warning row.
+
+#### Scenario: A critical member and an unavailable member coexist
+- **WHEN** a battery group has a valid 10% member and another missing, unknown, unavailable or invalid member
+- **THEN** the summary tile retains the threshold-red battery background instead of the generic partial-warning background
+- **AND** the low-battery count remains visible and unavailable-member reasons stay readable in the member sheet
+- **AND** the group remains reachable without enabling actions on an unavailable member
+
+#### Scenario: The critical member recovers or disappears
+- **WHEN** no valid member remains below 20 while some members remain unavailable
+- **THEN** the normal palette follows the remaining valid battery readings without an aggregate member-warning row
+- **AND** unavailable member details remain in the sheet and invalid data cannot become a fabricated critical reading
+
+#### Scenario: The entire group loses usable state
+- **WHEN** all members become unusable or HA disconnects while a red group is visible
+- **THEN** neutral unavailable/disconnected treatment replaces the threshold background and entity-dependent actions are disabled
+- **AND** recognized failure reasons and HA's native connection warning remain authoritative
+
+#### Scenario: An actual reported error is present
+- **WHEN** an existing recognized action or content error affects the battery-group card
+- **THEN** its normal shared error reporting and surface priority remain effective, subject to complete-availability priority
+- **AND** threshold coloring neither hides the error nor reclassifies missing data as a service failure
+
+#### Scenario: Another card family has a partial problem
+- **WHEN** a light, cover, climate or other non-battery summary has an unavailable member
+- **THEN** its family-specific readable availability reasons and action guards remain correct; partially usable group summaries use normal palettes and member-sheet availability detail
+- **AND** the critical-battery composition is not applied by title, icon or popup path
+
+#### Scenario: Additional critical battery color survives partial availability contracts
+- **WHEN** a battery group reports partial or complete availability loss
+- **THEN** Complete unavailability or disconnection SHALL remain neutral and disabled; reported errors SHALL retain their established priority.
+- **AND** Other partial-problem treatment SHALL remain unchanged.
+
+### Requirement: Concise card availability presentation
+Partially usable Entity Group and legacy summary tiles SHALL retain normal usable counts/palettes without unavailable counts or member-warning rows. Room-light availability problems SHALL retain their required visible neutral treatment and complete-list action guards. Individual availability cues SHALL omit entity names. Complete loss SHALL show only concise neutral status while retaining errors for recovery.
+
+#### Scenario: A group member goes unavailable
+- **WHEN** at least one configured member remains usable
+- **THEN** its aggregate tile keeps the usable count and normal palette without an added member-warning row
+- **AND** member status remains available in its sheet and unsafe aggregate actions remain disabled
+
+#### Scenario: An individual target has a long name
+- **WHEN** its entity or an actual auxiliary target is unavailable
+- **THEN** the availability cue is concise localized status text without repeating that target's name
+- **AND** unavailable target actions stay disabled
+
+#### Scenario: Retained errors coexist with complete loss
+- **WHEN** a card becomes completely unavailable after an action/content error
+- **THEN** only the concise availability status is displayed
+- **AND** recovery can show the retained error until explicitly cleared by the existing retry/configuration rules
+
+#### Scenario: Additional concise card availability presentation contracts
+- **WHEN** a card or summary reports an availability problem
+- **THEN** Action guards, member-sheet statuses, availability distinctions and operational errors while usable SHALL remain intact.
+
+### Requirement: Full-handle classic access slide
+Strict access controls SHALL show a themed rounded track and a round draggable handle without a progressing background fill. Their concise label SHALL fade with handle travel and restore on reset. The full measured handle area SHALL accept pointer/touch starts, including edges; the surrounding track SHALL NOT start a gesture. Existing horizontal-intent, cancellation, target-availability, haptic and single-dispatch completion rules SHALL remain intact.
+
+#### Scenario: Dragging from the outside of the handle
+- **WHEN** pointer or touch input begins on any part of the rendered handle, including an edge or its arrow
+- **THEN** the handle can follow deliberate horizontal travel without filling the background
+- **AND** a valid completion on release dispatches once, while tap/partial/vertical/cancelled gestures do not dispatch
+
+#### Scenario: A wrapped label changes track height
+- **WHEN** layout changes the handle's vertical position
+- **THEN** the start target follows its measured position and covers its complete area
+- **AND** starting outside that area cannot trigger an opener even if followed by full travel

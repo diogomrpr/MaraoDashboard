@@ -528,16 +528,12 @@ const catalogTemplates = [...new Set(
 )];
 const visibleMaraoCards = findCardsByType(visibleGallery, "custom:marao-card");
 const visibleTemplates = visibleMaraoCards.map((card) => card.template).filter(Boolean);
-const nativeCatalog = JSON.parse(fs.readFileSync(path.join(repoRoot, frontendRoot, "MaraoNativeCatalog.js"), "utf8")
-  .replace(/^export const catalog = /, "").trim().replace(/;$/, ""));
 for (const template of catalogTemplates) {
   let count = template === "md_timeline_card"
     ? findCardsByType(visibleGallery, "custom:marao-state-timeline-card").length
     : ['md_entity_group_card', 'md_scene_collection_card', 'md_energy_period_card', 'md_media_app_card'].includes(template)
       ? (cardTest.entities || []).filter((entity) => entity.template === template).length
     : visibleTemplates.filter((candidate) => candidate === template).length;
-  const nativeType = nativeCatalog.cards.find(card => card.id === template)?.type;
-  if (nativeType) count += findCardsByType(visibleGallery, nativeType).length;
   if (count < 1) {
     hasError = true;
     console.error(`Card test dashboard must include at least one visible ${template} example; found ${count}.`);

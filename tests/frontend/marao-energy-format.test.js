@@ -170,8 +170,8 @@ test('period summaries and consumption bars share formatting without resetting s
   period.setConfig({...config,display_precision:6});await tick();assert.equal(period._offset,-1);assert.equal(period._loadedKey,key);assert.equal(period._history,raw);assert.equal(calls,count);
   assert.deepEqual(period._detailOptions.samples.map(record=>period._detailOptions.format(record.value)),['1.000001 kWh','0.000001 kWh']);
   period._history=[sample('4')];period._render();assert.match(period.shadowRoot.innerHTML,/energy.format_error/);assert.doesNotMatch(period.shadowRoot.innerHTML,/<polyline/);
-  const summary=new MaraoEnergyPeriodCard();summary.setConfig({...config,popup:false});summary.hass=hass(states);assert.match(summary.shadowRoot.innerHTML,/1.23 kWh/);
-  const legacy=new MaraoEnergyPeriodCard();legacy.setConfig({entity:'sensor.energy'});legacy.hass=hass(states);assert.match(legacy.shadowRoot.innerHTML,/>1234.5</);
+  const summary=new MaraoEnergyPeriodCard();summary.setConfig({...config,popup:false});summary._range=period._range;summary.hass=hass(states,async()=>[records]);await tick();assert.match(summary.shadowRoot.innerHTML,/1.00 kWh/);
+  const legacy=new MaraoEnergyPeriodCard();legacy.setConfig({entity:'sensor.energy'});legacy.hass=hass(states);await tick();assert.doesNotMatch(legacy.shadowRoot.innerHTML,/>1234.5</);assert.match(legacy.shadowRoot.innerHTML,/energy.no_data/);
 });
 
 test('formatting reuses initial raw history and identity or availability changes discard stale work', async () => {
@@ -290,12 +290,30 @@ test('monthly contributor focus uses the selected day for energy and actual or e
   assert.deepEqual(rows(card._detailOptions.breakdownForSample(card._detailOptions.samples[0])),[['1.00 kWh','0.80 EUR',.8],['3.00 kWh','≈ 0.75 EUR',.75]]);
 });
 
-test('a derived cost summary uses the current period source without loading its history',async()=>{
-  const card=new MaraoEnergyPeriodCard();card.setConfig({entity:'sensor.energy',calculate_cost:true,cost_per_kwh:.25,display_precision:2});
-  let calls=0;card.hass={...hass({'sensor.energy':sample(8000,'Wh')},()=>calls++),config:{currency:'EUR'}};await tick();
-  assert.match(card.shadowRoot.innerHTML,/≈ 2.00 EUR/);assert.equal(calls,0);
-  card.hass={...card._hass,states:{'sensor.energy':sample('unavailable','Wh')}};
-  assert.match(card.shadowRoot.innerHTML,/common.unavailable/);assert.doesNotMatch(card.shadowRoot.innerHTML,/≈ 2.00/);
+test('one lifetime meter supplies day/month totals and estimated cost without contributor or chart reads',async()=>{
+  const start=Date.parse('2026-10-01'),day=86400000;
+  for (const [period,total] of [['day',10],['month',250]]) {
+    for (const calculate_cost of [false,true]) {
+      const card=new MaraoEnergyPeriodCard(),calls=[];
+      card.setConfig({entity:'sensor.energy',period,calculate_cost,cost_per_kwh:.25,display_precision:2,sub_entities:[{entity_id:'sensor.other'}]});
+      card._range=()=>({start:new Date(start),end:new Date(start+(period==='month'?day:3600000))});
+      card.hass={...hass({'sensor.energy':sample(10250,'kWh')},()=>{throw Error('Use statistics');}),config:{currency:'EUR'},callWS:async request=>{
+        calls.push(request);
+        assert.deepEqual(request.statistic_ids,['sensor.energy']);
+        return request.type==='recorder/get_statistics_metadata'
+          ? [{statistic_id:'sensor.energy',has_sum:true,statistics_unit_of_measurement:'kWh'}]
+          : {'sensor.energy':[{start,end:start+(period==='month'?day:3600000),change:total}]};
+      }};
+      await tick();
+      assert.match(card.shadowRoot.innerHTML,new RegExp(calculate_cost?`≈ ${(total*.25).toFixed(2)} EUR`:`${total.toFixed(2)} kWh`));
+      assert.equal(calls.length,2);
+      for(let i=0;i<3;i++)card.hass={...card._hass};
+      assert.equal(calls.length,2);
+      assert.equal(card._detailOptions,undefined);
+      card.hass={...card._hass,states:{'sensor.energy':sample('unavailable','kWh')}};
+      assert.match(card.shadowRoot.innerHTML,/common.unavailable/);
+    }
+  }
 });
 
 test('energy fallback batches devices and maps recorder rows by entity rather than response order', async()=>{

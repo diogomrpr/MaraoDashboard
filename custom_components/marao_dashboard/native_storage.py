@@ -51,7 +51,6 @@ async def async_find_native_dashboard(hass, source=None):
                 raise ValueError("The native Marao dashboard data is missing") from None
             continue
         config = document["data"].get("config")
-        from .native import native_owned
         proven_builder = source is not None and "legacy_storage_dashboard" in source and key == "marao-dashboard"
         if native_owned(config, aliases=not proven_builder):
             continue
@@ -126,7 +125,6 @@ class NativeDashboardPlan:
         before = path.read_bytes()
         document = _read_native_document(dashboard)
         data = document["data"]
-        from .native import native_owned
         if native_owned(data.get("config"), aliases=not allow_builder_aliases):
             raise ValueError("Native-owned dashboards cannot be adopted by the builder")
         if data != dashboard._data:
@@ -190,3 +188,19 @@ async def async_restore_native_cache(dashboard):
     dashboard._data = document["data"]
     dashboard._json_config = None
     dashboard._config_updated()
+
+
+def native_owned(config, *, aliases=True):
+    """Recognize native ownership even when its version is newer than ours."""
+    if not isinstance(config, dict):
+        return False
+    marker = config.get("marao")
+    if isinstance(marker, dict) and marker.get("mode") == "native":
+        return True
+    if isinstance(config.get("strategy"), dict) and config["strategy"].get("type") == "custom:marao-starter":
+        return True
+    def contains(value):
+        if isinstance(value, dict):
+            return str(value.get("type", "")).startswith("custom:marao-native-") or any(contains(child) for child in value.values())
+        return isinstance(value, list) and any(contains(child) for child in value)
+    return aliases and contains(config.get("views", []))

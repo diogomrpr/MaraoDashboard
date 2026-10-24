@@ -5,7 +5,7 @@ exists. Existing behavior requirements are unchanged (`skip_specs: true`).
 
 ## 1. Confirm a released fix and prepare the disposable update
 
-- [ ] 1.1 Verify official Core/frontend/WebSocket release and dependency evidence includes commit `4c5674c36cc898bbd38abc54b4d89777e37a8496` or its equivalent fix; record the versions and source links in a sanitized result. If no stable build includes it, leave the remaining tasks open and report that dated finding.
+- [x] 1.1 Verify official Core/frontend/WebSocket release and dependency evidence includes commit `4c5674c36cc898bbd38abc54b4d89777e37a8496` or its equivalent fix; record the versions and source links in a sanitized result. If no stable build includes it, leave the remaining tasks open and report that dated finding.
 - [ ] 1.2 When this change is requested for execution, confirm API and SSH both target disposable `192.168.0.28`, take a backup, and verify it completed; keep its identifier and rollback details in ignored private evidence.
 - [ ] 1.3 Update only that disposable instance to the verified stable build, wait for API and browser readiness, and record the actually installed Core/frontend versions alongside the delivery-chain evidence.
 
@@ -25,3 +25,17 @@ exists. Existing behavior requirements are unchanged (`skip_specs: true`).
 
 - Archive only after all tasks have their evidence and the reconnect outcome is confirmed; a planning-complete status is not task completion.
 - Any later push, tag or release requires an immediate clean `verify:publish` run and exact-commit GitHub Tests, hassfest and HACS results.
+
+## Delivery-chain check — 2026-10-24
+
+Latest stable [Core 2026.10.3](https://github.com/home-assistant/core/releases/tag/2026.10.3)
+(published October 23) pins
+[frontend 20260930.5](https://github.com/home-assistant/core/blob/2026.10.3/homeassistant/components/frontend/manifest.json).
+That frontend's [package.json](https://github.com/home-assistant/frontend/blob/20260930.5/package.json)
+still pins `home-assistant-js-websocket` 9.7.1. Its
+[latest release](https://github.com/home-assistant/home-assistant-js-websocket/releases/tag/9.7.1)
+was published October 4, before the
+[October 8 fix](https://github.com/home-assistant/home-assistant-js-websocket/commit/4c5674c36cc898bbd38abc54b4d89777e37a8496).
+The required fix is not delivered by this stable dependency chain. No HA update
+or outage/recovery test was performed. Tasks 1.2 onward remain blocked pending
+a stable frontend carrying the fix; the diagnosed exception remains unresolved.

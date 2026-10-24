@@ -7,7 +7,7 @@
     "navbar-press-without-rectangular-highlight",
     "ordinary-tap-and-overflow",
     "cancelled-and-incomplete-hold",
-    "generated-and-native-host",
+    "generated-dashboard-host",
     "dirty-and-inert-host",
     "native-reset-and-web-fallback",
     "http-without-cache-apis",
@@ -21,7 +21,8 @@
   "sliderFamilies": [
     "light",
     "fan",
-    "cover"
+    "cover",
+    "exhaust"
   ],
   "families": [
     {
@@ -518,6 +519,49 @@
         "idle",
         "running",
         "error",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "exhaust",
+      "name": "Exhaust opening",
+      "template": "md_fan_card",
+      "source": "cover.marao_dashboard_test_exhaust_valve",
+      "device_class": "damper",
+      "states": [
+        "closed",
+        "open",
+        "opening",
+        "closing",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "exhaust_binary",
+      "name": "Exhaust binary",
+      "template": "md_fan_card",
+      "source": "cover.marao_dashboard_test_exhaust_binary",
+      "states": [
+        "closed",
+        "open",
+        "unknown",
+        "unavailable",
+        "missing"
+      ]
+    },
+    {
+      "id": "exhaust_open_only",
+      "name": "Exhaust open only",
+      "template": "md_fan_card",
+      "source": "cover.marao_dashboard_test_exhaust_open_only",
+      "device_class": "damper",
+      "states": [
+        "closed",
+        "open",
         "unknown",
         "unavailable",
         "missing"
@@ -1334,6 +1378,22 @@
       "period": "day",
       "popup_hash": "#marao-dashboard-test-energy-format-cost-period",
       "display_precision": 2
+    },
+    {
+      "type": "custom:marao-energy-period-card",
+      "entity": "sensor.marao_dashboard_test_energy_demo_kitchen",
+      "name": "Cumulative meter · day",
+      "period": "day",
+      "display_unit": "kWh",
+      "display_precision": 2
+    },
+    {
+      "type": "custom:marao-energy-period-card",
+      "entity": "sensor.marao_dashboard_test_energy_demo_kitchen",
+      "name": "Cumulative meter · month",
+      "period": "month",
+      "display_unit": "kWh",
+      "display_precision": 2
     }
   ],
   "roomCompositionCases": [
@@ -2028,6 +2088,30 @@
         {
           "type": "markdown",
           "content": "Raw content remains untouched."
+        }
+      ]
+    },
+    {
+      "type": "custom:marao-control-grid",
+      "columns": 1,
+      "cards": [
+        {
+          "type": "custom:marao-card",
+          "template": "md_alarm_controls_card",
+          "entity": "alarm_control_panel.marao_dashboard_test_alarm_no_code",
+          "name": "Alarm · dropdown",
+          "variables": {
+            "alarm_layout": "dropdown"
+          }
+        },
+        {
+          "type": "custom:marao-card",
+          "template": "md_alarm_controls_card",
+          "entity": "alarm_control_panel.marao_dashboard_test_alarm_no_code",
+          "name": "Alarm · grid",
+          "variables": {
+            "alarm_layout": "grid"
+          }
         }
       ]
     }

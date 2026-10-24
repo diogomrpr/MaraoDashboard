@@ -27,6 +27,7 @@ Home Assistant reconnect issue remains unconfirmed.
 | [Repository workflow](specs/repository-workflow/spec.md) | Ownership, shared fixes, privacy, development loop, task lifecycle |
 | [Integration lifecycle](specs/integration-lifecycle/spec.md) | Installation, admin APIs, frontend registration, history, migration |
 | [Visual builder](specs/visual-builder/spec.md) | Visual/JSON editing, selectors, room snapshots, validation and save |
+| [Native dashboard editing](specs/native-dashboard-editing/spec.md) | Historical standalone feature; retired authoring, preserved independent ownership |
 | [Dashboard generation](specs/dashboard-generation/spec.md) | Pages, entity resolution, protected YAML, generated controls |
 | [Mobile theme and layout](specs/mobile-theme-layout/spec.md) | Typography, palette, touch sizing, title reflow, localization |
 | [Navigation and popups](specs/navigation-popups/spec.md) | Navbar, fullscreen shell, sheets, focus, scroll and route behavior |
@@ -191,9 +192,10 @@ The initial open change is
 Its tasks are deliberately uncompleted. Creating it does not run an upgrade,
 publish a release, or waive a failing check.
 
-[Native dashboard editing](changes/support-native-dashboard-editing/proposal.md)
-tracks the independent Home Assistant editing mode and its selected verification.
-See the [usage guide](../docs/docs/usage/native-dashboard.md) for creation and editing.
+[Standalone native authoring is retired](changes/remove-native-dashboard-authoring/proposal.md).
+The earlier [native editing change](changes/support-native-dashboard-editing/proposal.md)
+is historical and must not restore its superseded authoring requirements. See the
+[retirement notice](../docs/docs/usage/native-dashboard.md) for saved-data implications.
 
 ## Tool installation and ownership
 

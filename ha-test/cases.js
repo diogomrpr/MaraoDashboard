@@ -1,6 +1,5 @@
 // Canonical case expansion stays in development tooling. HACS never ships this file.
 const manifest = require('./cases.json');
-const { nativeCases } = require('./native-cases');
 const prefix = 'marao_dashboard_test_case_';
 const unavailableStates = ['unknown', 'unavailable', 'missing'];
 const slug = (value) => String(value).toLowerCase().replace(/[^a-z0-9]+/g, '_');
@@ -31,7 +30,7 @@ function concreteCases() {
   for (const familyId of manifest.sliderFamilies) {
     const family = manifest.families.find(({ id }) => id === familyId);
     for (const [position, sliderPercentage] of [['minimum', 0], ['middle', 50], ['maximum', 100]]) {
-      const state = familyId === 'cover' ? (sliderPercentage ? 'open' : 'closed') : (sliderPercentage ? 'on' : 'off');
+      const state = family.source.startsWith('cover.') ? (sliderPercentage ? 'open' : 'closed') : (sliderPercentage ? 'on' : 'off');
       const base = cases.find((example) => example.id === `${familyId}_${state}`);
       const id = `${familyId}_slider_${position}`;
       cases.push({ ...base, id, entity: `${family.source.split('.')[0]}.${prefix}${id}`, name: `${family.name} · slider ${position}`, sliderPercentage });
@@ -185,7 +184,6 @@ function expandGallery(source) {
   }
   view.cards.push({ type: 'vertical-stack', cards: [
     { type: 'custom:marao-card', template: 'md_title_card', name: 'Native Home Assistant cards' },
-    ...nativeCases(view, manifest, walkCards),
   ] });
   return view;
 }
@@ -227,6 +225,10 @@ function expandHelpers(source) {
     const [domain, key] = example.entity.split('.');
     const sourceDomain = example.source.split('.')[0];
     const name = key.replaceAll('_', ' ');
+    if (example.source === 'cover.marao_dashboard_test_exhaust_open_only') {
+      helpers.cover.push({platform:'marao_test_cover',name,device_class:'damper',initial_state:example.state});
+      continue;
+    }
     if (['climate', 'camera', 'media_player'].includes(domain)) {
       helpers[domain].push({ platform: { climate: 'marao_test_climate', camera: 'marao_test_camera', media_player: 'marao_test_media' }[domain], name, initial_state: example.state });
       continue;

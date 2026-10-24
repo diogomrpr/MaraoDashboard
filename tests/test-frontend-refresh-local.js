@@ -156,13 +156,13 @@ async function run({ alignmentOnly = false } = {}) {
               await page.waitForTimeout(100); assert.equal(await page.evaluate(() => services), 0);
             }
             assert.deepEqual(errors, []); assert.deepEqual(failed, []);
-            report.push({ engine: engine.name(), profile: profile.name, nativeWrapper: native, geometry: await geometry(page), services: await page.evaluate(() => services) });
+            report.push({ engine: engine.name(), profile: profile.name, queryFlagRetained: native, geometry: await geometry(page), services: await page.evaluate(() => services) });
           } catch (error) { await capture(page, { path: path.join(output, `${engine.name()}-${profile.name}-failure.png`), scale: 'css' }).catch(() => {}); throw error; }
           finally { await context.close(); }
         }
       } finally { await browser.close(); }
     }
-    fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ scope: 'Loopback Chromium touch/WebKit pointer and native wrapper; synthetic HA compile response. No physical Companion app or haptic-strength proof.', report }, null, 2), { mode: 0o600 });
+    fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ scope: 'Loopback Chromium touch/WebKit pointer on the generated shared navbar. No physical Companion app or haptic-strength proof.', report }, null, 2), { mode: 0o600 });
     console.log(`Frontend refresh: ${report.length} selected layouts/hosts, stale service-worker recovery, preserved page/settings and zero entity actions passed.`);
   } finally { await new Promise(resolve => server.close(resolve)); }
 }

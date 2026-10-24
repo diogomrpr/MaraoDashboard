@@ -8,5 +8,3 @@ export const runtimeReady = import(`./MaraoRuntime.js${query}`).catch(error => {
   message.textContent = navigation.navigationLocalize('navigation.loading_error', document.querySelector('home-assistant')?.hass);
   (navigation.findElements('hui-root')[0]?.shadowRoot?.querySelector('#view') || document.body).append(message);
 });
-
-await import(`./MaraoNativeNavbar.js${query}`);
