@@ -91,7 +91,12 @@
     },
     "md_access_card": {
       "options": [
-        "popup_hash"
+        "access_mode",
+        "popup_hash",
+        "action_service",
+        "action_color",
+        "action_label",
+        "action_label_key"
       ],
       "checks": [
         "generation",
@@ -338,6 +343,7 @@
     },
     "md_access_hold_action_card": {
       "options": [
+        "access_mode",
         "action_color",
         "action_label",
         "action_label_key"
@@ -399,6 +405,7 @@
     },
     "md_access_slide_action_card": {
       "options": [
+        "access_mode",
         "action_color",
         "action_label",
         "action_label_key"
@@ -467,6 +474,7 @@
         "content"
       ],
       "options": [
+        "access_mode",
         "action_service",
         "action_color",
         "action_label",
