@@ -46,7 +46,7 @@ const TEXT = {
     format: "Format JSON", collapse: "Collapse region", expand: "Expand region", advanced: "Advanced options", restore: "Restore", cancel: "Cancel", more: "More actions",
     jsonIconsFailed: 'JSON icons could not load.',
     create: "Create", update: "Update", delete: "Delete", duplicate: "Duplicate",
-    edit: "Edit", add: "Add", chooseCard: "Choose a Marao card",
+    edit: "Edit", add: "Add", chooseCard: "Choose a card",
     byType: "By card type", byEntity: "By entity", searchEntities: "Search by name or entity ID",
     suggestions: "Suggested for this room", metadataLoading: "Loading current entities…", metadataFailed: "Could not load current entities. ",
     unknown: "Unknown", unavailable: "Unavailable",
@@ -64,7 +64,7 @@ const TEXT = {
     format: "Formatar JSON", collapse: "Recolher região", expand: "Expandir região", advanced: "Opções avançadas", restore: "Restaurar", cancel: "Cancelar", more: "Mais ações",
     jsonIconsFailed: 'Não foi possível carregar os ícones JSON.',
     create: "Criar", update: "Atualizar", delete: "Eliminar", duplicate: "Duplicar",
-    edit: "Editar", add: "Adicionar", chooseCard: "Escolha um cartão Marao",
+    edit: "Editar", add: "Adicionar", chooseCard: "Escolha um cartão",
     byType: "Por tipo de cartão", byEntity: "Por entidade", searchEntities: "Pesquisar por nome ou ID da entidade",
     suggestions: "Sugestões para esta divisão", metadataLoading: "A carregar as entidades atuais…", metadataFailed: "Não foi possível carregar as entidades atuais. ",
     unknown: "Desconhecida", unavailable: "Indisponível",
@@ -103,7 +103,19 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   set hass(value) {
+    const previous = this._hass;
     this._hass = value;
+    this.shadowRoot.querySelectorAll?.("ha-form,[data-ha-context]").forEach(element => { element.hass = value; });
+    if (previous?.states !== value.states) {
+      const count = Object.keys(value.states || {}).length;
+      if (this._stateCount != null && count !== this._stateCount && this.isConnected && this._loaded) this._scheduleMetadataRefresh();
+      this._stateCount = count;
+    }
+    if (previous && this.isConnected && this._loaded && (
+      ['entities', 'areas', 'devices'].some(key => previous[key] !== value[key])
+      || previous.connected === false && value.connected
+      || previous.connection !== value.connection
+    )) this._scheduleMetadataRefresh();
     const mark = this.shadowRoot.querySelector(".brand-mark");
     if (mark) mark.src = value?.themes?.darkMode ? BRAND_MARK_DARK : BRAND_MARK;
     if (this._monaco) this._setMonacoTheme();
@@ -140,6 +152,7 @@ class MaraoDashboardPanel extends HTMLElement {
     });
     if (this._loaded && !this.shadowRoot.getElementById("visual-view").firstElementChild) this._renderVisual();
     if (this._loaded) {
+      if (this._hass?.connection) this._scheduleMetadataRefresh();
       this._nativeVisualReady().then(() => {
         if (!this.isConnected) return;
         if (this._requestedTab === 'json') this._switchTab('json'); else this._startJsonPreparation();
@@ -148,6 +161,8 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   disconnectedCallback() {
+    clearTimeout(this._metadataRefreshTimer); this._metadataRefreshTimer = null;
+    this._metadataRefreshVersion = (this._metadataRefreshVersion || 0) + 1;
     this._cardDrag?.dispose(); this._cardDrag = null;
     this._headerResize?.disconnect();
     this._lifecycle += 1;
@@ -222,17 +237,7 @@ class MaraoDashboardPanel extends HTMLElement {
         <div id="status" class="status" role="status">${this._t("loading")}</div>
         <ha-button id="retry" hidden>${this._t("retry")}</ha-button>
       </main>`;
-    this.shadowRoot.addEventListener("focusin", (event) => {
-      const path = event.composedPath(); const target = path[0];
-      const pressed = this._pressedPath?.includes(target); this._pressedPath = null;
-      if (!path.includes(this.shadowRoot.getElementById("visual-view"))) return;
-      // Moving a pressed button before pointerup cancels its native click.
-      if (pressed && target.localName === "button") return;
-      // Native field reveal otherwise considers content behind the sticky header visible.
-      target.style.scrollMarginTop = "calc(var(--editor-header-height,150px) + 12px)";
-      const bounds = target.getBoundingClientRect();
-      if (bounds.top < this.shadowRoot.querySelector(".editor-header").getBoundingClientRect().bottom + 8 || bounds.bottom > innerHeight) target.scrollIntoView({ block: "start", behavior: "instant" });
-    });
+    this.shadowRoot.addEventListener("focusin", event => this._revealFocusedControl(event));
     this.shadowRoot.querySelectorAll("[data-tab]").forEach((tab) =>
       tab.addEventListener("click", () => this._switchTab(tab.dataset.tab)));
     this.shadowRoot.getElementById("retry").addEventListener("click", () => {
@@ -250,7 +255,7 @@ class MaraoDashboardPanel extends HTMLElement {
     this.shadowRoot.getElementById("history").addEventListener("click", () => this._openHistory());
     this.shadowRoot.querySelector(".secondary-menu").addEventListener("click", () => {
       this.shadowRoot.querySelector(".secondary-actions").open = false;
-      this.shadowRoot.querySelector(".secondary-actions summary").focus();
+      this._focusWithoutScroll(this.shadowRoot.querySelector(".secondary-actions summary"));
     });
     this.shadowRoot.addEventListener("pointerdown", (event) => {
       this._pressedPath = event.composedPath();
@@ -263,13 +268,32 @@ class MaraoDashboardPanel extends HTMLElement {
     this.shadowRoot.addEventListener('click', event => this._iconActionHaptic(event), { capture: true });
   }
 
+  _revealFocusedControl(event) {
+    const path = event.composedPath(), target = path[0];
+    const pressed = this._pressedPath?.includes(target); this._pressedPath = null;
+    if (this._restoringFocus || !path.includes(this.shadowRoot.getElementById('visual-view'))) return;
+    // Moving a pressed button before pointerup cancels its native click.
+    if (pressed && target.localName === 'button') return;
+    // Native field reveal otherwise considers content behind the sticky header visible.
+    target.style.scrollMarginTop = 'calc(var(--editor-header-height,150px) + 12px)';
+    const bounds = target.getBoundingClientRect();
+    if (bounds.top < this.shadowRoot.querySelector('.editor-header').getBoundingClientRect().bottom + 8 || bounds.bottom > innerHeight) target.scrollIntoView({ block: 'start', behavior: 'instant' });
+  }
+
+  _focusWithoutScroll(target) {
+    // preventScroll does not suppress our own focusin reveal handler.
+    this._restoringFocus = true;
+    try { target?.focus({ preventScroll: true }); }
+    finally { this._restoringFocus = false; }
+  }
+
   _load(force = false) {
     if (this._loading) return this._loading;
     if (!this._hass || this._busy || !this.isConnected) return;
     const lifecycle = this._lifecycle;
     const previousModel = this._model;
     const previouslyLoaded = this._loaded;
-    const retained = Object.fromEntries(['_catalog', '_entities', '_areas', '_displayEntityIds', '_contextReady', '_contextError', '_contextPayload', '_history', '_historyLoaded', '_pageTemplates', '_savedSource', '_jsonDraft', '_dirty', '_dashboardUrl', '_visualReady'].map(key => [key, this[key]]));
+    const retained = Object.fromEntries(['_catalog', '_entities', '_areas', '_haCardLabels', '_displayEntityIds', '_contextReady', '_contextError', '_contextPayload', '_history', '_historyLoaded', '_pageTemplates', '_savedSource', '_jsonDraft', '_dirty', '_dashboardUrl', '_visualReady'].map(key => [key, this[key]]));
     this._loadAttempted = true;
     this._retryKind = null;
     this._setBusy(true); this._setStatus(this._t("loading"), "");
@@ -280,6 +304,7 @@ class MaraoDashboardPanel extends HTMLElement {
         const model = normalizeConfig(JSON.parse(payload.config));
         this._catalog = payload.editor.catalog; this._entities = payload.editor.entities;
         this._areas = payload.editor.areas || [];
+        this._haCardLabels = payload.editor.native_card_labels || {};
         this._displayEntityIds = new Set(payload.editor.display_entity_ids || payload.editor.entities.map(entity => entity.entity_id));
         this._contextReady = !payload.editor.display_entity_ids;
         this._contextError = null; this._contextRequest = null; this._contextPayload = null; this._metadataLoading = null;
@@ -366,7 +391,7 @@ class MaraoDashboardPanel extends HTMLElement {
       this._mountGeneralForm(root.querySelector('#general-form'));
       this._renderNavigation(root.querySelector('#navbar-list'));
       root.querySelector('#add-page').addEventListener('click', () => this._openPageDialog());
-      if (restoreFocus) manager.focus({ preventScroll: true });
+      if (restoreFocus) this._focusWithoutScroll(manager);
       return;
     }
     root.innerHTML = `
@@ -526,7 +551,7 @@ class MaraoDashboardPanel extends HTMLElement {
           else {
             this._openPages.delete(page);
             const focused = this.shadowRoot.activeElement;
-            if (focused && entry.body.contains(focused)) entry.header.focus({ preventScroll: true });
+            if (focused && entry.body.contains(focused)) this._focusWithoutScroll(entry.header);
             entry.body.replaceChildren(); entry.sections.clear(); entry.add = null;
           }
         });
@@ -589,7 +614,7 @@ class MaraoDashboardPanel extends HTMLElement {
         });
       }
       this._setDirty(); this._refreshPages(new Set(), action.startsWith('page-'));
-      this._pageEntries.get(focusPage)?.header.focus({ preventScroll: true });
+      this._focusWithoutScroll(button.isConnected ? button : this._pageEntries.get(focusPage)?.header);
     } catch (error) { this._setStatus(this._error(error), 'error'); }
   }
 
@@ -792,13 +817,15 @@ class MaraoDashboardPanel extends HTMLElement {
     const metadata = entityMeta(this._entities, entity.entity_id);
     const card = this._catalog.cards.find((item) => item.id === entity.template) || cardForEntity(this._catalog, metadata || entity);
     const shortcutPage = entity.page && this._availablePages().find((page) => page.path === entity.page);
+    const native = entity.template === 'ha_card';
+    const summary = native && (this._haCardModule?.describeCardYaml(entity.yaml) || this._haCardLabels?.[entity.yaml]);
     const group = entity.template === 'hc_entity_group_card';
-    const warning = group || card?.entity_optional ? '' : entity.page ? (shortcutPage ? "" : " · Missing page") : !metadata && (this._contextReady || this._displayEntityIds?.has(entity.entity_id)) ? " · Missing" : metadata?.state === "unavailable" ? " · Unavailable" : "";
-    const title = (entity.name_key ? this._l(entity.name) : entity.name) || shortcutPage?.name || metadata?.name || entity.entity_id || entity.page || this._l(card?.label || 'Card');
-    const detail = group ? `${this._l('Entity Group')} · ${this._l(({light:'Light', cover:'Cover', battery:'Battery', climate:'Climate'})[entity.entity_type] || entity.entity_type)} · ${new Set((entity.entities || []).map(member => this._entityId(member))).size} ${this._l('members')}` : entity.page ? `${entity.page} · ${this._l("Page shortcut")}` : `${entity.entity_id ? entity.entity_id + ' · ' : ''}${this._l(card?.label || entity.template || "Automatic")}`;
+    const warning = native || group || card?.entity_optional ? '' : entity.page ? (shortcutPage ? "" : " · Missing page") : !metadata && (this._contextReady || this._displayEntityIds?.has(entity.entity_id)) ? " · Missing" : metadata?.state === "unavailable" ? " · Unavailable" : "";
+    const title = (entity.name_key ? this._l(entity.name) : entity.name) || shortcutPage?.name || metadata?.name || entity.entity_id || entity.page || (native ? this._l(summary?.name || 'Home Assistant card') : this._l(card?.label || 'Card'));
+    const detail = native ? summary?.type || 'Home Assistant · YAML' : group ? `${this._l('Entity Group')} · ${this._l(({light:'Light', cover:'Cover', battery:'Battery', climate:'Climate'})[entity.entity_type] || entity.entity_type)} · ${new Set((entity.entities || []).map(member => this._entityId(member))).size} ${this._l('members')}` : entity.page ? `${entity.page} · ${this._l("Page shortcut")}` : `${entity.entity_id ? entity.entity_id + ' · ' : ''}${this._l(card?.label || entity.template || "Automatic")}`;
     return `<div class="entity-row" data-card-drag="${cardIndex}" data-room="${roomIndex}" data-kind="${kind}">
       <button type="button" class="card-drag-handle" data-card-handle aria-label="${esc(this._l("Drag card") + ": " + title)}"><ha-icon icon="mdi:drag"></ha-icon></button>
-      <div class="entity-main"><div class="entity-name">${esc(title)}</div><div class="entity-meta">${esc(detail)}${esc(warning)}</div></div>
+      <div class="entity-main"><div class="entity-name"${native ? ' data-ha-title' : ''}>${esc(title)}</div><div class="entity-meta">${esc(detail)}${esc(warning)}</div></div>
       <div class="row-actions">
         ${this._iconButton("mdi:arrow-up", "Move up", "card-up", roomIndex, cardIndex === 0, cardIndex, kind)}
         ${this._iconButton("mdi:arrow-down", "Move down", "card-down", roomIndex, cardIndex === container.entities.length - 1, cardIndex, kind)}
@@ -821,7 +848,7 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   _iconActionHaptic(event) {
-    const button = event.composedPath().find(element => element.classList?.contains('icon-action'));
+    const button = event.composedPath().find(element => element.classList?.contains('icon-action') || element.classList?.contains('native-card-action'));
     if (button && !button.disabled && !this._busy && !button.closest('[inert]')) this._moveHaptic();
   }
 
@@ -906,8 +933,7 @@ class MaraoDashboardPanel extends HTMLElement {
     const row = this.shadowRoot.querySelector(`[data-card-drag="${index}"][data-kind="${source.kind}"][data-room="${room}"]`);
     await row?.closest('ha-expansion-panel')?.updateComplete;
     if (!row?.isConnected || source.model !== this._model || revision !== this._revision || lifecycle !== this._lifecycle) return;
-    row.querySelector('[data-card-handle]')?.focus({ preventScroll: true });
-    row?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    this._focusWithoutScroll(row.querySelector('[data-card-handle]'));
   }
 
   _moveHaptic() {
@@ -1104,6 +1130,10 @@ class MaraoDashboardPanel extends HTMLElement {
         }
         const errors = validateConfig(parsed, this._catalog.config_version, this._entities, this._catalog.energy_units, this._catalog);
         if (errors.length) throw new Error(errors.map((error) => this._l(error)).join(" "));
+        if (Array.isArray(parsed.pages) && parsed.pages.some(page => pageContainers(page).some(section => flattenEntities(section.entities).some(card => card.template === 'ha_card' && !this._haCardLabels?.[card.yaml])))) {
+          (await this._loadHaCardModule()).validateCardYaml(parsed);
+          if (!this.isConnected || lifecycle !== this._lifecycle || model !== this._model || this._requestedTab !== 'visual') return;
+        }
         const next = normalizeConfig(parsed);
         const changed = JSON.stringify(serializeConfig(next)) !== JSON.stringify(serializeConfig(this._model));
         this._jsonDraft = legacy ? null : jsonSource;
@@ -1255,6 +1285,10 @@ class MaraoDashboardPanel extends HTMLElement {
       }
       const errors = validateConfig(parsed, this._catalog.config_version, this._entities, this._catalog.energy_units, this._catalog);
       if (errors.length) throw new Error(errors.map(error => this._l(error)).join(' '));
+      if (Array.isArray(parsed.pages) && parsed.pages.some(page => pageContainers(page).some(section => flattenEntities(section.entities).some(card => card.template === 'ha_card')))) {
+        (await this._loadHaCardModule()).validateCardYaml(parsed);
+        if (!current()) return;
+      }
       this._setStatus(this._t('saving'), '');
       const result = await this._hass.callWS({ type: 'marao_dashboard/config/generate', config: source });
       if (!current()) return;
@@ -1348,11 +1382,14 @@ class MaraoDashboardPanel extends HTMLElement {
 
   _openCardGallery(roomIndex, kind = "room") {
     if (!this._contextReady) return this._withEditorContext(() => this._openCardGallery(roomIndex, kind));
-    if (this._galleryDialog?.open) return;
+    if (this._galleryDialog?.isConnected && this._galleryDialog.open) return;
     const dialog = this._dialog(this._t('chooseCard'));
+    const model = this._model, epoch = this._documentEpoch, revision = this._revision;
+    const active = () => dialog.isConnected && dialog.open && this._model === model && this._documentEpoch === epoch && this._revision === revision;
     this._galleryDialog = dialog;
     const content = dialog.querySelector(".dialog-content");
-    content.innerHTML = `<div class="add-tabs" role="tablist" aria-label="${esc(this._t('addCard'))}"><button type="button" role="tab" id="by-type" aria-controls="type-cards" aria-selected="true" tabindex="0">${this._t('byType')}</button><button type="button" role="tab" id="by-entity" aria-controls="entity-cards" aria-selected="false" tabindex="-1">${this._t('byEntity')}</button></div><section id="type-cards" role="tabpanel" aria-labelledby="by-type"><div class="gallery">${this._catalog.cards.map((card) => `<button type="button" class="gallery-card" data-card="${card.id}"><ha-icon icon="${card.icon}"></ha-icon><span><strong>${esc(this._l(card.label))}</strong><small>${esc(this._l(card.description))}</small></span></button>`).join("")}</div></section><section id="entity-cards" role="tabpanel" aria-labelledby="by-entity" hidden><label for="entity-search">${this._t('searchEntities')}</label><input type="search" id="entity-search" autocomplete="off"><div class="entity-results" aria-live="polite"></div></section><div class="dialog-actions"><ha-button data-close>${this._t("cancel")}</ha-button></div>`;
+    content.innerHTML = `<div class="add-tabs" role="tablist" aria-label="${esc(this._t('addCard'))}"><button type="button" role="tab" id="by-type" aria-controls="type-cards" aria-selected="true" tabindex="0">${this._t('byType')}</button><button type="button" role="tab" id="by-entity" aria-controls="entity-cards" aria-selected="false" tabindex="-1">${this._t('byEntity')}</button><button type="button" role="tab" id="by-ha" aria-controls="ha-cards" aria-selected="false" tabindex="-1">Home Assistant</button></div><section id="type-cards" role="tabpanel" aria-labelledby="by-type"><div class="gallery">${this._catalog.cards.filter(card => !card.hidden).map((card) => `<button type="button" class="gallery-card" data-card="${card.id}"><ha-icon icon="${card.icon}"></ha-icon><span><strong>${esc(this._l(card.label))}</strong><small>${esc(this._l(card.description))}</small></span></button>`).join("")}</div></section><section id="entity-cards" role="tabpanel" aria-labelledby="by-entity" hidden><label for="entity-search">${this._t('searchEntities')}</label><input type="search" id="entity-search" autocomplete="off"><div class="entity-results" aria-live="polite"></div></section><section id="ha-cards" role="tabpanel" aria-labelledby="by-ha" hidden><div data-ha-picker></div><ha-button data-ha-manual>${this._l("Manual YAML")}</ha-button></section><div class="dialog-actions"><ha-button data-close>${this._t("cancel")}</ha-button></div>`;
+    content.querySelector("[data-ha-manual]").addEventListener("click", () => { this._closeDialog(dialog); this._openHaCardEditor(roomIndex, null, kind); });
     content.querySelector("[data-close]").addEventListener("click", () => this._closeDialog(dialog));
     content.querySelectorAll("[data-card]").forEach((button) => button.addEventListener("click", () => { const cardId = button.dataset.card; this._closeDialog(dialog); this._openCardEditor(roomIndex, null, cardId, kind); }));
     const search = content.querySelector('#entity-search'), results = content.querySelector('.entity-results');
@@ -1383,18 +1420,36 @@ class MaraoDashboardPanel extends HTMLElement {
       loading = false; renderResults();
     };
     search.addEventListener('input', renderResults);
-    for (const [index, tab] of [...content.querySelectorAll('[role="tab"]')].entries()) {
+    for (const [index, tab] of [...content.querySelectorAll('.add-tabs > [role="tab"]')].entries()) {
       const select = () => {
-        content.querySelectorAll('[role="tab"]').forEach(button => { button.setAttribute('aria-selected', String(button === tab)); button.tabIndex = button === tab ? 0 : -1; });
+        content.querySelectorAll('.add-tabs > [role="tab"]').forEach(button => { button.setAttribute('aria-selected', String(button === tab)); button.tabIndex = button === tab ? 0 : -1; });
         content.querySelector('#type-cards').hidden = index !== 0; content.querySelector('#entity-cards').hidden = index !== 1;
+        content.querySelector('#ha-cards').hidden = index !== 2;
+        if (index === 2) this._loadHaCardModule().then(module => { if (active()) module.mountPicker(this, dialog, roomIndex, kind); }).catch(error => { if (active()) content.querySelector('[data-ha-picker]').textContent = this._error(error); });
       };
       tab.addEventListener('click', select);
       tab.addEventListener('keydown', event => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-        event.preventDefault(); const next = content.querySelectorAll('[role="tab"]')[event.key === 'Home' ? 0 : event.key === 'End' ? 1 : 1 - index]; next.click(); next.focus();
+        event.preventDefault(); const tabs = content.querySelectorAll('.add-tabs > [role="tab"]'); const next = tabs[event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length]; next.click(); next.focus();
       });
     }
     loading = false; renderResults();
+    dialog._metadataUpdated = () => { failure = ''; renderResults(); };
+  }
+
+  _loadHaCardModule() {
+    if (!this._haCardLoading) this._haCardLoading = import(new URL(`./MaraoLovelaceEditor.js${PANEL_ASSET_VERSION}`, import.meta.url).href)
+      .then(module => { this._haCardModule = module; return module; })
+      .catch(error => { this._haCardLoading = null; throw error; });
+    return this._haCardLoading;
+  }
+
+  async _openHaCardEditor(roomIndex, cardIndex, kind) {
+    const model = this._model, revision = this._revision;
+    try {
+      const module = await this._loadHaCardModule();
+      if (this.isConnected && this._model === model && this._revision === revision) module.openEditor(this, roomIndex, cardIndex, kind);
+    } catch (error) { this._setStatus(this._error(error), 'error'); }
   }
 
   _requestEditorContext() {
@@ -1421,10 +1476,11 @@ class MaraoDashboardPanel extends HTMLElement {
       if (!this.isConnected || lifecycle !== this._lifecycle || epoch !== this._documentEpoch) return;
       this._entities = payload.editor.entities; this._areas = payload.editor.areas; this._catalog = payload.editor.catalog;
       this._contextReady = true;
-      if (this._retryKind === 'context') { this._retryKind = null; this._updateHeader(); }
+      if (this._retryKind === 'context') { this._retryKind = null; this._setStatus('', ''); this._updateHeader(); }
       // Source-dependent templates never revive an older document's projection.
       if (payload.epoch === this._documentEpoch && payload.page_templates) this._pageTemplates = payload.page_templates;
       this._jsonAssistance?.updateMetadata(this._catalog, this._entities, serializeConfig(this._model));
+      this.shadowRoot.querySelectorAll?.('ha-dialog[open]').forEach(dialog => dialog._metadataUpdated?.());
     });
     this._metadataLoading = loading;
     loading.finally(() => { if (this._metadataLoading === loading) this._metadataLoading = null; }).catch(() => {});
@@ -1432,6 +1488,19 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   _refreshEditorMetadata() { return this._ensureEditorContext(true); }
+
+  _scheduleMetadataRefresh() {
+    const lifecycle = this._lifecycle, version = this._metadataRefreshVersion = (this._metadataRefreshVersion || 0) + 1;
+    clearTimeout(this._metadataRefreshTimer);
+    this._metadataRefreshTimer = setTimeout(async () => {
+      this._metadataRefreshTimer = null;
+      // An older warmup response must finish before requesting the changed registries.
+      await (this._metadataLoading || this._contextRequest)?.catch(() => {});
+      if (!this.isConnected || !this._loaded || lifecycle !== this._lifecycle || version !== this._metadataRefreshVersion) return;
+      try { await this._refreshEditorMetadata(); }
+      catch (error) { if (this.isConnected && lifecycle === this._lifecycle) this._contextFailure(error); }
+    }, 500);
+  }
 
   _contextFailure(error) {
     this._retryKind = 'context'; this._setStatus(this._t('metadataFailed') + this._error(error), 'error'); this._updateHeader();
@@ -1450,6 +1519,7 @@ class MaraoDashboardPanel extends HTMLElement {
   _openCardEditor(roomIndex, cardIndex = null, selectedCardId = null, kind = "room", prefilledEntity = null, memberOptions = null) {
     if (!this._contextReady) return this._withEditorContext(() => this._openCardEditor(roomIndex, cardIndex, selectedCardId, kind, prefilledEntity, memberOptions));
     const existing = memberOptions ? memberOptions.entity : cardIndex == null ? null : this._editableContainer(kind, roomIndex).entities[cardIndex];
+    if (existing?.template === 'ha_card') return this._openHaCardEditor(roomIndex, cardIndex, kind);
     if (selectedCardId === 'hc_entity_group_card' || existing?.template === 'hc_entity_group_card') return this._openEntityGroupEditor(roomIndex, cardIndex, kind);
     const metadata = entityMeta(this._entities, existing?.entity_id);
     const selected = this._catalog.cards.find((card) => card.id === (selectedCardId || existing?.template || (existing?.page ? "hc_navigation_card" : ""))) || cardForEntity(this._catalog, metadata || existing) || this._catalog.cards[0];
@@ -1509,6 +1579,9 @@ class MaraoDashboardPanel extends HTMLElement {
     content.querySelector("[data-save]").addEventListener("click", () => {
         const target = shortcut ? data.page : data.entity_id;
         if (!target && (shortcut || !selected.entity_optional)) { this._renderSummary(content.querySelector("#summary"), "", selected, roomIndex, cardIndex, kind, shortcut ? "Select a page first." : "Select an entity first."); return; }
+        if (data.entity_id && !/^[a-z0-9_]+\.[a-z0-9_]+$/.test(data.entity_id)) {
+          this._renderSummary(content.querySelector('#summary'), target, selected, roomIndex, cardIndex, kind, 'Page card entity_id must be a valid entity.'); return;
+        }
         if (prefilledEntity && configuredEntityIds(this._container(kind, roomIndex)).has(target)) {
           this._renderSummary(content.querySelector("#summary"), target, selected, roomIndex, cardIndex, kind, this._t('alreadyAdded')); return;
         }
@@ -1615,6 +1688,9 @@ class MaraoDashboardPanel extends HTMLElement {
         else members = moveItem(members, index, index + (action === 'member-up' ? -1 : 1));
         render();
       }));
+      renderResults();
+    };
+    const renderResults = () => {
       if (loading) { results.textContent = this._t('metadataLoading'); return; }
       if (failure) {
         results.innerHTML = `<p role="alert">${esc(this._t('metadataFailed') + failure)}</p><ha-button data-retry>${this._t('retry')}</ha-button>`;
@@ -1655,6 +1731,7 @@ class MaraoDashboardPanel extends HTMLElement {
       this._closeDialog(dialog); this._setDirty(); this._refreshCards(kind, roomIndex);
     });
     loading = false; render();
+    dialog._metadataUpdated = () => { failure = ''; renderResults(); };
   }
 
   _renderSummary(host, target, card, roomIndex, cardIndex, kind = "room", error = "") {
@@ -1833,10 +1910,12 @@ class MaraoDashboardPanel extends HTMLElement {
     const dialog = document.createElement("ha-dialog"); dialog.open = true; dialog.heading = this._l(title); dialog.headerTitle = this._l(title);
     const invoking = this.shadowRoot.activeElement, lifecycle = this._lifecycle, model = this._model;
     dialog.innerHTML = `<div class="dialog-content"></div>`; dialog.addEventListener("closed", () => {
-      dialog.remove(); this._resumeJsonPreparation();
+      dialog.remove();
+      if (this._galleryDialog === dialog) this._galleryDialog = null;
+      this._resumeJsonPreparation();
       if (this.isConnected && lifecycle === this._lifecycle && model === this._model) {
         const target = invoking?.isConnected ? invoking : this.shadowRoot.querySelector('#page-manager');
-        target?.focus({ preventScroll: true });
+        this._focusWithoutScroll(target);
       }
     });
     this.shadowRoot.append(dialog);
@@ -1915,6 +1994,7 @@ class MaraoDashboardPanel extends HTMLElement {
 
   _variableSchema(field, sourceId) {
     let selector = { text: {} };
+    if (field.kind === "select") selector = { select: { mode: 'dropdown', options: field.options.map(value => ({ value, label: this._l(({ auto: 'Automatic', popup: 'Popup', slide: 'Slide to open', close: 'Close or lock', hold: 'Security hold' })[value] || value) })) } };
     if (field.kind === "boolean") selector = { boolean: {} };
     if (field.kind === "entity") selector = { entity: { domain: field.domains || [], multiple: Boolean(field.multiple) } };
     if (field.kind === "energy_period") selector = { select: { mode: 'dropdown', options: [{ value: 'day', label: this._l('Day') }, { value: 'month', label: this._l('Month') }] } };

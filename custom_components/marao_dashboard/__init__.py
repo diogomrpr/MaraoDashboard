@@ -53,7 +53,7 @@ from .frontend_assets import (
     ASSET_STATE, FrontendAssetView, FrontendBootstrapView,
     asset_snapshot, frontend_asset_url, frontend_fingerprint,
 )
-from .editor import EDITOR_CATALOG, display_catalog, initial_entity_ids, page_templates
+from .editor import EDITOR_CATALOG, display_catalog, initial_entity_ids, native_card_labels, page_templates
 from .native_storage import NativeDashboardPlan, async_find_native_dashboard, async_restore_native_cache, staged_native_dashboard
 from .generator import (
     CUSTOM_START,
@@ -516,6 +516,7 @@ def _management_payload(
                 "catalog": display_catalog() if scope == "initial" else EDITOR_CATALOG,
                 "entities": [] if scope == "initial" else registry_entities or [],
                 "areas": [] if scope == "initial" else areas or [],
+                "native_card_labels": native_card_labels(config),
             },
         }
         if scope == "initial":
@@ -646,6 +647,9 @@ def _generated_dashboard_needs_self_contained_repair(dashboard_dir: Path) -> boo
     if not dashboard_dir.is_dir():
         return False
     owned = _load_generation_manifest(dashboard_dir) if (dashboard_dir / MANIFEST_NAME).exists() else None
+    from .generator import _supports_native_card_output
+    if owned is not None and _supports_native_card_output(dashboard_dir):
+        return False
     paths = (
         (dashboard_dir / relative for relative in (*owned["plain"], *owned["containers"]))
         if owned is not None else dashboard_dir.rglob("*.yaml")

@@ -271,3 +271,50 @@ def test_light_color_option_rejects_non_boolean(value):
         compile_card({"type": native_type("hc_light_card"), "entity": "light.safe", "variables": descriptor["variables"]}, "light-color", "marao-dashboard")
     with pytest.raises(ValueError, match="Use light color"):
         validate_pages({"name": "Home", "config_version": 2, "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [descriptor]}]}, {"hc_light_card": ["light"]})
+
+
+@pytest.mark.parametrize("domain,mode,role,popups", [
+    ("lock", "popup", "hc_access_card", 1),
+    ("lock", "slide", "hc_access_slide_action_card", 0),
+    ("cover", "slide", "hc_access_slide_action_card", 0),
+    ("button", "slide", "hc_access_slide_action_card", 0),
+    ("script", "auto", "hc_access_slide_action_card", 0),
+    ("button", "auto", "hc_access_hold_action_card", 0),
+    ("switch", "hold", "hc_access_hold_action_card", 0),
+    ("lock", "close", "hc_access_action_card", 0),
+    ("cover", "close", "hc_access_action_card", 0),
+])
+def test_unified_access_modes_preserve_source_and_use_existing_safe_controls(domain, mode, role, popups):
+    source = {"type": native_type("hc_access_card"), "entity": domain + ".safe", "name": "My access",
+              "variables": {"access_mode": mode, "future": [1]}, "future": {"keep": True}}
+    before = deepcopy(source)
+    result = compile_card(source, "native-unified", "marao-dashboard")
+    assert result["card"]["template"] == role
+    assert len(result["popups"]) == popups
+    assert result["card"]["variables"]["future"] == [1]
+    if mode == "close":
+        assert result["card"]["variables"]["action_service"] == ("lock.lock" if domain == "lock" else "cover.close_cover")
+    if not popups:
+        assert "popup_hash" not in result["card"]["variables"]
+    assert source == before
+
+
+@pytest.mark.parametrize("domain,mode", [("button", "popup"), ("input_boolean", "slide"), ("lock", "hold"), ("lock", "invalid")])
+def test_unified_access_rejects_incompatible_modes(domain, mode):
+    with pytest.raises(ValueError, match="access behavior|Access behavior"):
+        compile_card({"type": native_type("hc_access_card"), "entity": domain + ".safe", "variables": {"access_mode": mode}},
+                     "native-unified", "marao-dashboard")
+
+
+def test_access_catalog_has_one_discoverable_family_and_retains_legacy_settings():
+    family = [card for card in native_catalog()["cards"] if card["id"] in (
+        "hc_access_card", "hc_access_slide_action_card", "hc_access_action_card", "hc_access_hold_action_card")]
+    assert [card["id"] for card in family if not card.get("hidden")] == ["hc_access_card"]
+    assert all(any(option["key"] == "access_mode" for option in card["variables"]) for card in family)
+
+
+def test_unified_slide_rejects_tap_bypasses_and_close_rejects_opening_services():
+    for options in ({"variables": {"access_mode": "slide"}, "tap_action": {"action": "toggle"}},
+                    {"variables": {"access_mode": "close", "action_service": "lock.unlock"}}):
+        with pytest.raises(ValueError):
+            compile_card({"type": native_type("hc_access_card"), "entity": "lock.safe", **options}, "native-unified", "marao-dashboard")

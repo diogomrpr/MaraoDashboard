@@ -85,6 +85,44 @@ The editable source of truth is:
 dashboard/MaraoDashboard/dashboard.json
 ```
 
+## Home Assistant cards
+
+Choose **Add card → Home Assistant** to search Home Assistant's native picker,
+including custom cards that register themselves with it. Use **Manual YAML** for
+an installed card that is absent from the picker. Marao loads existing resources;
+install and configure any custom card in Home Assistant first.
+
+The card dialog uses Home Assistant's visual and YAML editors with a non-interactive
+preview. Cards without a visual editor open in YAML mode. If HA's editor cannot
+load, use the basic YAML text editor or Retry. Add/Update changes your local draft;
+Cancel discards dialog edits. Only **Save & Generate** persists the dashboard.
+
+Cards can be edited, moved, reordered, deleted and duplicated with other cards.
+Automatic sections give them full width; fixed-column sections preserve mixed
+order. Their appearance, actions, visibility and errors belong to Home Assistant.
+
+Format-2 JSON stores the entire configuration as a string:
+
+```json
+{
+  "id": "welcome",
+  "template": "ha_card",
+  "yaml": "type: markdown\ntitle: Welcome\ncontent: Hello from Home Assistant\n"
+}
+```
+
+Place this descriptor in a page or section's `entities` list. Unchanged YAML,
+including comments, survives saves and history restoration. Making a visual
+configuration change can reformat YAML and remove comments. Native settings and
+unknown descriptor fields are retained; entity IDs and navigation paths inside
+YAML are user-managed. Existing raw `cards` objects keep their current behavior.
+
+YAML must contain one mapping with a nonempty `type`. Quote state strings such as
+`"on"` and `"off"`; ordinary anchors and merges work. Duplicate keys, recursive
+aliases and non-JSON values are rejected before writes. Inline configuration
+instead of using `!include`, `!secret` or other file directives. A missing custom
+resource remains a visible Home Assistant card error without deleting its source.
+
 ## Moving cards in Visual
 
 Drag a card's dotted handle to a position before, between or after other cards.
@@ -552,3 +590,21 @@ with the power-history period picker. All entity options remain in a scrollable
 menu, with the current selection marked. The current selection follows Home
 Assistant; large option lists do not expand the card. Escape or a tap outside
 closes the menu.
+
+
+### Access card behavior
+
+Choose **Access** for locks, gates, doors or service-based access controls. Its
+**Access behavior** setting selects **Automatic**, **Popup**, **Slide to open**,
+**Close or lock**, or **Security hold**. Popup and close/lock require a lock or
+cover. Slide supports locks, covers, buttons, switches and scripts; security hold
+supports buttons, switches, toggle helpers and alarm entities. Automatic retains
+the normal lock/cover popup (or inline opening for open-only doors), uses a slide
+for scripts and a security hold for other service controls.
+
+In JSON, use `"template": "hc_access_card"` and, for example,
+`"variables": {"access_mode": "slide"}`. Existing access opener, close/lock and
+security action templates remain supported with their original defaults and can
+be configured through the same behavior setting. Opening and unlocking always
+require the strict slide; security holds keep their 1.2-second safeguard. The
+separate Alarm card retains its full alarm controls.

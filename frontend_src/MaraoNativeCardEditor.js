@@ -90,7 +90,7 @@ export class MaraoNativeCardEditor extends (globalThis.HTMLElement || class {}) 
         const selected = item.path.split(".").reduce((value, key) => value?.[key], this._draft);
         if (selected && !options.includes(selected)) options.push(selected);
       }
-      const labels = { fullscreen: "Full screen", none: "No action", toggle: "Toggle", "more-info": "More information", navigate: "Navigate", url: "Open URL", "perform-action": "Service action", "call-service": "Service action", unifi_protect: "UniFi Protect", frigate: "Frigate", netatmo: "Netatmo", all: "All entities", active: "Active only", light: "Lights", cover: "Covers", battery: "Batteries", climate: "Thermostats", day: "Day", month: "Month", auto: "Auto" };
+      const labels = { fullscreen: "Full screen", none: "No action", toggle: "Toggle", "more-info": "More information", navigate: "Navigate", url: "Open URL", "perform-action": "Service action", "call-service": "Service action", unifi_protect: "UniFi Protect", frigate: "Frigate", netatmo: "Netatmo", all: "All entities", active: "Active only", light: "Lights", cover: "Covers", battery: "Batteries", climate: "Thermostats", day: "Day", month: "Month", auto: "Auto", popup: "Popup", slide: "Slide to open", close: "Close or lock", hold: "Security hold" };
       return { select: { options: options.map(value => ({ value, label: this._label(labels[value] || catalog.cards.find(card => card.type === value || card.id === value)?.label || value) })) } };
     }
     if (["boolean", "icon", "object"].includes(item.kind)) return { [item.kind]: {} };
@@ -189,7 +189,7 @@ export class MaraoNativeCardEditor extends (globalThis.HTMLElement || class {}) 
     if (spec.id === "navbar") this._repeat(host, "routes", "Navigation routes",
       [field("url", "URL"), field("label", "Label"), field("icon", "Icon", "icon"), field("icon_selected", "Selected icon", "icon")], { url: "", label: "" });
     if (spec.id === "popup") this._repeat(host, "cards", "Popup contents",
-      [choices("type", "Native card", catalog.cards.map(card => card.type)), field("entity", "Entity", "entity"), field("name", "Name"), field("variables", "Advanced", "object")], { type: "custom:marao-native-light-card" });
+      [choices("type", "Native card", catalog.cards.filter(card => !card.hidden).map(card => card.type)), field("entity", "Entity", "entity"), field("name", "Name"), field("variables", "Advanced", "object")], { type: "custom:marao-native-light-card" });
     const details = document.createElement("details"); const summary = document.createElement("summary"); summary.textContent = this._label("Advanced"); details.append(summary);
     this._form(details, fields.advanced, this._draft, next => this._commit(next), () => this._draft); host.append(details);
     this._error = document.createElement("p"); this._error.className = "error"; this._error.setAttribute("role", "status"); host.append(this._error);

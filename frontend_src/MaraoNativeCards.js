@@ -241,7 +241,7 @@ export function registerNativeCards() {
     }
     if (globalThis.window) {
       window.customCards ||= [];
-      if (!window.customCards.some(card => card.type === name)) window.customCards.push({
+      if (!spec.hidden && !window.customCards.some(card => card.type === name)) window.customCards.push({
         type: name, get name() { return "Marao " + editorLabel(spec.label, document.querySelector("home-assistant")?.hass); },
         documentationURL: "https://diogomrpr.github.io/MaraoDashboard/usage/native-dashboard/",
         getEntitySuggestion: (hass, entity) => supportsEntity(spec, hass, entity) ? { config: { type: spec.type, entity } } : null,

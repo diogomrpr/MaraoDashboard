@@ -201,3 +201,34 @@ test('logo-only app groups fit three phone columns without shrinking ordinary co
     assert.deepEqual(grid._children, children);
   } finally { globalThis.getComputedStyle = previous; }
 });
+
+test('mixed grids delegate external settings, visibility and isolated errors to native HA hosts', async () => {
+  const createElement = document.createElement, computed = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = () => ({ fontSize: '18px' });
+  document.createElement = tag => {
+    const node = new Node(); node.localName = tag;
+    if (tag === 'hui-card') node.load = () => { node.loaded = true; node.error = node.config.type === 'custom:missing-test-card'; };
+    return node;
+  };
+  try {
+    globalThis.loadCardHelpers = async () => ({ createCardElement: () => new Node() });
+    const grid = new MaraoControlGrid(); grid.getBoundingClientRect = () => ({ width: 360 });
+    grid.setConfig({ columns: 2, native_cards: [3], cards: [card(),
+      { type: 'markdown', content: 'Safe', variables: [], visibility: [{ condition: 'state', entity: 'sensor.safe', state: 'on' }] },
+      { type: 'custom:missing-test-card' }, { type: 'custom:marao-card', variables: [] }] });
+    await grid._ready;
+    assert.equal(grid._children.length, 4);
+    for (const index of [1, 2, 3]) assert.equal(grid._children[index].localName, 'hui-card');
+    assert.deepEqual(grid._children[1].config.variables, []);
+    assert.equal(grid._children[2].error, true);
+    assert.equal(grid.shadowRoot.querySelector('[role=status]'), undefined);
+    const layout = { style: {} }, query = grid.shadowRoot.querySelector.bind(grid.shadowRoot);
+    grid.shadowRoot.querySelector = selector => selector === '.control-grid' ? layout : query(selector);
+    grid._children[1].hidden = true;
+    grid._children[1].dispatchEvent(new Event('card-visibility-changed'));
+    assert.equal(grid._children[2].style.gridRow, '1');
+    assert.equal(grid._children[2].style.alignSelf, 'start');
+    const hass = { states: {} }; grid.hass = hass;
+    assert.equal(grid._children[2].hass, hass);
+  } finally { document.createElement = createElement; globalThis.getComputedStyle = computed; }
+});

@@ -14,7 +14,7 @@ import shutil
 from threading import RLock
 from typing import Any
 
-from .generator import (_fsync_directory, _load_generation_manifest, _write_bytes, _write_text, dashboard_identity,
+from .generator import (_fsync_directory, _load_generation_manifest, _supports_native_card_output, _write_bytes, _write_text, dashboard_identity,
                         dashboard_key_for_slug, load_dashboard_config, normalize_config)
 from .config_patch import patch_lovelace_dashboard, registered_dashboard_key, validate_dashboard_registration
 
@@ -370,7 +370,7 @@ def read_dashboard_version(output_base_dir: str | Path, version: str) -> tuple[d
     _load_generation_manifest(snapshot_dir)
     if metadata.get("fingerprint") != _fingerprint(source.encode("utf-8"), snapshot_dir):
         raise ValueError("Dashboard history copy is damaged")
-    for path in snapshot_dir.rglob("*.yaml"):
+    for path in [] if _supports_native_card_output(snapshot_dir) else snapshot_dir.rglob("*.yaml"):
         text = path.read_text(encoding="utf-8")
         if any(marker in text for marker in ("custom:button-card", "custom:bubble-card", "custom:navbar-card")):
             raise ValueError("Historical generated cards need conversion; restore the matching package and data backup")

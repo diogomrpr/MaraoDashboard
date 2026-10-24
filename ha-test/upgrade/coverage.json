@@ -633,6 +633,11 @@
       "assertion": "async function actions",
       "scope": "shared"
     },
+    "native-yaml-preservation": {
+      "file": "tests/components/marao_dashboard/test_card_yaml.py",
+      "assertion": "test_save_and_history_retain_yaml_and_invalid_save_preserves_every_file",
+      "scope": "shared"
+    },
     "builder-preservation": {
       "file": "tests/test-ha-editor.js",
       "assertion": "releasedDraftPreservation",
@@ -1520,6 +1525,7 @@
     "builder": [
       "builder-model",
       "builder-preservation",
+      "native-yaml-preservation",
       "builder-rooms",
       "builder-groups",
       "builder-save",

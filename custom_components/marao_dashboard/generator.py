@@ -69,7 +69,7 @@ ENERGY_FORMAT_TEMPLATES = {
 }
 
 MANIFEST_NAME = ".marao-generated.json"
-GENERATION_CONTRACT_VERSION = 2
+GENERATION_CONTRACT_VERSION = 3
 GENERATED_START = "  # marao:generated:start\n"
 GENERATED_END = "  # marao:generated:end\n"
 CUSTOM_START = "  # marao:custom:start\n"
@@ -162,6 +162,10 @@ class TaggedScalar:
         return f"TaggedScalar({self.tag!r}, {self.value!r})"
 
 
+class NativeLovelaceCard(dict):
+    """User-owned configs bypass retired Marao template rewriting."""
+
+
 class MaraoDashboardDumper(yaml.SafeDumper):
     """YAML dumper that avoids anchors and supports HA tags."""
 
@@ -178,6 +182,7 @@ def _represent_tagged_scalar(dumper: yaml.Dumper, data: TaggedScalar) -> yaml.No
 
 
 MaraoDashboardDumper.add_representer(TaggedScalar, _represent_tagged_scalar)
+MaraoDashboardDumper.add_representer(NativeLovelaceCard, yaml.SafeDumper.represent_dict)
 
 
 def _construct_tagged_scalar(
@@ -1072,6 +1077,12 @@ def _custom_view_paths(config: dict[str, Any]) -> list[str]:
     ]
 
 
+def _supports_native_card_output(output_dir: Path) -> bool:
+    manifest = output_dir / MANIFEST_NAME
+    # Contract 3 emits user-owned native types intentionally, including retired names.
+    return manifest.is_file() and json.loads(manifest.read_text()).get("generated_contract", 0) >= 3
+
+
 def _load_generation_manifest(output_dir: Path) -> dict[str, list[str]]:
     target = output_dir / MANIFEST_NAME
     if not target.is_file():
@@ -1227,6 +1238,8 @@ def _is_navigation_include(card: Any) -> bool:
 def _rewrite_external_card_types(value: Any) -> Any:
     """Translate retired upstream card types in generated Marao-owned YAML."""
 
+    if isinstance(value, NativeLovelaceCard):
+        return deepcopy(dict(value))
     if isinstance(value, dict):
         return {
             key: (
@@ -1760,12 +1773,15 @@ def _page_action_card(entity: dict[str, Any]) -> dict[str, Any]:
         }
     else:
         action = {"action": "toggle", "haptic": "heavy"}
+    if service := (entity.get("variables") or {}).get("action_service"):
+        action = {"action": "call-service", "service": service, "entity_id": entity["entity_id"], "haptic": "heavy"}
     card = {
         "type": "custom:marao-card",
         "template": "hc_access_hold_action_card",
         "entity": entity["entity_id"],
         "name": entity.get("name") or _friendly_name(entity["entity_id"]),
         "show_state": False,
+        "variables": deepcopy(entity.get("variables") or {}),
         "tap_action": action,
     }
     if entity.get("icon"):
@@ -2089,7 +2105,7 @@ def _configured_name(item, language="en"):
 def _resolve_pages(config, registry=None, *, validate_source_units=True):
     """Validate and resolve each occurrence without persisting live metadata."""
     from .editor import EDITOR_CATALOG
-    from .page_model import page_entries, page_sections, validate_pages
+    from .page_model import access_template, page_entries, page_sections, validate_pages
 
     templates = {card["id"]: card["domains"] for card in EDITOR_CATALOG["cards"]}
     validate_pages(config, templates)
@@ -2119,6 +2135,7 @@ def _resolve_pages(config, registry=None, *, validate_source_units=True):
                 role = source.get("template") or ("hc_navigation_card" if source.get("page") else _domain_template(entity) if domain in DOMAIN_TEMPLATES else defaults.get(domain))
                 if not role:
                     raise ValueError(f"Page {page['name']}: choose a supported template for {entity_id}")
+                role = access_template({**entity, "template": role})
                 entity["template"] = role
                 entity["_page_instance"] = page["id"] if page.get("id") else page["path"]
                 if entity_id:
@@ -2181,8 +2198,12 @@ def _resolve_pages(config, registry=None, *, validate_source_units=True):
 
 
 def _page_card(entity, dashboard_key, language="en"):
+    if entity.get("template") == "ha_card":
+        from .card_yaml import parse_card_yaml
+        return NativeLovelaceCard(parse_card_yaml(entity.get("yaml")))
     item = {**entity, "name": _configured_name(entity, language)}
-    role = item["template"]
+    from .page_model import access_template
+    role = item["template"] = access_template(item)
     variables = item.get("variables", {})
     if role == "hc_entity_group_card":
         return _entity_group_card(item, language)
@@ -2205,7 +2226,7 @@ def _page_card(entity, dashboard_key, language="en"):
     elif role == "hc_access_slide_action_card":
         card = _entity_card(item)
     elif role == "hc_access_action_card":
-        card = _entity_card(item)
+        card = _room_entity_card(item)
     elif str(item.get("entity_id") or "").startswith("scene."):
         card = _scene_card(item)
     else:
@@ -2223,8 +2244,12 @@ def _page_card(entity, dashboard_key, language="en"):
 
 
 def _page_card_popups(entity, language="en"):
+    if entity.get("template") == "ha_card":
+        return []
     item = {**entity, "name": _configured_name(entity, language)}
-    role, variables = item["template"], item.get("variables", {})
+    from .page_model import access_template
+    role = item["template"] = access_template(item)
+    variables = item.get("variables", {})
     if role in ("hc_access_slide_action_card", "hc_access_action_card"):
         return []
     if role == "hc_security_card" and "tap_action" not in item:
@@ -2250,7 +2275,7 @@ def _page_card_popups(entity, language="en"):
         return [_media_popup(item)]
     if role == "hc_camera_card":
         return [_camera_popup(item, language)]
-    if item.get("entity_id") and _is_access_entity(item) and not _is_open_only_access(item):
+    if item.get("entity_id") and _is_access_entity(item) and (not _is_open_only_access(item) or variables.get("access_mode") == "popup"):
         return [_access_popup(item, language)]
     return []
 
@@ -2271,6 +2296,8 @@ def _standard_control(card):
 
 def _owned_content(card):
     """Classify owned content independently of compact control composition."""
+    if isinstance(card, NativeLovelaceCard):
+        return False
     if not isinstance(card, dict):
         return False
     kind = card.get("type", "")
@@ -2284,6 +2311,8 @@ def _control_grid(cards, columns, *, raw=False, groups=None):
     """One owner per logical section; raw siblings keep their untouched configs."""
     if cards and any(_owned_content(card) for card in cards):
         return {"type": "custom:marao-control-grid", "columns": columns, "cards": cards,
+                **({"native_cards": [index for index, card in enumerate(cards) if isinstance(card, NativeLovelaceCard)]}
+                   if any(isinstance(card, NativeLovelaceCard) for card in cards) else {}),
                 **({"groups": groups} if groups is not None else {})}
     return {"type": "grid", "columns": columns, "square": False, "cards": cards}
 
@@ -2328,7 +2357,7 @@ def _page_view(page, include_root, dashboard_key, language="en"):
             domains = ["sensor", "binary_sensor", "camera", "lock", "cover", "climate", "fan", "switch", "input_boolean", "media_player", "vacuum", "number", "input_number", "light", "navigation", "entity_group"]
             buckets = {}
             for entity, card in zip(entries, rendered, strict=True):
-                domain = "navigation" if entity.get("page") else "entity_group" if entity["template"] == "hc_entity_group_card" else str(entity.get("entity_id") or "").split(".", 1)[0]
+                domain = "ha_card" if entity.get("template") == "ha_card" else "navigation" if entity.get("page") else "entity_group" if entity["template"] == "hc_entity_group_card" else str(entity.get("entity_id") or "").split(".", 1)[0]
                 buckets.setdefault(domain, []).append(card)
             groups = [(buckets[domain], 2 if domain in ("sensor", "binary_sensor", "switch", "input_boolean", "number", "input_number", "light", "navigation", "entity_group") else 1)
                       for domain in [*domains, *(key for key in buckets if key not in domains)] if buckets.get(domain)]
@@ -2533,6 +2562,16 @@ def _alarm_popup(entity: dict[str, Any]) -> dict[str, Any]:
 
 
 def _room_entity_card(entity: dict[str, Any]) -> dict[str, Any]:
+    from .page_model import access_template
+    if entity.get("template"):
+        entity = {**entity, "template": access_template(entity)}
+    if entity.get("template") == "hc_access_action_card":
+        variables = entity.get("variables") or {}
+        service = variables.get("action_service") or ("lock.lock" if entity["entity_id"].startswith("lock.") else "cover.close_cover")
+        return _entity_card({**entity, "variables": {**variables, "action_service": service,
+            "action_label_key": variables.get("action_label_key", "common.lock" if service == "lock.lock" else "common.close")}})
+    if entity.get("template") == "hc_access_hold_action_card" and not _is_access_entity(entity):
+        return _page_action_card(entity)
     if entity.get("template") == "hc_access_slide_action_card":
         return _entity_card(entity)
     if entity.get("template") == "hc_security_card" and "tap_action" not in entity:
@@ -2540,7 +2579,7 @@ def _room_entity_card(entity: dict[str, Any]) -> dict[str, Any]:
                      **(entity.get("variables") or {})}
         return _entity_card({**entity, "variables": variables})
     if _is_access_entity(entity):
-        if _is_open_only_access(entity):
+        if _is_open_only_access(entity) and (entity.get("variables") or {}).get("access_mode") != "popup":
             return _access_action_card(
                 entity,
                 name=entity.get("name") or _friendly_name(entity["entity_id"]),
@@ -2931,6 +2970,8 @@ def _access_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any
             ),
         ]
 
+    if _is_open_only_access(entity):
+        actions = actions[:1]
     popup_cards = [_control_grid(actions, 1)]
     return {
         **_popup_header((entity.get("variables") or {}).get("popup_hash") or _access_popup_hash(entity["entity_id"]), entity["entity_id"], name, icon),

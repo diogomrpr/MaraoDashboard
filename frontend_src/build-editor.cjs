@@ -10,6 +10,8 @@ const check = process.argv.includes("--check");
 
 const generatedFiles = [
   "MaraoDashboardPanel.js",
+  "MaraoLovelaceEditor.js",
+  "YAML.LICENSE.txt",
   "MaraoDashboardPanel.css",
   "MaraoDashboardEditorLabels.js",
   "MaraoDashboardJsonEditor.js",
@@ -50,6 +52,7 @@ async function build() {
     fs.writeFileSync(path.join(outputRoot, "MaraoNativeCatalog.js"), catalogSource);
     const result = await esbuild.build({
       entryPoints: {
+        MaraoLovelaceEditor: path.join(repoRoot, "frontend_src", "lovelace-editor.js"),
         MaraoDashboardPanel: path.join(repoRoot, "frontend_src", "MaraoDashboardPanel.js"),
         MaraoDashboardEditorLabels: path.join(repoRoot, "frontend_src", "editor-labels.js"),
         MaraoNativeCardEditor: path.join(repoRoot, "frontend_src", "MaraoNativeCardEditor.js"),
@@ -99,6 +102,7 @@ async function build() {
         throw new Error('Chart.js must remain in the on-demand numeric detail bundle.');
       }
     }
+    fs.copyFileSync(path.join(repoRoot, "node_modules", "yaml", "LICENSE"), path.join(outputRoot, "YAML.LICENSE.txt"));
     fs.copyFileSync(
       path.join(repoRoot, "node_modules", "monaco-editor", "LICENSE"),
       path.join(outputRoot, "MonacoEditor.LICENSE.txt"),

@@ -5,7 +5,7 @@ import re
 
 from . import generator as g
 from .editor import EDITOR_CATALOG
-from .page_model import page_sections
+from .page_model import access_template, page_sections
 
 NATIVE_MARKER = {"mode": "native", "version": 1}
 DIRECT_CARDS = {
@@ -97,7 +97,7 @@ def compile_card(config, instance, url_path, entities=None, language="en", valid
     variables = deepcopy(config.get("variables", {}))
     if not isinstance(variables, dict):
         raise ValueError("Native card variables must be an object")
-    role = spec["id"]
+    role = access_template({**config, "template": spec["id"]})
     if role == "hc_camera_card":
         from .page_model import camera_popup_stream
         camera_popup_stream(config.get("entity"), variables)

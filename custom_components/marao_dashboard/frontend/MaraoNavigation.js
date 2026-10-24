@@ -314,8 +314,9 @@ export class MaraoNavbarCard extends BaseElement {
     if (!this._pageRefresh) {
       const row = this._pageRefresh = document.createElement('div');
       row.setAttribute('data-marao-page-refresh', '');
+      // HA flexes every view child; keep the refresh row from absorbing spare height.
       row.attachShadow({ mode: 'open' }).innerHTML = `<style>
-        :host{display:flex;flex-direction:row!important;justify-content:flex-end;box-sizing:border-box;width:100%;height:60px;min-height:60px;min-width:0;flex:none;padding:12px 12px 0}
+        :host{display:flex;flex-direction:row!important;justify-content:flex-end;box-sizing:border-box;width:100%;height:60px;min-height:60px;min-width:0;flex:none!important;padding:12px 12px 0}
         button{display:grid;place-items:center;box-sizing:border-box;min-width:48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow,0 1px 6px rgba(0,0,0,.12));cursor:pointer;appearance:none;-webkit-appearance:none;-webkit-tap-highlight-color:transparent}
         button:active:not(:disabled){transform:scale(.92)}button:disabled{opacity:.5;cursor:default}button:focus{outline:none}
       </style><button type="button" class="frontend-refresh"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-2.6L20 7M4 17l2.4 2.6A7 7 0 0 0 17.9 17"/></svg></button>`;

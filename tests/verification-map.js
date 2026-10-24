@@ -73,6 +73,7 @@ const components = {
       browser('slider-headers:access', 'test-ha-security', ['--scenario', 'iphone-normal']),
       browser('access-label:android-gesture', 'test-ha-security', ['--scenario', 'android-normal']),
     ] },
+  'lovelace-cards': { units: [['lovelace-model'], ['marao-control-grid'], ['editor-panel']], python: ['test_card_yaml', 'test_history'], editor: true, browser: [] },
   'editor-rendering': { units: [['editor-model'], ['canonical-page-model'], ['page-manager-model'], ['editor-panel'], ['editor-drag'], ['json-editor']],
     python: ['test_page_generation', 'test_page_migration'], editor: true,
     browser: [
@@ -173,6 +174,7 @@ const rules = [
   [/^frontend_src\/power-history\.js$|^tests\/frontend\/power-history\.test\.js$/, ['chart-details']],
   [/^frontend_src\/history-(chart|data)\.js$|^custom_components\/marao_dashboard\/frontend\/(MaraoHistory|ChartJS\.LICENSE|KurkleColor\.LICENSE)/, ['chart-details']],
   [/^tests\/test-history-chart-local\.js$|^tests\/history-detail-checks\.js$|^ha-test\/history-fixture\.js$/, ['chart-details']],
+  [/^frontend_src\/lovelace-(?:model|loader|editor)\.js$|^custom_components\/marao_dashboard\/(?:card_yaml\.py|frontend\/(?:MaraoLovelaceEditor\.js|YAML\.LICENSE\.txt))$|^tests\/frontend\/lovelace-cards\.fixture\.json$/, ['lovelace-cards']],
   [/^tests\/editor-preload-checks\.js$/, ['editor-preload']],
   [/^tests\/(test-camera-live-local|test-ha-camera-latency|test-ha-camera-streams|camera-live-native-checks|camera-slow-native-checks|camera-request-ledger|camera-media-shaper)\.js$|^tests\/frontend\/(?:marao-camera-adaptive|camera-media-shaper)\.test\.js$|^tests\/components\/marao_dashboard\/test_camera_(?:media|events)\.py$|^custom_components\/marao_dashboard\/(?:camera_(?:events|sessions|media)\.py|frontend\/(?:MaraoCamera(?:Adaptive|Preload)?\.js|MaraoHls\.js|HlsJS\.LICENSE\.txt))$|^frontend_src\/camera-hls\.js$|^ha-test\/camera-live-fixture\.js$|^ha-test\/generate-camera-live\.(?:js|py)$|^ha-test\/custom_components\/(?:marao_test_camera|unifiprotect|netatmo)\//, ['camera']],
   [/^tests\/control-grid-checks\.js$/, ['control-grid']],

@@ -395,7 +395,7 @@ export function cardForEntity(catalog, entity) {
     sensor: "hc_sensor_card",
     switch: "hc_switch_card",
     vacuum: "hc_vacuum_card",
-    weather: 'hc_weather_card', alarm_control_panel: 'hc_security_card', button: 'hc_access_hold_action_card', scene: 'hc_switch_card',
+    weather: 'hc_weather_card', alarm_control_panel: 'hc_security_card', button: 'hc_access_card', script: 'hc_access_card', scene: 'hc_switch_card',
   };
   return catalog.cards.find((card) => card.id === defaults[domain]) || null;
 }
@@ -605,6 +605,10 @@ export function validatePages(config, catalog) {
           if (!safeId(card.id) || ids.has(card.id)) errors.push('Each local card identity must be safe and unique within its page.');
           ids.add(card.id);
         }
+        if (card.template === 'ha_card') {
+          if (typeof card.yaml !== 'string' || !card.yaml.trim()) errors.push('Home Assistant card YAML must be nonempty text.');
+          continue;
+        }
         if (card.template != null && (typeof card.template !== 'string' || catalog && !templates.has(card.template))) errors.push('Choose a supported page card template.');
         if (card.entity_id != null && !entityId(card.entity_id)) errors.push('Page card entity_id must be a valid entity.');
         if (!freeRoles.has(card.template) && !card.entity_id && !Object.hasOwn(card, 'page')) errors.push('Bind or remove the draft card before generation.');
@@ -613,7 +617,17 @@ export function validatePages(config, catalog) {
         if (card.variables != null && !object(card.variables)) errors.push('Card options must be an object.');
         const options = object(card.variables) ? card.variables : {};
         if (card.template === 'hc_vacuum_card' && ['action_1', 'action_2', 'action_3'].some(key => object(options[key]) && Object.hasOwn(options[key], 'data') && !object(options[key].data))) errors.push('Vacuum action data must be an object');
-        if (card.template === 'hc_access_slide_action_card') {
+        let accessRole = card.template;
+        if (['hc_access_card', 'hc_access_slide_action_card', 'hc_access_action_card', 'hc_access_hold_action_card'].includes(accessRole)) {
+          const mode = options.access_mode ?? 'auto', domain = card.entity_id?.split('.')[0];
+          const modes = { popup: ['lock', 'cover'], slide: ['lock', 'cover', 'button', 'switch', 'script'], close: ['lock', 'cover'], hold: ['button', 'switch', 'input_boolean', 'alarm_control_panel'] };
+          if (mode !== 'auto' && (!Object.hasOwn(modes, mode) || !modes[mode].includes(domain))) errors.push('Access behavior is incompatible with the selected entity.');
+          accessRole = ({ popup: 'hc_access_card', slide: 'hc_access_slide_action_card', close: 'hc_access_action_card', hold: 'hc_access_hold_action_card' })[mode] || accessRole;
+          if (mode === 'auto' && accessRole === 'hc_access_card' && !['lock', 'cover'].includes(domain)) accessRole = domain === 'script' ? 'hc_access_slide_action_card' : 'hc_access_hold_action_card';
+          if (accessRole === 'hc_access_action_card' && options.action_service && options.action_service !== ({lock: 'lock.lock', cover: 'cover.close_cover'})[domain]) errors.push('Use an access opener slide for opening or unlocking');
+        }
+        if (accessRole === 'hc_access_action_card' && options.access_mode === 'close' && ['tap_action', 'hold_action', 'double_tap_action'].some(key => (card[key]?.action ?? 'none') !== 'none')) errors.push('Close and lock cards use their explicit safe service');
+        if (accessRole === 'hc_access_slide_action_card') {
           const opener = { lock: 'lock.unlock', cover: 'cover.open_cover', button: 'button.press', switch: 'switch.turn_on', script: 'script.turn_on' }[card.entity_id?.split('.')[0]];
           if (!opener || (Object.hasOwn(options, 'action_service') ? options.action_service : opener) !== opener) errors.push("Access opener must use its selected entity's native opening service");
           if (['tap_action', 'hold_action', 'double_tap_action'].some(key => (card[key]?.action ?? 'none') !== 'none')) errors.push('Access openers use only the strict slide');
@@ -627,7 +641,7 @@ export function validatePages(config, catalog) {
         if (card.template === 'hc_camera_card' && options.popup_stream_entity != null && options.popup_stream_entity !== '' && (!entityId(options.popup_stream_entity) || !options.popup_stream_entity.startsWith('camera.'))) errors.push('Choose a camera entity for the popup stream.');
         if (card.template === 'hc_room_card' && Object.hasOwn(options, 'light_entities') && (!Array.isArray(options.light_entities) || options.light_entities.some(value => !entityId(value) || !value.startsWith('light.')))) errors.push('Room lights must be an explicit list of light entities.');
         if (card.template === 'hc_media_app_card' && (typeof options.app_source !== 'string' || !options.app_source.trim())) errors.push('Media app requires an explicit source.');
-        if (card.template === 'hc_access_hold_action_card' && Object.hasOwn(card, 'tap_action')) {
+        if (accessRole === 'hc_access_hold_action_card' && Object.hasOwn(card, 'tap_action')) {
           const action = card.tap_action, button = card.entity_id?.startsWith('button.');
           const valid = object(action) && (button
             ? action.action === 'perform-action' && action.perform_action === 'button.press' && object(action.target) && Object.keys(action.target).length === 1 && action.target.entity_id === card.entity_id
@@ -879,11 +893,15 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
       variables: { type: 'object', additionalProperties: true },
       entities: { type: 'array', items: entityValue },
     }, allOf: [{ $ref: '#/$defs/cardOptions' }], additionalProperties: true };
+    const nativeValue = { type: 'object', required: ['template', 'yaml'], properties: {
+      template: { const: 'ha_card' }, id: freeValue.properties.id,
+      yaml: { type: 'string', minLength: 1, description: 'Complete inline Home Assistant card YAML, including type.' },
+    }, additionalProperties: true };
     const content = { ...entityContainer.properties,
       entities: { anyOf: [
-        { type: 'array', items: { anyOf: [...cardValue.anyOf, freeValue] } },
-        { type: 'object', additionalProperties: { type: 'array', items: { anyOf: [...cardValue.anyOf, freeValue] } } },
-        ...cardValue.anyOf, freeValue,
+        { type: 'array', items: { anyOf: [...cardValue.anyOf, freeValue, nativeValue] } },
+        { type: 'object', additionalProperties: { type: 'array', items: { anyOf: [...cardValue.anyOf, freeValue, nativeValue] } } },
+        ...cardValue.anyOf, freeValue, nativeValue,
       ] },
       cards: { type: 'array', items: rawCard },
     };

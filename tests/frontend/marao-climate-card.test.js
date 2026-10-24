@@ -452,6 +452,20 @@ test("light state palette colors share a dark foreground across card families", 
   }
 });
 
+test('lock and cover access actions use the same action palette across reported states', () => {
+  for (const kind of ['hc_access_action_card', 'hc_access_hold_action_card', 'hc_access_slide_action_card']) {
+    for (const color of ['var(--color-red)', 'var(--color-green)']) {
+      const lock = { entity: 'lock.fixture', variables: { action_color: color } };
+      const cover = { entity: 'cover.fixture', variables: { action_color: color } };
+      for (const [lockState, coverState] of [['locked', 'closed'], ['unlocked', 'open']]) {
+        assert.deepEqual(stateAppearance(kind, lockState, lock, {}), stateAppearance(kind, coverState, cover, {}));
+        assert.equal(stateAppearance(kind, lockState, lock, {}).background, color);
+      }
+      for (const state of ['unknown', 'unavailable']) assert.deepEqual(stateAppearance(kind, state, lock, {}), { unavailable: true });
+    }
+  }
+});
+
 test("number buttons use the entity step and limits", () => {
   const attributes = { min: 0, max: 10, step: 0.5 };
   assert.equal(numberStepValue(4, attributes, 1), 4.5);

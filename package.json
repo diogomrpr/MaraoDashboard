@@ -1,6 +1,6 @@
 {
   "name": "marao-dashboard",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "private": true,
   "description": "Marao Dashboard Home Assistant dashboard development tools",
   "scripts": {

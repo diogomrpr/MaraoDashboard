@@ -6,6 +6,8 @@ import re
 import math
 from typing import Any
 
+from .card_yaml import parse_card_yaml
+
 PAGE_FORMAT_VERSION = 2
 FREE_CARD_ROLES = {
     "hc_title_card", "hc_navigation_card", "hc_room_card",
@@ -15,6 +17,35 @@ FREE_CARD_ROLES = {
 ENTITY_ID = re.compile(r"[a-z0-9_]+\.[a-z0-9_]+")
 PAGE_PATH = re.compile(r"[a-z0-9][a-z0-9_-]*")
 LOCAL_ID = re.compile(r"[a-z][a-z0-9_-]{0,63}")
+
+
+ACCESS_ROLES = {
+    "popup": "hc_access_card", "slide": "hc_access_slide_action_card",
+    "close": "hc_access_action_card", "hold": "hc_access_hold_action_card",
+}
+
+
+def access_template(card: dict[str, Any]) -> str | None:
+    """Resolve presentation without rewriting the authored card or legacy aliases."""
+    role = card.get("template")
+    if role not in ACCESS_ROLES.values():
+        return role
+    mode = (card.get("variables") or {}).get("access_mode", "auto")
+    if mode not in ("auto", *ACCESS_ROLES):
+        raise ValueError("Choose a supported access behavior.")
+    domain = str(card.get("entity_id") or card.get("entity") or "").split(".")[0]
+    if mode == "auto":
+        if role != "hc_access_card" or domain in ("lock", "cover"):
+            return role
+        mode = "slide" if domain == "script" else "hold"
+    supported = {"popup": ("lock", "cover"), "slide": ("lock", "cover", "button", "switch", "script"),
+                 "close": ("lock", "cover"), "hold": ("button", "switch", "input_boolean", "alarm_control_panel")}
+    if domain not in supported[mode]:
+        raise ValueError("Access behavior is incompatible with the selected entity.")
+    safe_service = {"lock": "lock.lock", "cover": "cover.close_cover"}.get(domain)
+    if mode == "close" and (card.get("variables") or {}).get("action_service", safe_service) != safe_service:
+        raise ValueError("Use an access opener slide for opening or unlocking")
+    return ACCESS_ROLES[mode]
 
 
 def validate_light_options(options: dict[str, Any]) -> None:
@@ -157,6 +188,9 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                         raise ValueError("Each local card identity must be safe and unique within its page")
                     identities.add(identity)
                 role, entity = card.get("template"), card.get("entity_id")
+                if role == "ha_card":
+                    parse_card_yaml(card.get("yaml"))
+                    continue
                 if role is not None and (not isinstance(role, str) or role not in templates):
                     raise ValueError("Choose a supported page card template")
                 if entity is not None and (not isinstance(entity, str) or not ENTITY_ID.fullmatch(entity)):
@@ -177,6 +211,9 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                         action = options.get(key)
                         if isinstance(action, dict) and "data" in action and not isinstance(action["data"], dict):
                             raise ValueError("Vacuum action data must be an object")
+                role = access_template(card)
+                if role == "hc_access_action_card" and options.get("access_mode") == "close" and any(key in card and (not isinstance(card[key], dict) or card[key].get("action", "none") != "none") for key in ("tap_action", "hold_action", "double_tap_action")):
+                    raise ValueError("Close and lock cards use their explicit safe service")
                 if role == "hc_access_slide_action_card":
                     opener = {"lock": "lock.unlock", "cover": "cover.open_cover", "button": "button.press",
                               "switch": "switch.turn_on", "script": "script.turn_on"}.get((entity or "").split(".")[0])

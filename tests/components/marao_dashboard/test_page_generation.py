@@ -487,3 +487,23 @@ def test_power_device_option_remains_opaque_on_unrelated_card_families():
     resolved = g._resolve_pages(source, [])
     assert resolved["pages"][0]["_sections"][0]["ordered_cards"][0]["variables"]["power_devices"] == {"future_hook": []}
     assert source == before
+
+
+@pytest.mark.parametrize("mode,template,popup_count", [("popup", "hc_access_card", 1), ("slide", "hc_access_slide_action_card", 0), ("close", "hc_access_action_card", 0)])
+def test_unified_access_page_modes_resolve_without_rewriting_authored_configuration(mode, template, popup_count):
+    source = {"config_version": 2, "name": "Test", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [
+        {"id": "safe", "entity_id": "lock.safe", "template": "hc_access_card", "name": "Custom", "variables": {"access_mode": mode, "future": []}}
+    ]}]}
+    before = deepcopy(source)
+    item = g._resolve_pages(source)["pages"][0]["_sections"][0]["ordered_cards"][0]
+    assert g._page_card(item, "marao-dashboard")["template"] == template
+    assert len(g._page_card_popups(item)) == popup_count
+    assert source == before
+
+
+def test_explicit_popup_on_open_only_door_offers_only_supported_opening_control():
+    from custom_components.marao_dashboard.native import compile_card, native_type
+    result = compile_card({"type": native_type("hc_access_card"), "entity": "cover.safe", "variables": {"access_mode": "popup"}},
+                          "native-door", "marao-dashboard", [{"entity_id": "cover.safe", "supported_features": 1, "device_class": "door"}])
+    assert result["card"]["template"] == "hc_access_card"
+    assert len(result["popups"][0]["cards"][0]["cards"]) == 1

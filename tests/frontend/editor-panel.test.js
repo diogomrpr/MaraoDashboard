@@ -14,7 +14,7 @@ const context = vm.createContext({
   ...model,
   cameraTitleFields: nativeModel.cameraTitleFields, formData: nativeModel.formData,
   patchForm: nativeModel.patchForm, sameFormValue: nativeModel.same,
-  performance, URL, AbortController,
+  performance, URL, AbortController, setTimeout, clearTimeout,
   document: { hidden: false },
   requestAnimationFrame: callback => callback(),
   PT_LABELS, MOVE_PT_LABELS,
@@ -406,6 +406,62 @@ test('late metadata responses cannot update a reconnected panel lifecycle', asyn
   await loading; assert.equal(p._entities, entities); assert.equal(p._metadataLoading, null);
 });
 
+test('HA registry snapshots and new states invalidate metadata, ordinary state changes do not', () => {
+  const p = panel(canonical()); p.isConnected = true; p._loaded = true;
+  let refreshes = 0;
+  p._scheduleMetadataRefresh = () => { refreshes++; };
+  const form = {};
+  p.shadowRoot.querySelectorAll = () => [form];
+  const entities = {}, areas = {}, devices = {}, connection = {};
+  p.hass = { entities, areas, devices, connection, connected: true, states: { 'light.test': {} } };
+  refreshes = 0;
+  const before = p._source();
+  p.hass = { ...p._hass, states: { 'light.test': { state: 'on' } } };
+  assert.equal(refreshes, 0);
+  assert.equal(form.hass, p._hass, 'Native HA forms receive the current hass object');
+  p.hass = { ...p._hass, entities: { 'light.new': {} } };
+  assert.equal(refreshes, 1);
+  p.hass = { ...p._hass, states: { ...p._hass.states, 'light.new': {} } };
+  assert.equal(refreshes, 2);
+  p.hass = { ...p._hass, areas: { office: {} } };
+  p.hass = { ...p._hass, devices: { device: {} } };
+  p.hass = { ...p._hass, connected: false };
+  p.hass = { ...p._hass, connected: true };
+  assert.equal(refreshes, 5);
+  assert.equal(p._source(), before);
+});
+
+test('live metadata coalesces events, refreshes after older work and cancels on removal', async () => {
+  const oldSet = context.setTimeout, oldClear = context.clearTimeout;
+  let next = 0;
+  const timers = new Map();
+  context.setTimeout = callback => { timers.set(++next, callback); return next; };
+  context.clearTimeout = id => timers.delete(id);
+  try {
+    let resolve, calls = 0, updates = 0;
+    const p = loadingPanel(() => { calls++; return new Promise(done => { resolve = done; }); });
+    p._loaded = true; p._dirty = true; p._jsonDraft = '{ unsaved }';
+    const before = p._source();
+    p.shadowRoot.querySelectorAll = () => [{ _metadataUpdated() { updates++; } }];
+    const older = p._ensureEditorContext(); await Promise.resolve();
+    p._scheduleMetadataRefresh(); p._scheduleMetadataRefresh();
+    assert.equal(timers.size, 1);
+    const callback = [...timers.values()][0]; timers.clear();
+    const refreshed = callback();
+    resolve({ editor: { entities: [], areas: [], catalog: { cards: [] } } });
+    await older; await Promise.resolve(); await Promise.resolve();
+    assert.equal(calls, 2, 'A registry change cannot reuse an older in-flight snapshot');
+    resolve({ editor: { entities: [{ entity_id: 'light.new' }], areas: [], catalog: { cards: [] } } });
+    await refreshed;
+    assert.equal(p._entities[0].entity_id, 'light.new'); assert.equal(updates, 2);
+    assert.equal(p._source(), before); assert.equal(p._jsonDraft, '{ unsaved }'); assert.equal(p._dirty, true);
+    p._scheduleMetadataRefresh(); const cancelled = [...timers.values()][0];
+    p.isConnected = false; p.disconnectedCallback();
+    assert.equal(timers.size, 0);
+    await cancelled(); assert.equal(calls, 2, 'Removed panels cannot request metadata');
+  } finally { context.setTimeout = oldSet; context.clearTimeout = oldClear; }
+});
+
 test('energy controls retain explicit zero and Auto removes only its override',()=>{
   const p=panel({name:'Energy',rooms:[]});
   const precision={key:'display_precision',kind:'energy_precision',label:'Decimal places'};
@@ -459,6 +515,46 @@ test('a replaced document, busy mode or JSON tab rejects a pending move', () => 
     const before = p._source();
     assert.equal(p._commitCardMove(source, 0, 2), false); assert.equal(p._source(), before);
   }
+});
+
+test('restored editor focus cannot reveal an off-screen control, while keyboard focus still can', () => {
+  const p = panel(canonical()), visual = {}, reveals = [], focuses = [];
+  p.shadowRoot = {
+    getElementById: () => visual,
+    querySelector: () => ({ getBoundingClientRect: () => ({ bottom: 100 }) }),
+  };
+  const target = {
+    localName: 'button', style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 48 }),
+    scrollIntoView: options => reveals.push(options),
+    focus(options) { focuses.push(options); p._revealFocusedControl({ composedPath: () => [target, visual] }); },
+  };
+  p._focusWithoutScroll(target);
+  assert.equal(focuses[0].preventScroll, true);
+  assert.equal(reveals.length, 0, 'Programmatic focus restoration must not move the page');
+  assert.equal(p._restoringFocus, false);
+  p._revealFocusedControl({ composedPath: () => [target, visual] });
+  assert.equal(reveals.length, 1, 'Keyboard focus still reveals a control hidden by the sticky header');
+  p._pressedPath = [target];
+  p._revealFocusedControl({ composedPath: () => [target, visual] });
+  assert.equal(reveals.length, 1, 'Pointer focus cannot shift a button before its click completes');
+  assert.throws(() => p._focusWithoutScroll({ focus() { throw new Error('Detached focus'); } }), /Detached focus/);
+  assert.equal(p._restoringFocus, false, 'A failed restoration must not disable subsequent keyboard reveal');
+});
+
+test('card moves restore the handle without scrolling its whole row into view', async () => {
+  const p = panel(canonical()), source = p._cardSource('page', '0:0', 0);
+  let focused = 0;
+  const row = {
+    isConnected: true, closest: () => ({ updateComplete: Promise.resolve() }),
+    querySelector: () => ({ focus(options) { focused++; assert.equal(options.preventScroll, true); assert.equal(p._restoringFocus, true); } }),
+    scrollIntoView() { assert.fail('A drop or arrow action must keep the current viewport'); },
+  };
+  p.shadowRoot.querySelector = () => row;
+  await p._focusMovedCard(source, 0);
+  assert.equal(focused, 1);
+  row.isConnected = false;
+  await p._focusMovedCard(source, 0);
+  assert.equal(focused, 1, 'Detached rows cannot steal focus');
 });
 
 test('page expansion is presentation-only and reconciles unique identity across accepted documents', () => {
@@ -898,6 +994,33 @@ test('builder camera title controls share defaults and preserve retired options 
   assert.equal(PT_LABELS['Show title'],'Mostrar título');
 });
 
+test('entity-first cards keep the selected ID separate from display names and reject name bindings', () => {
+  const p = panel(canonical()), handlers = {}, forms = [];
+  const entityId = 'light.device_123', displayName = 'Kitchen ceiling';
+  p._model.pages[0].sections[0].entities = [];
+  p._entities = [{ entity_id: entityId, name: displayName, domain: 'light', has_state: true }];
+  p._catalog = { cards: [{ id: 'hc_light_card', label: 'Light', domains: ['light'], variables: [] }] };
+  const nodes = new Map(), content = { querySelector(key) {
+    if (!nodes.has(key)) nodes.set(key, { addEventListener(type, fn) { handlers[key + type] = fn; } });
+    return nodes.get(key);
+  } };
+  p._dialog = () => ({ querySelector: () => content }); p._availablePages = () => [];
+  p._mountForm = (host, data, schema, changed) => forms.push({ data, changed });
+  let error;
+  p._renderSummary = (...args) => { error = args.at(-1); };
+  p._refreshEnergyFields = p._closeDialog = p._refreshCards = () => {};
+  p._openCardEditor('0:0', null, 'hc_light_card', 'page', entityId);
+  assert.equal(forms[0].data.entity_id, entityId);
+  forms[0].changed({ ...forms[0].data, entity_id: displayName });
+  handlers['[data-save]click']();
+  assert.equal(p._model.pages[0].sections[0].entities.length, 0);
+  assert.equal(error, 'Page card entity_id must be a valid entity.');
+  forms[0].changed({ ...forms[0].data, entity_id: entityId, name: displayName });
+  handlers['[data-save]click']();
+  const saved = p._model.pages[0].sections[0].entities[0];
+  assert.equal(saved.entity_id, entityId); assert.equal(saved.name, displayName);
+});
+
 test('energy breakdown editing keeps a private draft and preserves ordered unknown row fields', () => {
   const p = panel(canonical()), handlers = {}, forms = [];
   const original = { id: 'energy', entity_id: 'sensor.total', template: 'hc_energy_period_card', variables: {
@@ -925,4 +1048,16 @@ test('energy breakdown editing keeps a private draft and preserves ordered unkno
   assert.deepEqual(saved().variables, { future: true, cost_per_kwh: 0, sub_entities: [original.variables.sub_entities[1], { ...original.variables.sub_entities[0], name: 'Renamed' }] });
   update([]); handlers['[data-save]click']();
   assert.deepEqual(saved().variables.sub_entities, []);
+});
+
+test('a dismissed card picker cannot block adding cards to any section', () => {
+  const p = panel(canonical());
+  const reached = new Error('new card picker requested');
+  p._dialog = () => { throw reached; };
+  p._galleryDialog = { open: true, isConnected: false };
+  for (const position of ['0:0', '1:0']) {
+    assert.throws(() => p._openCardGallery(position, 'page'), error => error === reached);
+  }
+  p._galleryDialog = { open: true, isConnected: true };
+  assert.doesNotThrow(() => p._openCardGallery('0:0', 'page'), 'A real open picker still prevents duplicates');
 });

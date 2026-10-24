@@ -202,3 +202,18 @@ test('native grids reflow ordinary and access cards without changing owned contr
   assert.match(styles[1].textContent, /max-width:160px/);
   assert.equal(runtime.fitNativeGrid({ parentElement: { localName: 'marao-control-grid', parentElement: item } }, 76), undefined);
 });
+
+test('unified access modes retain strict controls, source options and compact aliases', () => {
+  for (const [mode, template] of [['popup', 'hc_access_card'], ['slide', 'hc_access_slide_action_card'], ['close', 'hc_access_action_card']]) {
+    const source = { template: 'hc_access_card', entity: 'lock.safe', variables: { access_mode: mode, future: [] } };
+    const before = structuredClone(source), result = runtime.accessCardConfig(source);
+    assert.equal(result.template, template);
+    assert.deepEqual(source, before);
+    if (mode === 'close') assert.equal(result.variables.action_service, 'lock.lock');
+  }
+  assert.throws(() => runtime.accessCardConfig({template: 'hc_access_card', entity: 'lock.safe', variables: {access_mode: 'slide'}, tap_action: {action:'toggle'}}), /strict slide/);
+  assert.throws(() => runtime.accessCardConfig({template: 'hc_access_card', entity: 'button.safe', variables: {access_mode: 'popup'}}), /incompatible/);
+  assert.equal(runtime.accessCardConfig({template: 'hc_access_card', entity: 'button.safe'}).template, 'hc_access_hold_action_card');
+  const old = {template:'hc_access_slide_action_card', entity:'lock.safe', variables:{future:true}};
+  assert.equal(runtime.accessCardConfig(old), old);
+});

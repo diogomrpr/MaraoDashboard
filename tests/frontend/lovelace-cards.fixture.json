@@ -1,0 +1,62 @@
+{
+  "source": "# Keep this comment\ntype: custom:button-card\nname: Native test\nvariables: [one, two]\nbase: &base\n  color: blue\n  enabled: false\noptions:\n  <<: *base\n  color: red\nfuture:\n  empty: []\n  state: \"on\"\n  unset: null\ncards:\n  - type: custom:mini-graph-card\n    entities: [sensor.safe]\n",
+  "expected": {
+    "type": "custom:button-card",
+    "name": "Native test",
+    "variables": [
+      "one",
+      "two"
+    ],
+    "base": {
+      "color": "blue",
+      "enabled": false
+    },
+    "options": {
+      "color": "red",
+      "enabled": false
+    },
+    "future": {
+      "empty": [],
+      "state": "on",
+      "unset": null
+    },
+    "cards": [
+      {
+        "type": "custom:mini-graph-card",
+        "entities": [
+          "sensor.safe"
+        ]
+      }
+    ]
+  },
+  "invalid": [
+    "",
+    "[]",
+    "type: 1",
+    "type: ''",
+    "type: tile\ntype: button",
+    "type: tile\nx: !include secrets.yaml",
+    "type: tile\nx: !secret password",
+    "type: tile\n---\ntype: button",
+    "type: tile\nx: .nan",
+    "type: tile\nx: &loop [*loop]",
+    "type: tile\nx: 2026-01-01",
+    "type: tile\n1: value",
+    "type: tile\nx: {name: a, name: b}",
+    "type: markdown\nx: !!set {a: null}",
+    "type: markdown\nx: !!binary YQ==",
+    "type: markdown\nx: &x {<<: *x}"
+  ],
+  "scalars": {
+    "1e3": "1e3",
+    "1.0e3": "1.0e3",
+    "1.0e+3": 1000,
+    "-.5": "-.5",
+    "-.5e+3": "-.5e+3",
+    ".5": 0.5,
+    "1:20": 80,
+    "012": 10,
+    "0o12": "0o12",
+    "1_000": 1000
+  }
+}

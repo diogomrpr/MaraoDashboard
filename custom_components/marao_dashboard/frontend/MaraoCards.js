@@ -65,6 +65,35 @@ export function accessOpenerService(entity, configured) {
   return native && (!configured || configured === native) ? native : "";
 }
 
+export function accessCardConfig(config, hass) {
+  const roles = { popup: "hc_access_card", slide: "hc_access_slide_action_card", close: "hc_access_action_card", hold: "hc_access_hold_action_card" };
+  if (!Object.values(roles).includes(config.template)) return config;
+  let mode = config.variables?.access_mode ?? "auto";
+  const domain = domainOf(config.entity);
+  if (mode === "auto") {
+    if (config.template !== "hc_access_card" || ["lock", "cover"].includes(domain)) return config;
+    mode = domain === "script" ? "slide" : "hold";
+  }
+  const domains = { popup: ["lock", "cover"], slide: ["lock", "cover", "button", "switch", "script"], close: ["lock", "cover"], hold: ["button", "switch", "input_boolean", "alarm_control_panel"] };
+  if (!Object.hasOwn(domains, mode) || !domains[mode].includes(domain)) throw new Error(localize("access.invalid_behavior", hass, {}, "Access behavior is incompatible with the selected entity."));
+  const variables = { ...config.variables };
+  if (mode === "slide") {
+    if (!accessOpenerService(config.entity, variables.action_service)) throw new Error(localize("access.native_service", hass, {}, "Access opener must use its selected entity's native opening service"));
+    if (["tap_action", "hold_action", "double_tap_action"].some(key => config[key] && config[key].action !== "none")) throw new Error(localize("access.strict_slide", hass, {}, "Access openers use only the strict slide"));
+  }
+  let tap_action = config.tap_action;
+  if (mode === "close") {
+    const service = domain === "lock" ? "lock.lock" : "cover.close_cover";
+    if (variables.action_service && variables.action_service !== service) throw new Error(localize("access.slide_required", hass, {}, "Use the access slide to open or unlock."));
+    variables.action_service = service;
+    variables.action_label_key ??= domain === "lock" ? "common.lock" : "common.close";
+  }
+  if (mode === "hold" && !tap_action && !variables.action_service) tap_action = domain === "button"
+    ? { action: "perform-action", perform_action: "button.press", target: { entity_id: config.entity } }
+    : { action: "toggle" };
+  return { ...config, template: roles[mode], variables, ...(tap_action ? { tap_action } : {}) };
+}
+
 const alarmModes = [
   ["home", 1], ["away", 2], ["night", 4], ["custom_bypass", 16], ["vacation", 32],
 ];
@@ -239,6 +268,7 @@ function presentationState(state, entity, kind) {
 }
 
 export function binaryState(entity, state, kind = "hc_base_card") {
+  if (["hc_access_action_card", "hc_access_hold_action_card", "hc_access_slide_action_card"].includes(kind)) return null;
   if (["hc_title_card", "hc_cover_card", "hc_climate_card", "hc_media_card", "hc_media_app_card", "hc_camera_card", "hc_security_card", "hc_weather_card", "hc_vacuum_card", "hc_dishwasher_card", "hc_scene_card", "hc_number_card", "hc_wallbox_current_card", "hc_battery_card"].includes(kind)) return null;
   const value = text(state?.state);
   const domain = domainOf(entity);
@@ -1106,6 +1136,7 @@ export class MaraoCard extends BaseElement {
     if (this._authoritativeHass) this.hass = this._authoritativeHass;
   }
   setConfig(config) {
+    config = accessCardConfig(config, this._hass);
     this._layoutMetadata = {};
     if (config.template === 'hc_light_card' && Object.hasOwn(config.variables || {}, 'use_light_color') && typeof config.variables.use_light_color !== 'boolean') throw new Error(localize('light.invalid_color_background', this._hass, {}, 'Use light color as background must be a boolean.'));
     if (config.template === 'hc_camera_card' && Object.hasOwn(config.variables || {}, 'preload_stream') && typeof config.variables.preload_stream !== 'boolean') throw new Error(localize('camera.invalid_preload', this._hass, {}, 'Preload stream must be a boolean.'));
@@ -1676,7 +1707,7 @@ export class MaraoCard extends BaseElement {
       : !loading && Array.isArray(summaryEntities) && summaryEntities.length ? summaryState(summaryEntities, this._hass) : null;
     const state = summary ? { ...originalState, state: summary.state } : configuredKind === "hc_room_card" ? { ...originalState, state: "off" } : originalState;
     const accessService = variables.action_service || config.tap_action?.service || config.tap_action?.perform_action;
-    const requiresSlide = configuredKind.startsWith("hc_access_") && ["lock.unlock", "cover.open_cover"].includes(accessService);
+    const requiresSlide = variables.access_mode !== "popup" && configuredKind.startsWith("hc_access_") && ["lock.unlock", "cover.open_cover"].includes(accessService);
     const kind = requiresSlide ? "hc_access_slide_action_card" : entityGroup ? 'hc_navigation_card' : configuredKind;
     const camera = kind === "hc_camera_card";
     const graphEntity = text(variables.graph_entity || variables.power_entity || (["hc_graph_card", "hc_toggle_graph_card"].includes(kind) ? entity : ""));
@@ -2206,9 +2237,11 @@ export class MaraoControlGrid extends BaseElement {
   setConfig(config) {
     if (!config || typeof config !== 'object' || Array.isArray(config) || !Number.isInteger(config.columns ?? 2)
       || (config.columns ?? 2) < 1 || (config.columns ?? 2) > 6 || !Array.isArray(config.cards)
-      || config.cards.some(card => !card || typeof card !== 'object' || Array.isArray(card) || typeof card.type !== 'string'
-        || ['custom:marao-navbar-card', 'custom:marao-popup-card'].includes(card.type)
-        || card.variables != null && (typeof card.variables !== 'object' || Array.isArray(card.variables)))
+      || config.native_cards != null && (!Array.isArray(config.native_cards) || new Set(config.native_cards).size !== config.native_cards.length
+        || config.native_cards.some(index => !Number.isInteger(index) || index < 0 || index >= config.cards.length))
+      || config.cards.some((card, index) => !card || typeof card !== 'object' || Array.isArray(card) || typeof card.type !== 'string'
+        || !config.native_cards?.includes(index) && ['custom:marao-navbar-card', 'custom:marao-popup-card'].includes(card.type)
+        || !config.native_cards?.includes(index) && card.type.startsWith('custom:marao-') && card.variables != null && (typeof card.variables !== 'object' || Array.isArray(card.variables)))
       || config.groups != null && (!Array.isArray(config.groups) || config.groups.some((group, index, groups) =>
         !group || !Number.isInteger(group.count) || group.count < 1 || !Number.isInteger(group.columns) || group.columns < 1 || group.columns > 6)
         || config.groups.reduce((count, group) => count + group.count, 0) !== config.cards.length)) {
@@ -2217,6 +2250,7 @@ export class MaraoControlGrid extends BaseElement {
     this._config = structuredClone({ ...config, columns: config.columns ?? 2 });
     this._ready = this._mount();
   }
+  _native(config, index) { return config.native_cards?.includes(index) || !config.cards[index].type.startsWith('custom:marao-'); }
   get preview() { return Boolean(this._preview); }
   set preview(value) { this._preview = Boolean(value); this._forward(); }
   set hass(value) { this._hass = value; this._forward(); }
@@ -2247,13 +2281,16 @@ export class MaraoControlGrid extends BaseElement {
       let column = 0;
       for (let n = 0; n < group.count; n++, index++) {
         const child = this._children[index], childConfig = config.cards[index];
-        const structural = childConfig.template === 'hc_title_card' || /marao-native-title-card$/.test(childConfig.type);
+        if (child.hidden) continue;
+        const native = this._native(config, index);
+        const structural = !native && (childConfig.template === 'hc_title_card' || /marao-native-title-card$/.test(childConfig.type));
         if (structural) {
           if (column) { row++; column = 0; }
           rows[row] = 'auto'; child.style.gridColumn = '1 / -1'; child.style.gridRow = String(++row);
           continue;
         }
-        rows[row] = 'minmax(0,1fr)';
+        rows[row] = native || rows[row] === 'auto' ? 'auto' : 'minmax(0,1fr)';
+        if (native) child.style.alignSelf = 'start';
         child.style.gridColumn = `${1 + column * span} / span ${span}`;
         child.style.gridRow = String(row + 1);
         if (++column === count) { column = 0; row++; }
@@ -2270,7 +2307,14 @@ export class MaraoControlGrid extends BaseElement {
       if (config.cards.length) {
         const helpers = localCardHelpers(config.cards) || await globalThis.loadCardHelpers?.();
         if (!helpers?.createCardElement) throw new Error(localize('popup.controls_unavailable', this._hass, {}, 'Controls unavailable'));
-        for (const childConfig of config.cards) {
+        for (const [index, childConfig] of config.cards.entries()) {
+          if (this._native(config, index)) {
+            const child = document.createElement('hui-card');
+            if (typeof child.load !== 'function') throw new Error(localize('popup.controls_unavailable', this._hass, {}, 'Controls unavailable'));
+            child.config = childConfig; child.preview = this.preview; child.hass = this._hass;
+            child.addEventListener('card-visibility-changed', event => { event.stopPropagation(); if (request === this._request) this._layout(); });
+            child.load(); children.push(child); continue;
+          }
           if (request !== this._request) return;
           const created = helpers.createCardElement(childConfig);
           const child = typeof created?.then === 'function' ? await created : created;

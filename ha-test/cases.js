@@ -103,6 +103,7 @@ function expandGallery(source) {
     {type:'custom:marao-card',template:'hc_camera_card',entity:'camera.marao_dashboard_test_netatmo',show_name:false,tap_action:{action:'fullscreen'}},
     {type:'custom:marao-camera-events-card',entity:'camera.marao_dashboard_test_netatmo',event_provider:'netatmo'},
   ]});
+  view.cards.push({ type: 'custom:marao-card', template: 'hc_access_card', entity: 'lock.marao_dashboard_test_lock', name: 'Access · inline slider', variables: { access_mode: 'slide' } });
   const valueSliders = concreteCases().filter((entry) => entry.sliderPercentage === 50);
   const valueSliderHash = '#marao-dashboard-test-value-sliders-popup';
   view.cards.push({ type: 'custom:marao-card', template: 'hc_bubble_popup_card', entity: valueSliders[0].entity, name: 'Value slider touch tests', variables: { popup_hash: valueSliderHash } });

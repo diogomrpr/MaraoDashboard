@@ -214,10 +214,11 @@ EDITOR_CATALOG: dict[str, Any] = {
             "id": "hc_access_card",
             "label": "Access",
             "icon": "mdi:lock-outline",
-            "domains": ["lock", "cover"],
+            "domains": ["lock", "cover", "button", "switch", "script", "input_boolean", "alarm_control_panel"],
             "device_classes": ["door", "garage", "gate"],
-            "description": "Guided lock, door, garage, or gate controls with a popup.",
-            "variables": [_field("popup_hash", "Popup hash", "text", advanced=True)],
+            "description": "Access controls with configurable popup, slide, close or security hold.",
+            "variables": [_field("popup_hash", "Popup hash", "text", advanced=True),
+                          _field("action_service", "Action service", "text", advanced=True)],
         },
         {
             "id": "hc_sensor_card",
@@ -465,7 +466,12 @@ EDITOR_CATALOG["cards"].extend([
 ])
 
 for _card in EDITOR_CATALOG["cards"]:
-    if _card["id"] in ("hc_base_card", "hc_media_app_card", "hc_access_slide_action_card", "hc_access_hold_action_card", "hc_access_action_card"):
+    if _card["id"] in ("hc_access_card", "hc_access_slide_action_card", "hc_access_hold_action_card", "hc_access_action_card"):
+        _card["hidden"] = _card["id"] != "hc_access_card"
+        _card["label"] = "Access"
+        _card["variables"].insert(0, {**_field("access_mode", "Access behavior", "select", default="auto"),
+            "options": ["auto", "popup", "slide", "close", "hold"]})
+    if _card["id"] in ("hc_base_card", "hc_media_app_card", "hc_access_card", "hc_access_slide_action_card", "hc_access_hold_action_card", "hc_access_action_card"):
         _card["variables"].extend([
             _field("action_color", "Action color", "color", advanced=True),
             _field("action_label", "Action label", "text", advanced=True),
@@ -578,6 +584,21 @@ def display_catalog() -> dict[str, Any]:
     fields = ("id", "label", "entity_optional", "domains", "device_classes")
     return {"version": EDITOR_CATALOG["version"], "config_version": EDITOR_CATALOG["config_version"],
             "cards": [{key: card[key] for key in fields if key in card} for card in EDITOR_CATALOG["cards"]]}
+
+
+def native_card_labels(config: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Summaries keep YAML parsing out of the initial browser bundle."""
+    from .card_yaml import parse_card_yaml
+    from .page_model import page_entries, page_sections
+    labels = {}
+    for page in config.get("pages", []):
+        for section in page_sections(page):
+            for entry in page_entries(section.get("entities")):
+                if entry.get("template") == "ha_card":
+                    card = parse_card_yaml(entry["yaml"])
+                    name = next((card[key] for key in ("name", "title", "type") if isinstance(card.get(key), str) and card[key]), card["type"])
+                    labels[entry["yaml"]] = {"name": name, "type": card["type"]}
+    return labels
 
 
 def initial_entity_ids(config: dict[str, Any]) -> list[str]:
