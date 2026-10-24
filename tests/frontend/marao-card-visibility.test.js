@@ -818,7 +818,7 @@ test("slider headers follow family and preserve optional controls and hidden fie
     ["md_fan_card", "fan.test", { supported_features: 1, percentage: 50 }, {}, true],
     ["md_fan_card", "fan.test", { supported_features: 1 }, { enable_slider: false }, false],
     ["md_fan_card", "fan.test", { supported_features: 0 }, {}, false],
-    ["md_cover_card", "cover.test", { current_position: 50 }, {}, true],
+    ["md_cover_card", "cover.test", { current_position: 50, supported_features: 4 }, {}, true],
     ["md_access_slide_action_card", "lock.test", {}, { action_service: "lock.unlock" }, false],
     ["md_access_action_card", "lock.test", {}, { action_service: "lock.unlock" }, false],
   ];
@@ -931,7 +931,7 @@ test("wallbox current card uses a large stepper and optional shortcuts", () => {
   assert.doesNotMatch(source, /\.climate-stepper \{[^}]*min-width:/);
   assert.match(source, /\.wallbox-stepper \{[^}]*background:var\(--ha-card-background,var\(--card-background-color,#fff\)\);[^}]*color:var\(--primary-text-color,#141414\);/);
   assert.match(source, /\.wallbox-shortcuts \{[^}]*pointer-events:auto;/);
-  assert.match(source, /\.wallbox-shortcuts button \{[^}]*background:var\(--opacity-contrast-100,color-mix\(in srgb,currentColor 14%,transparent\)\);[^}]*color:var\(--primary-text-color,#141414\);/);
+  assert.match(source, /\.wallbox-shortcuts button[^\{]*\{[^}]*background:var\(--opacity-contrast-100,color-mix\(in srgb,currentColor 14%,transparent\)\);[^}]*color:var\(--primary-text-color,#141414\);/);
   return card._setNumberValue("input_number.wallbox_current", 12).then(() => {
     assert.deepEqual(calls, [["input_number", "set_value", { entity_id: "input_number.wallbox_current", value: 12 }, undefined, false]]);
   });
@@ -1752,12 +1752,13 @@ test("light and fan can omit their sliders while cover positions use the native 
   const card = new MaraoCard();
   const calls = [];
   card.setConfig({ template: "md_light_card", variables: { enable_slider: false } });
-  card.hass = { callService: (...args) => { calls.push(args); return Promise.resolve(); }, states: { "cover.test": { state: "open", attributes: { current_position: 50 } } } };
+  card.hass = { callService: (...args) => { calls.push(args); return Promise.resolve(); }, states: { "cover.test": { state: "open", attributes: { current_position: 50, supported_features: 4 } } } };
   const state = { state: "on", attributes: { brightness: 128, percentage: 50 } };
   assert.equal(card._range("light.test", state, "md_light_card"), "");
   assert.equal(card._range("fan.test", state, "md_fan_card"), "");
   card.setConfig({ template: "md_light_card" });
   assert.match(card._range("light.test", state, "md_light_card"), /type="range"/);
+  card.setConfig({ entity: "cover.test", template: "md_cover_card" });
   await card._setRange("cover.test", "md_cover_card", 60);
   assert.deepEqual(calls, [["cover", "set_cover_position", { entity_id: "cover.test", position: 60 }, undefined, false]]);
 });
@@ -1766,13 +1767,13 @@ test("value slider drags retain their native input across unrelated and confirme
   const card = new MaraoCard();
   const entity = "cover.test";
   card.setConfig({ entity, template: "md_cover_card" });
-  card.hass = { callService() {}, states: { [entity]: { state: "open", attributes: { current_position: 50 } } } };
+  card.hass = { callService() {}, states: { [entity]: { state: "open", attributes: { current_position: 50, supported_features: 4 } } } };
   const markup = card.shadowRoot.innerHTML;
   const refreshed = [];
   const gesture = { input: { isConnected: true }, key: `md_cover_card:${entity}`, refresh: (state) => refreshed.push(state) };
   card._sliderGesture = gesture;
   card.hass = { ...card.hass, states: { ...card.hass.states } };
-  const confirmed = { state: "open", attributes: { current_position: 40 } };
+  const confirmed = { state: "open", attributes: { current_position: 40, supported_features: 4 } };
   card.hass = { ...card.hass, states: { [entity]: confirmed } };
   card._render();
   assert.equal(card._sliderGesture, gesture);
