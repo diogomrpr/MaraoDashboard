@@ -9,7 +9,7 @@ const catalog = JSON.parse(fs.readFileSync(new URL('../../custom_components/mara
 const entities = [{ entity_id: 'light.safe' }, { entity_id: 'remote.safe' }, { entity_id: 'sensor.safe', device_class: 'battery' }];
 const schema = (draft = {}) => buildJsonSchema(catalog, entities, draft);
 const rules = () => schema().$defs.cardOptions.anyOf;
-const properties = id => rules().find(rule => rule.properties?.template.const === id).properties;
+const properties = id => rules().find(rule => rule.properties?.template.const === id || rule.properties?.template.anyOf?.some(choice => choice.enum?.includes(id))).properties;
 const resolve = value => value.$ref ? schema().$defs[value.$ref.split('/').at(-1)] : value;
 test('diagnostics retain true positions and reject stale versions/models', () => {
   let version = 2, uri = 'inmemory://one.json', disposed = false, markers;
