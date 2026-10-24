@@ -1,0 +1,112 @@
+{
+  "config_version": 2,
+  "name": "Saved",
+  "slug": "dashboard",
+  "landing_page": "home",
+  "navigation": [],
+  "extension": {
+    "template": "hc_light_card",
+    "keep": []
+  },
+  "legacy_page_options": {
+    "template": "hc_light_card"
+  },
+  "pages": [
+    {
+      "path": "home",
+      "name": "Home",
+      "sections": [
+        {
+          "columns": 2,
+          "entities": [
+            {
+              "id": "hc_group",
+              "template": "md_entity_group_card",
+              "name": "Lights",
+              "entity_type": "light",
+              "entities": [
+                {
+                  "entity_id": "light.hc_safe",
+                  "template": "md_light_card",
+                  "name": "hc_name",
+                  "variables": {
+                    "md_card_color": "#123456",
+                    "md_show_background_art": false,
+                    "future": {
+                      "template": "hc_light_card"
+                    }
+                  },
+                  "tap_action": {
+                    "action": "call-service",
+                    "data": {
+                      "template": "hc_light_card",
+                      "hc_color": "payload"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "battery",
+              "template": "md_entity_group_card",
+              "name": "Battery",
+              "entity_type": "battery",
+              "entities": [
+                {
+                  "entity_id": "sensor.safe",
+                  "template": "md_battery_card"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cards": [
+            {
+              "type": "grid",
+              "cards": [
+                {
+                  "type": "custom:marao-card",
+                  "template": "md_switch_card",
+                  "entity": "switch.hc_safe",
+                  "variables": {
+                    "md_icon_color": "#abcdef"
+                  }
+                },
+                {
+                  "type": "custom:foreign-card",
+                  "template": "hc_light_card",
+                  "variables": {
+                    "hc_color": "custom"
+                  },
+                  "cards": [
+                    {
+                      "type": "custom:marao-card",
+                      "template": "hc_light_card"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "custom:marao-native-popup-card",
+              "cards": [
+                {
+                  "type": "custom:marao-native-light-card",
+                  "entity": "light.hc_safe",
+                  "variables": {
+                    "md_color": "#112233"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "markdown",
+              "content": "hc_light_card"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

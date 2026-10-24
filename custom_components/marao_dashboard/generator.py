@@ -15,7 +15,7 @@ from typing import Any, Callable, Iterable
 
 import yaml
 
-from .card_names import canonical_card, canonical_template
+from .card_names import canonical_card, canonical_template, migrate_card_namespace_v1
 
 from .const import (
     BASE_DASHBOARD_ICON,
@@ -368,6 +368,7 @@ def migrate_dashboard_config(
             room["entities"] = []
     if converted.get("config_version") == 2:
         normalize_config(converted)
+        migrate_card_namespace_v1(converted)
     return converted
 
 

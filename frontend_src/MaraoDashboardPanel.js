@@ -273,8 +273,8 @@ class MaraoDashboardPanel extends HTMLElement {
     const path = event.composedPath(), target = path[0];
     const pressed = this._pressedPath?.includes(target); this._pressedPath = null;
     if (this._restoringFocus || !path.includes(this.shadowRoot.getElementById('visual-view'))) return;
-    // Moving a pressed button before pointerup cancels its native click.
-    if (pressed && target.localName === 'button') return;
+    // Safari can focus an expansion-panel ancestor while its child button is pressed.
+    if (pressed) return;
     // Native field reveal otherwise considers content behind the sticky header visible.
     target.style.scrollMarginTop = 'calc(var(--editor-header-height,150px) + 12px)';
     const bounds = target.getBoundingClientRect();

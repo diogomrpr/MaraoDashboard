@@ -705,13 +705,13 @@
           "cards": [
             {
               "type": "custom:marao-card",
-              "template": "hc_scene_card",
+              "template": "md_scene_card",
               "entity": "input_select.marao_dashboard_test_scene",
               "name": "Living Room scene"
             },
             {
               "type": "custom:marao-card",
-              "template": "hc_glance_card",
+              "template": "md_glance_card",
               "name": "Living Room readings",
               "variables": {
                 "entity1": "sensor.marao_dashboard_test_temperature",
@@ -865,7 +865,7 @@
           "cards": [
             {
               "type": "custom:marao-card",
-              "template": "hc_dishwasher_card",
+              "template": "md_dishwasher_card",
               "entity": "input_select.marao_dashboard_test_dishwasher_state",
               "name": "Dishwasher",
               "variables": {
@@ -950,7 +950,7 @@
           "cards": [
             {
               "type": "custom:marao-card",
-              "template": "hc_dishwasher_card",
+              "template": "md_dishwasher_card",
               "entity": "input_select.marao_dashboard_test_dishwasher_state",
               "name": "Dishwasher",
               "variables": {
@@ -963,7 +963,7 @@
             },
             {
               "type": "custom:marao-card",
-              "template": "hc_navigation_card",
+              "template": "md_navigation_card",
               "entity": "sensor.marao_dashboard_test_wallbox_status",
               "name": "Wallbox",
               "icon": "mdi:ev-station",
@@ -976,7 +976,7 @@
             },
             {
               "type": "custom:marao-card",
-              "template": "hc_navigation_card",
+              "template": "md_navigation_card",
               "entity": "media_player.marao_dashboard_test_apple_tv",
               "name": "Media",
               "icon": "mdi:television-play",

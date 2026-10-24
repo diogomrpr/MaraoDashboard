@@ -459,6 +459,7 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
   }
   const groupIds = new Set();
   const checkGroup = (group, overview = false) => {
+    group = canonicalCard(group);
     const id = group?.id, kind = group?.entity_type;
     if (!group || typeof group !== 'object' || group.template !== 'md_entity_group_card') { errors.push('Entity Group must be an md_entity_group_card object.'); return; }
     if (typeof id !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(id)) errors.push('Entity Group requires a stable safe id.');
@@ -683,6 +684,7 @@ export function validatePages(config, catalog) {
 }
 
 export function entityGroupMemberCompatible(kind, member, metadata, legacyBattery = false) {
+  member = canonicalCard(member);
   const domain = member.entity_id?.split('.')[0];
   const templates = { light: ['md_light_card', 'md_base_card'], cover: ['md_cover_card', 'md_access_card'],
     climate: ['md_climate_card'], battery: ['md_battery_card', 'md_sensor_card', 'md_base_card'] };

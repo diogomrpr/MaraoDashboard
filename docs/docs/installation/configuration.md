@@ -614,8 +614,12 @@ separate Alarm card retains its full alarm controls.
 
 New Marao card templates and owned options use `md_`, for example
 `md_light_card` and `md_show_background_art`. Released `hc_` identifiers remain
-supported as input aliases. Loading or reopening an unchanged configuration does
-not rewrite its saved source; newly created and edited cards use `md_`.
+supported as input aliases. During setup/reload, namespace migration v1 automatically
+converts active saved Marao-owned names and options to `md_`, including group members
+and Marao cards inside standard card containers. You do not need to save manually.
+The integration keeps an exact source/output history backup before the atomic update.
+Already-migrated configurations are not rewritten; previews remain read-only.
+The dashboard document format stays at version 2.
 Entity IDs, names, actions, third-party card YAML and unknown options are retained.
 If both spellings of an owned option are present with different values, remove
 that ambiguity before saving. Archived history and released source fixtures are

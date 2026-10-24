@@ -52,3 +52,39 @@ def canonical_entities(spec):
             return result
         return {key: canonical_entities(value) for key, value in spec.items()}
     return spec
+
+
+def canonical_owned_card_tree(card):
+    """Visit owned cards and standard card containers, leaving custom payloads opaque."""
+    if not isinstance(card, dict):
+        return card
+    kind = card.get("type")
+    containers = {"vertical-stack", "horizontal-stack", "grid", "conditional",
+                  "custom:marao-control-grid", "custom:marao-popup-card", "custom:marao-native-popup-card"}
+    if kind not in containers and not (isinstance(kind, str) and kind.startswith("custom:marao-")):
+        return card
+    result = dict(canonical_card(card))
+    if kind in containers:
+        if isinstance(result.get("cards"), list):
+            result["cards"] = [canonical_owned_card_tree(child) for child in result["cards"]]
+        if kind == "conditional" and isinstance(result.get("card"), dict):
+            result["card"] = canonical_owned_card_tree(result["card"])
+    if result.get("template") in ("md_entity_group_card", "md_scene_collection_card") or kind in (
+        "custom:marao-native-entity-group-card", "custom:marao-native-scene-collection-card",
+    ):
+        if "entities" in result:
+            result["entities"] = canonical_entities(result["entities"])
+    return result
+
+
+def migrate_card_namespace_v1(config):
+    """Upgrade active owned names in a validated private format-2 document."""
+    from .page_model import page_sections
+
+    for page in config["pages"]:
+        for section in page_sections(page):
+            if "entities" in section:
+                section["entities"] = canonical_entities(section["entities"])
+            if "cards" in section:
+                section["cards"] = [canonical_owned_card_tree(card) for card in section["cards"]]
+    return config

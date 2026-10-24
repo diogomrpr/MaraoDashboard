@@ -1734,3 +1734,67 @@ async def test_setup_repairs_formatted_energy_without_ready_unit_metadata(hass, 
     await hass.async_block_till_done()
     assert source.read_text() == exact
     assert (source.parent / "dashboard/dashboard.yaml").exists()
+
+
+def _namespace_v1_baseline(hass):
+    from custom_components.marao_dashboard.generator import write_dashboard
+    fixtures = Path(__file__).parents[3] / 'ha-test/upgrade/fixtures'
+    raw = json.loads((fixtures / 'namespace-v1-input.json').read_text())
+    expected = json.loads((fixtures / 'namespace-v1-expected.json').read_text())
+    _reset_dashboard_files(hass)
+    Path(hass.config.path('configuration.yaml')).write_text('default_config:\n# keep unrelated config\n')
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG)); source.parent.mkdir(parents=True)
+    exact = (json.dumps(raw, indent=1) + '\r\n').encode(); source.write_bytes(exact)
+    write_dashboard(raw, source.parent, config_root=hass.config.config_dir)
+    output = source.parent / 'dashboard'
+    (output / 'private-custom.txt').write_bytes(b'untouched customization\r\n')
+    return source, exact, expected, output
+
+
+async def test_setup_migrates_owned_hc_names_with_exact_backup_and_no_repeat_writes(hass):
+    from custom_components.marao_dashboard.history import list_dashboard_history
+    source, exact, expected, output = _namespace_v1_baseline(hass)
+    before = {str(p.relative_to(output)): p.read_bytes() for p in output.rglob('*') if p.is_file()}
+    entry = MockConfigEntry(domain=DOMAIN, data={BASE_DASHBOARD_CREATED: True})
+    entry.add_to_hass(hass)
+    preview = _management_payload(hass, [])
+    assert preview['conversion_pending'] is True
+    assert json.loads(preview['config']) == expected
+    assert source.read_bytes() == exact
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert json.loads(source.read_bytes()) == expected
+    assert (output / 'private-custom.txt').read_bytes() == b'untouched customization\r\n'
+    versions = list_dashboard_history(source.parent)
+    baseline = next(source.parent / '.history' / v['version'] for v in versions
+                    if (source.parent / '.history' / v['version'] / 'dashboard.json').read_bytes() == exact)
+    assert {str(p.relative_to(baseline / 'dashboard')): p.read_bytes() for p in (baseline / 'dashboard').rglob('*') if p.is_file()} == before
+    migrated = source.read_bytes()
+    after = {str(p.relative_to(output)): p.read_bytes() for p in output.rglob('*') if p.is_file()}
+    snapshots = {str(p.relative_to(source.parent / '.history')): p.read_bytes() for p in (source.parent / '.history').rglob('*') if p.is_file()}
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert source.read_bytes() == migrated
+    assert {str(p.relative_to(output)): p.read_bytes() for p in output.rglob('*') if p.is_file()} == after
+    assert {str(p.relative_to(source.parent / '.history')): p.read_bytes() for p in (source.parent / '.history').rglob('*') if p.is_file()} == snapshots
+
+
+async def test_namespace_upgrade_rolls_back_exact_source_and_output_after_commit_failure(hass, monkeypatch):
+    from custom_components.marao_dashboard import history
+    import custom_components.marao_dashboard as integration
+    source, exact, _, output = _namespace_v1_baseline(hass)
+    before = {str(p.relative_to(output)): p.read_bytes() for p in output.rglob('*') if p.is_file()}
+    configuration = Path(hass.config.path('configuration.yaml')).read_bytes()
+    apply = history._apply_operation_target
+    def fail_after_source_commit(checkpoint, target, *, restoring):
+        apply(checkpoint, target, restoring=restoring)
+        if not restoring and target['path'] == str(source.absolute()):
+            raise OSError('Injected namespace commit failure')
+    monkeypatch.setattr(history, '_apply_operation_target', fail_after_source_commit)
+    with pytest.raises(OSError, match='Injected namespace commit failure'):
+        integration._generate_dashboard(hass, json.loads(exact), registry_entities=[])
+    assert source.read_bytes() == exact
+    assert {str(p.relative_to(output)): p.read_bytes() for p in output.rglob('*') if p.is_file()} == before
+    assert Path(hass.config.path('configuration.yaml')).read_bytes() == configuration
+    assert not (source.parent / '.history/.operation').exists()
+    assert any(p.read_bytes() == exact for p in (source.parent / '.history').glob('*/dashboard.json'))

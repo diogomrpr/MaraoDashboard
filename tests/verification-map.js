@@ -162,6 +162,7 @@ const components = {
 
 const rules = [
   [/^tests\/frontend\/canonical-pages\.fixture\.json$/, ['card-namespace']],
+  [/^ha-test\/upgrade\/fixtures\/namespace-v1-(?:input|expected|provenance)\.json$/, ['card-namespace']],
   [/^custom_components\/marao_dashboard\/(card_names\.py|frontend\/MaraoNames\.js)$|^tests\/(frontend\/card-names\.test\.js|components\/marao_dashboard\/test_card_names\.py)$/, ['card-namespace']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoLight(?:Color|Capabilities)\.js$|^tests\/test-light-color-local\.js$/, ['light-color']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoSlider\.js$/, ['slider']],

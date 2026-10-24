@@ -1,0 +1,10 @@
+{
+  "migration": "card-namespace-v1",
+  "source_format": 2,
+  "source_release": "v0.19.0",
+  "provenance": "Independently authored safe released-schema example; not a captured user configuration. Expected owned literals specified independently of candidate migration code.",
+  "sha256": {
+    "namespace-v1-input.json": "ebc17e2b68ea14a66722ef19ab48fabdd1e269976b88aab60691bd044587278e",
+    "namespace-v1-expected.json": "8f0600f898fac8bc09e3f044c7d05d8eea61e63f0634a2c1e182ae9bd5e5df35"
+  }
+}

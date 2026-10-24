@@ -38,3 +38,38 @@ def test_legacy_energy_templates_keep_unit_validation():
     for template in ("hc_graph_card", "md_graph_card"):
         with pytest.raises(ValueError, match="incompatible"):
             g._validate_energy_formatting({"template": template, "entity_id": "sensor.safe", "variables": {"display_unit": "kWh"}}, [{"entity_id": "sensor.safe", "unit_of_measurement": "W"}])
+
+
+def test_namespace_v1_matches_independent_expected_json_and_is_read_only_idempotent(tmp_path):
+    import hashlib
+    import json
+    from pathlib import Path
+    fixtures = Path(__file__).parents[3] / 'ha-test/upgrade/fixtures'
+    provenance = json.loads((fixtures / 'namespace-v1-provenance.json').read_text())
+    for name, digest in provenance['sha256'].items():
+        assert hashlib.sha256((fixtures / name).read_bytes()).hexdigest() == digest
+    source = json.loads((fixtures / 'namespace-v1-input.json').read_text())
+    expected = json.loads((fixtures / 'namespace-v1-expected.json').read_text())
+    before = deepcopy(source)
+    assert g.migrate_dashboard_config(source) == expected
+    assert g.migrate_dashboard_config(expected) == expected
+    assert source == before
+    path = tmp_path / 'dashboard.json'
+    exact = (json.dumps(source, indent=1) + '\r\n').encode()
+    path.write_bytes(exact)
+    assert g.migrate_dashboard_config(g.load_dashboard_config(path)) == expected
+    assert path.read_bytes() == exact
+
+
+def test_namespace_v1_conflicts_and_newer_sources_do_not_mutate_saved_data(tmp_path):
+    import json
+    source = {'config_version': 2, 'name': 'Safe', 'landing_page': 'home', 'pages': [{'name': 'Home', 'path': 'home', 'entities': [
+        {'entity_id': 'light.safe', 'template': 'hc_light_card', 'variables': {'hc_color': 'red', 'md_color': 'blue'}},
+    ]}]}
+    for config in (source, {**source, 'config_version': 3}):
+        before = deepcopy(config)
+        path = tmp_path / 'dashboard.json'
+        exact = json.dumps(config).encode(); path.write_bytes(exact)
+        with pytest.raises(ValueError):
+            g.migrate_dashboard_config(config)
+        assert config == before and path.read_bytes() == exact

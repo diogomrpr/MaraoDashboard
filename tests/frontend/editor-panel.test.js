@@ -537,6 +537,9 @@ test('restored editor focus cannot reveal an off-screen control, while keyboard 
   p._pressedPath = [target];
   p._revealFocusedControl({ composedPath: () => [target, visual] });
   assert.equal(reveals.length, 1, 'Pointer focus cannot shift a button before its click completes');
+  target.localName = 'div'; p._pressedPath = [target];
+  p._revealFocusedControl({ composedPath: () => [target, visual] });
+  assert.equal(reveals.length, 1, 'Safari ancestor focus cannot scroll a pressed child out from under the pointer');
   assert.throws(() => p._focusWithoutScroll({ focus() { throw new Error('Detached focus'); } }), /Detached focus/);
   assert.equal(p._restoringFocus, false, 'A failed restoration must not disable subsequent keyboard reveal');
 });

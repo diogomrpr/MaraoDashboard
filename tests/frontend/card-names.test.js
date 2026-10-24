@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { canonicalCard, canonicalTemplate, canonicalOptions, legacyTemplates } from '../../custom_components/marao_dashboard/frontend/MaraoNames.js';
-import { normalizeConfig, serializeConfig, validateConfig, buildJsonSchema } from '../../frontend_src/editor-model.js';
+import { normalizeConfig, serializeConfig, validateConfig, buildJsonSchema, entityGroupMemberCompatible } from '../../frontend_src/editor-model.js';
 
 test('released template and option aliases resolve without changing source or opaque data', () => {
   for (const [legacy, current] of Object.entries(legacyTemplates)) assert.equal(canonicalTemplate(legacy), current);
@@ -28,4 +28,18 @@ test('legacy editor source round trips unchanged while new descriptors and setti
   const catalog={cards:[{id:'md_media_card',domains:['media_player'],variables:[]}],pages:{}};
   assert.deepEqual(validateConfig(config,2,undefined,{},catalog),[]);
   assert.match(JSON.stringify(buildJsonSchema(catalog,[])),/hc_media_card/);
+});
+
+test('released group member templates remain compatible during save and member editing', () => {
+  for (const [kind, domain, template] of [['light','light','hc_light_card'], ['cover','cover','hc_cover_card'], ['battery','sensor','hc_battery_card'], ['climate','climate','hc_climate_card']]) {
+    const member = { entity_id: domain + '.safe', template, name: 'Keep this name', variables: { future: [] } };
+    const config = { config_version: 2, name: 'Safe', landing_page: 'home', pages: [{ name: 'Home', path: 'home', entities: [{ template: 'hc_entity_group_card', id: 'safe-group', name: 'Group', entity_type: kind, entities: [member] }] }] };
+    const before = structuredClone(config);
+    assert.equal(entityGroupMemberCompatible(kind, member, { device_class: undefined }), true);
+    assert.deepEqual(validateConfig(config, 2), []);
+    assert.deepEqual(config, before);
+    member.template = 'hc_camera_card';
+    assert.equal(entityGroupMemberCompatible(kind, member), false);
+    assert.ok(validateConfig(config, 2).includes('Entity Group has an incompatible member.'));
+  }
 });

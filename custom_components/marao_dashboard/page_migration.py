@@ -3,8 +3,8 @@
 from copy import deepcopy
 import math
 
-from .page_model import page_entries, page_sections
-from .card_names import canonical_entities
+from .page_model import page_entries
+from .card_names import migrate_card_namespace_v1
 
 
 def convert_native_storage_dashboard(source):
@@ -84,7 +84,7 @@ def convert_native_storage_dashboard(source):
                     "name": target_view.get("title") or target, "icon": "mdi:arrow-left"}]})
         converted["pages"].append(page)
     g.normalize_config(converted)
-    return converted
+    return migrate_card_namespace_v1(converted)
 
 
 def convert_legacy_pages(source, registry=None):
@@ -300,8 +300,4 @@ def convert_legacy_pages(source, registry=None):
                 route["page"] = path
                 route["label_key"] = "nav." + ("home" if path == "overview" else path)
         result["navigation"] = routes
-    for target in result["pages"]:
-        for container in page_sections(target):
-            if "entities" in container:
-                container["entities"] = canonical_entities(container["entities"])
-    return result
+    return migrate_card_namespace_v1(result)
