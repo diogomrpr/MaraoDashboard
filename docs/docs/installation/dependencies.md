@@ -10,7 +10,7 @@ nav_order: 1.1
 Marao Dashboard no longer requires third-party Lovelace cards. The generated
 dashboard uses three namespaced Marao cards and Home Assistant's native cards:
 
-- `custom:marao-card` — generated `hc_*` card variants and controls.
+- `custom:marao-card` — generated `md_*` card variants and controls.
 - `custom:marao-navbar-card` — the floating single-row navigation bar with overflow.
 - `custom:marao-popup-card` — bottom-sheet popovers with scrolling content.
 - Native Sensor and History Graph cards — metric and history graphs.
@@ -37,7 +37,7 @@ height: auto
 max_height: 80dvh
 cards:
   - type: custom:marao-card
-    template: hc_light_card
+    template: md_light_card
     entity: light.living_room
 ```
 
@@ -81,7 +81,7 @@ the Marao integration or restart Home Assistant to clear the Repair; reloading
 Lovelace resources alone is not sufficient.
 
 Older generated dashboards are regenerated to use the Marao cards. Manually
-written dashboards that use `custom:button-card` with Marao `hc_*` templates
+written dashboards that use `custom:button-card` with Marao `md_*` templates
 must be rebuilt or updated by their owner; Marao does not claim the upstream
 `button-card` element name.
 

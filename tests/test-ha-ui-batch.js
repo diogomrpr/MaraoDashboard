@@ -9,7 +9,7 @@ const { namedCard } = require('./test-ha-room-cards');
 
 async function batteryChecks(page, config, output, scenario, theme, geometryOnly = false) {
   if (geometryOnly) {
-    assert.deepEqual(await layoutIssues(page, ["hc_entity_group_card", "hc_battery_card"]), []);
+    assert.deepEqual(await layoutIssues(page, ["md_entity_group_card", "md_battery_card"]), []);
     const card = namedCard(page, "Entity Group · battery all"); await card.scrollIntoViewIfNeeded();
     await captureScreenshot(card, { path: path.join(output, `battery-${scenario.name}-${theme}.png`), scale: "css" }); return;
   }
@@ -20,7 +20,7 @@ async function batteryChecks(page, config, output, scenario, theme, geometryOnly
   const configBefore = await group.evaluate(e => JSON.stringify(e._config));
   const color = card => card.evaluate(e => { const c = e.shadowRoot.querySelector('ha-card'), s = getComputedStyle(c); return [s.backgroundColor, s.color]; });
   const reference = await group.evaluateHandle(e => {
-    const card = document.createElement('marao-card'); card.setConfig({ template: 'hc_battery_card', entity: 'sensor.marao_dashboard_test_battery', name: 'Palette reference' }); card.hass = e._hass; e.after(card); return card;
+    const card = document.createElement('marao-card'); card.setConfig({ template: 'md_battery_card', entity: 'sensor.marao_dashboard_test_battery', name: 'Palette reference' }); card.hass = e._hass; e.after(card); return card;
   });
   const normal = page.locator('marao-card').filter({ has: page.locator('.title').filter({ hasText: /^Palette reference$/ }) });
   const set = async value => {
@@ -49,7 +49,7 @@ async function batteryChecks(page, config, output, scenario, theme, geometryOnly
     }), true);
     await group.evaluate(e => { e.hass = document.querySelector('home-assistant').hass; });
     await set(10);
-    assert.deepEqual(await layoutIssues(page, ['hc_entity_group_card', 'hc_battery_card']), []);
+    assert.deepEqual(await layoutIssues(page, ['md_entity_group_card', 'md_battery_card']), []);
     if (['iphone-normal', 'narrow-320', 'iphone-bold-text-200'].includes(scenario.name)) { await group.scrollIntoViewIfNeeded(); await captureScreenshot(group, { path: path.join(output, `battery-${scenario.name}-${theme}.png`), scale: 'css' }); }
   } finally {
     await group.evaluate((e, config) => e.setConfig(JSON.parse(config)), configBefore);
@@ -68,11 +68,11 @@ async function accessChecks(page, output, scenario, theme) {
     await host.scrollIntoViewIfNeeded();
     await readySubtree(page, host, scenario, theme);
     await host.locator('.track').waitFor({ state: 'visible' });
-    assert.deepEqual((await layoutIssues(page, ['hc_access_slide_action_card'], await host.elementHandle())).filter(issue => /access (label|slide)/.test(issue)), [], `${language}/${width}`);
+    assert.deepEqual((await layoutIssues(page, ['md_access_slide_action_card'], await host.elementHandle())).filter(issue => /access (label|slide)/.test(issue)), [], `${language}/${width}`);
     const size = await host.locator('.track').boundingBox(); assert.ok(size.width >= 48 && size.height >= 48);
     if (width === 239 && language === 'en' && scenario.name === 'iphone-normal') {
       await host.evaluate(e => { const style = document.createElement('style'); style.dataset.regression = ''; style.textContent = '.label{padding:8px 8px 72px!important}.thumb{top:auto!important;bottom:4px!important}'; e.shadowRoot.append(style); });
-      assert.ok((await layoutIssues(page, ['hc_access_slide_action_card'], await host.elementHandle())).some(issue => /access label/.test(issue)), 'The former stacked layout must fail');
+      assert.ok((await layoutIssues(page, ['md_access_slide_action_card'], await host.elementHandle())).some(issue => /access label/.test(issue)), 'The former stacked layout must fail');
       await host.evaluate(e => e.shadowRoot.querySelector('[data-regression]').remove());
     }
   }
@@ -126,12 +126,12 @@ async function main() {
           await page.locator('marao-card .body').first().waitFor({ state: 'attached' });
           if (route === 'native-example') await page.locator('marao-native-light-card marao-card .body').first().waitFor({ state: 'attached' });
           await applyVisualPreferences(page, scenario, theme);
-          assert.deepEqual(await layoutIssues(page, ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_card', 'hc_access_slide_action_card']), []);
+          assert.deepEqual(await layoutIssues(page, ['md_light_card', 'md_fan_card', 'md_cover_card', 'md_access_card', 'md_access_slide_action_card']), []);
           if (route === 'rooms') await runCase('control-grid/rooms', () => require('./control-grid-checks').phoneRoomsChecks(page, output, scenario, theme));
           if (route === 'native-example') {
             if (process.argv.includes('--control-grid')) await runCase('control-grid/native', () => require('./control-grid-checks').nativeControlGridChecks(page, scenario, theme));
             await page.locator('marao-native-light-card').first().evaluate(e => { e.preview = true; });
-            assert.deepEqual(await layoutIssues(page, ['hc_light_card']), []);
+            assert.deepEqual(await layoutIssues(page, ['md_light_card']), []);
           }
         }
       }

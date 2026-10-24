@@ -50,6 +50,6 @@
     "explicit-empty-expected.json": "1a73572cd79f890bf0610226d505200a90423572afc37f352a557c613dc41473",
     "preserved-custom-cards.yaml": "2ae49ce2a4b78e21c45000933a0d027ac3d9416bf0a466f65aac70fdda7434e1",
     "unrelated-ownership.json": "9192ff2ce7e48f867370e83b59d08e49917791bdb70be39184fd7522c44bfbc9",
-    "v0.2.0-storage-format-2-expected.json": "32780d06f8d15164097faac1587d3eb5fe8fa4c242e489bcd6ba5f2228097cec"
+    "v0.2.0-storage-format-2-expected.json": "1af4df743687a0da86e563946463a1eca36b294adf038e4571ff0b7d9525e9ae"
   }
 }

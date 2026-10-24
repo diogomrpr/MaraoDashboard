@@ -134,10 +134,10 @@ async function titleLayoutIssues(page, families = [], subtree) {
     }
     const config = card._config || {};
     const service = config.variables?.action_service || config.tap_action?.service || config.tap_action?.perform_action;
-    const sliderHeader = ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_card', 'hc_access_slide_action_card'].includes(config.template)
-      || config.template === 'hc_access_action_card' && ['lock.lock','cover.close_cover'].includes(service)
-      || config.template === 'hc_access_hold_action_card' && /^(lock|cover)\./.test(config.entity || '')
-      || config.template?.startsWith('hc_access_') && ['lock.unlock', 'cover.open_cover'].includes(service);
+    const sliderHeader = ['md_light_card', 'md_fan_card', 'md_cover_card', 'md_access_card', 'md_access_slide_action_card'].includes(config.template)
+      || config.template === 'md_access_action_card' && ['lock.lock','cover.close_cover'].includes(service)
+      || config.template === 'md_access_hold_action_card' && /^(lock|cover)\./.test(config.entity || '')
+      || config.template?.startsWith('md_access_') && ['lock.unlock', 'cover.open_cover'].includes(service);
     const compact = parent.classList.contains('compact-copy'), header = compact ? parent.parentElement : null;
     if (compact) {
       const body = header.closest('.body'), icon = header.querySelector(':scope > .icon');
@@ -612,7 +612,7 @@ async function checkMediaRecovery(page, serviceCalls, output) {
   const cards = ['Camera preview · failed media', 'Media artwork · failed media'].map(name => cardByTitle(page, name));
   const waitFailure = async card => {
     await card.scrollIntoViewIfNeeded();
-    await page.waitForFunction(card => card._config.template === 'hc_camera_card' ? card._camera?.state === 'error' && card._camera.reason === 'poster_failed' : Boolean(card._mediaError), await card.elementHandle());
+    await page.waitForFunction(card => card._config.template === 'md_camera_card' ? card._camera?.state === 'error' && card._camera.reason === 'poster_failed' : Boolean(card._mediaError), await card.elementHandle());
   };
   const capture = async name => {
     if (!output) return;
@@ -653,9 +653,9 @@ async function checkMediaRecovery(page, serviceCalls, output) {
       await setFailure(false);
       for (const card of cards) {
         await card.scrollIntoViewIfNeeded();
-        if (await card.evaluate(card => card._config.template === 'hc_camera_card')) await card.locator('.camera-feedback button').tap();
+        if (await card.evaluate(card => card._config.template === 'md_camera_card')) await card.locator('.camera-feedback button').tap();
         await page.waitForFunction(card => {
-          if (card._config.template === 'hc_camera_card') {
+          if (card._config.template === 'md_camera_card') {
             const image = card._camera?.poster;
             return card._camera?.state === 'snapshot' && !image.hidden && image.complete && image.naturalWidth > 0;
           }
@@ -966,12 +966,12 @@ async function checkCardContent(page, serviceCalls) {
   if (!await page.locator('marao-card').filter({ has: page.locator('.body.glance-card') }).count()) throw new Error("The gallery is missing glance layouts.");
   const stalePreviews = await page.locator("marao-card").evaluateAll((cards) => cards.filter((card) => {
     const state = card._hass?.states?.[card._config.entity]?.state;
-    return card._config.template === "hc_camera_card" && (!state || ["unknown", "unavailable"].includes(state)) && card.shadowRoot.querySelector("img.camera-poster[src]:not([hidden]),ha-camera-stream");
+    return card._config.template === "md_camera_card" && (!state || ["unknown", "unavailable"].includes(state)) && card.shadowRoot.querySelector("img.camera-poster[src]:not([hidden]),ha-camera-stream");
   }).length);
   if (stalePreviews) throw new Error("Unavailable camera cards displayed old previews.");
-  const mediaPresentation = await page.locator("marao-card").evaluateAll((cards) => cards.filter((card) => card._config.template === "hc_media_card").map((card) => ({
+  const mediaPresentation = await page.locator("marao-card").evaluateAll((cards) => cards.filter((card) => card._config.template === "md_media_card").map((card) => ({
     name: card._config.name, state: card._hass?.states?.[card._config.entity]?.state,
-    optOut: card._config.variables?.hc_show_background_art === false,
+    optOut: card._config.variables?.md_show_background_art === false,
     artwork: Boolean(card.shadowRoot.querySelector(".media-artwork")),
     summary: card.shadowRoot.querySelector(".climate")?.textContent,
   })));
@@ -1513,7 +1513,7 @@ async function checkEntityGroups(page, serviceCalls, output, scenario, theme, co
   };
   await changeLights('turn_on', ['light.marao_dashboard_test_case_light_off']);
   assert.equal(await popup.evaluate(popup => popup.__groupFirst === popup._groupChildren.get('light.marao_dashboard_test_case_light_on')), true, 'Retained eligible slider was remounted');
-  const heldSlider = overlay.locator('input[data-slider-key="hc_light_card:light.marao_dashboard_test_case_light_on"]');
+  const heldSlider = overlay.locator('input[data-slider-key="md_light_card:light.marao_dashboard_test_case_light_on"]');
   await heldSlider.scrollIntoViewIfNeeded();
   const sliderBox = await heldSlider.boundingBox(), sliderValue = Number(await heldSlider.inputValue());
   const touch = await page.context().newCDPSession(page);
@@ -1569,7 +1569,7 @@ async function checkEntityGroups(page, serviceCalls, output, scenario, theme, co
   const openOnlyIndex = await accessCards.evaluateAll((cards, entity) => cards.findIndex(card => card._config.entity === entity), openOnly);
   assert.ok(openOnlyIndex >= 0, 'Open-only member is missing');
   const openOnlyCard = accessCards.nth(openOnlyIndex);
-  assert.equal(await openOnlyCard.evaluate(card => card._config.template), 'hc_access_slide_action_card');
+  assert.equal(await openOnlyCard.evaluate(card => card._config.template), 'md_access_slide_action_card');
   assert.equal(await openOnlyCard.locator('marao-slide-to-open').count(), 1, 'Open-only access must expose the strict slide control');
   assert.equal(await openOnlyCard.locator('input[type="range"], [data-card-action]').count(), 0, 'Open-only access must not expose ordinary position or tap actions');
   const openOnlyHelper = 'input_boolean.marao_dashboard_test_open_only_door';
@@ -2086,7 +2086,7 @@ async function main() {
     if (new URL(page.url()).pathname !== roomPathBefore) {
       throw new Error("Room all-lights-off action navigated instead of staying on the current card.");
     }
-    const independentSlider = page.locator('input[data-slider-key="hc_cover_card:cover.marao_dashboard_test_cover"]');
+    const independentSlider = page.locator('input[data-slider-key="md_cover_card:cover.marao_dashboard_test_cover"]');
     if (await independentSlider.isEnabled()) {
       const cover = "cover.marao_dashboard_test_cover";
       await page.evaluate(async () => {

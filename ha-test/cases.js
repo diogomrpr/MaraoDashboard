@@ -42,7 +42,7 @@ function concreteCases() {
 
 function walkCards(value, visit) {
   if (!value || typeof value !== 'object') return;
-  if (value.type || value.template === 'hc_entity_group_card') visit(value);
+  if (value.type || value.template === 'md_entity_group_card') visit(value);
   for (const child of Object.values(value)) {
     if (Array.isArray(child)) child.forEach((item) => walkCards(item, visit));
     else if (child && typeof child === 'object') walkCards(child, visit);
@@ -62,23 +62,23 @@ function expandGallery(source) {
   const view = structuredClone(source);
   view.entities = [...editable, ...structuredClone(manifest.entityGroupCases || [])];
   view.cards.push(...structuredClone(manifest.cameraLiveCases || []), ...structuredClone(manifest.sectionLayoutCases || []), ...structuredClone(manifest.titleLayoutCases), ...structuredClone(manifest.binaryPresentationCases), ...structuredClone(manifest.problemPresentationCases), ...structuredClone(manifest.energyFormattingCases), ...structuredClone(manifest.roomCompositionCases));
-  view.cards.push({type: 'custom:marao-card', template: 'hc_base_card', entity: 'sensor.marao_dashboard_test_energy_format_missing_live', name: 'Simulate source unit loss', show_state: false, tap_action: {action: 'call-service', service: 'marao_test_camera.toggle_energy_unit'}});
+  view.cards.push({type: 'custom:marao-card', template: 'md_base_card', entity: 'sensor.marao_dashboard_test_energy_format_missing_live', name: 'Simulate source unit loss', show_state: false, tap_action: {action: 'call-service', service: 'marao_test_camera.toggle_energy_unit'}});
   for (const example of manifest.energyFormattingCases.filter(card => card.popup_hash)) {
     const {popup_hash, ...reading} = example;
     view.cards.push({type: 'custom:marao-popup-card', hash: popup_hash, name: example.name, entity: example.entity, cards: [{...reading, popup: true}]});
   }
-  view.cards.push({ type: 'custom:marao-card', template: 'hc_vacuum_card', entity: 'vacuum.marao_dashboard_test_vacuum_commands', name: 'Vacuum segment commands', variables: {
+  view.cards.push({ type: 'custom:marao-card', template: 'md_vacuum_card', entity: 'vacuum.marao_dashboard_test_vacuum_commands', name: 'Vacuum segment commands', variables: {
     action_1: { icon: 'mdi:door', segment: 21 }, action_2: { icon: 'mdi:sofa', segment: 22 }, action_3: { icon: 'mdi:bed', segment: 23 },
   } });
   for (const [kind, entity, name] of [
-    ['hc_light_card', 'light.marao_dashboard_test_onoff_light', 'On/off light'],
-    ['hc_fan_card', 'fan.marao_dashboard_test_onoff_fan', 'Single-speed fan'],
+    ['md_light_card', 'light.marao_dashboard_test_onoff_light', 'On/off light'],
+    ['md_fan_card', 'fan.marao_dashboard_test_onoff_fan', 'Single-speed fan'],
   ]) view.cards.push({ type: 'custom:marao-card', template: kind, entity, name });
   for (const [name, ids] of [
     ['Summary · active secondary', ['light.marao_dashboard_test_case_light_off', 'light.marao_dashboard_test_case_light_on']],
     ['Summary · unavailable primary', ['light.marao_dashboard_test_case_light_unavailable', 'light.marao_dashboard_test_case_light_on']],
     ['Summary · all unavailable', ['light.marao_dashboard_test_case_light_unavailable', 'light.marao_dashboard_test_case_light_unknown']],
-  ]) view.cards.push({ type: 'custom:marao-card', template: 'hc_navigation_card', entity: ids[0], name,
+  ]) view.cards.push({ type: 'custom:marao-card', template: 'md_navigation_card', entity: ids[0], name,
     icon: 'mdi:lightbulb-group-outline', variables: { summary_entities: ids },
     tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/overview' },
   });
@@ -88,52 +88,52 @@ function expandGallery(source) {
     tap_action: { action: 'perform-action', perform_action: 'remote.send_command', target: { entity_id: `remote.marao_dashboard_test_remote_${state}` }, data: { command: 'up' } },
   });
   view.cards.push({ type: 'vertical-stack', cards: [
-    { type: 'custom:marao-card', template: 'hc_title_card', name: 'Compact navigation' },
+    { type: 'custom:marao-card', template: 'md_title_card', name: 'Compact navigation' },
     { type: 'grid', columns: 2, square: false, cards: [
       ['Iluminação', 'light.marao_dashboard_test_light', 'mdi:lightbulb-group-outline'],
       ['Persianas', 'cover.marao_dashboard_test_cover', 'mdi:window-shutter'],
       ['Climatização', 'climate.marao_dashboard_test_climate', 'mdi:thermostat'],
       ['Manutenção', 'input_number.marao_dashboard_test_battery', 'mdi:wrench'],
       ['Cenários', 'switch.marao_dashboard_test_switch', 'mdi:palette-outline'],
-    ].map(([name, entity, icon]) => ({ type: 'custom:marao-card', template: 'hc_navigation_card', name, entity, icon,
+    ].map(([name, entity, icon]) => ({ type: 'custom:marao-card', template: 'md_navigation_card', name, entity, icon,
       tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/overview' },
     })) },
   ] });
   view.cards.push({type:'custom:marao-popup-card', hash:'#marao-netatmo-camera', entity:'camera.marao_dashboard_test_netatmo', name:'Netatmo camera', cards:[
-    {type:'custom:marao-card',template:'hc_camera_card',entity:'camera.marao_dashboard_test_netatmo',show_name:false,tap_action:{action:'fullscreen'}},
+    {type:'custom:marao-card',template:'md_camera_card',entity:'camera.marao_dashboard_test_netatmo',show_name:false,tap_action:{action:'fullscreen'}},
     {type:'custom:marao-camera-events-card',entity:'camera.marao_dashboard_test_netatmo',event_provider:'netatmo'},
   ]});
-  view.cards.push({ type: 'custom:marao-card', template: 'hc_access_card', entity: 'lock.marao_dashboard_test_lock', name: 'Access · inline slider', variables: { access_mode: 'slide' } });
+  view.cards.push({ type: 'custom:marao-card', template: 'md_access_card', entity: 'lock.marao_dashboard_test_lock', name: 'Access · inline slider', variables: { access_mode: 'slide' } });
   const valueSliders = concreteCases().filter((entry) => entry.sliderPercentage === 50);
   const valueSliderHash = '#marao-dashboard-test-value-sliders-popup';
-  view.cards.push({ type: 'custom:marao-card', template: 'hc_bubble_popup_card', entity: valueSliders[0].entity, name: 'Value slider touch tests', variables: { popup_hash: valueSliderHash } });
+  view.cards.push({ type: 'custom:marao-card', template: 'md_bubble_popup_card', entity: valueSliders[0].entity, name: 'Value slider touch tests', variables: { popup_hash: valueSliderHash } });
   view.cards.push({ type: 'custom:marao-popup-card', hash: valueSliderHash, entity: valueSliders[0].entity, name: 'Value slider touch tests', height: '50dvh', cards: [{
     type: 'grid', columns: 1, square: false,
     cards: valueSliders.map(({ type, template, entity, name, variables }) => ({ type, template, entity, name, variables })),
   }] });
   const tallHash = '#marao-dashboard-test-tall-controls-popup';
-  view.cards.push({ type: 'custom:marao-card', template: 'hc_bubble_popup_card', entity: valueSliders[0].entity, name: 'Tall controls popup', variables: { popup_hash: tallHash } });
+  view.cards.push({ type: 'custom:marao-card', template: 'md_bubble_popup_card', entity: valueSliders[0].entity, name: 'Tall controls popup', variables: { popup_hash: tallHash } });
   view.cards.push({ type: 'custom:marao-popup-card', hash: tallHash, entity: valueSliders[0].entity, name: 'Tall controls popup', height: '100dvh', max_height: '100dvh', cards: valueSliders.map(({ type, template, entity, name, variables }) => ({ type, template, entity, name, variables })) });
   const mediaControls = view.cards.find((card) => card.hash === '#marao-dashboard-test-generic-media-popup').cards[0];
   for (const state of ['unknown', 'unavailable']) {
     view.cards.push({ type: 'vertical-stack', cards: [
-      { type: 'custom:marao-card', template: 'hc_title_card', name: `Generic media controls · ${state}` },
+      { type: 'custom:marao-card', template: 'md_title_card', name: `Generic media controls · ${state}` },
       { ...mediaControls, columns: 2, cards: mediaControls.cards.map((card) => ({ ...card, entity: `media_player.${prefix}media_${state}` })) },
     ] });
   }
   view.cards.push({ type: 'grid', columns: 2, square: false, cards: [
-    { type: 'custom:marao-card', template: 'hc_access_slide_action_card', entity: 'lock.marao_dashboard_test_lock', name: 'Narrow unlock slide', variables: { action_service: 'lock.unlock', action_label_key: 'common.unlock' } },
-    { type: 'custom:marao-card', template: 'hc_access_slide_action_card', entity: 'cover.marao_dashboard_test_open_only_door', name: 'Narrow open slide', variables: { action_service: 'cover.open_cover', action_label_key: 'common.open' } },
+    { type: 'custom:marao-card', template: 'md_access_slide_action_card', entity: 'lock.marao_dashboard_test_lock', name: 'Narrow unlock slide', variables: { action_service: 'lock.unlock', action_label_key: 'common.unlock' } },
+    { type: 'custom:marao-card', template: 'md_access_slide_action_card', entity: 'cover.marao_dashboard_test_open_only_door', name: 'Narrow open slide', variables: { action_service: 'cover.open_cover', action_label_key: 'common.open' } },
   ] });
   view.cards.push({ type: 'vertical-stack', cards: [
-    { type: 'custom:marao-card', template: 'hc_title_card', name: 'Independent state cases', show_state: false },
+    { type: 'custom:marao-card', template: 'md_title_card', name: 'Independent state cases', show_state: false },
     ...concreteCases().map(({ type, template, name, entity, variables, card }) => ({ type, ...(template ? { template } : {}), name, entity, variables, ...card })),
   ] });
   for (const example of concreteCases().filter((entry) => entry.variables.popup_hash)) {
     const lock = example.entity.startsWith('lock.');
     view.cards.push({ type: 'custom:marao-popup-card', hash: example.variables.popup_hash, name: example.name, entity: example.entity, cards: [
-      { type: 'custom:marao-card', template: 'hc_access_slide_action_card', entity: example.entity, name: lock ? 'Unlock' : 'Open', variables: { action_service: lock ? 'lock.unlock' : 'cover.open_cover', action_label_key: lock ? 'common.unlock' : 'access.open' } },
-      { type: 'custom:marao-card', template: 'hc_access_action_card', entity: example.entity, name: lock ? 'Lock' : 'Close', variables: { action_service: lock ? 'lock.lock' : 'cover.close_cover', action_label_key: lock ? 'common.lock' : 'common.close' } },
+      { type: 'custom:marao-card', template: 'md_access_slide_action_card', entity: example.entity, name: lock ? 'Unlock' : 'Open', variables: { action_service: lock ? 'lock.unlock' : 'cover.open_cover', action_label_key: lock ? 'common.unlock' : 'access.open' } },
+      { type: 'custom:marao-card', template: 'md_access_action_card', entity: example.entity, name: lock ? 'Lock' : 'Close', variables: { action_service: lock ? 'lock.lock' : 'cover.close_cover', action_label_key: lock ? 'common.lock' : 'common.close' } },
     ] });
   }
   for (const example of concreteCases().filter((entry) => entry.type === 'custom:marao-energy-period-card')) {
@@ -141,42 +141,42 @@ function expandGallery(source) {
       { type: example.type, name: example.name, entity: example.entity, period: 'day', popup: true },
     ] });
   }
-  view.cards.push({ type: 'custom:marao-card', template: 'hc_climate_card', name: manifest.dualClimateCase.name, entity: manifest.dualClimateCase.entity, variables: { show_mode_buttons: true } });
+  view.cards.push({ type: 'custom:marao-card', template: 'md_climate_card', name: manifest.dualClimateCase.name, entity: manifest.dualClimateCase.entity, variables: { show_mode_buttons: true } });
   for (const example of manifest.climateFeedbackCases) {
-    view.cards.push({ type: 'custom:marao-card', template: 'hc_climate_card', name: example.name, entity: example.entity, variables: { show_mode_buttons: true } });
+    view.cards.push({ type: 'custom:marao-card', template: 'md_climate_card', name: example.name, entity: example.entity, variables: { show_mode_buttons: true } });
   }
   const delayedClimate = manifest.climateFeedbackCases.find(example => example.id === 'delayed_confirmation');
   const climateHash = '#marao-dashboard-test-feedback-climate';
-  view.cards.push({ type: 'custom:marao-card', template: 'hc_climate_card', name: 'Delayed climate duplicate', entity: delayedClimate.entity, variables: { mode_selector_hash: climateHash } });
+  view.cards.push({ type: 'custom:marao-card', template: 'md_climate_card', name: 'Delayed climate duplicate', entity: delayedClimate.entity, variables: { mode_selector_hash: climateHash } });
   view.cards.push({ type: 'custom:marao-popup-card', name: delayedClimate.name, hash: climateHash, entity: delayedClimate.entity, cards: [
-    { type: 'custom:marao-card', template: 'hc_climate_card', name: delayedClimate.name, entity: delayedClimate.entity, variables: { show_mode_buttons: true } },
+    { type: 'custom:marao-card', template: 'md_climate_card', name: delayedClimate.name, entity: delayedClimate.entity, variables: { show_mode_buttons: true } },
   ] });
-  view.cards.push({ type: 'custom:marao-card', template: 'hc_room_card', name: manifest.groupCase.name, entity: manifest.groupCase.entity, variables: { light_entities: manifest.groupCase.entities }, tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/rooms' } });
-  view.cards.push({ type: 'custom:marao-card', template: 'hc_base_card', name: manifest.actionErrorCase.name, entity: manifest.actionErrorCase.entity, tap_action: { action: 'call-service', service: manifest.actionErrorCase.service } });
-  view.cards.push({ type: 'custom:marao-card', template: 'hc_switch_card', name: 'Simulate safe action failure', entity: 'input_boolean.marao_dashboard_test_action_failure' });
+  view.cards.push({ type: 'custom:marao-card', template: 'md_room_card', name: manifest.groupCase.name, entity: manifest.groupCase.entity, variables: { light_entities: manifest.groupCase.entities }, tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/rooms' } });
+  view.cards.push({ type: 'custom:marao-card', template: 'md_base_card', name: manifest.actionErrorCase.name, entity: manifest.actionErrorCase.entity, tap_action: { action: 'call-service', service: manifest.actionErrorCase.service } });
+  view.cards.push({ type: 'custom:marao-card', template: 'md_switch_card', name: 'Simulate safe action failure', entity: 'input_boolean.marao_dashboard_test_action_failure' });
   for (const example of manifest.historyCases) {
-    view.cards.push({ type: 'custom:marao-card', template: 'hc_graph_card', entity: example.entity, name: `Graph history · ${example.id}` });
+    view.cards.push({ type: 'custom:marao-card', template: 'md_graph_card', entity: example.entity, name: `Graph history · ${example.id}` });
     view.cards.push({ type: 'custom:marao-energy-period-card', entity: example.entity, name: `Energy history · ${example.id}`, period: 'day', popup: true });
     view.cards.push({ type: 'custom:marao-state-timeline-card', entity: example.entity, name: `Timeline history · ${example.id}` });
     if (example.id === 'error') {
       for (const [kind, type] of [['Energy', 'custom:marao-energy-period-card'], ['Timeline', 'custom:marao-state-timeline-card']]) {
         const name = `${kind} history Retry popup`, hash = `#marao-dashboard-test-${kind.toLowerCase()}-history-retry`;
-        view.cards.push({ type: 'custom:marao-card', template: 'hc_bubble_popup_card', entity: example.entity, name, variables: { popup_hash: hash } });
+        view.cards.push({ type: 'custom:marao-card', template: 'md_bubble_popup_card', entity: example.entity, name, variables: { popup_hash: hash } });
         view.cards.push({ type: 'custom:marao-popup-card', entity: example.entity, name, hash, cards: [{ type, entity: example.entity, name, ...(kind === 'Energy' ? { period: 'day', popup: true } : {}) }] });
       }
     }
   }
   for (let count = 1; count <= 5; count += 1) {
     const names = ['one', 'two', 'three', 'four', 'five'];
-    view.cards.push({ type: 'custom:marao-card', template: 'hc_scene_card', name: `Scene with ${names[count - 1]} option${count > 1 ? 's' : ''}`, entity: `input_select.${prefix}scene_options_${count}` });
+    view.cards.push({ type: 'custom:marao-card', template: 'md_scene_card', name: `Scene with ${names[count - 1]} option${count > 1 ? 's' : ''}`, entity: `input_select.${prefix}scene_options_${count}` });
   }
   for (const [name, variables] of [
     ['Graph line only', { show_graph_fill: false }],
     ['Graph fill only', { show_graph_line: false }],
-  ]) view.cards.push({ type: 'custom:marao-card', template: 'hc_graph_card', name, entity: 'sensor.marao_dashboard_test_graph_history', variables });
+  ]) view.cards.push({ type: 'custom:marao-card', template: 'md_graph_card', name, entity: 'sensor.marao_dashboard_test_graph_history', variables });
   for (const example of manifest.eventCases) {
     const hash = `#marao-dashboard-test-events-${example.id}`;
-    view.cards.push({ type: 'custom:marao-card', template: 'hc_navigation_card', name: example.name, entity: 'camera.marao_dashboard_test_camera', tap_action: { action: 'navigate', navigation_path: hash } });
+    view.cards.push({ type: 'custom:marao-card', template: 'md_navigation_card', name: example.name, entity: 'camera.marao_dashboard_test_camera', tap_action: { action: 'navigate', navigation_path: hash } });
     view.cards.push({ type: 'custom:marao-popup-card', hash, name: example.name, entity: 'camera.marao_dashboard_test_camera', height: 'auto', max_height: '100%', cards: [{
       type: 'custom:marao-camera-events-card', entity: example.entity || 'camera.marao_dashboard_test_camera', title: example.name,
       event_provider: example.provider, frigate_instance_id: 'marao_test', frigate_camera: example.camera,
@@ -184,7 +184,7 @@ function expandGallery(source) {
     }] });
   }
   view.cards.push({ type: 'vertical-stack', cards: [
-    { type: 'custom:marao-card', template: 'hc_title_card', name: 'Native Home Assistant cards' },
+    { type: 'custom:marao-card', template: 'md_title_card', name: 'Native Home Assistant cards' },
     ...nativeCases(view, manifest, walkCards),
   ] });
   return view;
@@ -307,7 +307,7 @@ function validateCoverage(view) {
   for (const example of manifest.sectionLayoutCases || []) for (const child of example.cards) if (child.name && !cards.some(card => card.name === child.name)) failures.push(`Missing section case ${child.name}`);
   for (const template of manifest.requiredTemplates) if (!cards.some((card) => card.template === template)) failures.push(`Missing template ${template}`);
   for (const name of manifest.requiredOptions) if (!cards.some((card) => card.name === name)) failures.push(`Missing option example ${name}`);
-  for (const group of manifest.entityGroupCases || []) if (!cards.some(card => card.template === 'hc_entity_group_card' && card.id === group.id && card.name === group.name)) failures.push(`Missing Entity Group ${group.id}`);
+  for (const group of manifest.entityGroupCases || []) if (!cards.some(card => card.template === 'md_entity_group_card' && card.id === group.id && card.name === group.name)) failures.push(`Missing Entity Group ${group.id}`);
   for (const example of concreteCases()) if (!cards.some((card) => card.entity === example.entity && card.type === example.type && card.template === example.template && card.name === example.name)) failures.push(`Missing state case ${example.id}`);
   for (const example of manifest.historyCases) for (const kind of ['Energy', 'Timeline']) if (!cards.some((card) => card.entity === example.entity && card.name === `${kind} history · ${example.id}`)) failures.push(`Missing ${kind} history case ${example.id}`);
   return failures;

@@ -10,10 +10,10 @@
       "columns": 1,
       "entities": [
         {"id": "native-welcome", "template": "ha_card", "yaml": "# Kept until a visual configuration edit\ntype: markdown\ntitle: Welcome\ncontent: Hello from Home Assistant\n"},
-        {"id": "first", "template": "hc_light_card", "entity_id": "light.marao_dashboard_test_light", "name": "Searchable first light", "variables": {"enable_slider": false, "future": []}},
-        {"id": "second", "template": "hc_light_card", "entity_id": "light.marao_dashboard_test_light", "name": "Searchable duplicate light"},
-        {"id": "vacuum", "template": "hc_vacuum_card", "entity_id": "vacuum.marao_dashboard_test_vacuum_commands", "variables": {"action_1": {"on_action": "vacuum.send_command", "data": {"command": "app_segment_clean", "params": [{"segments": [22, 21], "repeat": 2}], "future": []}}}},
-        {"id": "empty-group", "template": "hc_entity_group_card", "name": "Empty lights", "entity_type": "light", "popup_filter": "all", "entities": [], "variables": {"popup_hash": "#json-editor-empty-lights"}}
+        {"id": "first", "template": "md_light_card", "entity_id": "light.marao_dashboard_test_light", "name": "Searchable first light", "variables": {"enable_slider": false, "future": []}},
+        {"id": "second", "template": "md_light_card", "entity_id": "light.marao_dashboard_test_light", "name": "Searchable duplicate light"},
+        {"id": "vacuum", "template": "md_vacuum_card", "entity_id": "vacuum.marao_dashboard_test_vacuum_commands", "variables": {"action_1": {"on_action": "vacuum.send_command", "data": {"command": "app_segment_clean", "params": [{"segments": [22, 21], "repeat": 2}], "future": []}}}},
+        {"id": "empty-group", "template": "md_entity_group_card", "name": "Empty lights", "entity_type": "light", "popup_filter": "all", "entities": [], "variables": {"popup_hash": "#json-editor-empty-lights"}}
       ],
       "cards": [{"type": "markdown", "content": "Searchable raw card", "future": {"empty": []}}]
     }]

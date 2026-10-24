@@ -14,9 +14,9 @@ FIXTURES = Path(__file__).parents[3] / "ha-test/upgrade/fixtures"
 @pytest.mark.parametrize("columns", range(1, 7))
 def test_fixed_mixed_controls_keep_exact_order_options_and_preferred_columns(columns):
     entries = [
-        {"entity_id": "light.safe", "template": "hc_light_card", "name": "Simple", "variables": {"enable_slider": False, "future": []}},
-        {"entity_id": "cover.safe", "template": "hc_cover_card", "name": "Shade"},
-        {"entity_id": "lock.safe", "template": "hc_access_action_card", "name": "Lock", "variables": {"action_service": "lock.lock"}},
+        {"entity_id": "light.safe", "template": "md_light_card", "name": "Simple", "variables": {"enable_slider": False, "future": []}},
+        {"entity_id": "cover.safe", "template": "md_cover_card", "name": "Shade"},
+        {"entity_id": "lock.safe", "template": "md_access_action_card", "name": "Lock", "variables": {"action_service": "lock.lock"}},
     ]
     source = {"config_version": 2, "name": "Controls", "landing_page": "home", "pages": [
         {"name": "Home", "path": "home", "sections": [{"columns": columns, "entities": entries}]}]}
@@ -24,16 +24,16 @@ def test_fixed_mixed_controls_keep_exact_order_options_and_preferred_columns(col
     page = g._resolve_pages(source)["pages"][0]
     view = g._page_view(page, "", "marao-dashboard")
     assert view["cards"][0] == {"type": "custom:marao-control-grid", "columns": columns, "cards": [
-        {"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.safe", "name": "Simple", "variables": {"enable_slider": False, "future": []}},
-        {"type": "custom:marao-card", "template": "hc_cover_card", "entity": "cover.safe", "name": "Shade"},
-        {"type": "custom:marao-card", "template": "hc_access_action_card", "entity": "lock.safe", "name": "Lock", "variables": {"action_service": "lock.lock"}},
+        {"type": "custom:marao-card", "template": "md_light_card", "entity": "light.safe", "name": "Simple", "variables": {"enable_slider": False, "future": []}},
+        {"type": "custom:marao-card", "template": "md_cover_card", "entity": "cover.safe", "name": "Shade"},
+        {"type": "custom:marao-card", "template": "md_access_action_card", "entity": "lock.safe", "name": "Lock", "variables": {"action_service": "lock.lock"}},
     ]}
     assert source == before
 
 
-@pytest.mark.parametrize("raw", [{"type": "markdown", "content": "Keep"}, {"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.raw"}])
+@pytest.mark.parametrize("raw", [{"type": "markdown", "content": "Keep"}, {"type": "custom:marao-card", "template": "md_light_card", "entity": "light.raw"}])
 def test_raw_provenance_and_non_control_fallback_do_not_split_or_discard(raw):
-    for extra in [[], [{"entity_id": "climate.safe", "template": "hc_climate_card"}]]:
+    for extra in [[], [{"entity_id": "climate.safe", "template": "md_climate_card"}]]:
         source = {"config_version": 2, "name": "Mixed", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "sections": [
             {"columns": 2, "entities": [{"entity_id": "light.safe"}, *extra], "cards": [raw]}]}]}
         before = deepcopy(source)
@@ -54,7 +54,7 @@ def test_automatic_empty_and_access_popup_keep_existing_boundaries_and_actions()
     popup = g._access_popup({"entity_id": "lock.safe", "name": "Door"})
     assert popup["cards"][0]["type"] == "custom:marao-control-grid"
     assert [card["variables"]["action_service"] for card in popup["cards"][0]["cards"]] == ["lock.unlock", "lock.lock"]
-    assert [card["template"] for card in popup["cards"][0]["cards"]] == ["hc_access_slide_action_card", "hc_access_action_card"]
+    assert [card["template"] for card in popup["cards"][0]["cards"]] == ["md_access_slide_action_card", "md_access_action_card"]
 
 
 @pytest.mark.parametrize("record", json.loads((FIXTURES / "provenance.json").read_text()), ids=lambda record: record["tag"])
@@ -95,10 +95,10 @@ def test_history_retains_exact_source_unknown_options_and_unrelated_output(tmp_p
 
 def test_sections_keep_all_owned_families_and_structural_raw_boundaries():
     entries = [
-        {"entity_id": "fan.safe", "template": "hc_fan_card", "name": "Ventilation"},
-        {"entity_id": "sensor.safe", "template": "hc_sensor_card", "name": "Reading"},
-        {"entity_id": "light.safe", "template": "hc_light_card", "name": "Lamp"},
-        {"entity_id": "climate.safe", "template": "hc_climate_card", "name": "Climate"},
+        {"entity_id": "fan.safe", "template": "md_fan_card", "name": "Ventilation"},
+        {"entity_id": "sensor.safe", "template": "md_sensor_card", "name": "Reading"},
+        {"entity_id": "light.safe", "template": "md_light_card", "name": "Lamp"},
+        {"entity_id": "climate.safe", "template": "md_climate_card", "name": "Climate"},
     ]
     raw = {"type": "markdown", "content": "Keep exactly", "unknown": []}
     popup = {"type": "custom:marao-popup-card", "hash": "#raw-popup", "cards": []}
@@ -121,7 +121,7 @@ def test_sections_keep_all_owned_families_and_structural_raw_boundaries():
 
 @pytest.mark.parametrize("visibility", [None, False, True])
 def test_camera_title_generation_preserves_visibility_and_existing_options(visibility):
-    entry = {"id": "entrance", "entity_id": "camera.front", "template": "hc_camera_card",
+    entry = {"id": "entrance", "entity_id": "camera.front", "template": "md_camera_card",
              "name": "Custom entrance", "icon": "mdi:cctv", "show_state": True,
              "show_label": False, "future": {"keep": []},
              "variables": {"event_provider": "unifiprotect", "event_limit": 7}}
@@ -133,7 +133,7 @@ def test_camera_title_generation_preserves_visibility_and_existing_options(visib
     view = g._page_view(g._resolve_pages(source)["pages"][0], "", "marao-dashboard")
     card = view["cards"][0]["cards"][0]
     assert {key: card[key] for key in ("type", "template", "entity", "name", "icon", "show_state", "show_label")} == {
-        "type": "custom:marao-card", "template": "hc_camera_card", "entity": "camera.front",
+        "type": "custom:marao-card", "template": "md_camera_card", "entity": "camera.front",
         "name": "Custom entrance", "icon": "mdi:cctv", "show_state": True, "show_label": False}
     if visibility is None:
         assert "show_name" not in card

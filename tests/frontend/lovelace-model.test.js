@@ -17,7 +17,7 @@ test('native YAML parses HA states, aliases and merges without losing custom opt
 test('native descriptors preserve exact source and opaque options across JSON, moves and duplication', () => {
   const entry = { id: 'external', template: 'ha_card', yaml: fixture.source, future: { keep: true } };
   const source = { config_version: 2, name: 'Test', landing_page: 'home', pages: [{ name: 'Home', path: 'home', sections: [
-    { columns: 2, entities: [{ id: 'title', template: 'hc_title_card', name: 'Title' }, entry], cards: [{ type: 'markdown', content: 'Raw' }] }, { entities: [] }] }] };
+    { columns: 2, entities: [{ id: 'title', template: 'md_title_card', name: 'Title' }, entry], cards: [{ type: 'markdown', content: 'Raw' }] }, { entities: [] }] }] };
   const model = normalizeConfig(source);
   assert.deepEqual(serializeConfig(model), source);
   assert.equal(movePageCard(model.pages[0], 0, 1, 1, 0, model.pages[0].sections[0].entities[1]), true);

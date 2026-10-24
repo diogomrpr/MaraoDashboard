@@ -1,6 +1,6 @@
 :host {
   display: block;
-  min-height: 100vh;
+  min-height: 100dvh;
   color: var(--primary-text-color);
   background: var(--primary-background-color);
 }
@@ -116,8 +116,13 @@ ha-sortable { display: block; }
 .load-row ha-button::part(base) { height: auto; min-height: 48px; }
 .load-row ha-button::part(label) { white-space: normal; overflow-wrap: anywhere; }
 /* Native editor widgets stay below the pinned Marao controls. */
-.json-shell { isolation: isolate; height: max(240px, calc(100dvh - var(--editor-header-height,180px) - 48px)); border: 1px solid var(--divider-color); overflow: hidden; }
+.json-shell { isolation: isolate; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 #monaco { width: 100%; height: 100%; }
+.page:has(> #json-view:not([hidden])) { display: flex; flex-direction: column; height: 100dvh; min-width: 0; padding: 0; overflow: hidden; }
+.page:has(> #json-view:not([hidden])) > .editor-header { flex: none; margin-bottom: 0; padding: 16px 20px 0; }
+#json-view { flex: 1; min-width: 0; min-height: 0; display: flex; overflow: hidden; }
+.page:has(> #json-view:not([hidden])) > .status { flex: none; min-height: 0; padding: 8px 12px; }
+.page:has(> #json-view:not([hidden])) > .status:empty { display: none; }
 .status { min-height: 24px; padding: 12px 2px 0; color: var(--secondary-text-color); }
 .status.success { color: var(--success-color); }
 .status.error { color: var(--error-color); }
@@ -132,6 +137,7 @@ ha-dialog { --ha-icon-button-size: 48px; }
 .add-tabs button[aria-pressed="true"] { background: var(--primary-color); color: var(--text-primary-color); }
 .gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .gallery-card { display: grid; grid-template-columns: 42px 1fr; gap: 10px; text-align: left; border: 1px solid var(--divider-color); border-radius: 12px; padding: 14px; background: var(--card-background-color); color: var(--primary-text-color); cursor: pointer; }
+.gallery-card[hidden] { display: none; }
 .gallery-card:active { border-color: var(--primary-color); transform: scale(.98); }
 .gallery-card { min-height: 48px; min-width: 48px; overflow-wrap: anywhere; }
 .gallery-card span { min-width: 0; }
@@ -139,8 +145,8 @@ ha-dialog { --ha-icon-button-size: 48px; }
 .add-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
 .add-tabs button { min-height: 48px; min-width: 48px; flex: 1; padding: 8px; border: 0; border-radius: 12px; background: var(--secondary-background-color); color: var(--primary-text-color); overflow-wrap: anywhere; }
 .add-tabs button[aria-selected="true"] { background: var(--primary-color); color: var(--text-primary-color); }
-.add-tabs button:focus, .gallery-card:focus, #entity-search:focus { outline: none; }
-#entity-search { display: block; width: 100%; min-height: 48px; margin: 8px 0 16px; padding: 10px; border: 1px solid var(--divider-color); border-radius: 12px; background: var(--card-background-color); color: var(--primary-text-color); font: inherit; }
+.add-tabs button:focus, .gallery-card:focus, #entity-search:focus, #card-search:focus { outline: none; }
+#entity-search, #card-search { display: block; width: 100%; min-height: 48px; margin: 8px 0 16px; padding: 10px; border: 1px solid var(--divider-color); border-radius: 12px; background: var(--card-background-color); color: var(--primary-text-color); font: inherit; }
 .entity-results { display: grid; gap: 10px; }
 .gallery-card strong { display: block; }
 .gallery-card small { display: block; margin-top: 4px; color: var(--secondary-text-color); line-height: 1.35; }
@@ -157,6 +163,7 @@ ha-dialog { --ha-icon-button-size: 48px; }
 
 @media (max-width: 850px) {
   .page { padding: 16px 10px 56px; }
+  .page:has(> #json-view:not([hidden])) > .editor-header { padding: 12px 10px 0; }
   .toolbar { align-items: flex-start; flex-direction: column; }
   .editor-header .actions { width: fit-content; max-width: 100%; flex-wrap: nowrap; }
   .editor-header #save { min-width: 0; }

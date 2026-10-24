@@ -193,27 +193,27 @@ if (/!include|type:\s*custom:marao-navbar-card/.test(gallerySource)) {
   console.error("The generator must supply the Cases navbar through the ordinary custom-page interface.");
 }
 for (const expectedCard of [
-  "hc_camera_card",
-  "hc_light_card",
-  "hc_cover_card",
-  "hc_access_card",
-  "hc_access_action_card",
-  "hc_switch_card",
-  "hc_climate_card",
-  "hc_fan_card",
-  "hc_media_card",
-  "hc_media_app_card",
-  "hc_sensor_card",
-  "hc_number_card",
-  "hc_wallbox_current_card",
-  "hc_vacuum_card",
-  "hc_battery_card",
-  "hc_dishwasher_card",
-  "hc_washing_machine_card",
-  "hc_graph_card",
-  "hc_toggle_graph_card",
+  "md_camera_card",
+  "md_light_card",
+  "md_cover_card",
+  "md_access_card",
+  "md_access_action_card",
+  "md_switch_card",
+  "md_climate_card",
+  "md_fan_card",
+  "md_media_card",
+  "md_media_app_card",
+  "md_sensor_card",
+  "md_number_card",
+  "md_wallbox_current_card",
+  "md_vacuum_card",
+  "md_battery_card",
+  "md_dishwasher_card",
+  "md_washing_machine_card",
+  "md_graph_card",
+  "md_toggle_graph_card",
   "marao-state-timeline-card",
-  "hc_navigation_card",
+  "md_navigation_card",
   "marao-energy-period-card",
 ]) {
   if (!gallerySource.includes(expectedCard)) {
@@ -468,11 +468,11 @@ const testViewPaths = new Set([
   ...(testDashboard.pages || []).map((page) => page.path),
 ]);
 const popupHashes = new Set([cardTest, testDashboard].flatMap((source) => findCardsByType(source, "custom:marao-popup-card").map((card) => card.hash)));
-const popupRoles = new Set(['hc_entity_group_card', 'hc_scene_collection_card', 'hc_energy_period_card', 'hc_graph_card', 'hc_climate_card', 'hc_media_card', 'hc_camera_card', 'hc_access_card']);
+const popupRoles = new Set(['md_entity_group_card', 'md_scene_collection_card', 'md_energy_period_card', 'md_graph_card', 'md_climate_card', 'md_media_card', 'md_camera_card', 'md_access_card']);
 const collectGeneratedPopups = value => {
   if (Array.isArray(value)) return value.forEach(collectGeneratedPopups);
   if (!value || typeof value !== 'object') return;
-  if (popupRoles.has(value.template) && (value.template !== 'hc_graph_card' || value.variables?.history_popup)) {
+  if (popupRoles.has(value.template) && (value.template !== 'md_graph_card' || value.variables?.history_popup)) {
     for (const key of ['popup_hash', 'mode_selector_hash']) if (value.variables?.[key]) popupHashes.add(value.variables[key]);
   }
   Object.values(value).forEach(collectGeneratedPopups);
@@ -524,16 +524,16 @@ const editorSource = fs.readFileSync(
   "utf8"
 );
 const catalogTemplates = [...new Set(
-  [...editorSource.matchAll(/"id":\s*"(hc_[a-z0-9_]+_card)"/g)].map((match) => match[1])
+  [...editorSource.matchAll(/"id":\s*"(md_[a-z0-9_]+_card)"/g)].map((match) => match[1])
 )];
 const visibleMaraoCards = findCardsByType(visibleGallery, "custom:marao-card");
 const visibleTemplates = visibleMaraoCards.map((card) => card.template).filter(Boolean);
 const nativeCatalog = JSON.parse(fs.readFileSync(path.join(repoRoot, frontendRoot, "MaraoNativeCatalog.js"), "utf8")
   .replace(/^export const catalog = /, "").trim().replace(/;$/, ""));
 for (const template of catalogTemplates) {
-  let count = template === "hc_timeline_card"
+  let count = template === "md_timeline_card"
     ? findCardsByType(visibleGallery, "custom:marao-state-timeline-card").length
-    : ['hc_entity_group_card', 'hc_scene_collection_card', 'hc_energy_period_card', 'hc_media_app_card'].includes(template)
+    : ['md_entity_group_card', 'md_scene_collection_card', 'md_energy_period_card', 'md_media_app_card'].includes(template)
       ? (cardTest.entities || []).filter((entity) => entity.template === template).length
     : visibleTemplates.filter((candidate) => candidate === template).length;
   const nativeType = nativeCatalog.cards.find(card => card.id === template)?.type;
@@ -548,22 +548,22 @@ const allGalleryTemplates = new Set(
   findCardsByType(cardTest, "custom:marao-card").map((card) => card.template).filter(Boolean)
 );
 for (const template of [
-  "hc_access_action_card",
-  "hc_access_hold_action_card",
-  "hc_access_slide_action_card",
-  "hc_base_card",
-  "hc_blinds_popup_card",
-  "hc_climate_popup_card",
-  "hc_glance_card",
-  "hc_header_card",
-  "hc_lights_popup_card",
-  "hc_maintenance_popup_card",
-  "hc_media_app_card",
-  "hc_room_card",
-  "hc_scene_card",
-  "hc_security_card",
-  "hc_title_card",
-  "hc_weather_card",
+  "md_access_action_card",
+  "md_access_hold_action_card",
+  "md_access_slide_action_card",
+  "md_base_card",
+  "md_blinds_popup_card",
+  "md_climate_popup_card",
+  "md_glance_card",
+  "md_header_card",
+  "md_lights_popup_card",
+  "md_maintenance_popup_card",
+  "md_media_app_card",
+  "md_room_card",
+  "md_scene_card",
+  "md_security_card",
+  "md_title_card",
+  "md_weather_card",
 ]) {
   if (!allGalleryTemplates.has(template)) {
     hasError = true;
@@ -595,12 +595,12 @@ for (const popup of findCardsByType(cardTest, "custom:marao-popup-card")) {
 }
 
 const gridPopupCardExpectations = {
-  "#marao-dashboard-card-test-popup": "hc_sensor_card",
-  "#marao-dashboard-test-blinds-popup": "hc_cover_card",
-  "#marao-dashboard-test-lights-popup": "hc_light_card",
-  "#marao-dashboard-test-lock-popup": "hc_access_action_card",
-  "#marao-dashboard-test-garage-door-popup": "hc_access_action_card",
-  "#marao-dashboard-test-maintenance-popup": "hc_battery_card",
+  "#marao-dashboard-card-test-popup": "md_sensor_card",
+  "#marao-dashboard-test-blinds-popup": "md_cover_card",
+  "#marao-dashboard-test-lights-popup": "md_light_card",
+  "#marao-dashboard-test-lock-popup": "md_access_action_card",
+  "#marao-dashboard-test-garage-door-popup": "md_access_action_card",
+  "#marao-dashboard-test-maintenance-popup": "md_battery_card",
 };
 for (const [hash, expectedTemplate] of Object.entries(gridPopupCardExpectations)) {
   const popup = cardTest.cards.find((card) => card?.type === "custom:marao-popup-card" && card.hash === hash);
@@ -621,7 +621,7 @@ const garageDoorPopup = cardTest.cards.find(
   (card) => card?.type === "custom:marao-popup-card" && card.hash === "#marao-dashboard-test-garage-door-popup"
 );
 if (!findCardsByType(garageDoorPopup?.cards?.[0], "custom:marao-card").some(
-  (card) => card.template === "hc_access_slide_action_card"
+  (card) => card.template === "md_access_slide_action_card"
 )) {
   hasError = true;
   console.error("Garage door popup must contain the slide-to-open access card.");
@@ -630,13 +630,13 @@ if (!findCardsByType(garageDoorPopup?.cards?.[0], "custom:marao-card").some(
 for (const hash of ["#marao-dashboard-test-lock-popup"]) {
   const popup = cardTest.cards.find((card) => card?.type === "custom:marao-popup-card" && card.hash === hash);
   const actions = findCardsByType(popup?.cards?.[0], "custom:marao-card")
-    .filter((card) => ["hc_access_action_card", "hc_access_slide_action_card"].includes(card.template));
+    .filter((card) => ["md_access_action_card", "md_access_slide_action_card"].includes(card.template));
   if (
     popup?.cards?.[0]?.columns !== 1 ||
     actions.length !== 2 ||
-    actions[0]?.template !== "hc_access_slide_action_card" ||
+    actions[0]?.template !== "md_access_slide_action_card" ||
     actions[0]?.variables?.action_requires_hold !== false ||
-    actions[1]?.template !== "hc_access_action_card"
+    actions[1]?.template !== "md_access_action_card"
   ) {
     hasError = true;
     console.error(`${hash} must contain a full-width slide action followed by a normal access action card.`);
@@ -647,7 +647,7 @@ const climatePopup = cardTest.cards.find(
   (card) => card?.type === "custom:marao-popup-card" && card.hash === "#marao-dashboard-test-climate-popup"
 );
 const climatePopupCards = findCardsByType(climatePopup?.cards?.[0], "custom:marao-card")
-  .filter((card) => card.template === "hc_climate_card");
+  .filter((card) => card.template === "md_climate_card");
 if (
   climatePopupCards.length === 0 ||
   climatePopupCards.some((card) => card.variables?.show_mode_buttons !== true)
@@ -662,7 +662,7 @@ const climateModePopup = cardTest.cards.find(
 const climateModeCard = climateModePopup?.cards?.[0];
 if (
   climateModePopup?.title ||
-  climateModeCard?.template !== "hc_climate_card" ||
+  climateModeCard?.template !== "md_climate_card" ||
   climateModeCard?.name !== "Climate" ||
   climateModeCard?.variables?.show_mode_buttons !== true
 ) {
@@ -677,7 +677,7 @@ const multiModeClimateCard = multiModeClimatePopup?.cards?.[0];
 if (
   multiModeClimatePopup?.title ||
   multiModeClimatePopup?.entity !== "climate.marao_dashboard_test_multi_mode_climate" ||
-  multiModeClimateCard?.template !== "hc_climate_card" ||
+  multiModeClimateCard?.template !== "md_climate_card" ||
   multiModeClimateCard?.name !== "Multi Mode Climate" ||
   multiModeClimateCard?.variables?.show_mode_buttons !== true
 ) {
@@ -689,7 +689,7 @@ const singleModeClimateCard = visibleMaraoCards.find(
   (card) => card.entity === "climate.marao_dashboard_test_single_mode_climate"
 );
 if (
-  singleModeClimateCard?.template !== "hc_climate_card" ||
+  singleModeClimateCard?.template !== "md_climate_card" ||
   !singleModeClimateCard.variables?.mode_selector_hash ||
   cardTest.cards.some((card) => card?.hash === singleModeClimateCard.variables.mode_selector_hash)
 ) {
@@ -697,7 +697,7 @@ if (
   console.error("Card test dashboard must include a single-mode climate card whose tap cannot open a popup.");
 }
 
-const cameraCard = visibleMaraoCards.find((card) => card.template === "hc_camera_card");
+const cameraCard = visibleMaraoCards.find((card) => card.template === "md_camera_card");
 const cameraPopup = cardTest.cards.find(
   (card) => card?.type === "custom:marao-popup-card" && card.hash === cameraCard?.variables?.popup_hash
 );
@@ -713,13 +713,13 @@ if (
 }
 
 const appleTvCard = findCardsByType(visibleGallery, "custom:marao-card").find(
-  (card) => card.template === "hc_media_card" && card.variables?.apple_tv === true
+  (card) => card.template === "md_media_card" && card.variables?.apple_tv === true
 );
 const appleTvPopup = cardTest.cards.find(
   (card) => card?.type === "custom:marao-popup-card" && card.hash === "#marao-dashboard-test-apple-tv-popup"
 );
 const appleTvAppGrid = appleTvPopup?.cards?.find(
-  (card) => card?.type === "grid" && card.cards?.some((item) => item.template === "hc_media_app_card")
+  (card) => card?.type === "grid" && card.cards?.some((item) => item.template === "md_media_app_card")
 );
 if (
   appleTvCard?.variables?.popup_hash !== "#marao-dashboard-test-apple-tv-popup" ||
@@ -734,7 +734,7 @@ if (
 
 const graphEntity = "sensor.marao_dashboard_test_graph_history";
 const graphCards = findCardsByType(visibleGallery, "custom:marao-card").filter((card) =>
-  ["hc_graph_card", "hc_toggle_graph_card"].includes(card.template) || card.variables?.show_graph === true
+  ["md_graph_card", "md_toggle_graph_card"].includes(card.template) || card.variables?.show_graph === true
 );
 const hasGraphCard = (template, entity = graphEntity) => graphCards.some((card) =>
   card.template === template && (card.variables?.graph_entity || card.variables?.power_entity || card.entity) === entity
@@ -742,9 +742,9 @@ const hasGraphCard = (template, entity = graphEntity) => graphCards.some((card) 
 if (
   findCardsByType(cardTest, "history-graph").length ||
   graphCards.length < 3 ||
-  !hasGraphCard("hc_graph_card") ||
-  !hasGraphCard("hc_toggle_graph_card") ||
-  !hasGraphCard("hc_switch_card")
+  !hasGraphCard("md_graph_card") ||
+  !hasGraphCard("md_toggle_graph_card") ||
+  !hasGraphCard("md_switch_card")
 ) {
   hasError = true;
   console.error("Card test graph cards must use Marao's shared SVG graph with the simulated history sensor, without native history-graph cards.");

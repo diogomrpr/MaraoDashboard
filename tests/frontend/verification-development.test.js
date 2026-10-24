@@ -70,7 +70,7 @@ test('visual selection runs no suites and behavior excludes local browser matric
   const comparison = { base: 'base', head: 'head', files: ['custom_components/marao_dashboard/frontend/MaraoCamera.js'] };
   const visual = makePlan({ tier: 'visual' }, comparison);
   assert.deepEqual(visual.checks, []); assert.equal(visual.development_only, true);
-  assert.deepEqual(visual.inspection.families, ['hc_camera_card']);
+  assert.deepEqual(visual.inspection.families, ['md_camera_card']);
   assert.match(visual.inspection.status, /not performed/); assert.equal(visual.passed, undefined);
   const behavior = makePlan({ tier: 'behavior' }, comparison);
   assert.ok(behavior.checks.length);
@@ -86,7 +86,7 @@ test('task scope never guesses shared consumers even in offline mode', () => {
   for (const tier of ['visual', 'behavior', 'focused']) assert.throws(() => makePlan({ tier, offline: true }, comparison), /declare --component/);
   const plan = makePlan({ tier: 'visual', components: ['slider'] }, comparison);
   assert.deepEqual(plan.components, ['cover', 'fan', 'light', 'slider']);
-  assert.deepEqual(plan.inspection.families.sort(), ['hc_cover_card', 'hc_fan_card', 'hc_light_card']);
+  assert.deepEqual(plan.inspection.families.sort(), ['md_cover_card', 'md_fan_card', 'md_light_card']);
   assert.deepEqual(inspectionFor(selectComponents([], ['navbar'])).families, ['marao-navbar-card']);
   assert.deepEqual(inspectionFor(selectComponents([], ['labels'])).unresolved, ['labels']);
   assert.equal(inspectionFor(selectComponents([], ['editor-ui'])).editor, true);

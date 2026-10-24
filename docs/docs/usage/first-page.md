@@ -32,10 +32,10 @@ Like mentioned in the installation, you need to be able to edit your files. Ther
         - type: vertical-stack
           cards:
             - type: custom:marao-card
-              template: hc_header_card
+              template: md_header_card
               entity: weather.buienradar
             - type: custom:marao-card
-              template: hc_title_card
+              template: md_title_card
               name: "Welcome Home"
               label: "What are you up to"
 
@@ -48,7 +48,7 @@ From here on out, we can add some cards.
 
     ```yaml
          - type: custom:marao-card
-           template: hc_light_card
+           template: md_light_card
            entity: <your light entity>
     ```
 

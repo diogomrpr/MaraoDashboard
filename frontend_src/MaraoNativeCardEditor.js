@@ -2,14 +2,14 @@ const catalogURL = new URL("./MaraoNativeCatalog.js", import.meta.url);
 catalogURL.search = new URL(import.meta.url).search;
 const { catalog } = await import(catalogURL.href);
 import { editorLabel } from "./native-labels.js";
-import { copy, same, patchPath, patchForm, formData, cameraTitleFields, entityMetadata, dashboardRoot } from "./native-model.js";
+import { canonicalCard, copy, same, patchPath, patchForm, formData, cameraTitleFields, entityMetadata, dashboardRoot } from "./native-model.js";
 
 const field = (path, label, kind = "text", extra = {}) => ({ path, label, kind, ...extra });
 const choices = (path, label, options) => field(path, label, "select", { options });
 const rowObject = value => typeof value === "string" ? { entity_id: value } : typeof value === "number" ? { value } : value;
 const actionFields = (key, config) => [
   choices(key + ".action", { tap_action: "Tap action", hold_action: "Hold action", double_tap_action: "Double tap action" }[key],
-    ["none", "toggle", "more-info", "navigate", "url", "perform-action", ...(config.template === "hc_camera_card" || config.type === "custom:marao-native-camera-card" ? ["fullscreen"] : []), ...(config[key]?.action === "call-service" ? ["call-service"] : [])]),
+    ["none", "toggle", "more-info", "navigate", "url", "perform-action", ...(config.template === "md_camera_card" || config.type === "custom:marao-native-camera-card" ? ["fullscreen"] : []), ...(config[key]?.action === "call-service" ? ["call-service"] : [])]),
   field(key + ".navigation_path", "Page"), field(key + ".url_path", "URL"),
   field(key + (config[key]?.service !== undefined && config[key]?.perform_action === undefined ? ".service" : ".perform_action"), "Action service"),
   field(key + (config[key]?.entity_id !== undefined && config[key]?.target?.entity_id === undefined ? ".entity_id" : ".target.entity_id"), "Entity", "entity", { multiple: true }),
@@ -17,12 +17,12 @@ const actionFields = (key, config) => [
 ];
 
 export function nativeFields(spec, config) {
-  const camera = spec.id === "hc_camera_card";
+  const camera = spec.id === "md_camera_card";
   const common = camera ? cameraTitleFields()
     : [field("name", "Name"), field("icon", "Icon", "icon")];
   if (spec.domains.length) common.unshift(field("entity", camera ? "Dashboard stream" : "Entity", "entity", { domains: spec.domains, device_classes: spec.device_classes, required: !spec.entity_optional }));
-  if (["hc_navigation_card", "hc_room_card"].includes(spec.id)) common.push(field("page", "Page"));
-  if (spec.id === "hc_entity_group_card") common.push(
+  if (["md_navigation_card", "md_room_card"].includes(spec.id)) common.push(field("page", "Page"));
+  if (spec.id === "md_entity_group_card") common.push(
     choices("entity_type", "Group type", ["light", "cover", "battery", "climate"]),
     choices("popup_filter", "Popup filter", ["all", "active"]));
   const advanced = (camera ? [] : ["show_name", "show_icon", "show_state", "show_label"]).map(key => field(key, key.replaceAll("_", " ").replace(/^./, s => s.toUpperCase()), "boolean"));
@@ -31,11 +31,11 @@ export function nativeFields(spec, config) {
     const item = field("variables." + option.key, option.label, option.kind, option);
     (option.advanced ? advanced : common).push(item);
   }
-  if (spec.id === "hc_media_card") common.push(
+  if (spec.id === "md_media_card") common.push(
     field("apple_tv_disabled", "Disable Apple TV controls", "boolean"),
     field("apple_tv.remote_entity", "Remote", "entity", { domains: ["remote"] }),
     field("apple_tv.volume_remote_entity", "Volume remote", "entity", { domains: ["remote", "media_player"] }));
-  if (spec.id === "hc_vacuum_card") for (let index = 1; index <= 3; index++) {
+  if (spec.id === "md_vacuum_card") for (let index = 1; index <= 3; index++) {
     const key = "variables.action_" + index;
     advanced.push(field(key + ".segment", "Segment", "number"), field(key + ".name", "Name"), field(key + ".icon", "Icon", "icon"),
       field(key + ".on_action", "Action service"), field(key + ".data.command", "Command"), field(key + ".data.params", "Parameters", "object"));
@@ -46,7 +46,7 @@ export function nativeFields(spec, config) {
   if (spec.id.includes("events")) common.push(choices(config.event_provider === undefined && config.provider !== undefined ? "provider" : "event_provider", "Event provider", ["auto", "frigate", "unifi_protect", "netatmo"]),
     field("limit", "Event limit", "number"), field("frigate_camera", "Frigate camera name"), field("frigate_instance_id", "Frigate instance ID"),
     field("unifi_protect_media_source", "UniFi Protect media source"));
-  if (!["navbar", "popup", "hc_alarm_controls_card", "hc_access_slide_action_card", "hc_access_hold_action_card", "hc_access_action_card", "hc_entity_group_card"].includes(spec.id) && !spec.id.includes("events"))
+  if (!["navbar", "popup", "md_alarm_controls_card", "md_access_slide_action_card", "md_access_hold_action_card", "md_access_action_card", "md_entity_group_card"].includes(spec.id) && !spec.id.includes("events"))
     advanced.push(...actionFields("tap_action", config), ...actionFields("hold_action", config), ...actionFields("double_tap_action", config));
   if (config.type === spec.legacy_type) for (const item of [...common, ...advanced]) item.path = item.path.replace(/^variables\./, "");
   if (spec.id.includes("events") && config.type === spec.runtime_type) common.find(item => item.path === "name").path = "title";
@@ -58,6 +58,7 @@ export class MaraoNativeCardEditor extends (globalThis.HTMLElement || class {}) 
     super(); this.attachShadow({ mode: "open" }); this._draft = {}; this._forms = []; this._validation = 0;
   }
   setConfig(config) {
+    config = canonicalCard(config);
     if (same(config, this._draft) && this._rendered) return;
     this._draft = copy(config);
     if (config.apple_tv && typeof config.apple_tv === "object") this._appleTvOptions = copy(config.apple_tv);
@@ -83,7 +84,7 @@ export class MaraoNativeCardEditor extends (globalThis.HTMLElement || class {}) 
     if (item.kind === "select" || ["energy_period", "energy_unit", "energy_precision"].includes(item.kind)) {
       let options = item.options || (item.kind === "energy_period" ? ["day", "month"] : item.kind === "energy_precision" ? ["auto", "0", "1", "2", "3", "4", "5", "6"] : ["auto", ...Object.keys(catalog.energy_units)]);
       if (item.kind === "energy_unit") {
-        const entity = this._spec.id === "hc_switch_card" ? this._draft.variables?.power_entity : this._draft.entity;
+        const entity = this._spec.id === "md_switch_card" ? this._draft.variables?.power_entity : this._draft.entity;
         const source = this._hass?.states?.[entity]?.attributes?.unit_of_measurement;
         const dimension = catalog.energy_units[source]?.[0];
         options = ["auto", ...Object.keys(catalog.energy_units).filter(unit => dimension && catalog.energy_units[unit][0] === dimension)];
@@ -170,22 +171,22 @@ export class MaraoNativeCardEditor extends (globalThis.HTMLElement || class {}) 
       this._form(host, [variants], this._draft, next => { this._commit(next); this._spec = catalog.cards.find(card => card.id === next.template); this._render(); }, () => this._draft);
     }
     this._form(host, fields.common, this._draft, next => this._commit(next), () => this._draft);
-    if (spec.id === "hc_energy_period_card") this._repeat(host, this._draft.type === spec.legacy_type ? "sub_entities" : "variables.sub_entities", "Energy breakdown",
+    if (spec.id === "md_energy_period_card") this._repeat(host, this._draft.type === spec.legacy_type ? "sub_entities" : "variables.sub_entities", "Energy breakdown",
       [field("entity_id", "Energy sensor", "entity", { domains: ["sensor"], required: true }), field("name", "Name"),
         field("cost_entity", "Cost sensor (optional)", "entity", { domains: ["sensor"] })], { entity_id: "" });
-    if (spec.id === "hc_graph_card") this._repeat(host, "variables.power_devices", "Power devices",
+    if (spec.id === "md_graph_card") this._repeat(host, "variables.power_devices", "Power devices",
       [field("entity_id", "Power sensor (W/kW)", "entity", { domains: ["sensor"], required: true }), field("name", "Name")], { entity_id: "" });
-    if (spec.id === "hc_media_card") this._repeat(host, "apple_tv.apps", "Apps",
+    if (spec.id === "md_media_card") this._repeat(host, "apple_tv.apps", "Apps",
       [field("source", "Source"), field("name", "Name"), field("icon", "Icon", "icon")], { source: "" });
-    if (["hc_entity_group_card", "hc_scene_collection_card"].includes(spec.id)) {
+    if (["md_entity_group_card", "md_scene_collection_card"].includes(spec.id)) {
       const kind = this._draft.entity_type || "light";
-      const memberSpec = catalog.cards.find(card => card.id === ({ light: "hc_light_card", cover: "hc_cover_card", climate: "hc_climate_card", battery: "hc_battery_card" }[kind]));
-      const domains = spec.id === "hc_scene_collection_card" ? ["scene", "switch", "input_boolean"] : [kind === "battery" ? "sensor" : kind];
+      const memberSpec = catalog.cards.find(card => card.id === ({ light: "md_light_card", cover: "md_cover_card", climate: "md_climate_card", battery: "md_battery_card" }[kind]));
+      const domains = spec.id === "md_scene_collection_card" ? ["scene", "switch", "input_boolean"] : [kind === "battery" ? "sensor" : kind];
       const memberFields = [field("entity_id", "Entity", "entity", { domains, ...(kind === "battery" ? { device_classes: ["battery"] } : {}) }), field("name", "Name"), field("icon", "Icon", "icon"),
-        ...(spec.id === "hc_entity_group_card" ? memberSpec.variables.filter(option => !["number_list", "vacuum_action"].includes(option.kind)).map(option => field("variables." + option.key, option.label, option.kind, option)) : [])];
+        ...(spec.id === "md_entity_group_card" ? memberSpec.variables.filter(option => !["number_list", "vacuum_action"].includes(option.kind)).map(option => field("variables." + option.key, option.label, option.kind, option)) : [])];
       this._repeat(host, "entities", "Members", memberFields, { entity_id: "" });
     }
-    if (spec.id === "hc_wallbox_current_card") this._repeat(host, "variables.shortcuts", "Charging shortcuts", [field("value", "Charging Current", "number")], { value: 6 }, 3);
+    if (spec.id === "md_wallbox_current_card") this._repeat(host, "variables.shortcuts", "Charging shortcuts", [field("value", "Charging Current", "number")], { value: 6 }, 3);
     if (spec.id === "navbar") this._repeat(host, "routes", "Navigation routes",
       [field("url", "URL"), field("label", "Label"), field("icon", "Icon", "icon"), field("icon_selected", "Selected icon", "icon")], { url: "", label: "" });
     if (spec.id === "popup") this._repeat(host, "cards", "Popup contents",
@@ -203,7 +204,7 @@ export class MaraoNativeCardEditor extends (globalThis.HTMLElement || class {}) 
     try {
       if (next.type.startsWith("custom:marao-native-") && this._hass?.callWS) {
         const checked = copy(next);
-        if (this._spec.id === "hc_wallbox_current_card" && Array.isArray(checked.variables?.shortcuts)) {
+        if (this._spec.id === "md_wallbox_current_card" && Array.isArray(checked.variables?.shortcuts)) {
           checked.variables.shortcuts = checked.variables.shortcuts.map(value => typeof value === "object" ? value.value : value);
           this._draft = checked; next = checked;
         }

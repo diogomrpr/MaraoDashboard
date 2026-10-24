@@ -33,7 +33,7 @@
           "entities": [
             {
               "id": "card-1",
-              "template": "hc_room_card",
+              "template": "md_room_card",
               "name": "Office",
               "icon": "mdi:sofa-outline",
               "page": "room-office",
@@ -59,7 +59,7 @@
           "entities": [
             {
               "id": "page-title",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Office",
               "show_icon": false,
               "show_state": false,
@@ -97,7 +97,7 @@
           "entities": [
             {
               "id": "page-title",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Studio",
               "show_icon": false,
               "show_state": false,

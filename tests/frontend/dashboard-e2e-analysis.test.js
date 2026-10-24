@@ -148,7 +148,7 @@ test('compact header geometry permits contained wrapping only below the referenc
       classList: { contains: name => name === 'compact-copy' }, getBoundingClientRect: () => bounds(example.copy) };
     const title = { parentElement: copy, closest: () => surface, getBoundingClientRect: () => bounds(example.copy) };
     body.children = [header];
-    const card = { _config: { name: 'Light', template: 'hc_light_card' }, shadowRoot: { querySelector: () => title } };
+    const card = { _config: { name: 'Light', template: 'md_light_card' }, shadowRoot: { querySelector: () => title } };
     const environment = vm.createContext({ getComputedStyle: () => ({ paddingLeft: '0px',paddingRight: '0px',overflow: 'visible',getPropertyValue:()=>String(example.fontSize || 18)+'px' }) });
     const page = { locator: () => ({ evaluateAll: async (callback, argument) => structuredClone(vm.runInContext('(' + callback.toString() + ')', environment)([card], argument)) }) };
     const issues = await titleLayoutIssues(page);

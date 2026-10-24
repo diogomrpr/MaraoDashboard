@@ -5,6 +5,7 @@ import re
 
 from . import generator as g
 from .editor import EDITOR_CATALOG
+from .card_names import canonical_card, canonical_template
 from .page_model import access_template, page_sections
 
 NATIVE_MARKER = {"mode": "native", "version": 1}
@@ -17,7 +18,7 @@ DIRECT_CARDS = {
 
 
 def native_type(role):
-    return "custom:marao-native-" + role.removeprefix("hc_").removesuffix("_card").replace("_", "-") + "-card"
+    return "custom:marao-native-" + canonical_template(role).removeprefix("md_").removesuffix("_card").replace("_", "-") + "-card"
 
 
 def native_owned(config, *, aliases=True):
@@ -42,9 +43,9 @@ def native_catalog():
     for card in catalog["cards"]:
         card["type"] = native_type(card["id"])
         card["entity_optional"] = card.get("entity_optional", not card["domains"])
-        if card["id"] in ("hc_timeline_card", "hc_energy_period_card"):
-            card["legacy_type"] = {"hc_timeline_card": "custom:marao-state-timeline-card",
-                                   "hc_energy_period_card": "custom:marao-energy-period-card"}[card["id"]]
+        if card["id"] in ("md_timeline_card", "md_energy_period_card"):
+            card["legacy_type"] = {"md_timeline_card": "custom:marao-state-timeline-card",
+                                   "md_energy_period_card": "custom:marao-energy-period-card"}[card["id"]]
     for family, runtime in DIRECT_CARDS.items():
         catalog["cards"].append({"id": family, "type": f"custom:marao-native-{family}-card",
                                  "runtime_type": runtime, "label": family.replace("-", " ").title(),
@@ -66,6 +67,7 @@ def compile_card(config, instance, url_path, entities=None, language="en", valid
     """Compile explicit client input only; never read or write installed data."""
     if not isinstance(config, dict):
         raise ValueError("Native card configuration must be an object")
+    config = canonical_card(config)
     if not isinstance(instance, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,47}", instance):
         raise ValueError("Invalid native card instance")
     g.validate_dashboard_key(url_path)
@@ -98,7 +100,7 @@ def compile_card(config, instance, url_path, entities=None, language="en", valid
     if not isinstance(variables, dict):
         raise ValueError("Native card variables must be an object")
     role = access_template({**config, "template": spec["id"]})
-    if role == "hc_camera_card":
+    if role == "md_camera_card":
         from .page_model import camera_popup_stream
         camera_popup_stream(config.get("entity"), variables)
     registry = _registry(entities or [])
@@ -107,28 +109,28 @@ def compile_card(config, instance, url_path, entities=None, language="en", valid
     if entity := entry.pop("entity", None):
         entry["entity_id"] = entity
     # External references remain authored; automatic identities belong to this instance.
-    external = bool(variables.get("popup_hash") or role == "hc_climate_card" and variables.get("mode_selector_hash"))
+    external = bool(variables.get("popup_hash") or role == "md_climate_card" and variables.get("mode_selector_hash"))
     action = config.get("tap_action")
     external = external or isinstance(action, dict) and (
         action.get("action") == "none" or action.get("action") == "navigate" and str(action.get("navigation_path", "")).startswith("#"))
     prefix = "#" + instance
     if not external:
         metadata = next((item for item in registry if item["entity_id"] == entry.get("entity_id")), {})
-        owns_popup = role in ("hc_security_card", "hc_entity_group_card", "hc_scene_collection_card", "hc_energy_period_card", "hc_media_card", "hc_camera_card")
-        owns_popup = owns_popup or role == "hc_graph_card" and variables.get("history_popup")
-        owns_popup = owns_popup or entry.get("entity_id") and role not in ("hc_access_slide_action_card", "hc_access_action_card") and g._is_access_entity({**metadata, **entry})
+        owns_popup = role in ("md_security_card", "md_entity_group_card", "md_scene_collection_card", "md_energy_period_card", "md_media_card", "md_camera_card")
+        owns_popup = owns_popup or role == "md_graph_card" and variables.get("history_popup")
+        owns_popup = owns_popup or entry.get("entity_id") and role not in ("md_access_slide_action_card", "md_access_action_card") and g._is_access_entity({**metadata, **entry})
         if owns_popup:
             variables["popup_hash"] = prefix + "-popup"
-        if role == "hc_climate_card":
+        if role == "md_climate_card":
             variables["mode_selector_hash"] = prefix + "-modes"
     entry["variables"] = variables
-    if role == "hc_entity_group_card":
+    if role == "md_entity_group_card":
         entry.setdefault("entity_type", "light")
         entry.setdefault("entities", [])
         entry.setdefault("name", spec["label"])
-    if role == "hc_scene_collection_card":
+    if role == "md_scene_collection_card":
         entry.setdefault("entities", [])
-    if role == "hc_access_action_card":
+    if role == "md_access_action_card":
         service = variables.get("action_service") or ("lock.lock" if str(entity).startswith("lock.") else "cover.close_cover")
         if service not in ("lock.lock", "cover.close_cover"):
             raise ValueError("Use an access opener slide for opening or unlocking")
@@ -146,7 +148,7 @@ def compile_card(config, instance, url_path, entities=None, language="en", valid
     # Runtime tolerates opaque presentation options; controlled generated fields win.
     runtime = {**deepcopy(config), **runtime,
                "variables": {**deepcopy(config.get("variables", {})), **runtime.get("variables", {})}}
-    if role == "hc_security_card" and "tap_action" not in config and variables.get("popup_hash"):
+    if role == "md_security_card" and "tap_action" not in config and variables.get("popup_hash"):
         runtime["variables"] = {**runtime.get("variables", {}), "popup_hash": variables["popup_hash"]}
         runtime["tap_action"] = {"action": "navigate", "navigation_path": variables["popup_hash"], "haptic": "heavy"}
     popups = [] if external else g._page_card_popups(item, language)
@@ -173,19 +175,19 @@ def _validate_actions(entry, registry=None):
         metadata = next((item for item in registry or [] if item["entity_id"] == bound), {})
         if action.get("action") == "toggle" and any(
             str(entity).startswith("lock.") or str(entity).startswith("cover.") and (
-                role == "hc_access_card" or str(next((item.get("device_class") for item in registry or [] if item["entity_id"] == entity), "")).lower() in ("door", "garage", "gate"))
+                role == "md_access_card" or str(next((item.get("device_class") for item in registry or [] if item["entity_id"] == entity), "")).lower() in ("door", "garage", "gate"))
             for entity in targets
         ):
             raise ValueError("Opening and unlocking require the access opener slide")
         specific_target = (action.get("target") is None or isinstance(action["target"], dict) and not (action["target"].keys() - {"entity_id"}))
         specific_target = specific_target and not ({"area_id", "device_id"} & data.keys())
-        ordinary_cover = (role == "hc_cover_card" and str(bound).startswith("cover.") and targets == [bound]
+        ordinary_cover = (role == "md_cover_card" and str(bound).startswith("cover.") and targets == [bound]
                           and specific_target and str(metadata.get("device_class") or "").lower() not in ("door", "garage", "gate"))
         if service in ("lock.unlock", "lock.open") or service in ("cover.open_cover", "cover.toggle") and not ordinary_cover:
             raise ValueError("Opening and unlocking require the access opener slide")
         if service in ("alarm_control_panel.alarm_disarm", "alarm_control_panel.alarm_arm_custom_bypass"):
             raise ValueError("Use the alarm detail controls for guarded alarm actions")
-        if role == "hc_access_action_card" and action.get("action") not in ("none",):
+        if role == "md_access_action_card" and action.get("action") not in ("none",):
             raise ValueError("Close and lock cards use their explicit safe service")
 
 

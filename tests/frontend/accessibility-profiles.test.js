@@ -363,10 +363,10 @@ test('success capture sampling keeps the full mobile matrix and distinct popup l
   assert.equal(capturePolicy(parseArgs(['--screenshots', 'all']), { name: 'iphone-bold' }), 'all');
   assert.throws(() => parseArgs(['--screenshots', 'silent']), /screenshot policy/);
   assert.equal(parseArgs(['--pages-only']).pagesOnly, true);
-  const popup = { name: 'Living room', cards: [{ template: 'hc_light_card' }] };
+  const popup = { name: 'Living room', cards: [{ template: 'md_light_card' }] };
   assert.equal(popupReviewKey(popup), popupReviewKey({ ...popup, name: 'Another room' }));
   for (const changed of [{ ...popup, height: '500px' }, { ...popup, name: 'Light error' },
-    { ...popup, cards: [{ template: 'hc_climate_card' }] }, { ...popup, entity_group: { type: 'light', popup_filter: 'active' } }]) {
+    { ...popup, cards: [{ template: 'md_climate_card' }] }, { ...popup, entity_group: { type: 'light', popup_filter: 'active' } }]) {
     assert.notEqual(popupReviewKey(popup), popupReviewKey(changed));
   }
 });

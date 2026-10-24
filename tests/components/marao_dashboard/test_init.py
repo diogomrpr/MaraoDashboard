@@ -100,7 +100,7 @@ def _room_entities(config):
 
 
 def _home_groups(config):
-    return [card for section in config["pages"][0]["sections"] for card in section.get("entities", []) if card.get("template") == "hc_entity_group_card"]
+    return [card for section in config["pages"][0]["sections"] for card in section.get("entities", []) if card.get("template") == "md_entity_group_card"]
 
 def _create_area_entity(hass, area_name: str, entity_id: str) -> None:
     area = ar.async_get(hass).async_create(area_name)
@@ -971,7 +971,7 @@ async def test_saved_group_removal_refreshes_cached_yaml_includes(
     source.parent.mkdir(parents=True, exist_ok=True)
     config = {"config_version": 2, "name": "Marao Dashboard", "slug": "dashboard",
               "landing_page": "home", "navigation": [], "pages": [{"name": "Home", "path": "home",
-              "entities": [{"template": "hc_entity_group_card", "id": "covers", "name": "Covers",
+              "entities": [{"template": "md_entity_group_card", "id": "covers", "name": "Covers",
                             "entity_type": "cover", "entities": members}]}]}
     source.write_text(json.dumps(config))
     entry = MockConfigEntry(domain=DOMAIN, data={BASE_DASHBOARD_CREATED: True})
@@ -1087,29 +1087,29 @@ def test_editor_catalog_maps_to_installed_templates() -> None:
 
     assert len(card_ids) == len(EDITOR_CATALOG["cards"])
     assert card_ids == {
-        "hc_title_card", "hc_weather_card", "hc_room_card", "hc_scene_collection_card",
-        "hc_header_card", "hc_glance_card", "hc_scene_card", "hc_access_action_card", "hc_access_slide_action_card", "hc_alarm_controls_card",
-        "hc_security_card", "hc_access_hold_action_card", "hc_base_card", "hc_energy_period_card", "hc_media_app_card",
-        "hc_entity_group_card",
-        "hc_access_card",
-        "hc_battery_card",
-        "hc_camera_card",
-        "hc_climate_card",
-        "hc_cover_card",
-        "hc_dishwasher_card",
-        "hc_fan_card",
-        "hc_graph_card",
-        "hc_light_card",
-        "hc_media_card",
-        "hc_navigation_card",
-        "hc_number_card",
-        "hc_sensor_card",
-        "hc_switch_card",
-        "hc_timeline_card",
-        "hc_toggle_graph_card",
-        "hc_vacuum_card",
-        "hc_wallbox_current_card",
-        "hc_washing_machine_card",
+        "md_title_card", "md_weather_card", "md_room_card", "md_scene_collection_card",
+        "md_header_card", "md_glance_card", "md_scene_card", "md_access_action_card", "md_access_slide_action_card", "md_alarm_controls_card",
+        "md_security_card", "md_access_hold_action_card", "md_base_card", "md_energy_period_card", "md_media_app_card",
+        "md_entity_group_card",
+        "md_access_card",
+        "md_battery_card",
+        "md_camera_card",
+        "md_climate_card",
+        "md_cover_card",
+        "md_dishwasher_card",
+        "md_fan_card",
+        "md_graph_card",
+        "md_light_card",
+        "md_media_card",
+        "md_navigation_card",
+        "md_number_card",
+        "md_sensor_card",
+        "md_switch_card",
+        "md_timeline_card",
+        "md_toggle_graph_card",
+        "md_vacuum_card",
+        "md_wallbox_current_card",
+        "md_washing_machine_card",
     }
     assert Path("custom_components/marao_dashboard/frontend/MaraoCards.js").exists()
     for card in EDITOR_CATALOG["cards"]:
@@ -1148,9 +1148,8 @@ async def test_formatted_source_stays_editable_when_live_unit_disappears(hass, c
     assert json.loads(payload["config"]) == migrate_dashboard_config(config)
     assert payload["dashboard_url"] == "/marao-dashboard/overview"
     assert path.read_text() == source
-    with pytest.raises(ValueError, match="supported source unit"):
-        _save_and_generate_dashboard(hass, source, [])
-    assert path.read_text() == source
+    _save_and_generate_dashboard(hass, source, [])
+    assert json.loads(path.read_text()) == migrate_dashboard_config(config)
     if current:
         config["pages"][2]["sections"][0]["entities"][0]["variables"].pop("display_unit")
     else:
@@ -1198,7 +1197,7 @@ async def test_setup_keeps_converted_maintenance_without_battery_metadata(hass):
     source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
     source.parent.mkdir(parents=True)
     config = {"config_version": 2, "name": "Marao Dashboard", "slug": "dashboard", "landing_page": "overview",
-              "pages": [{"name": "Home", "path": "overview", "entities": [{"template": "hc_entity_group_card",
+              "pages": [{"name": "Home", "path": "overview", "entities": [{"template": "md_entity_group_card",
                   "id": "overview-maintenance", "name": "Maintenance", "entity_type": "battery",
                   "entities": ["sensor.fixture_battery"]}]}]}
     exact = json.dumps(config, indent=2).encode() + b"\n"
@@ -1570,7 +1569,7 @@ def _scoped_source(hass):
                   {'name': 'Studio', 'path': 'studio', 'sections': [
                       {'entities': ['light.registered', {'entity_id': 'sensor.unregistered'},
                                     {'entity_id': 'light.missing'}, {'page': 'home'},
-                                    {'template': 'hc_entity_group_card', 'id': 'safe-group', 'name': 'Group',
+                                    {'template': 'md_entity_group_card', 'id': 'safe-group', 'name': 'Group',
                                      'entity_type': 'light', 'entities': ['light.member']}],
                        'cards': [{'type': 'markdown', 'entity': 'light.raw', 'content': 'Keep'}]},
                       {'entities': []}]}]}
@@ -1714,3 +1713,24 @@ def test_scoped_initial_preserves_independent_released_conversion_and_saved_byte
         assert json.loads(result['config']) == expected
         assert result['conversion_pending'] is True
     assert source.read_bytes() == historical and baseline.read_bytes() == historical
+
+
+@pytest.mark.parametrize("unit", [None, "", "kWh"])
+async def test_setup_repairs_formatted_energy_without_ready_unit_metadata(hass, unit):
+    _reset_dashboard_files(hass)
+    Path(hass.config.path("configuration.yaml")).write_text("default_config:\n")
+    source = Path(hass.config.path(DEFAULT_DASHBOARD_CONFIG))
+    source.parent.mkdir(parents=True)
+    config = {"config_version": 2, "name": "Dashboard", "slug": "dashboard", "landing_page": "energy",
+              "pages": [{"name": "Energy", "path": "energy", "entities": [{"template": "md_graph_card",
+                  "entity_id": "sensor.startup_energy", "variables": {"display_unit": "kWh", "display_precision": 0}}]}]}
+    exact = json.dumps(config, indent=2) + "\n"
+    source.write_text(exact)
+    if unit is not None:
+        hass.states.async_set("sensor.startup_energy", "unavailable", {"unit_of_measurement": unit})
+    entry = MockConfigEntry(domain=DOMAIN, data={BASE_DASHBOARD_CREATED: True})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert source.read_text() == exact
+    assert (source.parent / "dashboard/dashboard.yaml").exists()

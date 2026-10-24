@@ -87,7 +87,7 @@ async function main() {
       await assertCurrentFrontend(page);
       await applyVisualPreferences(page, scenario, theme);
       assert.deepEqual(await emulationIssues(page, scenario, theme), []);
-      assert.deepEqual(await layoutIssues(page, ['hc_security_card', 'hc_alarm_controls_card']), []);
+      assert.deepEqual(await layoutIssues(page, ['md_security_card', 'md_alarm_controls_card']), []);
       const code = controls.locator('[data-alarm-code]');
       await code.fill('1357');
       await touch(page, controls.locator('[data-alarm-action="alarm_arm_away"]'));

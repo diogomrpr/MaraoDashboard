@@ -7,7 +7,7 @@ const root = '/marao-dashboard';
 test('Rooms creation snapshots unsaved room pages and explicit group members without later synchronization', () => {
   const model = normalizeConfig({ config_version: 2, pages: [
     { name: 'Home', path: 'home', entities: [] },
-    { name: 'Office draft', path: 'office', area: 'office', sections: [{ entities: ['light.safe', { template: 'hc_entity_group_card', id: 'group', entity_type: 'light', entities: ['light.safe', 'light.grouped'] }] }] },
+    { name: 'Office draft', path: 'office', area: 'office', sections: [{ entities: ['light.safe', { template: 'md_entity_group_card', id: 'group', entity_type: 'light', entities: ['light.safe', 'light.grouped'] }] }] },
     { name: 'Empty', path: 'empty', subview: true, entities: [] },
   ] });
   const snapshot = roomPageTemplate(model);
@@ -20,11 +20,11 @@ test('Rooms creation snapshots unsaved room pages and explicit group members wit
 });
 const initial = () => normalizeConfig({ config_version: 2, name: 'Safe', landing_page: 'home', navigation: ['home'], pages: [
   { id: 'home', name: 'Home', path: 'home', output_path: 'views/main/00-overview.yaml', extension: { keep: true }, columns: 2, entities: [
-    { id: 'link', template: 'hc_navigation_card', name: 'Office', page: 'office' },
-    { id: 'reading', template: 'hc_energy_period_card', entity_id: 'sensor.safe', variables: { period: 'month', popup_hash: '#page-home-reading-popup', future: 42 } },
-    { id: 'group', template: 'hc_entity_group_card', name: 'Climate', entity_type: 'climate', entities: [{ entity_id: 'climate.safe', variables: { mode_selector_hash: '#saved-modes' } }], variables: { popup_hash: '#saved-group' } },
+    { id: 'link', template: 'md_navigation_card', name: 'Office', page: 'office' },
+    { id: 'reading', template: 'md_energy_period_card', entity_id: 'sensor.safe', variables: { period: 'month', popup_hash: '#page-home-reading-popup', future: 42 } },
+    { id: 'group', template: 'md_entity_group_card', name: 'Climate', entity_type: 'climate', entities: [{ entity_id: 'climate.safe', variables: { mode_selector_hash: '#saved-modes' } }], variables: { popup_hash: '#saved-group' } },
   ], cards: [{ type: 'markdown', content: 'Saved note', future: true }] },
-  { id: 'office', name: 'Office', path: 'office', sections: [{ columns: 1, entities: [{ id: 'back', template: 'hc_navigation_card', page: 'home' }] }] },
+  { id: 'office', name: 'Office', path: 'office', sections: [{ columns: 1, entities: [{ id: 'back', template: 'md_navigation_card', page: 'home' }] }] },
 ] });
 
 test('adding sections preserves flat source, unknown/raw options and explicit empty new section', () => {
@@ -82,7 +82,7 @@ test('unpin preserves the page and newly created pages pin beyond five entries',
   const model = initial();
   for (const path of ['one', 'two', 'three', 'four']) model.pages.push({ name: path, path, entities: [] });
   model.navigation = ['home', 'one', 'two', 'three', 'four'];
-  const template = { icon: 'mdi:chart-line', entities: [{ id: 'draft', template: 'hc_graph_card', name: 'House power' }] };
+  const template = { icon: 'mdi:chart-line', entities: [{ id: 'draft', template: 'md_graph_card', name: 'House power' }] };
   const created = createPage(model, { template: 'energy', name: 'Energy', path: 'energy' }, { energy: template });
   assert.equal(created.entities[0].entity_id, undefined);
   assert.equal(model.navigation.length, 6);

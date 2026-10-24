@@ -4,7 +4,7 @@ icon: mdi:test-tube
 theme: Marao Dashboard
 cards:
   - type: custom:marao-card
-    template: hc_scene_card
+    template: md_scene_card
     entity: input_select.marao_dashboard_test_scene
     name: Input select
     icon: mdi:form-select
@@ -12,13 +12,13 @@ cards:
   - type: vertical-stack
     cards:
       - type: custom:marao-card
-        template: hc_header_card
+        template: md_header_card
         entity: weather.marao_dashboard_test_weather
         variables:
           person_entity: sensor.marao_dashboard_test_person
 
       - type: custom:marao-card
-        template: hc_title_card
+        template: md_title_card
         name: Marao Dashboard Cases
         label: All supported cards, states, and behaviors. Hold a navbar icon for three seconds to refresh this device. The same hold works between icons. The bar stays usable while page content loads. Holding an icon does not open a link preview. Releasing early cancels the refresh. Pressed icons and overflow controls keep their rounded appearance without a square highlight.
         variables:
@@ -58,7 +58,7 @@ cards:
         square: false
         cards:
           - type: custom:marao-card
-            template: hc_navigation_card
+            template: md_navigation_card
             name: Rooms page
             icon: mdi:sofa-outline
             show_state: false
@@ -66,7 +66,7 @@ cards:
               action: navigate
               navigation_path: /marao-dashboard/rooms
           - type: custom:marao-card
-            template: hc_navigation_card
+            template: md_navigation_card
             name: Media page
             icon: mdi:television-play
             show_state: false
@@ -74,7 +74,7 @@ cards:
               action: navigate
               navigation_path: /marao-dashboard/media
           - type: custom:marao-card
-            template: hc_navigation_card
+            template: md_navigation_card
             name: Appliances page
             icon: mdi:dishwasher
             show_state: false
@@ -83,20 +83,20 @@ cards:
               navigation_path: /marao-dashboard/appliances
 
       - type: custom:marao-card
-        template: hc_weather_card
+        template: md_weather_card
         entity: weather.marao_dashboard_test_weather
         variables:
           show_forecast: false
 
       - type: custom:marao-card
-        template: hc_weather_card
+        template: md_weather_card
         entity: weather.marao_dashboard_test_weather
         name: Weather with forecast
         variables:
           show_forecast: true
 
       - type: custom:marao-card
-        template: hc_camera_card
+        template: md_camera_card
         entity: camera.marao_dashboard_test_camera
         name: Camera · automatic live video + events
         variables:
@@ -105,7 +105,7 @@ cards:
           frigate_instance_id: marao_test
 
       - type: custom:marao-card
-        template: hc_glance_card
+        template: md_glance_card
         variables:
           entity1: sensor.marao_dashboard_test_temperature
           entity1_name: Living Room Temperature
@@ -118,14 +118,14 @@ cards:
           entity3_icon: mdi:flash
 
       - type: custom:marao-card
-        template: hc_glance_card
+        template: md_glance_card
         name: Single reading
         variables:
           entity1: sensor.marao_dashboard_test_temperature
           entity1_name: Temperature
 
       - type: custom:marao-card
-        template: hc_glance_card
+        template: md_glance_card
         name: Mixed availability readings
         variables:
           entity1: sensor.marao_dashboard_test_power
@@ -134,45 +134,45 @@ cards:
           entity2_name: Unavailable battery
 
       - type: custom:marao-card
-        template: hc_base_card
+        template: md_base_card
         entity: sensor.marao_dashboard_test_temperature
         name: Base card
 
       - type: custom:marao-card
-        template: hc_light_card
+        template: md_light_card
         entity: light.marao_dashboard_test_light
         name: Light + slider
 
       - type: custom:marao-card
-        template: hc_light_card
+        template: md_light_card
         entity: light.marao_dashboard_test_light
         name: Light without slider
         variables:
           enable_slider: false
 
       - type: custom:marao-card
-        template: hc_cover_card
+        template: md_cover_card
         entity: cover.marao_dashboard_test_cover
         name: Cover + slider
 
       # The live action check retains this popup's idle and active access track
       # across updates from the safe light helper above.
       - type: custom:marao-card
-        template: hc_access_card
+        template: md_access_card
         entity: lock.marao_dashboard_test_lock
         name: Lock access
         variables:
           popup_hash: "#marao-dashboard-test-lock-popup"
 
       - type: custom:marao-card
-        template: hc_access_card
+        template: md_access_card
         entity: cover.marao_dashboard_test_garage_door
         name: Garage door access
         variables:
           popup_hash: "#marao-dashboard-test-garage-door-popup"
 
       - type: custom:marao-card
-        template: hc_access_slide_action_card
+        template: md_access_slide_action_card
         entity: cover.marao_dashboard_test_open_only_door
         name: Open-only door
         icon: mdi:door-open
@@ -186,28 +186,28 @@ cards:
         square: false
         cards:
           - type: custom:marao-card
-            template: hc_access_card
+            template: md_access_card
             entity: sensor.marao_dashboard_test_locking
             name: Locking
             tap_action: { action: none }
           - type: custom:marao-card
-            template: hc_access_card
+            template: md_access_card
             entity: sensor.marao_dashboard_test_unlocking
             name: Unlocking
             tap_action: { action: none }
           - type: custom:marao-card
-            template: hc_access_card
+            template: md_access_card
             entity: sensor.marao_dashboard_test_opening
             name: Opening
             tap_action: { action: none }
           - type: custom:marao-card
-            template: hc_access_card
+            template: md_access_card
             entity: sensor.marao_dashboard_test_closing
             name: Closing
             tap_action: { action: none }
 
       - type: custom:marao-card
-        template: hc_switch_card
+        template: md_switch_card
         entity: switch.marao_dashboard_test_switch
         name: Switch + graph
         variables:
@@ -239,84 +239,84 @@ cards:
         popup_hash: "#marao-dashboard-test-energy-today-cost-popup"
 
       - type: custom:marao-card
-        template: hc_fan_card
+        template: md_fan_card
         entity: fan.marao_dashboard_test_fan
         name: Fan + slider
         variables:
           enable_slider: true
 
       - type: custom:marao-card
-        template: hc_fan_card
+        template: md_fan_card
         entity: fan.marao_dashboard_test_fan
         name: Fan without slider
         variables:
           enable_slider: false
 
       - type: custom:marao-card
-        template: hc_climate_card
+        template: md_climate_card
         entity: climate.marao_dashboard_test_climate
         name: Climate
         variables:
           mode_selector_hash: "#climate-mode-test"
 
       - type: custom:marao-card
-        template: hc_climate_card
+        template: md_climate_card
         entity: climate.marao_dashboard_test_single_mode_climate
         name: Single Mode Climate
         variables:
           mode_selector_hash: "#single-mode-climate-should-not-open"
 
       - type: custom:marao-card
-        template: hc_climate_card
+        template: md_climate_card
         entity: climate.marao_dashboard_test_multi_mode_climate
         name: Multi Mode Climate
         variables:
           mode_selector_hash: "#multi-mode-climate-test"
 
       - type: custom:marao-card
-        template: hc_climate_card
+        template: md_climate_card
         entity: climate.marao_dashboard_test_case_climate_heat
         name: Climate · Heat
         tap_action: { action: none }
 
       - type: custom:marao-card
-        template: hc_climate_card
+        template: md_climate_card
         entity: climate.marao_dashboard_test_case_climate_cool
         name: Climate · Cool
         tap_action: { action: none }
 
       - type: custom:marao-card
-        template: hc_climate_card
+        template: md_climate_card
         entity: climate.marao_dashboard_test_case_climate_heat_cool
         name: Climate · Heat/Cool
         tap_action: { action: none }
 
       - type: custom:marao-card
-        template: hc_climate_card
+        template: md_climate_card
         entity: climate.marao_dashboard_test_case_climate_auto
         name: Climate · Auto
         tap_action: { action: none }
 
       - type: custom:marao-card
-        template: hc_climate_card
+        template: md_climate_card
         entity: climate.marao_dashboard_test_case_climate_dry
         name: Climate · Dry
         tap_action: { action: none }
 
       - type: custom:marao-card
-        template: hc_climate_card
+        template: md_climate_card
         entity: climate.marao_dashboard_test_case_climate_fan_only
         name: Climate · Fan
         tap_action: { action: none }
 
       - type: custom:marao-card
-        template: hc_climate_card
+        template: md_climate_card
         entity: climate.marao_dashboard_test_case_climate_off
         name: Climate · Off
         tap_action: { action: none }
 
       - type: custom:marao-card
-        template: hc_media_card
+        template: md_media_card
         entity: media_player.marao_dashboard_test_apple_tv
         name: Apple TV
         variables:
@@ -324,28 +324,28 @@ cards:
           popup_hash: "#marao-dashboard-test-apple-tv-popup"
 
       - type: custom:marao-card
-        template: hc_media_card
+        template: md_media_card
         entity: media_player.marao_dashboard_test_audio
         name: Generic media player
         variables:
           popup_hash: "#marao-dashboard-test-generic-media-popup"
 
       - type: custom:marao-card
-        template: hc_media_card
+        template: md_media_card
         entity: media_player.marao_dashboard_test_case_media_playing
         name: Media without artwork
         variables:
-          hc_show_background_art: false
-          hc_background_color: var(--color-blue)
+          md_show_background_art: false
+          md_background_color: var(--color-blue)
 
       - type: custom:marao-card
-        template: hc_security_card
+        template: md_security_card
         entity: alarm_control_panel.marao_dashboard_test_alarm
         variables:
-          hc_security_code: "1234"
+          md_security_code: "1234"
 
       - type: custom:marao-card
-        template: hc_access_hold_action_card
+        template: md_access_hold_action_card
         entity: alarm_control_panel.marao_dashboard_test_alarm_no_code
         name: Arm away · hold
         icon: mdi:shield-lock
@@ -355,7 +355,7 @@ cards:
           action_color: var(--color-red)
 
       - type: custom:marao-card
-        template: hc_sensor_card
+        template: md_sensor_card
         entity: sensor.marao_dashboard_test_temperature
         name: Sensor
 
@@ -364,16 +364,16 @@ cards:
         square: false
         cards:
           - type: custom:marao-card
-            template: hc_sensor_card
+            template: md_sensor_card
             entity: sensor.marao_dashboard_test_temperature
             name: Narrow temperature reading
           - type: custom:marao-card
-            template: hc_sensor_card
+            template: md_sensor_card
             entity: sensor.marao_dashboard_test_humidity
             name: Narrow humidity reading
 
       - type: custom:marao-card
-        template: hc_battery_card
+        template: md_battery_card
         entity: sensor.marao_dashboard_test_battery
         name: Battery
 
@@ -382,15 +382,15 @@ cards:
         square: false
         cards:
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_battery_low
             name: Battery low
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_battery_medium
             name: Battery medium
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_battery_full
             name: Battery full
 
@@ -399,16 +399,16 @@ cards:
         square: false
         cards:
           - type: custom:marao-card
-            template: hc_light_card
+            template: md_light_card
             entity: sensor.marao_dashboard_test_unknown
             name: Unknown control
           - type: custom:marao-card
-            template: hc_light_card
+            template: md_light_card
             entity: sensor.marao_dashboard_test_unavailable
             name: Unavailable control
 
       - type: custom:marao-card
-        template: hc_graph_card
+        template: md_graph_card
         entity: sensor.marao_dashboard_test_graph_history
         name: Graph
 
@@ -417,14 +417,14 @@ cards:
         name: Lock state - last 24 hours
 
       - type: custom:marao-card
-        template: hc_toggle_graph_card
+        template: md_toggle_graph_card
         entity: sensor.marao_dashboard_test_graph_history
         name: Toggle graph
         variables:
           toggle_entity: switch.marao_dashboard_test_switch
 
       - type: custom:marao-card
-        template: hc_scene_card
+        template: md_scene_card
         entity: input_select.marao_dashboard_test_scene
         variables:
           icon_1: mdi:sofa
@@ -439,43 +439,43 @@ cards:
           name_5: Off
 
       - type: custom:marao-card
-        template: hc_number_card
+        template: md_number_card
         entity: input_number.marao_dashboard_test_number
         name: Number
 
       - type: custom:marao-card
-        template: hc_wallbox_current_card
+        template: md_wallbox_current_card
         entity: input_number.marao_dashboard_test_wallbox_current
         name: Wallbox charging current
         variables:
           shortcuts: [6, 12, 16]
 
       - type: custom:marao-card
-        template: hc_wallbox_current_card
+        template: md_wallbox_current_card
         entity: input_number.marao_dashboard_test_wallbox_current
         name: Wallbox current with one shortcut
         variables:
           shortcuts: [16]
 
       - type: custom:marao-card
-        template: hc_wallbox_current_card
+        template: md_wallbox_current_card
         entity: input_number.marao_dashboard_test_wallbox_current
         name: Wallbox current with two shortcuts
         variables:
           shortcuts: [6, 16]
 
       - type: custom:marao-card
-        template: hc_wallbox_current_card
+        template: md_wallbox_current_card
         entity: input_number.marao_dashboard_test_wallbox_current
         name: Wallbox current without shortcuts
 
       - type: custom:marao-card
-        template: hc_vacuum_card
+        template: md_vacuum_card
         entity: vacuum.marao_dashboard_test_vacuum
         name: Vacuum
 
       - type: custom:marao-card
-        template: hc_dishwasher_card
+        template: md_dishwasher_card
         entity: input_select.marao_dashboard_test_dishwasher_state
         variables:
           progress_entity: sensor.marao_dashboard_test_dishwasher_progress
@@ -485,11 +485,11 @@ cards:
           active_program_entity: input_select.marao_dashboard_test_dishwasher_program
 
       - type: custom:marao-card
-        template: hc_washing_machine_card
+        template: md_washing_machine_card
         entity: binary_sensor.marao_dashboard_test_washing_machine
 
       - type: custom:marao-card
-        template: hc_navigation_card
+        template: md_navigation_card
         entity: switch.marao_dashboard_test_switch
         name: Bubble popup
         icon: mdi:card-account-details-outline
@@ -498,7 +498,7 @@ cards:
           navigation_path: "#marao-dashboard-card-test-popup"
 
       - type: custom:marao-card
-        template: hc_navigation_card
+        template: md_navigation_card
         entity: switch.marao_dashboard_test_switch
         name: Fixed-height popup
         icon: mdi:arrow-up-bold-box-outline
@@ -507,7 +507,7 @@ cards:
           navigation_path: "#marao-dashboard-test-fixed-popup"
 
       - type: custom:marao-card
-        template: hc_room_card
+        template: md_room_card
         entity: light.marao_dashboard_test_light
         name: Room card
         icon: mdi:sofa
@@ -522,7 +522,7 @@ cards:
           navigation_path: /marao-dashboard/rooms
 
       - type: custom:marao-card
-        template: hc_blinds_popup_card
+        template: md_blinds_popup_card
         entity: cover.marao_dashboard_test_cover
         name: Blinds popup
         icon: mdi:blinds
@@ -532,7 +532,7 @@ cards:
             - cover.marao_dashboard_test_cover
 
       - type: custom:marao-card
-        template: hc_lights_popup_card
+        template: md_lights_popup_card
         entity: light.marao_dashboard_test_light
         name: Lights popup
         icon: mdi:lightbulb-group
@@ -542,7 +542,7 @@ cards:
             - light.marao_dashboard_test_light
 
       - type: custom:marao-card
-        template: hc_climate_popup_card
+        template: md_climate_popup_card
         entity: climate.marao_dashboard_test_climate
         name: Climate popup
         icon: mdi:thermostat
@@ -553,7 +553,7 @@ cards:
             - climate.marao_dashboard_test_single_mode_climate
 
       - type: custom:marao-card
-        template: hc_maintenance_popup_card
+        template: md_maintenance_popup_card
         entity: sensor.marao_dashboard_test_battery
         name: Maintenance popup
         icon: mdi:wrench
@@ -571,7 +571,7 @@ cards:
     max_height: 100%
     cards:
       - type: custom:marao-card
-        template: hc_climate_card
+        template: md_climate_card
         entity: climate.marao_dashboard_test_climate
         name: Climate
         variables:
@@ -586,7 +586,7 @@ cards:
     max_height: 100%
     cards:
       - type: custom:marao-card
-        template: hc_camera_card
+        template: md_camera_card
         entity: camera.marao_dashboard_test_camera_adaptive_high
         show_name: false
         tap_action:
@@ -606,7 +606,7 @@ cards:
     max_height: 100%
     cards:
       - type: custom:marao-card
-        template: hc_climate_card
+        template: md_climate_card
         entity: climate.marao_dashboard_test_multi_mode_climate
         name: Multi Mode Climate
         variables:
@@ -625,7 +625,7 @@ cards:
         square: false
         cards:
           - type: custom:marao-card
-            template: hc_sensor_card
+            template: md_sensor_card
             entity: sensor.marao_dashboard_test_temperature
             name: Popup sensor
 
@@ -638,7 +638,7 @@ cards:
     max_height: 100%
     cards:
       - type: custom:marao-card
-        template: hc_sensor_card
+        template: md_sensor_card
         entity: sensor.marao_dashboard_test_temperature
         name: Fixed popup content
 
@@ -698,7 +698,7 @@ cards:
         square: false
         cards:
           - type: custom:marao-card
-            template: hc_cover_card
+            template: md_cover_card
             entity: cover.marao_dashboard_test_cover
             name: Marao Dashboard Test Cover
 
@@ -712,19 +712,19 @@ cards:
         square: false
         cards:
           - type: custom:marao-card
-            template: hc_light_card
+            template: md_light_card
             entity: light.marao_dashboard_test_light
             name: Marao Dashboard Test Light
           - type: custom:marao-card
-            template: hc_light_card
+            template: md_light_card
             entity: light.marao_dashboard_test_case_light_on
             name: Active light
           - type: custom:marao-card
-            template: hc_light_card
+            template: md_light_card
             entity: light.marao_dashboard_test_case_light_unknown
             name: Unknown light
           - type: custom:marao-card
-            template: hc_light_card
+            template: md_light_card
             entity: light.marao_dashboard_test_case_light_unavailable
             name: Unavailable light
 
@@ -739,7 +739,7 @@ cards:
         square: false
         cards:
           - type: custom:marao-card
-            template: hc_access_slide_action_card
+            template: md_access_slide_action_card
             entity: lock.marao_dashboard_test_lock
             name: Unlock
             icon: mdi:lock-open-variant
@@ -749,7 +749,7 @@ cards:
               action_label_key: common.unlock
               action_color: var(--color-red)
           - type: custom:marao-card
-            template: hc_access_action_card
+            template: md_access_action_card
             entity: lock.marao_dashboard_test_lock
             name: Lock
             icon: mdi:lock
@@ -770,7 +770,7 @@ cards:
         square: false
         cards:
           - type: custom:marao-card
-            template: hc_access_slide_action_card
+            template: md_access_slide_action_card
             entity: cover.marao_dashboard_test_garage_door
             name: Open
             icon: mdi:garage-open
@@ -780,7 +780,7 @@ cards:
               action_label_key: access.open
               action_color: var(--color-red)
           - type: custom:marao-card
-            template: hc_access_action_card
+            template: md_access_action_card
             entity: cover.marao_dashboard_test_garage_door
             name: Close
             icon: mdi:garage
@@ -798,13 +798,13 @@ cards:
       - type: vertical-stack
         cards:
           - type: custom:marao-card
-            template: hc_climate_card
+            template: md_climate_card
             entity: climate.marao_dashboard_test_climate
             name: Marao Dashboard Test Climate
             variables:
               show_mode_buttons: true
           - type: custom:marao-card
-            template: hc_climate_card
+            template: md_climate_card
             entity: climate.marao_dashboard_test_single_mode_climate
             name: Marao Dashboard Test Single Mode Climate
             variables:
@@ -820,131 +820,131 @@ cards:
         square: false
         cards:
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_battery
             name: Marao Dashboard Test Battery
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_legacy_battery
             name: Legacy battery
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_1
             name: Maintenance battery 1
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_2
             name: Maintenance battery 2
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_3
             name: Maintenance battery 3
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_4
             name: Maintenance battery 4
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_5
             name: Maintenance battery 5
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_6
             name: Maintenance battery 6
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_7
             name: Maintenance battery 7
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_8
             name: Maintenance battery 8
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_9
             name: Maintenance battery 9
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_10
             name: Maintenance battery 10
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_11
             name: Maintenance battery 11
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_12
             name: Maintenance battery 12
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_13
             name: Maintenance battery 13
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_14
             name: Maintenance battery 14
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_15
             name: Maintenance battery 15
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_16
             name: Maintenance battery 16
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_17
             name: Maintenance battery 17
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_18
             name: Maintenance battery 18
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_19
             name: Maintenance battery 19
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_20
             name: Maintenance battery 20
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_21
             name: Maintenance battery 21
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_22
             name: Maintenance battery 22
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_23
             name: Maintenance battery 23
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_24
             name: Maintenance battery 24
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_25
             name: Maintenance battery 25
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_26
             name: Maintenance battery 26
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_27
             name: Maintenance battery 27
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_28
             name: Maintenance battery 28
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_29
             name: Maintenance battery 29
           - type: custom:marao-card
-            template: hc_battery_card
+            template: md_battery_card
             entity: sensor.marao_dashboard_test_maintenance_battery_30
             name: Maintenance battery 30
 
@@ -1011,7 +1011,7 @@ cards:
         square: false
         cards:
           - type: custom:marao-card
-            template: hc_media_app_card
+            template: md_media_app_card
             entity: media_player.marao_dashboard_test_apple_tv
             name: YouTube
             icon: mdi:youtube
@@ -1019,7 +1019,7 @@ cards:
             variables:
               app_source: YouTube
           - type: custom:marao-card
-            template: hc_media_app_card
+            template: md_media_app_card
             entity: media_player.marao_dashboard_test_apple_tv
             name: Plex
             icon: mdi:plex
@@ -1270,4 +1270,4 @@ cards:
               target:
                 entity_id: media_player.marao_dashboard_test_apple_tv
 
-  - {"type": "custom:marao-control-grid", "columns": 2, "cards": [{"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.marao_dashboard_test_onoff_light", "name": "Grid · simple light"}, {"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.marao_dashboard_test_light", "name": "Grid · brightness"}, {"type": "custom:marao-card", "template": "hc_cover_card", "entity": "cover.marao_dashboard_test_cover", "name": "Grid · cover"}, {"type": "custom:marao-card", "template": "hc_access_action_card", "entity": "lock.marao_dashboard_test_lock", "name": "Grid · lock", "variables": {"action_service": "lock.lock"}}, {"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.marao_dashboard_test_room_light", "name": "Grid · hidden icon", "show_icon": false, "variables": {"enable_slider": false}}, {"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.marao_dashboard_test_light", "name": "Grid · hidden title", "show_name": false, "show_state": false, "show_label": false, "variables": {"enable_slider": false}}, {"type": "custom:marao-card", "template": "hc_access_hold_action_card", "entity": "lock.marao_dashboard_test_lock", "name": "Grid · guarded lock", "variables": {"action_service": "lock.lock", "action_label": "Lock safely"}}, {"type": "custom:marao-card", "template": "hc_access_card", "entity": "lock.marao_dashboard_test_lock", "name": "Grid · door summary", "tap_action": {"action": "none"}}, {"type": "custom:marao-card", "template": "hc_access_slide_action_card", "entity": "lock.marao_dashboard_test_lock", "name": "Grid · front entrance opening control with a deliberately long later-row title"}]}
+  - {"type": "custom:marao-control-grid", "columns": 2, "cards": [{"type": "custom:marao-card", "template": "md_light_card", "entity": "light.marao_dashboard_test_onoff_light", "name": "Grid · simple light"}, {"type": "custom:marao-card", "template": "md_light_card", "entity": "light.marao_dashboard_test_light", "name": "Grid · brightness"}, {"type": "custom:marao-card", "template": "md_cover_card", "entity": "cover.marao_dashboard_test_cover", "name": "Grid · cover"}, {"type": "custom:marao-card", "template": "md_access_action_card", "entity": "lock.marao_dashboard_test_lock", "name": "Grid · lock", "variables": {"action_service": "lock.lock"}}, {"type": "custom:marao-card", "template": "md_light_card", "entity": "light.marao_dashboard_test_room_light", "name": "Grid · hidden icon", "show_icon": false, "variables": {"enable_slider": false}}, {"type": "custom:marao-card", "template": "md_light_card", "entity": "light.marao_dashboard_test_light", "name": "Grid · hidden title", "show_name": false, "show_state": false, "show_label": false, "variables": {"enable_slider": false}}, {"type": "custom:marao-card", "template": "md_access_hold_action_card", "entity": "lock.marao_dashboard_test_lock", "name": "Grid · guarded lock", "variables": {"action_service": "lock.lock", "action_label": "Lock safely"}}, {"type": "custom:marao-card", "template": "md_access_card", "entity": "lock.marao_dashboard_test_lock", "name": "Grid · door summary", "tap_action": {"action": "none"}}, {"type": "custom:marao-card", "template": "md_access_slide_action_card", "entity": "lock.marao_dashboard_test_lock", "name": "Grid · front entrance opening control with a deliberately long later-row title"}]}

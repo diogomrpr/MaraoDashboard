@@ -74,48 +74,48 @@ EDITOR_CATALOG: dict[str, Any] = {
     ],
     "cards": [
         {
-            "id": "hc_title_card", "label": "Title", "icon": "mdi:format-title", "domains": [],
+            "id": "md_title_card", "label": "Title", "icon": "mdi:format-title", "domains": [],
             "entity_optional": True, "description": "An editable heading inside any page or section.", "variables": [],
         },
         {
-            "id": "hc_weather_card", "label": "Weather", "icon": "mdi:weather-partly-cloudy", "domains": ["weather", "sensor"],
+            "id": "md_weather_card", "label": "Weather", "icon": "mdi:weather-partly-cloudy", "domains": ["weather", "sensor"],
             "description": "Current weather with an optional native forecast.",
             "variables": [_field("show_forecast", "Forecast", "boolean", default=True)],
         },
         {
-            "id": "hc_room_card", "label": "Room shortcut", "icon": "mdi:sofa", "domains": [],
+            "id": "md_room_card", "label": "Room shortcut", "icon": "mdi:sofa", "domains": [],
             "entity_optional": True, "page_shortcut": True,
             "description": "Open a page and switch off its explicitly selected lights.",
             "variables": [_field("light_entities", "Room lights", "entity", domains=["light"], multiple=True)],
         },
         {
-            "id": "hc_scene_collection_card", "label": "Scene collection", "icon": "mdi:palette-outline", "domains": [],
+            "id": "md_scene_collection_card", "label": "Scene collection", "icon": "mdi:palette-outline", "domains": [],
             "entity_optional": True, "scene_collection": True,
             "description": "Open an ordered collection of native scenes and toggle helpers.",
             "variables": [_field("popup_hash", "Popup hash", "text", advanced=True)],
         },
         {
-            "id": "hc_security_card", "label": "Alarm", "icon": "mdi:shield-home", "domains": ["alarm_control_panel"],
+            "id": "md_security_card", "label": "Alarm", "icon": "mdi:shield-home", "domains": ["alarm_control_panel"],
             "description": "Alarm state and supported controls with transient code entry.",
             "variables": [_field("popup_hash", "Popup hash", "text", advanced=True)],
         },
         {
-            "id": "hc_access_slide_action_card", "label": "Access opener", "icon": "mdi:door-open",
+            "id": "md_access_slide_action_card", "label": "Access opener", "icon": "mdi:door-open",
             "domains": ["lock", "cover", "button", "switch", "script"],
             "description": "Slide deliberately to unlock or open the selected access point.",
             "variables": [],
         },
         {
-            "id": "hc_access_hold_action_card", "label": "Security action", "icon": "mdi:shield-alert", "domains": ["button", "switch", "input_boolean", "alarm_control_panel"],
+            "id": "md_access_hold_action_card", "label": "Security action", "icon": "mdi:shield-alert", "domains": ["button", "switch", "input_boolean", "alarm_control_panel"],
             "description": "A deliberate security service action with a 1.2-second hold.", "variables": [],
         },
         {
-            "id": "hc_base_card", "label": "Status", "icon": "mdi:information-outline",
+            "id": "md_base_card", "label": "Status", "icon": "mdi:information-outline",
             "domains": ["sensor", "binary_sensor", "number", "input_number", "switch", "input_boolean"],
             "description": "A compact entity reading or status.", "variables": [*COMMON_CARD_FIELDS],
         },
         {
-            "id": "hc_energy_period_card", "label": "Energy period", "icon": "mdi:chart-bar", "domains": ["sensor"],
+            "id": "md_energy_period_card", "label": "Energy period", "icon": "mdi:chart-bar", "domains": ["sensor"],
             "description": "A day or month reading and its independently named history popup.",
             "variables": [_field("period", "Period", "energy_period", default="day"),
                           _field("calculate_cost", "Calculate cost from energy", "boolean"),
@@ -124,12 +124,12 @@ EDITOR_CATALOG: dict[str, Any] = {
                           _field("popup_hash", "Popup hash", "text", advanced=True)],
         },
         {
-            "id": "hc_media_app_card", "label": "Media app", "icon": "mdi:play-box-outline", "domains": ["media_player"],
+            "id": "md_media_app_card", "label": "Media app", "icon": "mdi:play-box-outline", "domains": ["media_player"],
             "description": "Open a configured source on the selected media player.",
             "variables": [_field("app_source", "App source", "text")],
         },
         {
-            "id": "hc_camera_card",
+            "id": "md_camera_card",
             "label": "Camera",
             "icon": "mdi:cctv",
             "domains": ["camera"],
@@ -152,7 +152,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             ],
         },
         {
-            "id": "hc_light_card",
+            "id": "md_light_card",
             "label": "Light",
             "icon": "mdi:lightbulb-outline",
             "domains": ["light"],
@@ -165,7 +165,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             ],
         },
         {
-            "id": "hc_cover_card",
+            "id": "md_cover_card",
             "label": "Cover",
             "icon": "mdi:window-shutter",
             "domains": ["cover"],
@@ -173,7 +173,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             "variables": [_field("card_color", "Card color", "color", advanced=True)],
         },
         {
-            "id": "hc_climate_card",
+            "id": "md_climate_card",
             "label": "Climate",
             "icon": "mdi:thermostat",
             "domains": ["climate"],
@@ -188,7 +188,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             ],
         },
         {
-            "id": "hc_fan_card",
+            "id": "md_fan_card",
             "label": "Fan",
             "icon": "mdi:fan",
             "domains": ["fan"],
@@ -199,19 +199,19 @@ EDITOR_CATALOG: dict[str, Any] = {
             ],
         },
         {
-            "id": "hc_media_card",
+            "id": "md_media_card",
             "label": "Media player",
             "icon": "mdi:television-play",
             "domains": ["media_player"],
             "description": "Media controls with artwork and generated popup controls.",
             "variables": [
-                _field("hc_show_background_art", "Background artwork", "boolean", default=True),
-                _field("hc_background_color", "Background color", "color", advanced=True),
+                _field("md_show_background_art", "Background artwork", "boolean", default=True),
+                _field("md_background_color", "Background color", "color", advanced=True),
                 _field("popup_hash", "Popup hash", "text", advanced=True),
             ],
         },
         {
-            "id": "hc_access_card",
+            "id": "md_access_card",
             "label": "Access",
             "icon": "mdi:lock-outline",
             "domains": ["lock", "cover", "button", "switch", "script", "input_boolean", "alarm_control_panel"],
@@ -221,19 +221,19 @@ EDITOR_CATALOG: dict[str, Any] = {
                           _field("action_service", "Action service", "text", advanced=True)],
         },
         {
-            "id": "hc_sensor_card",
+            "id": "md_sensor_card",
             "label": "Sensor",
             "icon": "mdi:access-point",
             "domains": ["sensor", "binary_sensor"],
             "description": "Show sensor state, last change, and state-aware colors.",
             "variables": [
-                _field("hc_card_color", "Active color", "color"),
+                _field("md_card_color", "Active color", "color"),
                 _field("on_icon", "On icon", "icon", advanced=True),
                 _field("off_icon", "Off icon", "icon", advanced=True),
             ],
         },
         {
-            "id": "hc_switch_card",
+            "id": "md_switch_card",
             "label": "Switch",
             "icon": "mdi:toggle-switch-outline",
             "domains": ["switch", "input_boolean", "scene"],
@@ -249,7 +249,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             ],
         },
         {
-            "id": "hc_number_card",
+            "id": "md_number_card",
             "label": "Number control",
             "icon": "mdi:plus-minus",
             "domains": ["number", "input_number"],
@@ -257,7 +257,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             "variables": [],
         },
         {
-            "id": "hc_wallbox_current_card",
+            "id": "md_wallbox_current_card",
             "label": "Wallbox charging current",
             "icon": "mdi:ev-plug-type2",
             "domains": ["number", "input_number"],
@@ -267,7 +267,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             ],
         },
         {
-            "id": "hc_vacuum_card",
+            "id": "md_vacuum_card",
             "label": "Vacuum",
             "icon": "mdi:robot-vacuum",
             "domains": ["vacuum"],
@@ -280,7 +280,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             ],
         },
         {
-            "id": "hc_battery_card",
+            "id": "md_battery_card",
             "label": "Battery",
             "icon": "mdi:battery",
             "domains": ["sensor"],
@@ -288,11 +288,11 @@ EDITOR_CATALOG: dict[str, Any] = {
             "description": "Battery percentage with green, yellow, and red states.",
             "variables": [
                 _field("on_icon", "Battery icon", "icon"),
-                _field("hc_card_color", "Card color", "color", advanced=True),
+                _field("md_card_color", "Card color", "color", advanced=True),
             ],
         },
         {
-            "id": "hc_dishwasher_card",
+            "id": "md_dishwasher_card",
             "label": "Dishwasher",
             "icon": "mdi:dishwasher",
             "domains": ["sensor", "input_select"],
@@ -306,7 +306,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             ],
         },
         {
-            "id": "hc_washing_machine_card",
+            "id": "md_washing_machine_card",
             "label": "Washing machine",
             "icon": "mdi:washing-machine",
             "domains": ["binary_sensor", "sensor"],
@@ -314,7 +314,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             "variables": [],
         },
         {
-            "id": "hc_graph_card",
+            "id": "md_graph_card",
             "label": "Graph",
             "icon": "mdi:chart-line",
             "domains": ["sensor", "number", "input_number"],
@@ -331,7 +331,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             ],
         },
         {
-            "id": "hc_toggle_graph_card",
+            "id": "md_toggle_graph_card",
             "label": "Toggle graph",
             "icon": "mdi:chart-areaspline",
             "domains": ["sensor"],
@@ -353,7 +353,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             ],
         },
         {
-            "id": "hc_timeline_card",
+            "id": "md_timeline_card",
             "label": "Timeline",
             "icon": "mdi:timeline-clock-outline",
             "domains": [
@@ -375,20 +375,20 @@ EDITOR_CATALOG: dict[str, Any] = {
             "variables": [_field("timeline_name", "Timeline title", "text")],
         },
         {
-            "id": "hc_navigation_card",
+            "id": "md_navigation_card",
             "label": "Page shortcut",
             "icon": "mdi:open-in-new",
             "domains": [],
             "page_shortcut": True,
             "description": "Open another generated dashboard page.",
             "variables": [
-                _field("hc_label_prefix", "Label prefix", "text", advanced=True, description="Binary state is shown by the card and icon. Prefix-only labels are omitted; useful labels and readings remain."),
-                _field("hc_icon_color", "Icon color", "color", advanced=True),
-                _field("hc_color", "Card color", "color", advanced=True),
+                _field("md_label_prefix", "Label prefix", "text", advanced=True, description="Binary state is shown by the card and icon. Prefix-only labels are omitted; useful labels and readings remain."),
+                _field("md_icon_color", "Icon color", "color", advanced=True),
+                _field("md_color", "Card color", "color", advanced=True),
             ],
         },
         {
-            "id": "hc_entity_group_card",
+            "id": "md_entity_group_card",
             "label": "Entity Group",
             "icon": "mdi:view-list",
             "domains": [],
@@ -446,32 +446,32 @@ EDITOR_CATALOG: dict[str, Any] = {
 }
 
 EDITOR_CATALOG["cards"].extend([
-    {"id": "hc_alarm_controls_card", "label": "Alarm controls", "icon": "mdi:shield-home", "domains": ["alarm_control_panel"],
+    {"id": "md_alarm_controls_card", "label": "Alarm controls", "icon": "mdi:shield-home", "domains": ["alarm_control_panel"],
      "description": "Capability-aware alarm controls with transient PIN entry and guarded actions.", "variables": []},
-    {"id": "hc_header_card", "label": "Header", "icon": "mdi:calendar", "domains": ["weather"],
+    {"id": "md_header_card", "label": "Header", "icon": "mdi:calendar", "domains": ["weather"],
      "entity_optional": True, "description": "Date, weather and optional person and air quality.",
      "variables": [_field("person_entity", "Person", "entity", domains=["person"]),
                    _field("air_quality_sensor", "Air quality", "entity", domains=["sensor"])]},
-    {"id": "hc_glance_card", "label": "Glance", "icon": "mdi:view-dashboard", "domains": [],
+    {"id": "md_glance_card", "label": "Glance", "icon": "mdi:view-dashboard", "domains": [],
      "entity_optional": True, "description": "Up to three independently configured readings.",
      "variables": [field for index in range(1, 4) for field in (
          _field(f"entity{index}", f"Reading {index}", "entity"),
          _field(f"entity{index}_name", f"Reading {index} name", "text"),
          _field(f"entity{index}_icon", f"Reading {index} icon", "icon"))]},
-    {"id": "hc_scene_card", "label": "Scene selector", "icon": "mdi:palette", "domains": ["select", "input_select"],
+    {"id": "md_scene_card", "label": "Scene selector", "icon": "mdi:palette", "domains": ["select", "input_select"],
      "description": "Native selector options and authoritative selection.", "variables": []},
-    {"id": "hc_access_action_card", "label": "Close or lock", "icon": "mdi:lock", "domains": ["lock", "cover"],
+    {"id": "md_access_action_card", "label": "Close or lock", "icon": "mdi:lock", "domains": ["lock", "cover"],
      "description": "An explicit safe close or lock action.",
      "variables": [_field("action_service", "Action service", "text")]},
 ])
 
 for _card in EDITOR_CATALOG["cards"]:
-    if _card["id"] in ("hc_access_card", "hc_access_slide_action_card", "hc_access_hold_action_card", "hc_access_action_card"):
-        _card["hidden"] = _card["id"] != "hc_access_card"
+    if _card["id"] in ("md_access_card", "md_access_slide_action_card", "md_access_hold_action_card", "md_access_action_card"):
+        _card["hidden"] = _card["id"] != "md_access_card"
         _card["label"] = "Access"
         _card["variables"].insert(0, {**_field("access_mode", "Access behavior", "select", default="auto"),
             "options": ["auto", "popup", "slide", "close", "hold"]})
-    if _card["id"] in ("hc_base_card", "hc_media_app_card", "hc_access_card", "hc_access_slide_action_card", "hc_access_hold_action_card", "hc_access_action_card"):
+    if _card["id"] in ("md_base_card", "md_media_app_card", "md_access_card", "md_access_slide_action_card", "md_access_hold_action_card", "md_access_action_card"):
         _card["variables"].extend([
             _field("action_color", "Action color", "color", advanced=True),
             _field("action_label", "Action label", "text", advanced=True),
@@ -498,7 +498,7 @@ def page_templates(config: dict[str, Any], entities: list[dict[str, Any]]) -> di
                      and (not suffix or entity["entity_id"].endswith(suffix)) and (not device_class or entity.get("device_class") == device_class)), None)
 
     weather = first("weather")
-    home_sections = [{"columns": 1, "entities": [{"template": "hc_weather_card", "entity_id": weather, "variables": {"show_forecast": True}}]}] if weather else []
+    home_sections = [{"columns": 1, "entities": [{"template": "md_weather_card", "entity_id": weather, "variables": {"show_forecast": True}}]}] if weather else []
     groups = []
     for kind, domain, label, icon in (("light", "light", "overview.lights", "mdi:lightbulb-group-outline"),
                                       ("cover", "cover", "overview.blinds", "mdi:window-shutter"),
@@ -506,11 +506,11 @@ def page_templates(config: dict[str, Any], entities: list[dict[str, Any]]) -> di
                                       ("battery", "sensor", "overview.maintenance", "mdi:wrench")):
         members = [entity["entity_id"] for entity in available if entity["entity_id"].startswith(domain + ".") and (kind != "battery" or entity.get("device_class") == "battery")]
         if members:
-            groups.append({"template": "hc_entity_group_card", "id": "starter-" + kind, "name": GENERATOR_TRANSLATIONS["en"][label], "name_key": label,
+            groups.append({"template": "md_entity_group_card", "id": "starter-" + kind, "name": GENERATOR_TRANSLATIONS["en"][label], "name_key": label,
                            "icon": icon, "entity_type": kind, "popup_filter": "active" if kind == "light" else "all", "entities": members})
     scenes = [entity["entity_id"] for entity in available if entity["entity_id"].startswith("scene.")]
     if scenes:
-        groups.append({"template": "hc_scene_collection_card", "name": "Scenes", "name_key": "overview.scenes", "icon": "mdi:palette-outline", "entities": scenes})
+        groups.append({"template": "md_scene_collection_card", "name": "Scenes", "name_key": "overview.scenes", "icon": "mdi:palette-outline", "entities": scenes})
     if groups:
         home_sections.append({"columns": 2, "entities": groups})
     room_links = []
@@ -521,61 +521,61 @@ def page_templates(config: dict[str, Any], entities: list[dict[str, Any]]) -> di
             entries = [entry for section in page_sections(page) for entry in page_entries(section.get("entities"))]
             lights = [entry["entity_id"] for entry in entries if str(entry.get("entity_id") or "").startswith("light.")]
             for entry in entries:
-                if entry.get("template") == "hc_entity_group_card" and entry.get("entity_type") == "light":
+                if entry.get("template") == "md_entity_group_card" and entry.get("entity_type") == "light":
                     lights.extend(member["entity_id"] for member in page_entries(entry["entities"]))
             primary = next(iter(lights), None) or next((entry.get("entity_id") for entry in entries if entry.get("entity_id")), None)
-            room_links.append({"template": "hc_room_card", "name": page["name"], "icon": page.get("icon") or "mdi:sofa", "page": page["path"],
+            room_links.append({"template": "md_room_card", "name": page["name"], "icon": page.get("icon") or "mdi:sofa", "page": page["path"],
                                **({"entity_id": primary} if primary else {}), "variables": {"light_entities": list(dict.fromkeys(lights))}})
     power = first("sensor", device_class="power")
-    energy = [bound("hc_graph_card", "House Power", power, name_key="energy.house_power", icon="mdi:flash", variables={"history_popup": True, "show_icon": True})]
+    energy = [bound("md_graph_card", "House Power", power, name_key="energy.house_power", icon="mdi:flash", variables={"history_popup": True, "show_icon": True})]
     for suffix, name, key, period, icon in (("month_energy", "Month Power", "energy.month_power", "month", "mdi:flash"),
                                            ("today_energy", "Today Power", "energy.today_power", "day", "mdi:flash-outline"),
                                            ("month_cost", "Month Cost", "energy.month_cost", "month", "mdi:currency-eur"),
                                            ("today_cost", "Today Cost", "energy.today_cost", "day", "mdi:cash-clock")):
         if entity := first("sensor", suffix=suffix):
-            energy.append(bound("hc_energy_period_card", name, entity, name_key=key, icon=icon, variables={"period": period}))
+            energy.append(bound("md_energy_period_card", name, entity, name_key=key, icon=icon, variables={"period": period}))
     wallbox = []
-    for suffix, role, name, key, icon in (("wallbox_status", "hc_base_card", "Wallbox Status", "wallbox.status", "mdi:ev-station"),
-                                        ("wallbox_power", "hc_graph_card", "Charging Power", "wallbox.charging_power", "mdi:flash"),
-                                        ("wallbox_maximum_current", "hc_graph_card", "Charging Current", "wallbox.current", "mdi:current-ac")):
+    for suffix, role, name, key, icon in (("wallbox_status", "md_base_card", "Wallbox Status", "wallbox.status", "mdi:ev-station"),
+                                        ("wallbox_power", "md_graph_card", "Charging Power", "wallbox.charging_power", "mdi:flash"),
+                                        ("wallbox_maximum_current", "md_graph_card", "Charging Current", "wallbox.current", "mdi:current-ac")):
         if entity := first("sensor", suffix=suffix):
             wallbox.append(bound(role, name, entity, name_key=key, icon=icon))
     current = first("number", suffix="wallbox_current") or first("input_number", suffix="wallbox_current")
-    wallbox.append(bound("hc_wallbox_current_card", "Charging Current", current, name_key="wallbox.current", variables={"shortcuts": [6, 12, 16]}))
+    wallbox.append(bound("md_wallbox_current_card", "Charging Current", current, name_key="wallbox.current", variables={"shortcuts": [6, 12, 16]}))
     if pause := first("switch", suffix="wallbox_pause") or first("input_boolean", suffix="wallbox_pause"):
-        wallbox.append(bound("hc_switch_card", "Pause / Resume", pause, name_key="wallbox.pause_resume", icon="mdi:pause-circle"))
+        wallbox.append(bound("md_switch_card", "Pause / Resume", pause, name_key="wallbox.pause_resume", icon="mdi:pause-circle"))
     selected_players = {}
     for page in config.get("pages", []) if isinstance(config.get("pages"), list) else []:
         for section in page_sections(page):
             for entry in page_entries(section.get("entities")):
-                if str(entry.get("entity_id") or "").startswith("media_player.") and entry.get("template") in (None, "hc_media_card"):
+                if str(entry.get("entity_id") or "").startswith("media_player.") and entry.get("template") in (None, "md_media_card"):
                     selected_players.setdefault(entry["entity_id"], entry)
     players = []
     for entity in available:
         if not entity["entity_id"].startswith("media_player."):
             continue
         selected = deepcopy(selected_players.get(entity["entity_id"], {}))
-        player = {**bound("hc_media_card", entity.get("name") or _friendly_name(entity["entity_id"]), entity["entity_id"]), **selected}
+        player = {**bound("md_media_card", entity.get("name") or _friendly_name(entity["entity_id"]), entity["entity_id"]), **selected}
         players.append(player)
         if options := _apple_tv_options({**entity, **selected}):
             player["apple_tv"] = {**deepcopy(selected.get("apple_tv") or {}), **deepcopy(options)}
             for app in options["apps"]:
-                players.append({**deepcopy(app), "template": "hc_media_app_card", "entity_id": entity["entity_id"],
+                players.append({**deepcopy(app), "template": "md_media_app_card", "entity_id": entity["entity_id"],
                                 "name": app.get("name") or app["source"], "variables": {"app_source": app["source"]}})
                 players[-1].pop("source", None)
-    security = [bound("hc_security_card", "Alarm", first("alarm_control_panel"), name_key="security.alarm")]
-    security.extend(bound("hc_access_card", entity.get("name") or _friendly_name(entity["entity_id"]), entity["entity_id"])
+    security = [bound("md_security_card", "Alarm", first("alarm_control_panel"), name_key="security.alarm")]
+    security.extend(bound("md_access_card", entity.get("name") or _friendly_name(entity["entity_id"]), entity["entity_id"])
                     for entity in available if _is_access_entity(entity))
-    security.extend(bound("hc_access_hold_action_card", entity.get("name") or _friendly_name(entity["entity_id"]), entity["entity_id"])
+    security.extend(bound("md_access_hold_action_card", entity.get("name") or _friendly_name(entity["entity_id"]), entity["entity_id"])
                     for entity in available if entity["entity_id"].startswith("button."))
     return deepcopy({
         "empty": container("mdi:file-outline", []), "home": {"icon": "mdi:home-variant", "sections": home_sections},
         "rooms": container("mdi:sofa", room_links, 2),
         "room": {"icon": "mdi:sofa-outline", "subview": True, "sections": [
-            {"columns": 1, "entities": [bound("hc_title_card", "Room", id="page-title")]}, {"entities": []}]},
+            {"columns": 1, "entities": [bound("md_title_card", "Room", id="page-title")]}, {"entities": []}]},
         "security": container("mdi:shield-home", security),
         "energy": container("mdi:lightning-bolt", energy), "wallbox": container("mdi:ev-station", wallbox),
-        "media": container("mdi:television-play", players or [bound("hc_media_card", "Media player", name_key="media.player")]),
+        "media": container("mdi:television-play", players or [bound("md_media_card", "Media player", name_key="media.player")]),
     })
 
 
@@ -609,4 +609,4 @@ def initial_entity_ids(config: dict[str, Any]) -> list[str]:
         return []
     return sorted({entity["entity_id"] for section in page_sections(page)
                    for entity in page_entries(section.get("entities"))
-                   if entity.get("entity_id") and entity.get("template") != "hc_entity_group_card"})
+                   if entity.get("entity_id") and entity.get("template") != "md_entity_group_card"})

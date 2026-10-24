@@ -1,3 +1,4 @@
+export { canonicalCard, canonicalTemplate } from '../custom_components/marao_dashboard/frontend/MaraoNames.js';
 export const copy = value => structuredClone(value);
 export const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export const getPath = (value, path) => path.split(".").reduce((item, key) => item?.[key], value);
@@ -56,9 +57,9 @@ export function entityMetadata(config, hass) {
 export function supportsEntity(spec, hass, entity) {
   const domain = entity.split(".")[0], attrs = hass?.states?.[entity]?.attributes || {};
   if (spec.hidden || !spec.domains.includes(domain)) return false;
-  if (spec.id === "hc_access_card" && domain === "cover") return ["door", "garage", "gate"].includes(attrs.device_class);
-  if (spec.id === "hc_cover_card" && ["door", "garage", "gate"].includes(attrs.device_class)) return false;
-  if (spec.id === "hc_battery_card") return attrs.device_class === "battery";
+  if (spec.id === "md_access_card" && domain === "cover") return ["door", "garage", "gate"].includes(attrs.device_class);
+  if (spec.id === "md_cover_card" && ["door", "garage", "gate"].includes(attrs.device_class)) return false;
+  if (spec.id === "md_battery_card") return attrs.device_class === "battery";
   // Service openers require an explicit choice, never a generic entity suggestion.
   return true;
 }

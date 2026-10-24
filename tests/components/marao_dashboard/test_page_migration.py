@@ -70,26 +70,26 @@ def test_parity_expectation_checks_every_starter_role_and_customization_scope():
     entries = lambda path: [entry for section in pages[path]["sections"] for entry in section.get("entities", [])]
     assert set(MANIFEST["parity"]) == {"Home", "Rooms", "Room/custom", "Security", "Energy", "Wallbox", "Media"}
     home = entries("overview")
-    assert home[0]["template"] == "hc_weather_card" and home[0]["variables"]["show_forecast"]
-    assert [item["entity_type"] for item in home if item["template"] == "hc_entity_group_card"] == ["light", "cover", "climate", "battery"]
+    assert home[0]["template"] == "md_weather_card" and home[0]["variables"]["show_forecast"]
+    assert [item["entity_type"] for item in home if item["template"] == "md_entity_group_card"] == ["light", "cover", "climate", "battery"]
     assert home[-1]["entities"] == ["input_boolean.holiday_mode"]
     shortcut = entries("rooms")[0]
     assert shortcut["page"] == "room-living-room"
     assert shortcut["variables"]["light_entities"] == [shortcut["entity_id"]]
     room = pages["room-living-room"]
-    assert room["subview"] and room["sections"][0]["entities"][0]["template"] == "hc_title_card"
+    assert room["subview"] and room["sections"][0]["entities"][0]["template"] == "md_title_card"
     assert room["sections"][1]["cards"] == source["rooms"][0]["cards"]
     assert room["future_page"] == source["rooms"][0]["future_page"]
     security = entries("security")
-    assert [item["template"] for item in security] == ["hc_security_card", "hc_access_card", "hc_access_hold_action_card"]
+    assert [item["template"] for item in security] == ["md_security_card", "md_access_card", "md_access_hold_action_card"]
     assert security[-1]["tap_action"]["perform_action"] == "button.press"
     energy = entries("energy")
     assert energy[0]["name"] == "Whole-home demand" and energy[0]["variables"]["history_popup"]
     assert energy[0]["variables"]["show_graph_line"] is False and energy[0]["future_card"] == 42
     assert [item["variables"]["period"] for item in energy[1:5]] == ["month", "day", "month", "day"]
-    assert energy[-2]["variables"]["toggle_entity"] == "switch.heater" and energy[-1]["template"] == "hc_dishwasher_card"
+    assert energy[-2]["variables"]["toggle_entity"] == "switch.heater" and energy[-1]["template"] == "md_dishwasher_card"
     wallbox = entries("wallbox")
-    assert [item["template"] for item in wallbox] == ["hc_base_card", "hc_graph_card", "hc_graph_card", "hc_wallbox_current_card", "hc_switch_card"]
+    assert [item["template"] for item in wallbox] == ["md_base_card", "md_graph_card", "md_graph_card", "md_wallbox_current_card", "md_switch_card"]
     assert wallbox[3]["variables"] == {"shortcuts": [6, 12, 16], "future_option": True}
     assert wallbox[3]["icon"] == "mdi:ev-plug-type2" and wallbox[3]["name"] == "Requested current"
     media = entries("media")
@@ -120,7 +120,7 @@ def test_access_actions_keep_strict_access_instead_of_becoming_generic_holds():
     ]}}}
     security = next(page for page in convert_legacy_pages(source)["pages"] if page["path"] == "security")
     actions = [section["entities"][0] for section in security["sections"]]
-    assert [item["template"] for item in actions] == ["hc_access_card", "hc_access_card", "hc_access_hold_action_card"]
+    assert [item["template"] for item in actions] == ["md_access_card", "md_access_card", "md_access_hold_action_card"]
     assert "tap_action" not in actions[0] and "tap_action" not in actions[1]
     assert actions[2]["tap_action"]["action"] == "toggle"
 

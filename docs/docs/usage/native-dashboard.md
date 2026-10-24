@@ -69,9 +69,9 @@ availability guards and transient masked alarm codes. Alarm codes are never card
           name: Television
           icon: mdi:television
     variables:
-      hc_show_background_art: true
+      md_show_background_art: true
 
-Existing generic Marao types and public hc_* template keys continue to work.
+Existing generic Marao types and public md_* template keys continue to work.
 There is no automatic conversion or copying of an existing builder dashboard.
 Native starter ownership is recorded as `marao: {mode: native, version: 1}`.
 Builder generation, setup repair and history restoration refuse native destinations.

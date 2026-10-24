@@ -24,27 +24,27 @@ test('diagnostics retain true positions and reject stale versions/models', () =>
   assert.equal(markers, null);
 });
 test('catalog options stay role-specific and nested command data remains opaque', () => {
-  assert.ok(properties('hc_light_card').variables.properties.enable_slider);
-  assert.ok(!properties('hc_light_card').variables.properties.event_provider);
-  assert.ok(properties('hc_camera_card').variables.properties.event_provider.anyOf[0].enum.includes('unifi_protect'));
-  assert.deepEqual(resolve(properties('hc_media_card').apple_tv.anyOf[1].properties.remote_entity).anyOf[0].enum, ['remote.safe']);
-  assert.ok(properties('hc_media_card').apple_tv.anyOf[1].properties.apps.items.properties.source);
-  assert.ok(properties('hc_vacuum_card').variables.properties.action_1.properties.data.description);
-  assert.equal(properties('hc_vacuum_card').variables.properties.action_1.properties.data.type, undefined);
-  assert.ok(properties('hc_dishwasher_card').variables.properties.progress_entity);
-  assert.ok(properties('hc_wallbox_current_card').variables.properties.shortcuts);
-  assert.ok(properties('hc_energy_period_card').variables.properties.display_precision);
-  assert.deepEqual(properties('hc_energy_period_card').variables.properties.sub_entities.items.required, ['entity_id']);
-  assert.ok(properties('hc_energy_period_card').variables.properties.sub_entities.items.properties.cost_entity);
-  assert.equal(properties('hc_energy_period_card').variables.properties.cost_per_kwh.minimum, 0);
-  assert.deepEqual(resolve(properties('hc_light_card').entity_id).anyOf[0].enum, ['light.safe']);
-  assert.equal(resolve(properties('hc_light_card').entity_id).anyOf[1].enum, undefined, 'Manual bindings remain valid');
+  assert.ok(properties('md_light_card').variables.properties.enable_slider);
+  assert.ok(!properties('md_light_card').variables.properties.event_provider);
+  assert.ok(properties('md_camera_card').variables.properties.event_provider.anyOf[0].enum.includes('unifi_protect'));
+  assert.deepEqual(resolve(properties('md_media_card').apple_tv.anyOf[1].properties.remote_entity).anyOf[0].enum, ['remote.safe']);
+  assert.ok(properties('md_media_card').apple_tv.anyOf[1].properties.apps.items.properties.source);
+  assert.ok(properties('md_vacuum_card').variables.properties.action_1.properties.data.description);
+  assert.equal(properties('md_vacuum_card').variables.properties.action_1.properties.data.type, undefined);
+  assert.ok(properties('md_dishwasher_card').variables.properties.progress_entity);
+  assert.ok(properties('md_wallbox_current_card').variables.properties.shortcuts);
+  assert.ok(properties('md_energy_period_card').variables.properties.display_precision);
+  assert.deepEqual(properties('md_energy_period_card').variables.properties.sub_entities.items.required, ['entity_id']);
+  assert.ok(properties('md_energy_period_card').variables.properties.sub_entities.items.properties.cost_entity);
+  assert.equal(properties('md_energy_period_card').variables.properties.cost_per_kwh.minimum, 0);
+  assert.deepEqual(resolve(properties('md_light_card').entity_id).anyOf[0].enum, ['light.safe']);
+  assert.equal(resolve(properties('md_light_card').entity_id).anyOf[1].enum, undefined, 'Manual bindings remain valid');
 });
 test('shared schema definitions handle a large safe dashboard and entity registry in the installed language service', async () => {
   const draft = JSON.parse(fs.readFileSync(new URL('../../ha-test/json-editor-example.json', import.meta.url), 'utf8'));
   draft.pages[0].sections[0].cards = Array.from({ length: 1200 }, (_, index) => index % 2
     ? { type: 'markdown', content: 'Safe raw card', future: { keep: [] } }
-    : { type: 'custom:marao-card', template: 'hc_light_card', entity: 'light.safe_1', variables: { enable_slider: false }, future: [] });
+    : { type: 'custom:marao-card', template: 'md_light_card', entity: 'light.safe_1', variables: { enable_slider: false }, future: [] });
   const registry = Array.from({ length: 3000 }, (_, index) => ({ entity_id: `light.safe_${index}` }));
   const definition = buildJsonSchema(catalog, registry, draft);
   assert.ok(JSON.stringify(definition).length < 1000000, 'Entity choices must not be copied per schema use');

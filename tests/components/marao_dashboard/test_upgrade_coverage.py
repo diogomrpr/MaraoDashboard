@@ -22,8 +22,8 @@ def test_reviewed_inventory_covers_the_current_catalog_runtime_and_gallery():
 
 
 @pytest.mark.parametrize("change, message", [
-    (lambda m: m["catalog"].pop("hc_entity_group_card"), "card family"),
-    (lambda m: m["catalog"]["hc_light_card"]["options"].pop(), "card option"),
+    (lambda m: m["catalog"].pop("md_entity_group_card"), "card family"),
+    (lambda m: m["catalog"]["md_light_card"]["options"].pop(), "card option"),
     (lambda m: m["guided_pages"].pop("energy"), "guided page"),
     (lambda m: m["guided_page_options"]["energy"].pop(), "guided-page option"),
     (lambda m: m["energy_options"].pop(), "energy option"),

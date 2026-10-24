@@ -13,9 +13,9 @@ async function checkPointerInteraction(page, context, config, example, calls, po
   if (!example.entity.startsWith(`${example.source.split('.')[0]}.marao_dashboard_test_case_`)) throw new Error('Pointer checks require a safe gallery fixture');
   const selector = `${scope} input[data-slider-key="${example.template}:${example.entity}"]`;
   const input = page.locator(selector);
-  const expected = { hc_light_card: 'turn_on', hc_fan_card: 'set_percentage', hc_cover_card: 'set_cover_position' }[example.template];
-  const field = { hc_light_card: 'brightness_pct', hc_fan_card: 'percentage', hc_cover_card: 'position' }[example.template];
-  const fixtureValue = (state) => example.template === 'hc_light_card' ? state.attributes.brightness * 100 / 255 : example.template === 'hc_fan_card' ? state.attributes.percentage : state.attributes.current_position;
+  const expected = { md_light_card: 'turn_on', md_fan_card: 'set_percentage', md_cover_card: 'set_cover_position' }[example.template];
+  const field = { md_light_card: 'brightness_pct', md_fan_card: 'percentage', md_cover_card: 'position' }[example.template];
+  const fixtureValue = (state) => example.template === 'md_light_card' ? state.attributes.brightness * 100 / 255 : example.template === 'md_fan_card' ? state.attributes.percentage : state.attributes.current_position;
   const count = () => calls.filter((call) => call.entities.includes(example.entity)).length;
   const touch = pointer === 'touch' ? await context.newCDPSession(page) : null;
   let box;

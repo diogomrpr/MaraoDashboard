@@ -58,7 +58,7 @@ function roomContent(source, index) {
   return { ...page, ...page.sections.at(-1) };
 }
 function homeGroups(source) {
-  return source.pages.find(page => page.path === 'overview').sections.flatMap(section => section.entities || []).filter(card => card.template === 'hc_entity_group_card');
+  return source.pages.find(page => page.path === 'overview').sections.flatMap(section => section.entities || []).filter(card => card.template === 'md_entity_group_card');
 }
 
 test('long maintenance popup uses 32 safe battery sensors in the realistic page and gallery', () => {
@@ -105,7 +105,7 @@ test('every published native family has a canonical safe example and a realistic
   assert.ok(native.some(card => card.name === 'Native media duplicate'));
   assert.ok(native.some(card => card.type === 'custom:marao-native-entity-group-card' && card.entities.length === 0));
   const prefixed = { ...view, cards: [
-    { template: 'hc_entity_group_card', entity_type: 'light', entities: [] }, ...view.cards,
+    { template: 'md_entity_group_card', entity_type: 'light', entities: [] }, ...view.cards,
   ] };
   assert.deepEqual(require('../../ha-test/native-cases.js').nativeCases(prefixed, manifest, require('../../ha-test/cases.js').walkCards), native);
 });
@@ -122,8 +122,8 @@ test('editable page roles are visible descriptors with safe real bindings and in
   const ids = fixtureIds(helpers);
   assert.equal(new Set(manifest.editablePageCases.map(card => card.id)).size, manifest.editablePageCases.length);
   assert.ok(manifest.editablePageCases.every(card => view.entities.some(entry => entry.id === card.id)));
-  assert.ok(manifest.editablePageCases.some(card => card.template === 'hc_scene_collection_card' && card.entities.length === 0));
-  assert.deepEqual(manifest.editablePageCases.filter(card => card.template === 'hc_energy_period_card').map(card => card.variables.period), ['day', 'month']);
+  assert.ok(manifest.editablePageCases.some(card => card.template === 'md_scene_collection_card' && card.entities.length === 0));
+  assert.deepEqual(manifest.editablePageCases.filter(card => card.template === 'md_energy_period_card').map(card => card.variables.period), ['day', 'month']);
   for (const card of manifest.editablePageCases) {
     if (card.entity_id) assert.ok(ids.has(card.entity_id));
     for (const entity of card.entities || []) assert.ok(ids.has(entity));
@@ -137,8 +137,8 @@ test('a saved mixed page reuses safe entities with independent popups and an unp
   const studio = source.pages.find(page => page.id === 'studio');
   assert.deepEqual(studio.sections.map(section => section.columns), [1, 2, 2, undefined, 1, 2, 2]);
   const cards = studio.sections.flatMap(section => section.entities || []);
-  const television = cards.find(card => card.template === 'hc_media_card');
-  const energy = cards.find(card => card.template === 'hc_energy_period_card');
+  const television = cards.find(card => card.template === 'md_media_card');
+  const energy = cards.find(card => card.template === 'md_energy_period_card');
   assert.equal(television.entity_id, source.pages.find(page => page.id === 'media').sections[0].entities[0].entity_id);
   assert.equal(energy.entity_id, source.pages.find(page => page.id === 'energy').sections[2].entities[0].entity_id);
   assert.equal(energy.variables.popup_hash, undefined);
@@ -179,7 +179,7 @@ test('narrow access examples use safe targets and strict slides for both domains
   const grid = view.cards.find(card => card.type === 'grid' && card.cards?.some(child => child.name === 'Narrow unlock slide'));
   assert.equal(grid.columns, 2);
   for (const card of grid.cards) {
-    assert.equal(card.template, 'hc_access_slide_action_card');
+    assert.equal(card.template, 'md_access_slide_action_card');
     assert.match(card.entity, /^(lock|cover)\.marao_dashboard_test_/);
     assert.equal(card.variables.action_service, card.entity.startsWith('lock.') ? 'lock.unlock' : 'cover.open_cover');
     assert.equal(card.tap_action, undefined);
@@ -283,12 +283,12 @@ test('climate feedback examples isolate each delayed or failed behavior and shar
 
 test('slider header cases retain absent capabilities, hidden fields and a realistic disabled slider', () => {
   const cases = manifest.titleLayoutCases;
-  assert.ok(cases.some(card => card.variables?.enable_slider === false && card.template === 'hc_light_card'));
+  assert.ok(cases.some(card => card.variables?.enable_slider === false && card.template === 'md_light_card'));
   for (const entity of ['light.marao_dashboard_test_onoff_light', 'fan.marao_dashboard_test_onoff_fan']) assert.ok(cases.some(card => card.entity === entity));
   assert.ok(cases.some(card => card.show_icon === false));
   assert.ok(cases.some(card => card.variables?.show_icon === false));
   assert.ok(cases.some(card => card.show_name === false && card.show_state === false && card.show_label === false));
-  assert.ok(cases.some(card => card.template === 'hc_access_action_card' && card.variables.action_service === 'lock.unlock'));
+  assert.ok(cases.some(card => card.template === 'md_access_action_card' && card.variables.action_service === 'lock.unlock'));
   const source = require('../../ha-test/marao_dashboard_test_dashboard.json');
   assert.equal(roomContent(source, 0).entities.light[1].variables.enable_slider, false);
 });
@@ -339,7 +339,7 @@ test('binary presentation cases preserve labels, readings and isolated domain co
     assert.equal(fixture.initial, state);
     assert.ok(fixture.options.includes(state));
   }
-  const graph = manifest.binaryPresentationCases.find(card => card.template === 'hc_toggle_graph_card');
+  const graph = manifest.binaryPresentationCases.find(card => card.template === 'md_toggle_graph_card');
   assert.ok(graph.entity.startsWith('sensor.'));
   assert.ok(graph.variables.toggle_entity.startsWith('switch.'));
   const source = JSON.parse(fs.readFileSync(new URL('../../ha-test/marao_dashboard_test_dashboard.json', import.meta.url), 'utf8'));
@@ -373,7 +373,7 @@ test('value sliders have independent minimum, middle and maximum fixtures', () =
     assert.equal(controls.length, 1, example.id);
     const key = controls[0][1], control = helpers.input_number[key];
     assert.ok(key.startsWith(`${example.entity.split('.')[1]}_control_`), example.id);
-    const maximum = example.template === 'hc_light_card' ? 255 : 100;
+    const maximum = example.template === 'md_light_card' ? 255 : 100;
     assert.equal(control.initial, Math.max(control.min, Math.round(example.sliderPercentage * maximum / 100)), example.id);
     assert.ok(control.initial <= control.max, example.id);
   }
@@ -385,7 +385,7 @@ test('brightness endpoints preserve independent light color defaults', () => {
   for (const [name, value] of Object.entries(defaults)) source.input_number[`marao_dashboard_test_light_${name}`].initial = value;
   const expanded = expandHelpers(source);
   const seen = new Set();
-  for (const example of concreteCases().filter(entry => entry.template === 'hc_light_card' && entry.sliderPercentage !== undefined)) {
+  for (const example of concreteCases().filter(entry => entry.template === 'md_light_card' && entry.sliderPercentage !== undefined)) {
     const fixture = expanded.template.flatMap(block => block.light || []).find(entry => entry.default_entity_id === example.entity);
     const keys = [...`${fixture.hs} ${fixture.temperature}`.matchAll(/input_number\.([a-z0-9_]+)/g)].map(match => match[1]);
     assert.equal(new Set(keys).size, 3, example.id);
@@ -436,7 +436,7 @@ test('compact navigation covers the Portuguese overview titles with existing saf
   const ids = fixtureIds(helpers);
   for (const card of grid.cards) {
     assert.ok(ids.has(card.entity), `Missing safe fixture: ${card.entity}`);
-    assert.equal(card.template, 'hc_navigation_card');
+    assert.equal(card.template, 'md_navigation_card');
     assert.equal(card.tap_action.navigation_path, '/marao-dashboard/overview');
   }
 });
@@ -463,7 +463,7 @@ test('history Retry sheets use the existing safe error source and matching trigg
   for (const kind of ['Energy', 'Timeline']) {
     const name = `${kind} history Retry popup`;
     const popup = view.cards.find(card => card.type === 'custom:marao-popup-card' && card.name === name);
-    const trigger = view.cards.find(card => card.template === 'hc_bubble_popup_card' && card.name === name);
+    const trigger = view.cards.find(card => card.template === 'md_bubble_popup_card' && card.name === name);
     assert.equal(trigger.variables.popup_hash, popup.hash);
     assert.equal(trigger.entity, error.entity);
     assert.equal(popup.cards[0].entity, error.entity);
@@ -518,7 +518,7 @@ test('room compositions use safe explicit lights and representative product icon
   const rooms = manifest.roomCompositionCases;
   for (const room of rooms) {
     assert.ok(view.cards.some(card => card.name === room.name));
-    assert.equal(room.template, 'hc_room_card');
+    assert.equal(room.template, 'md_room_card');
     assert.equal(room.tap_action.action, room.name === 'Room · custom label' ? 'none' : 'navigate');
     for (const entity of room.variables.light_entities) assert.ok(ids.has(entity), entity);
   }

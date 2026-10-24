@@ -64,7 +64,7 @@ async function controlGridChecks(page, output, scenario, theme, transitions = tr
   await grid.waitFor({ state: 'attached' }); await readySubtree(page, grid, scenario, theme);
   const measure = () => measureGrid(grid), check = async () => assert.deepEqual(gridGeometryIssues(await measure(), names), []);
   await check();
-  assert.deepEqual(await layoutIssues(page, ['hc_light_card', 'hc_cover_card', 'hc_access_action_card', 'hc_access_slide_action_card']), []);
+  assert.deepEqual(await layoutIssues(page, ['md_light_card', 'md_cover_card', 'md_access_action_card', 'md_access_slide_action_card']), []);
   assert.equal(await grid.locator('marao-card').nth(5).locator('.title').count(), 0);
   if (transitions) {
     const before = await measure();
@@ -96,7 +96,7 @@ async function controlGridChecks(page, output, scenario, theme, transitions = tr
       await card.locator('[data-card-action]').tap();
       const sheet = page.locator('.marao-popup-sheet'); await sheet.waitFor({ state: 'visible' });
       await readySubtree(page, sheet, scenario, theme);
-      assert.deepEqual(await layoutIssues(page, ['hc_light_card', 'hc_cover_card', 'hc_access_action_card', 'hc_access_slide_action_card']), []);
+      assert.deepEqual(await layoutIssues(page, ['md_light_card', 'md_cover_card', 'md_access_action_card', 'md_access_slide_action_card']), []);
       await page.locator('.marao-popup-close').tap(); await sheet.waitFor({ state: 'detached' });
     }
   }
@@ -138,7 +138,7 @@ async function phoneRoomsChecks(page, output, scenario, theme) {
   assert.equal(evidence.viewport, scenario.viewport.width);
   assert.ok(evidence.section < evidence.viewport, 'Rooms proof must retain real host margins');
   assert.equal(evidence.preferred, 2); assert.equal(evidence.columns, 2, JSON.stringify(evidence));
-  assert.deepEqual(await layoutIssues(page, ['hc_room_card']), []);
+  assert.deepEqual(await layoutIssues(page, ['md_room_card']), []);
   fs.writeFileSync(path.join(output, 'phone-rooms-' + scenario.name + '-' + theme + '.json'), JSON.stringify(evidence, null, 2), {mode: 0o600});
 }
 module.exports = { controlGridChecks, gridGeometryIssues, measureGrid, nativeControlGridChecks, phoneRoomsChecks };

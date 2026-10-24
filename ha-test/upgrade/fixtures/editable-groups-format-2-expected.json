@@ -100,7 +100,7 @@
           "columns": 2,
           "entities": [
             {
-              "template": "hc_entity_group_card",
+              "template": "md_entity_group_card",
               "id": "selected-lights",
               "name": "Reading lights",
               "icon": "mdi:book-open",
@@ -146,7 +146,7 @@
           "entities": [
             {
               "id": "page-title",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Study",
               "show_icon": false,
               "show_state": false,
@@ -163,7 +163,7 @@
           "columns": 2,
           "entities": [
             {
-              "template": "hc_entity_group_card",
+              "template": "md_entity_group_card",
               "id": "study-climate",
               "name": "Study climate",
               "entity_type": "climate",

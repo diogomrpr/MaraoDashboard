@@ -449,10 +449,10 @@ async function weatherChecks(context, scenario, theme, config) {
       await page.locator('marao-card').first().waitFor({state:'visible'});
       await applyVisualPreferences(page,scenario,theme);
       const ids=await page.locator('marao-card').evaluateAll(cards=>cards.flatMap((card,i)=>{
-        if(!['hc_weather_card','hc_header_card'].includes(card._config?.template))return [];
+        if(!['md_weather_card','md_header_card'].includes(card._config?.template))return [];
         card.dataset.editorWeather=String(i);return [{i,template:card._config.template,entity:card._config.entity}];
       }));
-      assert.ok(ids.some(c=>c.template==='hc_weather_card'));
+      assert.ok(ids.some(c=>c.template==='md_weather_card'));
       for(const {i,template,entity} of ids) {
         const card=page.locator(`[data-editor-weather="${i}"]`);
         await card.evaluate(c=>c.scrollIntoView({block:'start',behavior:'instant'}));
@@ -744,7 +744,7 @@ async function independentRoomChecks(page, panel, client, scenario, theme) {
     assert.equal(await panel.evaluate(p => p._source()), original.source);
     await panel.locator('ha-dialog #by-type').tap();
     await capture('types');
-    await panel.locator('ha-dialog [data-card="hc_light_card"]').tap();
+    await panel.locator('ha-dialog [data-card="md_light_card"]').tap();
     await panel.locator('ha-dialog #by-type').waitFor({ state: 'detached' });
     await panel.locator('ha-dialog #card-form ha-form').waitFor({ state: 'visible' });
     assert.equal(await panel.locator('ha-dialog #card-form ha-form').evaluate(form => form.data.entity_id), '');
@@ -905,7 +905,7 @@ async function entityGroupEditorChecks(page, panel, client, config, originalByte
   try {
     assert.equal(original.dirty, false, 'Displayed defaults must start clean');
     await panel.locator(`[data-action="card-add"][data-kind="page"][data-room="${home}"]`).tap();
-    await panel.locator('ha-dialog [data-card="hc_entity_group_card"]').tap();
+    await panel.locator('ha-dialog [data-card="md_entity_group_card"]').tap();
     await panel.locator('ha-dialog #by-type').waitFor({ state: 'detached' });
     await page.waitForFunction(p => !p._metadataLoading, await panel.elementHandle());
     await capture('new');
@@ -999,7 +999,7 @@ async function independentRoomPersistence(page, panel, config, client, original,
     const generated = await client.call({ type: 'lovelace/config', url_path: 'marao-dashboard', force: true });
     const ordinaryCards = value => {
       if (Array.isArray(value)) return value.flatMap(ordinaryCards);
-      if (!value || typeof value !== 'object' || value.type === 'custom:marao-popup-card' || value.template === 'hc_entity_group_card') return [];
+      if (!value || typeof value !== 'object' || value.type === 'custom:marao-popup-card' || value.template === 'md_entity_group_card') return [];
       return [value, ...ordinaryCards(value.cards || [])];
     };
     assert.ok(!ordinaryCards(generated.views.find(view => view.path === 'living-room')).some(card => card.entity === removed));
@@ -1076,7 +1076,7 @@ async function editablePageChecks(page, panel, client, config, originalBytes, sc
     await panel.locator(`[data-action="card-delete"][data-kind="page"][data-room="${position}"][data-card="${initial - 1}"]`).tap();
     await panel.locator(`[data-action="section-add"][data-room="${index}"]`).tap();
     await panel.locator(`[data-action="card-add"][data-kind="page"][data-room="${index}:1"]`).tap();
-    await panel.locator('ha-dialog [data-card="hc_title_card"]').tap();
+    await panel.locator('ha-dialog [data-card="md_title_card"]').tap();
     await form({ name: 'My second section' }); await saveDialog();
     await panel.locator(`[data-action="page-duplicate"][data-room="${index}"]`).tap();
     const copyIndex = index + 1;
@@ -1090,7 +1090,7 @@ async function editablePageChecks(page, panel, client, config, originalBytes, sc
     const first = draft.pages.find(page => page.path === 'editable-tv'), copy = draft.pages.find(page => page.path === 'independent-tv');
     assert.equal(first.sections[0].entities.length, initial - 1);
     assert.equal(first.sections[0].entities[0].name, 'My editable TV');
-    assert.equal(first.sections[1].entities[0].template, 'hc_title_card');
+    assert.equal(first.sections[1].entities[0].template, 'md_title_card');
     assert.notEqual(copy.id, first.id);
     assert.notEqual(copy.sections[0].entities[0].id, first.sections[0].entities[0].id);
     await panel.locator(`[data-page-panel="${copyIndex}"]`).scrollIntoViewIfNeeded();

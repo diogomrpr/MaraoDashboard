@@ -65,7 +65,7 @@ async function checkTextScaling(page) {
 }
 
 async function checkRoomComposition(page) {
-  const rooms = await page.locator('marao-card').evaluateAll(cards => cards.filter(card => card._config?.template === 'hc_room_card').map(card => {
+  const rooms = await page.locator('marao-card').evaluateAll(cards => cards.filter(card => card._config?.template === 'md_room_card').map(card => {
     const root = card.shadowRoot, body = root.querySelector('.body'), title = root.querySelector('.title');
     const action = root.querySelector('[data-room-lights-off]'), decoration = root.querySelector('.room-artwork');
     const box = root.querySelector('ha-card').getBoundingClientRect(), b = body.getBoundingClientRect(), style = getComputedStyle(body);
@@ -124,19 +124,19 @@ async function checkNavbar(page) {
 
 async function sliderHeaderChecks(page, output, scenario, theme) {
   const assert = require('node:assert/strict'), path = require('node:path');
-  const families = ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_slide_action_card'];
+  const families = ['md_light_card', 'md_fan_card', 'md_cover_card', 'md_access_slide_action_card'];
   const rendered = await page.locator('marao-card').evaluateAll(cards => cards.map(card => card._config?.template));
   for (const family of families) assert.ok(rendered.includes(family), 'Missing gallery family: ' + family);
   assert.deepEqual(await layoutIssues(page, families), [], 'Gallery header subjects');
-          const card = page.locator('marao-card').filter({ has: page.locator('input[data-slider-key^="hc_light_card:"]') }).first();
+          const card = page.locator('marao-card').filter({ has: page.locator('input[data-slider-key^="md_light_card:"]') }).first();
           await card.evaluate(element => element.shadowRoot.querySelector('.body').classList.remove('slider-header'));
-          assert.ok((await titleLayoutIssues(page, ['hc_light_card'])).length, 'A missing header layout must fail geometry');
+          assert.ok((await titleLayoutIssues(page, ['md_light_card'])).length, 'A missing header layout must fail geometry');
           await card.evaluate(element => element.shadowRoot.querySelector('.body').classList.add('slider-header'));
           assert.deepEqual(await titleLayoutIssues(page, families), []);
           const width = await card.evaluate(element => { const width = element.style.width; element.style.width = '120px'; return width; });
           assert.deepEqual(await titleLayoutIssues(page, families), [], 'Narrow 120px card container');
           await card.evaluate((element, width) => { element.style.width = width; }, width);
-          if (scenario.name === 'iphone-normal') assert.deepEqual(await titleLayoutIssues(page, ['hc_navigation_card', 'hc_room_card', 'hc_switch_card', 'hc_climate_card', 'hc_media_card', 'hc_number_card']), []);
+          if (scenario.name === 'iphone-normal') assert.deepEqual(await titleLayoutIssues(page, ['md_navigation_card', 'md_room_card', 'md_switch_card', 'md_climate_card', 'md_media_card', 'md_number_card']), []);
           await page.evaluate(() => { location.hash = '#marao-dashboard-test-value-sliders-popup'; });
           await page.locator('.marao-popup-sheet input[data-slider-key]').first().waitFor({ state: 'visible' });
           await page.locator('.marao-popup-sheet').evaluate(async sheet => { await Promise.all(sheet.getAnimations().map(animation => animation.finished)); });
@@ -154,7 +154,7 @@ async function checkSliderHeaders() {
   const assert = require('node:assert/strict');
   const fs = require('node:fs');
   const path = require('node:path');
-  const families = ['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_slide_action_card'];
+  const families = ['md_light_card', 'md_fan_card', 'md_cover_card', 'md_access_slide_action_card'];
   const config = readConfig(); assertDisposableHaTarget(config);
   await prepare(config);
   const tokens = await accessToken(config, config.url);
@@ -182,7 +182,7 @@ async function checkSliderHeaders() {
         await applyVisualPreferences(page, scenario, theme);
         assert.deepEqual(await emulationIssues(page, scenario, theme), []);
         const rendered = await page.locator('marao-card').evaluateAll(cards => cards.map(card => card._config?.template));
-        for (const family of route === 'card-test' ? families : ['hc_light_card']) assert.ok(rendered.includes(family), route + ': missing ' + family);
+        for (const family of route === 'card-test' ? families : ['md_light_card']) assert.ok(rendered.includes(family), route + ': missing ' + family);
         assert.deepEqual(await layoutIssues(page, families), [], route);
         if (route === 'card-test') {
           await sliderHeaderChecks(page, output, scenario, theme);
@@ -192,7 +192,7 @@ async function checkSliderHeaders() {
           assert.deepEqual(await layoutIssues(page, families), [], 'Read-only native preview');
         }
         if (route !== 'card-test') {
-          const card = page.locator('marao-card').filter({ has: page.locator('input[data-slider-key^="hc_light_card:"]') }).first();
+          const card = page.locator('marao-card').filter({ has: page.locator('input[data-slider-key^="md_light_card:"]') }).first();
           await card.scrollIntoViewIfNeeded();
           await captureScreenshot(card, { path: path.join(output, route + '-' + theme + '.png'), scale: 'device' });
         }

@@ -1,3 +1,5 @@
+import { canonicalCard, canonicalTemplate, legacyTemplates } from '../custom_components/marao_dashboard/frontend/MaraoNames.js';
+export { canonicalCard, canonicalTemplate };
 import { validatePowerDevices } from './history-data.js';
 export function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -28,13 +30,13 @@ export function flattenEntities(spec) {
     }
   }
   return values.flatMap((value) => {
-    if (typeof value?.template === 'string') return [{ ...clone(value), __simple: false }];
+    if (typeof value?.template === 'string') return [{ ...canonicalCard(clone(value)), __simple: false }];
     if (typeof value === "string") return [{ entity_id: value, __simple: true }];
     if (value && typeof value === "object" && typeof value.entity_id === "string") {
-      return [{ ...clone(value), __simple: false }];
+      return [{ ...canonicalCard(clone(value)), __simple: false }];
     }
     if (value && typeof value === "object" && typeof value.page === "string") {
-      return [{ ...clone(value), __simple: false }];
+      return [{ ...canonicalCard(clone(value)), __simple: false }];
     }
     return [];
   });
@@ -95,7 +97,7 @@ function serializeEntityContainer(container, options) {
     delete entity.__simple;
     if (options?.materializeIds && !entity.id) entity.id = entity.__localId;
     delete entity.__localId;
-    if (entity.template === 'hc_entity_group_card') {
+    if (entity.template === 'md_entity_group_card') {
       (grouped.entity_group ||= []).push(entity);
       ordered.push(entity);
       continue;
@@ -207,10 +209,10 @@ export function pageContainers(page) {
 export function roomPageTemplate(model) {
   return { icon: 'mdi:sofa', columns: 2, entities: model.pages.filter(page => page.area || page.subview).map(page => {
     const cards = pageContainers(page).flatMap(container => flattenEntities(container.entities));
-    const members = cards.flatMap(card => card.template === 'hc_entity_group_card' ? flattenEntities(card.entities) : [card]);
+    const members = cards.flatMap(card => card.template === 'md_entity_group_card' ? flattenEntities(card.entities) : [card]);
     const lights = [...new Set(members.filter(card => card.entity_id?.startsWith('light.')).map(card => card.entity_id))];
     const primary = lights[0] || members.find(card => card.entity_id)?.entity_id;
-    return { template: 'hc_room_card', name: page.name, icon: page.icon || 'mdi:sofa', page: page.path,
+    return { template: 'md_room_card', name: page.name, icon: page.icon || 'mdi:sofa', page: page.path,
       ...(primary ? { entity_id: primary } : {}), variables: { light_entities: lights } };
   }) };
 }
@@ -226,7 +228,7 @@ export function createPage(model, details, templates) {
   if (details.area) page.area = details.area; else delete page.area;
   const normalized = normalizeConfig({ config_version: 2, pages: [page] }).pages[0];
   for (const container of pageContainers(normalized)) for (const card of container.entities || []) {
-    if (card.template === 'hc_title_card' && card.id === 'page-title') card.name = name;
+    if (card.template === 'md_title_card' && card.id === 'page-title') card.name = name;
     card.id = newEntityGroupId().replace('group-', 'card-');
     // Starter links use each new page instance; saved pages are never repopulated.
     if (card.variables) { delete card.variables.popup_hash; delete card.variables.mode_selector_hash; }
@@ -381,21 +383,21 @@ export function cardForEntity(catalog, entity) {
   );
   if (special) return special;
   const defaults = {
-    binary_sensor: "hc_sensor_card",
-    camera: "hc_camera_card",
-    climate: "hc_climate_card",
-    cover: "hc_cover_card",
-    fan: "hc_fan_card",
-    input_boolean: "hc_switch_card",
-    input_number: "hc_number_card",
-    light: "hc_light_card",
-    lock: "hc_access_card",
-    media_player: "hc_media_card",
-    number: "hc_number_card",
-    sensor: "hc_sensor_card",
-    switch: "hc_switch_card",
-    vacuum: "hc_vacuum_card",
-    weather: 'hc_weather_card', alarm_control_panel: 'hc_security_card', button: 'hc_access_card', script: 'hc_access_card', scene: 'hc_switch_card',
+    binary_sensor: "md_sensor_card",
+    camera: "md_camera_card",
+    climate: "md_climate_card",
+    cover: "md_cover_card",
+    fan: "md_fan_card",
+    input_boolean: "md_switch_card",
+    input_number: "md_number_card",
+    light: "md_light_card",
+    lock: "md_access_card",
+    media_player: "md_media_card",
+    number: "md_number_card",
+    sensor: "md_sensor_card",
+    switch: "md_switch_card",
+    vacuum: "md_vacuum_card",
+    weather: 'md_weather_card', alarm_control_panel: 'md_security_card', button: 'md_access_card', script: 'md_access_card', scene: 'md_switch_card',
   };
   return catalog.cards.find((card) => card.id === defaults[domain]) || null;
 }
@@ -417,7 +419,7 @@ export function entityCandidates(catalog, entities, container, search = "") {
   return entities.flatMap(entity => {
     const card = cardForEntity(catalog, entity);
     if (!card || entity.disabled_by || entity.hidden_by || entity.has_state !== true) return [];
-    const group = container.template === 'hc_entity_group_card';
+    const group = container.template === 'md_entity_group_card';
     if (group && !entityGroupMemberCompatible(container.entity_type, { entity_id: entity.entity_id }, entity)) return [];
     if (query ? !`${entity.name || ""} ${entity.entity_id}`.toLocaleLowerCase().includes(query)
       : (!group && (!container.area || (entity.area_id || entity.device_area_id) !== container.area)) || added.has(entity.entity_id)) return [];
@@ -458,7 +460,7 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
   const groupIds = new Set();
   const checkGroup = (group, overview = false) => {
     const id = group?.id, kind = group?.entity_type;
-    if (!group || typeof group !== 'object' || group.template !== 'hc_entity_group_card') { errors.push('Entity Group must be an hc_entity_group_card object.'); return; }
+    if (!group || typeof group !== 'object' || group.template !== 'md_entity_group_card') { errors.push('Entity Group must be an md_entity_group_card object.'); return; }
     if (typeof id !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(id)) errors.push('Entity Group requires a stable safe id.');
     if (groupIds.has(id)) errors.push('Duplicate Entity Group id.');
     groupIds.add(id);
@@ -491,10 +493,10 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
     : [...(Array.isArray(config.rooms) ? config.rooms : []), ...(Array.isArray(config.pages?.custom) ? config.pages.custom : [])];
   for (const container of containers.filter(item => item && typeof item === 'object')) {
     if (version === 2) groupIds.clear();
-    flattenEntities(container.entities).filter(item => item.template === 'hc_entity_group_card').forEach(group => checkGroup(group));
+    flattenEntities(container.entities).filter(item => item.template === 'md_entity_group_card').forEach(group => checkGroup(group));
   }
   const metadata = new Map((entities || []).map(entity => [entity.entity_id, entity.unit_of_measurement]));
-  const eligible = new Set(["hc_graph_card", "hc_toggle_graph_card", "hc_sensor_card", "hc_base_card", "hc_switch_card", "hc_energy_period_card"]);
+  const eligible = new Set(["md_graph_card", "md_toggle_graph_card", "md_sensor_card", "md_base_card", "md_switch_card", "md_energy_period_card"]);
   const visit = item => {
     if (Array.isArray(item)) { item.forEach(visit); return; }
     if (!item || typeof item !== "object") return;
@@ -502,16 +504,16 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
     const entity = item.entity_id || item.entity;
     const load = typeof item.power_entity === "object" ? item.power_entity?.entity_id : item.power_entity;
     const domain = typeof entity === "string" ? entity.split(".")[0] : undefined;
-    const template = item.template || ({sensor: "hc_sensor_card", switch: "hc_switch_card", input_boolean: "hc_switch_card"})[domain];
+    const template = item.template || ({sensor: "md_sensor_card", switch: "md_switch_card", input_boolean: "md_switch_card"})[domain];
     const options = direct ? item : item.variables;
-    if (template==='hc_graph_card' && (!item.type || item.type==='custom:marao-card') && options && Object.hasOwn(options,'power_devices')) {
+    if (template==='md_graph_card' && (!item.type || item.type==='custom:marao-card') && options && Object.hasOwn(options,'power_devices')) {
       errors.push(...validatePowerDevices(options, options.graph_entity || entity));
       if (Array.isArray(options.power_devices) && options.power_devices.length && Object.keys(units).length) {
         const sources=[options.graph_entity||entity,...options.power_devices.map(item=>item?.entity_id)];
         if(sources.some(source=>metadata.get(source)&&units[metadata.get(source)]?.[0]!=='power'))errors.push('Power devices require power sensors in W or kW.');
       }
     }
-    if ((direct || template === 'hc_energy_period_card') && options) {
+    if ((direct || template === 'md_energy_period_card') && options) {
       errors.push(...validateEnergyOptions(options));
       const members = Array.isArray(options.sub_entities) ? options.sub_entities : [];
       const sources = [...(options.calculate_cost ? [entity] : []), ...members.map(member => member?.entity_id)];
@@ -527,9 +529,9 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
         const target = options.display_unit;
         if (typeof target !== "string" || !Object.hasOwn(units, target)) errors.push("Choose a supported power or energy display unit.");
         else if (entities) {
-          const sources = template === "hc_switch_card" ? [options.power_entity] : [entity || load];
+          const sources = template === "md_switch_card" ? [options.power_entity] : [entity || load];
           const graph = options.graph_entity || item.graph_entity;
-          if (graph && ["hc_graph_card", "hc_toggle_graph_card"].includes(template)) sources.push(graph);
+          if (graph && ["md_graph_card", "md_toggle_graph_card"].includes(template)) sources.push(graph);
           if (sources.some(source => !Object.hasOwn(units, metadata.get(source)))) errors.push("A supported source unit is required for conversion.");
           else if (sources.some(source => units[metadata.get(source)][0] !== units[target][0])) errors.push("Display unit is incompatible with the source reading.");
         }
@@ -565,7 +567,7 @@ export function validatePages(config, catalog) {
   const safePath = value => typeof value === 'string' && /^[a-z0-9][a-z0-9_-]*$/.test(value);
   const safeId = value => typeof value === 'string' && /^[a-z][a-z0-9_-]{0,63}$/.test(value);
   const entityId = value => typeof value === 'string' && /^[a-z0-9_]+\.[a-z0-9_]+$/.test(value);
-  const freeRoles = new Set(['hc_title_card', 'hc_navigation_card', 'hc_room_card', 'hc_entity_group_card', 'hc_scene_collection_card']);
+  const freeRoles = new Set(['md_title_card', 'md_navigation_card', 'md_room_card', 'md_entity_group_card', 'md_scene_collection_card']);
   const templates = new Map((catalog?.cards || []).map(card => [card.id, card.domains]));
   if (['overview', 'rooms'].some(key => Object.hasOwn(config, key))) errors.push('Mixed legacy and canonical page configuration.');
   if (!Array.isArray(config.pages) || !config.pages.length) return [...errors, 'Keep at least one page.'];
@@ -592,7 +594,7 @@ export function validatePages(config, catalog) {
       if (spec == null) return [];
       if (typeof spec === 'string') return [{ entity_id: spec }];
       if (Array.isArray(spec)) return spec.flatMap(entries);
-      if (object(spec)) return ['entity_id', 'page', 'template'].some(key => Object.hasOwn(spec, key)) ? [spec] : Object.values(spec).flatMap(entries);
+      if (object(spec)) return ['entity_id', 'page', 'template'].some(key => Object.hasOwn(spec, key)) ? [canonicalCard(spec)] : Object.values(spec).flatMap(entries);
       errors.push('Page entities must be strings, descriptors, lists or grouped objects.'); return [];
     };
     for (const section of sections) {
@@ -616,32 +618,32 @@ export function validatePages(config, catalog) {
         if (['name', 'icon'].some(key => card[key] != null && typeof card[key] !== 'string')) errors.push('Card name and icon must be strings.');
         if (card.variables != null && !object(card.variables)) errors.push('Card options must be an object.');
         const options = object(card.variables) ? card.variables : {};
-        if (card.template === 'hc_vacuum_card' && ['action_1', 'action_2', 'action_3'].some(key => object(options[key]) && Object.hasOwn(options[key], 'data') && !object(options[key].data))) errors.push('Vacuum action data must be an object');
+        if (card.template === 'md_vacuum_card' && ['action_1', 'action_2', 'action_3'].some(key => object(options[key]) && Object.hasOwn(options[key], 'data') && !object(options[key].data))) errors.push('Vacuum action data must be an object');
         let accessRole = card.template;
-        if (['hc_access_card', 'hc_access_slide_action_card', 'hc_access_action_card', 'hc_access_hold_action_card'].includes(accessRole)) {
+        if (['md_access_card', 'md_access_slide_action_card', 'md_access_action_card', 'md_access_hold_action_card'].includes(accessRole)) {
           const mode = options.access_mode ?? 'auto', domain = card.entity_id?.split('.')[0];
           const modes = { popup: ['lock', 'cover'], slide: ['lock', 'cover', 'button', 'switch', 'script'], close: ['lock', 'cover'], hold: ['button', 'switch', 'input_boolean', 'alarm_control_panel'] };
           if (mode !== 'auto' && (!Object.hasOwn(modes, mode) || !modes[mode].includes(domain))) errors.push('Access behavior is incompatible with the selected entity.');
-          accessRole = ({ popup: 'hc_access_card', slide: 'hc_access_slide_action_card', close: 'hc_access_action_card', hold: 'hc_access_hold_action_card' })[mode] || accessRole;
-          if (mode === 'auto' && accessRole === 'hc_access_card' && !['lock', 'cover'].includes(domain)) accessRole = domain === 'script' ? 'hc_access_slide_action_card' : 'hc_access_hold_action_card';
-          if (accessRole === 'hc_access_action_card' && options.action_service && options.action_service !== ({lock: 'lock.lock', cover: 'cover.close_cover'})[domain]) errors.push('Use an access opener slide for opening or unlocking');
+          accessRole = ({ popup: 'md_access_card', slide: 'md_access_slide_action_card', close: 'md_access_action_card', hold: 'md_access_hold_action_card' })[mode] || accessRole;
+          if (mode === 'auto' && accessRole === 'md_access_card' && !['lock', 'cover'].includes(domain)) accessRole = domain === 'script' ? 'md_access_slide_action_card' : 'md_access_hold_action_card';
+          if (accessRole === 'md_access_action_card' && options.action_service && options.action_service !== ({lock: 'lock.lock', cover: 'cover.close_cover'})[domain]) errors.push('Use an access opener slide for opening or unlocking');
         }
-        if (accessRole === 'hc_access_action_card' && options.access_mode === 'close' && ['tap_action', 'hold_action', 'double_tap_action'].some(key => (card[key]?.action ?? 'none') !== 'none')) errors.push('Close and lock cards use their explicit safe service');
-        if (accessRole === 'hc_access_slide_action_card') {
+        if (accessRole === 'md_access_action_card' && options.access_mode === 'close' && ['tap_action', 'hold_action', 'double_tap_action'].some(key => (card[key]?.action ?? 'none') !== 'none')) errors.push('Close and lock cards use their explicit safe service');
+        if (accessRole === 'md_access_slide_action_card') {
           const opener = { lock: 'lock.unlock', cover: 'cover.open_cover', button: 'button.press', switch: 'switch.turn_on', script: 'script.turn_on' }[card.entity_id?.split('.')[0]];
           if (!opener || (Object.hasOwn(options, 'action_service') ? options.action_service : opener) !== opener) errors.push("Access opener must use its selected entity's native opening service");
           if (['tap_action', 'hold_action', 'double_tap_action'].some(key => (card[key]?.action ?? 'none') !== 'none')) errors.push('Access openers use only the strict slide');
         }
-        if (card.template === 'hc_energy_period_card' && !['day', 'month'].includes(options.period ?? 'day')) errors.push('Energy period must be day or month.');
-        if (card.template === 'hc_energy_period_card') errors.push(...validateEnergyOptions(options));
-        if (card.template === 'hc_graph_card') errors.push(...validatePowerDevices(options, options.graph_entity || card.entity_id));
-        if (card.template === 'hc_wallbox_current_card' && Object.hasOwn(options, 'shortcuts') && (!Array.isArray(options.shortcuts) || options.shortcuts.length > 3 || options.shortcuts.some(value => typeof value !== 'number' || !Number.isFinite(value)))) errors.push('Charging shortcuts require at most three finite numbers.');
-        if (card.template === 'hc_light_card' && Object.hasOwn(options, 'use_light_color') && typeof options.use_light_color !== 'boolean') errors.push('Use light color as background must be a boolean.');
-        if (card.template === 'hc_camera_card' && Object.hasOwn(options, 'preload_stream') && typeof options.preload_stream !== 'boolean') errors.push('Preload stream must be a boolean.');
-        if (card.template === 'hc_camera_card' && options.popup_stream_entity != null && options.popup_stream_entity !== '' && (!entityId(options.popup_stream_entity) || !options.popup_stream_entity.startsWith('camera.'))) errors.push('Choose a camera entity for the popup stream.');
-        if (card.template === 'hc_room_card' && Object.hasOwn(options, 'light_entities') && (!Array.isArray(options.light_entities) || options.light_entities.some(value => !entityId(value) || !value.startsWith('light.')))) errors.push('Room lights must be an explicit list of light entities.');
-        if (card.template === 'hc_media_app_card' && (typeof options.app_source !== 'string' || !options.app_source.trim())) errors.push('Media app requires an explicit source.');
-        if (accessRole === 'hc_access_hold_action_card' && Object.hasOwn(card, 'tap_action')) {
+        if (card.template === 'md_energy_period_card' && !['day', 'month'].includes(options.period ?? 'day')) errors.push('Energy period must be day or month.');
+        if (card.template === 'md_energy_period_card') errors.push(...validateEnergyOptions(options));
+        if (card.template === 'md_graph_card') errors.push(...validatePowerDevices(options, options.graph_entity || card.entity_id));
+        if (card.template === 'md_wallbox_current_card' && Object.hasOwn(options, 'shortcuts') && (!Array.isArray(options.shortcuts) || options.shortcuts.length > 3 || options.shortcuts.some(value => typeof value !== 'number' || !Number.isFinite(value)))) errors.push('Charging shortcuts require at most three finite numbers.');
+        if (card.template === 'md_light_card' && Object.hasOwn(options, 'use_light_color') && typeof options.use_light_color !== 'boolean') errors.push('Use light color as background must be a boolean.');
+        if (card.template === 'md_camera_card' && Object.hasOwn(options, 'preload_stream') && typeof options.preload_stream !== 'boolean') errors.push('Preload stream must be a boolean.');
+        if (card.template === 'md_camera_card' && options.popup_stream_entity != null && options.popup_stream_entity !== '' && (!entityId(options.popup_stream_entity) || !options.popup_stream_entity.startsWith('camera.'))) errors.push('Choose a camera entity for the popup stream.');
+        if (card.template === 'md_room_card' && Object.hasOwn(options, 'light_entities') && (!Array.isArray(options.light_entities) || options.light_entities.some(value => !entityId(value) || !value.startsWith('light.')))) errors.push('Room lights must be an explicit list of light entities.');
+        if (card.template === 'md_media_app_card' && (typeof options.app_source !== 'string' || !options.app_source.trim())) errors.push('Media app requires an explicit source.');
+        if (accessRole === 'md_access_hold_action_card' && Object.hasOwn(card, 'tap_action')) {
           const action = card.tap_action, button = card.entity_id?.startsWith('button.');
           const valid = object(action) && (button
             ? action.action === 'perform-action' && action.perform_action === 'button.press' && object(action.target) && Object.keys(action.target).length === 1 && action.target.entity_id === card.entity_id
@@ -660,8 +662,8 @@ export function validatePages(config, catalog) {
           }
         }
         if (Object.hasOwn(card, 'page')) references.push(card.page);
-        else if (['hc_navigation_card', 'hc_room_card'].includes(card.template) && (!object(card.tap_action) || !['navigate', 'none'].includes(card.tap_action.action))) errors.push('Choose a destination for the page shortcut.');
-        if (card.template === 'hc_scene_collection_card') {
+        else if (['md_navigation_card', 'md_room_card'].includes(card.template) && (!object(card.tap_action) || !['navigate', 'none'].includes(card.tap_action.action))) errors.push('Choose a destination for the page shortcut.');
+        if (card.template === 'md_scene_collection_card') {
           if (!Array.isArray(card.entities)) errors.push('Scene collection entities must be an explicit list.');
           else if (entries(card.entities).some(member => !entityId(member.entity_id) || !['scene', 'switch', 'input_boolean'].includes(member.entity_id.split('.')[0]))) errors.push('Scene collection members must be native scenes or toggle entities.');
         }
@@ -682,11 +684,11 @@ export function validatePages(config, catalog) {
 
 export function entityGroupMemberCompatible(kind, member, metadata, legacyBattery = false) {
   const domain = member.entity_id?.split('.')[0];
-  const templates = { light: ['hc_light_card', 'hc_base_card'], cover: ['hc_cover_card', 'hc_access_card'],
-    climate: ['hc_climate_card'], battery: ['hc_battery_card', 'hc_sensor_card', 'hc_base_card'] };
+  const templates = { light: ['md_light_card', 'md_base_card'], cover: ['md_cover_card', 'md_access_card'],
+    climate: ['md_climate_card'], battery: ['md_battery_card', 'md_sensor_card', 'md_base_card'] };
   return Boolean(Object.hasOwn(templates, kind) && domain === (kind === 'battery' ? 'sensor' : kind)
     && (!member.template || templates[kind].includes(member.template))
-    && (kind !== 'battery' || !metadata || metadata.device_class === 'battery' || member.template === 'hc_battery_card' || legacyBattery));
+    && (kind !== 'battery' || !metadata || metadata.device_class === 'battery' || member.template === 'md_battery_card' || legacyBattery));
 }
 
 export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '/marao-dashboard') {
@@ -694,6 +696,10 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
   const descriptions = new Map(entities.map(entity => [entity.entity_id,
     [entity.name, entity.state, entity.area_name].filter(Boolean).join(' · ') || entity.entity_id]));
   const suggested = (values, base = { type: 'string' }) => values.length ? { anyOf: [{ ...base, enum: values }, base] } : base;
+  const templateSchema = ids => {
+    const aliases = Object.keys(legacyTemplates).filter(key => ids.includes(legacyTemplates[key]));
+    return aliases.length ? { type: 'string', anyOf: [{ enum: ids }, { pattern: '^(?:' + aliases.join('|') + ')$' }] } : { type: 'string', enum: ids };
+  };
   const pagePath = suggested((Array.isArray(draft.pages) ? draft.pages : []).map(page => page.path).filter(Boolean));
   const navigationPath = suggested((Array.isArray(draft.pages) ? draft.pages : []).map(page => page.path && `${dashboardPath}/${page.path}`).filter(Boolean));
   const binding = (domains = [], deviceClasses = []) => {
@@ -729,24 +735,24 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
     const properties = { entity_id: binding(card.domains, card.device_classes), page: pagePath,
       variables: object(Object.fromEntries((card.variables || []).map(field => [field.key, fieldSchema(field)]))),
       tap_action: action, hold_action: action, double_tap_action: action };
-    if (card.id === 'hc_camera_card') properties.variables.properties.event_provider = suggested(['auto', 'frigate', 'unifi_protect', 'netatmo']);
-    if (card.id === 'hc_media_card') properties.apple_tv = { anyOf: [{ type: ['boolean', 'null'] }, object({
+    if (card.id === 'md_camera_card') properties.variables.properties.event_provider = suggested(['auto', 'frigate', 'unifi_protect', 'netatmo']);
+    if (card.id === 'md_media_card') properties.apple_tv = { anyOf: [{ type: ['boolean', 'null'] }, object({
       remote_entity: binding(['remote']), volume_remote_entity: binding(['remote', 'media_player']),
       apps: { type: 'array', items: object({ name: { type: 'string' }, source: { type: 'string' }, icon: { type: 'string' } }) },
     })] };
-    if (card.id === 'hc_media_card') Object.assign(properties, {
+    if (card.id === 'md_media_card') Object.assign(properties, {
       remote_entity: binding(['remote']), volume_remote_entity: binding(['remote', 'media_player']),
       apple_tv_apps: properties.apple_tv.anyOf[1].properties.apps,
     });
-    if (card.id === 'hc_entity_group_card') Object.assign(properties, {
+    if (card.id === 'md_entity_group_card') Object.assign(properties, {
       entity_type: suggested(['light', 'cover', 'battery', 'climate']), popup_filter: suggested(['all', 'active']),
       entities: { type: 'array', items: { anyOf: [entityIdValue, object({ entity_id: entityIdValue, name: { type: 'string' }, template: suggested(catalog.cards.map(card => card.id)) })] } },
     });
-    return { if: { required: ['template'], properties: { template: { const: card.id } } }, then: { properties } };
+    return { if: { required: ['template'], properties: { template: templateSchema([card.id]) } }, then: { properties } };
   });
   const groupValue = {
     type: 'object', required: ['template', 'id', 'name', 'entity_type', 'entities'],
-    properties: { template: { const: 'hc_entity_group_card' }, id: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
+    properties: { template: templateSchema(['md_entity_group_card']), id: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
       name: { type: 'string', minLength: 1 }, icon: { type: ['string', 'null'] }, entity_type: { enum: ['light', 'cover', 'battery', 'climate'] },
       popup_filter: { enum: ['all', 'active'] }, entities: { type: 'array', items: { anyOf: [binding(),
         { type: 'object', required: ['entity_id'], properties: { entity_id: binding() }, additionalProperties: true }] } } },
@@ -768,7 +774,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
           entity_id: { type: 'string', pattern: '^[a-z0-9_]+\\.[a-z0-9_]+$' },
           name: { type: "string" },
           icon: { type: ["string", "null"] },
-          template: { type: "string", enum: catalog.cards.map((card) => card.id) },
+          template: templateSchema(catalog.cards.map(card => card.id)),
           variables: { type: 'object', additionalProperties: true },
         },
         additionalProperties: true,
@@ -780,7 +786,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
           page: pagePath,
           name: { type: "string" },
           icon: { type: ["string", "null"] },
-          template: { const: "hc_navigation_card" },
+          template: templateSchema(["md_navigation_card"]),
         },
         additionalProperties: true,
       },
@@ -887,7 +893,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
     const legacy = clone(schema);
     const paths = { type: 'string', pattern: '^[a-z0-9][a-z0-9_-]*$' };
     const freeValue = { type: 'object', required: ['template'], properties: {
-      template: { enum: ['hc_title_card', 'hc_navigation_card', 'hc_room_card', 'hc_scene_collection_card'] },
+      template: { enum: ['md_title_card', 'md_navigation_card', 'md_room_card', 'md_scene_collection_card'] },
       id: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
       name: { type: 'string' }, icon: { type: ['string', 'null'] }, page: pagePath,
       variables: { type: 'object', additionalProperties: true },

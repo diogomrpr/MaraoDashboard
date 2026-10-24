@@ -27,7 +27,7 @@ def test_historical_groups_match_independent_descriptors_and_popup_membership(tm
     expected = json.loads((FIXTURES / "entity-groups-expected.json").read_text())["groups"][record["tag"]]
     converted = migrate_dashboard_config(json.loads(source))
     preview = materialize_overview_groups(converted)
-    groups = [card for section in preview["pages"][0]["sections"] for card in section.get("entities", []) if card.get("template") == "hc_entity_group_card"]
+    groups = [card for section in preview["pages"][0]["sections"] for card in section.get("entities", []) if card.get("template") == "md_entity_group_card"]
     assert [{key: group[key] for key in old} for group, old in zip(groups, expected, strict=True)] == expected
     assert "overview" not in converted and "rooms" not in converted
     active = tmp_path / "source.json"
@@ -195,7 +195,7 @@ def test_released_room_selections_and_navigation_survive_generation(tmp_path: Pa
 
 def test_manual_room_options_remain_raw_and_preview_does_not_write(tmp_path: Path) -> None:
     config = load_dashboard_config(FIXTURES / "v0.5.1-dashboard.json")
-    manual = {"type": "custom:marao-card", "template": "hc_room_card", "name": "Manual bedroom", "icon": "mdi:bed",
+    manual = {"type": "custom:marao-card", "template": "md_room_card", "name": "Manual bedroom", "icon": "mdi:bed",
               "entity": "sensor.unrelated", "show_icon": False, "show_name": False,
               "variables": {"light_entities": ["light.first", "light.second", "light.first"], "custom_label": "Reading corner", "future_option": {"retain": True}},
               "tap_action": {"action": "navigate", "navigation_path": "/marao-dashboard/empty-room", "haptic": "heavy"},

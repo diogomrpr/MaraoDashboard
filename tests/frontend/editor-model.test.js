@@ -24,14 +24,14 @@ test('group identifiers are stable safe values on HTTP, without randomUUID', () 
 });
 
 test('typed global group search retains unavailable candidates and independent room references', () => {
-  const catalog = { cards: [{ id: 'hc_light_card', domains: ['light'] }, { id: 'hc_sensor_card', domains: ['sensor'] }] };
+  const catalog = { cards: [{ id: 'md_light_card', domains: ['light'] }, { id: 'md_sensor_card', domains: ['sensor'] }] };
   const entities = [
     { entity_id: 'light.other', name: 'Other light', has_state: true, state: 'unavailable', area_id: 'elsewhere' },
     { entity_id: 'light.added', name: 'Added light', has_state: true },
     { entity_id: 'sensor.charge', name: 'Charge', has_state: true, device_class: 'battery' },
     { entity_id: 'sensor.temperature', name: 'Temperature', has_state: true, device_class: 'temperature' },
   ];
-  const group = { template: 'hc_entity_group_card', entity_type: 'light', entities: ['light.added'] };
+  const group = { template: 'md_entity_group_card', entity_type: 'light', entities: ['light.added'] };
   assert.deepEqual(entityCandidates(catalog, entities, group).map(item => item.entity_id), ['light.other']);
   assert.equal(entityCandidates(catalog, entities, group, 'ADDED')[0].added, true);
   assert.deepEqual(entityCandidates(catalog, entities, { ...group, entity_type: 'battery', entities: [] }).map(item => item.entity_id), ['sensor.charge']);
@@ -40,7 +40,7 @@ test('typed global group search retains unavailable candidates and independent r
 
 for (const [kind, id, device_class] of [['light', 'light.main'], ['cover', 'cover.blind'], ['climate', 'climate.office'], ['battery', 'sensor.charge', 'battery']]) {
   test(`Entity Group ${kind} survives mixed order and unknown member options`, () => {
-    const group = { template: 'hc_entity_group_card', id: 'office-group', name: 'Office', entity_type: kind,
+    const group = { template: 'md_entity_group_card', id: 'office-group', name: 'Office', entity_type: kind,
       entities: [id, { entity_id: id, variables: { future: 42 }, extension: true }], future: { keep: true } };
     const config = { config_version: 1, name: 'Groups', rooms: [{ name: 'Office', columns: 2,
       entities: ['light.independent', group, { page: 'overview' }], cards: [{ type: 'markdown', content: 'Raw' }] }] };
@@ -55,7 +55,7 @@ for (const [kind, id, device_class] of [['light', 'light.main'], ['cover', 'cove
 }
 
 test('empty direct and grouped Entity Group objects are preserved without member expansion', () => {
-  const group = { template: 'hc_entity_group_card', id: 'empty', name: 'Empty', entity_type: 'light', entities: [] };
+  const group = { template: 'md_entity_group_card', id: 'empty', name: 'Empty', entity_type: 'light', entities: [] };
   for (const entities of [group, [group], { entity_group: [group] }]) {
     const config = { name: 'Groups', rooms: [{ name: 'Room', entities }] };
     assert.equal(flattenEntities(entities).length, 1);
@@ -65,10 +65,10 @@ test('empty direct and grouped Entity Group objects are preserved without member
 });
 
 test('Entity Group validation rejects invalid, incompatible, nested and colliding groups', () => {
-  const base = { template: 'hc_entity_group_card', id: 'safe', name: 'Group', entity_type: 'light', entities: [] };
+  const base = { template: 'md_entity_group_card', id: 'safe', name: 'Group', entity_type: 'light', entities: [] };
   for (const change of [{ id: '../unsafe' }, { entity_type: 'sensor' }, { popup_filter: 'off' }, { popup_filter: null },
     { entities: ['cover.blind'] }, { entities: [{ page: 'overview' }] }, { entities: [{ entity_id: 'light.main', entities: [] }] },
-    { entities: [{ entity_id: 'light.main', template: 'hc_battery_card' }] }, { entities: [false] }, { entity_id: 'light.main' }, { name: '' }, { entities: null }, { icon: [] },
+    { entities: [{ entity_id: 'light.main', template: 'md_battery_card' }] }, { entities: [false] }, { entity_id: 'light.main' }, { name: '' }, { entities: null }, { icon: [] },
     { entities: [{ entity_id: 'light.main', template: {} }] }, { entities: [{ entity_id: 'light.main', variables: [] }] }]) {
     assert.ok(validateConfig({ name: 'Groups', rooms: [{ name: 'Room', entities: [{ ...base, ...change }] }] }).length, JSON.stringify(change));
   }
@@ -82,7 +82,7 @@ test('Entity Group validation rejects invalid, incompatible, nested and collidin
 
 test('converted maintenance keeps legacy battery members without relaxing other groups', () => {
   const member = { entity_id: 'sensor.fixture_battery', name: 'Saved battery', variables: { future: 42 } };
-  const group = { template: 'hc_entity_group_card', id: 'overview-maintenance', name: 'Maintenance', entity_type: 'battery', entities: [member] };
+  const group = { template: 'md_entity_group_card', id: 'overview-maintenance', name: 'Maintenance', entity_type: 'battery', entities: [member] };
   const metadata = [{ entity_id: member.entity_id, device_class: null }];
   const legacy = { config_version: 1, name: 'Groups', rooms: [], overview: { entity_groups: [group] } };
   const current = { config_version: 2, name: 'Groups', landing_page: 'home', pages: [{ name: 'Home', path: 'home', sections: [{ entities: [group] }] }] };
@@ -91,7 +91,7 @@ test('converted maintenance keeps legacy battery members without relaxing other 
     assert.deepEqual(serializeConfig(normalizeConfig(config)), config);
   }
   for (const change of [{ id: 'other-group' }, { entities: ['sensor.temperature'] }, { entities: ['light.fixture_battery'] },
-    { entities: [{ ...member, template: 'hc_climate_card' }] }]) {
+    { entities: [{ ...member, template: 'md_climate_card' }] }]) {
     const config = { ...current, pages: [{ ...current.pages[0], sections: [{ entities: [{ ...group, ...change }] }] }] };
     assert.ok(validateConfig(config, 2, [...metadata, { entity_id: 'sensor.temperature', device_class: 'temperature' }]).some(error => error.includes('incompatible')));
   }
@@ -130,7 +130,7 @@ test("format validation rejects malformed/future markers without modifying the d
 });
 
 test("camera entities use the Frigate-compatible camera template", () => {
-  const cameraCard = { id: "hc_camera_card", domains: ["camera"] };
+  const cameraCard = { id: "md_camera_card", domains: ["camera"] };
   assert.equal(
     cardForEntity({ cards: [cameraCard] }, { entity_id: "camera.front_door" }),
     cameraCard,
@@ -260,9 +260,9 @@ test("current rooms serialize empty selections and preserve their suggestion ass
 
 test("entity candidates respect effective areas, compatibility, state metadata and existing raw references", () => {
   const catalog = { cards: [
-    { id: 'hc_light_card', domains: ['light'] },
-    { id: 'hc_sensor_card', domains: ['sensor'] },
-    { id: 'hc_battery_card', domains: ['sensor'], device_classes: ['battery'] },
+    { id: 'md_light_card', domains: ['light'] },
+    { id: 'md_sensor_card', domains: ['sensor'] },
+    { id: 'md_battery_card', domains: ['sensor'], device_classes: ['battery'] },
   ] };
   const entity = (entity_id, options = {}) => ({ entity_id, area_id: 'office', has_state: true, ...options });
   const entities = [entity('light.selected'), entity('light.raw'), entity('light.device', { area_id: null, device_area_id: 'office' }),
@@ -276,7 +276,7 @@ test("entity candidates respect effective areas, compatibility, state metadata a
   ] }] };
   assert.deepEqual([...configuredEntityIds(room)].sort(), ['light.raw', 'light.selected']);
   assert.deepEqual(entityCandidates(catalog, entities, room).map(item => item.entity_id), ['light.device', 'sensor.battery']);
-  assert.equal(entityCandidates(catalog, entities, room).find(item => item.entity_id === 'sensor.battery').card.id, 'hc_battery_card');
+  assert.equal(entityCandidates(catalog, entities, room).find(item => item.entity_id === 'sensor.battery').card.id, 'md_battery_card');
   assert.equal(entityCandidates(catalog, entities, room, 'LIGHT.SELECTED')[0].added, true);
   assert.equal(entityCandidates(catalog, entities, room, 'kItChEn')[0].entity_id, 'light.elsewhere');
   assert.deepEqual(entityCandidates(catalog, entities, { entities: [] }), []);
@@ -326,7 +326,7 @@ test("page selections preserve options attached to unchanged entities", () => {
 
 test("Monaco schema includes dynamic entity and page completions", () => {
   const catalog = {
-    cards: [{ id: "hc_light_card" }],
+    cards: [{ id: "md_light_card" }],
     pages: {
       energy: {
         label: "Energy",
@@ -364,7 +364,7 @@ test('energy formatting validates shape and actual units without rewriting draft
     const invalid=structuredClone(config);invalid.rooms[0].entities[0].variables.display_precision=precision;
     assert.match(validateConfig(invalid,0,entities,units).join(' '),/Decimal places/);
   }
-  const graph={name:'Energy',rooms:[],pages:{custom:[{name:'Custom',path:'custom',cards:[{type:'custom:marao-card',template:'hc_graph_card',entity:'sensor.power',variables:{display_unit:'kW',graph_entity:'sensor.history'}}]}]}};
+  const graph={name:'Energy',rooms:[],pages:{custom:[{name:'Custom',path:'custom',cards:[{type:'custom:marao-card',template:'md_graph_card',entity:'sensor.power',variables:{display_unit:'kW',graph_entity:'sensor.history'}}]}]}};
   assert.match(validateConfig(graph,0,entities,units).join(' '),/incompatible/);
   assert.match(validateConfig(config,0,[],units).join(' '),/source unit/);
   delete config.rooms[0].entities[0].variables.display_unit;
@@ -387,7 +387,7 @@ test('energy breakdown and tariffs validate without rewriting saved rows or expl
     { entity_id: 'sensor.lighting', name: '' },
   ], future: { keep: [] } };
   const config = { config_version: 2, name: 'Energy', landing_page: 'energy', pages: [{ name: 'Energy', path: 'energy', entities: [
-    { template: 'hc_energy_period_card', entity_id: 'sensor.total', variables: options },
+    { template: 'md_energy_period_card', entity_id: 'sensor.total', variables: options },
   ] }] };
   const before = structuredClone(config);
   assert.deepEqual(validateConfig(config, 2), []);
@@ -432,7 +432,7 @@ test('independent energy expected document survives Visual and JSON with raw con
 });
 
 test('camera title visibility and retired options survive Visual/JSON, duplication, reordering and discarded drafts', () => {
-  const camera = { id: 'entrance', entity_id: 'camera.front', template: 'hc_camera_card', name: '', show_name: false,
+  const camera = { id: 'entrance', entity_id: 'camera.front', template: 'md_camera_card', name: '', show_name: false,
     icon: 'mdi:cctv', show_state: true, show_label: false, future: {keep: []}, variables: {event_provider: 'unifiprotect', popup_stream_entity:'camera.front_high',future: []} };
   const source = {config_version: 2, name: 'Cameras', landing_page: 'home', navigation: [], pages: [
     {name: 'Home', path: 'home', sections: [{columns: 1, entities: [camera], cards: [{type:'markdown',content:'Keep raw'}]}]}]};
@@ -452,7 +452,7 @@ test('camera title visibility and retired options survive Visual/JSON, duplicati
 test('popup stream accepts only optional camera bindings without changing saved data', () => {
   for (const value of [undefined, null, '', 'camera.front_high', 'sensor.front', 42, [], 'camera.bad/path']) {
     const config = {config_version:2,name:'Home',landing_page:'home',navigation:[],pages:[{name:'Home',path:'home',entities:[
-      {id:'camera',template:'hc_camera_card',entity_id:'camera.front_low',variables:{popup_stream_entity:value}}]}]};
+      {id:'camera',template:'md_camera_card',entity_id:'camera.front_low',variables:{popup_stream_entity:value}}]}]};
     const before=structuredClone(config), errors=validateConfig(config,2);
     const valid=[undefined,null,'','camera.front_high'].includes(value);
     assert.equal(errors.some(message=>message.includes('popup stream')), !valid, JSON.stringify(value));
@@ -466,7 +466,7 @@ test('camera background preload is optional, boolean and preserved without defau
     const variables = {future: []};
     if (value !== undefined) variables.preload_stream = value;
     const config = {config_version:2,name:'Home',landing_page:'home',navigation:[],pages:[{name:'Home',path:'home',entities:[
-      {id:'camera',template:'hc_camera_card',entity_id:'camera.low',variables}]}]};
+      {id:'camera',template:'md_camera_card',entity_id:'camera.low',variables}]}]};
     const before = structuredClone(config);
     assert.equal(validateConfig(config,2).some(message=>message.includes('Preload stream')), value !== undefined && typeof value !== 'boolean');
     assert.deepEqual(serializeConfig(normalizeConfig(config)), before);
@@ -475,7 +475,7 @@ test('camera background preload is optional, boolean and preserved without defau
 
 test('power devices preserve ordered unknown data and validate sensor dimensions',()=>{
   const options={history_popup:true,power_devices:[{entity_id:'sensor.fridge',name:'Kitchen',future:{keep:[]}}],future:[]};
-  const source={config_version:2,name:'Power',landing_page:'energy',pages:[{name:'Energy',path:'energy',entities:[{entity_id:'sensor.house',template:'hc_graph_card',variables:options}]}]};
+  const source={config_version:2,name:'Power',landing_page:'energy',pages:[{name:'Energy',path:'energy',entities:[{entity_id:'sensor.house',template:'md_graph_card',variables:options}]}]};
   const original=structuredClone(source);
   const entities=[{entity_id:'sensor.house',unit_of_measurement:'W'},{entity_id:'sensor.fridge',unit_of_measurement:'kW'}];
   const units={W:['power',1],kW:['power',1000],kWh:['energy',1000]};
@@ -494,7 +494,7 @@ test('light color background is optional and round-trips without default writes'
   for (const value of [undefined,false,true,'true',1,null]) {
     const variables={future:[]};
     if (value !== undefined) variables.use_light_color=value;
-    const config={config_version:2,name:'Home',landing_page:'home',navigation:[],pages:[{name:'Home',path:'home',entities:[{id:'light',template:'hc_light_card',entity_id:'light.fixture',variables}]}]};
+    const config={config_version:2,name:'Home',landing_page:'home',navigation:[],pages:[{name:'Home',path:'home',entities:[{id:'light',template:'md_light_card',entity_id:'light.fixture',variables}]}]};
     const before=structuredClone(config);
     assert.equal(validateConfig(config,2).some(message=>message.includes('Use light color')),value !== undefined && typeof value !== 'boolean');
     assert.deepEqual(serializeConfig(normalizeConfig(config)),before);

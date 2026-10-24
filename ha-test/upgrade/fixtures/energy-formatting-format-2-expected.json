@@ -34,7 +34,7 @@
           "entities": [
             {
               "id": "card-1",
-              "template": "hc_room_card",
+              "template": "md_room_card",
               "entity_id": "sensor.energy",
               "name": "Room",
               "icon": "mdi:sofa-outline",
@@ -62,7 +62,7 @@
             {
               "id": "card-1",
               "entity_id": "sensor.energy",
-              "template": "hc_energy_period_card",
+              "template": "md_energy_period_card",
               "name": "Today Power",
               "name_key": "energy.today_power",
               "icon": "mdi:flash-outline",
@@ -82,7 +82,7 @@
             {
               "id": "card-2",
               "entity_id": "sensor.power",
-              "template": "hc_graph_card",
+              "template": "md_graph_card",
               "name": "Power",
               "icon": null,
               "variables": {
@@ -107,7 +107,7 @@
           "entities": [
             {
               "id": "page-title",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Room",
               "show_icon": false,
               "show_state": false,
@@ -124,7 +124,7 @@
           "entities": [
             {
               "entity_id": "sensor.energy",
-              "template": "hc_graph_card",
+              "template": "md_graph_card",
               "variables": {
                 "display_unit": "kWh",
                 "display_precision": 0,
@@ -133,7 +133,7 @@
             },
             {
               "entity_id": "sensor.energy",
-              "template": "hc_sensor_card",
+              "template": "md_sensor_card",
               "variables": {
                 "display_unit": "Wh",
                 "display_precision": 6
@@ -173,7 +173,7 @@
           "entities": [
             {
               "id": "page-title",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Custom",
               "show_icon": false,
               "show_state": false,

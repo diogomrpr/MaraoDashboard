@@ -546,7 +546,7 @@ test('a choppy but advancing lowest-quality stream stays live instead of failing
 
 test('background preload discovers enabled dashboard streams without popup or default-off demand', async () => {
   const {preloadCameras} = await import('../../custom_components/marao_dashboard/frontend/MaraoCameraPreload.js');
-  const enabled = {type:'custom:marao-card',template:'hc_camera_card',entity:'camera.low',variables:{preload_stream:true,popup_stream_entity:'camera.high'}};
+  const enabled = {type:'custom:marao-card',template:'md_camera_card',entity:'camera.low',variables:{preload_stream:true,popup_stream_entity:'camera.high'}};
   const config = {views:[{sections:[{cards:[{type:'vertical-stack',cards:[enabled,{...enabled}]}]}]},
     {cards:[{...enabled,entity:'camera.off',variables:{}}, {type:'custom:marao-popup-card',cards:[{...enabled,entity:'camera.popup'}]}]}]};
   const before = structuredClone(config);

@@ -3,7 +3,7 @@
   "groups": {
     "v0.3.0": [
       {
-        "template": "hc_entity_group_card",
+        "template": "md_entity_group_card",
         "id": "overview-lights",
         "name": "Lights",
         "icon": "mdi:lightbulb-group-outline",
@@ -14,7 +14,7 @@
         ]
       },
       {
-        "template": "hc_entity_group_card",
+        "template": "md_entity_group_card",
         "id": "overview-blinds",
         "name": "Blinds",
         "icon": "mdi:window-shutter",
@@ -25,7 +25,7 @@
         ]
       },
       {
-        "template": "hc_entity_group_card",
+        "template": "md_entity_group_card",
         "id": "overview-climate",
         "name": "Climate",
         "icon": "mdi:thermostat",
@@ -40,7 +40,7 @@
     "v0.5.0": [],
     "v0.5.1": [
       {
-        "template": "hc_entity_group_card",
+        "template": "md_entity_group_card",
         "id": "overview-lights",
         "name": "Lights",
         "icon": "mdi:lightbulb-group-outline",
@@ -62,7 +62,7 @@
         ]
       },
       {
-        "template": "hc_entity_group_card",
+        "template": "md_entity_group_card",
         "id": "overview-blinds",
         "name": "Blinds",
         "icon": "mdi:window-shutter",
@@ -86,7 +86,7 @@
         ]
       },
       {
-        "template": "hc_entity_group_card",
+        "template": "md_entity_group_card",
         "id": "overview-climate",
         "name": "Climate",
         "icon": "mdi:thermostat",
@@ -104,7 +104,7 @@
         ]
       },
       {
-        "template": "hc_entity_group_card",
+        "template": "md_entity_group_card",
         "id": "overview-maintenance",
         "name": "Maintenance",
         "icon": "mdi:wrench",

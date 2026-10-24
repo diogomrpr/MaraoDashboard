@@ -5,22 +5,22 @@ import { normalizeConfig, serializeConfig, validateConfig, buildJsonSchema, move
 
 const source = JSON.parse(fs.readFileSync(new URL('./canonical-pages.fixture.json', import.meta.url)));
 const catalog = { config_version: 2, cards: [
-  ['hc_title_card', []], ['hc_room_card', []], ['hc_navigation_card', []], ['hc_scene_collection_card', []],
-  ['hc_entity_group_card', []], ['hc_weather_card', ['weather']], ['hc_light_card', ['light']],
-  ['hc_energy_period_card', ['sensor']], ['hc_wallbox_current_card', ['number', 'input_number']],
-  ['hc_media_app_card', ['media_player']], ['hc_media_card', ['media_player']], ['hc_access_hold_action_card', ['button', 'switch', 'input_boolean']],
+  ['md_title_card', []], ['md_room_card', []], ['md_navigation_card', []], ['md_scene_collection_card', []],
+  ['md_entity_group_card', []], ['md_weather_card', ['weather']], ['md_light_card', ['light']],
+  ['md_energy_period_card', ['sensor']], ['md_wallbox_current_card', ['number', 'input_number']],
+  ['md_media_app_card', ['media_player']], ['md_media_card', ['media_player']], ['md_access_hold_action_card', ['button', 'switch', 'input_boolean']],
 ].map(([id, domains]) => ({ id, domains })), pages: {} };
 
 for (const [card, message] of [
-  [{ template: 'hc_energy_period_card', entity_id: 'sensor.safe', variables: { period: 'year' } }, /period/],
-  [{ template: 'hc_wallbox_current_card', entity_id: 'number.safe', variables: { shortcuts: [true] } }, /shortcuts/],
-  [{ template: 'hc_wallbox_current_card', entity_id: 'number.safe', variables: { shortcuts: [Infinity] } }, /shortcuts/],
-  [{ template: 'hc_wallbox_current_card', entity_id: 'number.safe', variables: { shortcuts: [1, 2, 3, 4] } }, /shortcuts/],
-  [{ template: 'hc_media_app_card', entity_id: 'media_player.safe', variables: { app_source: ' ' } }, /source/],
-  [{ template: 'hc_room_card', page: 'home', variables: { light_entities: ['switch.safe'] } }, /Room lights/],
-  [{ template: 'hc_media_card', entity_id: 'media_player.safe', apple_tv: { remote_entity: 'lock.safe' } }, /remote/],
-  [{ template: 'hc_media_card', entity_id: 'media_player.safe', apple_tv: { apps: [{ name: 'Missing source' }] } }, /sources/],
-  [{ template: 'hc_access_hold_action_card', entity_id: 'button.safe', tap_action: { action: 'perform-action', perform_action: 'lock.unlock', target: { entity_id: 'lock.safe' } } }, /Security action/],
+  [{ template: 'md_energy_period_card', entity_id: 'sensor.safe', variables: { period: 'year' } }, /period/],
+  [{ template: 'md_wallbox_current_card', entity_id: 'number.safe', variables: { shortcuts: [true] } }, /shortcuts/],
+  [{ template: 'md_wallbox_current_card', entity_id: 'number.safe', variables: { shortcuts: [Infinity] } }, /shortcuts/],
+  [{ template: 'md_wallbox_current_card', entity_id: 'number.safe', variables: { shortcuts: [1, 2, 3, 4] } }, /shortcuts/],
+  [{ template: 'md_media_app_card', entity_id: 'media_player.safe', variables: { app_source: ' ' } }, /source/],
+  [{ template: 'md_room_card', page: 'home', variables: { light_entities: ['switch.safe'] } }, /Room lights/],
+  [{ template: 'md_media_card', entity_id: 'media_player.safe', apple_tv: { remote_entity: 'lock.safe' } }, /remote/],
+  [{ template: 'md_media_card', entity_id: 'media_player.safe', apple_tv: { apps: [{ name: 'Missing source' }] } }, /sources/],
+  [{ template: 'md_access_hold_action_card', entity_id: 'button.safe', tap_action: { action: 'perform-action', perform_action: 'lock.unlock', target: { entity_id: 'lock.safe' } } }, /Security action/],
 ]) {
   test(`promoted option boundary: ${message}`, () => {
     const config = { config_version: 2, name: 'Safe', landing_page: 'home', pages: [{ name: 'Home', path: 'home', entities: [card] }] };
@@ -42,10 +42,10 @@ test('all pages, sections, entity-free cards, unknown values and explicit emptin
 
 test('editing and reordering a grouped page retains mixed order and unrelated section/raw options', () => {
   const model = normalizeConfig(source);
-  model.pages[1].entities.push({ template: 'hc_title_card', name: 'Reading corner', id: 'reading' });
+  model.pages[1].entities.push({ template: 'md_title_card', name: 'Reading corner', id: 'reading' });
   model.pages[1].entities = moveItem(model.pages[1].entities, 2, 0);
   const saved = serializeConfig(model);
-  assert.equal(saved.pages[1].entities[0].template, 'hc_title_card');
+  assert.equal(saved.pages[1].entities[0].template, 'md_title_card');
   assert.deepEqual(saved.pages[1].entities[1], { entity_id: 'sensor.safe', id: 'card-1' });
   assert.deepEqual(saved.pages[0], source.pages[0]);
   assert.deepEqual(saved.pages[2], source.pages[2]);
@@ -54,7 +54,7 @@ test('editing and reordering a grouped page retains mixed order and unrelated se
 
 test('implicit card identities survive section deletion and reordering without changing untouched JSON', () => {
   const config = { config_version: 2, name: 'Stable', landing_page: 'home', pages: [{ name: 'Home', path: 'home', sections: [
-    { entities: [{ id: 'heading', template: 'hc_title_card', name: 'Home' }] },
+    { entities: [{ id: 'heading', template: 'md_title_card', name: 'Home' }] },
     { entities: ['media_player.same', 'media_player.same'], cards: [{ type: 'markdown', content: 'Keep', tap_action: { action: 'navigate', navigation_path: '#page-home-card-3-popup' } }] },
   ] }] };
   const model = normalizeConfig(config);
@@ -83,7 +83,7 @@ const invalid = [
   ['duplicate local identity', config => { config.pages[0].sections[1].entities[0].id = 'weather'; }],
   ['missing binding', config => { delete config.pages[0].sections[0].entities[1].entity_id; }],
   ['incompatible binding', config => { config.pages[0].sections[0].entities[1].entity_id = 'light.safe'; }],
-  ['unsupported template', config => { config.pages[0].sections[0].entities[1].template = 'hc_unrecognized_card'; }],
+  ['unsupported template', config => { config.pages[0].sections[0].entities[1].template = 'md_unrecognized_card'; }],
   ['invalid options', config => { config.pages[0].sections[0].entities[1].variables = []; }],
   ['missing shortcut destination', config => { config.pages[0].sections[1].entities[0].page = 'removed'; }],
   ['unbound shortcut', config => { delete config.pages[0].sections[1].entities[0].page; }],
@@ -121,7 +121,7 @@ test('canonical schema offers ordered pages, sections and entity-free roles with
   assert.equal(schema.properties.pages.items.properties.sections.items.properties.columns.maximum, 6);
   assert.ok(!Object.hasOwn(schema.properties, 'rooms'));
   assert.ok(!Object.hasOwn(schema.properties, 'overview'));
-  const shortcut = { id: 'office-link', template: 'hc_navigation_card', name: 'Office',
+  const shortcut = { id: 'office-link', template: 'md_navigation_card', name: 'Office',
     tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/office' } };
   const config = { config_version: 2, name: 'Safe', landing_page: 'home', pages: [
     { name: 'Home', path: 'home', entities: [shortcut] }, { name: 'Office', path: 'office', entities: [] },
@@ -177,12 +177,12 @@ test('moving every published option shape preserves all fields and page-wide ide
     { entity_id: 'media_player.safe', apple_tv: { remote_entity: 'remote.safe', apps: [] } },
     { entity_id: 'media_player.safe', name: 'Duplicate', variables: { popup_hash: '#retained' } },
     { entity_id: 'climate.safe', variables: { modes: [], mode_selector_hash: '#mode' } },
-    { template: 'hc_entity_group_card', id: 'lights', entity_type: 'light', entities: [{ entity_id: 'light.safe', future: [] }], popup_filter: 'all' },
+    { template: 'md_entity_group_card', id: 'lights', entity_type: 'light', entities: [{ entity_id: 'light.safe', future: [] }], popup_filter: 'all' },
     { entity_id: 'alarm_control_panel.safe', variables: { future: [] } },
-    { template: 'hc_energy_period_card', entity_id: 'sensor.safe', variables: { period: 'day', display_unit: 'kWh', display_precision: 0 } },
-    { template: 'hc_vacuum_card', entity_id: 'vacuum.safe', variables: { action_1: { data: { command: 'app_segment_clean', params: [{ segments: [21, 22], repeat: 2 }] } } } },
-    { template: 'hc_title_card', name: 'Heading', future: {} },
-    { template: 'hc_scene_collection_card', entities: [], future: [] },
+    { template: 'md_energy_period_card', entity_id: 'sensor.safe', variables: { period: 'day', display_unit: 'kWh', display_precision: 0 } },
+    { template: 'md_vacuum_card', entity_id: 'vacuum.safe', variables: { action_1: { data: { command: 'app_segment_clean', params: [{ segments: [21, 22], repeat: 2 }] } } } },
+    { template: 'md_title_card', name: 'Heading', future: {} },
+    { template: 'md_scene_collection_card', entities: [], future: [] },
     { page: 'home', name: 'Back', future: true },
   ];
   for (const entities of [cards, { cards }]) {

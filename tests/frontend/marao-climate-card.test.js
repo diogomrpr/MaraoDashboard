@@ -18,7 +18,7 @@ function reportedClimate(mode = "heat", attributes = {}) {
 }
 function climateCard(t, hass, variables = {}) {
   const card = new MaraoCard();
-  card.setConfig({ template: "hc_climate_card", entity: climateEntity, variables });
+  card.setConfig({ template: "md_climate_card", entity: climateEntity, variables });
   card.hass = hass;
   card.connectedCallback();
   t.after(() => card.disconnectedCallback());
@@ -53,7 +53,7 @@ test("rapid target steps accumulate absolute native requests, including reversal
   const hass = { states: { [climateEntity]: reportedClimate() }, callService: async (_domain, _service, data) => { calls.push(data); } };
   const card = climateCard(t, hass);
   const duplicate = climateCard(t, hass);
-  for (const direction of [1, 1, 1, -1]) await card._adjustNumber(climateEntity, "hc_climate_card", direction);
+  for (const direction of [1, 1, 1, -1]) await card._adjustNumber(climateEntity, "md_climate_card", direction);
   assert.deepEqual(calls.map(data => data.temperature), [21.5, 22, 22.5, 22]);
   assert.equal(displayedTarget(card), "22");
   assert.equal(displayedTarget(duplicate), "22");
@@ -68,7 +68,7 @@ test("null, missing and incomplete range targets never become zero or generate a
   let calls = 0;
   const hass = { states: { [climateEntity]: reportedClimate("heat_cool", { temperature: null, target_temp_low: 18, target_temp_high: null }) }, callService: async () => { calls += 1; } };
   const card = climateCard(t, hass);
-  await card._adjustNumber(climateEntity, "hc_climate_card", 1);
+  await card._adjustNumber(climateEntity, "md_climate_card", 1);
   await card._setClimateMode(climateEntity, "unsupported");
   assert.equal(calls, 0);
   assert.equal(displayedTarget(card), "—");
@@ -88,11 +88,11 @@ test("requested range targets preserve their gap and bounds, and mode changes us
   const calls = [];
   const hass = { states: { [climateEntity]: reportedClimate("heat_cool", { temperature: 21, target_temp_low: 18, target_temp_high: 24 }) }, callService: async (_domain, _service, data) => { calls.push(data); } };
   const card = climateCard(t, hass);
-  for (const direction of [1, 1, -1]) await card._adjustNumber(climateEntity, "hc_climate_card", direction);
+  for (const direction of [1, 1, -1]) await card._adjustNumber(climateEntity, "md_climate_card", direction);
   assert.deepEqual(calls.map(({ target_temp_low, target_temp_high }) => [target_temp_low, target_temp_high]), [[18.5, 24.5], [19, 25], [18.5, 24.5]]);
   await card._setClimateMode(climateEntity, "heat");
   assert.equal(displayedTarget(card), "21");
-  await card._adjustNumber(climateEntity, "hc_climate_card", 1);
+  await card._adjustNumber(climateEntity, "md_climate_card", 1);
   assert.equal(calls.at(-1).temperature, 21.5);
   assert.deepEqual(climateTemperatureChange({ target_temperature: "21.1", target_temperature_step: .1 }, "heat", 1), { temperature: 21.2 });
   assert.deepEqual(climateTemperatureChange({ target_temp_low: 10, target_temp_high: 16, target_temp_step: .5, min_temp: 10, max_temp: 30 }, "heat_cool", -1), { target_temp_low: 10, target_temp_high: 16 });
@@ -104,7 +104,7 @@ test("mode and target confirm independently, while old rejections cannot erase a
   const card = climateCard(t, hass);
   const first = card._setClimateMode(climateEntity, "heat");
   const second = card._setClimateMode(climateEntity, "cool");
-  const third = card._adjustNumber(climateEntity, "hc_climate_card", 1);
+  const third = card._adjustNumber(climateEntity, "md_climate_card", 1);
   requests[0].reject(new Error("Old request rejected")); await first;
   assert.match(card.shadowRoot.innerHTML, /class="state">Cool</);
   card.hass = { ...hass, states: { [climateEntity]: reportedClimate("cool") } };
@@ -121,7 +121,7 @@ test("expiry uses each setting's latest deadline and unrelated updates do not ex
   const card = climateCard(t, hass);
   await card._setClimateMode(climateEntity, "heat");
   t.mock.timers.tick(10000);
-  await card._adjustNumber(climateEntity, "hc_climate_card", 1);
+  await card._adjustNumber(climateEntity, "md_climate_card", 1);
   t.mock.timers.tick(10000);
   await card._setClimateMode(climateEntity, "cool");
   card.hass = { ...hass };
@@ -140,16 +140,16 @@ test("disconnect, target loss, configuration changes and the final subscriber cl
   const hass = { states: { [climateEntity]: reportedClimate() }, callService: async () => {} };
   const card = climateCard(t, hass);
   for (const updated of [ { ...hass, connected: false }, { ...hass, states: {} }, { ...hass, states: { [climateEntity]: reportedClimate("unknown") } }, { ...hass, states: { [climateEntity]: reportedClimate("unavailable") } } ]) {
-    card.hass = hass; await card._adjustNumber(climateEntity, "hc_climate_card", 1);
+    card.hass = hass; await card._adjustNumber(climateEntity, "md_climate_card", 1);
     card.hass = updated;
     card.hass = hass;
     assert.equal(displayedTarget(card), "21");
   }
-  await card._adjustNumber(climateEntity, "hc_climate_card", 1);
-  card.setConfig({ template: "hc_number_card", entity: "number.test" });
+  await card._adjustNumber(climateEntity, "md_climate_card", 1);
+  card.setConfig({ template: "md_number_card", entity: "number.test" });
   const replacement = climateCard(t, hass);
   assert.equal(displayedTarget(replacement), "21");
-  await replacement._adjustNumber(climateEntity, "hc_climate_card", 1);
+  await replacement._adjustNumber(climateEntity, "md_climate_card", 1);
   replacement.disconnectedCallback(); replacement.connectedCallback();
   assert.equal(displayedTarget(replacement), "21");
 });
@@ -179,8 +179,8 @@ test("opt-in outcomes distinguish skipped, sent, successful and rejected calls w
 test("a rapid reversal stays pending on unrelated updates and when another sheet subscribes", async t => {
   const hass = { states: { [climateEntity]: reportedClimate() }, callService: async () => {} };
   const card = climateCard(t, hass);
-  await card._adjustNumber(climateEntity, "hc_climate_card", 1);
-  await card._adjustNumber(climateEntity, "hc_climate_card", -1);
+  await card._adjustNumber(climateEntity, "md_climate_card", 1);
+  await card._adjustNumber(climateEntity, "md_climate_card", -1);
   card.hass = { ...hass };
   assert.equal(displayedTarget(card), "21");
   assert.match(card.shadowRoot.innerHTML, /Updating/);
@@ -201,7 +201,7 @@ test("current rejection restores the latest differing report and notifies once; 
   let reject;
   const hass = { states: { [climateEntity]: reportedClimate() }, callService: () => new Promise((_resolve, fail) => { reject = fail; }) };
   const card = climateCard(t, hass);
-  const request = card._adjustNumber(climateEntity, "hc_climate_card", 1);
+  const request = card._adjustNumber(climateEntity, "md_climate_card", 1);
   card.hass = { ...hass, states: { [climateEntity]: reportedClimate("heat", { temperature: 24 }) } };
   assert.equal(displayedTarget(card), "21.5");
   reject(new Error("Fixture rejected")); await request;
@@ -210,11 +210,11 @@ test("current rejection restores the latest differing report and notifies once; 
   t.mock.timers.tick(30000);
   assert.equal(notifications.length, 1);
   card.hass = { ...hass, callService: async () => {} };
-  await card._adjustNumber(climateEntity, "hc_climate_card", 1);
+  await card._adjustNumber(climateEntity, "md_climate_card", 1);
   t.mock.timers.tick(30000);
   assert.equal(displayedTarget(card), "21");
   assert.deepEqual(notifications, ["Action failed: Fixture rejected", "Change not confirmed: climate.test"]);
-  await card._adjustNumber(climateEntity, "hc_climate_card", 1);
+  await card._adjustNumber(climateEntity, "md_climate_card", 1);
   card.disconnectedCallback();
   t.mock.timers.tick(30000);
   assert.equal(notifications.length, 2);
@@ -240,7 +240,7 @@ test("native range payloads retain their capability contract outside the heat-co
   await callServiceWithNotification(hass, 'climate', 'set_temperature', data);
   assert.deepEqual(calls, [['climate', 'set_temperature', data, undefined, false]]);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /Updating/);
-  await card._adjustNumber(climateEntity, 'hc_climate_card', 1);
+  await card._adjustNumber(climateEntity, 'md_climate_card', 1);
   assert.equal(calls.length, 1, 'a range-only entity must not receive a fabricated single target');
 });
 
@@ -373,18 +373,18 @@ test("climate modes use the theme state palette", () => {
     fan_only: "var(--color-teal,var(--color-blue))",
   };
   for (const [state, background] of Object.entries(expected)) {
-    assert.equal(stateAppearance("hc_climate_card", state, {}, {}).background, background);
+    assert.equal(stateAppearance("md_climate_card", state, {}, {}).background, background);
   }
-  assert.equal(stateAppearance("hc_climate_card", "off", {}, {}).background, undefined);
-  assert.equal(stateAppearance("hc_climate_card", "auto", {}, {}).text, "var(--color-black)");
+  assert.equal(stateAppearance("md_climate_card", "off", {}, {}).background, undefined);
+  assert.equal(stateAppearance("md_climate_card", "auto", {}, {}).text, "var(--color-black)");
 });
 
 test("seasonal backgrounds follow active device state and preserve custom colors", () => {
   for (const [kind, entity, activeState, inactiveState, color] of [
-    ['hc_light_card', 'light.test', 'on', 'off', 'var(--color-gold)'],
-    ['hc_fan_card', 'fan.test', 'on', 'off', 'var(--color-teal,var(--color-blue))'],
-    ['hc_cover_card', 'cover.test', 'open', 'closed', 'var(--color-blue)'],
-    ['hc_climate_card', 'climate.test', 'heat', 'off', 'var(--color-orange)'],
+    ['md_light_card', 'light.test', 'on', 'off', 'var(--color-gold)'],
+    ['md_fan_card', 'fan.test', 'on', 'off', 'var(--color-teal,var(--color-blue))'],
+    ['md_cover_card', 'cover.test', 'open', 'closed', 'var(--color-blue)'],
+    ['md_climate_card', 'climate.test', 'heat', 'off', 'var(--color-orange)'],
   ]) {
     const config = { entity };
     assert.equal(stateAppearance(kind, activeState, config, {}).background, color);
@@ -396,16 +396,16 @@ test("seasonal backgrounds follow active device state and preserve custom colors
     { entity: 'light.test', variables: { summary_entities: ['light.test'] } },
     { variables: { entity_type: 'light', summary_entities: ['light.test'] } },
   ]) {
-    assert.equal(stateAppearance('hc_navigation_card', 'on', config, {}).background, 'var(--color-gold)');
-    assert.equal(stateAppearance('hc_navigation_card', 'off', config, {}).background, undefined);
-    assert.equal(stateAppearance('hc_navigation_card', 'on', { ...config, variables: { ...config.variables, hc_color: '#234567' } }, {}).background, '#234567');
+    assert.equal(stateAppearance('md_navigation_card', 'on', config, {}).background, 'var(--color-gold)');
+    assert.equal(stateAppearance('md_navigation_card', 'off', config, {}).background, undefined);
+    assert.equal(stateAppearance('md_navigation_card', 'on', { ...config, variables: { ...config.variables, md_color: '#234567' } }, {}).background, '#234567');
   }
-  for (const key of ['active_color', 'card_color', 'hc_card_color']) {
-    assert.equal(stateAppearance('hc_light_card', 'on', { variables: { [key]: '#234567' } }, {}).background, '#234567');
+  for (const key of ['active_color', 'card_color', 'md_card_color']) {
+    assert.equal(stateAppearance('md_light_card', 'on', { variables: { [key]: '#234567' } }, {}).background, '#234567');
   }
-  assert.equal(stateAppearance('hc_sensor_card', '150', { entity: 'sensor.power' }, {}).background, undefined);
-  assert.equal(stateAppearance('hc_security_card', 'triggered', {}, {}).background, 'var(--color-red)');
-  assert.equal(stateAppearance('hc_access_card', 'unlocked', {}, {}).background, 'var(--color-red)');
+  assert.equal(stateAppearance('md_sensor_card', '150', { entity: 'sensor.power' }, {}).background, undefined);
+  assert.equal(stateAppearance('md_security_card', 'triggered', {}, {}).background, 'var(--color-red)');
+  assert.equal(stateAppearance('md_access_card', 'unlocked', {}, {}).background, 'var(--color-red)');
 });
 
 test("climate modes use the shared dropdown and retain measured/target slots", t => {
@@ -419,13 +419,13 @@ test("climate modes use the shared dropdown and retain measured/target slots", t
 
 test("light state palette colors share a dark foreground across card families", () => {
   for (const [kind, state, color] of [
-    ["hc_cover_card", "open", "blue"],
-    ["hc_light_card", "on", "gold"],
-    ["hc_fan_card", "on", "teal,var(--color-blue)"],
-    ["hc_climate_card", "cool", "blue"],
-    ["hc_battery_card", "50", "yellow"],
-    ["hc_access_card", "opening", "orange"],
-    ["hc_climate_card", "auto", "gold"],
+    ["md_cover_card", "open", "blue"],
+    ["md_light_card", "on", "gold"],
+    ["md_fan_card", "on", "teal,var(--color-blue)"],
+    ["md_climate_card", "cool", "blue"],
+    ["md_battery_card", "50", "yellow"],
+    ["md_access_card", "opening", "orange"],
+    ["md_climate_card", "auto", "gold"],
   ]) {
     const appearance = stateAppearance(kind, state, {}, {});
     assert.equal(appearance.background, `var(--color-${color})`, `${kind}: preserve palette hue`);
@@ -435,17 +435,17 @@ test("light state palette colors share a dark foreground across card families", 
   }
   for (const color of ["blue", "yellow", "orange", "gold", "peach", "teal", "lilac"]) {
     const active_color = `var(--color-${color}, #abcdef)`;
-    const appearance = stateAppearance("hc_wallbox_current_card", "16", { variables: { active_color } }, {});
+    const appearance = stateAppearance("md_wallbox_current_card", "16", { variables: { active_color } }, {});
     assert.equal(appearance.background, active_color);
     assert.equal(appearance.text, "var(--color-black)", "the Wallbox default does not override its light palette");
   }
-  for (const [kind, state] of [["hc_access_card", "locked"], ["hc_switch_card", "on"]]) {
+  for (const [kind, state] of [["md_access_card", "locked"], ["md_switch_card", "on"]]) {
     assert.equal(stateAppearance(kind, state, {}, {}).text, "var(--active-text-color)", `${kind}: green keeps white text`);
   }
-  const current = stateAppearance("hc_wallbox_current_card", "16", {}, {});
+  const current = stateAppearance("md_wallbox_current_card", "16", {}, {});
   assert.equal(current.text, "var(--primary-text-color)");
   assert.equal(current.background, "var(--ha-card-background,var(--card-background-color))");
-  for (const [kind, state] of [["hc_sensor_card", "on"], ["hc_room_card", "on"]]) {
+  for (const [kind, state] of [["md_sensor_card", "on"], ["md_room_card", "on"]]) {
     const appearance = stateAppearance(kind, state, {}, {});
     assert.equal(appearance.text, "var(--text-primary-color,var(--active-text-color))");
     assert.equal(appearance.icon, appearance.text);
@@ -453,7 +453,7 @@ test("light state palette colors share a dark foreground across card families", 
 });
 
 test('lock and cover access actions use the same action palette across reported states', () => {
-  for (const kind of ['hc_access_action_card', 'hc_access_hold_action_card', 'hc_access_slide_action_card']) {
+  for (const kind of ['md_access_action_card', 'md_access_hold_action_card', 'md_access_slide_action_card']) {
     for (const color of ['var(--color-red)', 'var(--color-green)']) {
       const lock = { entity: 'lock.fixture', variables: { action_color: color } };
       const cover = { entity: 'cover.fixture', variables: { action_color: color } };

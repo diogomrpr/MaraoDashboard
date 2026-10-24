@@ -1,7 +1,7 @@
 {
   "version": 2,
   "catalog": {
-    "hc_camera_card": {
+    "md_camera_card": {
       "options": [
         "popup_stream_entity",
         "preload_stream",
@@ -22,7 +22,7 @@
         "camera-runtime"
       ]
     },
-    "hc_light_card": {
+    "md_light_card": {
       "options": [
         "enable_slider",
         "use_light_color",
@@ -36,7 +36,7 @@
         "card-runtime"
       ]
     },
-    "hc_cover_card": {
+    "md_cover_card": {
       "options": [
         "card_color"
       ],
@@ -47,7 +47,7 @@
         "card-runtime"
       ]
     },
-    "hc_climate_card": {
+    "md_climate_card": {
       "options": [
         "show_graph",
         "graph_entity",
@@ -63,7 +63,7 @@
         "card-runtime"
       ]
     },
-    "hc_fan_card": {
+    "md_fan_card": {
       "options": [
         "enable_slider",
         "card_color",
@@ -76,10 +76,10 @@
         "card-runtime"
       ]
     },
-    "hc_media_card": {
+    "md_media_card": {
       "options": [
-        "hc_show_background_art",
-        "hc_background_color",
+        "md_show_background_art",
+        "md_background_color",
         "popup_hash"
       ],
       "checks": [
@@ -89,7 +89,7 @@
         "card-runtime"
       ]
     },
-    "hc_access_card": {
+    "md_access_card": {
       "options": [
         "popup_hash"
       ],
@@ -100,9 +100,9 @@
         "card-runtime"
       ]
     },
-    "hc_sensor_card": {
+    "md_sensor_card": {
       "options": [
-        "hc_card_color",
+        "md_card_color",
         "on_icon",
         "off_icon",
         "display_unit",
@@ -115,7 +115,7 @@
         "card-runtime"
       ]
     },
-    "hc_switch_card": {
+    "md_switch_card": {
       "options": [
         "power_entity",
         "show_graph",
@@ -134,7 +134,7 @@
         "card-runtime"
       ]
     },
-    "hc_number_card": {
+    "md_number_card": {
       "options": [],
       "checks": [
         "generation",
@@ -143,7 +143,7 @@
         "card-runtime"
       ]
     },
-    "hc_wallbox_current_card": {
+    "md_wallbox_current_card": {
       "options": [
         "shortcuts"
       ],
@@ -154,7 +154,7 @@
         "card-runtime"
       ]
     },
-    "hc_vacuum_card": {
+    "md_vacuum_card": {
       "options": [
         "icon",
         "action_1",
@@ -168,10 +168,10 @@
         "card-runtime"
       ]
     },
-    "hc_battery_card": {
+    "md_battery_card": {
       "options": [
         "on_icon",
-        "hc_card_color"
+        "md_card_color"
       ],
       "checks": [
         "generation",
@@ -180,7 +180,7 @@
         "card-runtime"
       ]
     },
-    "hc_dishwasher_card": {
+    "md_dishwasher_card": {
       "options": [
         "progress_entity",
         "remaining_time_entity",
@@ -195,7 +195,7 @@
         "card-runtime"
       ]
     },
-    "hc_washing_machine_card": {
+    "md_washing_machine_card": {
       "options": [],
       "checks": [
         "generation",
@@ -204,7 +204,7 @@
         "card-runtime"
       ]
     },
-    "hc_graph_card": {
+    "md_graph_card": {
       "options": [
         "show_graph_line",
         "show_graph_fill",
@@ -225,7 +225,7 @@
         "power-history-runtime"
       ]
     },
-    "hc_toggle_graph_card": {
+    "md_toggle_graph_card": {
       "options": [
         "toggle_entity",
         "show_graph_line",
@@ -250,7 +250,7 @@
         "card-runtime"
       ]
     },
-    "hc_timeline_card": {
+    "md_timeline_card": {
       "options": [
         "timeline_name"
       ],
@@ -261,11 +261,11 @@
         "card-runtime"
       ]
     },
-    "hc_navigation_card": {
+    "md_navigation_card": {
       "options": [
-        "hc_label_prefix",
-        "hc_icon_color",
-        "hc_color"
+        "md_label_prefix",
+        "md_icon_color",
+        "md_color"
       ],
       "checks": [
         "generation",
@@ -274,7 +274,7 @@
         "card-runtime"
       ]
     },
-    "hc_entity_group_card": {
+    "md_entity_group_card": {
       "options": [],
       "checks": [
         "generation",
@@ -283,7 +283,7 @@
         "builder-groups"
       ]
     },
-    "hc_title_card": {
+    "md_title_card": {
       "options": [],
       "checks": [
         "page-generation",
@@ -292,7 +292,7 @@
         "card-runtime"
       ]
     },
-    "hc_weather_card": {
+    "md_weather_card": {
       "options": [
         "show_forecast"
       ],
@@ -303,7 +303,7 @@
         "card-runtime"
       ]
     },
-    "hc_room_card": {
+    "md_room_card": {
       "options": [
         "light_entities"
       ],
@@ -314,7 +314,7 @@
         "card-runtime"
       ]
     },
-    "hc_scene_collection_card": {
+    "md_scene_collection_card": {
       "options": [
         "popup_hash"
       ],
@@ -325,7 +325,7 @@
         "card-runtime"
       ]
     },
-    "hc_security_card": {
+    "md_security_card": {
       "options": [
         "popup_hash"
       ],
@@ -336,7 +336,7 @@
         "card-runtime"
       ]
     },
-    "hc_access_hold_action_card": {
+    "md_access_hold_action_card": {
       "options": [
         "action_color",
         "action_label",
@@ -349,7 +349,7 @@
         "card-runtime"
       ]
     },
-    "hc_base_card": {
+    "md_base_card": {
       "options": [
         "card_color",
         "custom_label",
@@ -366,7 +366,7 @@
         "card-runtime"
       ]
     },
-    "hc_energy_period_card": {
+    "md_energy_period_card": {
       "options": [
         "period",
         "calculate_cost",
@@ -383,7 +383,7 @@
         "card-runtime"
       ]
     },
-    "hc_media_app_card": {
+    "md_media_app_card": {
       "options": [
         "app_source",
         "action_color",
@@ -397,7 +397,7 @@
         "card-runtime"
       ]
     },
-    "hc_access_slide_action_card": {
+    "md_access_slide_action_card": {
       "options": [
         "action_color",
         "action_label",
@@ -410,7 +410,7 @@
         "card-runtime"
       ]
     },
-    "hc_alarm_controls_card": {
+    "md_alarm_controls_card": {
       "checks": [
         "page-generation",
         "native-cards-runtime",
@@ -419,7 +419,7 @@
       ],
       "options": []
     },
-    "hc_header_card": {
+    "md_header_card": {
       "checks": [
         "page-generation",
         "page-model",
@@ -431,7 +431,7 @@
         "air_quality_sensor"
       ]
     },
-    "hc_glance_card": {
+    "md_glance_card": {
       "checks": [
         "page-generation",
         "page-model",
@@ -450,7 +450,7 @@
         "entity3_icon"
       ]
     },
-    "hc_scene_card": {
+    "md_scene_card": {
       "checks": [
         "page-generation",
         "page-model",
@@ -459,7 +459,7 @@
       ],
       "options": []
     },
-    "hc_access_action_card": {
+    "md_access_action_card": {
       "checks": [
         "page-generation",
         "native-cards-runtime",
@@ -1095,41 +1095,41 @@
     },
     "requiredTemplates": {
       "identities": [
-        "hc_base_card",
-        "hc_header_card",
-        "hc_title_card",
-        "hc_navigation_card",
-        "hc_weather_card",
-        "hc_camera_card",
-        "hc_glance_card",
-        "hc_light_card",
-        "hc_cover_card",
-        "hc_access_card",
-        "hc_access_action_card",
-        "hc_access_hold_action_card",
-        "hc_access_slide_action_card",
-        "hc_switch_card",
-        "hc_fan_card",
-        "hc_climate_card",
-        "hc_media_card",
-        "hc_media_app_card",
-        "hc_security_card",
-        "hc_sensor_card",
-        "hc_battery_card",
-        "hc_graph_card",
-        "hc_toggle_graph_card",
-        "hc_scene_card",
-        "hc_number_card",
-        "hc_wallbox_current_card",
-        "hc_vacuum_card",
-        "hc_dishwasher_card",
-        "hc_washing_machine_card",
-        "hc_room_card",
-        "hc_blinds_popup_card",
-        "hc_lights_popup_card",
-        "hc_climate_popup_card",
-        "hc_maintenance_popup_card",
-        "hc_entity_group_card"
+        "md_base_card",
+        "md_header_card",
+        "md_title_card",
+        "md_navigation_card",
+        "md_weather_card",
+        "md_camera_card",
+        "md_glance_card",
+        "md_light_card",
+        "md_cover_card",
+        "md_access_card",
+        "md_access_action_card",
+        "md_access_hold_action_card",
+        "md_access_slide_action_card",
+        "md_switch_card",
+        "md_fan_card",
+        "md_climate_card",
+        "md_media_card",
+        "md_media_app_card",
+        "md_security_card",
+        "md_sensor_card",
+        "md_battery_card",
+        "md_graph_card",
+        "md_toggle_graph_card",
+        "md_scene_card",
+        "md_number_card",
+        "md_wallbox_current_card",
+        "md_vacuum_card",
+        "md_dishwasher_card",
+        "md_washing_machine_card",
+        "md_room_card",
+        "md_blinds_popup_card",
+        "md_lights_popup_card",
+        "md_climate_popup_card",
+        "md_maintenance_popup_card",
+        "md_entity_group_card"
       ],
       "checks": [
         "generation",

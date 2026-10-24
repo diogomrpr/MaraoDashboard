@@ -37,7 +37,7 @@ const server = http.createServer((request, response) => {
       const hass = {connected:true,connection:{connected:true},language:'en',config:{time_zone:'UTC'},callService:()=>{throw Error('Unexpected service call')},callApi:async()=>[]};
       const records = specs.map(([family,domain,state,attrs={},variables={}]) => {
         const card = new MaraoCard(); const entity = domain ? domain+'.safe' : '';
-        card.setConfig({type:'custom:marao-card',template:'hc_'+family+'_card',entity,name:'Safe '+family,variables});
+        card.setConfig({type:'custom:marao-card',template:'md_'+family+'_card',entity,name:'Safe '+family,variables});
         document.querySelector('#cards').append(card);
         return {card,entity,state,attrs,family};
       });
@@ -84,7 +84,7 @@ const server = http.createServer((request, response) => {
       const { MaraoNativeCard } = await import('/MaraoNativeCards.js');
       const { catalog } = await import('/MaraoNativeCatalog.js');
       for (const family of ['climate','sensor']) {
-        const spec = catalog.cards.find(item=>item.id==='hc_'+family+'_card');
+        const spec = catalog.cards.find(item=>item.id==='md_'+family+'_card');
         class Native extends MaraoNativeCard { static spec = spec; }
         customElements.define('test-native-'+family,Native);
         const card = new Native(); card.setConfig({type:spec.type,name:'Safe native '+family,entity:family+'.safe',variables:{show_mode_buttons:true}});parent.append(card);
@@ -97,7 +97,7 @@ const server = http.createServer((request, response) => {
         details.push({family:'native-'+family,loading,ready,unavailable,error});parent.replaceChildren();
       }
       const popup = new MaraoPopupCard();
-      popup.setConfig({hash:'#safe-layout',title:'Safe popup',cards:[{type:'custom:marao-card',template:'hc_sensor_card',entity:'sensor.safe',name:'Safe sensor'}]});
+      popup.setConfig({hash:'#safe-layout',title:'Safe popup',cards:[{type:'custom:marao-card',template:'md_sensor_card',entity:'sensor.safe',name:'Safe sensor'}]});
       popup.hass={states:{'sensor.safe':{state:'40'}}};document.body.append(popup);popup._openSheet();
       const child=popup._overlay.querySelector('marao-card'), opener=child.shadowRoot.querySelector('[data-card-details]');
       showCardDetails(child,'Long error details '.repeat(100),opener);

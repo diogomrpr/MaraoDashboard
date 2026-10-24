@@ -117,7 +117,7 @@ async function checkHistoryDetails(page,serviceCalls,{scenario,theme,geometryOnl
 
 async function checkDrillIn(page,graph,sheet,serviceCalls,startedCalls){
  await graph.evaluate(card=>{
-  const popup=document.createElement('marao-popup-card');popup.setConfig({title:'Safe chart drill-in',hash:'#marao-history-inspection',cards:[{type:'markdown',content:'Safe retained parent\n\n'+('Read-only history inspection.\n\n'.repeat(10))},{...card._config,name:'Safe retained graph'},{type:'custom:marao-card',template:'hc_climate_card',entity:'climate.marao_dashboard_test_climate',name:'Safe climate history',variables:{graph_entity:'sensor.marao_dashboard_test_temperature',show_graph:true}}, {type:'markdown',content:'Safe parent content after graph'}]});popup.hass=card.hass;
+  const popup=document.createElement('marao-popup-card');popup.setConfig({title:'Safe chart drill-in',hash:'#marao-history-inspection',cards:[{type:'markdown',content:'Safe retained parent\n\n'+('Read-only history inspection.\n\n'.repeat(10))},{...card._config,name:'Safe retained graph'},{type:'custom:marao-card',template:'md_climate_card',entity:'climate.marao_dashboard_test_climate',name:'Safe climate history',variables:{graph_entity:'sensor.marao_dashboard_test_temperature',show_graph:true}}, {type:'markdown',content:'Safe parent content after graph'}]});popup.hass=card.hass;
   const application=document.querySelector('home-assistant').shadowRoot;application.append(popup);window.__chartTemporaryPopup=popup;
   history.replaceState({...history.state,maraoInspection:'preserved unrelated state'},'',location.href);
   history.pushState({...history.state},'',location.pathname+location.search+'#marao-history-inspection');dispatchEvent(new Event('location-changed'));

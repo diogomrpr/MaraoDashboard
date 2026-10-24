@@ -41,13 +41,13 @@ def _room(config, index=0):
     content = page.get("_sections", page["sections"])[-1]
     groups = {}
     for card in content.get("ordered_cards", []):
-        domain = "entity_group" if card.get("template") == "hc_entity_group_card" else "navigation" if card.get("page") else card["entity_id"].split(".")[0]
+        domain = "entity_group" if card.get("template") == "md_entity_group_card" else "navigation" if card.get("page") else card["entity_id"].split(".")[0]
         groups.setdefault(domain, []).append(card)
     return {**page, **content, "entities_by_domain": groups}
 
 
 def _home_groups(config):
-    return [card for section in config["pages"][0].get("_sections", config["pages"][0]["sections"]) for card in section.get("ordered_cards", section.get("entities", [])) if card.get("template") == "hc_entity_group_card"]
+    return [card for section in config["pages"][0].get("_sections", config["pages"][0]["sections"]) for card in section.get("ordered_cards", section.get("entities", [])) if card.get("template") == "md_entity_group_card"]
 
 
 def _load_view(path):
@@ -203,7 +203,7 @@ def test_conversion_folds_instructions_preserving_order_options_and_raw_content(
     raw = {"type": "markdown", "content": "Protected", "extension": {"keep": [2, 1]}}
     source = {"name": "Independent", "pages": {"media": {}}, "extension": {"keep": True}, "rooms": [{
         "name": "Room", "area": "obsolete", "columns": 2,
-        "entities": ["light.remove", {"page": "media", "name": "Shortcut"}, {"entity_id": "sensor.keep", "template": "hc_graph_card", "variables": {"display_precision": 2}, "unknown": [2, 1]}],
+        "entities": ["light.remove", {"page": "media", "name": "Shortcut"}, {"entity_id": "sensor.keep", "template": "md_graph_card", "variables": {"display_precision": 2}, "unknown": [2, 1]}],
         "include": {"light": [{"entity_id": "light.add", "name": "Added"}]},
         "exclude": ["light.remove"], "overrides": {"sensor.keep": {"icon": "mdi:chart-line"}}, "cards": [raw],
     }]}
@@ -281,11 +281,11 @@ def test_write_dashboard_files_without_helper_entities(tmp_path: Path) -> None:
     assert all("theme: Marao Dashboard" in view.read_text(encoding="utf-8") for view in generated_views)
     assert "platform: group" not in source
     assert "light.office_main" in source
-    assert "hc_battery_card" in source
+    assert "md_battery_card" in source
     rooms_view = (tmp_path / generated.slug / "views/main/02-rooms.yaml").read_text(
         encoding="utf-8"
     )
-    assert "template: hc_room_card" in rooms_view
+    assert "template: md_room_card" in rooms_view
     assert "light_entities:" in rooms_view
     assert "- light.office_main" in rooms_view
     assert "- light.office_desk" in rooms_view
@@ -299,11 +299,11 @@ def test_write_dashboard_files_without_helper_entities(tmp_path: Path) -> None:
 def test_cases_use_normal_custom_page_cards_and_one_navbar(tmp_path: Path) -> None:
     cards = [
         {"type": "grid", "columns": 2, "square": False, "cards": [
-            {"type": "custom:marao-card", "template": "hc_switch_card", "entity": "switch.gallery_on"},
-            {"type": "custom:marao-card", "template": "hc_switch_card", "entity": "switch.gallery_unavailable"},
+            {"type": "custom:marao-card", "template": "md_switch_card", "entity": "switch.gallery_on"},
+            {"type": "custom:marao-card", "template": "md_switch_card", "entity": "switch.gallery_unavailable"},
         ]},
         {"type": "custom:marao-popup-card", "hash": "#gallery-popup", "cards": [
-            {"type": "custom:marao-card", "template": "hc_light_card", "entity": "light.gallery"},
+            {"type": "custom:marao-card", "template": "md_light_card", "entity": "light.gallery"},
         ]},
     ]
     config = {
@@ -335,7 +335,7 @@ def test_timeline_template_generates_the_native_timeline_card(tmp_path: Path) ->
                     "entities": [
                         {
                             "entity_id": "sensor.office_state",
-                            "template": "hc_timeline_card",
+                            "template": "md_timeline_card",
                             "variables": {"timeline_name": "Office history"},
                         }
                     ],
@@ -802,7 +802,7 @@ def test_room_graph_cards_use_the_shared_marao_background(tmp_path: Path) -> Non
                 {
                     "name": "Office",
                     "entities": [
-                        {"entity_id": "sensor.power", "template": "hc_graph_card"},
+                        {"entity_id": "sensor.power", "template": "md_graph_card"},
                         {
                             "entity_id": "switch.heater",
                             "variables": {
@@ -822,8 +822,8 @@ def test_room_graph_cards_use_the_shared_marao_background(tmp_path: Path) -> Non
     )
 
     assert "type: history-graph" not in source
-    assert "template: hc_graph_card" in source
-    assert "template: hc_switch_card" in source
+    assert "template: md_graph_card" in source
+    assert "template: md_switch_card" in source
     assert "sensor.power" in source
     assert "sensor.heater_power" in source
     assert "show_graph: true" in source
@@ -852,8 +852,8 @@ def test_room_access_cards_open_generated_action_popups(tmp_path: Path) -> None:
     room_view = tmp_path / generated.slug / "views/rooms/00-office.yaml"
     source = _view_source(room_view)
 
-    assert source.count("template: hc_access_card") == 2
-    assert "template: hc_cover_card" in source
+    assert source.count("template: md_access_card") == 2
+    assert "template: md_cover_card" in source
     assert "popup_hash: '#page-room-office-card-2-popup'" in source
     assert "popup_hash: '#page-room-office-card-3-popup'" in source
     assert "hash: '#page-room-office-card-2-popup'" in source
@@ -862,9 +862,9 @@ def test_room_access_cards_open_generated_action_popups(tmp_path: Path) -> None:
     assert "action_service: lock.lock" in source
     assert "action_service: cover.open_cover" in source
     assert "action_service: cover.close_cover" in source
-    assert source.count("template: hc_access_slide_action_card") == 2
-    assert "template: hc_access_hold_action_card" not in source
-    assert source.count("template: hc_access_action_card") == 2
+    assert source.count("template: md_access_slide_action_card") == 2
+    assert "template: md_access_hold_action_card" not in source
+    assert source.count("template: md_access_action_card") == 2
     assert "action_requires_hold: true" not in source
     assert source.index("# marao:custom:start") < source.index("components/navigation/navbar.yaml")
 
@@ -886,8 +886,8 @@ def test_open_only_door_generates_strict_slide_without_unused_popup(tmp_path: Pa
     )
 
     source = (tmp_path / generated.slug / "views/rooms/00-entry.yaml").read_text(encoding="utf-8")
-    assert "template: hc_access_slide_action_card" in source
-    assert "template: hc_access_action_card" not in source
+    assert "template: md_access_slide_action_card" in source
+    assert "template: md_access_action_card" not in source
     assert "action_label_key: access.open" in source
     assert "action_service: cover.open_cover" in source
     assert "#access-cover-entry-door" not in source
@@ -923,11 +923,11 @@ def test_room_media_card_opens_generated_apple_tv_remote_popup(tmp_path: Path) -
     source = _view_source(tmp_path / generated.slug / "views/rooms/00-living-room.yaml")
     view = _load_view(tmp_path / generated.slug / "views/rooms/00-living-room.yaml")
     popup = next(card for card in view["cards"] if card.get("hash") == "#page-room-living-room-card-2-popup")
-    app_grid = next(card for card in popup["cards"] if card.get("cards", [{}])[0].get("template") == "hc_media_app_card")
+    app_grid = next(card for card in popup["cards"] if card.get("cards", [{}])[0].get("template") == "md_media_app_card")
 
     assert "popup_hash: '#page-room-living-room-card-2-popup'" in source
     assert "hash: '#page-room-living-room-card-2-popup'" in source
-    assert "template: hc_media_app_card" in source
+    assert "template: md_media_app_card" in source
     assert "app_source: YouTube" in source
     assert "command: top_menu" in source
     assert "command: KEY_VOLDOWN" in source
@@ -949,7 +949,7 @@ def test_media_page_exposes_every_configured_player_and_its_popup(tmp_path: Path
         tmp_path,
     )
     view = _load_view(tmp_path / generated.slug / "views/main/05-media.yaml")
-    controls = [card for card in _walk_generated_cards(view["cards"]) if card.get("template") == "hc_media_card"]
+    controls = [card for card in _walk_generated_cards(view["cards"]) if card.get("template") == "md_media_card"]
     assert [card["entity"] for card in controls] == [player["entity_id"] for player in players]
     popups = {card["hash"] for card in view["cards"] if isinstance(card, dict) and card.get("type") == "custom:marao-popup-card"}
     assert {card["variables"]["popup_hash"] for card in controls} == popups
@@ -984,7 +984,7 @@ def test_room_camera_card_opens_generated_frigate_events_popup(tmp_path: Path) -
 
     source = _view_source(tmp_path / generated.slug / "views/rooms/00-garden.yaml")
 
-    assert "template: hc_camera_card" in source
+    assert "template: md_camera_card" in source
     assert "popup_hash: '#page-room-garden-card-2-popup'" in source
     assert "hash: '#page-room-garden-card-2-popup'" in source
     assert "type: custom:marao-camera-events-card" in source
@@ -1023,7 +1023,7 @@ def test_room_camera_card_forwards_unifi_protect_event_source(tmp_path: Path) ->
 
     source = _view_source(tmp_path / generated.slug / "views/rooms/00-garden.yaml")
 
-    assert "template: hc_camera_card" in source
+    assert "template: md_camera_card" in source
     assert "type: custom:marao-camera-events-card" in source
     assert "event_provider: unifiprotect" in source
     assert (
@@ -1064,7 +1064,7 @@ def test_generates_configured_julian_pages_and_derived_overview_popups(tmp_path:
                     "month_energy": "sensor.month_energy",
                     "month_cost": "sensor.month_cost",
                     "loads": [{"power_entity": "sensor.heater_power", "toggle_entity": "switch.heater"}],
-                    "appliances": [{"entity_id": "sensor.dishwasher", "template": "hc_dishwasher_card"}],
+                    "appliances": [{"entity_id": "sensor.dishwasher", "template": "md_dishwasher_card"}],
                 },
                 "wallbox": {
                     "status_entity": "sensor.wallbox_status",
@@ -1114,13 +1114,13 @@ def test_generates_configured_julian_pages_and_derived_overview_popups(tmp_path:
     assert [card["entity"] for card in _walk_generated_cards(energy["cards"]) if card.get("type") == "custom:marao-energy-period-card"] == ["sensor.month_energy", "sensor.month_cost"]
     assert (root / "components/popups/energy_house_power.yaml").exists()
     wallbox = (root / "views/main/04-wallbox.yaml").read_text(encoding="utf-8")
-    assert "template: hc_wallbox_current_card" in wallbox
+    assert "template: md_wallbox_current_card" in wallbox
     assert "shortcuts:" in wallbox
     media = yaml.load(
         (root / "views/main/05-media.yaml").read_text(encoding="utf-8"),
         Loader=MaraoDashboardLoader,
     )
-    app_grid = next(card for card in _walk_generated_cards(media["cards"]) if card.get("cards", [{}]) and card.get("cards", [{}])[0].get("template") == "hc_media_app_card")
+    app_grid = next(card for card in _walk_generated_cards(media["cards"]) if card.get("cards", [{}]) and card.get("cards", [{}])[0].get("template") == "md_media_app_card")
     assert app_grid["type"] == "custom:marao-control-grid"
     assert app_grid["columns"] == 2
     assert app_grid["cards"][0]["variables"]["app_source"] == "YouTube"
@@ -1454,9 +1454,9 @@ def test_security_page_access_actions_reuse_safe_controls_and_unique_popups(tmp_
     assert source.count("hash: '#page-security-card-2-popup'") == 2  # Duplicate controls own independent sheets.
     assert source.count("hash: '#page-security-card-3-popup'") == 2
     assert "#access-cover-gate" not in source  # Open-only gate uses a direct strict slide.
-    assert source.count("template: hc_access_slide_action_card") == 4
-    assert source.count("template: hc_access_action_card") == 3
-    assert "template: hc_access_hold_action_card" in source
+    assert source.count("template: md_access_slide_action_card") == 4
+    assert source.count("template: md_access_action_card") == 3
+    assert "template: md_access_hold_action_card" in source
     assert source.count("action: toggle") == 1  # Only the ordinary switch.
     for service in ["lock.unlock", "lock.lock", "cover.open_cover", "cover.close_cover"]:
         assert f"action_service: {service}" in source
@@ -1474,7 +1474,7 @@ def test_energy_precision_rejected_before_output(tmp_path: Path, precision: obje
 @pytest.mark.parametrize("source,target,accepted", [
     ("W", "kW", True), ("mW", "MW", True), ("J", "Wh", True),
     ("kWh", "GJ", True), ("Wh", "kW", False), ("EUR", "Wh", False),
-    (None, "kWh", False), ("W", "kw", False), ("W", None, False),
+    (None, "kWh", True), ("", "kWh", True), ("W", "kw", False), ("W", None, False),
 ])
 def test_energy_conversion_uses_actual_metadata(source: str | None, target: str | None, accepted: bool) -> None:
     config = {"name": "Energy", "rooms": [{"name": "Room", "entities": [
@@ -1497,7 +1497,7 @@ def test_energy_formatting_generation_and_independent_graph_sources(tmp_path: Pa
         "loads": [{"name": "Load", "power_entity": {"entity_id": "sensor.power", "variables": {
             "display_unit": "kW", "display_precision": 6}}, "variables": {"show_icon": False}}],
     }, "custom": [{"name": "Custom", "cards": [{"type": "custom:marao-card",
-        "template": "hc_graph_card", "entity": "sensor.energy", "variables": {
+        "template": "md_graph_card", "entity": "sensor.energy", "variables": {
             "display_unit": "kWh", "graph_entity": "sensor.history"}}]}]}}
     registry = [{"entity_id": "sensor.energy", "unit_of_measurement": "Wh"},
                 {"entity_id": "sensor.power", "unit_of_measurement": "W"},
@@ -1527,15 +1527,16 @@ def test_switch_formatting_uses_secondary_unit_and_preserves_legacy_label() -> N
     resolved = resolve_dashboard_config(config, [{"entity_id": "sensor.power", "unit_of_measurement": "W"}])
     entity = _room(resolved)["entities_by_domain"]["switch"][0]
     assert generator._entity_card(entity)["variables"] == config["rooms"][0]["entities"][0]["variables"]
+    resolve_dashboard_config(config, [])  # A late-loading source must not block generation.
     with pytest.raises(ValueError, match="requires a supported source unit"):
-        resolve_dashboard_config(config, [])
+        resolve_dashboard_config(config, [{"entity_id": "sensor.power", "unit_of_measurement": "EUR"}])
     del config["rooms"][0]["entities"][0]["variables"]["display_unit"]
     resolve_dashboard_config(config, [])  # Precision alone needs no guessed dimension.
 
 @pytest.mark.parametrize("columns", [None, 1])
 def test_energy_duplicate_occurrences_remain_independent(columns: int | None) -> None:
     entities = [
-        {"entity_id": "sensor.energy", "template": "hc_graph_card", "variables": {"display_unit": "kWh", "display_precision": 0}},
+        {"entity_id": "sensor.energy", "template": "md_graph_card", "variables": {"display_unit": "kWh", "display_precision": 0}},
         {"entity_id": "sensor.energy", "variables": {"display_unit": "Wh", "display_precision": 6}},
         "sensor.energy",
     ]
@@ -1549,8 +1550,8 @@ def test_energy_duplicate_occurrences_remain_independent(columns: int | None) ->
     assert cards[0]["variables"] == entities[0]["variables"]
     assert cards[1]["variables"] == entities[1]["variables"]
     assert "variables" not in cards[2]
-    assert cards[0]["template"] == "hc_graph_card"
-    assert cards[1]["template"] == cards[2]["template"] == "hc_sensor_card"
+    assert cards[0]["template"] == "md_graph_card"
+    assert cards[1]["template"] == cards[2]["template"] == "md_sensor_card"
 
 
 @pytest.mark.parametrize("key", ["../outside", "unsafe\nfrontend:\n  themes: changed", "Has Spaces", 12])
@@ -1569,7 +1570,7 @@ def test_invalid_dashboard_route_is_rejected_before_writes(tmp_path, key):
     ("climate", "climate.office", {}), ("battery", "sensor.charge", {"device_class": "battery"}),
 ])
 def test_entity_group_resolves_independently_and_preserves_member_options(kind, entity_id, metadata):
-    group = {"template": "hc_entity_group_card", "id": "office-group", "name": "Office", "entity_type": kind,
+    group = {"template": "md_entity_group_card", "id": "office-group", "name": "Office", "entity_type": kind,
              "entities": [entity_id, {"entity_id": entity_id, "name": "Custom", "variables": {"future": 42}, "extension": True}],
              "future": {"keep": True}}
     config = {"config_version": 1, "name": "Groups", "rooms": [{"name": "Room", "columns": 2,
@@ -1589,7 +1590,7 @@ def test_entity_group_resolves_independently_and_preserves_member_options(kind, 
 
 @pytest.mark.parametrize("selection", ["direct", "list", "grouped"])
 def test_empty_entity_group_keeps_identity_without_importing_room_entities(selection):
-    group = {"template": "hc_entity_group_card", "id": "empty-group", "name": "Empty", "entity_type": "light", "entities": []}
+    group = {"template": "md_entity_group_card", "id": "empty-group", "name": "Empty", "entity_type": "light", "entities": []}
     entities = group if selection == "direct" else [group] if selection == "list" else {"entity_group": [group]}
     result = resolve_dashboard_config({"name": "Groups", "rooms": [{"name": "Room", "entities": entities}]})
     actual = _room(result)["ordered_cards"][0]
@@ -1603,13 +1604,13 @@ def test_empty_entity_group_keeps_identity_without_importing_room_entities(selec
     {"id": "../unsafe"}, {"entity_type": "sensor"}, {"popup_filter": "off"}, {"popup_filter": None},
     {"entities": ["cover.blind"]}, {"entities": [{"page": "overview"}]},
     {"entities": [{"entity_id": "light.main", "entities": []}]},
-    {"entities": [{"entity_id": "light.main", "template": "hc_battery_card"}]},
+    {"entities": [{"entity_id": "light.main", "template": "md_battery_card"}]},
     {"entities": [False]}, {"entity_id": "light.main"}, {"name": ""}, {"entities": None}, {"icon": []},
     {"entities": [{"entity_id": "light.main", "template": {}}]},
     {"entities": [{"entity_id": "light.main", "variables": []}]},
 ])
 def test_invalid_entity_group_preflights_without_writes(tmp_path, change):
-    group = {"template": "hc_entity_group_card", "id": "safe-group", "name": "Group", "entity_type": "light", "entities": [], **change}
+    group = {"template": "md_entity_group_card", "id": "safe-group", "name": "Group", "entity_type": "light", "entities": [], **change}
     config = {"name": "Groups", "rooms": [{"name": "Room", "entities": [group]}]}
     with pytest.raises(ValueError, match="Entity Group"):
         write_dashboard(config, tmp_path)
@@ -1617,7 +1618,7 @@ def test_invalid_entity_group_preflights_without_writes(tmp_path, change):
 
 
 def test_entity_group_ids_are_unique_across_overview_and_containers():
-    group = {"template": "hc_entity_group_card", "id": "same", "name": "Group", "entity_type": "light", "entities": []}
+    group = {"template": "md_entity_group_card", "id": "same", "name": "Group", "entity_type": "light", "entities": []}
     config = {"name": "Groups", "overview": {"entity_groups": [group]}, "rooms": [{"name": "Room", "entities": [group]}]}
     with pytest.raises(ValueError, match="Duplicate Entity Group"):
         resolve_dashboard_config(config)
@@ -1628,7 +1629,7 @@ def test_entity_group_ids_are_unique_across_overview_and_containers():
 
 
 def test_battery_group_rejects_known_arbitrary_sensor_and_retains_missing_references():
-    group = {"template": "hc_entity_group_card", "id": "batteries", "name": "Battery", "entity_type": "battery", "entities": ["sensor.charge"]}
+    group = {"template": "md_entity_group_card", "id": "batteries", "name": "Battery", "entity_type": "battery", "entities": ["sensor.charge"]}
     config = {"name": "Groups", "rooms": [{"name": "Room", "entities": [group]}]}
     with pytest.raises(ValueError, match="incompatible"):
         resolve_dashboard_config(config, [{"entity_id": "sensor.charge", "device_class": "temperature"}])
@@ -1640,7 +1641,7 @@ def test_battery_group_rejects_known_arbitrary_sensor_and_retains_missing_refere
 @pytest.mark.parametrize("device_class", [None, "battery"])
 def test_legacy_maintenance_members_survive_page_conversion(tmp_path, explicit, device_class):
     member = {"entity_id": "sensor.fixture_battery", "name": "Saved battery", "variables": {"future": 42}}
-    group = {"template": "hc_entity_group_card", "id": "overview-maintenance", "name": "Maintenance",
+    group = {"template": "md_entity_group_card", "id": "overview-maintenance", "name": "Maintenance",
              "entity_type": "battery", "entities": [member]}
     source = {"config_version": 1, "name": "Groups", "rooms": [{"name": "Room", "entities": [member]}],
               "overview": {"entity_groups": [group]} if explicit else {}}
@@ -1665,7 +1666,7 @@ def test_legacy_maintenance_members_survive_page_conversion(tmp_path, explicit, 
 def test_legacy_group_adapter_preserves_source_options_empty_intent_and_registry_independence():
     source = {"config_version": 1, "name": "Legacy", "rooms": [{"name": "Office", "entities": [
         {"entity_id": "light.main", "variables": {"enable_slider": False}, "future": 42},
-        "cover.blind", "climate.office", {"entity_id": "sensor.office_battery", "template": "hc_battery_card"},
+        "cover.blind", "climate.office", {"entity_id": "sensor.office_battery", "template": "md_battery_card"},
     ]}], "overview": {"weather_entity": "weather.home", "scenes": ["scene.evening"], "extension": True}}
     original = json.loads(json.dumps(source))
     preview = generator.materialize_overview_groups(source)
@@ -1680,7 +1681,7 @@ def test_legacy_group_adapter_preserves_source_options_empty_intent_and_registry
 
 
 def test_reusable_group_generation_preserves_mixed_order_and_stable_scoped_popups(tmp_path):
-    group = {"template": "hc_entity_group_card", "id": "office-group", "name": "Office group", "entity_type": "climate",
+    group = {"template": "md_entity_group_card", "id": "office-group", "name": "Office group", "entity_type": "climate",
              "entities": [{"entity_id": "climate.office", "name": "Configured thermostat", "variables": {"setpoint_label": "Target"}}]}
     other = {**group, "id": "second-group", "name": "Other group"}
     config = {"name": "Groups", "overview": {"entity_groups": []}, "rooms": [{"name": "Room", "columns": 2,
@@ -1690,7 +1691,7 @@ def test_reusable_group_generation_preserves_mixed_order_and_stable_scoped_popup
     path = tmp_path / generated.slug / "views/rooms/00-room.yaml"
     view = _load_view(path)
     cards = view["cards"][1]["cards"]
-    assert [card.get("template", card["type"]) for card in cards] == ["hc_light_card", "hc_entity_group_card", "hc_navigation_card", "hc_entity_group_card", "markdown"]
+    assert [card.get("template", card["type"]) for card in cards] == ["md_light_card", "md_entity_group_card", "md_navigation_card", "md_entity_group_card", "markdown"]
     popups = [card for card in view["cards"] if isinstance(card, dict) and card.get("type") == "custom:marao-popup-card"]
     assert len({popup["hash"] for popup in popups}) == 4
     assert next(popup for popup in popups if popup["hash"] == "#page-room-room-office-group-popup")["cards"][0]["name"] == "Configured thermostat"
@@ -1706,9 +1707,9 @@ def test_reusable_group_generation_preserves_mixed_order_and_stable_scoped_popup
 
 
 def test_cover_groups_keep_access_safety_open_only_and_blind_options(tmp_path):
-    group = {"template": "hc_entity_group_card", "id": "covers", "name": "Access and blinds", "entity_type": "cover", "entities": [
+    group = {"template": "md_entity_group_card", "id": "covers", "name": "Access and blinds", "entity_type": "cover", "entities": [
         {"entity_id": "cover.blind", "variables": {"future": 42}},
-        {"entity_id": "cover.garage", "template": "hc_cover_card"}, "cover.open_only",
+        {"entity_id": "cover.garage", "template": "md_cover_card"}, "cover.open_only",
     ]}
     registry = [{"entity_id": "cover.blind", "device_class": "blind"}, {"entity_id": "cover.garage", "device_class": "garage"},
                 {"entity_id": "cover.open_only", "device_class": "door", "supported_features": 1}]
@@ -1716,24 +1717,24 @@ def test_cover_groups_keep_access_safety_open_only_and_blind_options(tmp_path):
     path = tmp_path / generated.slug / "components/popups/entity_group_covers.yaml"
     popup = _load_view(path)
     assert "entity" not in popup
-    assert [card["template"] for card in popup["cards"]] == ["hc_cover_card", "hc_access_card", "hc_access_slide_action_card"]
+    assert [card["template"] for card in popup["cards"]] == ["md_cover_card", "md_access_card", "md_access_slide_action_card"]
     assert popup["cards"][0]["variables"]["future"] == 42
     assert popup["cards"][1]["variables"]["popup_hash"] == "#entity-group-covers-cover-garage-access"
     assert popup["cards"][2]["variables"]["action_service"] == "cover.open_cover"
     secondary = yaml.load((path.parent / "entity_group_covers_0.yaml").read_text(), Loader=MaraoDashboardLoader)
     assert secondary["hash"] == "#entity-group-covers-cover-garage-access"
-    assert secondary["cards"][0]["cards"][0]["template"] == "hc_access_slide_action_card"
+    assert secondary["cards"][0]["cards"][0]["template"] == "md_access_slide_action_card"
 
 
 def test_overview_group_type_change_retains_reserved_link_identity():
-    group = {"template": "hc_entity_group_card", "id": "overview-lights", "name": "Blinds", "entity_type": "cover", "entities": ["cover.blind"]}
+    group = {"template": "md_entity_group_card", "id": "overview-lights", "name": "Blinds", "entity_type": "cover", "entities": ["cover.blind"]}
     resolved = resolve_dashboard_config({"name": "Groups", "rooms": [], "overview": {"entity_groups": [group]}})
     assert generator._entity_group_card(_home_groups(resolved)[0])["tap_action"]["navigation_path"] == "#overview-lights"
 
 
 @pytest.mark.parametrize("popup_hash", ["#entity-group-controls", "#unsafe/hash", "#entity-group-controls-climate-a_b-modes"])
 def test_group_owned_popup_hashes_preflight_collisions_and_unsafe_links(tmp_path, popup_hash):
-    group = {"template": "hc_entity_group_card", "id": "controls", "name": "Controls", "entity_type": "climate", "entities": [
+    group = {"template": "md_entity_group_card", "id": "controls", "name": "Controls", "entity_type": "climate", "entities": [
         "climate.a_b", {"entity_id": "climate.other", "variables": {"mode_selector_hash": popup_hash}},
     ]}
     with pytest.raises(ValueError, match="popup hash"):
@@ -1742,7 +1743,7 @@ def test_group_owned_popup_hashes_preflight_collisions_and_unsafe_links(tmp_path
 
 
 def test_group_secondary_hashes_distinguish_underscores():
-    group = {"template": "hc_entity_group_card", "id": "controls", "name": "Controls", "entity_type": "climate", "entities": ["climate.a_b", "climate.ab"]}
+    group = {"template": "md_entity_group_card", "id": "controls", "name": "Controls", "entity_type": "climate", "entities": ["climate.a_b", "climate.ab"]}
     resolved = resolve_dashboard_config({"name": "Groups", "rooms": [], "overview": {"entity_groups": [group]}})
     popups = generator._entity_group_secondary_popups(_home_groups(resolved)[0])
     assert [popup["hash"] for popup in popups] == ["#entity-group-controls-climate-a_b-modes", "#entity-group-controls-climate-ab-modes"]
@@ -1753,7 +1754,7 @@ def test_group_secondary_hashes_distinguish_underscores():
     {"cards": [{"type": "custom:marao-popup-card", "hash": "#entity-group-controls", "cards": []}]},
 ])
 def test_group_rejects_other_generated_and_raw_popup_collisions_before_writes(tmp_path, other):
-    group = {"template": "hc_entity_group_card", "id": "controls", "name": "Controls", "entity_type": "light", "entities": []}
+    group = {"template": "md_entity_group_card", "id": "controls", "name": "Controls", "entity_type": "light", "entities": []}
     with pytest.raises(ValueError, match="conflicts with another popup"):
         write_dashboard({"name": "Groups", "rooms": [{"name": "Room", **other, "entities": [group, *other.get("entities", [])]}], "overview": {"entity_groups": []}}, tmp_path)
     assert not list(tmp_path.iterdir())

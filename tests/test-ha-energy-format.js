@@ -64,7 +64,7 @@ async function capture(page, card, filename) {
 }
 async function inspectGallery(page, run, requests) {
   const byLabel = label => reading(page, 'Energy format · ' + label);
-  const text = label => byLabel(label).evaluate(card => card.shadowRoot.querySelector(card._config.template === 'hc_switch_card' ? '.climate' : '.state,.value').textContent.trim());
+  const text = label => byLabel(label).evaluate(card => card.shadowRoot.querySelector(card._config.template === 'md_switch_card' ? '.climate' : '.state,.value').textContent.trim());
   for (const example of manifest.energyFormattingCases) {
     const card = reading(page, example.name);
     await card.scrollIntoViewIfNeeded();
@@ -251,7 +251,7 @@ async function main() {
         await page.evaluate(() => document.fonts.ready);
         const energyRequests = requests.filter(url => url.searchParams.get('filter_entity_id')?.startsWith('sensor.marao_dashboard_test_energy_format_'));
         fs.writeFileSync(path.join(output, run + '-requests.json'), JSON.stringify(energyRequests.map(url => url.pathname + url.search), null, 2));
-        const graphCount = manifest.energyFormattingCases.filter(card => ['hc_graph_card', 'hc_toggle_graph_card'].includes(card.template)).length;
+        const graphCount = manifest.energyFormattingCases.filter(card => ['md_graph_card', 'md_toggle_graph_card'].includes(card.template)).length;
         const warmEnergy = requests.slice(0, warmedRequests).filter(url => url.searchParams.get('filter_entity_id')?.startsWith('sensor.marao_dashboard_test_energy_format_'));
         // HA rebuilds the view once when the requested theme is applied.
         assert.ok(warmEnergy.length > 0 && warmEnergy.length <= graphCount * 2, 'Repeated initial energy history requests');

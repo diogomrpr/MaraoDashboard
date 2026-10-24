@@ -18,7 +18,7 @@
           "columns": 2,
           "entities": [
             {
-              "template": "hc_entity_group_card",
+              "template": "md_entity_group_card",
               "id": "overview-lights",
               "name": "Lights",
               "icon": "mdi:lightbulb-group-outline",
@@ -33,7 +33,7 @@
               "name_key": "overview.lights"
             },
             {
-              "template": "hc_entity_group_card",
+              "template": "md_entity_group_card",
               "id": "overview-blinds",
               "name": "Blinds",
               "icon": "mdi:window-shutter",
@@ -48,7 +48,7 @@
               "name_key": "overview.blinds"
             },
             {
-              "template": "hc_entity_group_card",
+              "template": "md_entity_group_card",
               "id": "overview-climate",
               "name": "Climate",
               "icon": "mdi:thermostat",
@@ -64,7 +64,7 @@
             },
             {
               "id": "card-4",
-              "template": "hc_scene_collection_card",
+              "template": "md_scene_collection_card",
               "name": "Scenes",
               "icon": "mdi:palette-outline",
               "entities": [
@@ -92,7 +92,7 @@
           "entities": [
             {
               "id": "card-1",
-              "template": "hc_room_card",
+              "template": "md_room_card",
               "entity_id": "light.living_room_main",
               "name": "Living Room",
               "icon": "mdi:sofa-outline",
@@ -121,7 +121,7 @@
           "entities": [
             {
               "id": "card-1",
-              "template": "hc_security_card",
+              "template": "md_security_card",
               "entity_id": "alarm_control_panel.home",
               "name": "Home"
             }
@@ -132,7 +132,7 @@
           "entities": [
             {
               "id": "card-2",
-              "template": "hc_access_hold_action_card",
+              "template": "md_access_hold_action_card",
               "entity_id": "button.open_door",
               "name": "Open Door",
               "show_state": false,
@@ -162,7 +162,7 @@
           "entities": [
             {
               "id": "card-1",
-              "template": "hc_graph_card",
+              "template": "md_graph_card",
               "entity_id": "sensor.house_power",
               "name": "House Power",
               "icon": "mdi:flash",
@@ -182,7 +182,7 @@
           "entities": [
             {
               "id": "card-2",
-              "template": "hc_energy_period_card",
+              "template": "md_energy_period_card",
               "entity_id": "sensor.month_energy",
               "name": "Month Power",
               "icon": "mdi:flash",
@@ -199,7 +199,7 @@
           "entities": [
             {
               "id": "card-3",
-              "template": "hc_energy_period_card",
+              "template": "md_energy_period_card",
               "entity_id": "sensor.month_cost",
               "name": "Month Cost",
               "icon": "mdi:currency-eur",
@@ -216,7 +216,7 @@
           "entities": [
             {
               "id": "card-4",
-              "template": "hc_toggle_graph_card",
+              "template": "md_toggle_graph_card",
               "entity_id": "sensor.heater_power",
               "name": "Heater Power",
               "icon": null,
@@ -232,7 +232,7 @@
             {
               "id": "card-5",
               "entity_id": "sensor.dishwasher",
-              "template": "hc_dishwasher_card",
+              "template": "md_dishwasher_card",
               "name": "Dishwasher"
             }
           ]
@@ -252,7 +252,7 @@
           "entities": [
             {
               "id": "card-1",
-              "template": "hc_base_card",
+              "template": "md_base_card",
               "entity_id": "sensor.wallbox_status",
               "name": "Wallbox Status",
               "icon": "mdi:ev-station",
@@ -265,7 +265,7 @@
           "entities": [
             {
               "id": "card-2",
-              "template": "hc_graph_card",
+              "template": "md_graph_card",
               "entity_id": "sensor.wallbox_power",
               "name": "Charging Power",
               "icon": "mdi:flash",
@@ -283,7 +283,7 @@
           "entities": [
             {
               "id": "card-3",
-              "template": "hc_wallbox_current_card",
+              "template": "md_wallbox_current_card",
               "entity_id": "input_number.wallbox_current",
               "name": "Charging Current",
               "variables": {
@@ -298,7 +298,7 @@
           "entities": [
             {
               "id": "card-4",
-              "template": "hc_switch_card",
+              "template": "md_switch_card",
               "entity_id": "switch.wallbox_pause",
               "name": "Pause / Resume",
               "icon": "mdi:pause-circle",
@@ -330,7 +330,7 @@
           "entities": [
             {
               "id": "page-title",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Living Room",
               "show_icon": false,
               "show_state": false,

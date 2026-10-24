@@ -26,7 +26,7 @@ async function loadingFixture(page) {
     window.calls=[];
     const hass={connected:true,connection:{connected:true},language:'en',states:{'light.synthetic':{state:'off',attributes:{supported_color_modes:['hs'],hs_color:[210,65],brightness:128}}},callService:async(...args)=>{calls.push(args);}};
     window.card=document.createElement('marao-card');
-    card.setConfig({type:'custom:marao-card',template:'hc_light_card',entity:'light.synthetic',name:'Safe color light'});
+    card.setConfig({type:'custom:marao-card',template:'md_light_card',entity:'light.synthetic',name:'Safe color light'});
     card.hass=hass; document.querySelector('#cards').append(card);
   });
 }
@@ -98,7 +98,7 @@ async function loadingChecks(browser) {
       const entry = modes => ({ entity_id:'light.synthetic', state:'off', attributes:{ friendly_name:'Safe color light', supported_color_modes:modes, hs_color:[210,65], brightness:128, color_temp_kelvin:3200, min_color_temp_kelvin:2200, max_color_temp_kelvin:6500 } });
       window.hass = { connected:true, connection:{ connected:true }, language:'en', locale:{ language:'en' }, states:{ 'light.synthetic':entry(['hs','color_temp']), 'light.dimmer':entry(['brightness']) },
         callService:async (domain, service, data) => { calls.push({ domain, service, data }); if (window.failService) throw Error('Synthetic light rejected the update'); } };
-      window.config = { type:'custom:marao-card', template:'hc_light_card', entity:'light.synthetic', name:'Safe color light' };
+      window.config = { type:'custom:marao-card', template:'md_light_card', entity:'light.synthetic', name:'Safe color light' };
       window.card = document.createElement('marao-card'); card.id='color-card'; card.setConfig(config); card.hass=hass; document.querySelector('#cards').append(card);
       window.dimmer = document.createElement('marao-card'); dimmer.id='dimmer-card'; dimmer.setConfig({...config,entity:'light.dimmer'}); dimmer.hass=hass; document.querySelector('#cards').append(dimmer);
       window.resetCard = extra => { calls.length=0; card.setConfig({...config,...extra}); card.hass=hass; window.scrollTo(0,0); };

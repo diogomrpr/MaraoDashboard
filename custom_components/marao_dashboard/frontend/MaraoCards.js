@@ -1,10 +1,11 @@
-const [dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities] = await Promise.all([
-  'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js',
+const [dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities, names] = await Promise.all([
+  'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js', 'MaraoNames.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
 const { bindDropdown, dropdownStyles } = dropdownModule;
 const { bindSlider, sliderMarkup, sliderStyles } = sliderModule;
 const { lightColorCapabilities, lightColorAppearance } = lightCapabilities;
 export { lightColorCapabilities };
+const { canonicalCard, canonicalTemplate } = names;
 const { createHistoryPlaceholder, createPowerToolbar } = historyLayout;
 export { createHistoryPlaceholder };
 const { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic, navigate, fullscreenUsers, findElements, focusRestorer, focusableElements, deepActiveElement, FOCUSABLE, beginFrontendInteraction } = navigationModule;
@@ -66,12 +67,13 @@ export function accessOpenerService(entity, configured) {
 }
 
 export function accessCardConfig(config, hass) {
-  const roles = { popup: "hc_access_card", slide: "hc_access_slide_action_card", close: "hc_access_action_card", hold: "hc_access_hold_action_card" };
+  config = canonicalCard(config);
+  const roles = { popup: "md_access_card", slide: "md_access_slide_action_card", close: "md_access_action_card", hold: "md_access_hold_action_card" };
   if (!Object.values(roles).includes(config.template)) return config;
   let mode = config.variables?.access_mode ?? "auto";
   const domain = domainOf(config.entity);
   if (mode === "auto") {
-    if (config.template !== "hc_access_card" || ["lock", "cover"].includes(domain)) return config;
+    if (config.template !== "md_access_card" || ["lock", "cover"].includes(domain)) return config;
     mode = domain === "script" ? "slide" : "hold";
   }
   const domains = { popup: ["lock", "cover"], slide: ["lock", "cover", "button", "switch", "script"], close: ["lock", "cover"], hold: ["button", "switch", "input_boolean", "alarm_control_panel"] };
@@ -138,7 +140,7 @@ function isServiceAction(action) {
 }
 
 function actionControlLabel(config, state, entity, action, hass) {
-  if (config.template === 'hc_camera_card' && action?.action === 'fullscreen') return localize('camera.fullscreen', hass, {}, 'Open full screen');
+  if (config.template === 'md_camera_card' && action?.action === 'fullscreen') return localize('camera.fullscreen', hass, {}, 'Open full screen');
   const actionLabelKey = text(config?.variables?.action_label_key).trim();
   if (actionLabelKey) {
     const fallback = text(config?.variables?.action_label || config?.name || actionLabelKey).trim();
@@ -146,7 +148,7 @@ function actionControlLabel(config, state, entity, action, hass) {
   }
   const configured = text(config?.name).trim();
   if (configured) return configured;
-  if (config.template === "hc_media_app_card" && config.variables?.app_source) return text(config.variables.app_source);
+  if (config.template === "md_media_app_card" && config.variables?.app_source) return text(config.variables.app_source);
   const command = text(action?.data?.command).trim();
   if (command) return localize(`controls.command.${command.toLowerCase()}`, hass, {}, climateModeLabel(command, hass));
   const service = text(action?.service || action?.perform_action).split(".").pop();
@@ -259,7 +261,7 @@ export function climateModeLabel(value, hass = null) {
 }
 
 function presentationDomain(kind, entity) {
-  return ({ hc_weather_card: "weather", hc_security_card: "alarm_control_panel", hc_vacuum_card: "vacuum", hc_camera_card: "camera", hc_media_card: "media_player", person: "person" })[kind] || domainOf(entity);
+  return ({ md_weather_card: "weather", md_security_card: "alarm_control_panel", md_vacuum_card: "vacuum", md_camera_card: "camera", md_media_card: "media_player", person: "person" })[kind] || domainOf(entity);
 }
 
 function presentationState(state, entity, kind) {
@@ -267,22 +269,22 @@ function presentationState(state, entity, kind) {
   return { ...state, entity_id: `${domain}.${text(entity).split('.').slice(1).join('.') || 'marao'}`, attributes: state.attributes || {} };
 }
 
-export function binaryState(entity, state, kind = "hc_base_card") {
-  if (["hc_access_action_card", "hc_access_hold_action_card", "hc_access_slide_action_card"].includes(kind)) return null;
-  if (["hc_title_card", "hc_cover_card", "hc_climate_card", "hc_media_card", "hc_media_app_card", "hc_camera_card", "hc_security_card", "hc_weather_card", "hc_vacuum_card", "hc_dishwasher_card", "hc_scene_card", "hc_number_card", "hc_wallbox_current_card", "hc_battery_card"].includes(kind)) return null;
+export function binaryState(entity, state, kind = "md_base_card") {
+  if (["md_access_action_card", "md_access_hold_action_card", "md_access_slide_action_card"].includes(kind)) return null;
+  if (["md_title_card", "md_cover_card", "md_climate_card", "md_media_card", "md_media_app_card", "md_camera_card", "md_security_card", "md_weather_card", "md_vacuum_card", "md_dishwasher_card", "md_scene_card", "md_number_card", "md_wallbox_current_card", "md_battery_card"].includes(kind)) return null;
   const value = text(state?.state);
   const domain = domainOf(entity);
   if (domain === "lock" && ["locked", "unlocked"].includes(value)) return value === "unlocked";
-  if (kind === "hc_washing_machine_card" && ["running", "idle"].includes(value)) return value === "running";
+  if (kind === "md_washing_machine_card" && ["running", "idle"].includes(value)) return value === "running";
   return ["light", "fan", "switch", "input_boolean", "binary_sensor"].includes(domain) && ["on", "off"].includes(value) ? value === "on" : null;
 }
 
 export function entityStateLabel(state, entity, kind, hass) {
   const value = text(state?.state, hass?.states ? "unknown" : "loading");
   if (["loading", "unknown", "unavailable"].includes(value)) return localize(`common.${value}`, hass, {}, value === "loading" ? "Loading…" : value);
-  if (kind === 'hc_battery_card' && batteryReading(value) === null) return localize('common.unavailable', hass, {}, 'Unavailable');
-  if (kind === "hc_climate_card") return climateModeLabel(value, hass);
-  if (kind === "hc_dishwasher_card") {
+  if (kind === 'md_battery_card' && batteryReading(value) === null) return localize('common.unavailable', hass, {}, 'Unavailable');
+  if (kind === "md_climate_card") return climateModeLabel(value, hass);
+  if (kind === "md_dishwasher_card") {
     const operation = { run: "running", pause: "paused", finish: "finished", inactive: "idle", ready: "ready", delayedstart: "delayed", actionrequired: "attention", aborting: "aborting" }[value] || value;
     return localize(`dishwasher.${operation}`, hass, {}, localize(`common.${value}`, hass, {}, value));
   }
@@ -339,7 +341,7 @@ export function entityGroupState(type, entities, hass) {
   return { state, label, activeEntities, unavailableEntities, available: usable.length, reading, minimumReading };
 }
 
-function readingMarkup(entity, name, icon, hass, kind = "hc_sensor_card") {
+function readingMarkup(entity, name, icon, hass, kind = "md_sensor_card") {
   const state = stateOf(hass, entity);
   const label = name || state.attributes?.friendly_name || entity;
   const unavailable = !hass?.states || ["unknown", "unavailable"].includes(text(state.state, "unknown"));
@@ -367,12 +369,12 @@ export function climateModeIcon(value) {
 export function stateAppearance(kind, state, config, hass) {
   const variables = config?.variables || {};
   const value = text(state).toLowerCase();
-  if (kind === 'hc_light_card' && value === 'on' && variables.use_light_color === true
+  if (kind === 'md_light_card' && value === 'on' && variables.use_light_color === true
     && hass?.connected !== false && hass?.connection?.connected !== false) {
     const appearance = lightColorAppearance(stateOf(hass, config.entity));
     if (appearance) return appearance;
   }
-  const active = variables.active_color || variables.card_color || variables.hc_card_color;
+  const active = variables.active_color || variables.card_color || variables.md_card_color;
   const green = "var(--color-green)";
   const red = "var(--color-red)";
   const orange = "var(--color-orange)";
@@ -385,37 +387,37 @@ export function stateAppearance(kind, state, config, hass) {
   let background;
   let foreground;
 
-  if (kind === "hc_battery_card") {
+  if (kind === "md_battery_card") {
     const percentage = batteryReading(state);
     background = percentage !== null ? active || (percentage >= 80 ? green : percentage >= 20 ? "var(--color-yellow)" : red) : undefined;
-  } else if (["hc_access_action_card", "hc_access_hold_action_card", "hc_access_slide_action_card"].includes(kind)) {
+  } else if (["md_access_action_card", "md_access_hold_action_card", "md_access_slide_action_card"].includes(kind)) {
     if (!["unknown", "unavailable"].includes(value)) {
       background = variables.action_color;
       accent = variables.action_color || active;
     }
-  } else if (kind === "hc_access_card") {
+  } else if (kind === "md_access_card") {
     if (["closed", "locked"].includes(value)) background = green;
     else if (["open", "unlocked"].includes(value)) background = red;
     else if (["opening", "closing"].includes(value)) background = orange;
-  } else if (kind === "hc_security_card" || kind === "hc_navigation_card") {
+  } else if (kind === "md_security_card" || kind === "md_navigation_card") {
     if (["armed_home", "disarmed"].includes(value)) background = value === "armed_home" ? green : undefined;
     else if (value === "armed_away" || value === "triggered") background = red;
     else if (value === "arming") background = orange;
-  } else if (kind === "hc_sensor_card") {
+  } else if (kind === "md_sensor_card") {
     if (value === "on") background = active || "var(--primary-color)";
     else if (value === "closed" || value === "locked") background = green;
     else if (value === "open") background = red;
     else if (value === "unlocked") background = "var(--color-yellow)";
-  } else if (kind === "hc_cover_card") {
+  } else if (kind === "md_cover_card") {
     accent = active || blue;
     if (["open", "opening", "closing"].includes(value)) background = active || blue;
-  } else if (["hc_light_card", "hc_fan_card"].includes(kind)) {
-    accent = active || (kind === "hc_light_card" ? gold : teal);
+  } else if (["md_light_card", "md_fan_card"].includes(kind)) {
+    accent = active || (kind === "md_light_card" ? gold : teal);
     if (value === "on") background = accent;
-  } else if (kind === "hc_switch_card") {
+  } else if (kind === "md_switch_card") {
     accent = active || "var(--color-green)";
     if (value === "on") background = active || "var(--color-green)";
-  } else if (kind === "hc_climate_card") {
+  } else if (kind === "md_climate_card") {
     const colors = {
       heat: orange,
       heating: orange,
@@ -431,37 +433,37 @@ export function stateAppearance(kind, state, config, hass) {
     };
     if (!["off", "unavailable", "unknown"].includes(value)) background = colors[value] || "var(--primary-color)";
     accent = background || active;
-  } else if (kind === "hc_number_card") {
+  } else if (kind === "md_number_card") {
     accent = active || "var(--primary-color)";
-  } else if (kind === "hc_media_card" && !["off", "unknown", "unavailable"].includes(value)) {
-    background = variables.hc_background_color || "var(--color-purple)";
-  } else if (kind === "hc_media_app_card") {
+  } else if (kind === "md_media_card" && !["off", "unknown", "unavailable"].includes(value)) {
+    background = variables.md_background_color || "var(--color-purple)";
+  } else if (kind === "md_media_app_card") {
     const app = mediaAppBrand(config);
     background = active || app?.color;
     foreground = active ? undefined : app?.text;
-  } else if (kind === "hc_vacuum_card") {
+  } else if (kind === "md_vacuum_card") {
     background = { docked: green, cleaning: teal, returning: orange, error: red }[value];
-  } else if (kind === "hc_wallbox_current_card") {
+  } else if (kind === "md_wallbox_current_card") {
     accent = active || "var(--primary-color)";
     if (!["unknown", "unavailable"].includes(value)) {
       background = active || "var(--ha-card-background,var(--card-background-color))";
       foreground = active ? "var(--active-text-color, #fff)" : "var(--primary-text-color)";
     }
-  } else if (kind === "hc_room_card") {
+  } else if (kind === "md_room_card") {
     if (value === "on") background = "var(--room-card-active-background,var(--primary-color))";
-  } else if (kind === "hc_toggle_graph_card") {
+  } else if (kind === "md_toggle_graph_card") {
     if (stateOf(hass, text(variables.toggle_entity)).state === "on") background = active || "var(--primary-color)";
   }
 
-  const unavailable = ["unavailable", "unknown"].includes(value) || kind === 'hc_battery_card' && value !== 'loading' && batteryReading(value) === null;
+  const unavailable = ["unavailable", "unknown"].includes(value) || kind === 'md_battery_card' && value !== 'loading' && batteryReading(value) === null;
   if (unavailable) return { unavailable: true };
   const binary = binaryState(Array.isArray(variables.summary_entities) && variables.summary_entities.length ? "binary_sensor.marao_summary" : config?.entity, { state: value }, kind);
-  if (binary === false && ["hc_access_action_card", "hc_access_hold_action_card", "hc_access_slide_action_card"].includes(kind)) background = undefined;
+  if (binary === false && ["md_access_action_card", "md_access_hold_action_card", "md_access_slide_action_card"].includes(kind)) background = undefined;
   if (binary && !background) background = active || domainBackground || blue;
-  if (kind === "hc_navigation_card") {
-    background = binary === false ? undefined : variables.hc_color || background;
+  if (kind === "md_navigation_card") {
+    background = binary === false ? undefined : variables.md_color || background;
   }
-  if (kind === "hc_toggle_graph_card") {
+  if (kind === "md_toggle_graph_card") {
     const enabled = stateOf(hass, text(variables.toggle_entity)).state === "on";
     const content = enabled ? variables.active_content_color : variables.inactive_name_color;
     const defaultContent = enabled ? (/^var\(\s*--color-(?:blue|yellow|orange|gold|peach|teal|lilac)\s*[,)]/.test(background) ? "var(--color-black)" : "var(--text-primary-color,var(--active-text-color))") : undefined;
@@ -475,7 +477,7 @@ export function stateAppearance(kind, state, config, hass) {
   foreground = primaryBackground ? "var(--text-primary-color,var(--active-text-color))" : /^var\(\s*--color-(?:blue|yellow|orange|gold|peach|teal|lilac)\s*[,)]/.test(background)
     ? "var(--color-black)" : foreground || "var(--active-text-color)";
   const iconBackground = primaryBackground || foreground === "var(--color-black)" ? "var(--active-overlay-color)" : undefined;
-  return { background, text: foreground, icon: kind === "hc_navigation_card" ? variables.hc_icon_color || foreground : foreground, ...(iconBackground ? { iconBackground } : {}), accent, unavailable };
+  return { background, text: foreground, icon: kind === "md_navigation_card" ? variables.md_icon_color || foreground : foreground, ...(iconBackground ? { iconBackground } : {}), accent, unavailable };
 }
 
 export function notifyActionError(hass, error) {
@@ -659,20 +661,20 @@ export function serviceOutcome(owner) {
 }
 
 export function cardProblem(config, hass, { error = "", contentError = "", loading = false } = {}) {
-  const kind = text(config.template, "hc_base_card");
+  const kind = text(config.template, "md_base_card");
   const variables = config.variables || {};
   const entity = text(config.entity);
   const summaries = Array.isArray(variables.summary_entities) ? variables.summary_entities : [];
-  const summary = kind === 'hc_entity_group_card' || kind === 'hc_room_card' || summaries.length > 0;
-  const readings = kind === "hc_glance_card" ? Array.from({ length: 3 }, (_, index) => variables[`entity${index + 1}`]).filter(Boolean) : [];
-  const roomMembers = kind === "hc_room_card" ? roomLightEntities(config) : [];
-  const content = kind === "hc_room_card" ? roomMembers : [...new Set(summaries.length ? summaries : [entity, ...readings].filter(Boolean))];
+  const summary = kind === 'md_entity_group_card' || kind === 'md_room_card' || summaries.length > 0;
+  const readings = kind === "md_glance_card" ? Array.from({ length: 3 }, (_, index) => variables[`entity${index + 1}`]).filter(Boolean) : [];
+  const roomMembers = kind === "md_room_card" ? roomLightEntities(config) : [];
+  const content = kind === "md_room_card" ? roomMembers : [...new Set(summaries.length ? summaries : [entity, ...readings].filter(Boolean))];
   const disconnected = hass?.connected === false || hass?.connection?.connected === false;
   if (!content.length && !error && !contentError) return null;
   if (!hass?.states) return { kind: "loading", reason: localize("common.loading", hass, {}, "Loading…") };
   const failed = entities => entities.filter(id => !hass.states[id] || ["unknown", "unavailable"].includes(text(hass.states[id].state, "unknown")));
-  const failedContent = kind === 'hc_entity_group_card' ? entityGroupState(variables.entity_type, summaries, hass).unavailableEntities
-    : kind === 'hc_battery_card' && batteryReading(hass.states[entity]?.state) === null ? [entity] : failed(content);
+  const failedContent = kind === 'md_entity_group_card' ? entityGroupState(variables.entity_type, summaries, hass).unavailableEntities
+    : kind === 'md_battery_card' && batteryReading(hass.states[entity]?.state) === null ? [entity] : failed(content);
   const complete = disconnected || content.length && failedContent.length === content.length;
   const details = [];
   let severity;
@@ -683,12 +685,12 @@ export function cardProblem(config, hass, { error = "", contentError = "", loadi
   if (error) details.push(localize("actions.failed", hass, { error }, `Action failed: ${error}`));
   if (contentError) details.push(contentError);
   const value = text(hass.states[entity]?.state);
-  const fault = kind !== "hc_room_card" && (domainOf(entity) === "lock" && value === "jammed"
-    || (domainOf(entity) === "vacuum" || kind === "hc_vacuum_card") && value === "error"
-    || kind === "hc_dishwasher_card" && ["error", "actionrequired", "attention"].includes(value)
-    || kind === "hc_washing_machine_card" && value === "error"
-    || (domainOf(entity) === "alarm_control_panel" || kind === "hc_security_card") && value === "triggered");
-  for (const [key, label] of kind === "hc_dishwasher_card" ? [["salt_entity", "salt"], ["rinse_aid_entity", "rinse_aid"]] : []) {
+  const fault = kind !== "md_room_card" && (domainOf(entity) === "lock" && value === "jammed"
+    || (domainOf(entity) === "vacuum" || kind === "md_vacuum_card") && value === "error"
+    || kind === "md_dishwasher_card" && ["error", "actionrequired", "attention"].includes(value)
+    || kind === "md_washing_machine_card" && value === "error"
+    || (domainOf(entity) === "alarm_control_panel" || kind === "md_security_card") && value === "triggered");
+  for (const [key, label] of kind === "md_dishwasher_card" ? [["salt_entity", "salt"], ["rinse_aid_entity", "rinse_aid"]] : []) {
     if (variables[key] && dishwasherWarning(hass.states[variables[key]])) {
       details.push(localize(`dishwasher.${label}`, hass, {}, label.replaceAll("_", " ")));
       severity ||= "warning";
@@ -696,12 +698,12 @@ export function cardProblem(config, hass, { error = "", contentError = "", loadi
   }
   if (fault) details.push(entityStateLabel(hass.states[entity], entity, kind, hass));
   if (error || contentError || fault) severity = "error";
-  const targets = [kind === "hc_toggle_graph_card" ? variables.toggle_entity : null,
+  const targets = [kind === "md_toggle_graph_card" ? variables.toggle_entity : null,
     ...roomMembers];
-  if (kind === "hc_switch_card") targets.push(variables.power_entity);
-  if (kind === "hc_header_card") targets.push(variables.person_entity, variables.air_quality_sensor);
-  if (kind === "hc_dishwasher_card") targets.push(...["progress_entity", "remaining_time_entity", "active_program_entity", "salt_entity", "rinse_aid_entity"].map(key => variables[key]));
-  if (variables.graph_entity && (["hc_graph_card", "hc_toggle_graph_card"].includes(kind) || variables.show_graph === true)) targets.push(variables.graph_entity);
+  if (kind === "md_switch_card") targets.push(variables.power_entity);
+  if (kind === "md_header_card") targets.push(variables.person_entity, variables.air_quality_sensor);
+  if (kind === "md_dishwasher_card") targets.push(...["progress_entity", "remaining_time_entity", "active_program_entity", "salt_entity", "rinse_aid_entity"].map(key => variables[key]));
+  if (variables.graph_entity && (["md_graph_card", "md_toggle_graph_card"].includes(kind) || variables.show_graph === true)) targets.push(variables.graph_entity);
   for (const action of [config.tap_action, config.hold_action]) {
     if (!isServiceAction(action)) continue;
     const target = action.target?.entity_id || action.data?.entity_id || action.entity_id || (action.target?.area_id || action.target?.device_id ? null : entity);
@@ -793,17 +795,17 @@ export async function performAction(hass, action, entity, onOutcome) {
 
 export function standardControl(config = {}) {
   const native = /^custom:marao-native-(light|fan|cover|access|access-slide-action|access-hold-action)-card$/.exec(config.type || '');
-  const kind = native ? 'hc_' + native[1].replaceAll('-', '_') + '_card' : config.template;
-  if (['hc_light_card', 'hc_fan_card', 'hc_cover_card', 'hc_access_card', 'hc_access_slide_action_card'].includes(kind)) return true;
+  const kind = native ? 'md_' + native[1].replaceAll('-', '_') + '_card' : config.template;
+  if (['md_light_card', 'md_fan_card', 'md_cover_card', 'md_access_card', 'md_access_slide_action_card'].includes(kind)) return true;
   const service = config.variables?.action_service || config.action_service || config.tap_action?.service || config.tap_action?.perform_action;
-  if (kind?.startsWith('hc_access_') && ['lock.unlock', 'cover.open_cover'].includes(service)) return true;
-  if (kind === 'hc_access_action_card') return ['lock.lock', 'lock.unlock', 'cover.close_cover', 'cover.open_cover'].includes(service);
-  return kind === 'hc_access_hold_action_card' && ['lock', 'cover'].includes(domainOf(config.entity));
+  if (kind?.startsWith('md_access_') && ['lock.unlock', 'cover.open_cover'].includes(service)) return true;
+  if (kind === 'md_access_action_card') return ['lock.lock', 'lock.unlock', 'cover.close_cover', 'cover.open_cover'].includes(service);
+  return kind === 'md_access_hold_action_card' && ['lock', 'cover'].includes(domainOf(config.entity));
 }
 
 // Structural hosts never establish a content section's height.
 export function ownedContent(config = {}) {
-  if (config.type === 'custom:marao-card') return Boolean(config.template) && !['hc_title_card', 'hc_navbar_card', 'hc_popup_card'].includes(config.template);
+  if (config.type === 'custom:marao-card') return Boolean(config.template) && !['md_title_card', 'md_navbar_card', 'md_popup_card'].includes(config.template);
   return /^custom:marao-native-/.test(config.type || '') && !/-(title|navbar|popup)-card$/.test(config.type)
     || ['custom:marao-timeline-card', 'custom:marao-energy-period-card', 'custom:marao-frigate-events-card', 'custom:marao-power-history-card', 'custom:marao-slide-to-open'].includes(config.type);
 }
@@ -1138,8 +1140,8 @@ export class MaraoCard extends BaseElement {
   setConfig(config) {
     config = accessCardConfig(config, this._hass);
     this._layoutMetadata = {};
-    if (config.template === 'hc_light_card' && Object.hasOwn(config.variables || {}, 'use_light_color') && typeof config.variables.use_light_color !== 'boolean') throw new Error(localize('light.invalid_color_background', this._hass, {}, 'Use light color as background must be a boolean.'));
-    if (config.template === 'hc_camera_card' && Object.hasOwn(config.variables || {}, 'preload_stream') && typeof config.variables.preload_stream !== 'boolean') throw new Error(localize('camera.invalid_preload', this._hass, {}, 'Preload stream must be a boolean.'));
+    if (config.template === 'md_light_card' && Object.hasOwn(config.variables || {}, 'use_light_color') && typeof config.variables.use_light_color !== 'boolean') throw new Error(localize('light.invalid_color_background', this._hass, {}, 'Use light color as background must be a boolean.'));
+    if (config.template === 'md_camera_card' && Object.hasOwn(config.variables || {}, 'preload_stream') && typeof config.variables.preload_stream !== 'boolean') throw new Error(localize('camera.invalid_preload', this._hass, {}, 'Preload stream must be a boolean.'));
     this._stateEntities = [...new Set(referencedEntities(config))];
     this._stateReferences = null;
     const previousGraph = this._graphEntity();
@@ -1177,7 +1179,7 @@ export class MaraoCard extends BaseElement {
     this._hass = value;
     this._serviceReady = serviceConnectionReady(value);
     this._camera?.update(value, entity, this._label(entity, this._config, stateOf(value, entity)));
-    if (this._config.template === "hc_alarm_controls_card") {
+    if (this._config.template === "md_alarm_controls_card") {
       if (!this._serviceReady || !serviceTargetReady(value, entity)) { this._clearAlarmPIN(); this._cancelHold(); }
       this._renderAlarm();
       return;
@@ -1185,7 +1187,7 @@ export class MaraoCard extends BaseElement {
     this._subscribeClimate();
     if (this._climateEntity) reconcileClimate(this._climateEntity, value, previousState !== value?.states?.[entity]);
     const graphEntity = this._config.variables?.graph_entity || this._config.variables?.power_entity
-      || (["hc_graph_card", "hc_toggle_graph_card"].includes(this._config.template) ? entity : "");
+      || (["md_graph_card", "md_toggle_graph_card"].includes(this._config.template) ? entity : "");
     const graphAvailability = this._graphAvailability(graphEntity, value);
     if (graphEntity && this._graphAvailabilityState !== graphAvailability) {
       this._graphRequests.delete(graphEntity);
@@ -1200,7 +1202,7 @@ export class MaraoCard extends BaseElement {
     this._graphAvailabilityState = graphAvailability;
     const accessSlide = this.shadowRoot?.querySelector('marao-slide-to-open');
     // Keep the elements under a scrolling finger mounted when other entities update.
-    if (previous?.states && value?.states && this._config.template !== 'hc_header_card'
+    if (previous?.states && value?.states && this._config.template !== 'md_header_card'
       && wasServiceReady === this._serviceReady
       && previous.connected === value.connected && previous.connection?.connected === value.connection?.connected
       && ["themes", "locale", "language", "localize", "entities", "services", "config", "callApi"].every(key => previous[key] === value[key])
@@ -1239,7 +1241,7 @@ export class MaraoCard extends BaseElement {
   }
 
   _syncCamera() {
-    if (this._config.template !== "hc_camera_card" || this.preview || !this.isConnected) { this._disposeCamera(); return; }
+    if (this._config.template !== "md_camera_card" || this.preview || !this.isConnected) { this._disposeCamera(); return; }
     const entity = text(this._config.entity), state = layoutState(this, stateOf(this._hass, entity));
     const label = this._label(entity, this._config, state);
     if (this._camera) { this._camera.update(this._hass, entity, label); return; }
@@ -1301,7 +1303,7 @@ export class MaraoCard extends BaseElement {
     updateCardSurface(this.shadowRoot, markup, 'ha-card', (surface, next) => {
       const previous = [...surface.childNodes];
       const cameraSlot = this._camera?.slot || this._cameraSlot;
-      const picker = ['hc_scene_card','hc_climate_card'].includes(this._config.template) ? surface.querySelector('[data-scene-picker]') : null;
+      const picker = ['md_scene_card','md_climate_card'].includes(this._config.template) ? surface.querySelector('[data-scene-picker]') : null;
       const nextPicker = picker ? next.querySelector('[data-scene-picker]') : null;
       if (picker && nextPicker && picker.getAttribute('data-scene-identity') === nextPicker.getAttribute('data-scene-identity')) {
         // Keep the open menu attached: reparenting a popover closes it and loses its scroll.
@@ -1357,7 +1359,7 @@ export class MaraoCard extends BaseElement {
       .alarm-body input { box-sizing:border-box; width:100%; min-width:0; height:max(48px,calc(1.25em + 20px)); min-height:48px; padding:10px; border:1px solid currentColor; border-radius:12px; background:var(--ha-card-background,var(--card-background-color)); color:inherit; font:inherit; outline:none; }
       @container marao-card (max-width:240px) { .alarm-actions { grid-template-columns:minmax(0,1fr); } }
     </style><ha-card style="${esc(problemStyle(problem) || "")}">${problem && problem.kind !== "loading" ? `<button class="card-action problem-details" data-problem-details type="button" aria-label="${esc(problem.reason)}"></button>` : ""}<div class="alarm-body">
-      <div class="state" aria-live="polite">${esc(problem ? problemLabel(problem, this._hass) : entityStateLabel(state, entity, "hc_security_card", this._hass))}</div>
+      <div class="state" aria-live="polite">${esc(problem ? problemLabel(problem, this._hass) : entityStateLabel(state, entity, "md_security_card", this._hass))}</div>
       ${`<label${!codeFormat ? ' class="placeholder" aria-hidden="true"' : ""}>${esc(label)}<input data-alarm-code type="password" inputmode="${codeFormat === "number" ? "numeric" : "text"}" autocomplete="off" aria-label="${esc(label)}"${!codeFormat || !ready || this._alarmBusy ? " disabled" : ""}></label>`}
       <div class="alarm-actions">${actions.map(action => {
         const name = localize(`alarm.${action.mode}`, this._hass, {}, action.mode.replaceAll("_", " "));
@@ -1405,7 +1407,7 @@ export class MaraoCard extends BaseElement {
   }
 
   _subscribeClimate() {
-    const entity = this._climateConnected && this._config.template === "hc_climate_card" && domainOf(this._config.entity) === "climate" ? this._config.entity : "";
+    const entity = this._climateConnected && this._config.template === "md_climate_card" && domainOf(this._config.entity) === "climate" ? this._config.entity : "";
     if (entity === this._climateEntity) return;
     const previous = climateRequests.get(this._climateEntity);
     if (previous) {
@@ -1428,7 +1430,7 @@ export class MaraoCard extends BaseElement {
   }
 
   _sliderCurrent(kind, attrs = {}) {
-    return { hc_light_card: Number(attrs.brightness) * 100 / 255 || 0, hc_cover_card: Number(attrs.current_position) || 0, hc_fan_card: Number(attrs.percentage) || 0 }[kind];
+    return { md_light_card: Number(attrs.brightness) * 100 / 255 || 0, md_cover_card: Number(attrs.current_position) || 0, md_fan_card: Number(attrs.percentage) || 0 }[kind];
   }
 
   _cancelSliderGesture() {
@@ -1439,32 +1441,32 @@ export class MaraoCard extends BaseElement {
   }
 
   _range(entity, state, kind, disabled = false) {
-    if (["hc_light_card", "hc_fan_card"].includes(kind) && this._config.variables?.enable_slider === false) return "";
+    if (["md_light_card", "md_fan_card"].includes(kind) && this._config.variables?.enable_slider === false) return "";
     const attrs = state.attributes || {};
-    if (kind === "hc_light_card" && Array.isArray(attrs.supported_color_modes)
+    if (kind === "md_light_card" && Array.isArray(attrs.supported_color_modes)
       && !attrs.supported_color_modes.some((mode) => mode !== "onoff" && mode !== "unknown")) return "";
-    if (kind === "hc_fan_card" && attrs.supported_features != null && !(Number(attrs.supported_features) & 1)) return "";
+    if (kind === "md_fan_card" && attrs.supported_features != null && !(Number(attrs.supported_features) & 1)) return "";
     const key = `${kind}:${entity}`;
-    if (kind === "hc_climate_card") {
+    if (kind === "md_climate_card") {
       const settings = climateSettings(entity, state);
       const target = climateTarget(settings.attributes, settings.mode);
       const label = this._config.variables?.setpoint_label || localize("climate.target_temperature", this._hass, {}, "Target temperature");
       return numberStepper(target, label, "", "climate-stepper", disabled, this._hass);
     }
-    if (kind === "hc_number_card") {
+    if (kind === "md_number_card") {
       const value = Number(state.state);
       return numberStepper(Number.isFinite(value) ? value : '—', this._label(entity, this._config, state), text(attrs.unit_of_measurement), "", disabled, this._hass);
     }
-    if (kind === "hc_wallbox_current_card") {
+    if (kind === "md_wallbox_current_card") {
       const value = Number(state.state);
       return numberStepper(Number.isFinite(value) ? value : '—', this._label(entity, this._config, state), text(attrs.unit_of_measurement || 'A'), "wallbox-stepper", disabled, this._hass);
     }
     const ranges = {
-      hc_light_card: [0, 100, this._sliderCurrent(kind, attrs), "brightness", 1],
-      hc_cover_card: [0, 100, this._sliderCurrent(kind, attrs), "position", 1],
-      hc_fan_card: [0, 100, this._sliderCurrent(kind, attrs), "percentage", 1],
+      md_light_card: [0, 100, this._sliderCurrent(kind, attrs), "brightness", 1],
+      md_cover_card: [0, 100, this._sliderCurrent(kind, attrs), "position", 1],
+      md_fan_card: [0, 100, this._sliderCurrent(kind, attrs), "percentage", 1],
     }[kind];
-    if (kind === "hc_access_slide_action_card") {
+    if (kind === "md_access_slide_action_card") {
       const renderedState = disabled ? "unavailable" : text(state.state);
       return `<marao-slide-to-open entity="${esc(entity)}" state="${esc(renderedState)}" aria-disabled="${disabled}"></marao-slide-to-open>`;
     }
@@ -1553,14 +1555,14 @@ export class MaraoCard extends BaseElement {
   _energyGraphSource(state) {
     return Object.hasOwn(energyUnits, state.attributes?.unit_of_measurement)
       || ["power", "energy", "monetary"].includes(state.attributes?.device_class)
-      || ["hc_graph_card", "hc_toggle_graph_card", "hc_switch_card", "hc_sensor_card", "hc_base_card"].includes(this._config.template || "hc_base_card")
+      || ["md_graph_card", "md_toggle_graph_card", "md_switch_card", "md_sensor_card", "md_base_card"].includes(this._config.template || "md_base_card")
         && energyFormatting(this._config.variables || {});
   }
 
   _graphValues(entity, variables = {}) {
     const end = Date.now(), start = end - 24 * 60 * 60 * 1000;
     const state = stateOf(this._hass, entity);
-    const energy = this._energyGraphSource(state), historyVariables = this._config.template === 'hc_climate_card' ? {} : variables;
+    const energy = this._energyGraphSource(state), historyVariables = this._config.template === 'md_climate_card' ? {} : variables;
     const records = this._graphHistory.get(entity);
     const key = JSON.stringify([entity, energy, state.attributes?.unit_of_measurement, historyVariables.display_unit, historyVariables.display_precision]);
     let cache = this._graphData;
@@ -1607,12 +1609,12 @@ export class MaraoCard extends BaseElement {
 
   _graphEntity() {
     const variables = this._config.variables || {};
-    return text(variables.graph_entity || variables.power_entity || (["hc_graph_card", "hc_toggle_graph_card"].includes(this._config.template) ? this._config.entity : ''));
+    return text(variables.graph_entity || variables.power_entity || (["md_graph_card", "md_toggle_graph_card"].includes(this._config.template) ? this._config.entity : ''));
   }
   _historyOptions() {
     const variables = this._config.variables || {}, entity = this._graphEntity(), state = stateOf(this._hass, entity);
-    const energy = this._energyGraphSource(state), historyVariables = this._config.template === 'hc_climate_card' ? {} : variables;
-    const climate = this._config.template === 'hc_climate_card';
+    const energy = this._energyGraphSource(state), historyVariables = this._config.template === 'md_climate_card' ? {} : variables;
+    const climate = this._config.template === 'md_climate_card';
     const data = this._graphValues(entity, variables);
     return { samples: data.values, hass: this._hass, stateClass: state.attributes?.state_class,
       unavailable: this._graphAvailability(entity) ? localize(`common.${this._graphAvailability(entity)}`, this._hass, {}, this._graphAvailability(entity)) : '',
@@ -1680,7 +1682,7 @@ export class MaraoCard extends BaseElement {
       this._activeHistoryPopup?._refreshHistory();
       return;
     }
-    if (this._config.template === "hc_alarm_controls_card") { this._renderAlarm(); return; }
+    if (this._config.template === "md_alarm_controls_card") { this._renderAlarm(); return; }
     const gesture = this._sliderGesture;
     if (gesture?.input.isConnected) {
       const state = stateOf(this._hass, this._config.entity);
@@ -1697,32 +1699,32 @@ export class MaraoCard extends BaseElement {
     const config = this._config || {};
     const entity = text(config.entity);
     const variables = config.variables && typeof config.variables === "object" ? config.variables : {};
-    const configuredKind = text(config.template, "hc_base_card");
-    const entityGroup = configuredKind === 'hc_entity_group_card';
-    const roomLights = configuredKind === "hc_room_card" ? roomLightEntities(config) : [];
+    const configuredKind = text(config.template, "md_base_card");
+    const entityGroup = configuredKind === 'md_entity_group_card';
+    const roomLights = configuredKind === "md_room_card" ? roomLightEntities(config) : [];
     const loading = !this._hass?.states;
     const originalState = layoutState(this, loading ? {} : stateOf(this._hass, entity));
-    const summaryEntities = configuredKind === "hc_room_card" ? roomLights : variables.summary_entities;
+    const summaryEntities = configuredKind === "md_room_card" ? roomLights : variables.summary_entities;
     const summary = entityGroup ? entityGroupState(variables.entity_type, summaryEntities, this._hass)
       : !loading && Array.isArray(summaryEntities) && summaryEntities.length ? summaryState(summaryEntities, this._hass) : null;
-    const state = summary ? { ...originalState, state: summary.state } : configuredKind === "hc_room_card" ? { ...originalState, state: "off" } : originalState;
+    const state = summary ? { ...originalState, state: summary.state } : configuredKind === "md_room_card" ? { ...originalState, state: "off" } : originalState;
     const accessService = variables.action_service || config.tap_action?.service || config.tap_action?.perform_action;
-    const requiresSlide = variables.access_mode !== "popup" && configuredKind.startsWith("hc_access_") && ["lock.unlock", "cover.open_cover"].includes(accessService);
-    const kind = requiresSlide ? "hc_access_slide_action_card" : entityGroup ? 'hc_navigation_card' : configuredKind;
-    const camera = kind === "hc_camera_card";
-    const graphEntity = text(variables.graph_entity || variables.power_entity || (["hc_graph_card", "hc_toggle_graph_card"].includes(kind) ? entity : ""));
-    const showsGraph = Boolean(graphEntity) && (["hc_graph_card", "hc_toggle_graph_card"].includes(kind) || variables.show_graph === true);
-    const toggleEntity = kind === "hc_toggle_graph_card" ? text(variables.toggle_entity) : "";
+    const requiresSlide = variables.access_mode !== "popup" && configuredKind.startsWith("md_access_") && ["lock.unlock", "cover.open_cover"].includes(accessService);
+    const kind = requiresSlide ? "md_access_slide_action_card" : entityGroup ? 'md_navigation_card' : configuredKind;
+    const camera = kind === "md_camera_card";
+    const graphEntity = text(variables.graph_entity || variables.power_entity || (["md_graph_card", "md_toggle_graph_card"].includes(kind) ? entity : ""));
+    const showsGraph = Boolean(graphEntity) && (["md_graph_card", "md_toggle_graph_card"].includes(kind) || variables.show_graph === true);
+    const toggleEntity = kind === "md_toggle_graph_card" ? text(variables.toggle_entity) : "";
     const interactionState = toggleEntity ? stateOf(this._hass, toggleEntity) : state;
-    const binary = entityGroup || kind === "hc_room_card" && !roomLights.length ? null : binaryState(summary ? "binary_sensor.marao_summary" : toggleEntity || entity, interactionState, kind);
-    const binaryLayout = binary !== null || binaryState(summary ? 'binary_sensor.marao_summary' : toggleEntity || entity, { state: domainOf(entity) === 'lock' ? 'locked' : kind === 'hc_washing_machine_card' ? 'idle' : 'off' }, kind) !== null;
+    const binary = entityGroup || kind === "md_room_card" && !roomLights.length ? null : binaryState(summary ? "binary_sensor.marao_summary" : toggleEntity || entity, interactionState, kind);
+    const binaryLayout = binary !== null || binaryState(summary ? 'binary_sensor.marao_summary' : toggleEntity || entity, { state: domainOf(entity) === 'lock' ? 'locked' : kind === 'md_washing_machine_card' ? 'idle' : 'off' }, kind) !== null;
     const redundantState = binary !== null && (!toggleEntity || toggleEntity === entity) && (!summary || summary.state === 'off' && serviceTargetReady(this._hass, variables.summary_entities));
-    const pictureURL = ["hc_camera_card", "hc_media_card"].includes(kind) && state.state !== "off" ? text(state.attributes?.entity_picture) : "";
+    const pictureURL = ["md_camera_card", "md_media_card"].includes(kind) && state.state !== "off" ? text(state.attributes?.entity_picture) : "";
     if (pictureURL !== this._mediaURL) { this._mediaURL = pictureURL; this._mediaError = ""; }
     const formatting = energyFormatting(variables);
-    const formattedPrimary = formatting && ["hc_graph_card", "hc_toggle_graph_card", "hc_sensor_card", "hc_base_card"].includes(kind)
+    const formattedPrimary = formatting && ["md_graph_card", "md_toggle_graph_card", "md_sensor_card", "md_base_card"].includes(kind)
       ? energyValue(state.state, state.attributes?.unit_of_measurement, variables) : null;
-    const power = kind === "hc_switch_card" && variables.power_entity ? stateOf(this._hass, variables.power_entity) : null;
+    const power = kind === "md_switch_card" && variables.power_entity ? stateOf(this._hass, variables.power_entity) : null;
     const formattedPower = formatting && power ? energyValue(power.state, power.attributes?.unit_of_measurement, variables) : null;
     const graphData = showsGraph ? this._graphValues(graphEntity, variables) : {values: [], error: false};
     const formatError = formattedPrimary?.error || formattedPower?.error || graphData.error
@@ -1731,31 +1733,31 @@ export class MaraoCard extends BaseElement {
       error: this._actionError,
       contentError: [formatError, this._cameraError, this._mediaError, showsGraph && this._graphErrors.has(graphEntity) ? localize("timeline.history_unavailable", this._hass, {}, "History unavailable") : ""].filter(Boolean).join(" · "),
     });
-    const requestedClimate = kind === "hc_climate_card" ? climateSettings(entity, state) : null;
+    const requestedClimate = kind === "md_climate_card" ? climateSettings(entity, state) : null;
     const value = loading ? "loading" : requestedClimate?.mode || text(state.state, "unknown");
     const batteryGroup = entityGroup && variables.entity_type === 'battery' && summary.minimumReading !== null;
-    const batteryConfig = batteryGroup && variables.hc_color ? { ...config, variables: { ...variables, active_color: variables.hc_color } } : config;
-    const appearance = stateAppearance(batteryGroup ? 'hc_battery_card' : kind, batteryGroup ? summary.minimumReading : value, batteryConfig, this._hass);
+    const batteryConfig = batteryGroup && variables.md_color ? { ...config, variables: { ...variables, active_color: variables.md_color } } : config;
+    const appearance = stateAppearance(batteryGroup ? 'md_battery_card' : kind, batteryGroup ? summary.minimumReading : value, batteryConfig, this._hass);
     const interactionUnavailable = ["unknown", "unavailable"].includes(text(interactionState.state, "unknown").toLowerCase());
     const stateDisabled = loading || entityGroup && (this._hass?.connected === false || this._hass?.connection?.connected === false)
       || Boolean(entity || toggleEntity || entityGroup) && (toggleEntity ? interactionUnavailable : appearance.unavailable);
     const serviceReady = serviceConnectionReady(this._hass);
     const controlsDisabled = !serviceReady || interactionUnavailable;
-    const stateIcon = kind === "hc_sensor_card" && value === "off" ? variables.off_icon
-      : ["hc_sensor_card", "hc_battery_card"].includes(kind) ? variables.on_icon : kind === "hc_vacuum_card" ? variables.icon : "";
+    const stateIcon = kind === "md_sensor_card" && value === "off" ? variables.off_icon
+      : ["md_sensor_card", "md_battery_card"].includes(kind) ? variables.on_icon : kind === "md_vacuum_card" ? variables.icon : "";
     const icon = text(config.icon || stateIcon || state.attributes?.icon);
-    const climate = kind === "hc_climate_card" ? state.attributes || {} : null;
+    const climate = kind === "md_climate_card" ? state.attributes || {} : null;
     const customLabel = text(variables.custom_label).trim();
-    const displayValue = kind === "hc_room_card" ? /[:：]$/.test(customLabel) ? "" : customLabel : redundantState
+    const displayValue = kind === "md_room_card" ? /[:：]$/.test(customLabel) ? "" : customLabel : redundantState
       ? /[:：]$/.test(customLabel) ? "" : customLabel
-      : `${variables.custom_label || variables.hc_label_prefix || ""}${summary?.label || (requestedClimate?.pending ? climateModeLabel(value, this._hass) : (formattedPrimary ? energyLabel(formattedPrimary, variables, this._hass) : entityStateLabel(state, entity, kind, this._hass)))}`;
+      : `${variables.custom_label || variables.md_label_prefix || ""}${summary?.label || (requestedClimate?.pending ? climateModeLabel(value, this._hass) : (formattedPrimary ? energyLabel(formattedPrimary, variables, this._hass) : entityStateLabel(state, entity, kind, this._hass)))}`;
     const climatePending = requestedClimate?.pending ? `<div class="climate-pending" role="status">${esc(localize("climate.updating", this._hass, {}, "Updating…"))}</div>` : "";
     const currentTemperature = climate && climate.current_temperature != null ? text(climate.current_temperature) : "";
     const climateReadingLabel = currentTemperature ? localize("climate.current_temperature", this._hass, { value: currentTemperature }, `Current ${currentTemperature}`) : "";
     const climateModes = Array.isArray(climate?.hvac_modes) ? climate.hvac_modes.filter(Boolean).map(text) : [];
-    const modeButtons = kind === "hc_climate_card" && config.variables?.show_mode_buttons
+    const modeButtons = kind === "md_climate_card" && config.variables?.show_mode_buttons
       ? `<div class="climate-mode-picker marao-dropdown" data-scene-picker data-scene-identity="${esc(JSON.stringify([entity,climateModes]))}"><button type="button" data-scene-select aria-label="${esc(localize('climate.modes', this._hass, {}, 'Climate modes'))}" aria-haspopup="menu" aria-expanded="false"${controlsDisabled || !climateModes.length ? ' disabled' : ''}><span data-scene-label>${esc(climateModeLabel(value, this._hass))}</span><ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon></button><div class="marao-dropdown-options" data-scene-menu role="menu" hidden>${climateModes.map(mode => `<button class="climate-mode${mode === value ? ' active' : ''}" type="button" role="menuitemradio" tabindex="-1" data-climate-mode="${esc(mode)}" data-scene-option="${esc(mode)}" aria-checked="${mode === value}"${controlsDisabled ? ' disabled' : ''}><ha-icon icon="${esc(climateModeIcon(mode))}" aria-hidden="true"></ha-icon><span>${esc(climateModeLabel(mode, this._hass))}</span><ha-icon icon="mdi:check" aria-hidden="true"></ha-icon></button>`).join('')}</div></div>` : '';
-    const shortcuts = kind === "hc_wallbox_current_card"
+    const shortcuts = kind === "md_wallbox_current_card"
       ? (Array.isArray(config.variables?.shortcuts) ? config.variables.shortcuts : []).map(Number).filter(Number.isFinite).slice(0, 3)
       : [];
     const shortcutButtons = shortcuts.length
@@ -1766,10 +1768,10 @@ export class MaraoCard extends BaseElement {
     const roomLightsControl = roomLights.length
       ? `<button class="room-lights-off" type="button" data-room-lights-off aria-label="${esc(roomLightsOffLabel)}" title="${esc(roomLightsOffLabel)}"${roomLightsControlDisabled ? " disabled" : ""}><ha-icon icon="mdi:lightbulb-off-outline" aria-hidden="true"></ha-icon></button>`
       : "";
-    const sceneOptions = kind === "hc_scene_card" && ["input_select", "select"].includes(domainOf(entity)) && Array.isArray(state.attributes?.options)
+    const sceneOptions = kind === "md_scene_card" && ["input_select", "select"].includes(domainOf(entity)) && Array.isArray(state.attributes?.options)
       ? state.attributes.options.filter((option) => typeof option === "string")
       : [];
-    const sceneDropdown = kind === 'hc_scene_card' && ['input_select','select'].includes(domainOf(entity))
+    const sceneDropdown = kind === 'md_scene_card' && ['input_select','select'].includes(domainOf(entity))
       ? `<div class="scene-options marao-dropdown" data-scene-picker data-scene-identity="${esc(JSON.stringify([entity,sceneOptions]))}"><button type="button" data-scene-select aria-label="${esc(this._label(entity, config, state))}" aria-haspopup="menu" aria-expanded="false"${controlsDisabled || !sceneOptions.length ? " disabled" : ""}><span data-scene-label>${esc(entityStateLabel(state, entity, kind, this._hass))}</span><ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon></button><div class="marao-dropdown-options" data-scene-menu role="menu" aria-label="${esc(this._label(entity, config, state))}" hidden>${sceneOptions.map(option=>`<button type="button" role="menuitemradio" tabindex="-1" data-scene-option="${esc(option)}" aria-checked="${!controlsDisabled && option === value}"${controlsDisabled ? " disabled" : ""}><span>${esc(option)}</span><ha-icon icon="mdi:check" aria-hidden="true"></ha-icon></button>`).join('')}</div></div>`
       : "";
     const climateControls = climate ? `<div class="climate current-temperature" aria-label="${esc(climateReadingLabel)}">${esc(currentTemperature || '—')}</div>` : "";
@@ -1779,30 +1781,30 @@ export class MaraoCard extends BaseElement {
     if (camera && this.preview) media = `<div class="camera-preview">${!interactionUnavailable && pictureURL ? `<img src="${esc(pictureURL)}" alt="${esc(this._label(entity, config, state))}">` : ''}<span>${esc(localize(!interactionUnavailable && pictureURL ? 'camera.snapshot' : loading ? 'common.loading' : 'common.unavailable', this._hass))}</span></div>`;
 
     const range = this._range(entity, state, kind, controlsDisabled);
-    const artwork = !problem && kind === "hc_media_card" && mediaAvailable && variables.hc_show_background_art !== false && state.attributes?.entity_picture
+    const artwork = !problem && kind === "md_media_card" && mediaAvailable && variables.md_show_background_art !== false && state.attributes?.entity_picture
       ? `<div class="media-artwork" aria-hidden="true"><img src="${esc(state.attributes.entity_picture)}" alt=""></div>` : "";
-    const glance = kind === "hc_glance_card";
+    const glance = kind === "md_glance_card";
     let readings = glance ? [1,2,3].filter((index) => variables[`entity${index}`]).map((index) => readingMarkup(variables[`entity${index}`], variables[`entity${index}_name`], variables[`entity${index}_icon`], this._hass)).join("") : "";
     const locale = this._hass?.locale?.language || this._hass?.language || "en";
-    let details = kind === "hc_sensor_card" ? '<div class="climate placeholder">—</div>' : "";
-    if (kind === "hc_sensor_card" && !appearance.unavailable && state.last_updated) {
+    let details = kind === "md_sensor_card" ? '<div class="climate placeholder">—</div>' : "";
+    if (kind === "md_sensor_card" && !appearance.unavailable && state.last_updated) {
       const updated = new Date(state.last_updated);
       if (Number.isFinite(updated.getTime())) details = `<div class="climate">${esc(localize("sensor.updated", this._hass, { time: new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(updated) }, "Updated " + new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(updated)))}</div>`;
     }
-    if (kind === "hc_switch_card" && variables.power_entity) {
+    if (kind === "md_switch_card" && variables.power_entity) {
       const reading = formattedPower ? energyLabel(formattedPower, variables, this._hass) : Number.isFinite(Number(power.state)) && power.state !== "" && power.state != null
-        ? `${power.state} ${variables.power_unit || power.attributes?.unit_of_measurement || "W"}` : entityStateLabel(power, variables.power_entity, "hc_sensor_card", this._hass);
+        ? `${power.state} ${variables.power_unit || power.attributes?.unit_of_measurement || "W"}` : entityStateLabel(power, variables.power_entity, "md_sensor_card", this._hass);
       details = `<div class="climate">${esc(reading)}</div>`;
     }
-    if (kind === "hc_media_card") {
+    if (kind === "md_media_card") {
       details = `<div class="climate${mediaAvailable && state.attributes?.media_title ? '' : ' placeholder'}">${esc(mediaAvailable ? [state.attributes.media_title, state.attributes.media_artist].filter(Boolean).join(' · ') || '—' : '—')}</div>`;
     }
-    if (kind === "hc_header_card") {
+    if (kind === "md_header_card") {
       details = `<div class="climate">${esc(new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: this._hass?.config?.time_zone }).format(new Date()))}</div>`;
       if (variables.person_entity) readings += readingMarkup(variables.person_entity, "", "mdi:account", this._hass, "person");
       if (variables.air_quality_sensor) readings += readingMarkup(variables.air_quality_sensor, "", "mdi:air-filter", this._hass);
     }
-    if (kind === "hc_weather_card") {
+    if (kind === "md_weather_card") {
       const attrs = state.attributes || {};
       const unit = text(attrs.temperature_unit || this._hass?.config?.unit_system?.temperature);
       details = `<div class="climate">${esc(!appearance.unavailable && attrs.temperature != null ? `${attrs.temperature} ${unit}` : '—')}</div>`;
@@ -1812,69 +1814,71 @@ export class MaraoCard extends BaseElement {
           const date = new Date(day.datetime);
           if (!Number.isFinite(date.getTime())) return "";
           const label = new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric" }).format(date);
-          const condition = entityStateLabel({ state: day.condition, attributes: {} }, entity, "hc_weather_card", this._hass);
+          const condition = entityStateLabel({ state: day.condition, attributes: {} }, entity, "md_weather_card", this._hass);
           const temperatures = [day.templow, day.temperature].filter((value) => value != null).map((value) => `${value} ${unit}`).join("–");
           return `<div class="reading"><dt>${esc(label)}</dt><dd>${esc(condition)}</dd><dd>${esc(temperatures)}</dd></div>`;
         }).join("");
       }
     }
-    if (kind === "hc_dishwasher_card") {
+    if (kind === "md_dishwasher_card") {
       for (const [key, icon] of [["progress_entity","mdi:progress-check"], ["remaining_time_entity","mdi:timer-outline"], ["active_program_entity","mdi:dishwasher"]]) {
         if (variables[key]) readings += readingMarkup(variables[key], "", icon, this._hass);
       }
     }
-    const showName = kind !== "hc_media_app_card" && config.show_name !== false && (!glance || Boolean(config.name));
+    const showName = kind !== "md_media_app_card" && config.show_name !== false && (!glance || Boolean(config.name));
     const uniformControl = standardControl(config);
     this.toggleAttribute?.('data-marao-standard-control', uniformControl);
-    const sliderHeader = showName && (uniformControl || kind === 'hc_fan_card');
-    const titleCard = kind === "hc_title_card";
-    const stateWanted = kind !== "hc_media_app_card" && !camera && !titleCard && !glance && (kind === "hc_room_card" ? Boolean(displayValue) : Boolean(entity || entityGroup)) && config.show_state !== false;
+    const sliderHeader = showName && (uniformControl || kind === 'md_fan_card');
+    const titleCard = kind === "md_title_card";
+    const stateWanted = kind !== "md_media_app_card" && !camera && !titleCard && !glance && (kind === "md_room_card" ? Boolean(displayValue) : Boolean(entity || entityGroup)) && config.show_state !== false;
     const showState = stateWanted;
     const showIcon = !camera && !titleCard && !glance && config.show_icon !== false && variables.show_icon !== false;
-    const lightCapabilities = kind === 'hc_light_card' ? lightColorCapabilities(state) : {};
+    const lightCapabilities = kind === 'md_light_card' ? lightColorCapabilities(state) : {};
     const lightColor = lightCapabilities.color || lightCapabilities.temperature;
     const colorHold = lightColor && !Object.hasOwn(config, 'hold_action');
     const iconOnly = !camera && !showName && !stateWanted && config.show_label === false;
-    const isAction = ["hc_switch_card", "hc_light_card", "hc_cover_card", "hc_fan_card", "hc_access_card"].includes(kind);
+    const isAction = ["md_switch_card", "md_light_card", "md_cover_card", "md_fan_card", "md_access_card"].includes(kind);
     const popupHash = config.variables?.popup_hash;
     let action = config.tap_action || (popupHash ? { action: "navigate", navigation_path: popupHash, haptic: "heavy" } : isAction ? { action: "toggle", haptic: "heavy" } : null);
-    if (kind === "hc_climate_card" && !config.tap_action) {
+    if (kind === "md_climate_card" && !config.tap_action) {
       action = climateDefaultAction(climateModes, config.variables);
     }
-    if (kind === "hc_toggle_graph_card" && !config.tap_action && config.variables?.toggle_entity) {
+    if (kind === "md_toggle_graph_card" && !config.tap_action && config.variables?.toggle_entity) {
       action = { action: "toggle", entity_id: config.variables.toggle_entity, haptic: "heavy" };
     }
-    if (["hc_access_action_card", "hc_access_hold_action_card"].includes(kind) && !config.tap_action) {
+    if (["md_access_action_card", "md_access_hold_action_card"].includes(kind) && !config.tap_action) {
       const service = text(config.variables?.action_service);
       action = service ? { action: "call-service", service, entity_id: entity, haptic: "heavy" } : null;
     }
-    if (kind === "hc_access_slide_action_card") action = null;
+    if (kind === "md_access_slide_action_card") action = null;
     if (action?.action === "none") action = null;
-    const usesNumberStepper = ["hc_climate_card", "hc_number_card", "hc_wallbox_current_card"].includes(kind);
+    const usesNumberStepper = ["md_climate_card", "md_number_card", "md_wallbox_current_card"].includes(kind);
     const binaryLabel = binary === null ? "" : `${this._label(toggleEntity || entity, toggleEntity && toggleEntity !== entity ? {} : config, interactionState)}: ${entityStateLabel(interactionState, toggleEntity || entity, kind, this._hass)}`;
-    const hiddenBinaryState = binaryLabel && kind !== "hc_room_card" && !showIcon ? `<span class="binary-state" role="img" aria-label="${esc(binaryLabel)}"></span>` : "";
-    const app = kind === "hc_media_app_card" ? mediaAppBrand(config) : null;
-    const iconElement = usesNumberStepper ? "" : kind === "hc_room_card" || !showIcon ? hiddenBinaryState : app
+    const hiddenBinaryState = binaryLabel && kind !== "md_room_card" && !showIcon ? `<span class="binary-state" role="img" aria-label="${esc(binaryLabel)}"></span>` : "";
+    const app = kind === "md_media_app_card" ? mediaAppBrand(config) : null;
+    const iconElement = usesNumberStepper ? "" : kind === "md_room_card" || !showIcon ? hiddenBinaryState : app
       ? `<img class="app-icon${app.symbol ? " app-symbol" : ""}" src="${esc(new URL(`./media-apps/${app.file || `${app.id}.png`}${new URL(import.meta.url).search}`, import.meta.url).href)}" width="64" height="64" alt="" aria-hidden="true">`
       : `<${lightColor ? 'button type="button" data-light-color' : 'div'} class="icon"${lightColor ? ` aria-label="${esc(localize('light.picker', this._hass, { name: this._label(entity, config, state) }, `Change color for ${this._label(entity, config, state)}`))}"${binaryLabel ? ` aria-description="${esc(binaryLabel)}"` : ''}${controlsDisabled ? ' disabled' : ''}` : binaryLabel ? ` role="img" aria-label="${esc(binaryLabel)}"` : ' aria-hidden="true"'}>${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : `<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>`}${lightColor ? '<ha-icon class="palette-indicator" icon="mdi:palette" aria-hidden="true"></ha-icon>' : ''}</${lightColor ? 'button' : 'div'}>`;
-    const roomArtwork = kind === "hc_room_card" && showIcon ? `<div class="room-artwork" aria-hidden="true">${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : '<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>'}</div>` : "";
+    const roomArtwork = kind === "md_room_card" && showIcon ? `<div class="room-artwork" aria-hidden="true">${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : '<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>'}</div>` : "";
     const roomBottom = roomLightsControl || roomArtwork ? `<div class="room-bottom">${roomLightsControl}${roomArtwork}</div>` : "";
-    const controlClass = kind === "hc_climate_card" ? "control number-control climate-number-control" : kind === "hc_wallbox_current_card" ? "control number-control wallbox-current-control" : usesNumberStepper ? "control number-control" : "control";
+    const controlClass = kind === "md_climate_card" ? "control number-control climate-number-control" : kind === "md_wallbox_current_card" ? "control number-control wallbox-current-control" : usesNumberStepper ? "control number-control" : "control";
     const serviceTarget = action?.target?.entity_id || action?.data?.entity_id || action?.entity_id || entity;
-    const roomNavigation = kind === "hc_room_card" && action?.action === "navigate";
+    const roomNavigation = kind === "md_room_card" && action?.action === "navigate";
     const actionDisabled = roomNavigation ? !text(action.navigation_path).trim() : isServiceAction(action) ? !serviceReady || !serviceTargetReady(this._hass, serviceTarget) : stateDisabled && problem?.complete !== false;
     const baseActionLabel = actionControlLabel(config, state, entity, action, this._hass);
     const targetEntity = text(action?.target?.entity_id || action?.entity_id || entity);
     const targetName = stateOf(this._hass, targetEntity).attributes?.friendly_name || targetEntity;
     const semanticActionLabel = iconOnly && isServiceAction(action) && targetName
       ? localize("actions.for_target", this._hass, { action: baseActionLabel, name: targetName }, `${baseActionLabel} ${targetName}`) : baseActionLabel;
-    const holdAction = kind === "hc_access_hold_action_card" && Boolean(action);
+    const holdAction = kind === "md_access_hold_action_card" && Boolean(action);
     const alternateHold = !holdAction && config.hold_action && config.hold_action.action !== "none";
     const actionLabel = holdAction ? localize("access.hold_to_activate", this._hass, { action: semanticActionLabel }, `Hold to ${semanticActionLabel}`) : semanticActionLabel;
-    const roomDescription = kind === "hc_room_card" && roomLights.length ? localize("room.lighting_summary", this._hass, { label: summary?.label || localize("common.loading", this._hass, {}, "Loading…") }, `Lighting: ${summary?.label || "Loading…"}`) : "";
+    const roomDescription = kind === "md_room_card" && roomLights.length ? localize("room.lighting_summary", this._hass, { label: summary?.label || localize("common.loading", this._hass, {}, "Loading…") }, `Lighting: ${summary?.label || "Loading…"}`) : "";
     const feedback = problem && problem.kind !== 'loading' && !camera;
     let actionControl = action || colorHold ? `<button class="card-action" type="button" data-card-action${holdAction ? " data-hold-action" : ""} aria-label="${esc(actionLabel)}"${roomDescription ? ` aria-description="${esc(roomDescription)}"` : ""} title="${esc(actionLabel)}"${actionDisabled || colorHold && controlsDisabled ? " disabled" : ""}></button>` : "";
-    if (!action && !colorHold && !camera && !titleCard && !iconOnly) actionControl += `<button class="card-action" type="button" data-card-details aria-label="${esc(localize('common.details', this._hass, {}, 'Details'))}"></button>`;
+    const graphCard = showsGraph && kind === "md_graph_card";
+    if (graphCard && !action && !config.tap_action) actionControl = `<button class="card-action" type="button" data-history-open aria-label="${esc(localize('history.title', this._hass, {}, 'History'))}"${this.preview || this._graphAvailability(graphEntity) ? ' disabled' : ''}></button>`;
+    if (!action && !colorHold && !camera && !titleCard && !iconOnly && !graphCard) actionControl += `<button class="card-action" type="button" data-card-details aria-label="${esc(localize('common.details', this._hass, {}, 'Details'))}"></button>`;
     if (feedback) actionControl += `<button class="card-action problem-details" type="button" data-problem-details aria-label="${esc(problem.reason)}"></button>`;
     const holdProgress = holdAction || alternateHold ? '<svg class="hold-progress" aria-hidden="true" focusable="false"><rect x="1.5" y="1.5" pathLength="100"></rect></svg>' : "";
     const holdHint = holdAction ? `<div class="climate">${esc(actionLabel)}</div>` : "";
@@ -1882,26 +1886,26 @@ export class MaraoCard extends BaseElement {
     const graphMarkup = showsGraph && graphStatus === "ready" ? this._graphMarkup(graphEntity, variables, graphData) : "";
     const historyLabel = localize('history.title', this._hass, {}, 'History');
     const historyCaption = graphStatus === 'error' ? localize('common.retry', this._hass, {}, 'Retry') : graphStatus === 'loading' ? localize('common.loading', this._hass, {}, 'Loading…') : historyLabel;
-    const historyControl = showsGraph ? `<button type="button" class="history-control" ${graphStatus === 'error' ? 'data-graph-retry' : 'data-history-open'} aria-label="${esc(historyCaption)}"${this.preview || this._graphAvailability(graphEntity) ? ' disabled' : ''}>${iconOnly ? '<ha-icon icon="mdi:chart-line" aria-hidden="true"></ha-icon>' : esc(historyCaption)}</button>` : '';
+    const historyControl = showsGraph && !graphCard ? `<button type="button" class="history-control" ${graphStatus === 'error' ? 'data-graph-retry' : 'data-history-open'} aria-label="${esc(historyCaption)}"${this.preview || this._graphAvailability(graphEntity) ? ' disabled' : ''}>${iconOnly ? '<ha-icon icon="mdi:chart-line" aria-hidden="true"></ha-icon>' : esc(historyCaption)}</button>` : '';
     const readingContent = readings ? `<dl class="readings">${readings}</dl>` : "";
-    const supportedVacuum = kind === 'hc_vacuum_card' ? vacuumActions(state, variables) : [];
-    const vacuum = kind === 'hc_vacuum_card' ? vacuumActions({ attributes: { supported_features: 8192 | 4 | 16 | 256 } }, variables) : [];
+    const supportedVacuum = kind === 'md_vacuum_card' ? vacuumActions(state, variables) : [];
+    const vacuum = kind === 'md_vacuum_card' ? vacuumActions({ attributes: { supported_features: 8192 | 4 | 16 | 256 } }, variables) : [];
     const vacuumControls = vacuum.length ? `<div class="vacuum-actions" role="group" aria-label="${esc(this._label(entity, config, state))}">${vacuum.map((entry, index) => {
       const label = entry.label || localize(entry.labelKey, this._hass, { segment: entry.segment }, entry.segment == null ? climateModeLabel(entry.key) : `Clean segment ${entry.segment}`);
       const semanticLabel = localize("actions.for_target", this._hass, { action: label, name: this._label(entity, config, state) }, `${label} ${this._label(entity, config, state)}`);
       return `<button class="${supportedVacuum.some(item => item.key === entry.key) ? "" : "placeholder"}" type="button" data-vacuum-action="${index}" aria-label="${esc(semanticLabel)}" title="${esc(label)}"${controlsDisabled || !supportedVacuum.some(item => item.key === entry.key) ? " disabled" : ""}><ha-icon icon="${esc(entry.icon)}" aria-hidden="true"></ha-icon></button>`;
     }).join("")}</div>` : "";
     const problemMessage = !camera && problem && (problem.kind !== "loading" || !showState) ? `<div class="problem" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="${problem.kind === "loading" ? "mdi:progress-clock" : problem.kind === "neutral" ? "mdi:help-circle-outline" : "mdi:alert-circle-outline"}" aria-hidden="true"></ha-icon><span>${esc(problemLabel(problem, this._hass))}</span></div>` : "";
-    const formattedReading = !iconOnly && formatting && (['hc_graph_card','hc_toggle_graph_card','hc_sensor_card','hc_base_card'].includes(kind) || kind === 'hc_switch_card' && variables.power_entity);
-    const stateMarkup = showState && kind !== "hc_wallbox_current_card" ? `<div class="state${!displayValue ? " placeholder" : ""}">${esc(displayValue || "—")}</div>` : "";
+    const formattedReading = !iconOnly && formatting && (['md_graph_card','md_toggle_graph_card','md_sensor_card','md_base_card'].includes(kind) || kind === 'md_switch_card' && variables.power_entity);
+    const stateMarkup = showState && kind !== "md_wallbox_current_card" ? `<div class="state${!displayValue ? " placeholder" : ""}">${esc(displayValue || "—")}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null && kind !== "hc_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "hc_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "hc_media_app_card" ? " media-app-card" : ""}${kind === "hc_room_card" ? " room-card" : ""}${kind === "hc_weather_card" ? " weather-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "hc_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
+    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${historyControl}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
     this._syncCamera();
     this._activeHistoryPopup?._refreshHistory();
     for (const symbol of this.shadowRoot.querySelectorAll("ha-state-icon")) {
       const readingEntity = symbol.dataset.readingEntity;
       symbol.hass = this._hass;
-      symbol.stateObj = readingEntity ? presentationState(stateOf(this._hass, readingEntity), readingEntity, "hc_sensor_card") : presentationState(state, entity, kind);
+      symbol.stateObj = readingEntity ? presentationState(stateOf(this._hass, readingEntity), readingEntity, "md_sensor_card") : presentationState(state, entity, kind);
     }
     const card = this.shadowRoot.querySelector("ha-card");
     if (card && !problem) {
@@ -1911,7 +1915,7 @@ export class MaraoCard extends BaseElement {
       if (appearance.icon) card.style.setProperty("--marao-icon-color", appearance.icon);
       if (appearance.iconBackground) card.style.setProperty("--marao-icon-background", appearance.iconBackground);
       if (appearance.accent) card.style.setProperty("--marao-accent-color", appearance.accent);
-      if (kind === "hc_navigation_card" && variables.hc_icon_color && !appearance.unavailable) card.style.setProperty("--marao-icon-color", text(variables.hc_icon_color));
+      if (kind === "md_navigation_card" && variables.md_icon_color && !appearance.unavailable) card.style.setProperty("--marao-icon-color", text(variables.md_icon_color));
       if (artwork) {
         card.style.setProperty("--marao-card-text-color", "#fff");
         card.style.setProperty("--marao-icon-color", "#fff");
@@ -2132,7 +2136,7 @@ export class MaraoCard extends BaseElement {
 
   _performAction(action, entity) {
     if (this.preview) return;
-    if (this._config.template === 'hc_camera_card' && action?.action === 'fullscreen') { haptic('heavy'); return this._camera?.fullscreen(); }
+    if (this._config.template === 'md_camera_card' && action?.action === 'fullscreen') { haptic('heavy'); return this._camera?.fullscreen(); }
     return performAction(this._hass, action, entity, isServiceAction(action) ? serviceOutcome(this) : undefined);
   }
 
@@ -2144,10 +2148,10 @@ export class MaraoCard extends BaseElement {
   _setRange(entity, kind, value) {
     if (!serviceConnectionReady(this._hass) || !entity) return;
     const domain = domainOf(entity);
-    if (kind === "hc_light_card") return this._callService("light", "turn_on", { entity_id: entity, brightness_pct: value });
-    if (kind === "hc_cover_card") return this._callService("cover", "set_cover_position", { entity_id: entity, position: value });
-    if (kind === "hc_fan_card") return this._callService("fan", "set_percentage", { entity_id: entity, percentage: value });
-    if (kind === "hc_access_slide_action_card" && value >= 100) {
+    if (kind === "md_light_card") return this._callService("light", "turn_on", { entity_id: entity, brightness_pct: value });
+    if (kind === "md_cover_card") return this._callService("cover", "set_cover_position", { entity_id: entity, position: value });
+    if (kind === "md_fan_card") return this._callService("fan", "set_percentage", { entity_id: entity, percentage: value });
+    if (kind === "md_access_slide_action_card" && value >= 100) {
       const service = text(this._config.variables?.action_service);
       const [serviceDomain, serviceName] = service.split(".", 2);
       if (serviceDomain && serviceName) {
@@ -2164,14 +2168,14 @@ export class MaraoCard extends BaseElement {
     if (!serviceConnectionReady(this._hass) || !entity) return;
     const state = stateOf(this._hass, entity);
     haptic("heavy");
-    if (kind === "hc_climate_card") {
+    if (kind === "md_climate_card") {
       if (!serviceTargetReady(this._hass, entity)) return;
       const settings = climateSettings(entity, state);
       const data = climateTemperatureChange(settings.attributes, settings.mode, direction);
       if (!data) return;
       return this._callService("climate", "set_temperature", { entity_id: entity, ...data });
     }
-    if (["hc_number_card", "hc_wallbox_current_card"].includes(kind)) {
+    if (["md_number_card", "md_wallbox_current_card"].includes(kind)) {
       const value = numberStepValue(state.state, state.attributes || {}, direction);
       if (value == null) return;
       return this._callService(domainOf(entity), "set_value", { entity_id: entity, value });
@@ -2196,10 +2200,10 @@ export class MaraoCard extends BaseElement {
     if (!picker) return;
     const trigger = picker.querySelector('[data-scene-select]'), menu = picker.querySelector('[data-scene-menu]');
     const state = stateOf(this._hass, entity), label = this._label(entity, this._config, state);
-    const climate = this._config.template === 'hc_climate_card';
+    const climate = this._config.template === 'md_climate_card';
     const current = () => climate ? climateSettings(entity, stateOf(this._hass, entity)).mode : stateOf(this._hass, entity).state;
     trigger.disabled = disabled || !picker.querySelectorAll('[data-scene-option]').length; trigger.setAttribute('aria-label', label); menu.setAttribute('aria-label', label);
-    picker.querySelector('[data-scene-label]').textContent = climate ? climateModeLabel(current(), this._hass) : entityStateLabel(state, entity, 'hc_scene_card', this._hass);
+    picker.querySelector('[data-scene-label]').textContent = climate ? climateModeLabel(current(), this._hass) : entityStateLabel(state, entity, 'md_scene_card', this._hass);
     this._sceneDropdown ||= bindDropdown(picker, { trigger, menu,
       choices: [...picker.querySelectorAll('[data-scene-option]')].map(button=>({button,value:button.getAttribute('data-scene-option')})),
       value: current, activeElement: () => this.shadowRoot.activeElement,
@@ -2247,7 +2251,7 @@ export class MaraoControlGrid extends BaseElement {
         || config.groups.reduce((count, group) => count + group.count, 0) !== config.cards.length)) {
       throw new Error(localize('grid.invalid', this._hass, {}, 'Use content cards and one to six columns.'));
     }
-    this._config = structuredClone({ ...config, columns: config.columns ?? 2 });
+    this._config = structuredClone({ ...config, columns: config.columns ?? 2, cards: config.cards.map((card, index) => config.native_cards?.includes(index) ? card : canonicalCard(card)) });
     this._ready = this._mount();
   }
   _native(config, index) { return config.native_cards?.includes(index) || !config.cards[index].type.startsWith('custom:marao-'); }
@@ -2266,7 +2270,7 @@ export class MaraoControlGrid extends BaseElement {
     let groupStart = 0;
     const columns = groups.map(group => {
       const cards = config.cards.slice(groupStart, groupStart += group.count);
-      const apps = cards.every(card => card.template === 'hc_media_app_card' || card.type === 'custom:marao-native-media-app-card');
+      const apps = cards.every(card => card.template === 'md_media_app_card' || card.type === 'custom:marao-native-media-app-card');
       const minimum = apps ? 80 : Math.max(CONTROL_CELL_MIN, font * CONTROL_CELL_FONT_SCALE);
       const capacity = Math.max(1, Math.floor((width + 8) / (minimum + 8)));
       return Math.min(group.columns, capacity);
@@ -2283,7 +2287,7 @@ export class MaraoControlGrid extends BaseElement {
         const child = this._children[index], childConfig = config.cards[index];
         if (child.hidden) continue;
         const native = this._native(config, index);
-        const structural = !native && (childConfig.template === 'hc_title_card' || /marao-native-title-card$/.test(childConfig.type));
+        const structural = !native && (childConfig.template === 'md_title_card' || /marao-native-title-card$/.test(childConfig.type));
         if (structural) {
           if (column) { row++; column = 0; }
           rows[row] = 'auto'; child.style.gridColumn = '1 / -1'; child.style.gridRow = String(++row);
@@ -2326,7 +2330,7 @@ export class MaraoControlGrid extends BaseElement {
             else this._interrupted = true;
           }, { once: true });
           if (!child || child.localName === 'hui-error-card') throw new Error(localize('popup.controls_unavailable', this._hass, {}, 'Controls unavailable'));
-          if (childConfig.template !== 'hc_title_card' && !/marao-native-title-card$/.test(childConfig.type)) child.setAttribute('data-marao-control-cell', ''); child.preview = this.preview; child.hass = this._hass;
+          if (childConfig.template !== 'md_title_card' && !/marao-native-title-card$/.test(childConfig.type)) child.setAttribute('data-marao-control-cell', ''); child.preview = this.preview; child.hass = this._hass;
           children.push(child);
         }
       }
@@ -2351,7 +2355,7 @@ export class MaraoControlGrid extends BaseElement {
 
 export class MaraoPopupCard extends BaseElement {
   constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._hass = null; this._open = false; this._focus = null; this._childrenRenderId = 0; this._backgroundState = []; }
-  setConfig(config) { this._config = { height: "auto", max_height: "100%", ...config }; this._renderHost(); this._sync(); if (this._open) this._renderChildren(); }
+  setConfig(config) { this._config = { height: "auto", max_height: "100%", ...config, ...(config.cards ? { cards: config.cards.map(canonicalCard) } : {}) }; this._renderHost(); this._sync(); if (this._open) this._renderChildren(); }
   get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
   set preview(value) { this._preview = Boolean(value); if (this._preview) this._close(false); }
   set hass(value) { this._hass = value; this._syncTheme(); this._updateChildrenHass(); this._refreshHistory(); }
@@ -2519,7 +2523,7 @@ export class MaraoPopupCard extends BaseElement {
     if (!this._message) previous?._close(false, false);
     this._open = true;
     const height = this._config.height === "auto" ? "auto" : text(this._config.height);
-    const isClimateModePopup = !this._config.entity_group && this._config.cards?.some((card) => card?.template === "hc_climate_card" && card.variables?.show_mode_buttons);
+    const isClimateModePopup = !this._config.entity_group && this._config.cards?.some((card) => card?.template === "md_climate_card" && card.variables?.show_mode_buttons);
     const title = isClimateModePopup ? "" : text(this._config.title ?? this._config.name);
     const column = this._viewOwner?.view.shadowRoot?.querySelector("#columns > div:first-child, hui-section, .section");
     const columnWidth = column ? Math.round(column.getBoundingClientRect().width) : 0;

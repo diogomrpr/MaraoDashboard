@@ -15,7 +15,7 @@ FIXTURE = json.loads((Path(__file__).parents[2] / 'frontend/lovelace-cards.fixtu
 def dashboard(columns=2):
     return {"config_version": 2, "name": "Native", "landing_page": "home", "pages": [{"name": "Home", "path": "home",
         **({"columns": columns} if columns else {}), "entities": [
-            {"entity_id": "light.safe", "template": "hc_light_card"},
+            {"entity_id": "light.safe", "template": "md_light_card"},
             {"id": "external", "template": "ha_card", "yaml": FIXTURE['source'], "future": {"keep": True}}],
         "cards": [{"type": "markdown", "content": "Existing raw"}]}]}
 

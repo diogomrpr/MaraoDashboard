@@ -19,26 +19,26 @@ and affected runtime before changing their shape.
 
 | Card | Existing behavior/options | Contract |
 | --- | --- | --- |
-| `hc_camera_card` | HA picture preview, generated events sheet; `popup_hash`, `event_provider`, Frigate camera/instance, Protect media source, Netatmo typed events/HLS recordings, `event_limit` | [Camera/history](specs/camera-history-content/spec.md) |
-| `hc_light_card` | Toggle, supported brightness, `enable_slider`, `card_color`, `custom_label` | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
-| `hc_cover_card` | State and position with confirmed fill/target thumb, `card_color`; separate access classification | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
-| `hc_climate_card` | Mode/current/target, single mode or generated mode sheet, single/range target stepping; graph entity/color, `show_graph`, `show_mode_buttons`, `setpoint_label`, `mode_selector_hash` | [Cards](specs/card-behaviors/spec.md), [values](specs/value-numeric-controls/spec.md), [history](specs/camera-history-content/spec.md) |
-| `hc_fan_card` | Toggle and supported percentage, `enable_slider`, `card_color`, `custom_label` | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
-| `hc_media_card` | State/title/artist, generic/Apple TV popup; artwork, background color, `popup_hash` | [Cards](specs/card-behaviors/spec.md) |
-| `hc_access_card` | Locks and door/garage/gate covers, `popup_hash`; strict opening/unlocking and explicit safe closing/locking | [Actions](specs/entity-state-actions/spec.md), [cards](specs/card-behaviors/spec.md) |
-| `hc_sensor_card` | Numeric/binary states, updated date, `hc_card_color`, `on_icon`, `off_icon` | [Cards](specs/card-behaviors/spec.md) |
-| `hc_switch_card` | Toggle, `power_entity`, `power_unit`, power graph, active/graph colors and line/fill visibility | [Cards](specs/card-behaviors/spec.md), [history](specs/camera-history-content/spec.md) |
-| `hc_number_card` | Native number/input-number min/max/step up/down input | [Values](specs/value-numeric-controls/spec.md) |
-| `hc_wallbox_current_card` | Shared current input, up to three `shortcuts` | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
-| `hc_vacuum_card` | Native start/pause/return capabilities; icon and `action_1`–`action_3` with explicit segment, optional name/icon/service/native data; documented segment command default | [Cards](specs/card-behaviors/spec.md), [command compatibility](../tests/frontend/marao-security.test.js) |
-| `hc_battery_card` | Battery thresholds, `on_icon`, `hc_card_color`, neutral unavailable state | [Cards](specs/card-behaviors/spec.md) |
-| `hc_dishwasher_card` | Operation, progress, remaining time, program, salt and rinse-aid entities | [Cards](specs/card-behaviors/spec.md) |
-| `hc_washing_machine_card` | Running/idle state and domain treatment | [Cards](specs/card-behaviors/spec.md) |
-| `hc_graph_card` | Live metric and 24-hour trace; line/fill/icon visibility, graph color/background | [History](specs/camera-history-content/spec.md) |
-| `hc_toggle_graph_card` | Metric trace plus independently guarded `toggle_entity`; active/inactive background, content and icon options | [History](specs/camera-history-content/spec.md), [cards](specs/card-behaviors/spec.md) |
-| `hc_timeline_card` | Project-owned timeline, optional `timeline_name` | [History](specs/camera-history-content/spec.md) |
-| `hc_entity_group_card` | Light, cover, climate and battery summaries with explicit membership, independent popup identity and supported member filters/options | [Cards](specs/card-behaviors/spec.md), [groups](../docs/docs/usage/cards/hc_entity_group_card.md) |
-| `hc_navigation_card` | Entity-free page shortcut, label prefix and icon/card colors | [Generation](specs/dashboard-generation/spec.md), [cards](specs/card-behaviors/spec.md) |
+| `md_camera_card` | HA picture preview, generated events sheet; `popup_hash`, `event_provider`, Frigate camera/instance, Protect media source, Netatmo typed events/HLS recordings, `event_limit` | [Camera/history](specs/camera-history-content/spec.md) |
+| `md_light_card` | Toggle, supported brightness, `enable_slider`, `card_color`, `custom_label` | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
+| `md_cover_card` | State and position with confirmed fill/target thumb, `card_color`; separate access classification | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
+| `md_climate_card` | Mode/current/target, single mode or generated mode sheet, single/range target stepping; graph entity/color, `show_graph`, `show_mode_buttons`, `setpoint_label`, `mode_selector_hash` | [Cards](specs/card-behaviors/spec.md), [values](specs/value-numeric-controls/spec.md), [history](specs/camera-history-content/spec.md) |
+| `md_fan_card` | Toggle and supported percentage, `enable_slider`, `card_color`, `custom_label` | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
+| `md_media_card` | State/title/artist, generic/Apple TV popup; artwork, background color, `popup_hash` | [Cards](specs/card-behaviors/spec.md) |
+| `md_access_card` | Locks and door/garage/gate covers, `popup_hash`; strict opening/unlocking and explicit safe closing/locking | [Actions](specs/entity-state-actions/spec.md), [cards](specs/card-behaviors/spec.md) |
+| `md_sensor_card` | Numeric/binary states, updated date, `md_card_color`, `on_icon`, `off_icon` | [Cards](specs/card-behaviors/spec.md) |
+| `md_switch_card` | Toggle, `power_entity`, `power_unit`, power graph, active/graph colors and line/fill visibility | [Cards](specs/card-behaviors/spec.md), [history](specs/camera-history-content/spec.md) |
+| `md_number_card` | Native number/input-number min/max/step up/down input | [Values](specs/value-numeric-controls/spec.md) |
+| `md_wallbox_current_card` | Shared current input, up to three `shortcuts` | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
+| `md_vacuum_card` | Native start/pause/return capabilities; icon and `action_1`–`action_3` with explicit segment, optional name/icon/service/native data; documented segment command default | [Cards](specs/card-behaviors/spec.md), [command compatibility](../tests/frontend/marao-security.test.js) |
+| `md_battery_card` | Battery thresholds, `on_icon`, `md_card_color`, neutral unavailable state | [Cards](specs/card-behaviors/spec.md) |
+| `md_dishwasher_card` | Operation, progress, remaining time, program, salt and rinse-aid entities | [Cards](specs/card-behaviors/spec.md) |
+| `md_washing_machine_card` | Running/idle state and domain treatment | [Cards](specs/card-behaviors/spec.md) |
+| `md_graph_card` | Live metric and 24-hour trace; line/fill/icon visibility, graph color/background | [History](specs/camera-history-content/spec.md) |
+| `md_toggle_graph_card` | Metric trace plus independently guarded `toggle_entity`; active/inactive background, content and icon options | [History](specs/camera-history-content/spec.md), [cards](specs/card-behaviors/spec.md) |
+| `md_timeline_card` | Project-owned timeline, optional `timeline_name` | [History](specs/camera-history-content/spec.md) |
+| `md_entity_group_card` | Light, cover, climate and battery summaries with explicit membership, independent popup identity and supported member filters/options | [Cards](specs/card-behaviors/spec.md), [groups](../docs/docs/usage/cards/md_entity_group_card.md) |
+| `md_navigation_card` | Entity-free page shortcut, label prefix and icon/card colors | [Generation](specs/dashboard-generation/spec.md), [cards](specs/card-behaviors/spec.md) |
 
 Most cards render through [MaraoCards.js](../custom_components/marao_dashboard/frontend/MaraoCards.js).
 Generation lives in [generator.py](../custom_components/marao_dashboard/generator.py),
@@ -54,13 +54,13 @@ page roles through ordinary section/card descriptors; raw cards remain preserved
 
 | Public name/component | Existing role | Contract and source/check |
 | --- | --- | --- |
-| `hc_base_card`, `hc_title_card` | Generic presentation and noninteractive section headings | [Cards](specs/card-behaviors/spec.md); [visibility checks](../tests/frontend/marao-card-visibility.test.js) |
-| `hc_header_card`, `hc_weather_card`, `hc_glance_card` | Date/person/air-quality header; condition/temperature/available forecasts; one–three independent named/icon readings | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
-| `hc_room_card` | Room navigation, explicit readings and lighting membership; guarded multi-light All off action; approved room-only background state | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
-| `hc_scene_card` | Native input-select/select options and authoritative selected state; separate from overview `scene.turn_on` buttons | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
-| `hc_security_card`, internal `hc_alarm_controls_card` | Authoritative alarm state, generated capability-aware sheet, transient masked numeric/text code, tap arming and held disarm/bypass | [Alarm change](changes/add-alarm-controls-and-service-access-openers/specs/card-behaviors/spec.md); [security checks](../tests/frontend/marao-security.test.js), [native safe checks](../tests/test-ha-security.js) |
-| `hc_media_app_card` | Apple TV source shortcut | [Cards](specs/card-behaviors/spec.md); [generator checks](../tests/components/marao_dashboard/test_generator.py) |
-| `hc_access_action_card`, `hc_access_hold_action_card`, `hc_access_slide_action_card` | Explicit service actions, 1.2-second security hold, strict access slide for lock/cover and explicitly selected button/switch/script openers | [Actions](specs/entity-state-actions/spec.md), [opener change](changes/add-alarm-controls-and-service-access-openers/specs/entity-state-actions/spec.md); [security checks](../tests/frontend/marao-security.test.js), [card checks](../tests/frontend/marao-climate-card.test.js) |
+| `md_base_card`, `md_title_card` | Generic presentation and noninteractive section headings | [Cards](specs/card-behaviors/spec.md); [visibility checks](../tests/frontend/marao-card-visibility.test.js) |
+| `md_header_card`, `md_weather_card`, `md_glance_card` | Date/person/air-quality header; condition/temperature/available forecasts; one–three independent named/icon readings | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
+| `md_room_card` | Room navigation, explicit readings and lighting membership; guarded multi-light All off action; approved room-only background state | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
+| `md_scene_card` | Native input-select/select options and authoritative selected state; separate from overview `scene.turn_on` buttons | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
+| `md_security_card`, internal `md_alarm_controls_card` | Authoritative alarm state, generated capability-aware sheet, transient masked numeric/text code, tap arming and held disarm/bypass | [Alarm change](changes/add-alarm-controls-and-service-access-openers/specs/card-behaviors/spec.md); [security checks](../tests/frontend/marao-security.test.js), [native safe checks](../tests/test-ha-security.js) |
+| `md_media_app_card` | Apple TV source shortcut | [Cards](specs/card-behaviors/spec.md); [generator checks](../tests/components/marao_dashboard/test_generator.py) |
+| `md_access_action_card`, `md_access_hold_action_card`, `md_access_slide_action_card` | Explicit service actions, 1.2-second security hold, strict access slide for lock/cover and explicitly selected button/switch/script openers | [Actions](specs/entity-state-actions/spec.md), [opener change](changes/add-alarm-controls-and-service-access-openers/specs/entity-state-actions/spec.md); [security checks](../tests/frontend/marao-security.test.js), [card checks](../tests/frontend/marao-climate-card.test.js) |
 | `custom:marao-card`, `custom:marao-navbar-card`, `custom:marao-popup-card` | Shared renderer, floating routes, modal sheet | [Navigation/popups](specs/navigation-popups/spec.md); [MaraoCards.js](../custom_components/marao_dashboard/frontend/MaraoCards.js), [navbar checks](../tests/frontend/marao-navbar-card.test.js) |
 | Native card surface lifecycle | Connected surfaces preserve page/sheet scroll during HA updates, including WebKit | [Scroll regression](../tests/test-ha-scroll.js), [surface checks](../tests/frontend/marao-card-visibility.test.js); `--component scroll` |
 | `marao-slide-to-open` | Embedded strict-slide element and gesture lifecycle | [Actions](specs/entity-state-actions/spec.md); [MaraoDashboard.js](../custom_components/marao_dashboard/frontend/MaraoDashboard.js) |

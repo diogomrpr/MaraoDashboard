@@ -9,7 +9,7 @@ nav_order: 2.1
 The [editable page card guide](editable-page-cards.md) covers weather, room,
 scenes, alarm/service actions, period readings, media apps and shared page
 layouts in the visual builder.
-Use [Entity Group](hc_entity_group_card.md) for explicit task summaries and member
+Use [Entity Group](md_entity_group_card.md) for explicit task summaries and member
 control sheets on Overview, room or custom pages.
 
 We made Marao Dashboard easy to use but you need to know a few basics. 
@@ -22,7 +22,7 @@ For example, the light cards requires you to add a `light entity` which you can 
 
 ```yaml
   - type: custom:marao-card
-    template: hc_light_card
+    template: md_light_card
     entity: light.livingroom
 ```
 ![Light Button Default](../../../assets/images/lightbutton-default.png)
@@ -31,7 +31,7 @@ It is also possible to change the name of the light by giving the `name:` entry,
 
 ```yaml
   - type: custom:marao-card
-    template: hc_light_card
+    template: md_light_card
     entity: light.livingroom
     name: My Awesome Light
 ```
@@ -41,7 +41,7 @@ With variables, you can change certain aspects in the card, eg. enabling the sli
 
 ```yaml
   - type: custom:marao-card
-    template: hc_light_card
+    template: md_light_card
     entity: light.livingroom
     name: My Awesome Light
     variables:
@@ -58,15 +58,15 @@ Every card you will see on this documentation page have all the needed and optio
 Marao Dashboard includes project-owned templates for more specific devices and
 workflows. These are documented in this cards section:
 
-- `hc_cover_card`
-- `hc_camera_card`
-- `hc_battery_card`
-- `hc_dishwasher_card`
-- `hc_number_card`
-- `hc_toggle_graph_card`
-- `hc_vacuum_card`
-- [`hc_room_card`](hc_room_card.md)
-- `hc_washing_machine_card`
+- `md_cover_card`
+- `md_camera_card`
+- `md_battery_card`
+- `md_dishwasher_card`
+- `md_number_card`
+- `md_toggle_graph_card`
+- `md_vacuum_card`
+- [`md_room_card`](md_room_card.md)
+- `md_washing_machine_card`
 
 Normal binary state words are omitted across Marao cards, including raw cards with `show_state: true`. Backgrounds and visible state markers communicate the current state, with localized accessible names. Useful values, labels, action names, transitions and historical interval labels remain.
 
@@ -93,7 +93,7 @@ sensors appear beneath the chart, with a circular comparison beside the legend.
 They stack using the same width and text-size rule as two-column cards. See
 [energy breakdown and prices](../../installation/configuration.md#energy-display-choices)
 for configuration and estimated costs. Inspecting history does not operate the
-entity. Other numeric cards retain their [recorded-reading chart](hc_graph_card.md#inspect-history).
+entity. Other numeric cards retain their [recorded-reading chart](md_graph_card.md#inspect-history).
 
 Graph and toggle-graph cards, numeric sensor/base readings, switch secondary power
 and Energy period summaries/sheets accept two opt-in display settings:

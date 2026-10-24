@@ -148,7 +148,7 @@ async function main() {
           await page.evaluate(() => document.fonts.ready);
           await checkRoomComposition(page);
           assert.deepEqual(await layoutIssues(page), [], view + ': layout defects');
-          names[view] = await page.locator('marao-card').evaluateAll(cards => cards.filter(card => card._config?.template === 'hc_room_card').map(card => card._config.name));
+          names[view] = await page.locator('marao-card').evaluateAll(cards => cards.filter(card => card._config?.template === 'md_room_card').map(card => card._config.name));
           for (const [index, name] of names[view].entries()) await capture(page, namedCard(page, name), `${run}-${view}-${index}`, scenario, theme);
           await page.evaluate(() => document.fonts.ready);
         }

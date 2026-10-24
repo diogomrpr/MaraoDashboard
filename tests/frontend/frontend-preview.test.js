@@ -5,24 +5,24 @@ const require = createRequire(import.meta.url);
 const { createRefreshQueue, editableFrontendFile, monitorDiagnostics, parseArgs, previewRoute, selectExamples } = require('../preview-frontend');
 
 test('preview requires a bounded known component and one valid profile', () => {
-  for (const argv of [[], ['--component', 'missing'], ['--component=light=extra'], ['--component'], ['--component', 'light', '--watch', '--once'], ['--component', 'light', '--scenario', 'all'], ['--component', 'light', '--theme', 'both'], ['--component', 'light', '--unexpected'], ['--component', 'light', '--family', 'hc_camera_card'], ['--component', 'camera-editor', '--family', 'hc_camera_card']]) {
+  for (const argv of [[], ['--component', 'missing'], ['--component=light=extra'], ['--component'], ['--component', 'light', '--watch', '--once'], ['--component', 'light', '--scenario', 'all'], ['--component', 'light', '--theme', 'both'], ['--component', 'light', '--unexpected'], ['--component', 'light', '--family', 'md_camera_card'], ['--component', 'camera-editor', '--family', 'md_camera_card']]) {
     assert.throws(() => parseArgs(argv));
   }
   const options = parseArgs(['--component=light', '--watch', '--scenario', 'narrow-320']);
-  assert.deepEqual(options.inspection.families, ['hc_light_card']);
+  assert.deepEqual(options.inspection.families, ['md_light_card']);
   assert.equal(options.scenario.viewport.width, 320);
   assert.equal(options.theme, 'light');
 });
 
 test('each selected family must have a visible example, unrelated cards are ignored', () => {
-  const cards = [{ index: 0, template: 'hc_camera_card', visible: true }, { index: 1, template: 'hc_light_card', visible: false }, { index: 2, template: 'hc_light_card', visible: true }, { index: 3, tag: 'marao-navbar-card', visible: true }];
-  assert.deepEqual(selectExamples(cards, ['hc_light_card', 'marao-navbar-card']).map(card => card.index), [2, 3]);
-  assert.throws(() => selectExamples(cards, ['hc_light_card', 'hc_cover_card']), /hc_cover_card/);
+  const cards = [{ index: 0, template: 'md_camera_card', visible: true }, { index: 1, template: 'md_light_card', visible: false }, { index: 2, template: 'md_light_card', visible: true }, { index: 3, tag: 'marao-navbar-card', visible: true }];
+  assert.deepEqual(selectExamples(cards, ['md_light_card', 'marao-navbar-card']).map(card => card.index), [2, 3]);
+  assert.throws(() => selectExamples(cards, ['md_light_card', 'md_cover_card']), /md_cover_card/);
 });
 
 test('preview chooses the smallest existing view containing all families outside popups and conditions', () => {
-  const light = { type: 'custom:marao-card', template: 'hc_light_card' };
-  const fan = { type: 'custom:marao-card', template: 'hc_fan_card' };
+  const light = { type: 'custom:marao-card', template: 'md_light_card' };
+  const fan = { type: 'custom:marao-card', template: 'md_fan_card' };
   const dashboard = { views: [
     { path: 'card-test', cards: [light, fan] },
     { path: 'popup-only', cards: [{ type: 'custom:marao-popup-card', cards: [light, fan] }] },
@@ -32,9 +32,9 @@ test('preview chooses the smallest existing view containing all families outside
     { path: 'studio', sections: [{ cards: [{ type: 'custom:marao-control-grid', cards: [{ type: 'grid', cards: [light, fan] }] }] }] },
     { path: 'light-only', cards: [light] },
   ] };
-  assert.equal(previewRoute(dashboard, ['hc_light_card', 'hc_fan_card']), 'studio');
-  assert.equal(previewRoute(dashboard, ['hc_light_card']), 'light-only');
-  assert.equal(previewRoute(dashboard, ['hc_cover_card']), 'card-test');
+  assert.equal(previewRoute(dashboard, ['md_light_card', 'md_fan_card']), 'studio');
+  assert.equal(previewRoute(dashboard, ['md_light_card']), 'light-only');
+  assert.equal(previewRoute(dashboard, ['md_cover_card']), 'card-test');
 });
 
 test('watch coalesces saves and serializes another edit arriving during preparation', async () => {

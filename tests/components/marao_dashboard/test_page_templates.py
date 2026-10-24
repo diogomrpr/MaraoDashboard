@@ -11,13 +11,13 @@ def test_media_creation_preserves_selected_remotes_apps_and_unknown_options_with
     options = {"remote_entity": "remote.safe", "volume_remote_entity": "media_player.volume", "future": {"keep": True},
                "apps": [{"name": "Saved app", "source": "App; exact", "icon": "mdi:play", "future": [2, 1]}]}
     source = {"config_version": 2, "pages": [{"name": "Media", "path": "media", "entities": [
-        {"id": "tv", "entity_id": "media_player.safe", "template": "hc_media_card", "name": "My TV", "apple_tv": options, "future": True},
+        {"id": "tv", "entity_id": "media_player.safe", "template": "md_media_card", "name": "My TV", "apple_tv": options, "future": True},
     ]}]}
     before = deepcopy(source)
     snapshot = page_templates(source, [{"entity_id": "media_player.safe", "has_state": True, "name": "Live TV"}])["media"]
     player, app = snapshot["entities"]
     assert player["name"] == "My TV" and player["apple_tv"] == options and player["future"] is True
-    assert app["template"] == "hc_media_app_card" and app["variables"]["app_source"] == "App; exact"
+    assert app["template"] == "md_media_app_card" and app["variables"]["app_source"] == "App; exact"
     assert app["future"] == [2, 1] and source == before
     options["apps"].clear()
     assert len(snapshot["entities"]) == 2
@@ -30,10 +30,10 @@ def test_security_creation_uses_real_strict_access_and_hold_actions():
                 {"entity_id": "cover.safe_gate", "device_class": "gate", "supported_features": 1, "has_state": True},
                 {"entity_id": "lock.safe", "has_state": True}, {"entity_id": "button.safe", "has_state": True}]
     snapshot = page_templates({}, entities)["security"]
-    assert [card["template"] for card in snapshot["entities"]] == ["hc_security_card", "hc_access_card", "hc_access_card", "hc_access_hold_action_card"]
+    assert [card["template"] for card in snapshot["entities"]] == ["md_security_card", "md_access_card", "md_access_card", "md_access_hold_action_card"]
     config = {"config_version": 2, "name": "Safe", "landing_page": "security", "pages": [{**snapshot, "name": "Security", "path": "security"}]}
     cards = _resolve_pages(config, entities)["pages"][0]["_sections"][0]["ordered_cards"]
-    assert _page_card(cards[1], "marao-dashboard")["template"] == "hc_access_slide_action_card"
+    assert _page_card(cards[1], "marao-dashboard")["template"] == "md_access_slide_action_card"
     assert _page_card(cards[3], "marao-dashboard")["tap_action"]["perform_action"] == "button.press"
 
 
@@ -46,7 +46,7 @@ def test_all_eight_templates_are_plain_containers_with_no_synthetic_bindings():
         for section in page_sections(template):
             for card in page_entries(section.get("entities")):
                 assert "entity_id" not in card
-    assert templates["room"]["sections"][0]["entities"][0]["template"] == "hc_title_card"
+    assert templates["room"]["sections"][0]["entities"][0]["template"] == "md_title_card"
     assert templates["room"]["sections"][1]["entities"] == []
 
 
@@ -63,7 +63,7 @@ def test_required_template_drafts_require_binding_or_explicit_removal(name):
 
 def test_snapshot_templates_use_explicit_room_targets_and_current_available_optional_roles():
     config = {"config_version": 2, "pages": [{"name": "Office", "path": "office", "area": "safe", "sections": [
-        {"entities": ["light.safe", {"template": "hc_entity_group_card", "entity_type": "light", "entities": ["light.grouped"]}]},
+        {"entities": ["light.safe", {"template": "md_entity_group_card", "entity_type": "light", "entities": ["light.grouped"]}]},
     ]}]}
     entities = [
         {"entity_id": "weather.safe", "has_state": True}, {"entity_id": "scene.safe", "has_state": True},
@@ -80,7 +80,7 @@ def test_snapshot_templates_use_explicit_room_targets_and_current_available_opti
     shortcut = snapshots["rooms"]["entities"][0]
     assert shortcut["page"] == "office" and shortcut["variables"]["light_entities"] == ["light.safe", "light.grouped"]
     home = [card for section in snapshots["home"]["sections"] for card in section["entities"]]
-    assert [card["template"] for card in home] == ["hc_weather_card", "hc_entity_group_card", "hc_scene_collection_card"]
+    assert [card["template"] for card in home] == ["md_weather_card", "md_entity_group_card", "md_scene_collection_card"]
     assert home[1]["entities"] == ["light.safe"] and home[2]["entities"] == ["scene.safe"]
     assert [card["entity_id"] for card in snapshots["energy"]["entities"]] == ["sensor.safe_power", "sensor.safe_month_energy"]
     assert [card["entity_id"] for card in snapshots["wallbox"]["entities"]] == ["sensor.safe_wallbox_status", "number.safe_wallbox_current"]

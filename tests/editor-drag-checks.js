@@ -17,7 +17,7 @@ async function editorDragChecks(page, panel, { scenario, theme, output, client, 
     { columns: 2, future: [], entities: [
       { id: 'drag-a', entity_id: 'light.marao_dashboard_test_light', name: 'Reading light', variables: { enable_slider: false, future: [] } },
       { id: 'drag-b', entity_id: 'light.marao_dashboard_test_light', name: 'Evening light', variables: { custom_label: 'Independent duplicate' } },
-      { id: 'drag-c', template: 'hc_title_card', name: 'Studio heading' },
+      { id: 'drag-c', template: 'md_title_card', name: 'Studio heading' },
       { id: 'drag-d', page: fixture.landing_page, name: 'Home shortcut' },
     ], cards: [{ type: 'markdown', content: 'Raw stays in section one.' }] },
     { entities: [], future: { empty: [] } },

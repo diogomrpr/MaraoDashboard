@@ -169,14 +169,14 @@ without a count limit. An empty navbar list stays empty.
         {
           "columns": 1,
           "entities": [
-            {"id": "heading", "template": "hc_title_card", "name": "Living room"}
+            {"id": "heading", "template": "md_title_card", "name": "Living room"}
           ]
         },
         {
           "columns": 2,
           "entities": [
-            {"id": "lamp", "entity_id": "light.living_room", "template": "hc_light_card"},
-            {"id": "office-link", "template": "hc_navigation_card", "name": "Office", "page": "office"}
+            {"id": "lamp", "entity_id": "light.living_room", "template": "md_light_card"},
+            {"id": "office-link", "template": "md_navigation_card", "name": "Office", "page": "office"}
           ],
           "cards": [{"type": "markdown", "content": "A saved note"}]
         }
@@ -335,7 +335,7 @@ templates and variables. `area` never adds entities during generation. Use
           "entity_id": "light.office_desk",
           "name": "Desk",
           "icon": "mdi:desk-lamp",
-          "template": "hc_light_card",
+          "template": "md_light_card",
           "variables": {
             "show_slider": true
           }
@@ -407,7 +407,7 @@ from `legacy_page_options` or refill an absent card list.
           "icon": "mdi:water-boiler"
         }
       ],
-      "appliances": [{"entity_id": "sensor.dishwasher_state", "template": "hc_dishwasher_card"}]
+      "appliances": [{"entity_id": "sensor.dishwasher_state", "template": "md_dishwasher_card"}]
     },
     "wallbox": {
       "status_entity": "sensor.wallbox_status",
@@ -432,7 +432,7 @@ Security, Energy, Wallbox, and Media only when that object exists in `pages`.
 Overview tiles open generated Marao popups: Lights includes only `on`
 lights by default; each Entity Group can instead choose All entities. Covers,
 battery sensors and thermostats default to All entities. Add groups through the
-same card catalog on room/custom pages; see the [Entity Group guide](../usage/cards/hc_entity_group_card.md)
+same card catalog on room/custom pages; see the [Entity Group guide](../usage/cards/md_entity_group_card.md)
 for the descriptor, activity definitions, member options and popup ownership.
 Energy period readings occupy full-width cards so enlarged numbers remain intact.
 Saved selections, values, ordering and popup actions are preserved.
@@ -562,7 +562,7 @@ Missing price data leaves energy usable and shows that cost is unavailable.
 
 Graph-enabled cards expose a separate **History** (**Histórico**) control;
 opening it preserves the card's existing action and does not send an entity
-command. See [Inspect history](../usage/cards/hc_graph_card.md#inspect-history).
+command. See [Inspect history](../usage/cards/md_graph_card.md#inspect-history).
 
 Light, fan, cover and access controls use compact content-driven sizing, with
 titles and useful readings beside the icon and any slider directly below.
@@ -602,9 +602,21 @@ supports buttons, switches, toggle helpers and alarm entities. Automatic retains
 the normal lock/cover popup (or inline opening for open-only doors), uses a slide
 for scripts and a security hold for other service controls.
 
-In JSON, use `"template": "hc_access_card"` and, for example,
+In JSON, use `"template": "md_access_card"` and, for example,
 `"variables": {"access_mode": "slide"}`. Existing access opener, close/lock and
 security action templates remain supported with their original defaults and can
 be configured through the same behavior setting. Opening and unlocking always
 require the strict slide; security holds keep their 1.2-second safeguard. The
 separate Alarm card retains its full alarm controls.
+
+
+### Card identifiers
+
+New Marao card templates and owned options use `md_`, for example
+`md_light_card` and `md_show_background_art`. Released `hc_` identifiers remain
+supported as input aliases. Loading or reopening an unchanged configuration does
+not rewrite its saved source; newly created and edited cards use `md_`.
+Entity IDs, names, actions, third-party card YAML and unknown options are retained.
+If both spellings of an owned option are present with different values, remove
+that ambiguity before saving. Archived history and released source fixtures are
+kept unchanged.

@@ -17,16 +17,16 @@ const entity = "alarm_control_panel.safe";
 const reported = (state = "disarmed", attributes = {}) => ({ state, attributes: { supported_features: 55, ...attributes } });
 function alarm(t, hass) {
   const card = new MaraoCard();
-  card.setConfig({ template: "hc_alarm_controls_card", entity });
+  card.setConfig({ template: "md_alarm_controls_card", entity });
   card.hass = hass; card.connectedCallback();
   t.after(() => card.disconnectedCallback());
   return card;
 }
 
 test("builder round trips explicit openers, rejects bypasses, and keeps generic defaults", () => {
-  const catalog = { cards: [{ id: "hc_access_slide_action_card", domains: ["lock", "cover", "button", "switch", "script"] }] };
+  const catalog = { cards: [{ id: "md_access_slide_action_card", domains: ["lock", "cover", "button", "switch", "script"] }] };
   for (const domain of ["lock", "cover", "button", "switch", "script"]) {
-    const card = { id: "opener", template: "hc_access_slide_action_card", entity_id: domain + ".safe", variables: { future: true } };
+    const card = { id: "opener", template: "md_access_slide_action_card", entity_id: domain + ".safe", variables: { future: true } };
     const config = { config_version: 2, name: "Safe", landing_page: "home", pages: [{ path: "home", name: "Home", entities: [card] }] };
     assert.deepEqual(validateConfig(config, 2, undefined, {}, catalog), []);
     assert.deepEqual(serializeConfig(normalizeConfig(config)), config);
@@ -45,7 +45,7 @@ test("alarm modes follow advertised features and only risky actions require hold
 });
 
 test("imported dishwasher sensor warnings preserve vendor attention states and neutral availability", () => {
-  const config = { template: "hc_dishwasher_card", entity: "sensor.safe", variables: { salt_entity: "sensor.refill" } };
+  const config = { template: "md_dishwasher_card", entity: "sensor.safe", variables: { salt_entity: "sensor.refill" } };
   for (const state of ["on", "present", "confirmed", "2"]) {
     const problem = runtime.cardProblem(config, { states: { "sensor.safe": { state: "run" }, "sensor.refill": { state } } });
     assert.equal(problem.kind, "warning");
@@ -108,7 +108,7 @@ test("text/no-code alarms, failures and loss of availability clear private input
   await card._sendAlarm("alarm_arm_away");
   assert.equal(Object.hasOwn(errors[0][2], "code"), false);
   card._alarmPIN = "discard";
-  card.setConfig({ template: "hc_alarm_controls_card", entity: "alarm_control_panel.other" });
+  card.setConfig({ template: "md_alarm_controls_card", entity: "alarm_control_panel.other" });
   assert.equal(card._alarmPIN, "");
   card._alarmPIN = "discard"; card.disconnectedCallback(); assert.equal(card._alarmPIN, "");
 });
@@ -204,16 +204,30 @@ test('native grids reflow ordinary and access cards without changing owned contr
 });
 
 test('unified access modes retain strict controls, source options and compact aliases', () => {
-  for (const [mode, template] of [['popup', 'hc_access_card'], ['slide', 'hc_access_slide_action_card'], ['close', 'hc_access_action_card']]) {
-    const source = { template: 'hc_access_card', entity: 'lock.safe', variables: { access_mode: mode, future: [] } };
+  for (const [mode, template] of [['popup', 'md_access_card'], ['slide', 'md_access_slide_action_card'], ['close', 'md_access_action_card']]) {
+    const source = { template: 'md_access_card', entity: 'lock.safe', variables: { access_mode: mode, future: [] } };
     const before = structuredClone(source), result = runtime.accessCardConfig(source);
     assert.equal(result.template, template);
     assert.deepEqual(source, before);
     if (mode === 'close') assert.equal(result.variables.action_service, 'lock.lock');
   }
-  assert.throws(() => runtime.accessCardConfig({template: 'hc_access_card', entity: 'lock.safe', variables: {access_mode: 'slide'}, tap_action: {action:'toggle'}}), /strict slide/);
-  assert.throws(() => runtime.accessCardConfig({template: 'hc_access_card', entity: 'button.safe', variables: {access_mode: 'popup'}}), /incompatible/);
-  assert.equal(runtime.accessCardConfig({template: 'hc_access_card', entity: 'button.safe'}).template, 'hc_access_hold_action_card');
-  const old = {template:'hc_access_slide_action_card', entity:'lock.safe', variables:{future:true}};
+  assert.throws(() => runtime.accessCardConfig({template: 'md_access_card', entity: 'lock.safe', variables: {access_mode: 'slide'}, tap_action: {action:'toggle'}}), /strict slide/);
+  assert.throws(() => runtime.accessCardConfig({template: 'md_access_card', entity: 'button.safe', variables: {access_mode: 'popup'}}), /incompatible/);
+  assert.equal(runtime.accessCardConfig({template: 'md_access_card', entity: 'button.safe'}).template, 'md_access_hold_action_card');
+  const old = {template:'md_access_slide_action_card', entity:'lock.safe', variables:{future:true}};
   assert.equal(runtime.accessCardConfig(old), old);
+});
+
+test("legacy access aliases retain strict slide controls without mutating saved configuration", t => {
+  const config = { template: "hc_access_slide_action_card", entity: "lock.safe", variables: { hc_background_color: "#123456" } };
+  const before = structuredClone(config);
+  const card = new MaraoCard();
+  card.setConfig(config);
+  card.hass = { states: { "lock.safe": { state: "locked", attributes: {} } }, callService: async () => {} };
+  card.connectedCallback();
+  t.after(() => card.disconnectedCallback());
+  assert.equal(card._config.template, "md_access_slide_action_card");
+  assert.equal(card._config.variables.md_background_color, "#123456");
+  assert.match(card.shadowRoot.innerHTML, /marao-slide-to-open/);
+  assert.deepEqual(config, before);
 });

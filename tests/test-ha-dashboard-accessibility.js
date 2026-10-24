@@ -805,7 +805,7 @@ function popupTriggerTargets(cards) {
     const config = card._config || {};
     const modes = card._hass?.states?.[config.entity]?.attributes?.hvac_modes?.filter(Boolean) || [];
     const hash = config.tap_action ? config.tap_action.navigation_path
-      : config.template === 'hc_climate_card' ? modes.length > 1 && config.variables?.mode_selector_hash
+      : config.template === 'md_climate_card' ? modes.length > 1 && config.variables?.mode_selector_hash
       : config.variables?.popup_hash || config.popup_hash;
     card.setAttribute('data-marao-popup-probe', String(index));
     return { index, tag: card.localName, hash };
@@ -816,10 +816,10 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
   const popups = await page.locator("marao-popup-card").evaluateAll((cards) => cards.map((card) => ({
     config: card._config,
     hash: card._config.hash, name: card._config.name || card._config.title || card._config.hash,
-    heading: !card._config.entity_group && card._config.cards?.some((child) => child?.template === "hc_climate_card" && child.variables?.show_mode_buttons)
+    heading: !card._config.entity_group && card._config.cards?.some((child) => child?.template === "md_climate_card" && child.variables?.show_mode_buttons)
       ? "" : String(card._config.title ?? card._config.name ?? ""),
-    directModeOnly: !card._config.entity_group && card._config.cards?.some(child => child.template === 'hc_climate_card' && child.variables?.show_mode_buttons)
-      && card._config.cards.every(child => child.template === 'hc_climate_card' && (card._hass?.states?.[child.entity]?.attributes?.hvac_modes?.filter(Boolean).length || 0) <= 1),
+    directModeOnly: !card._config.entity_group && card._config.cards?.some(child => child.template === 'md_climate_card' && child.variables?.show_mode_buttons)
+      && card._config.cards.every(child => child.template === 'md_climate_card' && (card._hass?.states?.[child.entity]?.attributes?.hvac_modes?.filter(Boolean).length || 0) <= 1),
     parentHash: cards.find(parent => parent._config.entity_group && parent._config.cards?.some(member =>
       [member.tap_action?.navigation_path, member.variables?.popup_hash, member.variables?.mode_selector_hash].includes(card._config.hash)
     ))?._config.hash,
@@ -970,7 +970,7 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
     });
     issues.push(...statusTypography.map(issue => `${popup.name}: ${issue}`));
     await page.waitForFunction(() => [...(document.querySelector('home-assistant')?.shadowRoot || document).querySelectorAll('.marao-popup-content marao-card')].every((card) => {
-      if (card._config.template !== 'hc_access_slide_action_card') return true;
+      if (card._config.template !== 'md_access_slide_action_card') return true;
       const track = card.shadowRoot.querySelector('marao-slide-to-open')?.shadowRoot?.querySelector('.track');
       const rect = track?.getBoundingClientRect();
       return rect && rect.width >= 48 && rect.height >= 48;

@@ -44,7 +44,7 @@ const redact=value=>String(value).replace(/https?:\s*\/\/?\s*[^\s]+/g,'[URL]').r
    window.latencyCards={};window.latency={started:performance.now(),samples:[],first:{},transports:{},gaps:{native:[],adaptive:[]}};
    for(const [index,kind] of ['native','adaptive'].entries()){
     const card=document.createElement('marao-card');card.id='latency-'+kind;
-    card.setConfig({type:'custom:marao-card',template:'hc_camera_card',entity:'camera.marao_dashboard_test_camera_adaptive_'+'low',name:kind});
+    card.setConfig({type:'custom:marao-card',template:'md_camera_card',entity:'camera.marao_dashboard_test_camera_adaptive_'+'low',name:kind});
     card.hass=hass;Object.assign(card.style,{position:'fixed',top:(64+index*280)+'px',left:'12px',width:'360px',zIndex:'10000',display:'block'});
     window.latencyCards[kind]=card;container.append(card);
    }

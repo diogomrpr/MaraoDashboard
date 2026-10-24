@@ -65,7 +65,7 @@ def test_native_storage_matches_independent_canonical_document_without_discovery
     generated = write_dashboard(source, tmp_path, dashboard_key_override="marao-dashboard")
     root = tmp_path / generated.slug
     view = (root / "views/pages/outside.yaml").read_text()
-    assert "template: hc_light_card" in view and "template: hc_camera_card" in view
+    assert "template: md_light_card" in view and "template: md_camera_card" in view
     assert "navigation_path: /marao-dashboard/home" in view
     assert "custom:marao-entity-card" not in view and "custom:marao-header-card" not in view
     assert (root / "components/popups/page-outside-card-4-popup.yaml").exists()

@@ -30,7 +30,7 @@
           "columns": 2,
           "entities": [
             {
-              "template": "hc_entity_group_card",
+              "template": "md_entity_group_card",
               "id": "overview-lights",
               "name": "Lights",
               "name_key": "overview.lights",
@@ -67,7 +67,7 @@
           "entities": [
             {
               "id": "card-1",
-              "template": "hc_room_card",
+              "template": "md_room_card",
               "entity_id": "light.marao_dashboard_test_light",
               "name": "Office",
               "icon": "mdi:sofa-outline",
@@ -82,7 +82,7 @@
             },
             {
               "id": "card-2",
-              "template": "hc_room_card",
+              "template": "md_room_card",
               "name": "Empty",
               "icon": "mdi:sofa-outline",
               "page": "room-empty",
@@ -111,7 +111,7 @@
           "entities": [
             {
               "id": "page-title",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Office",
               "show_icon": false,
               "show_state": false,
@@ -177,7 +177,7 @@
           "entities": [
             {
               "id": "page-title",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Empty",
               "show_icon": false,
               "show_state": false,
@@ -210,7 +210,7 @@
           "entities": [
             {
               "id": "page-title",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Studio",
               "show_icon": false,
               "show_state": false,

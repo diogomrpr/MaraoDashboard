@@ -89,7 +89,7 @@ test('rerenders never detach the native surface while replacing content and obso
     card._render();
     assert.equal(surface.childNodes[0], content, 'An equivalent report must keep the scrolling content mounted');
   }
-  card._config = { template: 'hc_alarm_controls_card', entity: 'alarm_control_panel.test' };
+  card._config = { template: 'md_alarm_controls_card', entity: 'alarm_control_panel.test' };
   card._hass = { states: { 'alarm_control_panel.test': { state: 'disarmed', attributes: {} } } };
   card._render();
   assert.equal(card.shadowRoot.querySelector('ha-card'), surface);
@@ -121,16 +121,18 @@ test('surface updates reserve height through native layout and restore it even o
   assert.equal(card.style.minHeight, '24px');
 });
 
-test('retained History buttons open once after equivalent state reports', t => {
+test('graph cards open history from the whole card without a redundant visible button', t => {
   const card = new MaraoCard();
-  card._config = { template: 'hc_graph_card', entity: 'sensor.test', name: 'Reading' };
-  retainedCardDOM(t, card);
+  card._config = { template: 'md_graph_card', entity: 'sensor.test', name: 'Reading' };
+  const { surface } = retainedCardDOM(t, card);
   const opened = [];
   card._openHistory = opener => opened.push(opener);
   let button;
   for (let report = 0; report < 4; report++) {
     card._hass = { states: { 'sensor.test': { state: '21', attributes: {}, last_reported: String(report) } } };
     card._render();
+    assert.doesNotMatch(surface.childNodes[0].markup, /class="history-control"/);
+    assert.match(surface.childNodes[0].markup, /class="card-action" type="button" data-history-open/);
     button ||= card.shadowRoot.querySelector('[data-history-open]');
     assert.equal(card.shadowRoot.querySelector('[data-history-open]'), button);
   }
@@ -140,7 +142,7 @@ test('retained History buttons open once after equivalent state reports', t => {
 
 test('retained card actions dispatch once with current service context and changed bindings', t => {
   const card = new MaraoCard(), calls = [];
-  card._config = { template: 'hc_switch_card', entity: 'switch.test', name: 'Switch', tap_action: { action: 'call-service', service: 'switch.turn_on' } };
+  card._config = { template: 'md_switch_card', entity: 'switch.test', name: 'Switch', tap_action: { action: 'call-service', service: 'switch.turn_on' } };
   retainedCardDOM(t, card);
   let button;
   for (let report = 0; report < 4; report++) {
@@ -161,7 +163,7 @@ test('retained card actions dispatch once with current service context and chang
 
 test('retained native icons receive fresh Home Assistant context and state', t => {
   const card = new MaraoCard();
-  card._config = { template: 'hc_switch_card', entity: 'switch.test', name: 'Switch' };
+  card._config = { template: 'md_switch_card', entity: 'switch.test', name: 'Switch' };
   const { surface } = retainedCardDOM(t, card);
   card._hass = { states: { 'switch.test': { state: 'off', attributes: {} } } };
   card._render();
@@ -180,7 +182,7 @@ test('unrelated state updates preserve scrolling cards while their own inputs st
   let renders = 0;
   card._render = () => { renders++; };
   card.setConfig({
-    template: 'hc_dishwasher_card', entity: 'sensor.operation',
+    template: 'md_dishwasher_card', entity: 'sensor.operation',
     variables: { progress_entity: 'sensor.progress', remaining_time_entity: 'sensor.remaining', active_program_entity: 'sensor.program', salt_entity: 'binary_sensor.salt' },
     tap_action: { action: 'call-service', service: 'switch.turn_on', target: { entity_id: ['switch.target'] } },
   });
@@ -240,7 +242,7 @@ test('battery groups retain first usable reading and count secondary lows and in
   const invalid = { states: { 'sensor.invalid': { state: 'not a number' } } };
   assert.equal(entityGroupState('battery', ['sensor.invalid'], invalid).state, 'unavailable');
   const card = new MaraoCard();
-  card.setConfig({ template: 'hc_entity_group_card', name: 'Maintenance', variables: { entity_type: 'battery', summary_entities: ['sensor.invalid'] }, tap_action: { action: 'navigate', navigation_path: '#group' } });
+  card.setConfig({ template: 'md_entity_group_card', name: 'Maintenance', variables: { entity_type: 'battery', summary_entities: ['sensor.invalid'] }, tap_action: { action: 'navigate', navigation_path: '#group' } });
   card.hass = invalid;
   assert.match(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
   assert.match(card.shadowRoot.innerHTML, /Unavailable/);
@@ -268,7 +270,7 @@ test('battery group rendered surfaces reconcile thresholds, partial availability
   const card = new MaraoCard(), colors = {};
   card._setMarkup = markup => { card.shadowRoot.innerHTML = markup; for (const key of Object.keys(colors)) delete colors[key]; };
   card.shadowRoot.querySelector = selector => selector === 'ha-card' ? { classList: { remove() {} }, style: { setProperty: (key, value) => { colors[key] = value; } } } : null;
-  const config = { template: 'hc_entity_group_card', name: 'Independent battery group', variables: { entity_type: 'battery', summary_entities: ['sensor.first', 'sensor.second'] }, tap_action: { action: 'navigate', navigation_path: '#batteries' } };
+  const config = { template: 'md_entity_group_card', name: 'Independent battery group', variables: { entity_type: 'battery', summary_entities: ['sensor.first', 'sensor.second'] }, tap_action: { action: 'navigate', navigation_path: '#batteries' } };
   card.setConfig(config);
   const render = (first, second, extra = {}) => { card.hass = { callService() {}, connected: true, states: { 'sensor.first': { state: first }, 'sensor.second': { state: second } }, ...extra }; return card.shadowRoot.innerHTML.split('</style>')[1]; };
   for (const [second, color] of [['10', 'red'], ['20', 'yellow'], ['80', 'green'], ['19.99', 'red']]) {
@@ -293,12 +295,12 @@ test('battery group rendered surfaces reconcile thresholds, partial availability
   assert.equal(colors['--marao-card-background'], 'var(--color-green)');
   card.setConfig({ ...config, variables: { ...config.variables, summary_entities: ['sensor.first'] } });
   assert.equal(colors['--marao-card-background'], 'var(--color-green)');
-  assert.equal(stateAppearance('hc_battery_card', '10', { variables: { card_color: '#123456' } }).background, '#123456');
+  assert.equal(stateAppearance('md_battery_card', '10', { variables: { card_color: '#123456' } }).background, '#123456');
 });
 
 test('entity-free group cards preserve counts, readable inactive/empty states and connection guards', () => {
   const card = new MaraoCard();
-  card.setConfig({ template: 'hc_entity_group_card', name: 'Lights', variables: { entity_type: 'light', summary_entities: ['light.on', 'light.off'] }, tap_action: { action: 'navigate', navigation_path: '#group' } });
+  card.setConfig({ template: 'md_entity_group_card', name: 'Lights', variables: { entity_type: 'light', summary_entities: ['light.on', 'light.off'] }, tap_action: { action: 'navigate', navigation_path: '#group' } });
   card.hass = { states: { 'light.on': { state: 'on' }, 'light.off': { state: 'off' } } };
   assert.match(card.shadowRoot.innerHTML, /1 active/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
@@ -335,7 +337,7 @@ test("summaries count every device and keep mixed-availability navigation action
   assert.deepEqual(summaryState(["light.unavailable", "light.on"], { states }), { state: "on", label: "1 active" });
   assert.deepEqual(summaryState(["light.off"], { states }), { state: "off", label: "All off" });
   const card = new MaraoCard();
-  card.setConfig({ template: "hc_navigation_card", entity: "light.unavailable", variables: { summary_entities: ["light.unavailable", "light.on"] }, tap_action: { action: "navigate", navigation_path: "#lights" } });
+  card.setConfig({ template: "md_navigation_card", entity: "light.unavailable", variables: { summary_entities: ["light.unavailable", "light.on"] }, tap_action: { action: "navigate", navigation_path: "#lights" } });
   card.hass = { states, callService() {} };
   assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
   assert.match(card.shadowRoot.innerHTML, /1 active/);
@@ -357,11 +359,11 @@ test("vacuum commands honor native capabilities and send each configured segment
 
 test("shared builder settings change the rendered labels, icons and power reading", () => {
   const card = new MaraoCard();
-  card.setConfig({ template: "hc_switch_card", entity: "switch.test", variables: { custom_label: "Status: ", power_entity: "sensor.power", power_unit: "kW" } });
+  card.setConfig({ template: "md_switch_card", entity: "switch.test", variables: { custom_label: "Status: ", power_entity: "sensor.power", power_unit: "kW" } });
   card.hass = { callService() {}, states: { "switch.test": { state: "on", attributes: {} }, "sensor.power": { state: "2", attributes: {} } } };
   assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="state">/);
   assert.match(card.shadowRoot.innerHTML, /2 kW/);
-  card.setConfig({ template: "hc_sensor_card", entity: "binary_sensor.test", variables: { on_icon: "mdi:check", off_icon: "mdi:close" } });
+  card.setConfig({ template: "md_sensor_card", entity: "binary_sensor.test", variables: { on_icon: "mdi:check", off_icon: "mdi:close" } });
   card.hass = { callService() {}, states: { "binary_sensor.test": { state: "off", attributes: {}, last_updated: "2026-10-09T12:00:00Z" } } };
   assert.match(card.shadowRoot.innerHTML, /icon="mdi:close"/);
   assert.match(card.shadowRoot.innerHTML, /Updated /);
@@ -369,18 +371,18 @@ test("shared builder settings change the rendered labels, icons and power readin
 
 test("unknown custom colors remain neutral and toggle graph presentation honors its builder fields", () => {
   const variables = { toggle_entity: "switch.test", active_content_color: "#111", active_icon_background: "#eee", inactive_background: "#ddd", inactive_name_color: "#222", inactive_state_color: "#333", inactive_icon_color: "#444", inactive_icon_background: "#ccc" };
-  assert.deepEqual(stateAppearance("hc_toggle_graph_card", "unknown", { variables }, { states: { "switch.test": { state: "on" } } }), { unavailable: true });
-  const active = stateAppearance("hc_toggle_graph_card", "2", { variables }, { states: { "switch.test": { state: "on" } } });
+  assert.deepEqual(stateAppearance("md_toggle_graph_card", "unknown", { variables }, { states: { "switch.test": { state: "on" } } }), { unavailable: true });
+  const active = stateAppearance("md_toggle_graph_card", "2", { variables }, { states: { "switch.test": { state: "on" } } });
   assert.equal(active.text, "#111"); assert.equal(active.iconBackground, "#eee");
-  const inactive = stateAppearance("hc_toggle_graph_card", "2", { variables }, { states: { "switch.test": { state: "off" } } });
+  const inactive = stateAppearance("md_toggle_graph_card", "2", { variables }, { states: { "switch.test": { state: "off" } } });
   assert.equal(inactive.background, "#ddd"); assert.equal(inactive.stateText, "#333"); assert.equal(inactive.icon, "#444");
 });
 
 test("native on-off devices do not offer unsupported value sliders", () => {
   const card = new MaraoCard();
-  assert.equal(card._range("light.test", { state: "on", attributes: { supported_color_modes: ["onoff"] } }, "hc_light_card"), "");
-  assert.equal(card._range("fan.test", { state: "on", attributes: { supported_features: 0 } }, "hc_fan_card"), "");
-  assert.match(card._range("light.test", { state: "off", attributes: { supported_color_modes: ["brightness"] } }, "hc_light_card"), /type="range"/);
+  assert.equal(card._range("light.test", { state: "on", attributes: { supported_color_modes: ["onoff"] } }, "md_light_card"), "");
+  assert.equal(card._range("fan.test", { state: "on", attributes: { supported_features: 0 } }, "md_fan_card"), "");
+  assert.match(card._range("light.test", { state: "off", attributes: { supported_color_modes: ["brightness"] } }, "md_light_card"), /type="range"/);
 });
 
 test("relative media seek uses live position and elapsed playback while respecting both bounds", async () => {
@@ -474,7 +476,7 @@ test("graph cards keep a single recorder history request and append live data", 
   ];
   const original=JSON.stringify(records);
   const card = new MaraoCard();
-  card.setConfig({ entity: "sensor.power", template: "hc_graph_card", name: "House Power" });
+  card.setConfig({ entity: "sensor.power", template: "md_graph_card", name: "House Power" });
   card.hass = {
     callService() {},
     callApi: async (_method,url) => {
@@ -505,7 +507,7 @@ test("graph cards keep a single recorder history request and append live data", 
 test("graph cards sample full history to a card-scale trace", () => {
   const card = new MaraoCard();
   const now = Date.now();
-  card.setConfig({ entity: "sensor.power", template: "hc_graph_card" });
+  card.setConfig({ entity: "sensor.power", template: "md_graph_card" });
   card.hass = {
     callService() {},
     states: { "sensor.power": { state: "100", attributes: {} } },
@@ -522,7 +524,7 @@ test("graph cards sample full history to a card-scale trace", () => {
 
 test("graph history failures remain readable without repeated requests and recover after reconnect", async () => {
   const card = new MaraoCard();
-  card.setConfig({ entity: "sensor.power", template: "hc_graph_card" });
+  card.setConfig({ entity: "sensor.power", template: "md_graph_card" });
   let requests = 0;
   let reject = true;
   const hass = {
@@ -535,7 +537,8 @@ test("graph history failures remain readable without repeated requests and recov
   await new Promise((resolve) => setImmediate(resolve));
   assert.match(card.shadowRoot.innerHTML, /data-graph-history-state="error"/);
   assert.match(card.shadowRoot.innerHTML, /data-problem-details aria-label="History unavailable"/);
-  assert.match(card.shadowRoot.innerHTML, /data-graph-retry/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /class="history-control"/);
+  assert.match(card.shadowRoot.innerHTML, /data-history-open/);
   assert.match(card.shadowRoot.innerHTML, /125 W/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /class="graph-background"/);
   for (let i = 0; i < 5; i += 1) card.hass = { ...hass };
@@ -553,7 +556,7 @@ test("graph history failures remain readable without repeated requests and recov
 test("graph history ignores responses after its source becomes neutral or its card detaches", async () => {
   for (const transition of ["unknown", "unavailable", "disconnect", "detach"]) {
     const card = new MaraoCard();
-    card.setConfig({ entity: "sensor.power", template: "hc_graph_card" });
+    card.setConfig({ entity: "sensor.power", template: "md_graph_card" });
     let finish;
     let requests = 0;
     const hass = {
@@ -583,7 +586,7 @@ test("graph history ignores responses after its source becomes neutral or its ca
 
 test("idle ranges and graph requests detect mutation of Home Assistant's shared connection", async () => {
   const card = new MaraoCard();
-  card.setConfig({ entity: "light.main", template: "hc_light_card", variables: { show_graph: true, graph_entity: "sensor.power" } });
+  card.setConfig({ entity: "light.main", template: "md_light_card", variables: { show_graph: true, graph_entity: "sensor.power" } });
   let finish;
   let requests = 0;
   const connection = { connected: true };
@@ -613,7 +616,7 @@ test("room cards preserve navigation and expose an all-lights-off control", () =
   const card = new MaraoCard();
   card.setConfig({
     entity: "light.main",
-    template: "hc_room_card",
+    template: "md_room_card",
     name: "Living Room",
     icon: "mdi:sofa",
     variables: { light_entities: ["light.main", "light.accent"] },
@@ -667,7 +670,7 @@ test('room lighting uses every unique selected light and ignores an unrelated pr
   const colors = {};
   const surface = { classList: { remove() {} }, style: { setProperty(key, value) { colors[key] = value; } } };
   card.shadowRoot.querySelector = selector => selector === 'ha-card' ? surface : null;
-  card.setConfig({ template: 'hc_room_card', entity: 'sensor.unrelated', name: 'Bedroom',
+  card.setConfig({ template: 'md_room_card', entity: 'sensor.unrelated', name: 'Bedroom',
     variables: { light_entities: ['light.first', 'light.second', 'light.second', 'sensor.unrelated'] },
     tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/bedroom' } });
   const states = { 'sensor.unrelated': { state: 'unavailable', attributes: {} },
@@ -713,7 +716,7 @@ test('room child activation dispatches once and rechecks targets without navigat
     let activate;
     const button = { disabled: false, addEventListener(_type, handler) { activate = handler; } };
     card.shadowRoot.querySelector = selector => selector === '[data-room-lights-off]' ? button : null;
-    card.setConfig({ template: 'hc_room_card', entity: 'sensor.unrelated', name: 'Bedroom',
+    card.setConfig({ template: 'md_room_card', entity: 'sensor.unrelated', name: 'Bedroom',
       variables: { light_entities: ['light.first', 'light.second', 'light.first'] },
       tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/bedroom' } });
     card.hass = { connected: true, callService: async (...args) => calls.push(args),
@@ -745,7 +748,7 @@ test("toggle graph cards use their toggle availability for control state", () =>
   const card = new MaraoCard();
   card.setConfig({
     entity: "sensor.power",
-    template: "hc_toggle_graph_card",
+    template: "md_toggle_graph_card",
     variables: { toggle_entity: "switch.heater" },
   });
   card.hass = {
@@ -793,7 +796,7 @@ test("action cards honor icon-only visibility flags", () => {
 test("title cards render as text-only section headings", () => {
   const card = new MaraoCard();
   card.setConfig({
-    template: "hc_title_card",
+    template: "md_title_card",
     name: "Living Room",
     tap_action: { action: "none" },
   });
@@ -809,15 +812,15 @@ test("title cards render as text-only section headings", () => {
 
 test("slider headers follow family and preserve optional controls and hidden fields", () => {
   const cases = [
-    ["hc_light_card", "light.test", { supported_color_modes: ["brightness"], brightness: 128 }, {}, true],
-    ["hc_light_card", "light.test", { supported_color_modes: ["brightness"] }, { enable_slider: false }, false],
-    ["hc_light_card", "light.test", { supported_color_modes: ["onoff"] }, {}, false],
-    ["hc_fan_card", "fan.test", { supported_features: 1, percentage: 50 }, {}, true],
-    ["hc_fan_card", "fan.test", { supported_features: 1 }, { enable_slider: false }, false],
-    ["hc_fan_card", "fan.test", { supported_features: 0 }, {}, false],
-    ["hc_cover_card", "cover.test", { current_position: 50 }, {}, true],
-    ["hc_access_slide_action_card", "lock.test", {}, { action_service: "lock.unlock" }, false],
-    ["hc_access_action_card", "lock.test", {}, { action_service: "lock.unlock" }, false],
+    ["md_light_card", "light.test", { supported_color_modes: ["brightness"], brightness: 128 }, {}, true],
+    ["md_light_card", "light.test", { supported_color_modes: ["brightness"] }, { enable_slider: false }, false],
+    ["md_light_card", "light.test", { supported_color_modes: ["onoff"] }, {}, false],
+    ["md_fan_card", "fan.test", { supported_features: 1, percentage: 50 }, {}, true],
+    ["md_fan_card", "fan.test", { supported_features: 1 }, { enable_slider: false }, false],
+    ["md_fan_card", "fan.test", { supported_features: 0 }, {}, false],
+    ["md_cover_card", "cover.test", { current_position: 50 }, {}, true],
+    ["md_access_slide_action_card", "lock.test", {}, { action_service: "lock.unlock" }, false],
+    ["md_access_action_card", "lock.test", {}, { action_service: "lock.unlock" }, false],
   ];
   for (const [template, entity, attributes, variables, range] of cases) {
     const card = new MaraoCard();
@@ -844,7 +847,7 @@ test("slider headers follow family and preserve optional controls and hidden fie
       assert.match(markup(), /class="body[^"\n]* slider-header/);
     }
   }
-  for (const template of ["hc_switch_card", "hc_navigation_card", "hc_media_card", "hc_climate_card"]) {
+  for (const template of ["md_switch_card", "md_navigation_card", "md_media_card", "md_climate_card"]) {
     const card = new MaraoCard();
     card.setConfig({ template, name: "Other family" });
     assert.doesNotMatch(card.shadowRoot.innerHTML.split("</style>")[1], /slider-header/);
@@ -855,7 +858,7 @@ test("media app shortcuts fill the card with artwork without a visible title", (
   const card = new MaraoCard();
   card.setConfig({
     entity: "media_player.apple_tv",
-    template: "hc_media_app_card",
+    template: "md_media_app_card",
     name: "YouTube",
     icon: "mdi:youtube",
     variables: { app_source: "YouTube" },
@@ -876,7 +879,7 @@ test("media app shortcuts fill the card with artwork without a visible title", (
 
 test("media app branding recognizes sources, ships real icons and preserves custom shortcuts", async () => {
   for (const [source, id, extension = "png"] of [["NETFLIX", "netflix", "svg"], ["Spotify", "spotify", "svg"], ["com.google.ios.youtube", "youtube"], ["Disney+", "disney-plus"], ["Amazon Prime Video", "prime-video"], ["com.apple.TVWatchList", "apple-tv"], ["Plex", "plex"], ["MEO", "meo", "svg"], ["meo go", "meo", "svg"], ["pt.sapo.mobile.iphone.tmn.meomobile", "meo", "svg"]]) {
-    const config = { template: "hc_media_app_card", entity: "media_player.apple_tv", name: "My app", icon: "mdi:play-box-outline", show_state: false, variables: { app_source: source } };
+    const config = { template: "md_media_app_card", entity: "media_player.apple_tv", name: "My app", icon: "mdi:play-box-outline", show_state: false, variables: { app_source: source } };
     const before = structuredClone(config);
     assert.equal(mediaAppBrand(config).id, id);
     const card = new MaraoCard();
@@ -887,15 +890,15 @@ test("media app branding recognizes sources, ships real icons and preserves cust
     const bytes = await fs.readFile(new URL(`../../custom_components/marao_dashboard/frontend/media-apps/${id}.${extension}`, import.meta.url));
     if (extension === "svg") assert.match(bytes.toString(), /<svg\b[^>]+viewBox=/);
     else assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
-    assert.ok(stateAppearance("hc_media_app_card", "idle", config).background);
-    assert.deepEqual(stateAppearance("hc_media_app_card", "unavailable", config), { unavailable: true });
+    assert.ok(stateAppearance("md_media_app_card", "idle", config).background);
+    assert.deepEqual(stateAppearance("md_media_app_card", "unavailable", config), { unavailable: true });
     assert.deepEqual(config, before);
   }
-  const custom = { template: "hc_media_app_card", name: "Netflix", icon: "mdi:television", variables: { app_source: "My private app" } };
+  const custom = { template: "md_media_app_card", name: "Netflix", icon: "mdi:television", variables: { app_source: "My private app" } };
   assert.equal(mediaAppBrand(custom), undefined, "The actual source takes priority over a nickname");
   const card = new MaraoCard(); card.setConfig(custom);
   assert.match(card.shadowRoot.innerHTML, /<ha-icon icon="mdi:television"/);
-  assert.equal(stateAppearance("hc_media_app_card", "idle", { variables: { app_source: "Netflix", active_color: "#123456" } }).background, "#123456");
+  assert.equal(stateAppearance("md_media_app_card", "idle", { variables: { app_source: "Netflix", active_color: "#123456" } }).background, "#123456");
 });
 
 test("wallbox current card uses a large stepper and optional shortcuts", () => {
@@ -903,7 +906,7 @@ test("wallbox current card uses a large stepper and optional shortcuts", () => {
   const card = new MaraoCard();
   card.setConfig({
     entity: "input_number.wallbox_current",
-    template: "hc_wallbox_current_card",
+    template: "md_wallbox_current_card",
     name: "Charging Current",
     variables: { shortcuts: [6, 12, 16, 20] },
   });
@@ -915,7 +918,7 @@ test("wallbox current card uses a large stepper and optional shortcuts", () => {
   assert.match(card.shadowRoot.innerHTML, /class="number-stepper wallbox-stepper"/);
   assert.match(card.shadowRoot.innerHTML, />22<small> A<\/small><\/output>/);
   assert.match(card.shadowRoot.innerHTML, /data-current-shortcut="12"/);
-  assert.deepEqual(stateAppearance("hc_wallbox_current_card", "10", {}, card.hass), {
+  assert.deepEqual(stateAppearance("md_wallbox_current_card", "10", {}, card.hass), {
     background: "var(--ha-card-background,var(--card-background-color))",
     text: "var(--primary-text-color)",
     icon: "var(--primary-text-color)",
@@ -936,7 +939,7 @@ test("wallbox current card uses a large stepper and optional shortcuts", () => {
 
 test("climate and Wallbox cards share the same minimum stepper width", () => {
   const climate = new MaraoCard();
-  climate.setConfig({ entity: "climate.test", template: "hc_climate_card" });
+  climate.setConfig({ entity: "climate.test", template: "md_climate_card" });
   climate.hass = {
     callService() {},
     states: {
@@ -954,7 +957,7 @@ test("scene dropdowns retain every option and the authoritative selection", () =
   const card = new MaraoCard();
   for (const domain of ["input_select", "select"]) {
     const entity = `${domain}.scene`;
-    card.setConfig({ entity, template: "hc_scene_card", name: "Room scene" });
+    card.setConfig({ entity, template: "md_scene_card", name: "Room scene" });
     for (const count of [1, 5, 200]) {
       const options = ["Relax", "Movie & Night", ...Array.from({length:198}, (_,index)=>`Option ${index+3}`)].slice(0,count);
       card.hass = {callService() {}, states:{[entity]:{state:"Relax",attributes:{options}}}};
@@ -1011,7 +1014,7 @@ test('scene rerenders retain the attached dropdown while replacing surrounding c
   const style={textContent:'old'},card=new MaraoCard(),doc=globalThis.document;
   t.after(()=>{globalThis.document=doc;});
   globalThis.document={createElement:()=>({set innerHTML(_markup){},content:{querySelector:selector=>selector==='ha-card'?next:{textContent:'new'}}})};
-  card._config={template:'hc_scene_card'};card.shadowRoot.querySelector=selector=>selector==='ha-card'?surface:style;
+  card._config={template:'md_scene_card'};card.shadowRoot.querySelector=selector=>selector==='ha-card'?surface:style;
   card._setMarkup('updated','bindings');
   assert.deepEqual(surface.childNodes,[before,body,after]);
   assert.deepEqual(body.childNodes,[heading,picker,note]);
@@ -1020,7 +1023,7 @@ test('scene rerenders retain the attached dropdown while replacing surrounding c
 
 test("the themed scene dropdown dispatches once, retains HA state and disables unavailable choices", async () => {
   const calls = [], card = new MaraoCard(), entity = "input_select.scene";
-  card.setConfig({entity,template:"hc_scene_card"});
+  card.setConfig({entity,template:"md_scene_card"});
   card.hass={callService:(...args)=>calls.push(args),states:{[entity]:{state:"Relax",attributes:{options:["Relax","Movie"]}}}};
   const doc=globalThis.document;
   globalThis.document=new EventTarget();
@@ -1064,7 +1067,7 @@ test("native select scene failures use the shared readable error notification", 
   globalThis.document = { querySelector: () => target };
   try {
     const card = new MaraoCard();
-    card.setConfig({ entity: "select.scene", template: "hc_scene_card" });
+    card.setConfig({ entity: "select.scene", template: "md_scene_card" });
     card.hass = {
       callService: async (domain, service, data) => {
         assert.equal(domain, "select");
@@ -1083,7 +1086,7 @@ test("native select scene failures use the shared readable error notification", 
 
 test("loading, unknown, and unavailable states stay distinct and disabled", () => {
   const card = new MaraoCard();
-  card.setConfig({ entity: "light.test", template: "hc_light_card" });
+  card.setConfig({ entity: "light.test", template: "md_light_card" });
   assert.match(card.shadowRoot.innerHTML, /<div class="state">Loading…<\/div>/);
   assert.match(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
 
@@ -1098,14 +1101,14 @@ test("loading, unknown, and unavailable states stay distinct and disabled", () =
 
 test("access actions use tap or a cancellable 1.2 second hold as configured", () => {
   const safe = new MaraoCard();
-  safe.setConfig({ entity: "lock.test", name: "Lock", template: "hc_access_action_card", variables: { action_service: "lock.lock" } });
+  safe.setConfig({ entity: "lock.test", name: "Lock", template: "md_access_action_card", variables: { action_service: "lock.lock" } });
   safe.hass = { callService() {}, states: { "lock.test": { state: "unlocked", attributes: {} } } };
   const safeMarkup = safe.shadowRoot.innerHTML.split("</style>")[1];
   assert.match(safeMarkup, /data-card-action/);
   assert.doesNotMatch(safeMarkup, /data-hold-action|class="hold-progress"/);
 
   const held = new MaraoCard();
-  held.setConfig({ entity: "lock.test", name: "Lock", template: "hc_access_hold_action_card", variables: { action_service: "lock.lock" } });
+  held.setConfig({ entity: "lock.test", name: "Lock", template: "md_access_hold_action_card", variables: { action_service: "lock.lock" } });
   held.hass = { callService() {}, states: { "lock.test": { state: "unlocked", attributes: {} } } };
   const heldMarkup = held.shadowRoot.innerHTML.split("</style>")[1];
   assert.match(heldMarkup, /data-card-action data-hold-action aria-label="Hold to Lock"/);
@@ -1190,7 +1193,7 @@ test("active holds survive unrelated HA updates but cancel when their target or 
     const card = new MaraoCard();
     const entity = "alarm_control_panel.test";
     const state = { state: "disarmed", attributes: {} };
-    const config = { entity, template: "hc_access_hold_action_card", variables: { action_service: "alarm_control_panel.alarm_arm_away" } };
+    const config = { entity, template: "md_access_hold_action_card", variables: { action_service: "alarm_control_panel.alarm_arm_away" } };
     const calls = [];
     const hass = { connected: true, callService: (...args) => { calls.push(args); }, states: { [entity]: state } };
     card.setConfig(config);
@@ -1255,7 +1258,7 @@ test("popup headings use the configured name while respecting explicit titles an
       [{ name: "Lights" }, "Lights"],
       [{ name: "Lights", title: "Room lights" }, "Room lights"],
       [{ name: "Lights", title: "" }, ""],
-      [{ name: "Climate", cards: [{ template: "hc_climate_card", variables: { show_mode_buttons: true } }] }, ""],
+      [{ name: "Climate", cards: [{ template: "md_climate_card", variables: { show_mode_buttons: true } }] }, ""],
     ]) {
       const popup = new MaraoPopupCard();
       popup._config = config;
@@ -1448,7 +1451,7 @@ test("closing a directly linked popup clears only its hash and keeps the dashboa
 
 test("glance readings show names, values and units independently of missing entities", () => {
   const card = new MaraoCard();
-  card.setConfig({ template: "hc_glance_card", variables: {
+  card.setConfig({ template: "md_glance_card", variables: {
     entity1: "sensor.temperature", entity1_name: "Temperature", entity1_icon: "mdi:thermometer",
     entity2: "sensor.missing", entity2_name: "Humidity",
     entity3: "sensor.power", entity3_name: "Power",
@@ -1461,18 +1464,18 @@ test("glance readings show names, values and units independently of missing enti
   assert.match(markup, /<dt>Temperature<\/dt><dd>21 °C<\/dd>/);
   assert.match(markup, /<dt>Humidity<\/dt><dd>unknown<\/dd>/);
   assert.match(markup, /<dt>Power<\/dt><dd>120 W<\/dd>/);
-  assert.doesNotMatch(markup, /hc_glance_card|aria-disabled="true"/);
+  assert.doesNotMatch(markup, /md_glance_card|aria-disabled="true"/);
 });
 
 test("state labels use native domain translations and preserve unitless climate values", () => {
   const formatted = [];
   const hass = { states: {}, formatEntityState: (state) => { formatted.push(state.entity_id); return state.entity_id.startsWith("weather.") ? "Ensolarado" : "21 °C"; } };
   const card = new MaraoCard();
-  card.setConfig({ entity: "sensor.weather", template: "hc_weather_card" });
+  card.setConfig({ entity: "sensor.weather", template: "md_weather_card" });
   card.hass = { ...hass, states: { "sensor.weather": { state: "sunny", attributes: {} } } };
   assert.match(card.shadowRoot.innerHTML, /<div class="state">Ensolarado<\/div>/);
   assert.deepEqual(formatted, ["weather.weather"]);
-  card.setConfig({ entity: "climate.room", template: "hc_climate_card" });
+  card.setConfig({ entity: "climate.room", template: "md_climate_card" });
   card.hass = { ...hass, states: { "climate.room": { state: "heat", attributes: { temperature: 22, current_temperature: 21, unit_of_measurement: "°C" } } } };
   assert.doesNotMatch(card.shadowRoot.innerHTML.split("</style>")[1], /°C/);
 });
@@ -1487,16 +1490,16 @@ test("configured weather, header, dishwasher and camera details reach the visibl
   };
   const card = new MaraoCard();
   card.hass = { states, language: "en" };
-  card.setConfig({ entity: "sensor.weather", template: "hc_weather_card" });
+  card.setConfig({ entity: "sensor.weather", template: "md_weather_card" });
   assert.match(card.shadowRoot.innerHTML, /14 °C–22 °C/);
-  card.setConfig({ entity: "sensor.weather", template: "hc_weather_card", variables: { show_forecast: false } });
+  card.setConfig({ entity: "sensor.weather", template: "md_weather_card", variables: { show_forecast: false } });
   assert.doesNotMatch(card.shadowRoot.innerHTML.split("</style>")[1], /14 °C–22 °C/);
-  card.setConfig({ entity: "sensor.weather", template: "hc_header_card", variables: { person_entity: "sensor.person" } });
+  card.setConfig({ entity: "sensor.weather", template: "md_header_card", variables: { person_entity: "sensor.person" } });
   assert.match(card.shadowRoot.innerHTML, /<dt>Person<\/dt><dd>home<\/dd>/);
   assert.match(card.shadowRoot.innerHTML, new RegExp(new Date().getFullYear()));
-  card.setConfig({ entity: "sensor.dishwasher", template: "hc_dishwasher_card", variables: { progress_entity: "sensor.progress" } });
+  card.setConfig({ entity: "sensor.dishwasher", template: "md_dishwasher_card", variables: { progress_entity: "sensor.progress" } });
   assert.match(card.shadowRoot.innerHTML, /40 %/);
-  card.setConfig({ entity: "camera.front", template: "hc_camera_card" });
+  card.setConfig({ entity: "camera.front", template: "md_camera_card" });
   assert.doesNotMatch(card.shadowRoot.innerHTML, /<img class="camera"/); // Native camera is mounted only when connected; browser harness covers playback.
   for (const state of ["unknown", "unavailable"]) {
     card.hass = { states: { ...states, "camera.front": { state, attributes: states["camera.front"].attributes } } };
@@ -1511,20 +1514,20 @@ test("configured weather, header, dishwasher and camera details reach the visibl
 test("media artwork and summary respect the configured opt-out and neutral states", () => {
   const attributes = { entity_picture: "/synthetic-art.svg", media_title: "Test programme", media_artist: "Test artist" };
   const card = new MaraoCard();
-  card.setConfig({ entity: "media_player.audio", template: "hc_media_card" });
+  card.setConfig({ entity: "media_player.audio", template: "md_media_card" });
   card.hass = { states: { "media_player.audio": { state: "playing", attributes } } };
   const markup = () => card.shadowRoot.innerHTML.split("</style>")[1];
   assert.match(markup(), /class="media-artwork"/);
   assert.match(markup(), /Test programme · Test artist/);
-  card.setConfig({ entity: "media_player.audio", template: "hc_media_card", variables: { hc_show_background_art: false, hc_background_color: "var(--color-blue)" } });
+  card.setConfig({ entity: "media_player.audio", template: "md_media_card", variables: { md_show_background_art: false, md_background_color: "var(--color-blue)" } });
   assert.doesNotMatch(markup(), /class="media-artwork"/);
   assert.match(markup(), /Test programme · Test artist/);
-  assert.equal(stateAppearance("hc_media_card", "playing", card._config).background, "var(--color-blue)");
-  card.setConfig({ entity: "media_player.audio", template: "hc_media_card" });
+  assert.equal(stateAppearance("md_media_card", "playing", card._config).background, "var(--color-blue)");
+  card.setConfig({ entity: "media_player.audio", template: "md_media_card" });
   for (const state of ["off", "unknown", "unavailable"]) {
     card.hass = { states: { "media_player.audio": { state, attributes } } };
     assert.doesNotMatch(markup(), /class="media-artwork"|Test programme/);
-    assert.equal(stateAppearance("hc_media_card", state, card._config).background, undefined);
+    assert.equal(stateAppearance("md_media_card", state, card._config).background, undefined);
   }
   for (const connection of [{ connected: false }, { connection: { connected: false } }]) {
     card.hass = { states: { "media_player.audio": { state: "playing", attributes } }, ...connection };
@@ -1534,7 +1537,7 @@ test("media artwork and summary respect the configured opt-out and neutral state
 
 test("navigation without a primary entity remains available when entity services disconnect", () => {
   const card = new MaraoCard();
-  card.setConfig({ template: "hc_navigation_card", name: "Rooms", tap_action: { action: "navigate", navigation_path: "/marao-dashboard/rooms" } });
+  card.setConfig({ template: "md_navigation_card", name: "Rooms", tap_action: { action: "navigate", navigation_path: "/marao-dashboard/rooms" } });
   card.hass = { states: {}, connected: false };
   const markup = card.shadowRoot.innerHTML.split("</style>")[1];
   assert.match(markup, /data-card-action/);
@@ -1714,7 +1717,7 @@ test("HA updates retain focus on the corresponding live card action", () => {
   try {
     globalThis.document = { activeElement: null };
     const card = new MaraoCard();
-    card.setConfig({ entity: "light.test", template: "hc_light_card", variables: { enable_slider: false } });
+    card.setConfig({ entity: "light.test", template: "md_light_card", variables: { enable_slider: false } });
     let button;
     const root = {
       activeElement: null,
@@ -1748,25 +1751,25 @@ test("HA updates retain focus on the corresponding live card action", () => {
 test("light and fan can omit their sliders while cover positions use the native service", async () => {
   const card = new MaraoCard();
   const calls = [];
-  card.setConfig({ template: "hc_light_card", variables: { enable_slider: false } });
+  card.setConfig({ template: "md_light_card", variables: { enable_slider: false } });
   card.hass = { callService: (...args) => { calls.push(args); return Promise.resolve(); }, states: { "cover.test": { state: "open", attributes: { current_position: 50 } } } };
   const state = { state: "on", attributes: { brightness: 128, percentage: 50 } };
-  assert.equal(card._range("light.test", state, "hc_light_card"), "");
-  assert.equal(card._range("fan.test", state, "hc_fan_card"), "");
-  card.setConfig({ template: "hc_light_card" });
-  assert.match(card._range("light.test", state, "hc_light_card"), /type="range"/);
-  await card._setRange("cover.test", "hc_cover_card", 60);
+  assert.equal(card._range("light.test", state, "md_light_card"), "");
+  assert.equal(card._range("fan.test", state, "md_fan_card"), "");
+  card.setConfig({ template: "md_light_card" });
+  assert.match(card._range("light.test", state, "md_light_card"), /type="range"/);
+  await card._setRange("cover.test", "md_cover_card", 60);
   assert.deepEqual(calls, [["cover", "set_cover_position", { entity_id: "cover.test", position: 60 }, undefined, false]]);
 });
 
 test("value slider drags retain their native input across unrelated and confirmed-state updates", () => {
   const card = new MaraoCard();
   const entity = "cover.test";
-  card.setConfig({ entity, template: "hc_cover_card" });
+  card.setConfig({ entity, template: "md_cover_card" });
   card.hass = { callService() {}, states: { [entity]: { state: "open", attributes: { current_position: 50 } } } };
   const markup = card.shadowRoot.innerHTML;
   const refreshed = [];
-  const gesture = { input: { isConnected: true }, key: `hc_cover_card:${entity}`, refresh: (state) => refreshed.push(state) };
+  const gesture = { input: { isConnected: true }, key: `md_cover_card:${entity}`, refresh: (state) => refreshed.push(state) };
   card._sliderGesture = gesture;
   card.hass = { ...card.hass, states: { ...card.hass.states } };
   const confirmed = { state: "open", attributes: { current_position: 40 } };
@@ -1782,7 +1785,7 @@ test("idle value sliders skip unrelated updates but refresh their state, graph, 
   for (const change of ["unrelated", "own", "graph", "themes", "locale", "language", "localize", "entities", "connection"]) {
     const entity = "light.test", graph = "sensor.power";
     const card = new MaraoCard();
-    card.setConfig({ entity, template: "hc_light_card", variables: { graph_entity: graph, show_graph: true } });
+    card.setConfig({ entity, template: "md_light_card", variables: { graph_entity: graph, show_graph: true } });
     card.hass = { callService() {}, states: { [entity]: { state: "on", attributes: { brightness: 128 } }, [graph]: { state: "20" } } };
     card.shadowRoot.querySelector = (selector) => selector === 'input[data-slider-key],.camera-live,.media-artwork img' ? {} : null;
     let renders = 0;
@@ -1801,10 +1804,10 @@ test("idle value sliders skip unrelated updates but refresh their state, graph, 
 test("invalid targets, disconnects and lifecycle changes cancel value slider targets", () => {
   for (const reason of ["unknown", "unavailable", "disconnect", "config", "detach"]) {
     const card = new MaraoCard();
-    const entity = "fan.test", config = { entity, template: "hc_fan_card" };
+    const entity = "fan.test", config = { entity, template: "md_fan_card" };
     card.setConfig(config);
     card.hass = { callService() {}, states: { [entity]: { state: "on", attributes: { percentage: 50 } } } };
-    const gesture = { input: { isConnected: true }, key: `hc_fan_card:${entity}`, refresh() {} };
+    const gesture = { input: { isConnected: true }, key: `md_fan_card:${entity}`, refresh() {} };
     card._sliderGesture = gesture;
     card._sliderTargets.set(gesture.key, 60);
     if (reason === "config") card.setConfig({ ...config, variables: { enable_slider: false } });
@@ -1819,7 +1822,7 @@ test("invalid targets, disconnects and lifecycle changes cancel value slider tar
 
 test("legacy access opening actions always render the strict slider without a tap overlay", () => {
   for (const [entity, service, state] of [["lock.test", "lock.unlock", "locked"], ["cover.test", "cover.open_cover", "closed"]]) {
-    for (const template of ["hc_access_action_card", "hc_access_hold_action_card", "hc_access_slide_action_card"]) {
+    for (const template of ["md_access_action_card", "md_access_hold_action_card", "md_access_slide_action_card"]) {
       const card = new MaraoCard();
       card.setConfig({ entity, template, variables: { action_service: service }, tap_action: { action: "call-service", service } });
       card.hass = { callService() {}, states: { [entity]: { state, attributes: {} } } };
@@ -1838,8 +1841,8 @@ test('binary meaning follows native domains and explicit appliance contracts',()
  for(const domain of ['sensor','number','select','input_select','climate','media_player','cover','vacuum','alarm_control_panel']) for(const value of ['on','off']) assert.equal(binaryState(`${domain}.test`,{state:value}),null);
  for(const value of ['unknown','unavailable','locking','unlocking','open','opening','jammed']) assert.equal(binaryState('lock.test',{state:value}),null);
  for(const value of ['locked','unlocked']) assert.equal(binaryState('lock.test',{state:value}),value==='unlocked');
- for(const [value,expected] of [['running',true],['idle',false],['paused',null],['error',null]]) assert.equal(binaryState('sensor.test',{state:value},'hc_washing_machine_card'),expected);
- for(const kind of ['hc_cover_card','hc_climate_card','hc_media_card','hc_media_app_card','hc_camera_card','hc_security_card','hc_weather_card','hc_vacuum_card','hc_dishwasher_card','hc_scene_card','hc_number_card','hc_wallbox_current_card','hc_battery_card']) assert.equal(binaryState('switch.test',{state:'on'},kind),null);
+ for(const [value,expected] of [['running',true],['idle',false],['paused',null],['error',null]]) assert.equal(binaryState('sensor.test',{state:value},'md_washing_machine_card'),expected);
+ for(const kind of ['md_cover_card','md_climate_card','md_media_card','md_media_app_card','md_camera_card','md_security_card','md_weather_card','md_vacuum_card','md_dishwasher_card','md_scene_card','md_number_card','md_wallbox_current_card','md_battery_card']) assert.equal(binaryState('switch.test',{state:'on'},kind),null);
 });
 test('binary cards omit the round badge and preserve state for native, static and hidden icons',()=>{
  for(const domain of ['light','fan','switch','input_boolean','binary_sensor','lock']) for(const value of domain==='lock'?['locked','unlocked']:['on','off']) for(const variant of [{},{icon:'mdi:test'},{show_icon:false}]) {
@@ -1851,10 +1854,10 @@ test('binary cards omit the round badge and preserve state for native, static an
 });
 test('binary state hiding retains configured labels, numeric readings and metadata without dangling prefixes',()=>{
  const entity='switch.test', states={[entity]:{state:'on',attributes:{}},'sensor.power':{state:'120',attributes:{unit_of_measurement:'W'}}};
- for(const variables of [{custom_label:'Status: ',hc_label_prefix:'Power: '},{hc_label_prefix:'Status '}]) assert.doesNotMatch(renderBinary({entity,variables},states),/<div class="state">/);
+ for(const variables of [{custom_label:'Status: ',md_label_prefix:'Power: '},{md_label_prefix:'Status '}]) assert.doesNotMatch(renderBinary({entity,variables},states),/<div class="state">/);
  assert.match(renderBinary({entity,variables:{custom_label:'Night lighting',power_entity:'sensor.power'}},states),/<div class="state">Night lighting<\/div>/);
- assert.match(renderBinary({template:'hc_switch_card',entity,variables:{power_entity:'sensor.power'}},states),/120 W/);
- const sensor=renderBinary({template:'hc_sensor_card',entity:'binary_sensor.test',variables:{on_icon:'mdi:check',off_icon:'mdi:close'}},{'binary_sensor.test':{state:'off',last_updated:'2026-10-10T12:00:00Z',attributes:{}}});
+ assert.match(renderBinary({template:'md_switch_card',entity,variables:{power_entity:'sensor.power'}},states),/120 W/);
+ const sensor=renderBinary({template:'md_sensor_card',entity:'binary_sensor.test',variables:{on_icon:'mdi:check',off_icon:'mdi:close'}},{'binary_sensor.test':{state:'off',last_updated:'2026-10-10T12:00:00Z',attributes:{}}});
  assert.match(sensor,/icon="mdi:close"/);assert.match(sensor,/Updated /);
 });
 test('binary hiding preserves explicit title-hidden and icon-only roles',()=>{
@@ -1863,30 +1866,30 @@ test('binary hiding preserves explicit title-hidden and icon-only roles',()=>{
  assert.match(renderBinary({entity,show_name:false,show_state:false,show_label:false},states),/body icon-only/);
 });
 test('summaries retain usable counts without member warnings and omit known All off',()=>{
- const entity='switch.test',config={template:'hc_navigation_card',entity,variables:{summary_entities:[entity,'switch.other']}};
+ const entity='switch.test',config={template:'md_navigation_card',entity,variables:{summary_entities:[entity,'switch.other']}};
  for(const [first,second,expected] of [['on','off','1 active'],['on','unavailable','1 active'],['off','unavailable','All off']]) assert.match(renderBinary(config,{[entity]:{state:first},'switch.other':{state:second}}),new RegExp(`<div class="state">${expected}<`));
  assert.doesNotMatch(renderBinary(config,{[entity]:{state:'off'},'switch.other':{state:'off'}}),/<div class="state">/);
 });
 test('toggle graphs use their actual toggle while preserving numeric state and header details',()=>{
  const entity='sensor.power',toggle='switch.test',states={[entity]:{state:'42',attributes:{unit_of_measurement:'W'}},[toggle]:{state:'on'}};
- const html=renderBinary({template:'hc_toggle_graph_card',entity,variables:{toggle_entity:toggle}},states);
+ const html=renderBinary({template:'md_toggle_graph_card',entity,variables:{toggle_entity:toggle}},states);
  assert.match(html,/<div class="state">42 W<\/div>/);assert.match(html,/data-binary-state="true"/);assert.doesNotMatch(html,/class="binary-cue"/);
- const binary=renderBinary({template:'hc_toggle_graph_card',entity:toggle,variables:{toggle_entity:toggle,graph_entity:entity}},states);
+ const binary=renderBinary({template:'md_toggle_graph_card',entity:toggle,variables:{toggle_entity:toggle,graph_entity:entity}},states);
  assert.doesNotMatch(binary,/<div class="state">/);
- const header=renderBinary({template:'hc_header_card',entity:toggle},states);
+ const header=renderBinary({template:'md_header_card',entity:toggle},states);
  assert.doesNotMatch(header,/<div class="state">/);assert.match(header,/<div class="climate">/);
 });
 test('nonbinary and transitional content stays visible, including configured prefixes',()=>{
- for(const [entity,value,template] of [['cover.test','opening','hc_cover_card'],['climate.test','heat','hc_climate_card'],['media_player.test','paused','hc_media_card'],['lock.test','locking','hc_access_card'],['vacuum.test','returning','hc_vacuum_card'],['sensor.test','on','hc_base_card'],['input_select.test','on','hc_scene_card']]) assert.match(renderBinary({entity,template,variables:{custom_label:'State: '}},{[entity]:{state:value,attributes:{}}}),/<div class="state">State: /);
+ for(const [entity,value,template] of [['cover.test','opening','md_cover_card'],['climate.test','heat','md_climate_card'],['media_player.test','paused','md_media_card'],['lock.test','locking','md_access_card'],['vacuum.test','returning','md_vacuum_card'],['sensor.test','on','md_base_card'],['input_select.test','on','md_scene_card']]) assert.match(renderBinary({entity,template,variables:{custom_label:'State: '}},{[entity]:{state:value,attributes:{}}}),/<div class="state">State: /);
 });
 test('binary backgrounds distinguish normal active and inactive states through shared and navigation paths',()=>{
- for(const kind of ['hc_base_card','hc_navigation_card','hc_washing_machine_card','hc_room_card']) {
-  const config={entity:'binary_sensor.test',variables:{hc_color:'var(--color-orange)'}};
+ for(const kind of ['md_base_card','md_navigation_card','md_washing_machine_card','md_room_card']) {
+  const config={entity:'binary_sensor.test',variables:{md_color:'var(--color-orange)'}};
   assert.notEqual(stateAppearance(kind,'on',config).background,stateAppearance(kind,'off',config).background);
  }
 });
 test('binary accessible state uses Home Assistant localized device-class meanings',()=>{
- for(const [deviceClass,on,off] of [['motion','Detected','Clear'],['moisture','Molhado','Seco'],['opening','Aberto','Fechado']]) for(const value of ['on','off']) for(const template of ['hc_sensor_card','hc_header_card']) {
+ for(const [deviceClass,on,off] of [['motion','Detected','Clear'],['moisture','Molhado','Seco'],['opening','Aberto','Fechado']]) for(const value of ['on','off']) for(const template of ['md_sensor_card','md_header_card']) {
   const card=new MaraoCard();card.setConfig({template,entity:'binary_sensor.test',name:'Target'});
   card.hass={language:deviceClass==='motion'?'en':'pt',states:{'binary_sensor.test':{state:value,attributes:{device_class:deviceClass}}},formatEntityState:state=>{assert.equal(state.entity_id,'binary_sensor.test');return state.state==='on'?on:off}};
   assert.match(card.shadowRoot.innerHTML,new RegExp(`aria-label="Target: ${value==='on'?on:off}"`));assert.doesNotMatch(card.shadowRoot.innerHTML,/<div class="state">/);
@@ -1928,26 +1931,26 @@ test('complete availability has priority over retained action and content errors
   const problem=cardProblem({entity},{states},{error:'Rejected',contentError:'History unavailable'});assert.equal(problem.kind,'neutral');assert.equal(problem.complete,true);assert.equal(problem.reason,reason);
  }
  const disconnected=cardProblem({entity},{...normal,connected:false});assert.equal(disconnected.kind,'neutral');assert.equal(disconnected.reason,'Disconnected');
- assert.equal(cardProblem({entity},{},{error:'Rejected'}).kind,'loading');assert.equal(cardProblem({template:'hc_title_card'},{connected:false}),null);
+ assert.equal(cardProblem({entity},{},{error:'Rejected'}).kind,'loading');assert.equal(cardProblem({template:'md_title_card'},{connected:false}),null);
 });
 test('usable summaries omit availability warnings while glance data retains a compact cue',()=>{
- const summary={template:'hc_navigation_card',entity,variables:{summary_entities:[entity,'light.missing']}};
+ const summary={template:'md_navigation_card',entity,variables:{summary_entities:[entity,'light.missing']}};
  assert.equal(cardProblem(summary,normal),null);
  assert.equal(cardProblem(summary,{states:{}}).kind,'neutral');
- const glance={template:'hc_glance_card',entity:'sensor.missing',variables:{entity1:'sensor.reading'}};assert.equal(cardProblem(glance,normal).kind,'warning');
- assert.equal(cardProblem({template:'hc_room_card',entity,variables:{light_entities:[entity,'light.missing']}},normal),null);
+ const glance={template:'md_glance_card',entity:'sensor.missing',variables:{entity1:'sensor.reading'}};assert.equal(cardProblem(glance,normal).kind,'warning');
+ assert.equal(cardProblem({template:'md_room_card',entity,variables:{light_entities:[entity,'light.missing']}},normal),null);
 });
 test('actual toggle, remote and graph failures remain distinct from readable primary content',()=>{
  for(const config of [
-  {template:'hc_toggle_graph_card',entity:'sensor.reading',variables:{toggle_entity:'switch.missing'}},
-  {template:'hc_climate_card',entity,variables:{show_graph:true,graph_entity:'sensor.missing'}},
+  {template:'md_toggle_graph_card',entity:'sensor.reading',variables:{toggle_entity:'switch.missing'}},
+  {template:'md_climate_card',entity,variables:{show_graph:true,graph_entity:'sensor.missing'}},
   {entity,tap_action:{action:'perform-action',perform_action:'remote.send_command',target:{entity_id:'remote.missing'}}},
  ])assert.equal(cardProblem(config,normal).kind,'warning');
  assert.equal(cardProblem({entity,variables:{graph_entity:'sensor.missing',show_graph:false}},normal),null);
  assert.equal(cardProblem({entity,tap_action:{action:'navigate',navigation_path:'#missing'}},normal),null);
 });
 test('only recognized operational faults take error priority over partial content',()=>{
- for(const [template,id,value] of [['hc_vacuum_card','vacuum.test','error'],['hc_dishwasher_card','sensor.test','actionrequired'],['hc_washing_machine_card','sensor.test','error'],['hc_access_card','lock.test','jammed'],['hc_security_card','alarm_control_panel.test','triggered']]) assert.equal(cardProblem({template,entity:id},{states:{[id]:state(value)}}).kind,'error');
+ for(const [template,id,value] of [['md_vacuum_card','vacuum.test','error'],['md_dishwasher_card','sensor.test','actionrequired'],['md_washing_machine_card','sensor.test','error'],['md_access_card','lock.test','jammed'],['md_security_card','alarm_control_panel.test','triggered']]) assert.equal(cardProblem({template,entity:id},{states:{[id]:state(value)}}).kind,'error');
  assert.equal(cardProblem({entity:'sensor.test'},{states:{'sensor.test':state('error')}}),null);
  assert.equal(cardProblem({entity},normal,{contentError:'History unavailable',loading:true}).kind,'error');
  assert.equal(cardProblem({entity},normal,{loading:true}).kind,'loading');assert.equal(cardProblem({entity},normal),null);
@@ -1955,20 +1958,20 @@ test('only recognized operational faults take error priority over partial conten
 
 test('problem surfaces override custom colors and hidden normal fields without hiding usable readings', () => {
   const card = new MaraoCard();
-  card.setConfig({ entity: 'light.test', template: 'hc_light_card', show_state: false, show_icon: false, variables: { active_color: '#123456' } });
+  card.setConfig({ entity: 'light.test', template: 'md_light_card', show_state: false, show_icon: false, variables: { active_color: '#123456' } });
   card.hass = { callService() {}, states: { 'light.test': { state: 'unknown', attributes: {} } } };
   assert.match(card.shadowRoot.innerHTML, /data-problem="neutral" style="background:var\(--marao-problem-neutral-background/);
   assert.match(card.shadowRoot.innerHTML, /class="problem" role="status">[\s\S]*Unknown/);
   assert.match(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /style="[^"]*#123456/);
-  card.setConfig({ entity: 'media_player.test', template: 'hc_media_card', variables: { hc_background_color: '#123456' } });
+  card.setConfig({ entity: 'media_player.test', template: 'md_media_card', variables: { md_background_color: '#123456' } });
   card._actionError = 'Reported rejection';
   card.hass = { callService() {}, states: { 'media_player.test': { state: 'playing', attributes: { entity_picture: '/synthetic-artwork', media_title: 'Safe programme' } } } };
   assert.match(card.shadowRoot.innerHTML, /data-problem="error" style="background:var\(--marao-problem-error-background/);
   assert.match(card.shadowRoot.innerHTML, /Reported rejection/);
   assert.match(card.shadowRoot.innerHTML, /Safe programme/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /class="media-artwork"/);
-  card.setConfig({ entity: 'sensor.value', template: 'hc_glance_card', variables: { entity1: 'sensor.value', entity2: 'sensor.missing' } });
+  card.setConfig({ entity: 'sensor.value', template: 'md_glance_card', variables: { entity1: 'sensor.value', entity2: 'sensor.missing' } });
   card.hass = { states: { 'sensor.value': { state: '21', attributes: { unit_of_measurement: 'W' } } } };
   assert.match(card.shadowRoot.innerHTML, /data-problem="warning"/);
   assert.match(card.shadowRoot.innerHTML, /21 W/);
@@ -1977,7 +1980,7 @@ test('problem surfaces override custom colors and hidden normal fields without h
 
 test('failed media stays local, waits for explicit retry, and ignores old resource callbacks', () => {
   const card = new MaraoCard();
-  card.setConfig({ entity: 'media_player.test', template: 'hc_media_card' });
+  card.setConfig({ entity: 'media_player.test', template: 'md_media_card' });
   const images = [], retries = [];
   card.shadowRoot.querySelectorAll = selector => {
     if (selector !== 'img.camera,.media-artwork img' || !card.shadowRoot.innerHTML.includes('class="media-artwork"')) return [];
@@ -2005,7 +2008,7 @@ test('failed media stays local, waits for explicit retry, and ignores old resour
   images[0].isConnected = false;
   firstError();
   assert.equal(card._mediaError, '');
-  card.setConfig({ entity: 'media_player.other', template: 'hc_media_card' });
+  card.setConfig({ entity: 'media_player.other', template: 'md_media_card' });
   images[1].error();
   assert.equal(card._mediaError, '');
 });
@@ -2013,7 +2016,7 @@ test('failed media stays local, waits for explicit retry, and ignores old resour
 for (const fail of [false, true]) test(`graph history survives a temporary HA shell move (${fail ? 'error' : 'ready'})`, async () => {
   const card = new MaraoCard();
   card.isConnected = true;
-  card.setConfig({entity: 'sensor.power', template: 'hc_graph_card'});
+  card.setConfig({entity: 'sensor.power', template: 'md_graph_card'});
   let calls = 0, finish, reject;
   card.hass = {states: {'sensor.power': {state: '125', attributes: {}}}, callApi: () => {calls++; return new Promise((resolve, fail) => {finish = resolve; reject = fail;});}};
   card.isConnected = false;
@@ -2034,7 +2037,7 @@ for (const fail of [false, true]) test(`graph history survives a temporary HA sh
 test('unrelated HA updates retain idle and active strict access slides with the current service context', () => {
   for (const pointerId of [null, 1]) for (const change of ['unrelated', 'target', 'unknown', 'disconnect', 'locale']) {
     const card = new MaraoCard();
-    card.setConfig({entity: 'lock.test', template: 'hc_access_slide_action_card', variables: {action_service: 'lock.unlock'}});
+    card.setConfig({entity: 'lock.test', template: 'md_access_slide_action_card', variables: {action_service: 'lock.unlock'}});
     const state = {state: 'locked', attributes: {}};
     const hass = {states: {'lock.test': state}, callService() {}, language: 'en'};
     card.hass = hass;
@@ -2056,7 +2059,7 @@ test('unrelated HA updates retain idle and active strict access slides with the 
 test('availability labels omit long member names and recover retained errors when the device returns', () => {
   const name = 'A very long auxiliary device name '.repeat(8);
   const hass = { states: { 'switch.main': { state: 'on' }, 'sensor.power': { state: 'unavailable', attributes: { friendly_name: name } } } };
-  const config = { entity: 'switch.main', template: 'hc_switch_card', variables: { power_entity: 'sensor.power' } };
+  const config = { entity: 'switch.main', template: 'md_switch_card', variables: { power_entity: 'sensor.power' } };
   assert.equal(cardProblem(config, hass).reason, 'Unavailable');
   const card = new MaraoCard();card.setConfig(config);card.hass = hass;
   assert.match(card.shadowRoot.innerHTML, /class="problem"[^>]*><ha-icon[^>]*><\/ha-icon><span>Unavailable<\/span>/);
@@ -2072,7 +2075,7 @@ test('availability labels omit long member names and recover retained errors whe
 test('partially available group tiles keep their counts without adding warning rows', () => {
   for (const type of ['light','cover','climate','battery']) {
     const card = new MaraoCard(), ids = ['sensor.first','sensor.missing'];
-    card.setConfig({ template: 'hc_entity_group_card', name: 'Group', variables: { entity_type: type, summary_entities: ids }, tap_action: { action: 'navigate', navigation_path: '#group' } });
+    card.setConfig({ template: 'md_entity_group_card', name: 'Group', variables: { entity_type: type, summary_entities: ids }, tap_action: { action: 'navigate', navigation_path: '#group' } });
     const state = { light: 'on', cover: 'open', climate: 'heat', battery: '10' }[type];
     for (const failure of ['unknown','unavailable',null]) {
       card.hass = { states: { [ids[0]]: { state }, ...(failure ? { [ids[1]]: { state: failure, attributes: { friendly_name: 'Long member name '.repeat(10) } } } : {}) } };
@@ -2087,9 +2090,9 @@ test('partially available group tiles keep their counts without adding warning r
 
 
 test('light color background is opt-in, authoritative and limited to available lights', () => {
-  const config = {template:'hc_light_card',entity:'light.fixture',variables:{use_light_color:true,card_color:'#abcdef'}};
+  const config = {template:'md_light_card',entity:'light.fixture',variables:{use_light_color:true,card_color:'#abcdef'}};
   const hass = {states:{'light.fixture':{state:'on',attributes:{supported_color_modes:['rgb'],rgb_color:[0,0,255]}}}};
-  const appearance = () => stateAppearance('hc_light_card','on',config,hass);
+  const appearance = () => stateAppearance('md_light_card','on',config,hass);
   assert.equal(appearance().background,'rgb(0, 0, 255)');
   hass.states['light.fixture'].attributes.rgb_color=[255,255,0];
   assert.equal(appearance().background,'rgb(255, 255, 0)');
@@ -2100,6 +2103,6 @@ test('light color background is opt-in, authoritative and limited to available l
   config.variables.use_light_color=true;
   delete hass.states['light.fixture'].attributes.rgb_color;
   assert.equal(appearance().background,'#abcdef');
-  for (const value of ['off','unknown','unavailable']) assert.equal(stateAppearance('hc_light_card',value,config,hass).background,undefined);
+  for (const value of ['off','unknown','unavailable']) assert.equal(stateAppearance('md_light_card',value,config,hass).background,undefined);
   assert.throws(()=>new MaraoCard().setConfig({...config,variables:{use_light_color:'true'}}),/boolean/);
 });

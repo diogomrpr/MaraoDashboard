@@ -36,7 +36,7 @@ test('compatible units, finite guards, signed values and fixed localized precisi
 });
 
 test('available readings cannot inherit a removed unit from layout metadata',()=>{
-  const card=new MaraoCard();card.setConfig({template:'hc_sensor_card',entity:'sensor.energy',variables:{display_unit:'kWh',display_precision:2}});
+  const card=new MaraoCard();card.setConfig({template:'md_sensor_card',entity:'sensor.energy',variables:{display_unit:'kWh',display_precision:2}});
   card.hass=hass({'sensor.energy':sample('42','Wh')});
   assert.match(card.shadowRoot.innerHTML,/0.04 kWh/);
   card.hass=hass({'sensor.energy':{state:'unavailable',attributes:{}}});
@@ -49,21 +49,21 @@ test('available readings cannot inherit a removed unit from layout metadata',()=
 
 test('only configured primary readings and switch secondary power change',()=>{
   const states={'sensor.energy':sample('1234.5','Wh'),'switch.load':sample('on'),'sensor.power':sample('1500','W'),'climate.room':{state:'heat',attributes:{current_temperature:21,temperature:22}}};
-  for(const kind of ['hc_graph_card','hc_toggle_graph_card','hc_sensor_card','hc_base_card']){
+  for(const kind of ['md_graph_card','md_toggle_graph_card','md_sensor_card','md_base_card']){
     const card=new MaraoCard();card.setConfig({template:kind,entity:'sensor.energy',variables:{display_unit:'kWh',display_precision:2}});card.hass=hass(states);
     assert.match(card.shadowRoot.innerHTML,/1.23 kWh/);
   }
-  const legacy=new MaraoCard();legacy.setConfig({template:'hc_switch_card',entity:'switch.load',variables:{power_entity:'sensor.power',power_unit:'MW'}});legacy.hass=hass(states);assert.match(legacy.shadowRoot.innerHTML,/1500 MW/);
+  const legacy=new MaraoCard();legacy.setConfig({template:'md_switch_card',entity:'switch.load',variables:{power_entity:'sensor.power',power_unit:'MW'}});legacy.hass=hass(states);assert.match(legacy.shadowRoot.innerHTML,/1500 MW/);
   const formatted=new MaraoCard();formatted.setConfig({...legacy._config,variables:{...legacy._config.variables,display_unit:'kW',display_precision:0}});formatted.hass=hass(states);assert.match(formatted.shadowRoot.innerHTML,/2 kW/);assert.doesNotMatch(formatted.shadowRoot.innerHTML,/1500 MW/);
   assert.equal(states['sensor.power'].state,'1500');assert.equal(states['switch.load'].state,'on');
-  const defaultCard=new MaraoCard();defaultCard.setConfig({template:'hc_base_card',entity:'sensor.energy'});defaultCard.hass=hass(states);assert.match(defaultCard.shadowRoot.innerHTML,/1234.5 Wh/);
-  const iconOnly=new MaraoCard();iconOnly.setConfig({template:'hc_base_card',entity:'sensor.energy',show_name:false,show_state:false,show_label:false,variables:{display_unit:'kWh',display_precision:2}});iconOnly.hass=hass(states);assert.match(iconOnly.shadowRoot.innerHTML,/class="body icon-only/);assert.doesNotMatch(iconOnly.shadowRoot.innerHTML,/<div class="formatted-values">/);
-  const climate=new MaraoCard();climate.setConfig({template:'hc_climate_card',entity:'climate.room',variables:{display_unit:'kW',display_precision:6}});climate.hass=hass(states);assert.doesNotMatch(climate.shadowRoot.innerHTML,/kW|21.000000|22.000000/);
+  const defaultCard=new MaraoCard();defaultCard.setConfig({template:'md_base_card',entity:'sensor.energy'});defaultCard.hass=hass(states);assert.match(defaultCard.shadowRoot.innerHTML,/1234.5 Wh/);
+  const iconOnly=new MaraoCard();iconOnly.setConfig({template:'md_base_card',entity:'sensor.energy',show_name:false,show_state:false,show_label:false,variables:{display_unit:'kWh',display_precision:2}});iconOnly.hass=hass(states);assert.match(iconOnly.shadowRoot.innerHTML,/class="body icon-only/);assert.doesNotMatch(iconOnly.shadowRoot.innerHTML,/<div class="formatted-values">/);
+  const climate=new MaraoCard();climate.setConfig({template:'md_climate_card',entity:'climate.room',variables:{display_unit:'kW',display_precision:6}});climate.hass=hass(states);assert.doesNotMatch(climate.shadowRoot.innerHTML,/kW|21.000000|22.000000/);
 });
 
 test('mixed raw unit history converts before geometry and formatting changes reuse cache',async()=>{
   const end=Date.now()-10000,raw=[sample('1000.001','Wh',end-2000),sample('3600007.2','J',end-1000)];const original=JSON.stringify(raw);let calls=0,query;
-  const card=new MaraoCard();const config={template:'hc_graph_card',entity:'sensor.energy',variables:{display_unit:'kWh',display_precision:0}};
+  const card=new MaraoCard();const config={template:'md_graph_card',entity:'sensor.energy',variables:{display_unit:'kWh',display_precision:0}};
   card.setConfig(config);card.hass=hass({'sensor.energy':sample('1000.003','Wh',end)},async(_method,url)=>{calls++;query=url;return [raw];});await tick();
   assert.equal(calls,1);assert.doesNotMatch(query,/minimal_response|no_attributes/);
   const before=card._graphValues('sensor.energy',config.variables);assert.equal(before.error,false);assert.ok(Math.abs(before.values[1].value-1.000002)<1e-12);assert.notEqual(before.values[0].value,before.values[1].value);
@@ -75,7 +75,7 @@ test('mixed raw unit history converts before geometry and formatting changes reu
 
 test('Auto graph history normalizes W/kW before detail and precision changes without changing primary defaults',async()=>{
   const end=Date.now()-10000,records=[sample('1000','W',end-2000),sample('2','kW',end-1000)],original=JSON.stringify(records);
-  let calls=0;const card=new MaraoCard(),config={template:'hc_graph_card',entity:'sensor.power'};
+  let calls=0;const card=new MaraoCard(),config={template:'md_graph_card',entity:'sensor.power'};
   card.setConfig(config);card.hass=hass({'sensor.power':sample('1500','W',end)},async()=>{calls++;return[records];});await tick();
   const before=card._historyOptions();assert.deepEqual(before.samples.map(sample=>sample.value),[1000,2000,1500]);assert.equal(before.format(2000),'2000 W');
   assert.match(card.shadowRoot.innerHTML,/1500 W/);assert.deepEqual(card._config,config);
@@ -87,18 +87,18 @@ test('Auto graph history normalizes W/kW before detail and precision changes wit
 
 test('shared fan and climate graph sources retain energy metadata while climate display overrides remain ignored',async()=>{
   const end=Date.now()-10000,records=[sample('1000','W',end-2000),sample('2','kW',end-1000)];
-  for(const template of ['hc_fan_card','hc_climate_card']){
+  for(const template of ['md_fan_card','md_climate_card']){
     const card=new MaraoCard();let query;
-    card.setConfig({template,entity:template==='hc_fan_card'?'fan.test':'climate.room',variables:{show_graph:true,graph_entity:'sensor.power',...(template==='hc_climate_card'?{display_unit:'kW',display_precision:0}:{})}});
+    card.setConfig({template,entity:template==='md_fan_card'?'fan.test':'climate.room',variables:{show_graph:true,graph_entity:'sensor.power',...(template==='md_climate_card'?{display_unit:'kW',display_precision:0}:{})}});
     card.hass=hass({'fan.test':sample('on'),'climate.room':{state:'heat',attributes:{current_temperature:21,temperature:22}},'sensor.power':sample('1500','W',end)},async(_method,url)=>{query=url;return[records];});await tick();
     assert.doesNotMatch(query,/no_attributes|minimal_response/);assert.deepEqual(card._historyOptions().samples.map(sample=>sample.value),[1000,2000,1500]);
-    assert.equal(card._historyOptions().format(1000.125),template==='hc_climate_card'?'1000.125':'1000.125 W');
+    assert.equal(card._historyOptions().format(1000.125),template==='md_climate_card'?'1000.125':'1000.125 W');
   }
 });
 
 test('Auto incompatible history is a null gap with its readable format error, preserving compatible records',async()=>{
   const end=Date.now()-10000,records=[sample('1000','W',end-2000),sample('2','Wh',end-1000)],card=new MaraoCard();
-  card.setConfig({template:'hc_graph_card',entity:'sensor.power'});card.hass=hass({'sensor.power':sample('1500','W',end)},async()=>[records]);await tick();
+  card.setConfig({template:'md_graph_card',entity:'sensor.power'});card.hass=hass({'sensor.power':sample('1500','W',end)},async()=>[records]);await tick();
   const data=card._graphValues('sensor.power');assert.equal(data.error,true);assert.deepEqual(data.values.map(sample=>sample.value),[1000,null,1500]);
   assert.match(card.shadowRoot.innerHTML,/Reading format is incompatible with its source unit/);assert.match(card._historyOptions().error,/Reading format is incompatible with its source unit/);
   assert.doesNotMatch(card.shadowRoot.innerHTML,/<polyline/);
@@ -120,9 +120,9 @@ test('nonnumeric history does not reject valid graph conversion or fabricate zer
   const records = [sample('1000', 'W',end-7000), ...['unavailable', 'unknown', '', ' ', 'invalid'].map((value,index) => sample(value,undefined,end-6000+index*1000)), sample('2', 'kW',end-1000)];
   const original = JSON.stringify(records);
   const variables = { display_unit: 'kW', display_precision: 2, show_graph: true, graph_entity: 'sensor.power', power_entity: 'sensor.power' };
-  for (const template of ['hc_graph_card', 'hc_toggle_graph_card', 'hc_switch_card', 'hc_sensor_card', 'hc_base_card']) {
+  for (const template of ['md_graph_card', 'md_toggle_graph_card', 'md_switch_card', 'md_sensor_card', 'md_base_card']) {
     const card = new MaraoCard();
-    card.setConfig({ template, entity: template === 'hc_switch_card' ? 'switch.load' : 'sensor.power', variables });
+    card.setConfig({ template, entity: template === 'md_switch_card' ? 'switch.load' : 'sensor.power', variables });
     card.hass = hass({ 'sensor.power': sample('1500', 'W',end), 'switch.load': sample('on') }, async () => [records]);
     await tick();
     const data = card._graphValues('sensor.power', variables);
@@ -177,7 +177,7 @@ test('period summaries and consumption bars share formatting without resetting s
 test('formatting reuses initial raw history and identity or availability changes discard stale work', async () => {
   let finish, calls = 0, query;
   const card = new MaraoCard();
-  const config = { template: 'hc_graph_card', entity: 'sensor.energy' };
+  const config = { template: 'md_graph_card', entity: 'sensor.energy' };
   const states = { 'sensor.energy': sample('1234.5', 'Wh'), 'sensor.other': sample('2', 'kWh') };
   card.setConfig(config);
   card.hass = hass(states, async (_method, url) => { calls++; query = url; return new Promise(resolve => { finish = resolve; }); });
@@ -197,7 +197,7 @@ test('formatting reuses initial raw history and identity or availability changes
   assert.equal(card._graphHistory.has('sensor.other'), false);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /<polyline/);
   const plain = new MaraoCard();
-  plain.setConfig({ template: 'hc_graph_card', entity: 'sensor.temperature' });
+  plain.setConfig({ template: 'md_graph_card', entity: 'sensor.temperature' });
   plain.hass = hass({ 'sensor.temperature': sample('21', '°C') }, async (_method, url) => { query = url; return []; });
   assert.match(query, /no_attributes/);
   assert.match(query, /minimal_response/);
@@ -220,7 +220,7 @@ test('independent formatting does not convert authoritative state or action payl
   const calls = [];
   const connection = { ...hass(states), callService: async (...args) => { calls.push(args); } };
   const card = new MaraoCard();
-  card.setConfig({ template: 'hc_switch_card', entity: 'switch.load', variables: { power_entity: 'sensor.power', display_unit: 'kW', display_precision: 2 } });
+  card.setConfig({ template: 'md_switch_card', entity: 'switch.load', variables: { power_entity: 'sensor.power', display_unit: 'kW', display_precision: 2 } });
   card.hass = connection;
   const duplicate = new MaraoCard();
   duplicate.setConfig({ ...card._config, variables: { ...card._config.variables, display_unit: 'W', display_precision: 6 } });

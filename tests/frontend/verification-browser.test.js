@@ -13,17 +13,17 @@ const { changedHelpers, prepareBatch, readBatchSnapshot } = require('../../ha-te
 const { candidateIdentity, validatePreparedReceipt } = require('../../ha-test/upgrade/prepared');
 
 test('focused samples include distinct availability/options and exclude equivalent permutations', () => {
-  const card = (name, state = 'on', variables = { enable_slider: true }) => ({ config: { template: 'hc_light_card', name, variables }, state });
+  const card = (name, state = 'on', variables = { enable_slider: true }) => ({ config: { template: 'md_light_card', name, variables }, state });
   const cards = [card('One'), card('Two'), card('Unavailable', 'unavailable'), card('No slider', 'on', { enable_slider: false }),
-    { config: { template: 'hc_camera_card' }, state: 'on' }];
-  assert.equal(selectSamples(cards, ['hc_light_card']).length, 3);
+    { config: { template: 'md_camera_card' }, state: 'on' }];
+  assert.equal(selectSamples(cards, ['md_light_card']).length, 3);
 });
 
 test('browser scope and parallel controls are explicit', () => {
   assert.equal(parseArgs([]).parallel, false);
   assert.equal(parseArgs([]).focused, false);
-  const options = parseArgs(['--focused', '--families', 'hc_light_card,hc_fan_card', '--popups', '--parallel']);
-  assert.deepEqual(options.families, ['hc_light_card', 'hc_fan_card']);
+  const options = parseArgs(['--focused', '--families', 'md_light_card,md_fan_card', '--popups', '--parallel']);
+  assert.deepEqual(options.families, ['md_light_card', 'md_fan_card']);
   assert.equal(options.popups, true); assert.equal(options.parallel, true);
   assert.equal(parseArgs(['--popup-hash', '#fixture']).popupHash, '#fixture');
 });

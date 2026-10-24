@@ -14,16 +14,16 @@ for page creation, landing selection and navbar pins.
 
 | Card | Binding and editable options |
 | --- | --- |
-| Title (`hc_title_card`) | Entity-free heading; name and optional icon. |
-| Weather (`hc_weather_card`) | Native weather entity; name, icon and `show_forecast`. |
-| Room (`hc_room_card`) | Destination page, optional primary light and explicit `light_entities`; name and icon. Its All off action targets only those lights. See [Room](hc_room_card.md). |
-| Scenes (`hc_scene_collection_card`) | Ordered native scene, switch or input-boolean members, each with its own name/icon. Native scenes activate once; switches and input booleans toggle. Empty collections show a localized empty message. |
-| Alarm (`hc_security_card`) | Native alarm state and generated supported-mode sheet with transient PIN entry and deliberate disarm/bypass holds. |
-| Access opener (`hc_access_slide_action_card`) | Explicit lock, cover, button, switch or script target. A completed strict slide uses native unlock/open/press/turn-on; ordinary button/switch defaults do not change. |
-| Security action (`hc_access_hold_action_card`) | Selected native button, switch or input boolean; a completed 1.2-second hold presses or toggles that exact target once. |
-| Reading (`hc_base_card`) | Numeric sensor; name, icon, custom label/color and compatible display unit/precision. |
-| Energy period (`hc_energy_period_card`) | Numeric sensor; `period` is `day` or `month`, with independent name/icon and reading format. The summary and history sheet share those settings. |
-| Media app (`hc_media_app_card`) | Media player and nonempty `app_source`; name/icon. A tap selects that source once. |
+| Title (`md_title_card`) | Entity-free heading; name and optional icon. |
+| Weather (`md_weather_card`) | Native weather entity; name, icon and `show_forecast`. |
+| Room (`md_room_card`) | Destination page, optional primary light and explicit `light_entities`; name and icon. Its All off action targets only those lights. See [Room](md_room_card.md). |
+| Scenes (`md_scene_collection_card`) | Ordered native scene, switch or input-boolean members, each with its own name/icon. Native scenes activate once; switches and input booleans toggle. Empty collections show a localized empty message. |
+| Alarm (`md_security_card`) | Native alarm state and generated supported-mode sheet with transient PIN entry and deliberate disarm/bypass holds. |
+| Access opener (`md_access_slide_action_card`) | Explicit lock, cover, button, switch or script target. A completed strict slide uses native unlock/open/press/turn-on; ordinary button/switch defaults do not change. |
+| Security action (`md_access_hold_action_card`) | Selected native button, switch or input boolean; a completed 1.2-second hold presses or toggles that exact target once. |
+| Reading (`md_base_card`) | Numeric sensor; name, icon, custom label/color and compatible display unit/precision. |
+| Energy period (`md_energy_period_card`) | Numeric sensor; `period` is `day` or `month`, with independent name/icon and reading format. The summary and history sheet share those settings. |
+| Media app (`md_media_app_card`) | Media player and nonempty `app_source`; name/icon. A tap selects that source once. |
 
 Required bindings must be selected or the draft card removed before saving.
 Unknown, unavailable, missing and disconnected targets use the shared neutral
@@ -41,7 +41,7 @@ icons remain hidden in pages, popups and native previews.
 Media cards expose ordered Apple TV apps, remote, and optional volume target in
 their card editor. An explicitly empty app list stays empty; `apple_tv: false`
 keeps the generic controls. A remote volume target uses native remote commands;
-a media-player volume target uses native volume services. See [Media](hc_media_card.md).
+a media-player volume target uses native volume services. See [Media](md_media_card.md).
 Wallbox current cards expose zero through three finite current presets; an empty
 list does not restore defaults.
 

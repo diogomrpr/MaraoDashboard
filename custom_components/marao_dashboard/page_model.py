@@ -7,12 +7,13 @@ import math
 from typing import Any
 
 from .card_yaml import parse_card_yaml
+from .card_names import canonical_card
 
 PAGE_FORMAT_VERSION = 2
 FREE_CARD_ROLES = {
-    "hc_title_card", "hc_navigation_card", "hc_room_card",
-    "hc_entity_group_card", "hc_scene_collection_card",
-    "hc_header_card", "hc_glance_card",
+    "md_title_card", "md_navigation_card", "md_room_card",
+    "md_entity_group_card", "md_scene_collection_card",
+    "md_header_card", "md_glance_card",
 }
 ENTITY_ID = re.compile(r"[a-z0-9_]+\.[a-z0-9_]+")
 PAGE_PATH = re.compile(r"[a-z0-9][a-z0-9_-]*")
@@ -20,13 +21,14 @@ LOCAL_ID = re.compile(r"[a-z][a-z0-9_-]{0,63}")
 
 
 ACCESS_ROLES = {
-    "popup": "hc_access_card", "slide": "hc_access_slide_action_card",
-    "close": "hc_access_action_card", "hold": "hc_access_hold_action_card",
+    "popup": "md_access_card", "slide": "md_access_slide_action_card",
+    "close": "md_access_action_card", "hold": "md_access_hold_action_card",
 }
 
 
 def access_template(card: dict[str, Any]) -> str | None:
     """Resolve presentation without rewriting the authored card or legacy aliases."""
+    card = canonical_card(card)
     role = card.get("template")
     if role not in ACCESS_ROLES.values():
         return role
@@ -35,7 +37,7 @@ def access_template(card: dict[str, Any]) -> str | None:
         raise ValueError("Choose a supported access behavior.")
     domain = str(card.get("entity_id") or card.get("entity") or "").split(".")[0]
     if mode == "auto":
-        if role != "hc_access_card" or domain in ("lock", "cover"):
+        if role != "md_access_card" or domain in ("lock", "cover"):
             return role
         mode = "slide" if domain == "script" else "hold"
     supported = {"popup": ("lock", "cover"), "slide": ("lock", "cover", "button", "switch", "script"),
@@ -122,7 +124,7 @@ def page_entries(spec: Any) -> list[dict[str, Any]]:
         return [entry for value in spec for entry in page_entries(value)]
     if isinstance(spec, dict):
         if any(key in spec for key in ("entity_id", "page", "template")):
-            return [spec]
+            return [canonical_card(spec)]
         return [entry for value in spec.values() for entry in page_entries(value)]
     raise ValueError("Page entities must be strings, descriptors, lists or grouped objects")
 
@@ -204,17 +206,17 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                 if card.get("variables") is not None and not isinstance(card["variables"], dict):
                     raise ValueError("Card options must be an object")
                 options = card.get("variables") or {}
-                if role == "hc_graph_card":
+                if role == "md_graph_card":
                     validate_power_devices(options, options.get("graph_entity") or entity)
-                if role == "hc_vacuum_card":
+                if role == "md_vacuum_card":
                     for key in ("action_1", "action_2", "action_3"):
                         action = options.get(key)
                         if isinstance(action, dict) and "data" in action and not isinstance(action["data"], dict):
                             raise ValueError("Vacuum action data must be an object")
                 role = access_template(card)
-                if role == "hc_access_action_card" and options.get("access_mode") == "close" and any(key in card and (not isinstance(card[key], dict) or card[key].get("action", "none") != "none") for key in ("tap_action", "hold_action", "double_tap_action")):
+                if role == "md_access_action_card" and options.get("access_mode") == "close" and any(key in card and (not isinstance(card[key], dict) or card[key].get("action", "none") != "none") for key in ("tap_action", "hold_action", "double_tap_action")):
                     raise ValueError("Close and lock cards use their explicit safe service")
-                if role == "hc_access_slide_action_card":
+                if role == "md_access_slide_action_card":
                     opener = {"lock": "lock.unlock", "cover": "cover.open_cover", "button": "button.press",
                               "switch": "switch.turn_on", "script": "script.turn_on"}.get((entity or "").split(".")[0])
                     if not opener or options.get("action_service", opener) != opener:
@@ -222,25 +224,25 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                     if any(key in card and (not isinstance(card[key], dict) or card[key].get("action", "none") != "none")
                            for key in ("tap_action", "hold_action", "double_tap_action")):
                         raise ValueError("Access openers use only the strict slide")
-                if role == "hc_energy_period_card" and options.get("period", "day") not in ("day", "month"):
+                if role == "md_energy_period_card" and options.get("period", "day") not in ("day", "month"):
                     raise ValueError("Energy period must be day or month")
-                if role == "hc_energy_period_card":
+                if role == "md_energy_period_card":
                     validate_energy_options(options)
-                if role == "hc_wallbox_current_card" and "shortcuts" in options:
+                if role == "md_wallbox_current_card" and "shortcuts" in options:
                     presets = options["shortcuts"]
                     if not isinstance(presets, list) or len(presets) > 3 or any(type(value) not in (int, float) or not math.isfinite(value) for value in presets):
                         raise ValueError("Charging shortcuts require at most three finite numbers")
-                if role == "hc_light_card":
+                if role == "md_light_card":
                     validate_light_options(options)
-                if role == "hc_camera_card":
+                if role == "md_camera_card":
                     camera_popup_stream(entity, options)
-                if role == "hc_room_card" and "light_entities" in options:
+                if role == "md_room_card" and "light_entities" in options:
                     lights = options["light_entities"]
                     if not isinstance(lights, list) or any(not isinstance(light, str) or not ENTITY_ID.fullmatch(light) or not light.startswith("light.") for light in lights):
                         raise ValueError("Room lights must be an explicit list of light entities")
-                if role == "hc_media_app_card" and (not isinstance(options.get("app_source"), str) or not options["app_source"].strip()):
+                if role == "md_media_app_card" and (not isinstance(options.get("app_source"), str) or not options["app_source"].strip()):
                     raise ValueError("Media app requires an explicit source")
-                if role == "hc_access_hold_action_card" and "tap_action" in card:
+                if role == "md_access_hold_action_card" and "tap_action" in card:
                     action = card["tap_action"]
                     button = entity and entity.startswith("button.")
                     valid = isinstance(action, dict) and (
@@ -264,11 +266,11 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                         raise ValueError("Media apps require an explicit ordered list of sources")
                 if "page" in card:
                     references.append(card["page"])
-                elif role in ("hc_navigation_card", "hc_room_card"):
+                elif role in ("md_navigation_card", "md_room_card"):
                     action = card.get("tap_action")
                     if not isinstance(action, dict) or action.get("action") not in ("navigate", "none"):
                         raise ValueError("Choose a destination for the page shortcut")
-                if role == "hc_scene_collection_card":
+                if role == "md_scene_collection_card":
                     members = card.get("entities")
                     if not isinstance(members, list):
                         raise ValueError("Scene collection entities must be an explicit list")

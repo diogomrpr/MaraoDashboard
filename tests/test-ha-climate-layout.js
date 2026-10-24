@@ -7,7 +7,7 @@ const { prepare } = require('../ha-test/prepare');
 const { scenarios, themes, contextOptionsForScenario, configurePageEmulation, applyVisualPreferences } = require('./test-ha-dashboard-accessibility');
 const { captureClimateFeedback } = require('./test-ha-dashboard-e2e');
 
-const templates = new Set(['hc_climate_card', 'hc_number_card', 'hc_wallbox_current_card']);
+const templates = new Set(['md_climate_card', 'md_number_card', 'md_wallbox_current_card']);
 function hasNumericCard(value) {
   if (!value || typeof value !== 'object') return false;
   if (templates.has(value.template)) return true;
@@ -68,7 +68,7 @@ async function main() {
             captures.push({ name, title: card.name, template: card.template });
           }
           const popups = await page.locator('marao-popup-card').evaluateAll(elements => elements.flatMap((card, index) => {
-            const numeric = value => !value || typeof value !== 'object' ? 0 : ['hc_climate_card', 'hc_number_card', 'hc_wallbox_current_card'].includes(value.template) ? 1 : Object.values(value).reduce((count, child) => count + numeric(child), 0);
+            const numeric = value => !value || typeof value !== 'object' ? 0 : ['md_climate_card', 'md_number_card', 'md_wallbox_current_card'].includes(value.template) ? 1 : Object.values(value).reduce((count, child) => count + numeric(child), 0);
             const count = numeric(card._config?.cards);
             return count ? [{ hash: card._config.hash, count, index }] : [];
           }));
@@ -81,7 +81,7 @@ async function main() {
               const sheet = popup._overlay?.querySelector('.marao-popup-sheet');
               const cards = []; const visit = root => {
                 for (const element of root?.children || []) {
-                  if (element.localName === 'marao-card' && ['hc_climate_card', 'hc_number_card', 'hc_wallbox_current_card'].includes(element._config?.template)) cards.push(element);
+                  if (element.localName === 'marao-card' && ['md_climate_card', 'md_number_card', 'md_wallbox_current_card'].includes(element._config?.template)) cards.push(element);
                   visit(element.shadowRoot); visit(element);
                 }
               };
@@ -90,7 +90,7 @@ async function main() {
               if (!group) return cards.length >= count;
               if (!popup._groupHelpers) return false;
               const expected = (popup._config.cards || []).filter(card =>
-                ['hc_climate_card', 'hc_number_card', 'hc_wallbox_current_card'].includes(card.template)
+                ['md_climate_card', 'md_number_card', 'md_wallbox_current_card'].includes(card.template)
                 && (group.popup_filter !== 'active' || !['off', 'unknown', 'unavailable'].includes(popup._hass?.states[card.entity]?.state || 'unknown'))
               ).map(card => card.entity);
               return cards.length === expected.length && cards.every((card, index) => card._config.entity === expected[index])

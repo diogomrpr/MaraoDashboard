@@ -210,7 +210,7 @@ const entries = [
 ];
 
 for (const kind of ['room', 'custom']) test(`duplicating a ${kind} renews group identity without changing members/options`, () => {
-  const group = { template: 'hc_entity_group_card', id: 'original', name: 'Group', entity_type: 'light', entities: [{ entity_id: 'light.test', variables: { enable_slider: false }, future: 42 }], future: true };
+  const group = { template: 'md_entity_group_card', id: 'original', name: 'Group', entity_type: 'light', entities: [{ entity_id: 'light.test', variables: { enable_slider: false }, future: 42 }], future: true };
   const p = panel({ name: 'Home', rooms: [{ name: 'Office', entities: [group] }], pages: { custom: [{ name: 'Studio', path: 'studio', entities: [group] }] } });
   p._roomAction({ dataset: { action: kind === 'room' ? 'room-duplicate' : 'custom-duplicate', kind, room: '0' } });
   const containers = kind === 'room' ? p._model.rooms : p._model.pages.custom;
@@ -222,7 +222,7 @@ for (const kind of ['room', 'custom']) test(`duplicating a ${kind} renews group 
 });
 
 test('ordered overview group controls reuse local move/delete without backend calls', () => {
-  const groups = ['first', 'second'].map(id => ({ template: 'hc_entity_group_card', id, name: id, entity_type: 'light', entities: [] }));
+  const groups = ['first', 'second'].map(id => ({ template: 'md_entity_group_card', id, name: id, entity_type: 'light', entities: [] }));
   const p = panel({ name: 'Home', rooms: [], overview: { entity_groups: groups, future: true } });
   assert.equal(p._source(), p._savedSource);
   assert.equal(Boolean(p._dirty), false);
@@ -977,7 +977,7 @@ test('builder camera title controls share defaults and preserve retired options 
     p._openCardEditor('0:0',0,null,'page');
     return {p,form:forms[0],save:()=>handlers['[data-save]click'](),close:()=>handlers['[data-close]click'](),value:()=>JSON.parse(JSON.stringify(p._model.pages[0].sections[0].entities[0]))};
   };
-  const original={id:'first',entity_id:'camera.test',template:'hc_camera_card',name:'',name_key:'camera.saved',icon:'',show_icon:true,show_state:false,show_label:true,variables:{provider:'',unknown:[]},tap_action:{action:'navigate',navigation_path:'#events'},future:{keep:true}};
+  const original={id:'first',entity_id:'camera.test',template:'md_camera_card',name:'',name_key:'camera.saved',icon:'',show_icon:true,show_state:false,show_label:true,variables:{provider:'',unknown:[]},tap_action:{action:'navigate',navigation_path:'#events'},future:{keep:true}};
   for(const visible of [undefined,false,true]) {
     const saved={...original,...(visible===undefined?{}:{show_name:visible})}, opened=edit(saved);
     assert.deepEqual(JSON.parse(JSON.stringify(opened.form.schema.map(f=>f.name))),['entity_id','name','show_name','var__provider']);
@@ -989,7 +989,7 @@ test('builder camera title controls share defaults and preserve retired options 
     const expected={...saved,name:'Saved entrance',show_name:false,__simple:false};delete expected.name_key;
     assert.deepEqual(hidden.value(),expected);
   }
-  const light=edit({...original,template:'hc_light_card'});
+  const light=edit({...original,template:'md_light_card'});
   assert.deepEqual(JSON.parse(JSON.stringify(light.form.schema.map(f=>f.name))),['entity_id','name','icon','var__provider']);
   assert.equal(PT_LABELS['Show title'],'Mostrar título');
 });
@@ -999,7 +999,7 @@ test('entity-first cards keep the selected ID separate from display names and re
   const entityId = 'light.device_123', displayName = 'Kitchen ceiling';
   p._model.pages[0].sections[0].entities = [];
   p._entities = [{ entity_id: entityId, name: displayName, domain: 'light', has_state: true }];
-  p._catalog = { cards: [{ id: 'hc_light_card', label: 'Light', domains: ['light'], variables: [] }] };
+  p._catalog = { cards: [{ id: 'md_light_card', label: 'Light', domains: ['light'], variables: [] }] };
   const nodes = new Map(), content = { querySelector(key) {
     if (!nodes.has(key)) nodes.set(key, { addEventListener(type, fn) { handlers[key + type] = fn; } });
     return nodes.get(key);
@@ -1009,7 +1009,7 @@ test('entity-first cards keep the selected ID separate from display names and re
   let error;
   p._renderSummary = (...args) => { error = args.at(-1); };
   p._refreshEnergyFields = p._closeDialog = p._refreshCards = () => {};
-  p._openCardEditor('0:0', null, 'hc_light_card', 'page', entityId);
+  p._openCardEditor('0:0', null, 'md_light_card', 'page', entityId);
   assert.equal(forms[0].data.entity_id, entityId);
   forms[0].changed({ ...forms[0].data, entity_id: displayName });
   handlers['[data-save]click']();
@@ -1023,7 +1023,7 @@ test('entity-first cards keep the selected ID separate from display names and re
 
 test('energy breakdown editing keeps a private draft and preserves ordered unknown row fields', () => {
   const p = panel(canonical()), handlers = {}, forms = [];
-  const original = { id: 'energy', entity_id: 'sensor.total', template: 'hc_energy_period_card', variables: {
+  const original = { id: 'energy', entity_id: 'sensor.total', template: 'md_energy_period_card', variables: {
     sub_entities: [{ entity_id: 'sensor.heating', name: 'Heating', future: [] }, { entity_id: 'sensor.lighting', cost_entity: 'sensor.cost' }], future: true,
   } };
   p._model.pages[0].sections[0].entities = [structuredClone(original)];
@@ -1060,4 +1060,29 @@ test('a dismissed card picker cannot block adding cards to any section', () => {
   }
   p._galleryDialog = { open: true, isConnected: true };
   assert.doesNotThrow(() => p._openCardGallery('0:0', 'page'), 'A real open picker still prevents duplicates');
+});
+
+test('card catalog search matches localized names and descriptions without changing card selection', () => {
+  const p = panel(canonical()), before = p._source();
+  p._areas = [];
+  p._catalog = { cards: [{ id: 'md_light_card', label: 'Light', description: 'Brightness', domains: ['light'] }] };
+  const button = (id, text) => Object.assign(new EventTarget(), { dataset: { card: id }, textContent: text, hidden: false });
+  const cards = [button('md_light_card', 'Iluminação Controlar brilho'), button('md_access_card', 'Acesso Abrir portas')];
+  const search = Object.assign(new EventTarget(), { value: '' }), empty = { hidden: true };
+  const nodes = { '#card-search': search, '#card-search-empty': empty, '#entity-search': Object.assign(new EventTarget(), { value: '' }),
+    '.entity-results': { querySelectorAll: () => [] }, '[data-close]': new EventTarget(), '[data-ha-manual]': new EventTarget() };
+  const content = { querySelector: key => nodes[key], querySelectorAll: key => key === '[data-card]' ? cards : [] };
+  const dialog = { open: true, isConnected: true, querySelector: () => content };
+  p._dialog = () => dialog;
+  let selected;
+  p._openCardEditor = (...args) => { selected = args; };
+  p._openCardGallery('0:0', 'page');
+  const filter = value => { search.value = value; search.dispatchEvent(new Event('input')); };
+  filter('ILUMINACAO'); assert.deepEqual(cards.map(card => card.hidden), [false, true]);
+  filter('brilho'); assert.deepEqual(cards.map(card => card.hidden), [false, true]);
+  filter('unmatched'); assert.ok(cards.every(card => card.hidden)); assert.equal(empty.hidden, false);
+  filter('  '); assert.ok(cards.every(card => !card.hidden)); assert.equal(empty.hidden, true);
+  filter('portas'); cards[1].dispatchEvent(new Event('click'));
+  assert.equal(selected[2], 'md_access_card'); assert.equal(selected[3], 'page');
+  assert.equal(p._source(), before, 'Searching must not change the dashboard draft');
 });

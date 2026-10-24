@@ -22,7 +22,7 @@ for (const spec of catalog.cards) test(spec.label + ": editing a controlled fiel
 });
 
 test("advanced vacuum params retain their native shape while another field changes", () => {
-  const spec = catalog.cards.find(card => card.id === "hc_vacuum_card");
+  const spec = catalog.cards.find(card => card.id === "md_vacuum_card");
   const config = { type: spec.type, variables: { action_1: { segment: 21, data: { command: "app_segment_clean", params: [{ segments: [21], repeat: 3 }] }, future: [] } } };
   const fields = nativeFields(spec, config).advanced, data = formData(config, fields);
   const changed = patchForm(config, fields, data, { ...data, "variables.action_1.icon": "mdi:sofa" });
@@ -69,10 +69,10 @@ test("entity metadata excludes values, PINs, artwork and unrelated entities", ()
 test("entity suggestions distinguish access covers and require deliberate service opener selection", () => {
   const hass = { states: { "cover.gate": { attributes: { device_class: "gate" } }, "cover.blind": { attributes: { device_class: "blind" } } } };
   const get = id => catalog.cards.find(card => card.id === id);
-  assert.equal(supportsEntity(get("hc_cover_card"), hass, "cover.gate"), false);
-  assert.equal(supportsEntity(get("hc_access_card"), hass, "cover.gate"), true);
-  assert.equal(supportsEntity(get("hc_cover_card"), hass, "cover.blind"), true);
-  assert.equal(supportsEntity(get("hc_access_slide_action_card"), hass, "button.safe"), false);
+  assert.equal(supportsEntity(get("md_cover_card"), hass, "cover.gate"), false);
+  assert.equal(supportsEntity(get("md_access_card"), hass, "cover.gate"), true);
+  assert.equal(supportsEntity(get("md_cover_card"), hass, "cover.blind"), true);
+  assert.equal(supportsEntity(get("md_access_slide_action_card"), hass, "button.safe"), false);
 });
 
 test("preview context disables actions without replacing reported state or history reads", async () => {
@@ -90,7 +90,7 @@ test("preview context disables actions without replacing reported state or histo
 });
 
 class Probe extends MaraoNativeCard {
-  static spec = catalog.cards.find(card => card.id === "hc_light_card");
+  static spec = catalog.cards.find(card => card.id === "md_light_card");
   isConnected = true;
   _status(message) { this.status = message; }
   async _mount(result) { this.result = result; }
@@ -180,7 +180,7 @@ test("native assets keep content fingerprints and avoid bundling the lazy editor
 });
 
 test('camera title controls are basic, default visibly on without a write, and retain retired settings', () => {
-  const spec = catalog.cards.find(card => card.id === 'hc_camera_card');
+  const spec = catalog.cards.find(card => card.id === 'md_camera_card');
   const original = { type: spec.type, name: 'Entrance', icon: 'mdi:cctv', show_state: true, show_label: false, future: [] };
   const { common, advanced } = nativeFields(spec, original), fields = [...common, ...advanced];
   assert.equal(common.find(field => field.path === 'entity').label, 'Dashboard stream');

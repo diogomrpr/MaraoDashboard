@@ -3,7 +3,7 @@ const catalogURL = new URL("./MaraoNativeCatalog.js", import.meta.url);
 catalogURL.search = new URL(import.meta.url).search;
 const { catalog } = await import(catalogURL.href);
 import { editorLabel } from "./native-labels.js";
-import { entityMetadata, supportsEntity, dashboardRoot, previewHass } from "./native-model.js";
+import { canonicalCard, entityMetadata, supportsEntity, dashboardRoot, previewHass } from "./native-model.js";
 
 const query = new URL(import.meta.url).search;
 const cardsURL = "./MaraoCards.js" + query;
@@ -40,14 +40,14 @@ export class MaraoNativeCard extends BaseElement {
     const entity = [...entities, ...Object.keys(hass?.states || {})].find(id => supportsEntity(spec, hass, id));
     return { ...(entity && !spec.entity_optional ? { entity } : {}),
       ...(spec.entity_optional ? { name: editorLabel(spec.label, hass) } : {}),
-      ...(spec.id === "hc_entity_group_card" ? { entity_type: "light", entities: [] } : {}),
-      ...(spec.id === "hc_scene_collection_card" ? { entities: [] } : {}),
+      ...(spec.id === "md_entity_group_card" ? { entity_type: "light", entities: [] } : {}),
+      ...(spec.id === "md_scene_collection_card" ? { entities: [] } : {}),
       ...(spec.id === "navbar" ? { routes: [], native: true } : {}),
-      ...(spec.id === "hc_room_card" || spec.id === "hc_navigation_card" ? { tap_action: { action: "none" } } : {}) };
+      ...(spec.id === "md_room_card" || spec.id === "md_navigation_card" ? { tap_action: { action: "none" } } : {}) };
   }
   setConfig(config) {
     if (!config || typeof config !== "object") throw new Error("Native card configuration must be an object");
-    this._config = structuredClone(config); this._identity = null; this._metadata = new Map();
+    this._config = structuredClone(canonicalCard(config)); this._identity = null; this._metadata = new Map();
     this._children = [];
     if (this.shadowRoot) this._status(editorLabel("Loading…", this._hass));
     this._compile();
@@ -100,7 +100,7 @@ export class MaraoNativeCard extends BaseElement {
       const child = Constructor ? document.createElement(type.slice(7)) : new MaraoCard();
       const variables = { ...Object.fromEntries((spec?.variables || []).filter(item => item.default !== undefined).map(item => [item.key, item.default])), ...this._config.variables };
       child.preview = true;
-      child.setConfig({ ...this._config, type, template: spec?.id || 'hc_base_card', variables,
+      child.setConfig({ ...this._config, type, template: spec?.id || 'md_base_card', variables,
         ...(spec?.legacy_type ? variables : {}),
         ...(spec?.entity_group ? { variables: { ...variables, entity_type: this._config.entity_type, summary_entities: this._config.entities || [] } } : {}) });
       child.hass = previewHass(this._hass, true);

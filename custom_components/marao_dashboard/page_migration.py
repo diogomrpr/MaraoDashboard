@@ -3,7 +3,8 @@
 from copy import deepcopy
 import math
 
-from .page_model import page_entries
+from .page_model import page_entries, page_sections
+from .card_names import canonical_entities
 
 
 def convert_native_storage_dashboard(source):
@@ -47,12 +48,12 @@ def convert_native_storage_dashboard(source):
             kind = card.get("type")
             descriptor = {**deepcopy(card), "id": f"card-{index}"}
             if kind in ("custom:marao-header-card", "heading"):
-                descriptor.update(template="hc_title_card", name=card.get("title") or card.get("heading") or "")
+                descriptor.update(template="md_title_card", name=card.get("title") or card.get("heading") or "")
                 descriptor.pop("title", None); descriptor.pop("heading", None)
             elif kind == "custom:marao-room-card":
                 route = card.get("navigation_path")
                 target = destination(route)
-                descriptor.update(template="hc_room_card", page=target, variables={"light_entities": lights[target]})
+                descriptor.update(template="md_room_card", page=target, variables={"light_entities": lights[target]})
                 if lights[target]:
                     descriptor["entity_id"] = lights[target][0]
                 if target == view["path"] and card.get("area_id"):
@@ -64,7 +65,7 @@ def convert_native_storage_dashboard(source):
                 descriptor["entity_id"] = entity
                 descriptor.pop("entity")
                 try:
-                    descriptor["template"] = "hc_camera_card" if kind == "custom:marao-camera-card" else g._domain_template(descriptor)
+                    descriptor["template"] = "md_camera_card" if kind == "custom:marao-camera-card" else g._domain_template(descriptor)
                 except KeyError:
                     raise ValueError("Native entity card has an unsupported binding") from None
             else:
@@ -79,7 +80,7 @@ def convert_native_storage_dashboard(source):
             if kind == "custom:marao-header-card" and card.get("back_path"):
                 target = destination(card["back_path"])
                 target_view = next(item for item in source["views"] if item["path"] == target)
-                page["sections"].append({"columns": 1, "entities": [{"id": f"back-{index}", "template": "hc_navigation_card", "page": target,
+                page["sections"].append({"columns": 1, "entities": [{"id": f"back-{index}", "template": "md_navigation_card", "page": target,
                     "name": target_view.get("title") or target, "icon": "mdi:arrow-left"}]})
         converted["pages"].append(page)
     g.normalize_config(converted)
@@ -141,7 +142,7 @@ def convert_legacy_pages(source, registry=None):
     home = page("overview", "Home", "mdi:home-variant", "views/main/00-overview.yaml")
     overview = original.get("overview") or {}
     if weather := overview.get("weather_entity"):
-        weather_card = card(home, weather, "hc_weather_card", variables={"show_forecast": True})
+        weather_card = card(home, weather, "md_weather_card", variables={"show_forecast": True})
         if isinstance(weather, str):
             weather_card.pop("name", None)
         section(home, [weather_card])
@@ -154,7 +155,7 @@ def convert_legacy_pages(source, registry=None):
             group["name_key"] = names[group["id"]]
     if scenes := g._entities_from_values(overview.get("scenes")):
         groups.append({"id": f"card-{sum(len(part['entities']) for part in home['sections']) + len(groups) + 1}",
-                       "template": "hc_scene_collection_card", "name": "Scenes", "name_key": "overview.scenes",
+                       "template": "md_scene_collection_card", "name": "Scenes", "name_key": "overview.scenes",
                        "icon": "mdi:palette-outline", "entities": deepcopy(overview["scenes"]),
                        "variables": {"popup_hash": "#overview-scenes"}})
     section(home, groups, 2)
@@ -164,7 +165,7 @@ def convert_legacy_pages(source, registry=None):
         lights = room["entities_by_domain"].get("light", [])
         members = [entity for values in room["entities_by_domain"].values() for entity in values if entity.get("entity_id")]
         primary = (lights or members or [{}])[0].get("entity_id", "")
-        room_cards.append({"id": f"card-{len(room_cards) + 1}", "template": "hc_room_card",
+        room_cards.append({"id": f"card-{len(room_cards) + 1}", "template": "md_room_card",
                            **({"entity_id": primary} if primary else {}), "name": room["name"], "icon": room["icon"],
                            "page": room["path"], "variables": {"light_entities": [item["entity_id"] for item in lights], "lights_target_entity": primary}})
     # The historical Rooms grid is retained even when intentionally empty.
@@ -175,22 +176,22 @@ def convert_legacy_pages(source, registry=None):
         security = page("security", "Security", "mdi:shield-home", "views/main/01-security.yaml")
         options = saved_pages["security"]
         if alarm := g._page_entity(options, "alarm_entity"):
-            section(security, [card(security, alarm, "hc_security_card")])
+            section(security, [card(security, alarm, "md_security_card")])
         access = []
         for entity in g._page_entities(options, "access_entities", g._access_entities(legacy)):
             selected = entity if "access_entities" in options else selected_by_id.get(entity["entity_id"], {"entity_id": entity["entity_id"]})
-            item = card(security, selected, "hc_access_card")
+            item = card(security, selected, "md_access_card")
             item["id"] = f"card-{sum(len(part['entities']) for part in security['sections']) + len(access) + 1}"
             access.append(item)
         section(security, access, 2)
         for entity in g._entities_from_values(options.get("actions")):
             if g._is_access_entity(entity):
-                item = card(security, entity, "hc_access_card")
-                item["template"] = "hc_access_card"
+                item = card(security, entity, "md_access_card")
+                item["template"] = "md_access_card"
                 section(security, [item])
                 continue
-            item = card(security, entity, "hc_access_hold_action_card")
-            item["template"] = "hc_access_hold_action_card"
+            item = card(security, entity, "md_access_hold_action_card")
+            item["template"] = "md_access_hold_action_card"
             runtime = g._page_action_card(entity)
             item.update(show_state=False, tap_action=runtime["tap_action"])
             section(security, [item])
@@ -199,7 +200,7 @@ def convert_legacy_pages(source, registry=None):
         energy = page("energy", "Energy", "mdi:lightning-bolt", "views/main/03-energy.yaml")
         options = saved_pages["energy"]
         if entity := g._page_entity(options, "house_power"):
-            item = card(energy, entity, "hc_graph_card", "House Power", "mdi:flash",
+            item = card(energy, entity, "md_graph_card", "House Power", "mdi:flash",
                         {"show_graph_fill": True, "show_graph_line": True, "show_icon": True}, "energy.house_power")
             item["variables"] = {**item["variables"], "history_popup": True,
                                  "popup_hash": entity.get("variables", {}).get("popup_hash", "#energy-house-power")}
@@ -211,7 +212,7 @@ def convert_legacy_pages(source, registry=None):
             ("today_cost", "Today Cost", "day", "mdi:cash-clock", "today-cost"),
         ):
             if entity := g._page_entity(options, key):
-                section(energy, [card(energy, entity, "hc_energy_period_card", name, icon,
+                section(energy, [card(energy, entity, "md_energy_period_card", name, icon,
                                      {"period": period, "popup_hash": "#energy-" + hash_name}, "energy." + hash_name.replace("-", "_"))])
         loads = []
         for load in options.get("loads", []):
@@ -222,24 +223,24 @@ def convert_legacy_pages(source, registry=None):
                       "variables": {**power.get("variables", {}), **load.get("variables", {})}}
             if load.get("toggle_entity"):
                 entity["variables"].setdefault("toggle_entity", load["toggle_entity"])
-            item = card(energy, entity, "hc_toggle_graph_card" if load.get("toggle_entity") else "hc_graph_card")
+            item = card(energy, entity, "md_toggle_graph_card" if load.get("toggle_entity") else "md_graph_card")
             item.setdefault("icon", power.get("icon"))
             item["id"] = f"card-{sum(len(part['entities']) for part in energy['sections']) + len(loads) + 1}"
             loads.append(item)
         section(energy, loads, 2)
         for entity in g._entities_from_values(options.get("appliances")):
-            section(energy, [card(energy, entity, g.DOMAIN_TEMPLATES.get(entity['entity_id'].split('.')[0], "hc_sensor_card"))])
+            section(energy, [card(energy, entity, g.DOMAIN_TEMPLATES.get(entity['entity_id'].split('.')[0], "md_sensor_card"))])
 
     if "wallbox" in saved_pages:
         wallbox = page("wallbox", "Wallbox", "mdi:ev-station", "views/main/04-wallbox.yaml")
         options = saved_pages["wallbox"]
         if entity := g._page_entity(options, "status_entity"):
-            section(wallbox, [card(wallbox, entity, "hc_base_card", "Wallbox Status", "mdi:ev-station", name_key="wallbox.status")])
+            section(wallbox, [card(wallbox, entity, "md_base_card", "Wallbox Status", "mdi:ev-station", name_key="wallbox.status")])
         metrics = []
         for key, name, icon, name_key in (("charging_power_entity", "Charging Power", "mdi:flash", "wallbox.charging_power"),
                                           ("max_current_entity", "Charging Current", "mdi:current-ac", "wallbox.current")):
             if entity := g._page_entity(options, key):
-                item = card(wallbox, entity, "hc_graph_card", name, icon,
+                item = card(wallbox, entity, "md_graph_card", name, icon,
                             {"show_graph_fill": True, "show_graph_line": True, "show_icon": True}, name_key)
                 item["id"] = f"card-{sum(len(part['entities']) for part in wallbox['sections']) + len(metrics) + 1}"
                 metrics.append(item)
@@ -248,10 +249,10 @@ def convert_legacy_pages(source, registry=None):
             presets = options.get("current_presets", [])
             if not isinstance(presets, list) or len(presets) > 3 or any(type(value) not in (int, float) or not math.isfinite(value) for value in presets):
                 raise ValueError("Charging current presets require at most three numbers")
-            section(wallbox, [card(wallbox, entity, "hc_wallbox_current_card", "Charging Current",
+            section(wallbox, [card(wallbox, entity, "md_wallbox_current_card", "Charging Current",
                                   variables={"shortcuts": presets}, name_key="wallbox.current")])
         if entity := g._page_entity(options, "pause_resume_entity"):
-            section(wallbox, [card(wallbox, entity, "hc_switch_card", "Pause / Resume", "mdi:pause-circle", name_key="wallbox.pause_resume")])
+            section(wallbox, [card(wallbox, entity, "md_switch_card", "Pause / Resume", "mdi:pause-circle", name_key="wallbox.pause_resume")])
 
     if "media" in saved_pages:
         media = page("media", "Media", "mdi:television-play", "views/main/05-media.yaml")
@@ -260,12 +261,12 @@ def convert_legacy_pages(source, registry=None):
             selected = selected_by_id.get(player["entity_id"], {"entity_id": player["entity_id"]})
             if "players" in saved_pages["media"]:
                 selected = next(entity for entity in g._entities_from_values(saved_pages["media"]["players"]) if entity["entity_id"] == player["entity_id"])
-            section(media, [card(media, selected, "hc_media_card")])
+            section(media, [card(media, selected, "md_media_card")])
             apple_tv = g._apple_tv_options(player)
             apps = []
             for app in apple_tv["apps"] if apple_tv else []:
                 item = {**deepcopy(app), "id": f"card-{sum(len(part['entities']) for part in media['sections']) + len(apps) + 1}",
-                        "template": "hc_media_app_card", "entity_id": player["entity_id"], "name": app.get("name") or app["source"],
+                        "template": "md_media_app_card", "entity_id": player["entity_id"], "name": app.get("name") or app["source"],
                         "icon": app.get("icon") or "mdi:play-box-outline", "show_state": False,
                         "variables": {"app_source": app["source"]}}
                 item.pop("source")
@@ -284,7 +285,7 @@ def convert_legacy_pages(source, registry=None):
                 item["subview"] = True
             content = {key: item.pop(key) for key in ("entities", "cards", "columns") if key in item}
             item["sections"] = [
-                {"columns": 1, "entities": [{"id": "page-title", "template": "hc_title_card", "name": resolved["name"],
+                {"columns": 1, "entities": [{"id": "page-title", "template": "md_title_card", "name": resolved["name"],
                                              "show_icon": False, "show_state": False, "tap_action": {"action": "none"}, "hold_action": {"action": "none"}}]},
                 content,
             ]
@@ -299,4 +300,8 @@ def convert_legacy_pages(source, registry=None):
                 route["page"] = path
                 route["label_key"] = "nav." + ("home" if path == "overview" else path)
         result["navigation"] = routes
+    for target in result["pages"]:
+        for container in page_sections(target):
+            if "entities" in container:
+                container["entities"] = canonical_entities(container["entities"])
     return result

@@ -12,13 +12,13 @@
       "future_page_option": {"keep": 7},
       "sections": [
         {"columns": 1, "entities": [
-          {"id": "heading", "template": "hc_title_card", "name": "My home", "future_card_option": true},
-          {"id": "weather", "template": "hc_weather_card", "entity_id": "weather.safe", "variables": {"show_forecast": true, "future_option": "keep"}}
+          {"id": "heading", "template": "md_title_card", "name": "My home", "future_card_option": true},
+          {"id": "weather", "template": "md_weather_card", "entity_id": "weather.safe", "variables": {"show_forecast": true, "future_option": "keep"}}
         ]},
         {"columns": 2, "future_section_option": "keep", "entities": [
-          {"id": "room-link", "template": "hc_room_card", "page": "office", "name": "Office", "variables": {"light_entities": ["light.safe"]}},
-          {"id": "scenes", "template": "hc_scene_collection_card", "name": "Scenes", "entities": [{"entity_id": "scene.safe", "name": "Relax", "extension": true}]},
-          {"id": "lights", "template": "hc_entity_group_card", "name": "Lights", "entity_type": "light", "entities": ["light.safe"], "popup_filter": "all"}
+          {"id": "room-link", "template": "md_room_card", "page": "office", "name": "Office", "variables": {"light_entities": ["light.safe"]}},
+          {"id": "scenes", "template": "md_scene_collection_card", "name": "Scenes", "entities": [{"entity_id": "scene.safe", "name": "Relax", "extension": true}]},
+          {"id": "lights", "template": "md_entity_group_card", "name": "Lights", "entity_type": "light", "entities": ["light.safe"], "popup_filter": "all"}
         ], "cards": [{"type": "markdown", "content": "Untouched raw content", "extension": [1, 2]}]}
       ]
     },

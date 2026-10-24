@@ -55,7 +55,7 @@ const waitFor = async condition => {
 const state = (value = "21") => ({ state: value, attributes: { friendly_name: "History" }, last_changed: new Date().toISOString() });
 test('graph history retains replaced authoritative live readings without mutating Recorder data or refetching', () => {
   const card = new MaraoCard(), now = Date.now();
-  card._config = { template: 'hc_graph_card', entity: 'sensor.history' };
+  card._config = { template: 'md_graph_card', entity: 'sensor.history' };
   card._render = () => {}; card._subscribeClimate = () => {};
   const record = (ago, value) => ({ state: String(value), last_updated: new Date(now-ago).toISOString(), attributes: { unit_of_measurement: 'W' } });
   const old = record(25*3600000, 99), recorded = record(10000, 1), live = record(5000, 2), next = record(0, 3);
@@ -75,7 +75,7 @@ test('graph history retains replaced authoritative live readings without mutatin
 
 test('graph updates reuse converted Recorder samples and retain exact spikes, gaps and corrected live readings', () => {
   const card = new MaraoCard(), now = Date.now();
-  card._config = { template: 'hc_graph_card', entity: 'sensor.history' };
+  card._config = { template: 'md_graph_card', entity: 'sensor.history' };
   card._render = () => {}; card._subscribeClimate = () => {};
   let reads = 0;
   const raw = Object.freeze(Array.from({length:1000}, (_, index) => Object.freeze({
@@ -108,7 +108,7 @@ test('off-screen graphs retain observations and update active popups, then catch
   globalThis.IntersectionObserver = class { constructor(callback){this.callback=callback;observers.push(this);} observe(){} disconnect(){this.disconnected=true;} };
   t.after(()=>{globalThis.IntersectionObserver=previous;});
   const card = new MaraoCard(); card.isConnected=true;
-  card.setConfig({template:'hc_graph_card',entity:'sensor.history'});
+  card.setConfig({template:'md_graph_card',entity:'sensor.history'});
   const live = state('21'); card.hass={states:{'sensor.history':live}};
   card._graphHistory.set('sensor.history',[]); card._render();
   const observer=observers[0]; observer.callback([{isIntersecting:false}]);

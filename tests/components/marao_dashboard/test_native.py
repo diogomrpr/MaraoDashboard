@@ -14,30 +14,30 @@ def test_every_published_role_compiles_without_mutating_its_options(spec, tmp_pa
     source = {"type": native_type(spec["id"]), "name": spec["label"], "future": {"keep": [1, 2]}, "variables": {"future": []}}
     if spec["domains"] and not spec.get("entity_optional"):
         source["entity"] = spec["domains"][0] + ".safe"
-    if spec["id"] in ("hc_room_card", "hc_navigation_card"):
+    if spec["id"] in ("md_room_card", "md_navigation_card"):
         source["page"] = "bedroom"
-    if spec["id"] == "hc_entity_group_card":
+    if spec["id"] == "md_entity_group_card":
         source.update(entity_type="light", entities=[])
-    if spec["id"] == "hc_media_app_card":
+    if spec["id"] == "md_media_app_card":
         source["variables"]["app_source"] = "TV"
     before = deepcopy(source)
     compiled = compile_card(source, "native-one", "marao-dashboard")
     assert source == before
     assert compiled["card"]["future"] == {"keep": [1, 2]}
-    assert compiled["card"]["variables"]["future"] == [] if spec["id"] != "hc_entity_group_card" else True
+    assert compiled["card"]["variables"]["future"] == [] if spec["id"] != "md_entity_group_card" else True
     assert not list(tmp_path.iterdir())
 
 
 def test_native_security_hold_accepts_the_published_alarm_binding():
-    source = {"type": native_type("hc_access_hold_action_card"), "entity": "alarm_control_panel.safe",
+    source = {"type": native_type("md_access_hold_action_card"), "entity": "alarm_control_panel.safe",
               "variables": {"action_service": "alarm_control_panel.alarm_arm_away"}}
     compiled = compile_card(source, "native-hold", "marao-native")
     assert compiled["card"]["entity"] == source["entity"]
-    assert compiled["card"]["template"] == "hc_access_hold_action_card"
+    assert compiled["card"]["template"] == "md_access_hold_action_card"
 
 
 def test_dishwasher_accepts_existing_state_and_refill_helpers():
-    source = {"type": native_type("hc_dishwasher_card"), "entity": "input_select.safe",
+    source = {"type": native_type("md_dishwasher_card"), "entity": "input_select.safe",
               "variables": {"salt_entity": "input_boolean.salt",
                             "rinse_aid_entity": "input_boolean.rinse",
                             "active_program_entity": "input_select.program"}}
@@ -45,7 +45,7 @@ def test_dishwasher_accepts_existing_state_and_refill_helpers():
     compiled = compile_card(source, "native-dishwasher", "dashboard-example")
     assert compiled["card"]["entity"] == source["entity"]
     assert source == before
-    spec = next(card for card in native_catalog()["cards"] if card["id"] == "hc_dishwasher_card")
+    spec = next(card for card in native_catalog()["cards"] if card["id"] == "md_dishwasher_card")
     fields = {field["key"]: field for field in spec["variables"]}
     assert "input_boolean" in fields["salt_entity"]["domains"]
     assert "input_boolean" in fields["rinse_aid_entity"]["domains"]
@@ -73,7 +73,7 @@ def test_starter_is_an_expanded_independent_snapshot():
 
 
 def test_media_options_and_duplicate_sheets_have_independent_identity():
-    source = {"type": native_type("hc_media_card"), "entity": "media_player.safe",
+    source = {"type": native_type("md_media_card"), "entity": "media_player.safe",
               "apple_tv": {"remote_entity": "remote.safe", "volume_remote_entity": "remote.volume", "apps": []},
               "variables": {"future": []}}
     one = compile_card(source, "native-one", "marao-native")
@@ -85,7 +85,7 @@ def test_media_options_and_duplicate_sheets_have_independent_identity():
     assert compile_card(source, "native-one", "marao-native")["popups"] == []
 
 
-@pytest.mark.parametrize("role,domain", [("hc_light_card", "light"), ("hc_fan_card", "fan"), ("hc_cover_card", "cover"), ("hc_switch_card", "switch"), ("hc_sensor_card", "sensor")])
+@pytest.mark.parametrize("role,domain", [("md_light_card", "light"), ("md_fan_card", "fan"), ("md_cover_card", "cover"), ("md_switch_card", "switch"), ("md_sensor_card", "sensor")])
 def test_inline_native_cards_do_not_get_phantom_popup_actions(role, domain):
     result = compile_card({"type": native_type(role), "entity": domain + ".safe"}, "native-inline", "marao-native")
     assert result["popups"] == []
@@ -94,26 +94,26 @@ def test_inline_native_cards_do_not_get_phantom_popup_actions(role, domain):
 
 @pytest.mark.parametrize("domain", ["lock", "cover", "button", "switch", "script"])
 def test_access_openers_reuse_strict_runtime(domain):
-    card = compile_card({"type": native_type("hc_access_slide_action_card"), "entity": domain + ".safe"},
+    card = compile_card({"type": native_type("md_access_slide_action_card"), "entity": domain + ".safe"},
                         "native-one", "marao-native")["card"]
-    assert card["template"] == "hc_access_slide_action_card"
+    assert card["template"] == "md_access_slide_action_card"
     assert card["entity"] == domain + ".safe"
 
 
 def test_alarm_sheet_contains_transient_runtime_controls_without_codes():
-    compiled = compile_card({"type": native_type("hc_security_card"), "entity": "alarm_control_panel.safe"},
+    compiled = compile_card({"type": native_type("md_security_card"), "entity": "alarm_control_panel.safe"},
                             "native-one", "marao-native")
-    assert compiled["popups"][0]["cards"][0]["template"] == "hc_alarm_controls_card"
+    assert compiled["popups"][0]["cards"][0]["template"] == "md_alarm_controls_card"
     assert compiled["card"]["tap_action"]["navigation_path"] == compiled["popups"][0]["hash"]
     assert "code" not in compiled["popups"][0]["cards"][0]
 
 
 @pytest.mark.parametrize("config", [
-    {"type": native_type("hc_light_card"), "entity": "lock.safe"},
-    {"type": native_type("hc_light_card"), "entity": "light.safe", "variables": []},
-    {"type": native_type("hc_access_card"), "entity": "lock.safe", "tap_action": {"action": "perform-action", "perform_action": "lock.unlock"}},
-    {"type": native_type("hc_access_card"), "entity": "lock.safe", "tap_action": {"action": "toggle"}},
-    {"type": native_type("hc_access_action_card"), "entity": "lock.safe", "variables": {"action_service": "lock.unlock"}},
+    {"type": native_type("md_light_card"), "entity": "lock.safe"},
+    {"type": native_type("md_light_card"), "entity": "light.safe", "variables": []},
+    {"type": native_type("md_access_card"), "entity": "lock.safe", "tap_action": {"action": "perform-action", "perform_action": "lock.unlock"}},
+    {"type": native_type("md_access_card"), "entity": "lock.safe", "tap_action": {"action": "toggle"}},
+    {"type": native_type("md_access_action_card"), "entity": "lock.safe", "variables": {"action_service": "lock.unlock"}},
 ])
 def test_invalid_or_unsafe_native_input_fails_read_only(config):
     exact = deepcopy(config)
@@ -123,7 +123,7 @@ def test_invalid_or_unsafe_native_input_fails_read_only(config):
 
 
 def test_native_blind_actions_preserve_normal_cover_features_without_bypassing_access_guards():
-    card = {"type": native_type("hc_cover_card"), "entity": "cover.safe",
+    card = {"type": native_type("md_cover_card"), "entity": "cover.safe",
             "tap_action": {"action": "perform-action", "perform_action": "cover.open_cover", "target": {"entity_id": "cover.safe"}}}
     result = compile_card(card, "native-cover", "marao-native", [{"entity_id": "cover.safe", "device_class": "blind"}])
     assert result["card"]["tap_action"] == card["tap_action"]
@@ -137,7 +137,7 @@ def test_native_blind_actions_preserve_normal_cover_features_without_bypassing_a
 def test_newer_native_markers_and_aliases_never_establish_legacy_ownership():
     assert native_owned({"marao": {"mode": "native", "version": 99}})
     assert native_owned({"strategy": {"type": "custom:marao-starter"}})
-    assert native_owned({"views": [{"sections": [{"cards": [{"type": native_type("hc_light_card")}]}]}]})
+    assert native_owned({"views": [{"sections": [{"cards": [{"type": native_type("md_light_card")}]}]}]})
     assert not native_owned({"views": [{"cards": [{"type": "custom:marao-card"}]}]})
 
 
@@ -164,7 +164,7 @@ async def test_read_only_native_commands_allow_a_viewer_but_builder_writes_do_no
     assert not user.is_admin
     refresh = await hass.auth.async_create_refresh_token(user, client_id="https://native.test")
     client = await hass_ws_client(hass, access_token=hass.auth.async_create_access_token(refresh))
-    source = {"type": native_type("hc_light_card"), "entity": "light.safe", "future": []}
+    source = {"type": native_type("md_light_card"), "entity": "light.safe", "future": []}
     await client.send_json({"id": 1, "type": "marao_dashboard/native/card", "config": source,
                             "instance": "native-safe", "url_path": "marao-native"})
     result = await client.receive_json()
@@ -197,7 +197,7 @@ async def test_native_storage_is_not_imported_and_cannot_be_captured(hass, tmp_p
 
 
 def test_saved_energy_configuration_renders_after_source_metadata_loss_but_editor_validation_stays_strict():
-    config = {"type": native_type("hc_graph_card"), "entity": "sensor.safe",
+    config = {"type": native_type("md_graph_card"), "entity": "sensor.safe",
               "variables": {"display_unit": "kW", "display_precision": 2}}
     with pytest.raises(ValueError, match="source unit"):
         compile_card(config, "native-safe", "marao-native")
@@ -211,7 +211,7 @@ async def test_proven_legacy_builder_can_contain_native_raw_cards_without_changi
     from homeassistant.components.lovelace import LOVELACE_DATA
     from custom_components.marao_dashboard.native_storage import async_find_native_dashboard
     config = {"views": [{"path": "home", "cards": [{"type": "custom:marao-navbar-card"},
-              {"type": native_type("hc_light_card"), "entity": "light.safe"}]}]}
+              {"type": native_type("md_light_card"), "entity": "light.safe"}]}]}
     file = tmp_path / "lovelace.saved"
     data = {"config": config}
     file.write_text(json.dumps({"version": 1, "minor_version": 1, "key": file.name, "data": data}))
@@ -226,8 +226,8 @@ async def test_proven_legacy_builder_can_contain_native_raw_cards_without_changi
 
 
 def test_native_close_or_lock_is_an_explicit_safe_action_without_an_opening_sheet():
-    result = compile_card({"type": native_type("hc_access_action_card"), "entity": "lock.safe"}, "native-safe", "marao-native")
-    assert result["card"]["template"] == "hc_access_action_card"
+    result = compile_card({"type": native_type("md_access_action_card"), "entity": "lock.safe"}, "native-safe", "marao-native")
+    assert result["card"]["template"] == "md_access_action_card"
     assert result["card"]["variables"]["action_service"] == "lock.lock"
     assert result["card"]["variables"]["action_label_key"] == "common.lock"
     assert result["popups"] == []
@@ -235,7 +235,7 @@ def test_native_close_or_lock_is_an_explicit_safe_action_without_an_opening_shee
 
 @pytest.mark.parametrize("binding", ["sensor.front", 42, [], "camera.bad/path"])
 def test_native_camera_rejects_invalid_popup_stream_even_with_external_action(binding):
-    source = {"type": native_type("hc_camera_card"), "entity": "camera.front_low",
+    source = {"type": native_type("md_camera_card"), "entity": "camera.front_low",
               "variables": {"popup_stream_entity": binding}, "tap_action": {"action": "none"}}
     before = deepcopy(source)
     with pytest.raises(ValueError, match="popup stream"):
@@ -248,14 +248,14 @@ def test_light_color_option_preserved_in_native_and_generated_cards(options):
     from custom_components.marao_dashboard.generator import _entity_card
     from custom_components.marao_dashboard.page_model import validate_pages
     options = {**options, "future": []}
-    source = {"type": native_type("hc_light_card"), "entity": "light.safe", "variables": options}
+    source = {"type": native_type("md_light_card"), "entity": "light.safe", "variables": options}
     before = deepcopy(source)
     assert compile_card(source, "light-color", "marao-dashboard")["card"]["variables"] == options
-    descriptor = {"template": "hc_light_card", "entity_id": "light.safe", "variables": options}
+    descriptor = {"template": "md_light_card", "entity_id": "light.safe", "variables": options}
     assert _entity_card(descriptor)["variables"] == options
-    validate_pages({"name": "Home", "config_version": 2, "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [descriptor]}]}, {"hc_light_card": ["light"]})
+    validate_pages({"name": "Home", "config_version": 2, "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [descriptor]}]}, {"md_light_card": ["light"]})
     assert source == before
-    spec = next(card for card in native_catalog()["cards"] if card["id"] == "hc_light_card")
+    spec = next(card for card in native_catalog()["cards"] if card["id"] == "md_light_card")
     field = next(field for field in spec["variables"] if field["key"] == "use_light_color")
     assert field["kind"] == "boolean" and field["default"] is False
 
@@ -264,28 +264,28 @@ def test_light_color_option_preserved_in_native_and_generated_cards(options):
 def test_light_color_option_rejects_non_boolean(value):
     from custom_components.marao_dashboard.generator import _entity_card
     from custom_components.marao_dashboard.page_model import validate_pages
-    descriptor = {"template": "hc_light_card", "entity_id": "light.safe", "variables": {"use_light_color": value}}
+    descriptor = {"template": "md_light_card", "entity_id": "light.safe", "variables": {"use_light_color": value}}
     with pytest.raises(ValueError, match="Use light color"):
         _entity_card(descriptor)
     with pytest.raises(ValueError, match="Use light color"):
-        compile_card({"type": native_type("hc_light_card"), "entity": "light.safe", "variables": descriptor["variables"]}, "light-color", "marao-dashboard")
+        compile_card({"type": native_type("md_light_card"), "entity": "light.safe", "variables": descriptor["variables"]}, "light-color", "marao-dashboard")
     with pytest.raises(ValueError, match="Use light color"):
-        validate_pages({"name": "Home", "config_version": 2, "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [descriptor]}]}, {"hc_light_card": ["light"]})
+        validate_pages({"name": "Home", "config_version": 2, "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [descriptor]}]}, {"md_light_card": ["light"]})
 
 
 @pytest.mark.parametrize("domain,mode,role,popups", [
-    ("lock", "popup", "hc_access_card", 1),
-    ("lock", "slide", "hc_access_slide_action_card", 0),
-    ("cover", "slide", "hc_access_slide_action_card", 0),
-    ("button", "slide", "hc_access_slide_action_card", 0),
-    ("script", "auto", "hc_access_slide_action_card", 0),
-    ("button", "auto", "hc_access_hold_action_card", 0),
-    ("switch", "hold", "hc_access_hold_action_card", 0),
-    ("lock", "close", "hc_access_action_card", 0),
-    ("cover", "close", "hc_access_action_card", 0),
+    ("lock", "popup", "md_access_card", 1),
+    ("lock", "slide", "md_access_slide_action_card", 0),
+    ("cover", "slide", "md_access_slide_action_card", 0),
+    ("button", "slide", "md_access_slide_action_card", 0),
+    ("script", "auto", "md_access_slide_action_card", 0),
+    ("button", "auto", "md_access_hold_action_card", 0),
+    ("switch", "hold", "md_access_hold_action_card", 0),
+    ("lock", "close", "md_access_action_card", 0),
+    ("cover", "close", "md_access_action_card", 0),
 ])
 def test_unified_access_modes_preserve_source_and_use_existing_safe_controls(domain, mode, role, popups):
-    source = {"type": native_type("hc_access_card"), "entity": domain + ".safe", "name": "My access",
+    source = {"type": native_type("md_access_card"), "entity": domain + ".safe", "name": "My access",
               "variables": {"access_mode": mode, "future": [1]}, "future": {"keep": True}}
     before = deepcopy(source)
     result = compile_card(source, "native-unified", "marao-dashboard")
@@ -302,14 +302,14 @@ def test_unified_access_modes_preserve_source_and_use_existing_safe_controls(dom
 @pytest.mark.parametrize("domain,mode", [("button", "popup"), ("input_boolean", "slide"), ("lock", "hold"), ("lock", "invalid")])
 def test_unified_access_rejects_incompatible_modes(domain, mode):
     with pytest.raises(ValueError, match="access behavior|Access behavior"):
-        compile_card({"type": native_type("hc_access_card"), "entity": domain + ".safe", "variables": {"access_mode": mode}},
+        compile_card({"type": native_type("md_access_card"), "entity": domain + ".safe", "variables": {"access_mode": mode}},
                      "native-unified", "marao-dashboard")
 
 
 def test_access_catalog_has_one_discoverable_family_and_retains_legacy_settings():
     family = [card for card in native_catalog()["cards"] if card["id"] in (
-        "hc_access_card", "hc_access_slide_action_card", "hc_access_action_card", "hc_access_hold_action_card")]
-    assert [card["id"] for card in family if not card.get("hidden")] == ["hc_access_card"]
+        "md_access_card", "md_access_slide_action_card", "md_access_action_card", "md_access_hold_action_card")]
+    assert [card["id"] for card in family if not card.get("hidden")] == ["md_access_card"]
     assert all(any(option["key"] == "access_mode" for option in card["variables"]) for card in family)
 
 
@@ -317,4 +317,4 @@ def test_unified_slide_rejects_tap_bypasses_and_close_rejects_opening_services()
     for options in ({"variables": {"access_mode": "slide"}, "tap_action": {"action": "toggle"}},
                     {"variables": {"access_mode": "close", "action_service": "lock.unlock"}}):
         with pytest.raises(ValueError):
-            compile_card({"type": native_type("hc_access_card"), "entity": "lock.safe", **options}, "native-unified", "marao-dashboard")
+            compile_card({"type": native_type("md_access_card"), "entity": "lock.safe", **options}, "native-unified", "marao-dashboard")

@@ -19,7 +19,7 @@
           "entities": [
             {
               "id": "card-1",
-              "template": "hc_weather_card",
+              "template": "md_weather_card",
               "entity_id": "weather.fixture",
               "variables": {
                 "show_forecast": true
@@ -31,7 +31,7 @@
           "columns": 2,
           "entities": [
             {
-              "template": "hc_entity_group_card",
+              "template": "md_entity_group_card",
               "id": "overview-lights",
               "name": "Lights",
               "icon": "mdi:lightbulb-group-outline",
@@ -46,7 +46,7 @@
               "name_key": "overview.lights"
             },
             {
-              "template": "hc_entity_group_card",
+              "template": "md_entity_group_card",
               "id": "overview-blinds",
               "name": "Blinds",
               "icon": "mdi:window-shutter",
@@ -61,7 +61,7 @@
               "name_key": "overview.blinds"
             },
             {
-              "template": "hc_entity_group_card",
+              "template": "md_entity_group_card",
               "id": "overview-climate",
               "name": "Climate",
               "icon": "mdi:thermostat",
@@ -77,7 +77,7 @@
             },
             {
               "id": "overview-maintenance",
-              "template": "hc_entity_group_card",
+              "template": "md_entity_group_card",
               "name": "Maintenance",
               "name_key": "overview.maintenance",
               "icon": "mdi:wrench",
@@ -86,7 +86,7 @@
               "entities": [
                 {
                   "entity_id": "sensor.fixture_battery",
-                  "template": "hc_battery_card"
+                  "template": "md_battery_card"
                 }
               ],
               "variables": {
@@ -95,7 +95,7 @@
             },
             {
               "id": "card-6",
-              "template": "hc_scene_collection_card",
+              "template": "md_scene_collection_card",
               "name": "Scenes",
               "icon": "mdi:palette-outline",
               "entities": [
@@ -123,7 +123,7 @@
           "entities": [
             {
               "id": "card-1",
-              "template": "hc_room_card",
+              "template": "md_room_card",
               "entity_id": "light.living_room_main",
               "name": "Living Room",
               "icon": "mdi:sofa-outline",
@@ -152,7 +152,7 @@
           "entities": [
             {
               "id": "card-1",
-              "template": "hc_security_card",
+              "template": "md_security_card",
               "entity_id": "alarm_control_panel.home",
               "name": "Home"
             }
@@ -163,7 +163,7 @@
           "entities": [
             {
               "id": "card-2",
-              "template": "hc_access_card",
+              "template": "md_access_card",
               "entity_id": "lock.front_door",
               "name": "Front Door"
             }
@@ -174,7 +174,7 @@
           "entities": [
             {
               "id": "card-3",
-              "template": "hc_access_hold_action_card",
+              "template": "md_access_hold_action_card",
               "entity_id": "button.open_door",
               "name": "Open Door",
               "show_state": false,
@@ -205,7 +205,7 @@
             {
               "id": "card-1",
               "entity_id": "sensor.house_power",
-              "template": "hc_graph_card",
+              "template": "md_graph_card",
               "name": "Whole-home demand",
               "icon": "mdi:home-lightning-bolt",
               "future_card": 42,
@@ -227,7 +227,7 @@
           "entities": [
             {
               "id": "card-2",
-              "template": "hc_energy_period_card",
+              "template": "md_energy_period_card",
               "entity_id": "sensor.month_energy",
               "name": "Month Power",
               "icon": "mdi:flash",
@@ -245,7 +245,7 @@
             {
               "id": "card-3",
               "entity_id": "sensor.today_energy",
-              "template": "hc_energy_period_card",
+              "template": "md_energy_period_card",
               "name": "Daily meter",
               "icon": "mdi:counter",
               "future_card": true,
@@ -261,7 +261,7 @@
           "entities": [
             {
               "id": "card-4",
-              "template": "hc_energy_period_card",
+              "template": "md_energy_period_card",
               "entity_id": "sensor.month_cost",
               "name": "Month Cost",
               "icon": "mdi:currency-eur",
@@ -279,7 +279,7 @@
             {
               "id": "card-5",
               "entity_id": "sensor.today_cost",
-              "template": "hc_energy_period_card",
+              "template": "md_energy_period_card",
               "name": "Daily spend",
               "icon": "mdi:cash",
               "future_card": true,
@@ -295,7 +295,7 @@
           "entities": [
             {
               "id": "card-6",
-              "template": "hc_toggle_graph_card",
+              "template": "md_toggle_graph_card",
               "entity_id": "sensor.heater_power",
               "name": "Heater Power",
               "icon": null,
@@ -311,7 +311,7 @@
             {
               "id": "card-7",
               "entity_id": "sensor.dishwasher",
-              "template": "hc_dishwasher_card",
+              "template": "md_dishwasher_card",
               "name": "Dishwasher"
             }
           ]
@@ -331,7 +331,7 @@
           "entities": [
             {
               "id": "card-1",
-              "template": "hc_base_card",
+              "template": "md_base_card",
               "entity_id": "sensor.wallbox_status",
               "name": "Wallbox Status",
               "icon": "mdi:ev-station",
@@ -344,7 +344,7 @@
           "entities": [
             {
               "id": "card-2",
-              "template": "hc_graph_card",
+              "template": "md_graph_card",
               "entity_id": "sensor.wallbox_power",
               "name": "Charging Power",
               "icon": "mdi:flash",
@@ -358,7 +358,7 @@
             {
               "id": "card-3",
               "entity_id": "sensor.max_current",
-              "template": "hc_graph_card",
+              "template": "md_graph_card",
               "name": "Current limit",
               "icon": "mdi:current-ac",
               "variables": {
@@ -375,7 +375,7 @@
           "entities": [
             {
               "id": "card-4",
-              "template": "hc_wallbox_current_card",
+              "template": "md_wallbox_current_card",
               "entity_id": "input_number.wallbox_current",
               "name": "Requested current",
               "variables": {
@@ -395,7 +395,7 @@
           "entities": [
             {
               "id": "card-5",
-              "template": "hc_switch_card",
+              "template": "md_switch_card",
               "entity_id": "switch.wallbox_pause",
               "name": "Pause / Resume",
               "icon": "mdi:pause-circle",
@@ -418,7 +418,7 @@
           "entities": [
             {
               "id": "card-1",
-              "template": "hc_media_card",
+              "template": "md_media_card",
               "entity_id": "media_player.living_room_tv",
               "name": "Living Room Tv",
               "apple_tv": {
@@ -442,7 +442,7 @@
           "entities": [
             {
               "id": "card-2",
-              "template": "hc_media_app_card",
+              "template": "md_media_app_card",
               "entity_id": "media_player.living_room_tv",
               "name": "YouTube",
               "icon": "mdi:youtube",
@@ -469,7 +469,7 @@
           "entities": [
             {
               "id": "page-title",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Living Room",
               "show_icon": false,
               "show_state": false,
@@ -508,7 +508,7 @@
             },
             {
               "entity_id": "sensor.fixture_battery",
-              "template": "hc_battery_card"
+              "template": "md_battery_card"
             }
           ],
           "cards": [

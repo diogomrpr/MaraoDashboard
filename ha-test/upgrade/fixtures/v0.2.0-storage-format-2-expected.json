@@ -18,7 +18,7 @@
               "subtitle": "1 area",
               "icon": "mdi:home-variant-outline",
               "id": "card-1",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Released storage example"
             }
           ]
@@ -43,7 +43,7 @@
               "entity_count": 2,
               "camera_count": 1,
               "id": "card-2",
-              "template": "hc_room_card",
+              "template": "md_room_card",
               "page": "outside",
               "variables": {
                 "light_entities": [
@@ -72,7 +72,7 @@
               "icon": "mdi:tree",
               "back_path": "/marao-dashboard/home",
               "id": "card-1",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Outside"
             }
           ]
@@ -91,7 +91,7 @@
           "entities": [
             {
               "id": "back-1",
-              "template": "hc_navigation_card",
+              "template": "md_navigation_card",
               "page": "home",
               "name": "Home",
               "icon": "mdi:arrow-left"
@@ -109,7 +109,7 @@
               "entity_count": 2,
               "camera_count": 1,
               "id": "card-2",
-              "template": "hc_room_card",
+              "template": "md_room_card",
               "page": "outside",
               "variables": {
                 "light_entities": [
@@ -126,7 +126,7 @@
             {
               "icon": "mdi:cctv",
               "id": "card-3",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Cameras"
             }
           ]
@@ -137,7 +137,7 @@
             {
               "name": "Safe camera",
               "id": "card-4",
-              "template": "hc_camera_card",
+              "template": "md_camera_card",
               "entity_id": "camera.marao_dashboard_test_camera"
             }
           ]
@@ -148,7 +148,7 @@
             {
               "icon": "mdi:lightbulb-group",
               "id": "card-5",
-              "template": "hc_title_card",
+              "template": "md_title_card",
               "name": "Lights"
             }
           ]
@@ -159,7 +159,7 @@
             {
               "name": "Safe light",
               "id": "card-6",
-              "template": "hc_light_card",
+              "template": "md_light_card",
               "entity_id": "light.marao_dashboard_test_light"
             }
           ]

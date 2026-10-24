@@ -18,11 +18,11 @@ const browser = (id, file, args = [], exclusive = true) => ({ id, kind: 'browser
     ...(file === 'test-ha-card-alignment' && args.includes('--access-label') ? ['tests/test-ha-ui-batch.js'] : []),
     ...(['test-ha-editor', 'test-ha-card-alignment'].includes(file) ? ['tests/test-ha-editor.js', 'tests/json-editor-checks.js', 'tests/editor-drag-checks.js', 'tests/editor-rendering-checks.js', 'tests/editor-preload-checks.js'] : [])], exclusive });
 const families = {
-  security: ['hc_security_card', 'hc_alarm_controls_card', 'hc_access_slide_action_card', 'hc_access_card'],
-  slider: ['hc_light_card', 'hc_fan_card', 'hc_cover_card'],
-  popup: ['hc_media_card', 'hc_climate_card', 'hc_entity_group_card', 'hc_access_card'],
-  rooms: ['hc_room_card'], groups: ['hc_entity_group_card'], climate: ['hc_climate_card', 'hc_number_card', 'hc_wallbox_current_card'],
-  camera: ['hc_camera_card'], history: ['hc_graph_card', 'hc_timeline_card', 'hc_toggle_graph_card'],
+  security: ['md_security_card', 'md_alarm_controls_card', 'md_access_slide_action_card', 'md_access_card'],
+  slider: ['md_light_card', 'md_fan_card', 'md_cover_card'],
+  popup: ['md_media_card', 'md_climate_card', 'md_entity_group_card', 'md_access_card'],
+  rooms: ['md_room_card'], groups: ['md_entity_group_card'], climate: ['md_climate_card', 'md_number_card', 'md_wallbox_current_card'],
+  camera: ['md_camera_card'], history: ['md_graph_card', 'md_timeline_card', 'md_toggle_graph_card'],
 };
 const components = {
   'navbar-startup': { units: [['frontend-refresh'], ['marao-navbar-card'], ['marao-native'], ['marao-history-cards'], ['marao-text-scale'], ['gallery-cases'], ['package-boundary']],
@@ -57,7 +57,7 @@ const components = {
     browser: [browser('editor-preload:startup', 'test-ha-editor', ['--preload', '--startup', '--json-tools', '--scenario=iphone-normal']),
       ...['narrow-320', 'iphone-landscape', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200'].map(profile => browser('editor-preload:' + profile, 'test-ha-editor', ['--json-geometry', '--scenario=' + profile]))] },
   'slider-headers': { units: [['marao-card-visibility'], ['marao-text-scale'], ['marao-climate-card', 'slider|brightness|percentage|cover'], ['marao-security'], ['gallery-cases']],
-    python: ['test_gallery_fixtures'], templates: [...families.slider, 'hc_access_slide_action_card'],
+    python: ['test_gallery_fixtures'], templates: [...families.slider, 'md_access_slide_action_card'],
     browser: [
       ...['iphone-normal', 'android-normal', 'narrow-320', 'iphone-landscape', 'android-landscape', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200'].map(profile =>
         browser('slider-headers:' + profile, 'test-ha-card-alignment', ['--slider-headers', '--scenario', profile])),
@@ -91,22 +91,22 @@ const components = {
       browser('json-editor:' + profile, 'test-ha-editor', ['--json-tools', '--scenario=' + profile, ...(profile === 'iphone-normal' ? ['--json-save', '--startup', '--portuguese'] : [])]))],
   },
   native: { units: [['marao-native'], ['native-backup']], python: ['test_native'], editor: true,
-    templates: [...Object.values(families).flat(), 'hc_weather_card', 'hc_scene_collection_card', 'hc_access_hold_action_card', 'hc_access_action_card', 'hc_header_card', 'hc_glance_card', 'hc_scene_card', 'hc_number_card', 'hc_wallbox_current_card', 'hc_vacuum_card', 'hc_dishwasher_card', 'hc_washing_machine_card', 'hc_sensor_card', 'hc_switch_card', 'hc_battery_card', 'hc_navigation_card', 'hc_energy_period_card', 'hc_media_app_card', 'hc_title_card', 'hc_base_card'],
+    templates: [...Object.values(families).flat(), 'md_weather_card', 'md_scene_collection_card', 'md_access_hold_action_card', 'md_access_action_card', 'md_header_card', 'md_glance_card', 'md_scene_card', 'md_number_card', 'md_wallbox_current_card', 'md_vacuum_card', 'md_dishwasher_card', 'md_washing_machine_card', 'md_sensor_card', 'md_switch_card', 'md_battery_card', 'md_navigation_card', 'md_energy_period_card', 'md_media_app_card', 'md_title_card', 'md_base_card'],
     profiles: ['iphone-normal', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200', 'narrow-320', 'iphone-landscape', 'android-normal', 'android-landscape'],
     browser: [browser('native-editor', 'test-ha-native', ['--scenario', 'iphone-normal'])] },
   'camera-editor': { units: [['marao-native'], ['native-backup']], python: ['test_native'], editor: true,
     browser: [browser('native-editor', 'test-ha-native', ['--scenario', 'iphone-normal'])] },
-  security: { units: [['marao-security']], python: ['test_security'], templates: [...families.security, 'hc_dishwasher_card', 'hc_vacuum_card'],
+  security: { units: [['marao-security']], python: ['test_security'], templates: [...families.security, 'md_dishwasher_card', 'md_vacuum_card'],
     profiles: ['iphone-normal', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200', 'narrow-320', 'iphone-landscape', 'android-normal', 'android-landscape'],
     browser: [browser('security:iphone', 'test-ha-security', ['--scenario', 'iphone-normal']), browser('security:android', 'test-ha-security', ['--scenario', 'android-normal'])] },
   labels: { units: [['marao-text-scale'], ['marao-card-visibility']], profiles: ['iphone-normal', 'narrow-320', 'iphone-bold-text-200'] },
   slider: { units: [['marao-slider'], ['marao-climate-card', 'slider|brightness|percentage|cover']], consumers: ['light', 'fan', 'cover'],
     browser: [browser('sliders:iphone', 'test-ha-value-sliders', ['--scenario', 'iphone-normal']), browser('sliders:android', 'test-ha-value-sliders', ['--scenario', 'android-normal'])] },
-  light: { units: [['marao-climate-card', 'light|brightness']], templates: ['hc_light_card'] },
-  'light-color': { units: [['marao-light-color'], ['marao-slider'], ['marao-card-visibility', 'light|hold|popup']], templates: ['hc_light_card'],
+  light: { units: [['marao-climate-card', 'light|brightness']], templates: ['md_light_card'] },
+  'light-color': { units: [['marao-light-color'], ['marao-slider'], ['marao-card-visibility', 'light|hold|popup']], templates: ['md_light_card'],
     browser: [{ id: 'light-color:local', kind: 'offline', command: ['node', 'tests/test-light-color-local.js'], inputs: [runtime, 'tests/test-light-color-local.js'], exclusive: true }] },
-  fan: { units: [['marao-climate-card', 'fan|percentage']], templates: ['hc_fan_card'] },
-  cover: { units: [['marao-climate-card', 'cover|position']], templates: ['hc_cover_card'] },
+  fan: { units: [['marao-climate-card', 'fan|percentage']], templates: ['md_fan_card'] },
+  cover: { units: [['marao-climate-card', 'cover|position']], templates: ['md_cover_card'] },
   popup: { units: [['marao-navbar-card'], ['marao-climate-card', 'popup|focus|inert']], profiles: ['iphone-normal', 'iphone-landscape', 'narrow-320'], popups: true },
   scroll: { units: [['marao-card-visibility'], ['marao-climate-card'], ['marao-security'], ['marao-text-scale']],
     browser: [
@@ -142,6 +142,7 @@ const components = {
       browser('editor-drag:alignment', 'test-ha-card-alignment', ['--editor-drag']),
       ...['narrow-320', 'iphone-landscape', 'android-landscape', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200'].map(profile => browser('editor-drag:' + profile, 'test-ha-editor', ['--drag-geometry', '--scenario=' + profile]))] },
   'editor-model': { units: [['editor-model'], ['page-manager-model'], ['canonical-page-model']] },
+  'card-namespace': { units: [['card-names'], ['marao-security'], ['marao-native']], python: ['test_card_names', 'test_page_migration'] },
   'editor-ui': { units: [['editor-panel']], browser: [browser('editor', 'test-ha-editor', ['--scenario=iphone-normal', '--header'])], editor: true },
   generator: { python: ['test_generator', 'test_page_generation'], upgrade: true },
   migration: { python: ['test_page_migration', 'test_native_storage_migration', 'test_release_replay_recovery', 'test_upgrade_fixtures'], upgrade: true },
@@ -150,7 +151,7 @@ const components = {
   packaging: { units: [['package-boundary'], ['brand-assets']], package: true },
   gallery: { units: [['gallery-cases']], python: ['test_gallery_fixtures'] },
   verification: { units: [['verification'], ['verification-development'], ['verification-policy'], ['verification-reuse'], ['verification-browser'], ['verification-evidence'], ['accessibility-profiles'], ['upgrade-prepared'], ['upgrade-runner'], ['release-gate']],
-    browser: [browser('tooling-layout', 'test-ha-dashboard-accessibility', ['--focused', '--families', 'hc_light_card', '--scenario', 'iphone-normal', '--screenshots', 'review', '--popups', '--popup-hash', '#marao-dashboard-test-value-sliders-popup'], false),
+    browser: [browser('tooling-layout', 'test-ha-dashboard-accessibility', ['--focused', '--families', 'md_light_card', '--scenario', 'iphone-normal', '--screenshots', 'review', '--popups', '--popup-hash', '#marao-dashboard-test-value-sliders-popup'], false),
       browser('tooling-actions', 'test-ha-dashboard-e2e', ['--toggle-only'])] },
   docs: {},
   'verification-map': { units: [['verification'], ['verification-development']] },
@@ -160,6 +161,8 @@ const components = {
 };
 
 const rules = [
+  [/^tests\/frontend\/canonical-pages\.fixture\.json$/, ['card-namespace']],
+  [/^custom_components\/marao_dashboard\/(card_names\.py|frontend\/MaraoNames\.js)$|^tests\/(frontend\/card-names\.test\.js|components\/marao_dashboard\/test_card_names\.py)$/, ['card-namespace']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoLight(?:Color|Capabilities)\.js$|^tests\/test-light-color-local\.js$/, ['light-color']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoSlider\.js$/, ['slider']],
   [/^tests\/test-ha-navbar-startup\.js$/, ['navbar-startup']],
@@ -266,7 +269,7 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     if (ids === 'editor-labels') ids = declared.includes('editor-drag') && !declared.includes('native') ? ['editor-ui', 'editor-drag'] : ['native', 'editor-ui'];
     if (ids === 'shared') {
       if (!declared.length && !conservativeShared) throw new Error(file + ': declare --component after reviewing the shared-component diff.');
-      const consumers = ['navbar-startup', 'frontend-refresh', 'chart-details', 'control-grid', 'battery-groups', 'access-label', 'slider-headers', 'navbar-overflow', 'native', 'security', 'labels', 'slider', 'light', 'light-color', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
+      const consumers = ['card-namespace', 'navbar-startup', 'frontend-refresh', 'chart-details', 'control-grid', 'battery-groups', 'access-label', 'slider-headers', 'navbar-overflow', 'native', 'security', 'labels', 'slider', 'light', 'light-color', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
       ids = declared.length ? declared.filter(id => consumers.includes(id)) : consumers;
       if (!ids.length) throw new Error(file + ': a runtime component is required; documentation scope cannot omit its checks.');
     }
@@ -287,9 +290,9 @@ function inspectionFor(selection) {
   const ids = selection.components;
   const aliases = {
     'navbar-startup': ['marao-navbar-card'], 'frontend-refresh': ['marao-navbar-card'], navbar: ['marao-navbar-card'], 'navbar-overflow': ['marao-navbar-card'],
-    'battery-groups': ['hc_entity_group_card', 'hc_battery_card'], 'access-label': ['hc_access_slide_action_card'],
-    'control-grid': [...families.slider, ...families.climate, 'hc_sensor_card'],
-    'chart-details': [...families.history, 'hc_energy_period_card'], energy: ['hc_energy_period_card'],
+    'battery-groups': ['md_entity_group_card', 'md_battery_card'], 'access-label': ['md_access_slide_action_card'],
+    'control-grid': [...families.slider, ...families.climate, 'md_sensor_card'],
+    'chart-details': [...families.history, 'md_energy_period_card'], energy: ['md_energy_period_card'],
   };
   const editor = ids.some(id => id.startsWith('editor-') || id === 'json-editor');
   const selectedFamilies = [...new Set(ids.flatMap(id => aliases[id] || components[id].templates || families[id] || []))];

@@ -43,7 +43,7 @@ def test_energy_breakdown_and_tariff_survive_page_and_native_generation(members)
     from custom_components.marao_dashboard.native import compile_card
 
     options = {"period": "month", "calculate_cost": True, "cost_per_kwh": 0, "sub_entities": members, "future": {"keep": []}}
-    descriptor = {"template": "hc_energy_period_card", "entity_id": "sensor.energy", "variables": options}
+    descriptor = {"template": "md_energy_period_card", "entity_id": "sensor.energy", "variables": options}
     source = {"config_version": 2, "name": "Energy", "landing_page": "energy", "pages": [{"name": "Energy", "path": "energy", "entities": [descriptor]}]}
     original = deepcopy(source)
     registry = [{"entity_id": "sensor.energy", "unit_of_measurement": "kWh"}, {"entity_id": "sensor.heating_energy", "unit_of_measurement": "Wh"},
@@ -69,7 +69,7 @@ def test_energy_breakdown_and_tariff_survive_page_and_native_generation(members)
 ])
 def test_energy_breakdown_rejects_known_incompatible_metadata_without_rewriting(metadata, message):
     source = {"config_version": 2, "name": "Energy", "landing_page": "energy", "pages": [{"name": "Energy", "path": "energy", "entities": [
-        {"template": "hc_energy_period_card", "entity_id": "sensor.total", "variables": {"sub_entities": [{"entity_id": "sensor.load", "cost_entity": "sensor.cost"}]}},
+        {"template": "md_energy_period_card", "entity_id": "sensor.total", "variables": {"sub_entities": [{"entity_id": "sensor.load", "cost_entity": "sensor.cost"}]}},
     ]}]}
     original = deepcopy(source)
     with pytest.raises(ValueError, match=message):
@@ -78,7 +78,7 @@ def test_energy_breakdown_rejects_known_incompatible_metadata_without_rewriting(
     assert source == original
 
 
-@pytest.mark.parametrize("role", ["hc_navigation_card", "hc_room_card"])
+@pytest.mark.parametrize("role", ["md_navigation_card", "md_room_card"])
 def test_entity_free_shortcuts_preserve_explicit_routes_names_and_options(tmp_path, role):
     source = {"config_version": 2, "name": "Shortcuts", "landing_page": "home", "pages": [
         {"name": "Home", "path": "home", "entities": [{"template": role, "name": "Saved shortcut", "icon": "mdi:desk", "show_state": False,
@@ -95,7 +95,7 @@ def test_entity_free_shortcuts_preserve_explicit_routes_names_and_options(tmp_pa
 def test_media_app_buttons_do_not_inherit_media_popup_routes():
     source = {"config_version": 2, "name": "Apps", "landing_page": "home", "pages": [
         {"name": "Home", "path": "home", "entities": [
-            {"entity_id": "media_player.safe", "template": "hc_media_app_card", "name": "YouTube", "variables": {"app_source": "YouTube"}},
+            {"entity_id": "media_player.safe", "template": "md_media_app_card", "name": "YouTube", "variables": {"app_source": "YouTube"}},
         ]},
     ]}
     entry = g._resolve_pages(source)["pages"][0]["_sections"][0]["ordered_cards"][0]
@@ -106,7 +106,7 @@ def test_media_app_buttons_do_not_inherit_media_popup_routes():
 
 def test_popup_rename_and_card_delete_clean_owned_files_and_retain_protected_yaml(tmp_path):
     source = {"config_version": 2, "name": "Owned", "landing_page": "home", "pages": [
-        {"id": "home", "name": "Home", "path": "home", "entities": [{"id": "tv", "template": "hc_media_card", "entity_id": "media_player.safe", "apple_tv": False}]},
+        {"id": "home", "name": "Home", "path": "home", "entities": [{"id": "tv", "template": "md_media_card", "entity_id": "media_player.safe", "apple_tv": False}]},
     ]}
     generated = g.write_dashboard(source, tmp_path)
     root = tmp_path / generated.slug
@@ -115,7 +115,7 @@ def test_popup_rename_and_card_delete_clean_owned_files_and_retain_protected_yam
     old.write_text(old.read_text().replace("  # marao:custom:start\n", "  # marao:custom:start\n" + exact_custom))
     source["pages"][0]["path"] = source["landing_page"] = "renamed"
     g.write_dashboard(source, tmp_path)
-    assert exact_custom in old.read_text() and "template: hc_media_card" not in old.read_text()
+    assert exact_custom in old.read_text() and "template: md_media_card" not in old.read_text()
     current = root / "components/popups/page-renamed-tv-popup.yaml"
     assert current.exists()
     source["pages"][0]["entities"] = []
@@ -132,7 +132,7 @@ def test_missing_owned_popup_reference_and_implicit_identity_collision_preflight
     with pytest.raises(ValueError, match="missing popup link"):
         g.write_dashboard(source, tmp_path)
     assert not list(tmp_path.iterdir())
-    source["pages"][0].update(cards=[], entities=[{"id": "card-2", "template": "hc_title_card", "name": "Title"}, "sensor.safe"])
+    source["pages"][0].update(cards=[], entities=[{"id": "card-2", "template": "md_title_card", "name": "Title"}, "sensor.safe"])
     with pytest.raises(ValueError, match="local card identity"):
         g.write_dashboard(source, tmp_path)
     assert not list(tmp_path.iterdir())
@@ -142,8 +142,8 @@ def test_common_sections_keep_explicit_order_raw_cards_and_one_footer():
     source = deepcopy(SOURCE)
     resolved = g._resolve_pages(source)
     page = g._page_view(resolved["pages"][0], "/config/test", "marao-dashboard")
-    assert [card["template"] for card in page["cards"][0]["cards"]] == ["hc_title_card", "hc_weather_card"]
-    assert [card["template"] for card in page["cards"][1]["cards"][:3]] == ["hc_room_card", "hc_navigation_card", "hc_entity_group_card"]
+    assert [card["template"] for card in page["cards"][0]["cards"]] == ["md_title_card", "md_weather_card"]
+    assert [card["template"] for card in page["cards"][1]["cards"][:3]] == ["md_room_card", "md_navigation_card", "md_entity_group_card"]
     assert page["cards"][1]["cards"][-1] == source["pages"][0]["sections"][1]["cards"][0]
     assert sum(isinstance(card, g.TaggedScalar) for card in page["cards"]) == 1
     assert source == SOURCE
@@ -155,11 +155,11 @@ def test_common_sections_keep_explicit_order_raw_cards_and_one_footer():
 
 def test_duplicate_pages_same_entities_have_independent_names_options_and_popups():
     cards = [
-        {"id": "media", "entity_id": "media_player.safe", "template": "hc_media_card", "name": "First TV", "apple_tv": False},
-        {"id": "period", "entity_id": "sensor.safe", "template": "hc_energy_period_card", "name": "Daily reading", "variables": {"period": "day"}},
-        {"id": "camera", "entity_id": "camera.safe", "template": "hc_camera_card"},
-        {"id": "group", "template": "hc_entity_group_card", "name": "Thermostats", "entity_type": "climate", "entities": ["climate.safe"]},
-        {"id": "scenes", "template": "hc_scene_collection_card", "name": "Scenes", "entities": ["scene.safe", "input_boolean.safe"]},
+        {"id": "media", "entity_id": "media_player.safe", "template": "md_media_card", "name": "First TV", "apple_tv": False},
+        {"id": "period", "entity_id": "sensor.safe", "template": "md_energy_period_card", "name": "Daily reading", "variables": {"period": "day"}},
+        {"id": "camera", "entity_id": "camera.safe", "template": "md_camera_card"},
+        {"id": "group", "template": "md_entity_group_card", "name": "Thermostats", "entity_type": "climate", "entities": ["climate.safe"]},
+        {"id": "scenes", "template": "md_scene_collection_card", "name": "Scenes", "entities": ["scene.safe", "input_boolean.safe"]},
     ]
     second = deepcopy(cards)
     second[0]["name"] = "Second TV"
@@ -186,7 +186,7 @@ def test_duplicate_pages_same_entities_have_independent_names_options_and_popups
 def test_direct_access_actions_do_not_gain_a_dangling_popup_reference():
     source = {"config_version": 2, "name": "Test", "landing_page": "home", "pages": [{
         "name": "Home", "path": "home", "entities": [{
-            "id": "lock", "entity_id": "lock.safe", "template": "hc_access_action_card",
+            "id": "lock", "entity_id": "lock.safe", "template": "md_access_action_card",
             "variables": {"action_service": "lock.lock"},
         }],
     }]}
@@ -201,8 +201,8 @@ def test_direct_access_actions_do_not_gain_a_dangling_popup_reference():
 
 def test_configured_popup_reference_is_used_by_card_and_actual_popup():
     source = {"config_version": 2, "name": "Test", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [
-        {"id": "camera", "entity_id": "camera.safe", "template": "hc_camera_card", "variables": {"popup_hash": "#my-camera"}},
-        {"id": "media", "entity_id": "media_player.safe", "template": "hc_media_card", "variables": {"popup_hash": "#my-media"}, "apple_tv": False},
+        {"id": "camera", "entity_id": "camera.safe", "template": "md_camera_card", "variables": {"popup_hash": "#my-camera"}},
+        {"id": "media", "entity_id": "media_player.safe", "template": "md_media_card", "variables": {"popup_hash": "#my-media"}, "apple_tv": False},
     ]}]}
     entries = g._resolve_pages(source)["pages"][0]["_sections"][0]["ordered_cards"]
     assert [g._page_card_popups(item)[0]["hash"] for item in entries] == ["#my-camera", "#my-media"]
@@ -212,8 +212,8 @@ def test_configured_popup_reference_is_used_by_card_and_actual_popup():
 @pytest.mark.parametrize("other", ["#same", "../unsafe"])
 def test_duplicate_or_invalid_owned_popup_is_a_preflight_error(other):
     source = {"config_version": 2, "name": "Test", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [
-        {"id": "one", "entity_id": "media_player.safe", "template": "hc_media_card", "variables": {"popup_hash": "#same"}},
-        {"id": "two", "entity_id": "media_player.safe", "template": "hc_media_card", "variables": {"popup_hash": other}},
+        {"id": "one", "entity_id": "media_player.safe", "template": "md_media_card", "variables": {"popup_hash": "#same"}},
+        {"id": "two", "entity_id": "media_player.safe", "template": "md_media_card", "variables": {"popup_hash": other}},
     ]}]}
     before = deepcopy(source)
     with pytest.raises(ValueError, match="popup hash"):
@@ -224,7 +224,7 @@ def test_duplicate_or_invalid_owned_popup_is_a_preflight_error(other):
 def test_legacy_option_sentinels_are_nonoperative_and_custom_names_survive_translation():
     source = {"config_version": 2, "name": "Test", "landing_page": "home", "legacy_page_options": {"pages": {"energy": {"variables": {"display_unit": "not a unit"}}}},
               "pages": [{"name": "Home", "name_key": "nav.home", "path": "home", "entities": [
-                  {"entity_id": "sensor.safe", "template": "hc_energy_period_card", "name": "My reading", "name_key": "energy.today_power", "variables": {"period": "day"}},
+                  {"entity_id": "sensor.safe", "template": "md_energy_period_card", "name": "My reading", "name_key": "energy.today_power", "variables": {"period": "day"}},
               ]}]}
     page = g._resolve_pages(source)["pages"][0]
     assert g._page_view(page, "/config/test", "marao-dashboard", "pt")["title"] == "Início"
@@ -232,7 +232,7 @@ def test_legacy_option_sentinels_are_nonoperative_and_custom_names_survive_trans
 
 
 def test_native_scene_collection_has_no_fake_primary_binding_and_uses_native_services():
-    item = {"template": "hc_scene_collection_card", "name": "Scenes", "variables": {"popup_hash": "#scenes"}, "entities": ["scene.safe", "input_boolean.safe"]}
+    item = {"template": "md_scene_collection_card", "name": "Scenes", "variables": {"popup_hash": "#scenes"}, "entities": ["scene.safe", "input_boolean.safe"]}
     card = g._page_card(item, "marao-dashboard")
     popup = g._page_card_popups(item)[0]
     assert "entity" not in card and "entity" not in popup
@@ -241,7 +241,7 @@ def test_native_scene_collection_has_no_fake_primary_binding_and_uses_native_ser
 
 
 def test_empty_scene_collection_has_a_readable_localized_popup_without_fake_entities():
-    item = {"template": "hc_scene_collection_card", "name": "Empty", "entities": [], "variables": {"popup_hash": "#empty"}}
+    item = {"template": "md_scene_collection_card", "name": "Empty", "entities": [], "variables": {"popup_hash": "#empty"}}
     assert g._page_card_popups(item)[0]["cards"] == [{"type": "markdown", "content": "No scenes configured."}]
     assert g._page_card_popups(item, "pt")[0]["cards"] == [{"type": "markdown", "content": "Nenhum cenário configurado."}]
     assert "entity" not in g._page_card_popups(item)[0]
@@ -268,27 +268,27 @@ def test_legacy_energy_history_uses_the_configured_title_and_icon():
 
 def test_security_native_actions_are_guarded_at_the_shared_dispatcher():
     for entity in ["button.safe", "switch.safe", "input_boolean.safe"]:
-        card = g._page_action_card({"entity_id": entity, "template": "hc_switch_card"})
-        assert card["template"] == "hc_access_hold_action_card"
-    assert g._page_action_card({"entity_id": "lock.safe"})["template"] == "hc_access_card"
+        card = g._page_action_card({"entity_id": entity, "template": "md_switch_card"})
+        assert card["template"] == "md_access_hold_action_card"
+    assert g._page_action_card({"entity_id": "lock.safe"})["template"] == "md_access_card"
 
 
 def test_canonical_plain_entities_keep_shared_battery_and_strict_access_classification():
     source = {"config_version": 2, "name": "Safe", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": ["sensor.battery", "cover.gate"]}]}
     resolved = g._resolve_pages(source, [{"entity_id": "sensor.battery", "device_class": "battery"}, {"entity_id": "cover.gate", "device_class": "gate", "supported_features": 1}])
     entries = resolved["pages"][0]["_sections"][0]["ordered_cards"]
-    assert entries[0]["template"] == "hc_battery_card"
-    assert g._page_card(entries[1], "marao-dashboard")["template"] == "hc_access_slide_action_card"
+    assert entries[0]["template"] == "md_battery_card"
+    assert g._page_card(entries[1], "marao-dashboard")["template"] == "md_access_slide_action_card"
 
 
 def test_explicit_access_role_has_a_real_strict_popup_even_with_a_plain_cover_name():
     source = {"config_version": 2, "name": "Safe", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [
-        {"id": "access", "entity_id": "cover.plain", "name": "Window", "template": "hc_access_card"},
+        {"id": "access", "entity_id": "cover.plain", "name": "Window", "template": "md_access_card"},
     ]}]}
     entity = g._resolve_pages(source)["pages"][0]["_sections"][0]["ordered_cards"][0]
     card, popup = g._page_card(entity, "marao-dashboard"), g._page_card_popups(entity)[0]
     assert card["variables"]["popup_hash"] == popup["hash"]
-    assert popup["cards"][0]["cards"][0]["template"] == "hc_access_slide_action_card"
+    assert popup["cards"][0]["cards"][0]["template"] == "md_access_slide_action_card"
     assert popup["cards"][0]["cards"][0]["variables"]["action_service"] == "cover.open_cover"
 
 
@@ -333,11 +333,11 @@ def test_editor_section_moves_preserve_generated_identities_sheets_and_protected
         {"entity_id": "media_player.safe", "apple_tv": {"apps": []}},
         {"entity_id": "media_player.safe", "name": "Second TV", "apple_tv": False},
         {"entity_id": "climate.safe"},
-        {"id": "group", "name": "Thermostats", "template": "hc_entity_group_card", "entity_type": "climate", "entities": ["climate.safe"], "popup_filter": "all"},
-        {"entity_id": "alarm_control_panel.safe", "template": "hc_security_card"},
-        {"entity_id": "sensor.safe", "template": "hc_energy_period_card", "variables": {"period": "day", "display_precision": 0}},
+        {"id": "group", "name": "Thermostats", "template": "md_entity_group_card", "entity_type": "climate", "entities": ["climate.safe"], "popup_filter": "all"},
+        {"entity_id": "alarm_control_panel.safe", "template": "md_security_card"},
+        {"entity_id": "sensor.safe", "template": "md_energy_period_card", "variables": {"period": "day", "display_precision": 0}},
         {"entity_id": "vacuum.safe", "variables": {"action_1": {"data": {"command": "app_segment_clean", "params": [{"segments": [21, 22], "repeat": 2}]}}}},
-        {"template": "hc_title_card", "name": "Heading", "future": []},
+        {"template": "md_title_card", "name": "Heading", "future": []},
         {"page": "home", "name": "Home", "future": {"keep": True}},
     ]
     source = {"config_version": 2, "name": "Move test", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "sections": [
@@ -381,14 +381,14 @@ def test_editor_section_moves_preserve_generated_identities_sheets_and_protected
 @pytest.mark.parametrize("popup_stream", [None, "", "camera.front_high"])
 @pytest.mark.parametrize("provider", ["unifiprotect", "netatmo"])
 def test_camera_popup_stream_preserves_dashboard_identity_and_event_options(popup_stream, provider):
-    item = {"entity_id": "camera.front_low", "template": "hc_camera_card", "name": "Entrance",
+    item = {"entity_id": "camera.front_low", "template": "md_camera_card", "name": "Entrance",
             "show_name": False, "future": [], "variables": {"popup_stream_entity": popup_stream,
             "event_provider": provider, "unifi_protect_media_source": "media-source://unifiprotect/test", "event_limit": 7}}
     original = deepcopy(item)
     card, popup = g._page_card(item, "marao-dashboard"), g._camera_popup(item)
     assert card["entity"] == "camera.front_low"
     live, events = popup["cards"]
-    assert live == {"type": "custom:marao-card", "template": "hc_camera_card", "entity": popup_stream or "camera.front_low",
+    assert live == {"type": "custom:marao-card", "template": "md_camera_card", "entity": popup_stream or "camera.front_low",
                     "name": "Entrance", "show_name": False, "tap_action": {"action": "fullscreen"}}
     assert events["entity"] == "camera.front_low"
     assert events["event_provider"] == provider and events["limit"] == 7
@@ -399,7 +399,7 @@ def test_camera_popup_stream_preserves_dashboard_identity_and_event_options(popu
 @pytest.mark.parametrize("binding", ["sensor.front", 42, [], "camera.bad/path"])
 def test_invalid_popup_camera_stream_is_rejected_before_output_write(tmp_path, binding):
     source = {"config_version": 2, "name": "Camera streams", "landing_page": "home", "pages": [
-        {"name": "Home", "path": "home", "entities": [{"id": "camera", "entity_id": "camera.low", "template": "hc_camera_card",
+        {"name": "Home", "path": "home", "entities": [{"id": "camera", "entity_id": "camera.low", "template": "md_camera_card",
          "variables": {"popup_stream_entity": binding}}]}]}
     before = deepcopy(source)
     with pytest.raises(ValueError, match="popup stream"):
@@ -419,7 +419,7 @@ def test_camera_preload_option_preserves_source_and_rejects_non_booleans(preload
         with pytest.raises(ValueError, match="Preload stream"):
             camera_popup_stream("camera.low", variables)
     else:
-        item = {"entity_id": "camera.low", "template": "hc_camera_card", "variables": variables}
+        item = {"entity_id": "camera.low", "template": "md_camera_card", "variables": variables}
         generated = g._page_card(item, "marao-dashboard")["variables"]
         assert {key: value for key, value in generated.items() if key != "popup_hash"} == variables
         assert "preload_stream" not in g._camera_popup(item)["cards"][0].get("variables", {})
@@ -433,7 +433,7 @@ def test_camera_preload_option_preserves_source_and_rejects_non_booleans(preload
 def test_power_history_popup_preserves_devices_across_canonical_native_and_legacy_paths(members):
     from custom_components.marao_dashboard.native import compile_card
     options = {"history_popup": True, "power_devices": members, "display_unit": "kW", "display_precision": 2, "future": []}
-    descriptor = {"template": "hc_graph_card", "entity_id": "sensor.house", "name": "House", "variables": options}
+    descriptor = {"template": "md_graph_card", "entity_id": "sensor.house", "name": "House", "variables": options}
     source = {"config_version": 2, "name": "Power", "landing_page": "energy", "pages": [{"name": "Energy", "path": "energy", "entities": [descriptor]}]}
     before = deepcopy(source)
     registry = [{"entity_id": "sensor.house", "unit_of_measurement": "W"}, {"entity_id": "sensor.kitchen", "unit_of_measurement": "kW"}, {"entity_id": "sensor.heating", "unit_of_measurement": "W"}]
@@ -458,7 +458,7 @@ def test_power_history_popup_preserves_devices_across_canonical_native_and_legac
 ])
 def test_power_history_device_validation_preserves_rejected_source(devices, message):
     source = {"config_version": 2, "name": "Power", "landing_page": "energy", "pages": [{"name": "Energy", "path": "energy", "entities": [
-        {"template": "hc_graph_card", "entity_id": "sensor.house", "variables": {"power_devices": devices}},
+        {"template": "md_graph_card", "entity_id": "sensor.house", "variables": {"power_devices": devices}},
     ]}]}
     before = deepcopy(source)
     with pytest.raises(ValueError, match=message):
@@ -476,12 +476,12 @@ def test_power_history_rejects_known_energy_devices_and_keeps_non_power_graphs_w
     compatible = compile_card(config, "power", "marao-dashboard", validate_units=False)
     assert compatible["popups"][0]["cards"][0]["power_devices"] == config["variables"]["power_devices"]
     other = compile_card({"type": "custom:marao-native-graph-card", "entity": "sensor.humidity", "variables": {"history_popup": True}}, "humidity", "marao-dashboard", [{"entity_id": "sensor.humidity", "unit_of_measurement": "%"}])
-    assert other["popups"][0]["cards"][0]["template"] == "hc_graph_card"
+    assert other["popups"][0]["cards"][0]["template"] == "md_graph_card"
 
 
 def test_power_device_option_remains_opaque_on_unrelated_card_families():
     source = {"config_version": 2, "name": "Power", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [
-        {"entity_id": "sensor.safe", "template": "hc_sensor_card", "variables": {"power_devices": {"future_hook": []}}},
+        {"entity_id": "sensor.safe", "template": "md_sensor_card", "variables": {"power_devices": {"future_hook": []}}},
     ]}]}
     before = deepcopy(source)
     resolved = g._resolve_pages(source, [])
@@ -489,10 +489,10 @@ def test_power_device_option_remains_opaque_on_unrelated_card_families():
     assert source == before
 
 
-@pytest.mark.parametrize("mode,template,popup_count", [("popup", "hc_access_card", 1), ("slide", "hc_access_slide_action_card", 0), ("close", "hc_access_action_card", 0)])
+@pytest.mark.parametrize("mode,template,popup_count", [("popup", "md_access_card", 1), ("slide", "md_access_slide_action_card", 0), ("close", "md_access_action_card", 0)])
 def test_unified_access_page_modes_resolve_without_rewriting_authored_configuration(mode, template, popup_count):
     source = {"config_version": 2, "name": "Test", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [
-        {"id": "safe", "entity_id": "lock.safe", "template": "hc_access_card", "name": "Custom", "variables": {"access_mode": mode, "future": []}}
+        {"id": "safe", "entity_id": "lock.safe", "template": "md_access_card", "name": "Custom", "variables": {"access_mode": mode, "future": []}}
     ]}]}
     before = deepcopy(source)
     item = g._resolve_pages(source)["pages"][0]["_sections"][0]["ordered_cards"][0]
@@ -503,7 +503,7 @@ def test_unified_access_page_modes_resolve_without_rewriting_authored_configurat
 
 def test_explicit_popup_on_open_only_door_offers_only_supported_opening_control():
     from custom_components.marao_dashboard.native import compile_card, native_type
-    result = compile_card({"type": native_type("hc_access_card"), "entity": "cover.safe", "variables": {"access_mode": "popup"}},
+    result = compile_card({"type": native_type("md_access_card"), "entity": "cover.safe", "variables": {"access_mode": "popup"}},
                           "native-door", "marao-dashboard", [{"entity_id": "cover.safe", "supported_features": 1, "device_class": "door"}])
-    assert result["card"]["template"] == "hc_access_card"
+    assert result["card"]["template"] == "md_access_card"
     assert len(result["popups"][0]["cards"][0]["cards"]) == 1
