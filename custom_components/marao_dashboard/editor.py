@@ -159,6 +159,8 @@ EDITOR_CATALOG: dict[str, Any] = {
             "description": "Control a light and optionally show its brightness slider.",
             "variables": [
                 _field("enable_slider", "Brightness slider", "boolean", default=True),
+                _field("use_light_color", "Use light color as background", "boolean", default=False,
+                       description="When on, use the reported color or white temperature. Otherwise keep the card color."),
                 *COMMON_CARD_FIELDS,
             ],
         },

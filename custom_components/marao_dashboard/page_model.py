@@ -17,6 +17,11 @@ PAGE_PATH = re.compile(r"[a-z0-9][a-z0-9_-]*")
 LOCAL_ID = re.compile(r"[a-z][a-z0-9_-]{0,63}")
 
 
+def validate_light_options(options: dict[str, Any]) -> None:
+    if "use_light_color" in options and type(options["use_light_color"]) is not bool:
+        raise ValueError("Use light color as background must be a boolean.")
+
+
 def camera_popup_stream(entity: str, options: dict[str, Any]) -> str:
     """Resolve the optional popup binding consistently for every generation path."""
     if "preload_stream" in options and type(options["preload_stream"]) is not bool:
@@ -188,6 +193,8 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                     presets = options["shortcuts"]
                     if not isinstance(presets, list) or len(presets) > 3 or any(type(value) not in (int, float) or not math.isfinite(value) for value in presets):
                         raise ValueError("Charging shortcuts require at most three finite numbers")
+                if role == "hc_light_card":
+                    validate_light_options(options)
                 if role == "hc_camera_card":
                     camera_popup_stream(entity, options)
                 if role == "hc_room_card" and "light_entities" in options:

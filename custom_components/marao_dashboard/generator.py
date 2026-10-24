@@ -2490,6 +2490,9 @@ def _entity_card(entity: dict[str, Any]) -> dict[str, Any]:
     variables = dict(
         entity.get("variables") if isinstance(entity.get("variables"), dict) else {}
     )
+    if template == "hc_light_card":
+        from .page_model import validate_light_options
+        validate_light_options(variables)
     if entity.get("graph_entity") and not variables.get("graph_entity"):
         variables["graph_entity"] = entity["graph_entity"]
     if template == "hc_timeline_card":

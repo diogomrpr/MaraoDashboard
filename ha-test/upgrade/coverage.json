@@ -25,6 +25,7 @@
     "hc_light_card": {
       "options": [
         "enable_slider",
+        "use_light_color",
         "card_color",
         "custom_label"
       ],

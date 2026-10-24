@@ -3,7 +3,7 @@ const [dropdownModule, historyLayout, navigationModule, historyData, sliderModul
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
 const { bindDropdown, dropdownStyles } = dropdownModule;
 const { bindSlider, sliderMarkup, sliderStyles } = sliderModule;
-const { lightColorCapabilities } = lightCapabilities;
+const { lightColorCapabilities, lightColorAppearance } = lightCapabilities;
 export { lightColorCapabilities };
 const { createHistoryPlaceholder, createPowerToolbar } = historyLayout;
 export { createHistoryPlaceholder };
@@ -337,6 +337,11 @@ export function climateModeIcon(value) {
 export function stateAppearance(kind, state, config, hass) {
   const variables = config?.variables || {};
   const value = text(state).toLowerCase();
+  if (kind === 'hc_light_card' && value === 'on' && variables.use_light_color === true
+    && hass?.connected !== false && hass?.connection?.connected !== false) {
+    const appearance = lightColorAppearance(stateOf(hass, config.entity));
+    if (appearance) return appearance;
+  }
   const active = variables.active_color || variables.card_color || variables.hc_card_color;
   const green = "var(--color-green)";
   const red = "var(--color-red)";
@@ -1102,6 +1107,7 @@ export class MaraoCard extends BaseElement {
   }
   setConfig(config) {
     this._layoutMetadata = {};
+    if (config.template === 'hc_light_card' && Object.hasOwn(config.variables || {}, 'use_light_color') && typeof config.variables.use_light_color !== 'boolean') throw new Error(localize('light.invalid_color_background', this._hass, {}, 'Use light color as background must be a boolean.'));
     if (config.template === 'hc_camera_card' && Object.hasOwn(config.variables || {}, 'preload_stream') && typeof config.variables.preload_stream !== 'boolean') throw new Error(localize('camera.invalid_preload', this._hass, {}, 'Preload stream must be a boolean.'));
     this._stateEntities = [...new Set(referencedEntities(config))];
     this._stateReferences = null;

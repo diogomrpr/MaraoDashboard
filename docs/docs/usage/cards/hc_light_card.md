@@ -35,6 +35,7 @@ control appear below.
 | <span class="entry-type-ha"></span> entity | | **Yes** | light.livingroom |
 | <span class="entry-type-ha"></span> name | friendly name | No | Livingroom Light |
 | <span class="entry-type-marao_dashboard"></span> enable_slider | true | No | Show or hide the brightness slider|
+| <span class="entry-type-marao_dashboard"></span> use_light_color | false | No | Use the reported light color as the active background |
 | <span class="entry-type-marao_dashboard"></span> card_color | var(--color-gold) | No | The active card color |
 
 ## Brightness
@@ -74,3 +75,11 @@ normal width. Keep full-width cameras, charts and detailed panels in separate
 explicit sections. Automatic mode retains domain grouping, and raw/non-control
 sections retain their existing layout. Manual/native cards share the minimum;
 place eligible cards inside `custom:marao-control-grid` for whole-grid equality.
+
+Enable **Use light color as background** in an individual light card's generator
+or native editor settings to follow its reported color, including white temperature.
+Text and icons automatically contrast with that color. Off and unavailable lights
+remain neutral; missing color data falls back to the configured card color.
+This is off by default and does not change existing saved cards.
+The white-temperature slider shows its warm-to-cool gradient and thumb without a
+progress fill; brightness retains its current-value fill.

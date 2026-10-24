@@ -2084,3 +2084,22 @@ test('partially available group tiles keep their counts without adding warning r
     }
   }
 });
+
+
+test('light color background is opt-in, authoritative and limited to available lights', () => {
+  const config = {template:'hc_light_card',entity:'light.fixture',variables:{use_light_color:true,card_color:'#abcdef'}};
+  const hass = {states:{'light.fixture':{state:'on',attributes:{supported_color_modes:['rgb'],rgb_color:[0,0,255]}}}};
+  const appearance = () => stateAppearance('hc_light_card','on',config,hass);
+  assert.equal(appearance().background,'rgb(0, 0, 255)');
+  hass.states['light.fixture'].attributes.rgb_color=[255,255,0];
+  assert.equal(appearance().background,'rgb(255, 255, 0)');
+  for (const option of [false,undefined]) {
+    config.variables.use_light_color=option;
+    assert.equal(appearance().background,'#abcdef');
+  }
+  config.variables.use_light_color=true;
+  delete hass.states['light.fixture'].attributes.rgb_color;
+  assert.equal(appearance().background,'#abcdef');
+  for (const value of ['off','unknown','unavailable']) assert.equal(stateAppearance('hc_light_card',value,config,hass).background,undefined);
+  assert.throws(()=>new MaraoCard().setConfig({...config,variables:{use_light_color:'true'}}),/boolean/);
+});

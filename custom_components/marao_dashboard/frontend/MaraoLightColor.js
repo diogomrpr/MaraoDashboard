@@ -21,7 +21,7 @@ const styles = `
   .light-color-thumb { position:absolute; width:48px; height:48px; box-sizing:border-box; border:3px solid #fff; border-radius:50%; box-shadow:0 0 0 1px #415C65,inset 0 0 0 1px #415C65; transform:translate(-50%,-50%); pointer-events:none; }
   .light-temperature .slider { border-radius:24px; background:linear-gradient(90deg,#ffc078,#fff4df,#c9e2ff); }
   .light-temperature .slider-background { fill:transparent; }
-  .light-temperature .slider-fill { fill:color-mix(in srgb,var(--marao-slider-fill,#F3F3EE) 55%,transparent); }
+  .light-temperature .slider-fill { display:none; }
   .light-temperature:has(input:disabled) .slider { filter:grayscale(1); }
   .light-temperature-ends { display:flex; justify-content:space-between; gap:12px; font-size:var(--font-size-caption,.9375rem); }
 `;

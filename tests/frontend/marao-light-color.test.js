@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lightColorCapabilities } from '../../custom_components/marao_dashboard/frontend/MaraoLightCapabilities.js';
+import { lightColorCapabilities, lightColorAppearance } from '../../custom_components/marao_dashboard/frontend/MaraoLightCapabilities.js';
 import { createLightColorPicker } from '../../custom_components/marao_dashboard/frontend/MaraoLightColor.js';
 
 class Element extends EventTarget {
@@ -145,4 +145,22 @@ test('native service errors preserve nested or string messages inside the picker
     fire(wheel, 'pointerdown'); fire(wheel, 'pointerup'); await tick();
     assert.equal(status.textContent, 'The light is busy'); assert.equal(status.getAttribute('role'), 'alert'); picker.destroy();
   }
+});
+
+
+test('reported light backgrounds use converted RGB with readable contrast and safe fallback', () => {
+  for (const mode of ['hs', 'xy', 'rgb', 'rgbw', 'rgbww', 'color_temp']) {
+    for (const rgb of [[255,0,0], [0,0,255], [255,255,255], [0,0,0], [255,180,90]]) {
+      const appearance = lightColorAppearance(light({supported_color_modes:[mode], rgb_color:rgb}));
+      assert.equal(appearance.background, `rgb(${rgb.join(', ')})`);
+      const linear = rgb.map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4);
+      const luminance = linear[0] * .2126 + linear[1] * .7152 + linear[2] * .0722;
+      assert.ok((appearance.text === '#000' ? (luminance + .05) / .05 : 1.05 / (luminance + .05)) >= 4.5);
+      assert.equal(appearance.icon, appearance.text);
+    }
+  }
+  for (const rgb_color of [undefined, null, [], [1,2], [1,2,3,4], ['255',0,0], [-1,0,0], [256,0,0], [NaN,0,0]])
+    assert.equal(lightColorAppearance(light({rgb_color})), null);
+  for (const state of ['off', 'unknown', 'unavailable']) assert.equal(lightColorAppearance(light({rgb_color:[255,0,0]}, state)), null);
+  assert.equal(lightColorAppearance(light({supported_color_modes:['brightness'],rgb_color:[255,0,0]})), null);
 });

@@ -488,3 +488,15 @@ test('power devices preserve ordered unknown data and validate sensor dimensions
   assert.deepEqual(validateConfig(source,2,entities,units),[]);
   assert.deepEqual(serializeConfig(normalizeConfig(source)).pages[0].entities[0].variables.power_devices,[]);
 });
+
+
+test('light color background is optional and round-trips without default writes', () => {
+  for (const value of [undefined,false,true,'true',1,null]) {
+    const variables={future:[]};
+    if (value !== undefined) variables.use_light_color=value;
+    const config={config_version:2,name:'Home',landing_page:'home',navigation:[],pages:[{name:'Home',path:'home',entities:[{id:'light',template:'hc_light_card',entity_id:'light.fixture',variables}]}]};
+    const before=structuredClone(config);
+    assert.equal(validateConfig(config,2).some(message=>message.includes('Use light color')),value !== undefined && typeof value !== 'boolean');
+    assert.deepEqual(serializeConfig(normalizeConfig(config)),before);
+  }
+});

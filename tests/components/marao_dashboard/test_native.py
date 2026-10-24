@@ -241,3 +241,33 @@ def test_native_camera_rejects_invalid_popup_stream_even_with_external_action(bi
     with pytest.raises(ValueError, match="popup stream"):
         compile_card(source, "native-camera", "marao-dashboard")
     assert source == before
+
+
+@pytest.mark.parametrize("options", [{}, {"use_light_color": False}, {"use_light_color": True}])
+def test_light_color_option_preserved_in_native_and_generated_cards(options):
+    from custom_components.marao_dashboard.generator import _entity_card
+    from custom_components.marao_dashboard.page_model import validate_pages
+    options = {**options, "future": []}
+    source = {"type": native_type("hc_light_card"), "entity": "light.safe", "variables": options}
+    before = deepcopy(source)
+    assert compile_card(source, "light-color", "marao-dashboard")["card"]["variables"] == options
+    descriptor = {"template": "hc_light_card", "entity_id": "light.safe", "variables": options}
+    assert _entity_card(descriptor)["variables"] == options
+    validate_pages({"name": "Home", "config_version": 2, "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [descriptor]}]}, {"hc_light_card": ["light"]})
+    assert source == before
+    spec = next(card for card in native_catalog()["cards"] if card["id"] == "hc_light_card")
+    field = next(field for field in spec["variables"] if field["key"] == "use_light_color")
+    assert field["kind"] == "boolean" and field["default"] is False
+
+
+@pytest.mark.parametrize("value", ["true", 1, None])
+def test_light_color_option_rejects_non_boolean(value):
+    from custom_components.marao_dashboard.generator import _entity_card
+    from custom_components.marao_dashboard.page_model import validate_pages
+    descriptor = {"template": "hc_light_card", "entity_id": "light.safe", "variables": {"use_light_color": value}}
+    with pytest.raises(ValueError, match="Use light color"):
+        _entity_card(descriptor)
+    with pytest.raises(ValueError, match="Use light color"):
+        compile_card({"type": native_type("hc_light_card"), "entity": "light.safe", "variables": descriptor["variables"]}, "light-color", "marao-dashboard")
+    with pytest.raises(ValueError, match="Use light color"):
+        validate_pages({"name": "Home", "config_version": 2, "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [descriptor]}]}, {"hc_light_card": ["light"]})
