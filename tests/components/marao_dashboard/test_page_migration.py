@@ -143,8 +143,9 @@ def test_conversion_keeps_saved_reading_options_when_live_metadata_is_temporaril
     options = energy["sections"][0]["entities"][0]["variables"]
     assert options["display_unit"] == "kWh" and options["display_precision"] == 0
     from custom_components.marao_dashboard.generator import _resolve_pages
-    with pytest.raises(ValueError, match="source unit"):
-        _resolve_pages(result)
+    _resolve_pages(result)  # Startup must tolerate metadata that HA has not loaded yet.
+    with pytest.raises(ValueError, match="incompatible"):
+        _resolve_pages(result, [{"entity_id": "sensor.safe", "unit_of_measurement": "W"}])
     assert source == before
 
 
