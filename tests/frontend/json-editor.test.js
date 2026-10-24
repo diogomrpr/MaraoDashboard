@@ -1,4 +1,3 @@
-import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,7 +6,7 @@ import { buildJsonSchema, normalizeConfig, serializeConfig } from '../../fronten
 import { publishDiagnostics } from '../../frontend_src/json-language.js';
 import { getLanguageService } from '../../node_modules/monaco-editor/esm/external/vscode-json-languageservice/lib/esm/jsonLanguageService.js';
 import { TextDocument } from '../../node_modules/monaco-editor/esm/external/vscode-json-languageservice/lib/esm/jsonLanguageTypes.js';
-const catalog = JSON.parse(execFileSync(fileURLToPath(new URL('../../.venv/bin/python', import.meta.url)), ['-c', 'import json; from custom_components.marao_dashboard.editor import EDITOR_CATALOG; print(json.dumps(EDITOR_CATALOG))'], {encoding:'utf8'}));
+const catalog = JSON.parse(execFileSync(process.env.MARAO_TEST_PYTHON || (fs.existsSync('.venv/bin/python') ? '.venv/bin/python' : 'python3'), ['-c', 'import json; from custom_components.marao_dashboard.editor import EDITOR_CATALOG; print(json.dumps(EDITOR_CATALOG))'], {encoding:'utf8'}));
 const entities = [{ entity_id: 'light.safe' }, { entity_id: 'remote.safe' }, { entity_id: 'sensor.safe', device_class: 'battery' }];
 const schema = (draft = {}) => buildJsonSchema(catalog, entities, draft);
 const rules = () => schema().$defs.cardOptions.anyOf;

@@ -137,7 +137,7 @@ const components = {
       browser('editor-drag:alignment', 'test-ha-card-alignment', ['--editor-drag']),
       ...['narrow-320', 'iphone-landscape', 'android-landscape', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200'].map(profile => browser('editor-drag:' + profile, 'test-ha-editor', ['--drag-geometry', '--scenario=' + profile]))] },
   'editor-model': { units: [['editor-model'], ['page-manager-model'], ['canonical-page-model']] },
-  'card-namespace': { units: [['card-names'], ['marao-security'], ['marao-native']], python: ['test_card_names', 'test_page_migration'] },
+  'card-namespace': { units: [['card-names'], ['marao-security'], ['retired-authoring']], python: ['test_card_names', 'test_page_migration'] },
   'editor-ui': { units: [['editor-panel']], browser: [browser('editor', 'test-ha-editor', ['--scenario=iphone-normal', '--header'])], editor: true },
   generator: { python: ['test_generator', 'test_page_generation'], upgrade: true },
   migration: { python: ['test_page_migration', 'test_native_storage_migration', 'test_release_replay_recovery', 'test_upgrade_fixtures'], upgrade: true },
