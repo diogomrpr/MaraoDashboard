@@ -196,12 +196,13 @@ async def test_native_storage_is_not_imported_and_cannot_be_captured(hass, tmp_p
     assert file.read_bytes() == exact
 
 
-def test_saved_energy_configuration_renders_after_source_metadata_loss_but_editor_validation_stays_strict():
+def test_saved_energy_configuration_tolerates_missing_metadata_but_rejects_known_incompatible_units():
     config = {"type": native_type("md_graph_card"), "entity": "sensor.safe",
               "variables": {"display_unit": "kW", "display_precision": 2}}
-    with pytest.raises(ValueError, match="source unit"):
-        compile_card(config, "native-safe", "marao-native")
-    rendered = compile_card(config, "native-safe", "marao-native", validate_units=False)
+    rendered = compile_card(config, "native-safe", "marao-native")
+    with pytest.raises(ValueError, match="incompatible"):
+        compile_card(config, "native-safe", "marao-native", [{"entity_id": "sensor.safe", "unit_of_measurement": "kWh"}])
+    assert compile_card(config, "native-safe", "marao-native", validate_units=False) == rendered
     assert rendered["card"]["variables"]["display_unit"] == "kW"
     assert rendered["card"]["variables"]["display_precision"] == 2
 
