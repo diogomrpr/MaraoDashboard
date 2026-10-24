@@ -35,7 +35,7 @@ control appear below.
 | <span class="entry-type-ha"></span> entity | | **Yes** | light.livingroom |
 | <span class="entry-type-ha"></span> name | friendly name | No | Livingroom Light |
 | <span class="entry-type-marao_dashboard"></span> enable_slider | true | No | Show or hide the brightness slider|
-| <span class="entry-type-marao_dashboard"></span> card_color | var(--color-blue) | No | The active card color |
+| <span class="entry-type-marao_dashboard"></span> card_color | var(--color-gold) | No | The active card color |
 
 ## Brightness
 
