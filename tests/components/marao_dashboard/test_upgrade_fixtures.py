@@ -103,7 +103,7 @@ def test_released_generated_baseline_regenerates_without_source_or_unrelated_los
     result = write_dashboard(json.loads(source), output)
     assert result.dashboard_key == baseline["dashboard_key"]
     assert manual.read_bytes() == b"# independent preservation sentinel\r\nmanual: retained\r\n"
-    assert json.loads((active / ".marao-generated.json").read_bytes())["generated_contract"] == 2
+    assert json.loads((active / ".marao-generated.json").read_bytes())["generated_contract"] == 3
     assert (FIXTURES / record["fixture"]).read_bytes() == source
     assert {str(file.relative_to(frozen)): file.read_bytes() for file in frozen.rglob("*") if file.is_file()} == original
 

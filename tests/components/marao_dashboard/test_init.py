@@ -1179,7 +1179,7 @@ async def test_setup_regenerates_contract_preserving_exact_empty_source_and_entr
     await hass.async_block_till_done()
     assert entry.entry_id == identifier and entry.data["extension"] == "retained"
     assert source.read_bytes() == exact
-    assert json.loads(manifest.read_text())["generated_contract"] == 2
+    assert json.loads(manifest.read_text())["generated_contract"] == 3
     assert (output / "custom.txt").read_bytes() == b"private customization\r\n"
     assert not any(page.get("subview") for page in json.loads(source.read_bytes())["pages"])
     before = {str(p.relative_to(output)): p.read_bytes() for p in output.rglob("*") if p.is_file()}
