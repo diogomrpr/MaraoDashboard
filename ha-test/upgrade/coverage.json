@@ -332,6 +332,7 @@
     },
     "md_security_card": {
       "options": [
+        "alarm_layout",
         "popup_hash"
       ],
       "checks": [
@@ -424,7 +425,9 @@
         "security-runtime",
         "content"
       ],
-      "options": []
+      "options": [
+        "alarm_layout"
+      ]
     },
     "md_header_card": {
       "checks": [
@@ -821,7 +824,8 @@
       "identities": [
         "light",
         "fan",
-        "cover"
+        "cover",
+        "exhaust"
       ],
       "checks": [
         "sliders",
@@ -1093,6 +1097,29 @@
           "unknown",
           "unavailable",
           "missing"
+        ],
+        "exhaust": [
+          "closed",
+          "open",
+          "opening",
+          "closing",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "exhaust_binary": [
+          "closed",
+          "open",
+          "unknown",
+          "unavailable",
+          "missing"
+        ],
+        "exhaust_open_only": [
+          "closed",
+          "open",
+          "unknown",
+          "unavailable",
+          "missing"
         ]
       },
       "checks": [
@@ -1342,7 +1369,9 @@
         "Energy format · legacy label only",
         "Energy format · converted period",
         "Energy format · source period",
-        "Energy format · cost period"
+        "Energy format · cost period",
+        "Cumulative meter · day",
+        "Cumulative meter · month"
       ],
       "checks": [
         "energy",
@@ -1501,6 +1530,7 @@
         "control-grid-sections"
       ],
       "identities": [
+        null,
         null,
         null,
         null
