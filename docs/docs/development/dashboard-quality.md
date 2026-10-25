@@ -556,7 +556,7 @@ large and readable.
 - Pressing navbar controls or their icons must not add a rectangular browser highlight; retain the circular active fill and short press feedback.
 - Keep button gaps compact without violating the visible 48-by-48 control rule.
 - Derive iPhone positioning from the shared host-aware bottom inset and preserve
-  the accepted lowered offset. Do not add a generic extra bottom margin.
+  twice the lowered safe-area offset, with a minimum 24px bottom gap. Use the shared bottom-gap helper for navbar positioning, page clearance and popup padding.
 - The navbar stays below open popups in the stacking order.
 - The fullscreen shell hides Home Assistant's native top bar only while a
   Marao dashboard is active and restores the normal Home Assistant chrome when
@@ -565,7 +565,7 @@ large and readable.
 ### Popups
 
 - Animate upward from the bottom.
-- Popup content ends with ordinary 8px spacing or the device bottom safe inset, whichever is larger; do not reserve navbar height inside a sheet that covers navigation.
+- Every popup sheet keeps internal bottom padding equal to the navbar’s bottom-to-screen gap, including history, detail and light-color sheets; do not reserve navbar height inside a sheet that covers navigation.
 - Stay above the navbar and all dashboard cards.
 - Keep a visible close button and internal scrolling.
 - Use content-driven height by default, growing to the available viewport with

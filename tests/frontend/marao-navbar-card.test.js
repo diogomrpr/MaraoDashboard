@@ -26,8 +26,10 @@ test("ported sheets copy theme colors while viewport insets keep inheriting live
 
 test("navbar and sheets share the host-aware inset fallback", () => {
   assert.match(source, /var\(--marao-safe-area-inset-\$\{side\}, var\(--safe-area-inset-\$\{side\}, env\(safe-area-inset-\$\{side\}, 0px\)\)\)/);
-  assert.match(source, /max\(4px, calc\(\$\{safeArea\("bottom"\)\} - 20px\)\)/);
+  assert.match(source, /max\(24px, calc\(\(\$\{safeArea\("bottom"\)\} - 20px\) \* 2\)\)/);
   assert.match(cardsSource, /padding:max\(50px, \$\{safeArea\("top"\)\}\) \$\{safeArea\("right"\)\} 0 \$\{safeArea\("left"\)\}/);
+  assert.match(cardsSource, /overflow:auto;padding:0 8px \$\{navbarBottomGap\(\)\};border-radius:22px/);
+  assert.doesNotMatch(cardsSource, /host\.style\.paddingBottom|padding-bottom:max\(8px/);
   assert.match(cardsSource, /max-height:min\(\$\{esc\(this\._config\.max_height\)\}, 100%\)/);
 });
 
@@ -85,16 +87,16 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
     addEventListener: (key, callback) => events.set(key, callback), removeEventListener: key => events.delete(key),
   };
   let timers = 0;
-  const functions = new Function("window", "getComputedStyle", "setInterval", "clearInterval", "safeArea", "navbarMainPage",
+  const functions = new Function("window", "getComputedStyle", "setInterval", "clearInterval", "safeArea", "navbarMainPage", "navbarBottomGap",
     source.slice(source.indexOf("const fullscreenUsers"), source.indexOf("export function registerNavigation")).replaceAll("export ", "")
     + ";return {registerFullscreen,unregisterFullscreen,applyFullscreen};")(window,
       node => ({ bottom: `${navBottom}px`, getPropertyValue: property => node.style?.getPropertyValue(property) || "0px" }),
-      () => { timers++; return 1; }, () => { timers--; }, side => `var(--safe-${side})`, navbarMainPage);
+      () => { timers++; return 1; }, () => { timers--; }, side => `var(--safe-${side})`, navbarMainPage, () => "24px");
   functions.registerFullscreen(first);
   assert.equal(view.style.getPropertyValue("flex-direction"), "column", "The main-page refresh row sits above the full-width view");
   assert.equal(header.style.getPropertyValue("display"), "none");
   assert.equal(view.style.getPropertyValue("padding-top"), "max(8px, var(--safe-top))");
-  assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(calc(60px + var(--safe-bottom) + 12px) + 8px))");
+  assert.equal(view.style.getPropertyValue("padding-bottom"), "max(13px, calc(calc(60px + 24px) + 8px))");
   assert.equal(unrelated.style.getPropertyValue("display"), "grid");
   window.location.pathname = "/marao-dashboard/energy";
   events.get("location-changed")();

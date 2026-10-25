@@ -8,11 +8,11 @@ within the same dashboard, including narrow and enlarged-text layouts.
 ## Requirements
 
 ### Requirement: Floating navbar
-The navbar SHALL float compactly in a single horizontal row, retaining circular active icons, visible 48px targets and iPhone safe-area insets. It SHALL preserve the accepted lowered iPhone offset and remain below popups. Its spacer SHALL keep the final page card reachable above navigation. Configured route lists SHALL have no product-level count cap; destinations exceeding the available width SHALL remain reachable through the rightmost overflow toggle.
+The navbar SHALL float compactly in a single horizontal row, retaining circular active icons, visible 48px targets and iPhone safe-area insets. It SHALL use one shared bottom-gap calculation for navbar positioning, fallback page clearance and popup internal padding: at least twice the previous gap, with a 24px minimum and twice the lowered safe-area offset on iPhone. It SHALL remain below popups. Its spacer SHALL keep the final page card reachable above navigation. Configured route lists SHALL have no product-level count cap; destinations exceeding the available width SHALL remain reachable through the rightmost overflow toggle.
 
 #### Scenario: A phone has a home-indicator inset
 - **WHEN** the navbar is positioned
-- **THEN** device-derived safe-area clearance is used without adding an unrelated universal bottom gap
+- **THEN** the shared bottom gap is at least 24px and at least twice the lowered device-derived offset; popup cards receive the same internal bottom spacing
 
 #### Scenario: All configured destinations fit
 - **WHEN** available safe width accommodates every configured route at its full control size

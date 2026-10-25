@@ -106,6 +106,8 @@ export function navigate(path) {
 
 export const safeArea = (side) => `var(--marao-safe-area-inset-${side}, var(--safe-area-inset-${side}, env(safe-area-inset-${side}, 0px)))`;
 
+export const navbarBottomGap = () => /iPhone|iPod/i.test(navigator.userAgent || '') ? `max(24px, calc((${safeArea("bottom")} - 20px) * 2))` : '24px';
+
 export function navbarRouteCurrent(route, location = window.location) {
   try {
     const target = new URL(route.url || route.path, location.href);
@@ -237,7 +239,7 @@ export class MaraoNavbarCard extends BaseElement {
     const overflow = routes.length > this._visibleCount;
     this.toggleAttribute?.('data-empty', !routes.length); this.toggleAttribute?.('data-preview', this.preview);
     this._renderedPreview = this.preview;
-    const bottom = /iPhone|iPod/i.test(navigator.userAgent || '') ? `max(4px, calc(${safeArea("bottom")} - 20px))` : '12px';
+    const bottom = navbarBottomGap();
     this.shadowRoot.innerHTML = `<style>
       :host{display:block;height:128px;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}
       :host([data-empty]){display:none}:host([data-preview]){height:auto}
@@ -582,7 +584,7 @@ function applyFullscreen() {
       const clearance = property === "padding-top"
         ? safeArea("top")
         : property === "padding-bottom"
-        ? `calc(${coveredBottom ? `${coveredBottom}px` : `calc(60px + ${safeArea("bottom")} + 12px)`} + 8px)`
+        ? `calc(${coveredBottom ? `${coveredBottom}px` : `calc(60px + ${navbarBottomGap()})`} + 8px)`
         : safeArea(property.slice(8));
       setStyle(node, property, property === "display" ? "none" : property === "flex-direction" ? "column"
         : `max(${normal}, ${clearance})`, "important");
