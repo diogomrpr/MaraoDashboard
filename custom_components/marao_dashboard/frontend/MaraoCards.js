@@ -881,6 +881,14 @@ function cardStyles() {
     .compact-copy>.title, .compact-copy>.state, .compact-copy>.climate { grid-area:auto; }
     .body.standard-control>.control { align-self:stretch; width:100%; margin-top:auto; }
     .body.standard-control.icon-only { justify-content:center; }
+    .body.access-popup-action { display:grid; grid-template-columns:48px minmax(0,1fr); grid-template-rows:auto; grid-template-areas:none; gap:8px 12px; align-items:center; min-height:88px; }
+    .access-action-icon { grid-column:1; grid-row:1; display:grid; place-items:center; width:48px; height:48px; --mdc-icon-size:28px; }
+    .body.access-popup-action>.control { grid-column:2; grid-row:1; align-self:center; margin-top:0; }
+    .body.access-popup-action>.problem { grid-column:1/-1; }
+    .body.access-close-action { grid-template-columns:48px minmax(0,1fr) 48px; text-align:center; }
+    .body.access-close-action>.title { grid-area:auto; grid-column:2; grid-row:1; margin:0; font-size:calc(var(--font-size-primary,1.125rem) * 1.25); font-weight:700; }
+
+
     ha-card.is-pressed { transform:scale(.985); }
     .card-action { position:absolute; inset:0; z-index:1; width:100%; height:100%; margin:0; padding:0; border:0; border-radius:inherit; background:transparent; color:transparent; cursor:pointer; }
     .card-action:disabled { cursor:default; }
@@ -1899,14 +1907,15 @@ export class MaraoCard extends BaseElement {
         if (variables[key]) readings += readingMarkup(variables[key], "", icon, this._hass);
       }
     }
-    const showName = kind !== "md_media_app_card" && config.show_name !== false && (!glance || Boolean(config.name));
+    const accessPopup = ['md_access_slide_action_card', 'md_access_action_card'].includes(kind) && this._inAccessPopup();
+    const showName = !(accessPopup && kind === "md_access_slide_action_card") && kind !== "md_media_app_card" && config.show_name !== false && (!glance || Boolean(config.name));
     const uniformControl = standardControl(config);
     this.toggleAttribute?.('data-marao-standard-control', uniformControl);
-    const sliderHeader = showName && (uniformControl || kind === 'md_fan_card');
+    const sliderHeader = !accessPopup && showName && (uniformControl || kind === 'md_fan_card');
     const titleCard = kind === "md_title_card";
-    const stateWanted = kind !== "md_media_app_card" && !camera && !titleCard && !glance && (kind === "md_room_card" ? Boolean(displayValue) : Boolean(entity || entityGroup)) && config.show_state !== false;
+    const stateWanted = !accessPopup && kind !== "md_media_app_card" && !camera && !titleCard && !glance && (kind === "md_room_card" ? Boolean(displayValue) : Boolean(entity || entityGroup)) && config.show_state !== false;
     const showState = stateWanted;
-    const showIcon = !camera && !titleCard && !glance && config.show_icon !== false && variables.show_icon !== false;
+    const showIcon = !accessPopup && !camera && !titleCard && !glance && config.show_icon !== false && variables.show_icon !== false;
     const lightCapabilities = kind === 'md_light_card' ? lightColorCapabilities(state) : {};
     const lightColor = lightCapabilities.color || lightCapabilities.temperature;
     const colorHold = lightColor && !Object.hasOwn(config, 'hold_action');
@@ -1937,6 +1946,13 @@ export class MaraoCard extends BaseElement {
     const iconElement = usesNumberStepper && !historyEntry ? "" : kind === "md_room_card" || !showIcon ? hiddenBinaryState : app
       ? `<img class="app-icon${app.symbol ? " app-symbol" : ""}" src="${esc(new URL(`./media-apps/${app.file || `${app.id}.png`}${new URL(import.meta.url).search}`, import.meta.url).href)}" width="64" height="64" alt="" aria-hidden="true">`
       : `<${lightColor || historyEntry ? `button type="button" ${lightColor ? 'data-light-color' : 'data-history-open'}` : 'div'} class="icon"${lightColor || historyEntry ? ` aria-label="${esc(lightColor ? localize('light.picker', this._hass, { name: this._label(entity, config, state) }, `Change color for ${this._label(entity, config, state)}`) : localize('actions.for_target', this._hass, {action:localize('history.title',this._hass,{},'History'),name:this._label(entity,config,state)}, `History ${this._label(entity,config,state)}`))}"${binaryLabel ? ` aria-description="${esc(binaryLabel)}"` : ''}${(historyEntry ? this.preview || this._graphAvailability(graphEntity) : controlsDisabled) ? ' disabled' : ''}` : binaryLabel ? ` role="img" aria-label="${esc(binaryLabel)}"` : ' aria-hidden="true"'}>${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : `<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>`}${lightColor || historyEntry ? `<ha-icon class="palette-indicator" icon="${lightColor ? 'mdi:palette' : 'mdi:chart-line'}" aria-hidden="true"></ha-icon>` : ''}</${lightColor || historyEntry ? 'button' : 'div'}>`;
+    const accessActionIcon = config.icon || (domainOf(entity) === 'lock'
+      ? kind === 'md_access_slide_action_card' ? 'mdi:lock-open-variant' : 'mdi:lock'
+      : state.attributes?.device_class === 'garage'
+        ? kind === 'md_access_slide_action_card' ? 'mdi:garage-open' : 'mdi:garage'
+        : kind === 'md_access_slide_action_card' ? 'mdi:door-open' : 'mdi:door-closed');
+    const accessIcon = accessPopup && config.show_icon !== false && variables.show_icon !== false
+      ? `<span class="access-action-icon" aria-hidden="true"><ha-icon icon="${esc(accessActionIcon)}"></ha-icon></span>` : '';
     const roomArtwork = kind === "md_room_card" && showIcon ? `<div class="room-artwork" aria-hidden="true">${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : '<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>'}</div>` : "";
     const roomBottom = roomLightsControl || roomArtwork ? `<div class="room-bottom">${roomLightsControl}${roomArtwork}</div>` : "";
     const controlClass = kind === "md_climate_card" ? "control number-control climate-number-control" : kind === "md_wallbox_current_card" ? "control number-control wallbox-current-control" : usesNumberStepper ? "control number-control" : "control";
@@ -1979,7 +1995,7 @@ export class MaraoCard extends BaseElement {
     const formattedReading = !iconOnly && formatting && (['md_graph_card','md_toggle_graph_card','md_sensor_card','md_base_card'].includes(kind) || kind === 'md_switch_card' && variables.power_entity);
     const stateMarkup = showState && kind !== "md_wallbox_current_card" ? `<div class="state${!displayValue ? " placeholder" : ""}">${esc(displayValue || "—")}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}">${uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${coverActions}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${historyControl}${historyEntry && graphStatus === 'error' ? `<button type="button" data-graph-retry aria-label="${esc(localize('common.retry',this._hass,{},'Retry'))}"><ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon></button>` : ''}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
+    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}${accessPopup ? " access-popup-action" : ""}${accessPopup && kind === "md_access_action_card" ? " access-close-action" : ""}">${accessPopup ? `${accessIcon}${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${details}` : uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${coverActions}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${historyControl}${historyEntry && graphStatus === 'error' ? `<button type="button" data-graph-retry aria-label="${esc(localize('common.retry',this._hass,{},'Retry'))}"><ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon></button>` : ''}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
     for (const button of this.shadowRoot.querySelectorAll('[data-exhaust-action]')) button.addEventListener('click', event => {
       event.stopPropagation(); haptic('heavy'); this._coverAction(entity, button.dataset.exhaustAction);
     });
@@ -2322,6 +2338,13 @@ export class MaraoCard extends BaseElement {
     return this._callService(domain, "select_option", { entity_id: entity, option });
   }
 
+  _inAccessPopup() {
+    for (let node = this; node; node = node.parentElement || node.getRootNode?.()?.host) {
+      if (node.classList?.contains('marao-popup-sheet')) return node.dataset.accessEntity === this._config.entity;
+    }
+    return false;
+  }
+
   getCardSize() { return 2; }
 }
 
@@ -2454,7 +2477,7 @@ export class MaraoPopupCard extends BaseElement {
   setConfig(config) { this._config = { height: "auto", max_height: "100%", ...config, ...(config.cards ? { cards: config.cards.map(canonicalCard) } : {}) }; this._renderHost(); this._sync(); if (this._open) this._renderChildren(); }
   get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
   set preview(value) { this._preview = Boolean(value); if (this._preview) this._close(false); }
-  set hass(value) { this._hass = value; this._syncTheme(); this._updateChildrenHass(); this._refreshHistory(); }
+  set hass(value) { this._hass = value; this._syncTheme(); this._updateAccessHeader(); this._updateChildrenHass(); this._refreshHistory(); }
   connectedCallback() {
     this._viewPath = window.location.pathname;
     this._viewOwner = null;
@@ -2592,6 +2615,26 @@ export class MaraoPopupCard extends BaseElement {
       this._overlay.style.setProperty(property, style.getPropertyValue(property));
     }
   }
+  _accessEntity() {
+    const entity = this._config.entity;
+    if (!/^(lock|cover)\./.test(entity || '') || this._historyContext || this._message) return '';
+    const containsAction = cards => cards.some(card => card.entity === entity && ['md_access_slide_action_card', 'md_access_action_card'].includes(canonicalTemplate(card.template))
+      || containsAction(card.cards || (card.card ? [card.card] : [])));
+    return containsAction(this._config.cards || []) ? entity : '';
+  }
+  _updateAccessHeader() {
+    const entity = this._accessEntity();
+    if (!entity) return;
+    const status = this._overlay?.querySelector('[data-access-state]');
+    if (!status) return;
+    const state = stateOf(this._hass, entity);
+    const problem = cardProblem({entity, template:'md_access_card'}, this._hass);
+    const label = problem ? problemLabel(problem, this._hass) : entityStateLabel(state, entity, 'md_access_card', this._hass);
+    const text = status.querySelector('span');
+    if (text.textContent !== label) text.textContent = label;
+    const icon = this._overlay.querySelector('[data-access-icon]');
+    icon.hass = this._hass; icon.stateObj = presentationState(state, entity, 'md_access_card');
+  }
   _renderHost() { if (this.shadowRoot) this.shadowRoot.innerHTML = "<style>:host{display:block;height:0;overflow:visible}</style>"; }
   _sync = () => {
     if (this._historyContext) {
@@ -2624,8 +2667,9 @@ export class MaraoPopupCard extends BaseElement {
     const columnWidth = column ? Math.round(column.getBoundingClientRect().width) : 0;
     const maxWidth = columnWidth > 0 ? `${columnWidth}px` : "100%";
     const closeLabel = localize("popup.close", this._hass, {}, "Close popup");
+    const accessEntity = this._accessEntity();
     const overlay = document.createElement("div"); overlay.className = "marao-popup-overlay";
-    overlay.innerHTML = `<style>${controlGridStyles(".marao-popup-content.control-grid")}@keyframes marao-popup-slide-up{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}.marao-popup-overlay{position:fixed;inset:0;z-index:1100;display:flex;align-items:flex-end;box-sizing:border-box;padding:max(50px, ${safeArea("top")}) ${safeArea("right")} 0 ${safeArea("left")};background:rgba(0,0,0,.42);font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}.marao-popup-sheet{--marao-popup-card-padding:8px;--marao-popup-detail-title-display:${title && this._config.cards?.length === 1 && this._config.cards[0].name === title ? 'none' : 'block'};box-sizing:border-box;width:100%;max-width:${maxWidth};height:${esc(height)};max-height:min(${esc(this._config.max_height)}, 100%);margin:0 auto;overflow:auto;padding:0 8px ${navbarBottomGap()};border-radius:22px 22px 0 0;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);overscroll-behavior:contain;animation:marao-popup-slide-up .28s cubic-bezier(.2,.8,.2,1) both}.marao-popup-head{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;padding:20px 0 12px;background:inherit;z-index:1}.marao-popup-head h2{min-width:0;margin:0;font-size:var(--font-size-primary,1.25rem);line-height:1.2;overflow-wrap:anywhere}.marao-popup-close{flex:0 0 48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;font-size:1.5rem;background:var(--secondary-background-color);color:inherit;cursor:pointer;transition:transform .12s ease,filter .12s ease}.marao-popup-close:active{transform:scale(.92);filter:brightness(.96)}.marao-popup-close:focus,.marao-popup-sheet:focus{outline:none}.marao-popup-content>p{min-width:0;font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.4;overflow-wrap:anywhere}.marao-popup-content[hidden]{display:none}.marao-popup-content{display:grid;min-width:0;gap:8px;isolation:isolate}@media(max-width:240px){.marao-popup-sheet{padding-left:4px;padding-right:4px}}@media(prefers-reduced-motion:reduce){.marao-popup-sheet{animation:none}.marao-popup-close{transition:none}}</style><section class="marao-popup-sheet" role="dialog" aria-modal="true" aria-label="${esc(title || this._config.name || localize("popup.title", this._hass, {}, "Marao popup"))}" tabindex="-1"><div class="marao-popup-head"><h2>${esc(title)}</h2><button class="marao-popup-close" type="button" aria-label="${esc(closeLabel)}" title="${esc(closeLabel)}">×</button></div><div class="marao-popup-content"></div></section>`;
+    overlay.innerHTML = `<style>${controlGridStyles(".marao-popup-content.control-grid")}@keyframes marao-popup-slide-up{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}.marao-popup-overlay{position:fixed;inset:0;z-index:1100;display:flex;align-items:flex-end;box-sizing:border-box;padding:max(50px, ${safeArea("top")}) ${safeArea("right")} 0 ${safeArea("left")};background:rgba(0,0,0,.42);font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}.marao-popup-sheet{--marao-popup-card-padding:8px;--marao-popup-detail-title-display:${title && this._config.cards?.length === 1 && this._config.cards[0].name === title ? 'none' : 'block'};box-sizing:border-box;width:100%;max-width:${maxWidth};height:${esc(height)};max-height:min(${esc(this._config.max_height)}, 100%);margin:0 auto;overflow:auto;padding:0 8px ${navbarBottomGap()};border-radius:22px 22px 0 0;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);overscroll-behavior:contain;animation:marao-popup-slide-up .28s cubic-bezier(.2,.8,.2,1) both}.marao-popup-head{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;padding:20px 12px 12px;background:inherit;z-index:1}.marao-popup-head h2{min-width:0;margin:0;font-size:var(--font-size-primary,1.25rem);line-height:1.2;overflow-wrap:anywhere} .marao-popup-sheet[data-access-entity] .marao-popup-head{box-sizing:border-box;min-height:112px;padding:22px 12px;align-items:center}.marao-popup-sheet[data-access-entity] .marao-popup-head h2{font-size:calc(var(--font-size-primary,1.125rem) * 1.25)}.marao-popup-sheet[data-access-entity] .marao-popup-access-state{font-size:var(--font-size-primary,1.125rem)}.marao-popup-heading{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;flex:1}.marao-popup-copy{display:grid;gap:4px;flex:1;text-align:left;min-width:min(100%,calc(var(--font-size-primary,1.125rem) * 3))}.marao-popup-access-state{font-size:var(--font-size-secondary,1rem);line-height:1.4;overflow-wrap:anywhere}.marao-popup-state-icon{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border-radius:50%;background:var(--marao-icon-background,var(--opacity-contrast-100,rgba(0,0,0,.08)));color:var(--marao-icon-color,var(--icon-color));--mdc-icon-size:28px}.marao-popup-state-icon ha-state-icon{display:inline-flex;width:28px;height:28px}.marao-popup-close{flex:0 0 48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;font-size:1.5rem;background:var(--secondary-background-color);color:inherit;cursor:pointer;transition:transform .12s ease,filter .12s ease}.marao-popup-close:active{transform:scale(.92);filter:brightness(.96)}.marao-popup-close:focus,.marao-popup-sheet:focus{outline:none}.marao-popup-content>p{min-width:0;font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.4;overflow-wrap:anywhere}.marao-popup-content[hidden]{display:none}.marao-popup-content{display:grid;min-width:0;gap:8px;isolation:isolate}@media(max-width:240px){.marao-popup-sheet{padding-left:4px;padding-right:4px}}@media(prefers-reduced-motion:reduce){.marao-popup-sheet{animation:none}.marao-popup-close{transition:none}}</style><section class="marao-popup-sheet"${accessEntity ? ` data-access-entity="${esc(accessEntity)}"` : ""} role="dialog" aria-modal="true" aria-label="${esc(title || this._config.name || localize("popup.title", this._hass, {}, "Marao popup"))}" tabindex="-1"><div class="marao-popup-head">${accessEntity ? `<div class="marao-popup-heading"><span class="marao-popup-state-icon" aria-hidden="true"><ha-state-icon data-access-icon></ha-state-icon></span><div class="marao-popup-copy"><h2>${esc(title)}</h2><div class="marao-popup-access-state" data-access-state><span role="status"></span></div></div></div>` : `<h2>${esc(title)}</h2>`}<button class="marao-popup-close" type="button" aria-label="${esc(closeLabel)}" title="${esc(closeLabel)}">×</button></div><div class="marao-popup-content"></div></section>`;
     overlay.addEventListener("click", (event) => { if (event.target === overlay) this._close(true); });
     overlay.querySelector(".marao-popup-close").addEventListener("click", () => { haptic("heavy"); this._close(true); });
     overlay.addEventListener("keydown", (event) => {
@@ -2638,6 +2682,7 @@ export class MaraoPopupCard extends BaseElement {
     root.append(overlay);
     this._overlay = overlay;
     this._syncTheme();
+    this._updateAccessHeader();
     const header = overlay.querySelector('.marao-popup-head');
     const sizeHeader = () => overlay.style.setProperty('--marao-popup-header-height', `${header.getBoundingClientRect().height}px`);
     sizeHeader();

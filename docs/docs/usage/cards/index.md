@@ -153,6 +153,15 @@ without a progressing background fill. Drag from anywhere on the handle,
 including its edges; the label fades during travel and returns on reset. Track
 taps, incomplete slides and scrolling gestures never execute the access action.
 
+Lock, door, gate and garage popups show the authoritative entity state and its
+matching icon once in the header. Their action cards omit repeated state. Unlock/open shows only a slider beside
+a decorative action icon on the left; close/lock shows its left action icon and
+a larger label centered across the tap surface. The header follows the base-card
+spacing, with a circular state icon on the left, left-aligned title/state text and
+vertically centered header controls.
+It grows with wrapped text instead of shrinking its title or state. Sending
+feedback and reported service errors remain attached to the action.
+
 ## Access slide feedback
 
 Completing a valid door, gate or lock opening slide requests a strong vibration

@@ -2143,3 +2143,40 @@ test('builder history cards use compact independent icon triggers and retain exp
   const light=new MaraoCard();light.setConfig({template:'md_light_card',entity:'light.safe'});light.hass={states:{'light.safe':{state:'on',attributes:{supported_color_modes:['hs']}}}};
   assert.match(light.shadowRoot.innerHTML,/data-light-color/);assert.doesNotMatch(light.shadowRoot.innerHTML.split('</style>')[1],/data-history-open/);
 });
+
+test('access popup owns the live state and action cards retain only their action presentation', () => {
+  const entity = 'lock.safe', popup = new MaraoPopupCard();
+  popup._config = {entity, cards:[{type:'grid',cards:[
+    {type:'custom:marao-card',template:'md_access_slide_action_card',entity},
+    {type:'custom:marao-card',template:'md_access_action_card',entity},
+  ]}]};
+  const saved = JSON.stringify(popup._config), label = {textContent:''}, icon = {};
+  popup._overlay = {querySelector: selector => selector === '[data-access-state]' ? {querySelector: () => label} : selector === '[data-access-icon]' ? icon : null};
+  for (const state of ['locked','unlocked','unlocking','unknown','unavailable']) {
+    popup._hass = {states:{[entity]:{state,attributes:{}}}};
+    popup._updateAccessHeader();
+    assert.equal(label.textContent, ({unknown:'Unknown',unavailable:'Unavailable'})[state] || state);
+    assert.equal(icon.stateObj.state, state);
+    assert.equal(icon.hass, popup._hass);
+  }
+  for (const template of ['md_access_slide_action_card','md_access_action_card']) {
+    const card = new MaraoCard(); card._inAccessPopup = () => true;
+    card.setConfig({template,entity,name:template === 'md_access_action_card' ? 'Lock' : 'Unlock'});
+    card.hass = {states:{[entity]:{state:'locked',attributes:{}}},callService(){}};
+    assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="state|<div class="icon"/);
+    assert.match(card.shadowRoot.innerHTML, /<span class="access-action-icon" aria-hidden="true">/);
+    assert.doesNotMatch(card.shadowRoot.innerHTML.match(/class="body([^"]*)"/)[1], /slider-header/);
+    if (template === 'md_access_action_card') {
+      assert.match(card.shadowRoot.innerHTML, /class="body[^\"]*access-close-action/);
+      assert.match(card.shadowRoot.innerHTML, /icon="mdi:lock"/);
+      assert.match(card.shadowRoot.innerHTML, /<div class="title">Lock<\/div>/);
+    } else {
+      assert.match(card.shadowRoot.innerHTML, /icon="mdi:lock-open-variant"/);
+      assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="title">/);
+      assert.match(card.shadowRoot.innerHTML, /<marao-slide-to-open /);
+    }
+  }
+  assert.equal(JSON.stringify(popup._config), saved);
+  popup._config = {entity,cards:[{type:'custom:marao-card',template:'md_sensor_card',entity}]};
+  assert.equal(popup._accessEntity(), '');
+});

@@ -961,13 +961,14 @@ class MaraoSlideToOpen extends HTMLElement {
 
   _label() {
     if (this._alarmOwner()) return window.MaraoDashboard?.localize?.('alarm.disarm', this._hassInstance()) || 'Disarm';
-    if (this._state() === "opening") {
+    const actionOnly = this.getRootNode()?.host?._inAccessPopup?.();
+    if (!actionOnly && this._state() === "opening") {
       return window.MaraoDashboard?.localize?.("common.opening", this._hassInstance()) || "Opening";
     }
     if (this._state() === "open") {
       return window.MaraoDashboard?.localize?.("common.open", this._hassInstance()) || "Open";
     }
-    if (this._state() === "unlocking") {
+    if (!actionOnly && this._state() === "unlocking") {
       return window.MaraoDashboard?.localize?.("common.unlocking", this._hassInstance()) || "Unlocking...";
     }
     const isLock = (this._entityId() || "").startsWith("lock.");
@@ -1178,12 +1179,17 @@ class MaraoSlideToOpen extends HTMLElement {
     if (!point || (point.pointerId ?? point.identifier) !== this._pointerId) return;
     const track = event.currentTarget;
     const bounds = track.getBoundingClientRect();
-    const releasedInside = point.clientX >= bounds.left
-      && point.clientX <= bounds.right
+    const releasedInLane = point.clientX >= bounds.left
       && point.clientY >= bounds.top
       && point.clientY <= bounds.bottom;
+    if (this._horizontalIntent && releasedInLane) {
+      // Release can carry a newer position than the browser's last move event.
+      const previousProgress = this._progress;
+      this._setProgress(this._startProgress + (point.clientX - this._startX) / Math.max(1, track.clientWidth - 62));
+      this._hapticProgress(previousProgress, this._progress);
+    }
     const completed = this._horizontalIntent
-      && releasedInside
+      && releasedInLane
       && this._progress >= MARAO_SLIDE_COMPLETE_AT;
     if (this._horizontalIntent) {
       event.preventDefault();

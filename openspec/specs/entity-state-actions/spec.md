@@ -80,7 +80,7 @@ Cancelled gestures SHALL NOT emit completion feedback.
 Open/unlock of locks, doors, garages and gates SHALL use only the strict slide
 control, with a concise localized visible label and semantic action/target name.
 It SHALL establish horizontal intent before pointer capture and dispatch once
-on valid completion on release. No keyboard, tap, hold or alternate button path
+on valid completion on release. Horizontal overtravel beyond the right edge SHALL count as completion when release remains within the track’s vertical lane. No keyboard, tap, hold or alternate button path
 SHALL execute the same risky access action.
 
 #### Scenario: The strict slide completes deliberately
@@ -89,7 +89,7 @@ SHALL execute the same risky access action.
 
 ### Requirement: Strict slide cancellation
 Strict access slides SHALL cancel without dispatch on taps, incomplete or reversed
-travel, vertical intent, release outside the completion boundary, pointer loss or
+travel, vertical intent, release above or below the track’s vertical lane or to its left, pointer loss or
 cancellation, route change, page hiding, removal or disabling. Cancellation SHALL
 reset visible progress and preserve authoritative state.
 

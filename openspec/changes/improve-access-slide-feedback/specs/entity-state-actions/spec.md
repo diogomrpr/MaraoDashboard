@@ -55,3 +55,17 @@ Access feedback SHALL survive ordinary unrelated state renders for its current r
 - **WHEN** reduced motion is requested or the client cannot deliver physical vibration
 - **THEN** static blue pending/confirmation treatment and distinct pending/checkmark icons still communicate the interaction
 - **AND** no browser vibration capability is required to use the slider
+
+#### Scenario: A deliberate slide finishes beyond the right edge
+- **WHEN** a gesture starts on the handle, establishes horizontal intent and reaches or passes the right completion boundary
+- **AND** release remains within the track’s vertical lane
+- **THEN** it dispatches once with the same sending and acceptance feedback
+- **AND** releasing above/below the lane, reversing below completion or cancelling still dispatches nothing
+
+### Requirement: Access popup state hierarchy
+A lock, door, gate or garage popup containing its access actions SHALL show the authoritative state and matching state icon once in its header. Child action cards SHALL omit repeated normal entity state and state icons. They SHALL have decorative action icons on the left. Unlock/open SHALL show its label only inside the slider; close/lock SHALL center its action label across the card. The header SHALL have a minimum 112px height, grow with wrapped text, and retain scalable title/state typography (22.5px and 18px at the default theme size). Close/lock SHALL retain an explicit tap target with larger centered action text; open/unlock SHALL retain the strict slider, request feedback and cancellation guards. Existing configuration and other popup families SHALL retain their meaning.
+
+#### Scenario: The access state changes while the popup is open
+- **WHEN** Home Assistant reports a new access state
+- **THEN** the header label and state icon update without replacing the active slider
+- **AND** action cards retain their action labels, availability guards and readable service errors

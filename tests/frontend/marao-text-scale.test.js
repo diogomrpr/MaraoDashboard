@@ -440,16 +440,40 @@ test("slide control captures only horizontal intent and resets partial or cancel
   assert.deepEqual(released, [1, 2]);
 });
 
-test("slide control cancels completion when the pointer is released outside", () => {
-  const { serviceCalls, slide, track } = slideFixture();
-  const start = pointerEvent(track, 10, 10);
-  slide._start(start, start);
-  const complete = pointerEvent(track, 240, 10);
-  slide._move(complete, complete);
-  const outside = pointerEvent(track, 280, 10);
-  slide._end(outside, outside);
-  assert.deepEqual(serviceCalls, []);
-  assert.equal(slide._progress, 0);
+test("slide completion uses the final release position for touch and pointer input", () => {
+  for (const input of ['pointer', 'touch']) for (const [moveX, releaseX, expected] of [
+    [150, 210, 1], [240, 100, 0], [150, 180, 0], [240, 280, 1], [150, 280, 1], [240, -10, 0], [null, 210, 0],
+  ]) {
+    const { slide, track, serviceCalls } = slideFixture();
+    const point = x => {
+      const event = pointerEvent(track, x, 20);
+      if (input === 'touch') { delete event.pointerId; event.identifier = 7; }
+      return event;
+    };
+    const start = point(10); slide._start(start, start);
+    if (moveX !== null) { const move = point(moveX); slide._move(move, move); }
+    const end = point(releaseX); slide._end(end, end); slide._end(end, end);
+    assert.equal(serviceCalls.length, expected, `${input}: move ${moveX}, release ${releaseX}`);
+    if (expected) assert.equal(slide._feedback, 'sending');
+    slide.disconnectedCallback();
+  }
+});
+
+test("slide control cancels release above or below the lane even beyond its right end", () => {
+  for (const input of ['pointer', 'touch']) for (const y of [-1, 65]) {
+    const { serviceCalls, slide, track } = slideFixture();
+    const point = (x, y) => {
+      const event = pointerEvent(track, x, y);
+      if (input === 'touch') { delete event.pointerId; event.identifier = 7; }
+      return event;
+    };
+    const start = point(10, 20); slide._start(start, start);
+    const move = point(240, 20); slide._move(move, move);
+    const end = point(280, y); slide._end(end, end);
+    assert.deepEqual(serviceCalls, []);
+    assert.equal(slide._progress, 0);
+    slide.disconnectedCallback();
+  }
 });
 
 test("slide control gives one strong haptic per milestone and distinct completion feedback", () => {
@@ -583,4 +607,13 @@ test("slide control uses the access action wording for covers", () => {
   slide._render();
   assert.match(slide.shadowRoot.innerHTML, /aria-label="Abrir Front Door"/);
   assert.match(slide.shadowRoot.innerHTML, /<span class="label" role="status">Abrir<\/span>/);
+});
+
+test('access popup sliders keep an action label while the header owns entity state', () => {
+  const {slide} = slideFixture();
+  slide.getRootNode = () => ({host:{_inAccessPopup:()=>true}});
+  for (const state of ['locked','unlocked','unlocking']) {
+    slide._hass.states['lock.front_door'].state = state; slide.setAttribute('state',state);
+    assert.equal(slide._label(), 'Unlock');
+  }
 });

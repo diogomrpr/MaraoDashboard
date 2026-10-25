@@ -62,3 +62,11 @@ Builder, validation and generator continue producing the same access descriptors
 Use the smallest existing safe tests with controlled service outcomes and timers for pending, acceptance, errors, skipped calls, lifecycle invalidation and exactly-once dispatch. Retain focused strict-gesture and alarm compatibility assertions because changes touch a security-control lifecycle. Add no broad browser campaign. Reuse a safe lock/cover/button example in Cases and a realistic access popup; update documentation and inventories only where their contracts/examples actually change.
 
 Manual watch list: visible blue dispatch pulse, restrained shimmer during a real pending request, brief checkmark hold, normal state restoration, error/availability precedence and phone vibration. Install final applicable assets once through the compatible frontend helper on disposable `192.168.0.28`, preserving configuration/helper state. Actual lock, door or gate devices must never be actuated by agent testing.
+
+## Popup presentation follow-up
+
+Recognize existing access sheets from their configured lock/cover entity and nested access-action cards. Keep the saved configuration unchanged. The sheet owns a live native HA state icon and localized state label; matching child actions derive their popup presentation from that sheet context. This preserves raw/generated and legacy layouts, slider request identity and error handling. The close/lock label is enlarged and centered within its existing tap surface.
+
+### Accepted popup refinement
+
+Use a 48px leading decorative action-icon column. Opening actions omit the separate card title and give the remaining row width to the slider. Closing actions balance the leading icon column with an empty trailing column so the label remains centered across the full card. Access headers use a 112px minimum height, 22px vertical and 12px horizontal padding, a leading circular state icon, left-aligned wrapping title/state text and vertically centered header elements. No saved configuration or dispatch contract changes.
