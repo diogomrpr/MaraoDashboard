@@ -1,5 +1,38 @@
 # Implementation progress
 
+## Current repository decision and live HACS gate
+
+The user selected **the existing `diogomrpr/MaraoDashboard` repository**, accepting
+one-time guided manual migration on every instance. No new repository, tag or
+prerelease was created. Earlier sections proposing a separate repository are
+historical and superseded by this decision and the revised proposal/design/tasks.
+
+On disposable `192.168.0.28`, supported HACS operations registered the existing
+repository as Integration, removed that custom-repository registration, then
+attempted to add the same repository as Dashboard (`plugin` internally). HACS
+reached Plugin validation and reported:
+
+`Repository structure for v0.21.1 is not compliant`.
+
+This is a published-layout failure, not evidence of a permanent category lock.
+The installed registration command accepts only repository/category; it strips
+URL suffixes and chooses the latest stable tag before version/beta controls are
+available. Thus a frontend-only prerelease does not unblock initial registration.
+Complete real HACS installation/update proof remains pending an authorized
+frontend-compatible stable release. No release flags, HACS implementation or
+private HACS storage were changed to bypass this.
+
+The native dashboard/source remains installed and unchanged by these probes.
+Private evidence is `installed-baseline/same-repo-handoff.json` and
+`same-repo-registration-probe.json` under ignored
+`ha-test/.artifacts/native-frontend/`. These failures are retained, not relabeled
+as installation/update success. Only the disposable instance was contacted.
+
+The earlier unit publication attempt stopped on the preparation guard regression:
+the new native branch was reached before the existing active-upgrade guard. The
+guard now runs before either preparation branch; its five focused preservation
+checks pass. This does not itself establish that the whole publication gate passed.
+
 Implementation was explicitly authorized on 2026-10-25 for the complete
 frontend-only transition, including the offline converter. The user requires
 clarification when an unresolved decision prevents sufficient confidence.

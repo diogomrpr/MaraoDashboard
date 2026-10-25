@@ -11,10 +11,10 @@ Implementation is in progress in OpenSpec change
 `192.168.0.28` with the legacy Python package/config entry absent. The original
 59-page source survived native UI import, unchanged and edited builder saves,
 independent disk comparison, restart and a matching v0.21.1 rollback followed by
-native restoration. The separate HACS distribution and actual next-update proof
+native restoration. Same-repository HACS installation and actual next-update proof
 remain pending. The earlier request-override probe is separate feasibility evidence.
 
-The target uses a separate HACS Dashboard repository, a Home Assistant dashboard
+The target reuses `diogomrpr/MaraoDashboard` as a HACS Dashboard repository, a Home Assistant dashboard
 strategy, native configuration storage and the existing Visual/JSON builder.
 The released legacy package remains frozen for rollback/reference. Guided manual
 migration removes it before native import; no new Python bridge is built. Configuration History/Restore is removed; old archives remain
@@ -30,7 +30,7 @@ recordings without inferred detection types; playback remains a manual check.
 | Native server saves/events | `lovelace/config/save`, `lovelace_updated` | Installed unchanged/edited saves, exact disk comparison and restart retention passed. A temporary non-admin account could read the disclosed source and was denied a save; it was deleted afterward. Session tests cover failure retention, single-flight and already-stale refusal. Simultaneous writers retain HA's native limit. |
 | Source visibility | Readable through authenticated native config APIs | Hidden/admin-only editor controls do not make source private. Import and cutover require explicit review; path-only hints cannot detect every secret. |
 | Resource registration | Native storage UI or existing YAML list | The disposable uses `resource_mode: yaml`: resource writes are intentionally absent. Append only the owned URL, use native `lovelace.reload_resources` and preserve mode/unrelated resources. This requires no Marao backend. |
-| HACS Dashboard files | Flat files in repository `dist/` | Installed HACS downloader source was inspected; a package/unit and read-only browser probe cover flat module/font/worker references. No published repository or actual second HACS update has been tested. |
+| HACS Dashboard files | Flat files in repository `dist/` | Installed downloader and local package checks cover flat assets. Actual removal of an Integration registration allowed Dashboard validation of the same repository; it rejected v0.21.1's legacy layout. Complete registration/install and the next HACS update require a frontend-compatible latest stable release and remain unverified. |
 | Netatmo browse metadata | Native camera unique ID and `events/<camera>/<epoch>` | [HA 2026.10.0 camera code](https://github.com/home-assistant/core/blob/2026.10.0/homeassistant/components/netatmo/camera.py) stores events by event time and builds the camera unique ID from its ID/type; [native media source](https://github.com/home-assistant/core/blob/2026.10.0/homeassistant/components/netatmo/media_source.py) exposes those IDs. Metadata-only tests verify matching and safe decimal epochs. No provider title is parsed for detections. |
 
 HA can acknowledge a normal save and notify clients before disk persistence is
@@ -71,8 +71,12 @@ boundary; already released legacy code is not retroactively changed.
 
 Use tagged repository contents. Do not attach a matching single JS release asset:
 HACS can select only that file. Do not rely on integration-only ZIP release
-handling for Dashboard repositories. Publishing a separate repository/prerelease
-is a later authorization step, after local migration artifacts are reviewable.
+handling for Dashboard repositories. Keep the existing repository: remove its HACS
+Integration registration completely, then add it as Dashboard. Installed HACS
+validates the latest stable tag before version/beta selection, so a frontend
+prerelease alone cannot bootstrap this handoff while v0.21.1 is stable. Stable
+publication requires the reviewable candidate, required checks and authorization;
+do not modify historical releases or private HACS files to bypass validation.
 
 The offline converter bundles its font, license, styles and script with a restrictive
 content security policy. It retains answers in page memory and clears them when

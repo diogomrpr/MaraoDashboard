@@ -9,7 +9,10 @@ nav_order: 1.6
 
 The frontend candidate is installed on the disposable development instance. Its
 native saves, restart retention and matching legacy rollback have been checked.
-The separate HACS Dashboard distribution is undergoing prerelease/update verification.
+The Dashboard package will use the existing `diogomrpr/MaraoDashboard` repository.
+HACS remove/re-add and update verification is in progress. The live probe reached
+Dashboard validation but rejected the current stable v0.21.1 Integration layout;
+the first frontend-compatible stable release must exist before this procedure.
 These instructions describe the guided manual migration selected for this major change;
 do not remove a working installation until the complete frontend package and
 converter are available and verified.
@@ -17,7 +20,7 @@ converter are available and verified.
 Run this procedure separately for each Home Assistant instance. The converter
 needs only a browser: no Home Assistant login, dashboard builder, local server,
 command line or intermediate Marao release. Migration needs administrator access
-and a one-time Home Assistant restart. Later updates use the separate **Dashboard**
+and a one-time Home Assistant restart. Later updates use its **Dashboard**
 package and a browser refresh; the actual HACS update proof is still pending.
 
 ## 1. Keep a recoverable original
@@ -87,17 +90,23 @@ inputs refuse conversion and leave the original unchanged.
 
 ## 3. Remove the old integration, then restart
 
-Obtain and verify the complete separate frontend package before starting removal.
+Obtain and verify the complete frontend stable package before starting removal.
 Keep its resource disabled until the old frontend bootstrap is removed.
+If HACS still identifies the latest stable as v0.21.1, stop here: adding the
+repository as Dashboard will fail its package-layout check. A prerelease alone
+does not change initial HACS validation. Do not choose Update on an unmigrated
+Integration entry; complete this manual migration on each instance instead.
 
 1. Delete Marao's config entry in **Settings → Devices & services**.
-2. Remove its **Integration** package in HACS.
+2. Remove its **Integration** package in HACS. In **Custom repositories**, also
+   remove `diogomrpr/MaraoDashboard` if it is still listed. The repository must
+   leave HACS's store before it can be added under a different category.
 3. Remove only the recorded Marao YAML entry from `lovelace.dashboards`, following
    its exact owned filename. Retain all other dashboard registrations/settings.
 4. Remove only obsolete Marao bootstrap/resource/`extra_module_url` entries
    identified in your recorded configuration or legacy Repair. Leave unrelated
    resources and their order alone. Never change HACS's private storage files or
-   try to change the old repository's category.
+   try to mutate its category while it is still registered.
 5. Check HA configuration and restart Home Assistant once the removals are ready.
    Keep the original source/generated/custom/history/theme files intact.
 
@@ -108,8 +117,10 @@ URLs are not redirected permanently.
 
 ## 4. Create and import through Home Assistant
 
-Install the separate repository as a HACS **Dashboard** package and verify its
-`MaraoFrontend.js` resource is registered once as a JavaScript module. With
+Add `https://github.com/diogomrpr/MaraoDashboard` again in HACS **Custom repositories**,
+select **Dashboard**, then download the frontend release. This reuses the same
+GitHub repository after removing the old HACS registration. Verify
+`/hacsfiles/MaraoDashboard/MaraoFrontend.js` is registered once as a JavaScript module. With
 HA-managed resources, use HACS/the native resource UI. If the existing installation
 uses `lovelace.resource_mode: yaml`, keep that mode and every existing resource;
 append only the Marao URL/type to its YAML resource list, then run HA’s built-in
@@ -151,9 +162,12 @@ Keep a separate export/backup of any new native edits before rollback. Stop edit
 and compare current state with the migration changes. Remove only the newly owned
 native registration/resource, reinstall the **exact saved old integration package**,
 restore its matching JSON/generated/custom files and owned registration/settings,
-and restart HA as required. HACS removal can also unregister a custom repository;
-if needed, add the old repository again as **Integration** before selecting the
-exact saved release. Restore YAML dashboard registrations in normal block style:
+and restart HA as required. Keep the exact old package in your private backup:
+once the latest stable contains only the frontend layout, HACS may also refuse
+adding that repository as Integration before an old version can be selected.
+In that case restore the saved `custom_components/marao_dashboard` directory
+manually, then add its HA config entry; do not alter HACS's private registry or
+relabel a published release. Restore YAML dashboard registrations in normal block style:
 the released installer does not recognize a flow-style `{...}` dashboard map.
 Verify the restored source and original dashboard root.
 
@@ -173,7 +187,10 @@ utilizadores autenticados do HA, mesmo num dashboard oculto ou só de administra
 
 Remova a integração antiga e apenas os seus registos YAML/recursos, mantendo
 JSON, ficheiros gerados, cartões personalizados, temas e histórico. Reinicie o HA.
-Instale o pacote separado de categoria **Dashboard**. Se os recursos forem
+Remova também o registo antigo nos repositórios personalizados do HACS e adicione
+o mesmo `diogomrpr/MaraoDashboard` com a categoria **Dashboard**. Este passo exige
+que a versão estável já contenha o pacote frontend; a versão antiga v0.21.1 ou
+apenas uma pré-versão nova não permitem concluir a validação inicial. Se os recursos forem
 geridos em YAML, mantenha esse modo e acrescente apenas o URL do Marao; use a
 ação nativa `lovelace.reload_resources` e atualize a página. Crie o dashboard nativo no
 mesmo endereço e cole o documento completo no editor nativo de configuração.

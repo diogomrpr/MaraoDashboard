@@ -422,13 +422,19 @@ After handoff, all retained Marao authoring and runtime capabilities SHALL funct
 - **THEN** current assets and retained source work while the HA process/start identity remains unchanged
 - **AND** no Marao integration reload, generated-file preparation or browser override substitutes for installation
 
-### Requirement: Separate HACS distribution handoff
-The frontend SHALL have a HACS Dashboard repository identity distinct from the legacy Integration identity. Users SHALL obtain/verify the complete frontend artifact before legacy removal and enable its resource after removing obsolete bootstrap registration. New users install it directly. Supported HACS/resource operations SHALL be used without category mutation or private HACS storage edits. Frontend releases SHALL not create legacy integration updates.
+### Requirement: Same-repository HACS distribution handoff
+The frontend SHALL use `diogomrpr/MaraoDashboard`. Migration SHALL verify its frontend stable artifact, remove the HACS Integration registration, then add the same URL as Dashboard. It SHALL use supported HACS/resource operations without mutating a registered category or editing private storage. New users SHALL install the Dashboard package directly; migrated entries SHALL track Dashboard releases.
 
 #### Scenario: The integration is already installed
 - **WHEN** an administrator migrates manually
 - **THEN** exact backups and converted JSON precede removal, followed by the accepted restart and native import at the recorded root
 - **AND** Python absence and persisted native operation are verified before declaring success
+- **AND** an unmigrated Integration entry receives manual-migration guidance rather than an in-place Update promise
+
+#### Scenario: HACS still sees the legacy stable package
+- **WHEN** adding the same repository as Dashboard validates the latest stable Integration tree
+- **THEN** the failed validation is reported and the native dashboard/source remain untouched
+- **AND** complete HACS handoff remains unverified until an authorized frontend-compatible stable release exists; prerelease-only publication is not claimed as sufficient
 
 #### Scenario: Frontend installation is incomplete
 - **WHEN** required assets or resource cannot be verified

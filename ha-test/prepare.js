@@ -306,6 +306,14 @@ async function prepare(config = readConfig(), { dryRun = false } = {}) {
     console.log("Would build the current workspace, deploy only Marao and its fixtures to " + config.url + ", provision Cases, and reload frontend changes or restart backend changes.");
     return { config };
   }
+  const root = config.remoteConfigPath;
+  const upgradeMarker = quote(root + '/.marao-upgrade-active.json');
+  const upgradeGuard = ssh(config, 'test ! -e ' + upgradeMarker + ' && test ! -L ' + upgradeMarker, { allowFailure: true });
+  if (upgradeGuard.status !== 0) {
+    throw new Error(upgradeGuard.status === 1
+      ? 'An upgrade inspection is active. Fresh preparation requires verified cleanup; use its private receipt instead.'
+      : 'Could not verify whether upgrade inspection is active; preparation stopped.');
+  }
   const {nativeState,prepareNativeFrontend,syncNativeFixtures}=require('./prepare-native-frontend');
   const native=await nativeState(config);
   if(native) {
@@ -323,14 +331,6 @@ async function prepare(config = readConfig(), { dryRun = false } = {}) {
   if (entries.some((entry) => ["frigate", "unifiprotect", "netatmo"].includes(entry.domain))) throw new Error("Test camera fixtures cannot replace a real Frigate, UniFi Protect or Netatmo integration.");
   const haConfig = await api(config, "GET", "/api/config");
   if (haConfig.config_dir !== config.remoteConfigPath) throw new Error("remoteConfigPath does not match this Home Assistant instance.");
-  const root = config.remoteConfigPath;
-  const upgradeMarker = quote(root + '/.marao-upgrade-active.json');
-  const upgradeGuard = ssh(config, 'test ! -e ' + upgradeMarker + ' && test ! -L ' + upgradeMarker, { allowFailure: true });
-  if (upgradeGuard.status !== 0) {
-    throw new Error(upgradeGuard.status === 1
-      ? 'An upgrade inspection is active. Fresh preparation requires verified cleanup; use its private receipt instead.'
-      : 'Could not verify whether upgrade inspection is active; preparation stopped.');
-  }
   const remoteConfig = root + "/configuration.yaml";
   const originalConfig = ssh(config, "cat " + quote(remoteConfig)).stdout;
   const patched = patchPackages(originalConfig);
