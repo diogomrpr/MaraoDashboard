@@ -472,7 +472,8 @@ test("slide control gives one strong haptic per milestone and distinct completio
   assert.deepEqual(serviceCalls, [["lock", "unlock", { entity_id: "lock.front_door" }]]);
   assert.equal(globalThis.__maraoTestHaptics.at(-1), "heavy");
   assert.equal(globalThis.__maraoTestHaptics.length, beforeCompletion + 1);
-  assert.equal(track.classList.contains("completing"), true);
+  assert.equal(slide._feedback, "sending");
+  assert.match(slide.shadowRoot.innerHTML, /class="track feedback sending"/);
   slide.disconnectedCallback();
 });
 
@@ -548,7 +549,7 @@ test("slide control keeps an action-only label, meaningful semantics, and a larg
   assert.match(slide.shadowRoot.innerHTML, /aria-orientation="horizontal"/);
   assert.match(slide.shadowRoot.innerHTML, /aria-valuetext="0%"/);
   assert.match(slide.shadowRoot.innerHTML, /aria-label="Unlock Front Door"/);
-  assert.match(slide.shadowRoot.innerHTML, /<span class="label">Unlock<\/span>/);
+  assert.match(slide.shadowRoot.innerHTML, /<span class="label" role="status">Unlock<\/span>/);
   assert.doesNotMatch(slide.shadowRoot.innerHTML, /slide to unlock/i);
   assert.match(slide.shadowRoot.innerHTML, /width: 54px;\s+height: 54px;/);
   assert.match(slide.shadowRoot.innerHTML, /padding: 8px 16px 8px 72px/);
@@ -564,7 +565,7 @@ test("slide control keeps an action-only label, meaningful semantics, and a larg
   slide._hass.language = "pt";
   slide._render();
   assert.match(slide.shadowRoot.innerHTML, /aria-label="Destrancar Front Door"/);
-  assert.match(slide.shadowRoot.innerHTML, /<span class="label">Destrancar<\/span>/);
+  assert.match(slide.shadowRoot.innerHTML, /<span class="label" role="status">Destrancar<\/span>/);
 });
 
 test("slide control uses the access action wording for covers", () => {
@@ -576,10 +577,10 @@ test("slide control uses the access action wording for covers", () => {
   };
   slide._render();
   assert.match(slide.shadowRoot.innerHTML, /aria-label="Open Front Door"/);
-  assert.match(slide.shadowRoot.innerHTML, /<span class="label">Open<\/span>/);
+  assert.match(slide.shadowRoot.innerHTML, /<span class="label" role="status">Open<\/span>/);
 
   slide._hass.language = "pt";
   slide._render();
   assert.match(slide.shadowRoot.innerHTML, /aria-label="Abrir Front Door"/);
-  assert.match(slide.shadowRoot.innerHTML, /<span class="label">Abrir<\/span>/);
+  assert.match(slide.shadowRoot.innerHTML, /<span class="label" role="status">Abrir<\/span>/);
 });
