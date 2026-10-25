@@ -5,6 +5,18 @@ import fs from "node:fs/promises";
 const cardsSource = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 const source = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoNavigation.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js', import.meta.url).href));
 
+test('native activity preserves custom dashboard roots and explicitly empty navigation', async () => {
+  const {fullscreenUsers,maraoDashboardActive}=await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
+  const owner={isConnected:true,preview:false,_config:{dashboard_root:'casa-main',routes:[]}};
+  fullscreenUsers.add(owner);
+  try {
+    assert.equal(maraoDashboardActive('/casa-main/home'),true);
+    assert.equal(maraoDashboardActive('/another-dashboard/home'),false);
+    owner.preview=true;assert.equal(maraoDashboardActive('/casa-main/home'),false);
+    owner.preview=false;owner.isConnected=false;assert.equal(maraoDashboardActive('/casa-main/home'),false);
+  } finally {fullscreenUsers.delete(owner);}
+});
+
 test("ported sheets copy theme colors while viewport insets keep inheriting live values", async () => {
   const { MaraoPopupCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoCards.js');
   const previous = globalThis.getComputedStyle;
@@ -85,6 +97,7 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
   const events = new Map();
   const window = { location: { href: "http://192.168.0.28/marao-dashboard/overview", pathname: "/marao-dashboard/overview" },
     addEventListener: (key, callback) => events.set(key, callback), removeEventListener: key => events.delete(key),
+    dispatchEvent() {},
   };
   let timers = 0;
   const functions = new Function("window", "getComputedStyle", "setInterval", "clearInterval", "safeArea", "navbarMainPage", "navbarBottomGap",

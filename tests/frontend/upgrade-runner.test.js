@@ -15,6 +15,17 @@ const { referencedEntities } = require('../../ha-test/prepare');
 const YAML = require('yaml');
 const config = { url: 'http://192.168.0.28:8123', disposable: true, sshHost: '192.168.0.28' };
 
+test('native upgrade replay includes modern released contracts and labels data replay without installation',async()=>{
+  const {nativePlan,verifyNativeConversions}=require('../test-ha-upgrade'),selected=nativePlan(config);
+  for(const tag of ['v0.2.0','v0.17.0','v0.20.0','v0.21.1','predecessor-format-1','current-format-2'])assert.ok(selected.rows.some(row=>row.baseline===tag));
+  assert.equal(selected.rows.find(row=>row.baseline==='predecessor-format-1').replay,'supported-predecessor-data');
+  assert.ok(selected.rows.every(row=>!row.replay.includes('package-install')));
+  const result=await verifyNativeConversions(selected);assert.equal(result.length,selected.rows.length);
+  assert.ok(result.every(row=>row.passed&&row.customRoot&&row.repeatConversion));
+  const source='{"config_version":999}';
+  await assert.rejects(verifyNativeConversions({rows:[{baseline:'future',source}]}));assert.equal(source,'{"config_version":999}');
+});
+
 test('restart readiness waits for active Supervisor Core jobs, closes connections and supports unsupervised Core', async () => {
   const { activeCoreJob } = require('../../ha-test/prepare');
   assert.equal(activeCoreJob([{ name: 'home_assistant_core_restart', done: false }]), true);

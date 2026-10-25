@@ -1,4 +1,4 @@
-const { navigationTranslations } = await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`, import.meta.url));
+const { navigationTranslations, maraoDashboardActive } = await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`, import.meta.url));
 const MARAO_RESOURCE_QUERY = new URL(import.meta.url).search;
 async function waitForHomeAssistantRegistry() {
   while (!globalThis.customElements?.get("home-assistant")) {
@@ -9,11 +9,11 @@ async function waitForHomeAssistantRegistry() {
   }
 }
 await waitForHomeAssistantRegistry();
-const cardsModule = await import(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`);
+const cardsModule = await import(new URL(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
 const { loadHistoryChart, createHistoryPlaceholder, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, fitNativeGrid, updateCardSurface, problemLabel, showCardDetails, layoutState, registerMaraoCards } = cardsModule;
 registerMaraoCards();
 
-const MARAO_FONT_URL = "https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900";
+const MARAO_FONT_URL = new URL(`./MaraoFonts.css${MARAO_RESOURCE_QUERY}`,import.meta.url).href;
 
 if (
   globalThis.document?.head
@@ -375,6 +375,7 @@ const TRANSLATIONS = {
     "camera_events.error.unsupported_provider": "Unsupported camera event provider: {provider}",
     "camera_events.error.api_unavailable": "Home Assistant's camera event API is unavailable.",
     "camera_events.error.load_failed": "Unable to load camera events from {provider}.",
+    "camera_events.type.recording": "Recording",
     "camera_events.error.protect_camera_not_matched": "Unable to match this camera in the UniFi Protect media source.",
     "camera_events.error.invalid_protect_media_source": "Invalid UniFi Protect media source.",
     "camera_events.error.no_protect_event_folders": "No UniFi Protect event folders are available for this camera.",
@@ -616,6 +617,7 @@ const TRANSLATIONS = {
     "camera_events.error.unsupported_provider": "Fornecedor de eventos de câmara não suportado: {provider}",
     "camera_events.error.api_unavailable": "A API de eventos de câmara do Home Assistant está indisponível.",
     "camera_events.error.load_failed": "Não foi possível carregar eventos da câmara de {provider}.",
+    "camera_events.type.recording": "Gravação",
     "camera_events.error.protect_camera_not_matched": "Não foi possível associar esta câmara na fonte multimédia do UniFi Protect.",
     "camera_events.error.invalid_protect_media_source": "Fonte multimédia do UniFi Protect inválida.",
     "camera_events.error.no_protect_event_folders": "Não existem pastas de eventos do UniFi Protect para esta câmara.",
@@ -761,6 +763,7 @@ const MARAO_TAP_DRAG_THRESHOLD = 10;
 const MARAO_TAP_BLOCK_MS = 500;
 
 function isMaraoDashboardPath(pathname) {
+  if (globalThis.window?.MaraoFrontendPackage) return maraoDashboardActive(pathname);
   const root = String(pathname || "").split("/")[1];
   return Boolean(root?.startsWith("marao-") && root !== "marao-dashboard-editor");
 }
@@ -795,6 +798,7 @@ function installMaraoTextScale() {
   sync();
   window.addEventListener("location-changed", sync);
   window.addEventListener("popstate", sync);
+  window.addEventListener("marao-dashboard-activity", sync);
 }
 
 function installMaraoTapGuard(eventRoot = window) {
@@ -2149,9 +2153,9 @@ console.info("%c Marao Dashboard loaded", "color: #d4b392; font-weight: 700;");
 
 // Optional content must not delay registration of basic dashboard cards.
 await Promise.all([
-  import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`).then(module => module.registerMaraoCameraEventCards()),
+  import(new URL(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`, import.meta.url)).then(module => module.registerMaraoCameraEventCards()),
   Promise.all([
-    import(`./MaraoNavigation.js${MARAO_RESOURCE_QUERY}`),
-    import(`./MaraoCameraPreload.js${MARAO_RESOURCE_QUERY}`),
+    import(new URL(`./MaraoNavigation.js${MARAO_RESOURCE_QUERY}`, import.meta.url)),
+    import(new URL(`./MaraoCameraPreload.js${MARAO_RESOURCE_QUERY}`, import.meta.url)),
   ]).then(([navigation, camera]) => navigation.registerCameraPreloader(record => camera.syncCameraPreload(record, {localize, haptic}))),
 ]);

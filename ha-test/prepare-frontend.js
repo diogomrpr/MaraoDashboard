@@ -66,10 +66,13 @@ function sameHashes(left, right) {
 }
 
 function buildEditor(root) {
-  const identity = [client.fingerprint(path.join(root, 'frontend_src')), client.fingerprint(path.join(root, 'custom_components/marao_dashboard'), file => !file.startsWith('frontend/')), hash(fs.readFileSync(path.join(root, 'package-lock.json')))].join(':');
-  if (builtEditor !== identity) {
+  const frontend=path.join(root,'custom_components/marao_dashboard/frontend');
+  const identity = () => [client.fingerprint(path.join(root, 'frontend_src')), client.fingerprint(path.join(root, 'custom_components/marao_dashboard'), file => !file.startsWith('frontend/')),
+    client.fingerprint(frontend,file=>/^(?:Marao(?:Source|Names)\.js|marao-(?:catalog|generator-labels)\.json)$/.test(file)),
+    JSON.stringify(client.sourceFiles(frontend)),hash(fs.readFileSync(path.join(root, 'package-lock.json')))].join(':');
+  if (builtEditor !== identity()) {
     execFileSync(process.execPath, ['frontend_src/build-editor.cjs'], { cwd: root, stdio: 'inherit' });
-    builtEditor = identity;
+    builtEditor = identity();
   }
 }
 
@@ -88,6 +91,10 @@ async function prepareFrontend(config = client.readConfig(), dependencies = {}) 
   const guard = () => ssh(config, guards.map(file => `test ! -L ${quote(config.remoteConfigPath + file)} || exit 1`).join('\n') + '\n' +
     ['/.marao-upgrade-active.json', '/dashboard/MaraoDashboard/.history/.operation'].map(file => `test ! -e ${quote(config.remoteConfigPath + file)} && test ! -L ${quote(config.remoteConfigPath + file)} || exit 1`).join('\n'));
   guard();
+  const {nativeState,prepareNativeFrontend}=require('./prepare-native-frontend');
+  const native=await nativeState(config,connect);
+  if(native) return prepareNativeFrontend(config,native,dependencies);
+  assert.ok(!fs.existsSync(path.join(frontendRoot,'MaraoNativeDashboard.js')), 'Native candidate requires guided migration first; legacy package was not changed');
   let receipt;
   try { receipt = JSON.parse(ssh(config, 'cat ' + quote(config.remoteConfigPath + '/.marao-test-deployment.json')).stdout); }
   catch { throw new Error('Missing prepared installation receipt; run ha:sync before preview'); }
@@ -189,4 +196,4 @@ trap - 0 1 2 15`, { allowFailure: true });
   } finally { fs.rmSync(localStage, { recursive: true, force: true }); }
 }
 
-module.exports = { assertTarget, backendHashes, frontendHashes, localHashes, prepareFrontend, sameHashes };
+module.exports = { buildEditor, upload, assertTarget, backendHashes, frontendHashes, localHashes, prepareFrontend, sameHashes };

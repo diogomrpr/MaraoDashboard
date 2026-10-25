@@ -131,8 +131,10 @@ async function assertCurrentFrontend(page, expected = fingerprint(path.join(repo
   // Navbar readiness intentionally precedes optional card/runtime imports.
   const ready = await page.waitForFunction(expected => {
     const urls = performance.getEntriesByType("resource").map(entry => new URL(entry.name));
+    const native=/^[a-f0-9]{64}$/.test(expected);
+    if(native && window.MaraoFrontendPackage?.identity!==expected) return false;
     return ["MaraoDashboard.js", "MaraoCards.js", "MaraoFrigateEventsCard.js"].every(file =>
-      urls.some(url => url.pathname.endsWith("/" + file) && url.searchParams.get("v") === expected));
+      urls.some(url => native ? url.pathname.endsWith('/'+expected+'--'+file) : url.pathname.endsWith("/" + file) && url.searchParams.get("v") === expected));
   }, expected, { timeout: 15000, polling: 50 });
   await ready.dispose();
 }

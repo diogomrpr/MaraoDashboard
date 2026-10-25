@@ -39,12 +39,12 @@ const BRAND_MARK_DARK = new URL(`./brand/mark-dark.svg${PANEL_ASSET_VERSION}`, i
 
 const TEXT = {
   en: {
-    editorTitle: "Marao Dashboard Editor", loading: "Loading your dashboard…", loadingJson: "Loading JSON editor…", retry: "Retry", loadFailed: "Could not load your dashboard: ", jsonFailed: "Could not load the JSON editor: ", jsonStylesFailed: "JSON styles could not load.", jsonWorkerFailed: "JSON worker could not load.",
+    importSource:"Import JSON", exportSource:"Export JSON", replaceSource:"Replace the current draft with this imported configuration? Unsaved changes will be replaced. The saved dashboard changes only after Save & Generate.", importHelp:"Paste Marao configuration JSON. Translation is checked before replacing the draft.", importFailed:"Could not import the configuration. ", editorTitle: "Marao Dashboard Editor", loading: "Loading your dashboard…", loadingJson: "Loading JSON editor…", retry: "Retry", loadFailed: "Could not load your dashboard: ", jsonFailed: "Could not load the JSON editor: ", jsonStylesFailed: "JSON styles could not load.", jsonWorkerFailed: "JSON worker could not load.",
     subtitle: "Configure pages and cards.", visual: "Visual", json: "JSON",
-    save: "Save & Generate", discard: "Discard changes", history: "History", open: "Open dashboard",
+    save: "Save & Generate", apply: "Apply to dashboard settings", applied: "Applied. Save the dashboard settings to finish.", discard: "Discard changes", open: "Open dashboard",
     navigation: "Navigation bar", addNavPage: "Add page", general: "General", overview: "Overview", rooms: "Rooms", pages: "Pages", addRoom: "Add room", addCustomPage: "Add custom page",
     addCard: "Add card", noCards: "No cards yet.", dirty: "Unsaved changes", clean: "Saved",
-    format: "Format JSON", collapse: "Collapse region", expand: "Expand region", advanced: "Advanced options", restore: "Restore", cancel: "Cancel", more: "More actions",
+    format: "Format JSON", collapse: "Collapse region", expand: "Expand region", advanced: "Advanced options", cancel: "Cancel", more: "More actions",
     jsonIconsFailed: 'JSON icons could not load.',
     create: "Create", update: "Update", delete: "Delete", duplicate: "Duplicate",
     edit: "Edit", add: "Add", chooseCard: "Choose a card",
@@ -53,16 +53,18 @@ const TEXT = {
     unknown: "Unknown", unavailable: "Unavailable",
     noArea: "Choose a suggestion area in Edit page, or search all entities.", missingArea: "This suggestion area is no longer available. Search all entities or choose another area.",
     noSuggestions: "No new compatible entities in this area.", noResults: "No compatible entities match your search.", globalSearch: "Search entities from any room.", alreadyAdded: "Already added",
-    labelsFailed: "Could not load editor translations. ", restoreConfirm: "Restore this version? Unsaved changes will be lost.", historyLoading: "Loading history…", historyEmpty: "No generated versions yet.", historyFailed: "Could not load history. ", saving: "Generating dashboard…",
-    pendingConversion: "The saved dashboard is ready to convert. Save & Generate keeps the prior version in History.",
+    labelsFailed: "Could not load editor translations. ", saving: "Saving…",
+    pendingConversion: "The saved dashboard is ready to convert. Export a copy before saving.",
+    externalChange: "This dashboard changed in another session. Your draft is retained. Export it before reloading or reconciling the changes.",
+    subscribeFailed: "Could not watch dashboard changes. ",
   },
   pt: {
-    editorTitle: "Editor do Marao Dashboard", loading: "A carregar o seu dashboard…", loadingJson: "A carregar o editor JSON…", retry: "Tentar novamente", loadFailed: "Não foi possível carregar o dashboard: ", jsonFailed: "Não foi possível carregar o editor JSON: ", jsonStylesFailed: "Não foi possível carregar os estilos do editor JSON.", jsonWorkerFailed: "Não foi possível carregar o processo do editor JSON.",
+    importSource:"Importar JSON", exportSource:"Exportar JSON", replaceSource:"Substituir o rascunho atual por esta configuração importada? As alterações por guardar serão substituídas. O dashboard guardado só muda após Guardar e gerar.", importHelp:"Cole o JSON da configuração Marao. A tradução é verificada antes de substituir o rascunho.", importFailed:"Não foi possível importar a configuração. ", editorTitle: "Editor do Marao Dashboard", loading: "A carregar o seu dashboard…", loadingJson: "A carregar o editor JSON…", retry: "Tentar novamente", loadFailed: "Não foi possível carregar o dashboard: ", jsonFailed: "Não foi possível carregar o editor JSON: ", jsonStylesFailed: "Não foi possível carregar os estilos do editor JSON.", jsonWorkerFailed: "Não foi possível carregar o processo do editor JSON.",
     subtitle: "Configure páginas e cartões.", visual: "Visual", json: "JSON",
-    save: "Guardar e gerar", discard: "Descartar alterações", history: "Histórico", open: "Abrir dashboard",
+    save: "Guardar e gerar", apply: "Aplicar às definições do dashboard", applied: "Aplicado. Guarde as definições do dashboard para concluir.", discard: "Descartar alterações", open: "Abrir dashboard",
     navigation: "Barra de navegação", addNavPage: "Adicionar página", general: "Geral", overview: "Resumo", rooms: "Divisões", pages: "Páginas", addRoom: "Adicionar divisão", addCustomPage: "Adicionar página personalizada",
     addCard: "Adicionar cartão", noCards: "Ainda não existem cartões.", dirty: "Alterações por guardar", clean: "Guardado",
-    format: "Formatar JSON", collapse: "Recolher região", expand: "Expandir região", advanced: "Opções avançadas", restore: "Restaurar", cancel: "Cancelar", more: "Mais ações",
+    format: "Formatar JSON", collapse: "Recolher região", expand: "Expandir região", advanced: "Opções avançadas", cancel: "Cancelar", more: "Mais ações",
     jsonIconsFailed: 'Não foi possível carregar os ícones JSON.',
     create: "Criar", update: "Atualizar", delete: "Eliminar", duplicate: "Duplicar",
     edit: "Editar", add: "Adicionar", chooseCard: "Escolha um cartão",
@@ -71,8 +73,10 @@ const TEXT = {
     unknown: "Desconhecida", unavailable: "Indisponível",
     noArea: "Escolha uma área para sugestões em Editar página ou pesquise todas as entidades.", missingArea: "Esta área para sugestões já não está disponível. Pesquise todas as entidades ou escolha outra área.",
     noSuggestions: "Não existem novas entidades compatíveis nesta área.", noResults: "Nenhuma entidade compatível corresponde à pesquisa.", globalSearch: "Pesquise entidades de qualquer divisão.", alreadyAdded: "Já adicionada",
-    labelsFailed: "Não foi possível carregar as traduções do editor. ", restoreConfirm: "Restaurar esta versão? As alterações por guardar serão perdidas.", historyLoading: "A carregar o histórico…", historyEmpty: "Ainda não existem versões geradas.", historyFailed: "Não foi possível carregar o histórico. ", saving: "A gerar o dashboard…",
-    pendingConversion: "O dashboard guardado está pronto para conversão. Guardar e gerar mantém a versão anterior no Histórico.",
+    labelsFailed: "Não foi possível carregar as traduções do editor. ", saving: "A guardar…",
+    pendingConversion: "O dashboard guardado está pronto para conversão. Exporte uma cópia antes de guardar.",
+    externalChange: "Este dashboard foi alterado noutra sessão. O rascunho foi mantido. Exporte antes de recarregar ou conciliar as alterações.",
+    subscribeFailed: "Não foi possível acompanhar as alterações do dashboard. ",
   },
 };
 
@@ -92,7 +96,6 @@ class MaraoDashboardPanel extends HTMLElement {
     this._requestedTab = "visual";
     this._jsonAttempt = 0;
     this._documentEpoch = 0;
-    this._historyEpoch = 0;
     this._preparationStages = [];
     this._busy = false;
     this._dirty = false;
@@ -124,9 +127,32 @@ class MaraoDashboardPanel extends HTMLElement {
       this._ensureLabels().then(() => { if (this.isConnected && this._tab === 'visual') this._renderVisual(); }).catch(error => { this._retryKind = 'labels'; this._setStatus(this._t('labelsFailed') + this._error(error), 'error'); });
     }
     if (this.isConnected && !this._loaded && !this._loadAttempted) this._load();
+    if (this.isConnected) this._subscribeNativeChanges();
   }
 
   set panel(value) { this._panel = value; }
+
+  get persistence() {
+    if (!this.nativeSession) throw new Error(this._l('Open the editor from the native Marao dashboard.'));
+    this.nativeSession.hass = this._hass;
+    return this.nativeSession;
+  }
+
+  _exportSource() {
+    this._moveHaptic();
+    const text = !this._dirty && this.nativeSession?.baseline?.strategy.source_json || (this._tab === 'json' ? this._monaco?.getValue() ?? this._jsonDraft ?? this._source() : this._source());
+    const url = URL.createObjectURL(new Blob([text], { type:'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'marao-source.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  async _importSource() {
+    try {
+      const {openSourceImport} = await import(new URL(`./MaraoSourceImport.js${PANEL_ASSET_VERSION}`,import.meta.url));
+      if (this.isConnected) openSourceImport(this);
+    } catch (error) { this._setStatus(this._t('importFailed') + this._error(error),'error'); }
+  }
+
 
   connectedCallback() {
     this._renderShell();
@@ -145,6 +171,7 @@ class MaraoDashboardPanel extends HTMLElement {
     this.addEventListener('scrollend', () => { this._scrolling = false; this._resumeJsonPreparation(); }, options);
     document.addEventListener('visibilitychange', () => this._resumeJsonPreparation(), options);
     if (this._hass && !this._loaded && !this._loadAttempted) this._load();
+    this._subscribeNativeChanges();
     this._cardDrag = bindCardDrag(this.shadowRoot, {
       sourceFor: row => this._cardSource(row.dataset.kind, row.dataset.room, Number(row.dataset.cardDrag)),
       commit: (source, section, boundary) => this._commitCardMove(source, section, boundary),
@@ -162,6 +189,8 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this._nativeSubscriptionEpoch = (this._nativeSubscriptionEpoch || 0) + 1;
+    this._nativeUnsubscribe?.(); this._nativeUnsubscribe = null; this._nativeConnection = null;
     clearTimeout(this._metadataRefreshTimer); this._metadataRefreshTimer = null;
     this._metadataRefreshVersion = (this._metadataRefreshVersion || 0) + 1;
     this._cardDrag?.dispose(); this._cardDrag = null;
@@ -171,7 +200,7 @@ class MaraoDashboardPanel extends HTMLElement {
     this._cancelIdleStage?.();
     this._interacting = false; this._scrolling = false;
     this._jsonPreparing = null; this._jsonLoading = null; this._jsonForeground = false;
-    this._contextRequest = null; this._metadataLoading = null; this._historyLoading = null;
+    this._contextRequest = null; this._metadataLoading = null;
     this._jsonCancel?.();
     this._jsonEvents?.abort();
     if (this._monaco) this._jsonDraft = this._monaco.getValue();
@@ -179,6 +208,24 @@ class MaraoDashboardPanel extends HTMLElement {
     this._monaco?.getModel()?.dispose(); this._monaco?.dispose(); this._monaco = null;
     this._busy = false;
     if (!this._loaded) this._loadAttempted = false;
+  }
+
+  _subscribeNativeChanges() {
+    const connection = this._hass?.connection;
+    if (!this.nativeSession?.subscribe || !connection || connection === this._nativeConnection) return;
+    this._nativeUnsubscribe?.(); this._nativeUnsubscribe = null; this._nativeConnection = connection;
+    const epoch = this._nativeSubscriptionEpoch = (this._nativeSubscriptionEpoch || 0) + 1;
+    this.persistence.subscribe(() => {
+      if (!this.isConnected || epoch !== this._nativeSubscriptionEpoch || !this._loaded) return;
+      if (this._dirty || this._busy) this._setStatus(this._t('externalChange'), 'error');
+      else this._load(true);
+    }).then(remove => {
+      if (!this.isConnected || epoch !== this._nativeSubscriptionEpoch) remove(); else this._nativeUnsubscribe = remove;
+    }).catch(error => {
+      if (!this.isConnected || epoch !== this._nativeSubscriptionEpoch) return;
+      this._nativeConnection = null;
+      this._setStatus(this._t('subscribeFailed') + this._error(error), 'error');
+    });
   }
 
   _t(key) {
@@ -218,7 +265,8 @@ class MaraoDashboardPanel extends HTMLElement {
             <details class="secondary-actions">
               <summary aria-label="${this._t("more")}"><ha-icon icon="mdi:dots-vertical"></ha-icon></summary>
               <div class="secondary-menu">
-            <ha-button id="history">${this._t("history")}</ha-button>
+            <ha-button id="import-source">${this._t("importSource")}</ha-button>
+            <ha-button id="export-source">${this._t("exportSource")}</ha-button>
             <ha-button id="discard">${this._t("discard")}</ha-button>
             <a id="open-dashboard" href="#" target="_blank" rel="noopener">${this._t("open")}</a>
               </div>
@@ -253,7 +301,8 @@ class MaraoDashboardPanel extends HTMLElement {
     this._updateHeader();
     this.shadowRoot.getElementById("save").addEventListener("click", () => this._save());
     this.shadowRoot.getElementById("discard").addEventListener("click", () => this._discard());
-    this.shadowRoot.getElementById("history").addEventListener("click", () => this._openHistory());
+    this.shadowRoot.getElementById("import-source").addEventListener("click", () => this._importSource());
+    this.shadowRoot.getElementById("export-source").addEventListener("click", () => this._exportSource());
     this.shadowRoot.querySelector(".secondary-menu").addEventListener("click", () => {
       this.shadowRoot.querySelector(".secondary-actions").open = false;
       this._focusWithoutScroll(this.shadowRoot.querySelector(".secondary-actions summary"));
@@ -294,13 +343,13 @@ class MaraoDashboardPanel extends HTMLElement {
     const lifecycle = this._lifecycle;
     const previousModel = this._model;
     const previouslyLoaded = this._loaded;
-    const retained = Object.fromEntries(['_catalog', '_entities', '_areas', '_haCardLabels', '_displayEntityIds', '_contextReady', '_contextError', '_contextPayload', '_history', '_historyLoaded', '_pageTemplates', '_savedSource', '_jsonDraft', '_dirty', '_dashboardUrl', '_visualReady'].map(key => [key, this[key]]));
+    const retained = Object.fromEntries(['_catalog', '_entities', '_areas', '_haCardLabels', '_displayEntityIds', '_contextReady', '_contextError', '_contextPayload', '_pageTemplates', '_savedSource', '_jsonDraft', '_dirty', '_dashboardUrl', '_visualReady'].map(key => [key, this[key]]));
     this._loadAttempted = true;
     this._retryKind = null;
     this._setBusy(true); this._setStatus(this._t("loading"), "");
     this._loading = Promise.resolve().then(async () => {
       try {
-        const [payload] = await Promise.all([this._hass.callWS({ type: "marao_dashboard/config/get", scope: "initial" }), this._ensureLabels(force)]);
+        const [payload] = await Promise.all([this.persistence.read('initial'), this._ensureLabels(force)]);
         if (!this.isConnected || lifecycle !== this._lifecycle) return;
         const model = normalizeConfig(JSON.parse(payload.config));
         this._catalog = payload.editor.catalog; this._entities = payload.editor.entities;
@@ -309,8 +358,7 @@ class MaraoDashboardPanel extends HTMLElement {
         this._displayEntityIds = new Set(payload.editor.display_entity_ids || payload.editor.entities.map(entity => entity.entity_id));
         this._contextReady = !payload.editor.display_entity_ids;
         this._contextError = null; this._contextRequest = null; this._contextPayload = null; this._metadataLoading = null;
-        this._documentEpoch++; this._historyEpoch++;
-        this._history = payload.history ?? this._history; this._historyLoaded = Array.isArray(this._history);
+        this._documentEpoch++;
         this._model = model; this._loaded = true;
         this._visualReady = false;
         this._renderVisual();
@@ -325,7 +373,7 @@ class MaraoDashboardPanel extends HTMLElement {
       } catch (error) {
         if (!this.isConnected || lifecycle !== this._lifecycle) return;
         this._model = previousModel; this._loaded = previouslyLoaded;
-        Object.assign(this, retained); this._documentEpoch++; this._historyEpoch++;
+        Object.assign(this, retained); this._documentEpoch++;
         this._contextRequest = null; this._metadataLoading = null;
         if (previouslyLoaded) this._renderVisual(); else this.shadowRoot.getElementById('visual-view').replaceChildren?.();
         if (this._monaco && previousModel) this._setEditorSource(this._jsonDraft ?? this._source());
@@ -361,10 +409,11 @@ class MaraoDashboardPanel extends HTMLElement {
     root.getElementById("dirty").textContent = this._dirty ? this._t("dirty") : "";
     root.querySelector(".title h1").textContent = this._t("editorTitle");
     root.querySelector(".secondary-actions summary").setAttribute("aria-label", this._t("more"));
-    for (const [id, key] of [["save", "save"], ["discard", "discard"], ["history", "history"], ["open-dashboard", "open"], ["retry", "retry"]]) root.getElementById(id).textContent = this._t(key);
+    for (const [id, key] of [["save", "save"], ["discard", "discard"], ["import-source", "importSource"], ["export-source", "exportSource"], ["open-dashboard", "open"], ["retry", "retry"]]) root.getElementById(id).textContent = this._t(id === "save" && this.nativeSession?.strategy ? "apply" : key);
     root.getElementById("save").disabled = this._busy || !this._loaded;
     root.getElementById("discard").disabled = this._busy || !this._dirty;
-    root.getElementById("history").disabled = this._busy || !this._loaded;
+    root.getElementById("import-source").disabled = this._busy || !this._loaded;
+    root.getElementById("export-source").disabled = !this._loaded;
     root.getElementById("open-dashboard").setAttribute("aria-disabled", String(this._busy || !this._loaded));
     root.querySelectorAll("[data-tab]").forEach(button => { button.disabled = this._busy || !this._loaded; });
   }
@@ -1125,7 +1174,7 @@ class MaraoDashboardPanel extends HTMLElement {
         const legacy = parsed && this._catalog.config_version >= 2 && [undefined, 0, 1].includes(parsed.config_version);
         if (legacy) {
           const lifecycle = this._lifecycle;
-          const payload = await this._hass.callWS({ type: 'marao_dashboard/config/get', config: this._monaco.getValue() });
+          const payload = await this.persistence.preview(this._monaco.getValue());
           if (!this.isConnected || lifecycle !== this._lifecycle || this._requestedTab !== 'visual') return;
           parsed = JSON.parse(payload.config);
         }
@@ -1271,8 +1320,10 @@ class MaraoDashboardPanel extends HTMLElement {
   async _save() {
     this._cardDrag?.cancel();
     if (this._busy || !this._loaded) return;
-    const lifecycle = this._lifecycle, epoch = this._documentEpoch, model = this._model;
-    const current = () => this.isConnected && lifecycle === this._lifecycle && epoch === this._documentEpoch && model === this._model;
+    const lifecycle = this._lifecycle, epoch = this._documentEpoch, model = this._model, session = this.nativeSession;
+    const sameDocument = () => epoch === this._documentEpoch && model === this._model && session === this.nativeSession;
+    const current = () => this.isConnected && lifecycle === this._lifecycle && sameDocument();
+    let accepted = false;
     this._setBusy(true); this._setStatus(this._contextReady ? this._t('saving') : this._t('metadataLoading'), '');
     try {
       await this._ensureEditorContext();
@@ -1280,7 +1331,7 @@ class MaraoDashboardPanel extends HTMLElement {
       const source = this._tab === 'json' ? this._monaco.getValue() : this._source();
       let parsed = JSON.parse(source);
       if (parsed && !Object.hasOwn(parsed, 'name') && Object.hasOwn(parsed, 'title') && Object.hasOwn(parsed, 'views')) {
-        const preview = await this._hass.callWS({ type: 'marao_dashboard/config/get', config: source });
+        const preview = await this.persistence.preview(source);
         if (!current()) return;
         parsed = JSON.parse(preview.config);
       }
@@ -1291,18 +1342,19 @@ class MaraoDashboardPanel extends HTMLElement {
         if (!current()) return;
       }
       this._setStatus(this._t('saving'), '');
-      const result = await this._hass.callWS({ type: 'marao_dashboard/config/generate', config: source });
-      if (!current()) return;
+      const result = await this.persistence.save(source);
+      // HA may reattach the same retained draft before acknowledging its save.
+      if (!sameDocument()) return;
+      accepted = true;
       this._model = normalizeConfig(JSON.parse(result.config || source)); this._documentEpoch++;
       this._jsonDraft = null; this._pageTemplates = null;
-      this._historyEpoch++; this._history = result.history; this._historyLoaded = Array.isArray(result.history);
       this._savedSource = this._source(); this._dirty = false;
       this.shadowRoot.getElementById('open-dashboard').href = result.dashboard_url;
       this._dashboardUrl = result.dashboard_url;
       this._setEditorSource(this._savedSource); this._renderVisual(); this._updateHeader();
-      this._setStatus(result.config_changed ? 'Generated. Restart Home Assistant once to load the changed dashboard registration.' : 'Dashboard generated successfully.', 'success');
-    } catch (error) { if (this.isConnected && lifecycle === this._lifecycle) { if (!this._contextReady) this._contextFailure(error); else this._setStatus(this._error(error), 'error'); } }
-    finally { if (this.isConnected && lifecycle === this._lifecycle) this._setBusy(false); }
+      this._setStatus(this._t(this.nativeSession?.strategy ? 'applied' : 'clean'), 'success');
+    } catch (error) { if (sameDocument()) { if (!this._contextReady) this._contextFailure(error); else this._setStatus(this._error(error), 'error'); } }
+    finally { if (accepted || sameDocument() || this.isConnected && lifecycle === this._lifecycle) this._setBusy(false); }
   }
 
   _discard() {
@@ -1466,7 +1518,7 @@ class MaraoDashboardPanel extends HTMLElement {
     if (this._contextRequest) return this._contextRequest;
     if (this._contextError) return Promise.reject(this._contextError);
     const lifecycle = this._lifecycle, epoch = this._documentEpoch;
-    const request = Promise.resolve().then(() => this._hass.callWS({ type: 'marao_dashboard/config/get', scope: 'context' })).then(payload => {
+    const request = Promise.resolve().then(() => this.persistence.read('context')).then(payload => {
       if (!Array.isArray(payload.editor?.entities) || !Array.isArray(payload.editor?.areas) || !Array.isArray(payload.editor?.catalog?.cards)) throw new Error(this._t('metadataFailed'));
       if (this.isConnected && lifecycle === this._lifecycle && epoch === this._documentEpoch) this._contextPayload = { ...payload, epoch };
       return { ...payload, epoch };
@@ -1871,54 +1923,6 @@ class MaraoDashboardPanel extends HTMLElement {
     render();
   }
 
-  _readHistory(retry = false) {
-    if (this._historyLoaded) return Promise.resolve(this._history);
-    if (this._historyLoading) return this._historyLoading;
-    if (this._historyError && !retry) return Promise.reject(this._historyError);
-    this._historyError = null;
-    const lifecycle = this._lifecycle, epoch = this._historyEpoch;
-    const loading = Promise.resolve().then(() => this._hass.callWS({ type: 'marao_dashboard/config/get', scope: 'history' })).then(payload => {
-      if (!Array.isArray(payload.history)) throw new Error(this._t('historyFailed'));
-      if (this.isConnected && lifecycle === this._lifecycle && epoch === this._historyEpoch) { this._history = payload.history; this._historyLoaded = true; }
-      return this._history;
-    }).catch(error => { if (epoch === this._historyEpoch) this._historyError = error; throw error; });
-    this._historyLoading = loading;
-    loading.finally(() => { if (this._historyLoading === loading) this._historyLoading = null; }).catch(() => {});
-    return loading;
-  }
-
-  _openHistory() {
-    const dialog = this._dialog(this._t('history')), content = dialog.querySelector('.dialog-content');
-    const render = async (retry = false) => {
-      content.innerHTML = `<p role="status">${this._t('historyLoading')}</p><div class="dialog-actions"><ha-button data-close>${this._t('cancel')}</ha-button></div>`;
-      content.querySelector('[data-close]').addEventListener('click', () => this._closeDialog(dialog));
-      try { await this._readHistory(retry); }
-      catch (error) {
-        if (!dialog.isConnected || !dialog.open) return;
-        content.innerHTML = `<p role="alert">${esc(this._t('historyFailed') + this._error(error))}</p><ha-button data-history-retry>${this._t('retry')}</ha-button><ha-button data-close>${this._t('cancel')}</ha-button>`;
-        content.querySelector('[data-history-retry]').addEventListener('click', () => render(true));
-        content.querySelector('[data-close]').addEventListener('click', () => this._closeDialog(dialog)); return;
-      }
-      if (!dialog.isConnected || !dialog.open) return;
-      content.innerHTML = `${this._history?.length ? this._history.map(item => `<div class="history-row"><div><strong>${esc(item.name || item.slug)}</strong><br><small>${new Date(item.created_at).toLocaleString()} · ${esc(item.reason)}</small></div><ha-button data-version="${esc(item.version)}">${this._t('restore')}</ha-button></div>`).join('') : `<div class="empty">${this._t('historyEmpty')}</div>`}<div class="dialog-actions"><ha-button data-close>${this._t('cancel')}</ha-button></div>`;
-      content.querySelector('[data-close]').addEventListener('click', () => this._closeDialog(dialog));
-      content.querySelectorAll('[data-version]').forEach(button => button.addEventListener('click', async () => {
-        if (this._busy || !this._historyLoaded || !confirm(this._t('restoreConfirm'))) return;
-        const lifecycle = this._lifecycle;
-        try {
-          this._setBusy(true);
-          const result = await this._hass.callWS({ type: 'marao_dashboard/history/restore', version: button.dataset.version });
-          if (!this.isConnected || lifecycle !== this._lifecycle) return;
-          this._documentEpoch++; this._historyEpoch++;
-          this._history = result.history; this._historyLoaded = Array.isArray(result.history);
-          this._closeDialog(dialog); this._setBusy(false); await this._load(true);
-        } catch (error) { this._setStatus(this._error(error), 'error'); }
-        finally { if (this.isConnected && lifecycle === this._lifecycle) this._setBusy(false); }
-      }));
-    };
-    render();
-  }
-
   _openFormDialog(title, initial, schema, save, action = this._t('update')) {
     const dialog = this._dialog(title); const content = dialog.querySelector(".dialog-content"); const data = clone(initial);
     content.innerHTML = `<div id="form"></div><p data-error role="alert"></p><div class="dialog-actions"><ha-button data-close>${this._t("cancel")}</ha-button><ha-button data-save appearance="filled">${esc(action)}</ha-button></div>`;
@@ -2081,6 +2085,7 @@ class MaraoDashboardPanel extends HTMLElement {
   _entityId(value) { return typeof value === "string" ? value : value?.entity_id || ""; }
   _entityIds(values) { if (values == null) return []; return (Array.isArray(values) ? values : [values]).map((value) => this._entityId(value)).filter(Boolean); }
   _setBusy(busy) {
+    const settled = this._busy && !busy;
     this._cardDrag?.cancel(); this._busy = busy;
     this.shadowRoot.getElementById("visual-view").inert = busy;
     if (busy) {
@@ -2097,9 +2102,11 @@ class MaraoDashboardPanel extends HTMLElement {
     for (const dialog of this.shadowRoot.querySelectorAll('ha-dialog')) dialog.inert = busy;
     this._updateHeader();
     if (!busy) this._resumeJsonPreparation();
+    if (settled) globalThis.window?.dispatchEvent?.(new Event('marao-interaction-settled'));
   }
   _setStatus(message, kind) { const status = this.shadowRoot.getElementById("status"); status.textContent = message; status.className = `status ${kind || ""}`; this.shadowRoot.getElementById("retry").hidden = !this._retryKind; }
   _error(error) {
+    if (error?.name === 'SourceError') return this.nativeSession.describeError(error);
     const message = String(error?.message || error?.body?.message || error), split = message.indexOf(': ');
     return split < 0 ? this._l(message) : this._l(message.slice(0, split)) + message.slice(split);
   }

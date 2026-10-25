@@ -39,9 +39,35 @@ function plan(config) {
     row.frozen_expected_sha256 = sha256(JSON.stringify(row.expected));
     row.entity_aliases = historicalEntityAliases(row.expected, require('../ha-test/prepare').referencedEntities);
   }
-  assert.equal(new Set(rows.map(row => row.baseline)).size, 7);
+  assert.equal(new Set(rows.map(row => row.baseline)).size, rows.length);
   for (const row of rows) assert.equal(row.expected.config_version, 2);
   return { rows, current, formats, baselines: ['v0.2.0', ...provenance.map(row => row.tag), 'predecessor-format-1', 'current-format-2'] };
+}
+
+function nativePlan(config) {
+  const selected=plan(config),modern=JSON.parse(fs.readFileSync(path.join(fixtures,'native-baselines.json'))).records;
+  for(const record of modern) selected.rows.push({baseline:record.tag,format:formats[3],source:fs.readFileSync(path.join(fixtures,record.input),'utf8'),expected:JSON.parse(fs.readFileSync(path.join(fixtures,record.expected_source))),expected_compiled:JSON.parse(fs.readFileSync(path.join(fixtures,record.expected_compiled))),replay:'released-source-data',provenance:record});
+  // This runner replays data only; actual manual cutover/rollback evidence remains separate.
+  for(const row of selected.rows)row.replay=row.baseline==='current-format-2'?'current-format-noop':row.baseline==='v0.2.0'?'historical-storage-data':row.baseline==='predecessor-format-1'?'supported-predecessor-data':'released-source-data';
+  selected.baselines=selected.rows.map(row=>row.baseline);return selected;
+}
+
+async function verifyNativeConversions(selected) {
+  const {convertDocument}=await import('../frontend_src/convert-document.js');
+  const results=[];
+  for(const row of selected.rows) {
+    const before=row.source,result=convertDocument(before,{dashboardRoot:'marao-dashboard'});
+    assert.deepEqual(result.source,row.expected,row.baseline+' complete native source');
+    if(row.expected_compiled)assert.deepEqual(result.compiled,row.expected_compiled,row.baseline+' complete native output');
+    const customInput=row.format===formats[0]?before.replaceAll('/marao-dashboard/','/marao-custom-root/'):before;
+    const customExpected=row.format===formats[0]?JSON.parse(JSON.stringify(row.expected).replaceAll('/marao-dashboard/','/marao-custom-root/')):row.expected;
+    const renamed=convertDocument(customInput,{dashboardRoot:'marao-custom-root'});
+    assert.deepEqual(renamed.source,customExpected);assert.equal(renamed.document.strategy.dashboard_root,'marao-custom-root');
+    assert.deepEqual(convertDocument(JSON.stringify(result.document)).source,result.source);
+    assert.equal(row.source,before);
+    results.push({baseline:row.baseline,format:row.format,replay:row.replay,source_sha256:sha256(before),expected_sha256:sha256(JSON.stringify(row.expected)),customRoot:true,repeatConversion:true,passed:true});
+  }
+  return results;
 }
 
 function scopedPlan(config, components) {
@@ -320,8 +346,17 @@ async function main() {
   const full = process.argv.includes('--full');
   const scopeIndex = process.argv.indexOf('--scope');
   let scope = scopeIndex >= 0 ? process.argv[scopeIndex + 1]?.split(',') : undefined;
+  const config = readConfig();
+  if(fs.existsSync(path.join(repoRoot,'custom_components/marao_dashboard/frontend/MaraoNativeDashboard.js'))) {
+    const selected=nativePlan(config);
+    if(process.argv.includes('--dry-run')) {console.log(JSON.stringify({target:config.url,mode:'native-guided-migration',baselines:selected.rows.map(({baseline,format,replay})=>({baseline,format,replay})),conversionCommand:'npm run test:ha:upgrade -- --conversion-only',manualGuide:'docs/docs/installation/native-migration.md',automaticLegacyReplacement:false},null,2));return;}
+    assert.ok(process.argv.includes('--conversion-only'),'Native cutover is guided manual migration. Use --conversion-only for historical data replay; follow the migration guide for preserved-install/rollback and separate HACS update proof. No installation changed.');
+    const rows=await verifyNativeConversions(selected),directory=path.join(repoRoot,'ha-test/.artifacts/native-frontend');fs.mkdirSync(directory,{recursive:true,mode:0o700});
+    const reportPath=path.join(directory,'conversion-replay.json');fs.writeFileSync(reportPath,JSON.stringify({kind:'native-conversion-data-replay',installed:false,candidate: fingerprint(path.join(repoRoot,'custom_components/marao_dashboard/frontend')),rows},null,2),{mode:0o600});
+    console.log('Native conversion data replay passed for '+rows.length+' baselines. No HA writes, historical package installation or HACS update was performed.');return;
+  }
   if (!full && !scope) scope = require('./verification').makePlan({ release: true }).components;
-  const config = readConfig(), selected = full ? plan(config) : scopedPlan(config, scope || []);
+  const selected = full ? plan(config) : scopedPlan(config, scope || []);
   if (process.argv.includes('--dry-run')) {
     console.log(JSON.stringify({ target: config.url, baselines: selected.rows.map(({ baseline, format, replay }) => ({ baseline, format, replay })),
       profiles: full ? coverage.profiles : ['iphone-normal'], themes: coverage.themes, scope: full ? 'full' : scope, phases: ['private backup', 'released package health', 'package-only replacement and setup',
@@ -611,5 +646,5 @@ function assertUnrelatedEntries(before, after, entryId) {
   assert.deepEqual(unrelated(after), unrelated(before), 'Concurrent unrelated entry change; retained recovery backup');
 }
 
-module.exports = { unrelatedConfiguration, addResourceSentinel, assertUnrelatedEntries, child, extendedSource, hashes, patchRegistration, plan, scopedPlan, validateVisualReviews, withRecovery };
+module.exports = { unrelatedConfiguration, addResourceSentinel, assertUnrelatedEntries, child, extendedSource, hashes, patchRegistration, plan, nativePlan, verifyNativeConversions, scopedPlan, validateVisualReviews, withRecovery };
 if (require.main === module) main().catch(error => { console.error(error.message.split('\n')[0]); process.exitCode = 1; });

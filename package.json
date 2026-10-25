@@ -1,13 +1,13 @@
 {
   "name": "marao-dashboard",
-  "version": "0.21.1",
+  "version": "0.22.0-beta.1",
   "private": true,
   "description": "Marao Dashboard Home Assistant dashboard development tools",
   "scripts": {
     "setup": "npm ci",
     "build:editor": "node frontend_src/build-editor.cjs",
     "check:editor": "node frontend_src/build-editor.cjs --check",
-    "build:hacs": "npm run build:editor && node frontend_src/build-hacs-dist.cjs",
+    "build:hacs": "npm run build:editor && node frontend_src/build-native.cjs --frontend",
     "test:frontend": "node --test --test-concurrency=1 tests/frontend/*.test.js",
     "test:static": "npm run check:editor && npm run test:frontend && node frontend_src/build-hacs-dist.cjs && node --check ha-test/.cache/dist/custom_components/marao_dashboard/frontend/MaraoDashboard.js && node tests/validate-yaml.js",
     "test:python": "pytest --cov=custom_components.marao_dashboard --cov-report=term-missing",
@@ -27,7 +27,8 @@
     "ha:sync:dry-run": "node ha-test/prepare.js --dry-run",
     "test:ha:upgrade": "node tests/test-ha-upgrade.js",
     "test:affected": "node tests/verification.js",
-    "test:full": "node tests/verification.js --full"
+    "test:full": "node tests/verification.js --full",
+    "build:converter": "node frontend_src/build-native.cjs"
   },
   "devDependencies": {
     "chart.js": "4.5.1",

@@ -74,8 +74,9 @@ function editableFrontendFile(root, filename) {
   const relative = String(filename).replaceAll('\\', '/');
   if (relative.split('/').some(part => part.startsWith('.')) || /(?:~|\.sw[op])$/.test(relative)) return false;
   if (root === 'frontend_src') return true;
+  if (relative === 'marao-owned-assets.json') return false;
   // Generated bundles follow source edits; watching them would rebuild each save twice.
-  return !/^(?:assets\/|.*\.LICENSE\.txt$|Marao(?:Dashboard(?:Panel|EditorLabels|JsonEditor|JsonPreparation|EditorWorker|JsonWorker)|Native(?:Catalog|CardEditor|Cards)|History(?:Data|Chart))\.(?:js|css)$)/.test(relative);
+  return !/^(?:assets\/|.*\.LICENSE\.txt$|Marao(?:Dashboard(?:Panel|EditorLabels|JsonEditor|JsonPreparation|EditorWorker|JsonWorker)|Native(?:Catalog|CardEditor|Cards|Model|Dashboard)|Theme|SourceImport|History(?:Data|Chart))\.(?:js|css)$)/.test(relative);
 }
 
 function createRefreshQueue(refresh, { delay = 250, onError = () => {} } = {}) {
@@ -138,7 +139,7 @@ async function inspect(page, options, version, output) {
     }
     const urls = await page.evaluate(() => performance.getEntriesByType('resource').map(entry => entry.name));
     for (const file of ['MaraoDashboardPanel.js', ...(inspection.components.includes('json-editor') ? ['MaraoDashboardJsonEditor.js'] : [])]) {
-      assert.ok(urls.some(value => { const url = new URL(value); return url.pathname.endsWith('/' + file) && url.searchParams.get('v') === version; }), 'Editor loaded stale ' + file);
+      assert.ok(urls.some(value => { const url = new URL(value); return /^[a-f0-9]{64}$/.test(version) ? url.pathname.endsWith('/'+version+'--'+file) : url.pathname.endsWith('/' + file) && url.searchParams.get('v') === version; }), 'Editor loaded stale ' + file);
     }
     targets = [{ locator: panel, family: 'editor' }];
   } else {
@@ -174,7 +175,7 @@ async function main(argv = process.argv.slice(2)) {
   const { contextOptionsForScenario, configurePageEmulation } = require('./test-ha-dashboard-accessibility');
   const prepared = await prepareFrontend();
   assert.equal(new URL(prepared.config.url).hostname, '192.168.0.28', 'Preview is restricted to the disposable instance.');
-  const route = options.inspection.editor ? '/marao-dashboard-editor' : '/marao-dashboard/' + previewRoute(prepared.dashboard, options.inspection.families);
+  const route = options.inspection.editor ? prepared.editorURL || '/marao-dashboard-editor' : '/marao-dashboard/' + previewRoute(prepared.previewDashboard || prepared.dashboard, options.inspection.families);
   const output = require('./verification-browser').artifactDirectory('frontend-preview/' + Date.now());
   const browser = await chromium.launch({ headless: options.once });
   let queue, failed = false;
@@ -201,7 +202,7 @@ async function main(argv = process.argv.slice(2)) {
         await inspect(page, options, current.version, output);
         if (diagnostics.errors.length > errorCount) throw new Error('Refreshed preview has browser diagnostics; inspect ' + output);
       }, { onError: error => report(error.message) });
-      for (const root of ['frontend_src', 'custom_components/marao_dashboard/frontend']) {
+      for (const root of ['frontend_src', 'custom_components/marao_dashboard/frontend', 'custom_components/marao_dashboard/themes']) {
         watchers.push(fs.watch(path.join(repoRoot, root), { recursive: true }, (_, filename) => { if (editableFrontendFile(root, filename)) queue.request(); }));
       }
     }

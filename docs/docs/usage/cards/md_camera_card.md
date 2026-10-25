@@ -139,10 +139,12 @@ Live video, dashboard/popup stream selection and fullscreen use the same native
 camera player. Netatmo recordings use Home Assistant's native HLS player with
 inline controls.
 
-The event timeline includes person, vehicle, animal, motion and other types
-reported by Netatmo. A recording containing several detections appears in each
-matching filter. Its original description appears in the detail view. Previews
-load only near the visible area and recordings resolve only when opened.
+The frontend package lists basic recordings exposed by Home Assistant's native
+Media browser. Netatmo detection headings and type filters are removed; titles
+are never used to guess person, vehicle, animal or motion events. Saved provider
+options remain in the configuration. Previews load only near the visible area
+and recordings resolve only when opened. The older Integration package supplied
+typed metadata through its Python endpoint; the frontend does not call it.
 The timeline contains recent recordings already available to Home Assistant,
 subject to `event_limit`, Netatmo retention, recording availability and camera
 read permissions. It does not download an unlimited archive.

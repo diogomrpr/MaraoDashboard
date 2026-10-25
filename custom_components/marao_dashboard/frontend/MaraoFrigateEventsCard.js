@@ -1,5 +1,5 @@
 const HTMLElementBase = globalThis.HTMLElement || class {};
-const { cardProblem, problemStyle, problemLabel, showCardDetails } = await import(`./MaraoCards.js${new URL(import.meta.url).search}`);
+const { cardProblem, problemStyle, problemLabel, showCardDetails } = await import(new URL(`./MaraoCards.js${new URL(import.meta.url).search}`, import.meta.url));
 
 const text = (value) => (value == null ? "" : String(value).trim());
 
@@ -28,6 +28,19 @@ const eventTime = (event) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : Date.parse(value) / 1000 || 0;
 };
+
+export function normalizeNetatmoRecordings(payload,cameraId,limit = 20) {
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('Invalid recording limit.');
+  if (!Array.isArray(payload?.children)) throw new Error('Unsupported native Netatmo recording response.');
+  const records = new Map();
+  for (const child of payload.children) {
+    const id = text(child?.media_content_id), match = /^media-source:\/\/netatmo\/events\/([a-zA-Z0-9:_-]+)\/([0-9]+)$/.exec(id);
+    const timestamp = match ? Number(match[2]) : NaN;
+    if (!match || match[1] !== cameraId || !Number.isSafeInteger(timestamp) || timestamp <= 0 || !Number.isFinite(new Date(timestamp * 1000).getTime()) || !child.can_play) throw new Error('Unsupported native Netatmo recording identifier.');
+    records.set(id,{id,provider:'netatmo',start_time:timestamp,mediaContentId:id,hasThumbnail:false,eventTypes:[]});
+  }
+  return [...records.values()].sort((a,b) => b.start_time - a.start_time).slice(0,limit);
+}
 
 export function normalizeFrigateEvents(payload) {
   let value = payload;
@@ -372,7 +385,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     try {
       const events = provider === "unifi_protect"
         ? await this._loadProtectEvents()
-        : provider === "netatmo" ? await this._hass.callWS({ type: "marao_dashboard/camera/netatmo_events", entity_id: this._config.entity, limit: this._config.limit })
+        : provider === "netatmo" ? await this._loadNetatmoRecordings()
         : await this._loadFrigateEvents(identity);
       if (request !== this._request) return;
       this._events = events;
@@ -409,6 +422,21 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     return normalizeProtectEvents(response, this._config.limit);
   }
 
+  async _loadNetatmoRecordings() {
+    const registry = await this._hass.callWS({type:'config/entity_registry/list'});
+    if (!Array.isArray(registry)) throw new Error('Native Netatmo camera metadata is unavailable.');
+    const entry = registry.find(item => item.entity_id === this._config.entity && item.platform === 'netatmo');
+    if (!entry?.unique_id) throw new Error('Native Netatmo camera identity is unavailable.');
+    const root = await this._browseMedia('media-source://netatmo');
+    const folders = (root.children || []).filter(item => {
+      const match = /^media-source:\/\/netatmo\/events\/([a-zA-Z0-9:_-]+)$/.exec(text(item.media_content_id));
+      return match && entry.unique_id.startsWith(match[1]+'-') && item.can_expand;
+    });
+    if (folders.length !== 1) throw new Error('Native Netatmo camera identity is ambiguous or unavailable.');
+    const id = folders[0].media_content_id, cameraId = id.split('/').at(-1);
+    return normalizeNetatmoRecordings(await this._browseMedia(id),cameraId,this._config.limit);
+  }
+
   _resetFeed() {
     this._observer?.disconnect();
     this._observer = undefined;
@@ -419,12 +447,12 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   _eventType(event) {
-    if (event.provider === "netatmo") return event.eventTypes?.[0] || "event";
+    if (event.provider === "netatmo") return "event";
     return event.provider === "unifi_protect" ? event.eventType || "event" : normalizedName(event.label) || "event";
   }
 
   _eventTypes(event) {
-    return event.provider === "netatmo" && event.eventTypes?.length ? event.eventTypes : [this._eventType(event)];
+    return event.provider === "netatmo" ? [] : [this._eventType(event)];
   }
 
   _typeLabel(type) {
@@ -642,7 +670,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
         ? await this._resolveMedia(event.mediaContentId)
         : await this._signPath(frigateEventPath(this._identity.instanceId, event.id, kind));
       if (kind === "hls" && !globalThis.customElements?.get("ha-hls-player")) {
-        const { loadNativeCamera } = await import(`./MaraoCamera.js${new URL(import.meta.url).search}`);
+        const { loadNativeCamera } = await import(new URL(`./MaraoCamera.js${new URL(import.meta.url).search}`, import.meta.url));
         await loadNativeCamera();
         if (!globalThis.customElements?.get("ha-hls-player")) throw new Error("HLS player unavailable");
       }
@@ -672,7 +700,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   _eventLabel(event) {
-    if (event.provider === "netatmo") return this._eventTypes(event).map(type => this._typeLabel(type)).join(" · ");
+    if (event.provider === "netatmo") return localize('camera_events.type.recording',this._hass,{},'Recording');
     if (event.provider === "unifi_protect") {
       return event.eventType && event.eventType !== "audio" ? this._typeLabel(event.eventType)
         : text(event.label) || localize("camera_events.event", this._hass, {}, "Event");
@@ -907,10 +935,8 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       : detail.kind === "clip"
       ? `<video src="${escapeHtml(detail.url)}" aria-label="${label}" controls playsinline preload="metadata"></video>`
       : `<img class="detail-image" src="${escapeHtml(detail.url)}" alt="${label}">`;
-    const description = detail.event.provider === "netatmo" && text(detail.event.label)
-      ? `<small>${escapeHtml(detail.event.label)}</small>` : "";
     const feedback = detail.status === "loading" ? localize("camera_events.loading_event", this._hass, {}, "Loading event…") : localize("common.error", this._hass, {}, "Error");
-    return `<section class="detail"><div class="detail-media">${detail.status === "loading" || detail.status === "error" ? `<p class="message" role="${detail.status === "error" ? "alert" : "status"}">${escapeHtml(feedback)}${detail.status === "error" ? `<button type="button" data-action="details" aria-label="${escapeHtml(detail.error)}"><ha-icon icon="mdi:information-outline" aria-hidden="true"></ha-icon></button>` : ""}</p>` : media}</div><div class="detail-meta"><strong>${label}</strong><small>${date}</small>${description}</div></section>`;
+    return `<section class="detail"><div class="detail-media">${detail.status === "loading" || detail.status === "error" ? `<p class="message" role="${detail.status === "error" ? "alert" : "status"}">${escapeHtml(feedback)}${detail.status === "error" ? `<button type="button" data-action="details" aria-label="${escapeHtml(detail.error)}"><ha-icon icon="mdi:information-outline" aria-hidden="true"></ha-icon></button>` : ""}</p>` : media}</div><div class="detail-meta"><strong>${label}</strong><small>${date}</small></div></section>`;
   }
 
   _handleMediaError(event) {

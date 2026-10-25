@@ -82,6 +82,8 @@ test('closing drains a queued save, ignores later requests and surfaces preparat
 });
 
 test('watch observes editable sources without looping on generated build output', () => {
+  for(const file of ['MaraoNativeModel.js','MaraoNativeDashboard.js','MaraoTheme.js','MaraoSourceImport.js','marao-owned-assets.json']) assert.equal(editableFrontendFile('custom_components/marao_dashboard/frontend',file),false);
+  assert.equal(editableFrontendFile('custom_components/marao_dashboard/frontend','MaraoSource.js'),true);
   assert.equal(editableFrontendFile('frontend_src', 'MaraoDashboardPanel.js'), true);
   for (const file of ['MaraoCards.js', 'MaraoCamera.js', 'themes/MaraoDashboard/marao-dashboard.yaml', 'brand/mark.svg', 'NewRuntime.js']) assert.equal(editableFrontendFile('runtime', file), true);
   for (const file of ['MaraoDashboardPanel.js', 'MaraoDashboardPanel.css', 'MaraoNativeCards.js', 'MaraoHistoryChart.js', 'assets/font.ttf', '.DS_Store', 'MaraoCards.js~']) assert.equal(editableFrontendFile('runtime', file), false);

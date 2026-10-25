@@ -7,7 +7,7 @@ let source = await fs.readFile(
   "utf8",
 );
 const cardsSource = (await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8')).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
-source = source.replace('await import(`./MaraoCards.js${new URL(import.meta.url).search}`)', `await import("data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}")`);
+source = source.replace('await import(new URL(`./MaraoCards.js${new URL(import.meta.url).search}`, import.meta.url))', `await import("data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}")`);
 globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
 const dashboardSource = await fs.readFile(
   new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url),
@@ -21,6 +21,7 @@ const {
   MaraoFrigateEventsCard,
   matchProtectCamera,
   normalizeFrigateEvents,
+  normalizeNetatmoRecordings,
   normalizeProtectEvents,
   protectThumbnailMediaSource,
   registerMaraoCameraEventCards,
@@ -692,42 +693,36 @@ test("Back restores filtered feed position and invalidates pending detail", asyn
   assert.equal(card._selected, undefined);
 });
 
-test('Netatmo uses typed metadata, lazy native media, multiple filters and controlled HLS detail', async () => {
-  const previous = globalThis.customElements;
-  globalThis.customElements = {get: name => name === 'ha-hls-player' ? class {} : undefined};
-  try {
-    const camera = 'camera.netatmo';
-    const calls = [];
-    const event = {id:'200',provider:'netatmo',label:'<script>provider text</script>',start_time:200,eventTypes:['person','animal'],hasThumbnail:true,mediaContentId:'media-source://netatmo/events/camera-id/200'};
-    const card = new MaraoFrigateEventsCard();
-    card.shadowRoot = {innerHTML:''}; card._connected = true;
-    card._config = {entity:camera, limit:12};
-    card._hass = {states:{[camera]:{state:'idle',attributes:{id:'camera-id'}}}, entities:{[camera]:{platform:'netatmo'}}, callWS: async message => {
-      calls.push(message);
-      if(message.type === 'marao_dashboard/camera/netatmo_events') return [structuredClone(event)];
-      if(message.type === 'media_source/browse_media') return {thumbnail:'https://fixture.invalid/preview.jpg'};
-      if(message.type === 'media_source/resolve_media') return {url:'https://fixture.invalid/recording.m3u8'};
-      throw new Error('Unexpected API');
-    }};
-    assert.equal(cameraEventProvider(card._config,card._hass),'netatmo');
-    assert.equal(cameraEventProvider({...card._config,event_provider:'frigate'},card._hass),'frigate');
-    await card._load({},'netatmo-key','netatmo');
-    assert.deepEqual(calls,[{type:'marao_dashboard/camera/netatmo_events',entity_id:camera,limit:12}]);
-    card._filter='animal'; assert.equal(card._filteredEvents().length,1);
-    card._filter='vehicle'; assert.equal(card._filteredEvents().length,0);
-    await card._loadPreview(0);
-    assert.equal(card._events[0].thumbnailUrl,'https://fixture.invalid/preview.jpg');
-    await card._openEvent(0);
-    assert.equal(card._selected.kind,'hls');
-    const markup = card._renderDetail(card._selected);
-    assert.match(markup,/<ha-hls-player[^>]*controls playsinline/);
-    assert.doesNotMatch(markup,/autoplay|<script>/);
-    assert.match(markup,/&lt;script&gt;provider text&lt;\/script&gt;/);
-    assert.match(card._eventDate(event),/1970/);
-    assert.deepEqual(calls.slice(1).map(call=>call.type),['media_source/browse_media','media_source/resolve_media']);
-    const withoutPreview={...event,hasThumbnail:false};card._events=[withoutPreview];card._thumbnailErrors.clear();
-    await card._loadPreview(0);assert.equal(withoutPreview.thumbnailStatus,'empty');assert.equal(card._thumbnailErrors.size,0);
-  } finally { globalThis.customElements = previous; }
+test('Netatmo native recording metadata matches the registry without a custom backend or inferred types', async () => {
+  const calls = [], camera = 'camera.netatmo';
+  const card = new MaraoFrigateEventsCard();
+  card._config = {entity:camera,limit:12};
+  card._hass = {states:{[camera]:{state:'idle',attributes:{}}},callWS:async message => {
+    calls.push(message);
+    if (message.type === 'config/entity_registry/list') return [{entity_id:camera,platform:'netatmo',unique_id:'camera-id-NACamera'}];
+    if (message.type === 'media_source/browse_media') return message.media_content_id === 'media-source://netatmo'
+      ? {children:[{media_content_id:'media-source://netatmo/events/camera-id',can_expand:true}]}
+      : {children:[{media_content_id:'media-source://netatmo/events/camera-id/200',can_play:true,title:'Person'}]};
+    throw new Error('Unexpected API');
+  }};
+  card._events = await card._loadNetatmoRecordings();
+  assert.equal(card._events.length,1);assert.deepEqual(card._eventTypes(card._events[0]),[]);
+  assert.equal(card._eventLabel(card._events[0]),'Recording');
+  assert.equal(card._events[0].hasThumbnail,false);
+  assert.deepEqual(calls.map(call=>call.type),['config/entity_registry/list','media_source/browse_media','media_source/browse_media']);
+  card._hass.callWS=async message=>message.type==='config/entity_registry/list' ? [{entity_id:camera,platform:'netatmo',unique_id:'other-NACamera'}] : {children:[]};
+  await assert.rejects(card._loadNetatmoRecordings(),/camera/);
+});
+
+test('Netatmo recording keys are decimal safe positive epochs, deduplicated and newest first', () => {
+  const child = key => ({media_content_id:'media-source://netatmo/events/camera-id/'+key,can_play:true});
+  const records=normalizeNetatmoRecordings({children:[child('100'),child('200'),child('200')]},'camera-id',1);
+  assert.deepEqual(records.map(record=>record.start_time),[200]);
+  assert.deepEqual(normalizeNetatmoRecordings({children:[]},'camera-id'),[]);
+  for (const key of ['0','-1','1.5','1e2','9007199254740993','8640000000001']) assert.throws(()=>normalizeNetatmoRecordings({children:[child(key)]},'camera-id'));
+  assert.throws(()=>normalizeNetatmoRecordings({children:[child('200')]},'other-camera'));
+  assert.throws(()=>normalizeNetatmoRecordings({children:[{...child('200'),can_play:false}]},'camera-id'));
+  assert.throws(()=>normalizeNetatmoRecordings({},'camera-id'));
 });
 
 test('event heading retains its name when camera attributes become unavailable', () => {

@@ -21,10 +21,11 @@ class QualityCamera(MaraoTestCamera):
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
-        # The fixture device belongs to the already-installed disposable dashboard.
-        entries = self.hass.config_entries.async_entries("marao_dashboard")
+        if ready := self.hass.data.get("marao_test_camera", {}).get("registry_ready"):
+            await ready
+        entries = self.hass.config_entries.async_entries("marao_test_camera")
         if not entries:
-            raise RuntimeError("Quality fixtures require the disposable Marao installation")
+            raise RuntimeError("Quality fixtures require their disposable registry owner")
         device = dr.async_get(self.hass).async_get_or_create(
             config_entry_id=entries[0].entry_id,
             identifiers={("unifiprotect", "marao_synthetic_adaptive_hls" if self._hls_only else "marao_synthetic_adaptive" if self._adaptive else "marao_synthetic_quality")},

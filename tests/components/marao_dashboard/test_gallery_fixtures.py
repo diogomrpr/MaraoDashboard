@@ -219,7 +219,9 @@ async def test_history_fixture_uses_native_routes_auth_and_delegation(hass, hass
 
 async def test_safe_rejected_action_and_dual_target_fixture(hass):
     from homeassistant.exceptions import HomeAssistantError
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+    MockConfigEntry(domain="marao_test_camera").add_to_hass(hass)
     provider = load_fixture("marao_test_camera/__init__.py")
     hass.http = SimpleNamespace(register_view=Mock(), app=SimpleNamespace(middlewares=[]))
     assert await provider.async_setup(hass, {})
@@ -369,6 +371,8 @@ async def test_media_artwork_decode_fixture_recovers(hass):
 
 
 async def test_energy_unit_fixture_changes_only_its_safe_source_and_resets(hass):
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    MockConfigEntry(domain="marao_test_camera").add_to_hass(hass)
     provider = load_fixture("marao_test_camera/__init__.py")
     hass.http = SimpleNamespace(register_view=Mock(), app=SimpleNamespace(middlewares=[]))
     assert await provider.async_setup(hass, {})
@@ -712,3 +716,39 @@ async def test_cover_templates_follow_home_assistant_action_pairing(hass):
     for block in source["template"]:
         for cover in block.get("cover", []):
             COVER_YAML_SCHEMA(cover)
+
+
+async def test_synthetic_registry_owner_is_independent_of_product_backend(hass, monkeypatch):
+    from unittest.mock import AsyncMock
+    provider = load_fixture("marao_test_camera/__init__.py")
+    initialize = AsyncMock(return_value={"type": "create_entry"})
+    monkeypatch.setattr(hass.config_entries.flow, "async_init", initialize)
+    hass.http = SimpleNamespace(register_view=Mock(), app=SimpleNamespace(middlewares=[]))
+    assert await provider.async_setup(hass, {})
+    await hass.data[provider.DOMAIN]["registry_ready"]
+    initialize.assert_awaited_once_with("marao_test_camera", context={"source": "import"}, data={})
+    assert await provider.async_setup_entry(hass, SimpleNamespace())
+
+
+async def test_quality_fixture_uses_only_its_own_registry_entry(monkeypatch):
+    import sys
+    from unittest.mock import AsyncMock
+    class Camera:
+        def __init__(self, *args, **kwargs):
+            self._adaptive = False
+        async_added_to_hass = AsyncMock()
+    monkeypatch.setitem(sys.modules, "custom_components.marao_test_camera.camera", SimpleNamespace(MaraoTestCamera=Camera))
+    monkeypatch.setitem(sys.modules, "homeassistant.components.camera", SimpleNamespace(CameraCapabilities=set, StreamType=SimpleNamespace(HLS="hls")))
+    fixture = load_fixture("unifiprotect/camera.py")
+    devices = SimpleNamespace(async_get_or_create=Mock(return_value=SimpleNamespace(id="safe-device")))
+    entities = SimpleNamespace(async_update_entity=Mock())
+    monkeypatch.setattr(fixture.dr, "async_get", lambda hass: devices)
+    monkeypatch.setattr(fixture.er, "async_get", lambda hass: entities)
+    entries = Mock(return_value=[SimpleNamespace(entry_id="fixture-owner")])
+    entity = fixture.QualityCamera("Safe quality", live=True, quality="high")
+    entity.entity_id = "camera.safe_quality"
+    entity.hass = SimpleNamespace(data={}, config_entries=SimpleNamespace(async_entries=entries))
+    await entity.async_added_to_hass()
+    entries.assert_called_once_with("marao_test_camera")
+    assert devices.async_get_or_create.call_args.kwargs["config_entry_id"] == "fixture-owner"
+    entities.async_update_entity.assert_called_once_with("camera.safe_quality", device_id="safe-device")

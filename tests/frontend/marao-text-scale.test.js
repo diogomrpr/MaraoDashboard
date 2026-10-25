@@ -66,15 +66,18 @@ function fakeDocument(foreignMeta) {
 
 globalThis.document = fakeDocument();
 globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
+globalThis.maraoDashboardActive = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).maraoDashboardActive;
 const source = await fs.readFile(
   new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url),
   "utf8",
 );
 // This harness loads only the shared shell/gesture implementation; native module
 // registration is checked by marao-native.test.js with a real module URL.
-const sourceWithoutFrontendImports = source.slice(source.indexOf("const MARAO_FONT_URL"), source.indexOf("// Optional content must not delay registration"));
+const sourceWithoutFrontendImports = source.slice(source.indexOf("const MARAO_FONT_URL"), source.indexOf("// Optional content must not delay registration")).replaceAll('import.meta.url',JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoRuntime.js',import.meta.url).href));
 const cardsSource = (await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8')).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 const instrumentedSource = `
+const MARAO_RESOURCE_QUERY = '';
+const maraoDashboardActive = globalThis.maraoDashboardActive;
 import { cardProblem, problemStyle, problemLabel, showCardDetails, serviceOutcome, serviceConnectionReady, serviceTargetReady, accessOpenerService } from "data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}";
 const haptic = (value) => globalThis.__maraoTestHaptics.push(value);
 const callServiceWithNotification = (hass, domain, service, data, onOutcome) => {
@@ -107,11 +110,12 @@ const {
   `data:text/javascript;base64,${Buffer.from(instrumentedSource).toString("base64")}`
 );
 
-test("preserves the existing Montserrat font stylesheet outside the card catalog", () => {
-  assert.match(
-    source,
-    /https:\/\/fonts\.googleapis\.com\/css2\?family=Montserrat:wght@100;200;300;400;500;600;700;800;900/,
-  );
+test("loads the bundled Montserrat stylesheet without a runtime font CDN", async () => {
+  assert.match(source,/\.\/MaraoFonts\.css/);
+  assert.doesNotMatch(source,/fonts\.googleapis\.com|fonts\.gstatic\.com/);
+  const font=await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoFonts.css',import.meta.url),'utf8');
+  assert.match(font,/font-weight:\s*100 900/);
+  assert.match(font,/\.\/fonts\/Montserrat\.ttf/);
   assert.match(source, /data-marao-font/);
 });
 
@@ -120,6 +124,17 @@ test("recognizes generated Marao routes but not the editor", () => {
   assert.equal(isMaraoDashboardPath("/marao-home"), true);
   assert.equal(isMaraoDashboardPath("/marao-dashboard-editor"), false);
   assert.equal(isMaraoDashboardPath("/lovelace/home"), false);
+});
+
+test('native text scaling follows the active owner at a custom root and stops after leaving', async () => {
+  const {fullscreenUsers}=await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
+  const owner={isConnected:true,preview:false,_config:{dashboard_root:'casa-main',routes:[]}};
+  fullscreenUsers.add(owner);window.MaraoFrontendPackage={};
+  try {
+    assert.equal(isMaraoDashboardPath('/casa-main/home'),true);
+    assert.equal(isMaraoDashboardPath('/marao-another/home'),false);
+    owner.isConnected=false;assert.equal(isMaraoDashboardPath('/casa-main/home'),false);
+  } finally {fullscreenUsers.delete(owner);delete window.MaraoFrontendPackage;}
 });
 
 test("adds one owned text-scale meta and removes it outside Marao", () => {

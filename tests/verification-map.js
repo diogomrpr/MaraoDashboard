@@ -25,6 +25,7 @@ const families = {
   camera: ['md_camera_card'], history: ['md_graph_card', 'md_timeline_card', 'md_toggle_graph_card'],
 };
 const components = {
+  'native-source': { units: [['native-source'], ['native-compiler'], ['native-session'], ['native-strategy'], ['native-dependencies'], ['native-package'], ['converter']], python: ['test_frontend_compiler'], editor: true, upgrade: true },
   'navbar-startup': { units: [['frontend-refresh'], ['marao-navbar-card'], ['marao-history-cards'], ['marao-text-scale'], ['gallery-cases'], ['package-boundary']],
     python: [], editor: true,
     browser: [
@@ -156,8 +157,11 @@ const components = {
 };
 
 const rules = [
+  [/^tests\/test-native-frontend-local\.js$/, ['native-source']],
+  [/^(?:custom_components\/marao_dashboard\/frontend\/(?:Marao(?:Source|NativeModel|NativeDashboard|Theme|SourceImport)\.js|marao-(?:catalog|generator-labels|owned-assets)\.json|MaraoFonts\.css|fonts\/.*)|frontend_src\/(?:compile-dashboard|native-model|native-metadata|native-session|native-strategy|native-theme|native-dependencies|source-import|convert-document|converter|build-native)\.(?:js|cjs|html)|tests\/frontend\/(?:native-(?:source|compiler|session|strategy|dependencies|package)|converter)\.test\.js|tests\/components\/marao_dashboard\/test_frontend_compiler\.py|tests\/test-converter-local\.js)$/, ['native-source']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoSensorThresholds\.js$/, ['labels', 'editor-model', 'generator']],
   [/^tests\/frontend\/canonical-pages\.fixture\.json$/, ['card-namespace']],
+  [/^ha-test\/upgrade\/fixtures\/(?:native-baselines|v0\.(?:17\.0|20\.0|21\.1)-(?:native-(?:input|source-expected|compiled-expected)|released-compiled))\.json$/, ['native-source']],
   [/^ha-test\/upgrade\/fixtures\/namespace-v1-(?:input|expected|provenance)\.json$/, ['card-namespace']],
   [/^custom_components\/marao_dashboard\/(card_names\.py|frontend\/MaraoNames\.js)$|^tests\/(frontend\/card-names\.test\.js|components\/marao_dashboard\/test_card_names\.py)$/, ['card-namespace']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoLight(?:Color|Capabilities)\.js$|^tests\/test-light-color-local\.js$/, ['light-color']],
@@ -167,7 +171,7 @@ const rules = [
   [/^custom_components\/marao_dashboard\/frontend\/MaraoRuntime\.js$/, 'shared'],
   [/^tests\/verification-task\.js$/, ['verification-development']],
   [/^tests\/preview-frontend\.js$/, ['frontend-preview']],
-  [/^ha-test\/prepare-frontend\.js$/, ['frontend-preview-preparation']],
+  [/^ha-test\/prepare-(?:native-)?frontend\.js$/, ['frontend-preview-preparation']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoFrontend(?:Refresh|Updates)\.js$|^tests\/test-frontend-refresh-local\.js$|^ha-test\/frontend-refresh-fixture\.js$/, ['frontend-refresh']],
   [/^frontend_src\/json-preparation\.js$|^custom_components\/marao_dashboard\/frontend\/MaraoDashboard(?:JsonPreparation|EditorLabels)\.js$/, ['editor-preload']],
   [/^tests\/(?:test-control-grid-local|test-card-state-layout-local)\.js$/, ['control-grid']],
@@ -195,7 +199,7 @@ const rules = [
   [/^tests\/native-backup\.js$/, ['verification']],
   [/^ha-test\/gallery-pages\.js$/, ['gallery']],
   [/^ha-test\/native-cases\.js$/, ['retired-authoring', 'gallery']],
-  [/^frontend_src\/(native-model|MaraoNativeCards|MaraoNativeCardEditor)\.js$/, ['retired-authoring']],
+  [/^frontend_src\/(MaraoNativeCards|MaraoNativeCardEditor)\.js$/, ['retired-authoring']],
   [/^frontend_src\/editor-labels\.js$/, 'editor-labels'],
   [/^frontend_src\/native-labels\.js$/, ['retired-authoring']],
   // Generated entry changes are checked for reproducibility; native source rules select behavior checks.

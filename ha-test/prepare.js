@@ -16,7 +16,7 @@ const quote = (value) => "'" + String(value).replace(/'/g, "'\\''") + "'";
 
 function run(command, args, { input, allowFailure = false, inherit = false } = {}) {
   const result = spawnSync(command, args, {
-    cwd: repoRoot, encoding: "utf8", input, stdio: inherit ? "inherit" : "pipe",
+    cwd: repoRoot, encoding: "utf8", input, stdio: inherit ? "inherit" : "pipe", maxBuffer: 16 * 1024 * 1024,
     env: { ...process.env, COPYFILE_DISABLE: "1" },
   });
   if (!allowFailure && (result.error || result.status !== 0)) {
@@ -306,6 +306,14 @@ async function prepare(config = readConfig(), { dryRun = false } = {}) {
     console.log("Would build the current workspace, deploy only Marao and its fixtures to " + config.url + ", provision Cases, and reload frontend changes or restart backend changes.");
     return { config };
   }
+  const {nativeState,prepareNativeFrontend,syncNativeFixtures}=require('./prepare-native-frontend');
+  const native=await nativeState(config);
+  if(native) {
+    await syncNativeFixtures(config);
+    const prepared=await prepareNativeFrontend(config,await nativeState(config));
+    return {...prepared,nativeDocument:prepared.dashboard,dashboard:prepared.previewDashboard};
+  }
+  if(fs.existsSync(path.join(repoRoot,'custom_components/marao_dashboard/frontend/MaraoNativeDashboard.js'))) throw new Error('Native candidate requires guided manual migration first; legacy installation and fixtures were not changed.');
   const connection = await connect(config);
   let entries;
   try {

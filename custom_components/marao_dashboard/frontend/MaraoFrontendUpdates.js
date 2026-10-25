@@ -75,11 +75,27 @@ export function createFrontendUpdates({ host = window, loadedVersion, context, r
     });
   };
   const subscribe = async (renew = false) => {
-    if (stopped || subscribing || (!renew && (unsubscribe || subscriptionFailed)) || !hass?.connected || !connection?.subscribeMessage) return;
+    if (stopped || subscribing || (!renew && (unsubscribe || subscriptionFailed)) || !hass?.connected
+      || !(host.MaraoFrontendPackage ? connection?.subscribeEvents : connection?.subscribeMessage)) return;
     subscribing = true;
     const token = generation, previous = unsubscribe;
     try {
-      const remove = await connection.subscribeMessage(payload => { if (token === generation) receive(payload); }, { type: 'marao_dashboard/frontend/subscribe' });
+      let remove;
+      if (host.MaraoFrontendPackage) {
+        const installed = async event => {
+          if (event?.data?.url_path && event.data.url_path !== context().dashboard) return;
+          const dashboard = context().dashboard;
+          const response = await host.fetch(host.MaraoFrontendPackage.manifestURL,{cache:'no-store',credentials:'same-origin'});
+          if (!response.ok) throw new Error('Could not read the installed Marao frontend identity.');
+          const info = await response.json();
+          if (!/^[a-f0-9]{64}$/.test(info.identity || '')) throw new Error('Invalid installed Marao frontend identity.');
+          if (token !== generation || stopped || context().dashboard !== dashboard) return;
+          // HA regenerates the strategy after native saves; reload only when the installed graph changes.
+          receive({dashboard,fingerprint:info.identity});
+        };
+        remove = await connection.subscribeEvents(event => { void installed(event).catch(error => {if (stopped || token !== generation) return;terminal='failed';report(terminal);host.console?.warn('Marao native update check failed',error);}); },'lovelace_updated');
+        try { await installed(); } catch (error) {await remove();throw error;}
+      } else remove = await connection.subscribeMessage(payload => { if (token === generation) receive(payload); }, { type: 'marao_dashboard/frontend/subscribe' });
       if (stopped || token !== generation) await remove();
       else {
         unsubscribe = remove; subscriptionFailed = false;
@@ -87,6 +103,7 @@ export function createFrontendUpdates({ host = window, loadedVersion, context, r
         if (previous) await previous();
       }
     } catch (error) {
+      if (stopped || token !== generation) return;
       // Older servers can lack this optional endpoint; normal rendering continues.
       subscriptionFailed = true; terminal = 'failed'; report(terminal);
       host.console?.warn('Marao frontend update subscription failed', error);

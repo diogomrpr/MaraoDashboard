@@ -31,6 +31,7 @@ function fixture(t) {
   write(remote, '/.marao-test-deployment.json', JSON.stringify(receipt));
   const bin = path.join(directory, 'bin'); fs.mkdirSync(bin);
   fs.writeFileSync(path.join(bin, 'sha256sum'), '#!' + process.execPath + '\nconst fs=require("node:fs"),c=require("node:crypto");for(const f of process.argv.slice(2))console.log(c.createHash("sha256").update(fs.readFileSync(f)).digest("hex")+"  "+f);\n', { mode: 0o700 });
+  fs.writeFileSync(path.join(bin,'stat'),'#!'+process.execPath+'\nconsole.log((require("node:fs").statSync(process.argv.at(-1)).mode&0o7777).toString(8));\n',{mode:0o700});
   const calls = [], uploads = [];
   let loadedVersion = fingerprint(remote + integration + '/frontend');
   const dependencies = {
@@ -55,7 +56,7 @@ function fixture(t) {
     },
     async api(_config, method, endpoint, body) {
       calls.push(method + ' ' + endpoint);
-      if (method === 'GET' && endpoint === '/api/config') return { config_dir: remote };
+      if (method === 'GET' && endpoint === '/api/config') return { config_dir: remote, version:'2026.10.0' };
       if (method === 'POST' && endpoint === '/api/services/homeassistant/reload_config_entry') {
         assert.deepEqual(body, { entry_id: 'safe' }); loadedVersion = fingerprint(remote + integration + '/frontend'); return [];
       }
@@ -141,4 +142,98 @@ test('symlinked workspace assets are refused without changing the remote install
   fs.symlinkSync('/private', f.root + f.integration + '/frontend/link');
   await assert.rejects(prepareFrontend(f.config, f.dependencies), /symlinked source/);
   assert.deepEqual(f.remoteBytes(), before);
+});
+
+async function nativeFixture(t) {
+  const f=fixture(t), {createEnvelope}=await import('../../custom_components/marao_dashboard/frontend/MaraoSource.js');
+  fs.rmSync(f.remote+f.integration,{recursive:true});
+  const document=createEnvelope(JSON.stringify({config_version:2,name:'Safe',landing_page:'card-test',navigation:[],pages:[{name:'Cases',path:'card-test',entities:[]}]}),'marao-dashboard');
+  const folder='MaraoFrontend', installed=f.remote+'/www/community/'+folder;
+  fs.mkdirSync(installed,{recursive:true});fs.writeFileSync(installed+'/old.js','old');
+  const candidate=f.root+'/native-stage', dist=candidate+'/dist';fs.mkdirSync(dist,{recursive:true});
+  const identity='b'.repeat(64);
+  for(const file of ['MaraoFrontend.js','MaraoFrontend.release.json',identity+'--MaraoNativeDashboard.js',identity+'--MaraoDashboard.js',identity+'--MaraoDashboardJsonWorker.js']) fs.writeFileSync(dist+'/'+file,'native candidate '+file);
+  f.dependencies.buildFrontend=async()=>({destination:candidate,identity});
+  f.dependencies.connect=async()=>({close(){},async call(message) {
+    f.calls.push(message.type);
+    if(message.type==='auth/current_user') return {is_admin:true};
+    if(message.type==='lovelace/config') return structuredClone(document);
+    if(message.type==='config_entries/get') return [];
+    if(message.type==='lovelace/resources') return [{url:'/hacsfiles/'+folder+'/MaraoFrontend.js?hacstag=1',type:'module'}];
+    throw new Error('Unexpected native mutation: '+message.type);
+  }});
+  const api=f.dependencies.api;
+  f.dependencies.api=async(config,method,endpoint,...args)=> {
+    if(method==='GET' && endpoint.startsWith('/hacsfiles/'+folder+'/')) {f.calls.push('GET '+endpoint);return fs.readFileSync(installed+'/'+endpoint.split('/').at(-1),'utf8');}
+    return api(config,method,endpoint,...args);
+  };
+  return {...f,installed,dist,document};
+}
+
+test('native sync installs a complete graph without changing source, fixtures or restarting HA; repeat is a no-op',async t=>{
+  const f=await nativeFixture(t), before=f.remoteBytes();
+  const result=await prepareFrontend(f.config,f.dependencies);
+  assert.equal(result.mode,'native');assert.equal(result.installed,true);
+  assert.equal(result.editorURL,'/marao-dashboard/marao-editor');assert.equal(result.previewDashboard.views[0].path,'card-test');
+  assert.deepEqual(localHashes(f.installed),localHashes(f.dist));
+  const preserved=values=>Object.fromEntries(Object.entries(values).filter(([file])=>!file.startsWith('www/community/') && file!=='.marao-test-deployment.json'));
+  assert.deepEqual(preserved(f.remoteBytes()),preserved(before));assert.deepEqual(result.dashboard,f.document);
+  assert.ok(!f.calls.some(call=>/POST|save|restart|generate|reload/.test(call)));
+  assert.equal(f.calls.filter(call=>call==='upload').length,1);
+  f.calls.length=0;await prepareFrontend(f.config,f.dependencies);
+  assert.ok(!f.calls.includes('upload'));
+});
+
+test('native stale serving retains installed candidate and recovery copy without claiming readiness',async t=>{
+  const f=await nativeFixture(t), api=f.dependencies.api;
+  f.dependencies.api=(config,method,endpoint,...args)=>endpoint.includes('/hacsfiles/')?'stale':api(config,method,endpoint,...args);
+  await assert.rejects(prepareFrontend(f.config,f.dependencies),/Served native asset is stale[\s\S]*recovery data retained/);
+  assert.deepEqual(localHashes(f.installed),localHashes(f.dist));
+  assert.equal(fs.readFileSync(path.dirname(f.uploads[0])+'/frontend-before/old.js','utf8'),'old');
+  assert.deepEqual(JSON.parse(fs.readFileSync(f.remote+'/.marao-test-deployment.json')),f.receipt);
+});
+
+test('explicit native fixture preparation updates only owned code, restarts once and keeps source and helpers',async t=>{
+  const f=await nativeFixture(t),{syncNativeFixtures}=require('../../ha-test/prepare-native-frontend');
+  for(const [file,contents] of Object.entries({'manifest.json':'{"domain":"marao_test_camera"}','__init__.py':'# fixture code'})) {
+    f.write(f.root,'/ha-test/custom_components/marao_test_camera/'+file,contents);
+    f.write(f.remote,'/custom_components/marao_test_camera/'+file,'old '+file);
+  }
+  f.write(f.remote,'/custom_components/marao_test_camera/marao-fixture.json','{"owner":"marao-dashboard-tests"}\n');
+  const before=f.remoteBytes();let restarts=0;f.dependencies.restart=async()=>{restarts++;};
+  const result=await syncNativeFixtures(f.config,f.dependencies);assert.equal(result.changed,true);assert.equal(restarts,1);
+  const after=f.remoteBytes();
+  for(const [file,contents] of Object.entries(before))if(!['custom_components/marao_test_camera/manifest.json','custom_components/marao_test_camera/__init__.py'].includes(file))assert.equal(after[file],contents);
+  assert.equal(after['custom_components/marao_test_camera/__init__.py'],'# fixture code');
+  assert.equal((await syncNativeFixtures(f.config,f.dependencies)).changed,false);assert.equal(restarts,1);
+  f.write(f.remote,'/custom_components/marao_test_camera/marao-fixture.json','{"owner":"another-owner"}');
+  await assert.rejects(syncNativeFixtures(f.config,f.dependencies),/guard failed/);assert.equal(restarts,1);
+});
+
+
+test('native preparation refuses unsupported HA before building or uploading',async t=>{
+  const f=await nativeFixture(t), before=f.remoteBytes(), api=f.dependencies.api;
+  f.dependencies.api=(config,method,endpoint,...args)=>endpoint==='/api/config'?{config_dir:f.remote,version:'2026.9.9'}:api(config,method,endpoint,...args);
+  await assert.rejects(prepareFrontend(f.config,f.dependencies),/2026.10.0/);
+  assert.ok(!f.calls.includes('build'));assert.deepEqual(f.remoteBytes(),before);
+});
+
+
+test('editor preparation rebuilds bundled source helpers but caches generated outputs',t=>{
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'marao-editor-cache-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  const frontend=path.join(directory,'custom_components/marao_dashboard/frontend');fs.mkdirSync(frontend,{recursive:true});fs.mkdirSync(path.join(directory,'frontend_src'));
+  fs.writeFileSync(path.join(directory,'package-lock.json'),'{}');fs.writeFileSync(path.join(frontend,'MaraoSource.js'),'first source');
+  fs.writeFileSync(path.join(directory,'frontend_src/build-editor.cjs'),"const fs=require('fs');const p='custom_components/marao_dashboard/frontend/';fs.copyFileSync(p+'MaraoSource.js',p+'MaraoNativeModel.js');fs.appendFileSync('build-count','1');");
+  const {buildEditor}=require('../../ha-test/prepare-frontend');buildEditor(directory);buildEditor(directory);
+  assert.equal(fs.readFileSync(path.join(directory,'build-count'),'utf8'),'1');
+  fs.writeFileSync(path.join(frontend,'MaraoSource.js'),'second source');buildEditor(directory);
+  assert.equal(fs.readFileSync(path.join(frontend,'MaraoNativeModel.js'),'utf8'),'second source');assert.equal(fs.readFileSync(path.join(directory,'build-count'),'utf8'),'11');
+});
+
+
+test('native preparation refuses an unexpected configured root alias before writing',async t=>{
+  const f=await nativeFixture(t), alias=f.remote+'-alias';fs.symlinkSync(f.remote,alias);t.after(()=>fs.rmSync(alias,{force:true}));
+  const api=f.dependencies.api;f.dependencies.api=(config,method,endpoint,...args)=>endpoint==='/api/config'?{config_dir:alias,version:'2026.10.0'}:api(config,method,endpoint,...args);
+  await assert.rejects(prepareFrontend({...f.config,remoteConfigPath:alias},f.dependencies),/guard failed/);
+  assert.ok(!f.calls.includes('upload'));
 });

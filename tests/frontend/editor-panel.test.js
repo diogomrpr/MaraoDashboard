@@ -5,6 +5,7 @@ import vm from "node:vm";
 import * as model from "../../frontend_src/editor-model.js";
 import { PT_LABELS, MOVE_PT_LABELS } from "../../frontend_src/editor-labels.js";
 import { prepareJson } from '../../frontend_src/json-preparation.js';
+import { NativeSession } from '../../frontend_src/native-session.js';
 
 const source = await fs.readFile(new URL("../../frontend_src/MaraoDashboardPanel.js", import.meta.url), "utf8");
 let Panel;
@@ -38,9 +39,15 @@ test("vacuum native command data is editable and survives sibling option changes
   assert.deepEqual(variables.action_1.data.params, [{ segments: [22], repeat: 1 }]);
 });
 
+// Panel checks inject the persistence boundary; native API contracts have separate session tests.
+function persistence(p) {
+  return {read:scope => p._hass.callWS({type:'native/read',scope}),preview:config => p._hass.callWS({type:'native/preview',config}),save:config => p._hass.callWS({type:'native/save',config})};
+}
+
 function panel(config) {
   confirmations = [];
   const p = new Panel();
+  p.nativeSession = persistence(p);
   p._labelModule = { PT_LABELS, MOVE_PT_LABELS };
   p._model = model.normalizeConfig(config);
   p._savedSource = p._source();
@@ -59,6 +66,33 @@ const canonical = () => ({ config_version: 2, name: 'Safe', landing_page: 'home'
   { name: 'Home', path: 'home', sections: [{ entities: [{ id: 'first', entity_id: 'light.test' }, { id: 'second', entity_id: 'light.test', name: 'Duplicate' }], future: true }] },
   { name: 'Office', path: 'office', entities: [{ page: 'home', name: 'Back home' }], cards: [{ type: 'markdown', content: 'Saved note' }] },
 ] });
+
+test('source refusal messages are localized and reveal paths without private values',()=>{
+  const p=panel(canonical());
+  p.nativeSession=new NativeSession(p._hass,'marao-dashboard');
+  for(const code of ['source_version_future','native_envelope_invalid','legacy_asset_unresolved','room_members_needed','json_invalid']) {
+    const error=Object.assign(new Error('private source value'),{name:'SourceError',code,path:'$.pages[0]'});
+    p._hass.language='en';const english=p._error(error);
+    p._hass.language='pt';const portuguese=p._error(error);
+    assert.notEqual(english,portuguese);assert.match(english,/\$\.pages\[0\]/);
+    assert.ok(!english.includes(code)&&!english.includes('private source value'));
+    assert.ok(!portuguese.includes(code)&&!portuguese.includes('private source value'));
+  }
+  assert.equal(p._error(Object.assign(new Error('native write rejected'),{code:'unauthorized'})),'native write rejected');
+});
+
+test('native notifications retain a dirty draft, refresh clean data and unsubscribe obsolete mounts', async () => {
+  const p=panel(canonical());p.isConnected=true;p._loaded=true;p._hass.connection={};
+  let listener,removed=0,status,loads=0;
+  p.nativeSession.subscribe=async callback=>{listener=callback;return()=>{removed++;};};
+  p._setStatus=value=>{status=value;};p._load=()=>{loads++;};
+  p._subscribeNativeChanges();await Promise.resolve();
+  const before=p._source();p._dirty=true;listener();
+  assert.equal(p._source(),before);assert.match(status,/draft is retained/);assert.equal(loads,0);
+  p._dirty=false;listener();assert.equal(loads,1);
+  p._nativeSubscriptionEpoch++;p._nativeUnsubscribe();p.isConnected=false;listener();
+  assert.equal(removed,1);assert.equal(loads,1);
+});
 
 test('General cache reset toggle preserves its default, explicit false and unrelated settings', () => {
   for (const source of [{name:'Legacy',rooms:[]}, canonical()]) {
@@ -669,7 +703,7 @@ test('initial loading makes native Visual ready independently of deferred contex
   assert.equal(p._loaded, true); assert.equal(p._visualReady, true); assert.equal(p._busy, false);
   assert.equal(prepared, 1);
   assert.deepEqual(messages.map(message => message.scope), ['initial', 'context']);
-  assert.equal(p._contextReady, false); assert.equal(p._historyLoaded, true);
+  assert.equal(p._contextReady, false); assert.equal(p._historyLoaded, undefined);
   contextResolve({ editor: { catalog: { cards: [] }, entities: [], areas: [] } });
   await p._contextRequest;
   assert.equal(p._contextReady, false, 'Transport does not apply optional metadata on its continuation');
@@ -695,7 +729,7 @@ test('Save enters its guard before context, preserves latest edits and dispatche
   const p = loadingPanel(message => {
     messages.push(message);
     if (message.scope === 'context') return new Promise(done => { resolveContext = done; });
-    assert.equal(message.type, 'marao_dashboard/config/generate');
+    assert.equal(message.type, 'native/save');
     return Promise.resolve({ config: message.config, history: [], dashboard_url: '/marao-dashboard/home' });
   });
   p._model = model.normalizeConfig(config); p._loaded = true;
@@ -727,13 +761,13 @@ test('context failure and superseded documents release Save without generation o
   }
 });
 
-test('Discard and Restore during real delayed JSON preparation retain the newest document without stealing Visual', async () => {
+test('Discard during real delayed JSON preparation retain the newest document without stealing Visual', async () => {
   const oldConfirm = context.confirm, oldIdle = context.requestIdleCallback, oldCancelIdle = context.cancelIdleCallback;
   context.confirm = () => true;
   context.requestIdleCallback = callback => { queueMicrotask(() => callback({ timeRemaining: () => 50 })); return 1; };
   context.cancelIdleCallback = () => {};
   try {
-    for (const operation of ['Discard', 'Restore']) {
+    for (const operation of ['Discard']) {
       let releaseEditor, editorStarted, resolveReload, reloadStarted, restoreClick, restoreBound;
       const editorGate = new Promise(resolve => { releaseEditor = resolve; });
       const creating = new Promise(resolve => { editorStarted = resolve; });
@@ -743,8 +777,7 @@ test('Discard and Restore during real delayed JSON preparation retain the newest
       const response = { ...payload, config: JSON.stringify(next), editor: { catalog: { config_version: 2, cards: [] }, entities: [], areas: [] } };
       const p = loadingPanel(message => {
         messages.push(message);
-        if (message.type === 'marao_dashboard/history/restore') return Promise.resolve({ history: [] });
-        assert.equal(message.type, 'marao_dashboard/config/get'); assert.equal(message.scope, 'initial');
+        assert.equal(message.type, 'native/read'); assert.equal(message.scope, 'initial');
         return new Promise(resolve => { resolveReload = resolve; reloadStarted(); });
       });
       p._model = model.normalizeConfig(canonical()); p._model.name = 'Stale unsaved source';
@@ -768,18 +801,10 @@ test('Discard and Restore during real delayed JSON preparation retain the newest
       await creating;
       assert.equal(creates, 1); assert.equal(p._jsonForeground, true); assert.equal(p._busy, false);
       await p._switchTab('visual'); assert.equal(p._jsonForeground, false);
-      let restoring;
-      if (operation === 'Discard') p._discard();
-      else {
-        p._historyLoaded = true; p._history = [{ version: 'safe-version', created_at: '2026-10-18T00:00:00Z', reason: 'fixture' }];
-        const restoreButton = { dataset: { version: 'safe-version' }, addEventListener(_name, listener) { restoreClick = listener; restoreBound(); } };
-        const content = { querySelector: () => ({ addEventListener() {} }), querySelectorAll: () => [restoreButton] };
-        p._dialog = () => ({ isConnected: true, open: true, querySelector: () => content });
-        p._openHistory(); await restoreReady; restoring = restoreClick();
-      }
+      p._discard();
       await reloading;
       assert.equal(p._busy, true); assert.equal(nodes.get('visual-view').inert, true);
-      resolveReload(response); await p._loading; await restoring;
+      resolveReload(response); await p._loading;
       const newestModel = p._model, newestSource = p._source();
       assert.deepEqual(JSON.parse(newestSource), next); assert.equal(p._jsonDraft, null); assert.equal(p._dirty, false);
       releaseEditor(); await Promise.all([opening, repeated]);
@@ -787,24 +812,11 @@ test('Discard and Restore during real delayed JSON preparation retain the newest
       assert.equal(p._monaco.getValue(), newestSource); assert.deepEqual(JSON.parse(JSON.stringify(assistanceDraft)), next);
       assert.equal(p._tab, 'visual'); assert.equal(p._requestedTab, 'visual'); assert.equal(p._jsonForeground, false);
       assert.equal(p._busy, false); assert.equal(p._dirty, false); assert.equal(p._jsonLoading, null); assert.equal(p._jsonPreparing, null);
-      assert.deepEqual(messages.map(message => message.type), operation === 'Discard' ? ['marao_dashboard/config/get'] : ['marao_dashboard/history/restore', 'marao_dashboard/config/get']);
+      assert.deepEqual(messages.map(message => message.type), ['native/read']);
     }
   } finally {
     context.confirm = oldConfirm; context.requestIdleCallback = oldIdle; context.cancelIdleCallback = oldCancelIdle;
   }
-});
-
-test('History is single-flight, failed reads require retry and late lists cannot replace Save history', async () => {
-  let resolve, reject, calls = 0;
-  const p = loadingPanel(message => { assert.equal(message.scope, 'history'); calls++; return new Promise((done, fail) => { resolve = done; reject = fail; }); });
-  const first = p._readHistory(); assert.equal(p._readHistory(), first);
-  await Promise.resolve(); reject(new Error('History unavailable'));
-  await assert.rejects(first, /History unavailable/);
-  await assert.rejects(p._readHistory(), /History unavailable/); assert.equal(calls, 1);
-  const retried = p._readHistory(true); await Promise.resolve();
-  p._historyEpoch++; p._history = [{ version: 'new-save' }]; p._historyLoaded = true;
-  resolve({ history: [{ version: 'stale' }] }); await retried;
-  assert.equal(p._history[0].version, 'new-save'); assert.equal(calls, 2);
 });
 
 test('idle work waits for readiness, idle budget and interaction completion, then foreground promotes it', async () => {
@@ -1106,4 +1118,21 @@ test('threshold row editor preserves zero and unknown data and leaves explicit e
     buttons.get(0).click();assert.equal(last.length,0);
     add.click();assert.equal(last[0].value,0);assert.equal(error.textContent,'');
   } finally {context.document=previous;}
+});
+
+test('native save acknowledgment reconciles the retained draft after HA reattaches its view',async()=>{
+  for(const failed of [false,true]) {
+    let finish, reject, entered;const started=new Promise(resolve=>{entered=resolve;});let writes=0;
+    const p=loadingPanel(message=>{assert.equal(message.type,'native/save');writes++;return new Promise((resolve,fail)=>{finish=()=>resolve({config:message.config,dashboard_url:'/marao-dashboard/home'});reject=fail;entered();});});
+    const config=canonical();config.pages[0].sections[0].entities=[];config.pages[1].entities=[];
+    p._model=model.normalizeConfig(config);p._loaded=true;p._contextReady=true;p._catalog={cards:[],config_version:2};p._entities=[];
+    p._savedSource=p._source();p._model.name='Saved once';p._setDirty();
+    const saving=p._save();await started;
+    // Native HA can replace the view before returning the save response.
+    p._lifecycle++;p._busy=false;
+    if(failed) reject(new Error('Native save rejected'));else finish();
+    await saving;assert.equal(writes,1);assert.equal(p._busy,false);
+    assert.equal(p._dirty,failed);assert.equal(p._model.name,'Saved once');
+    assert.equal(p.status.kind,failed?'error':'success');
+  }
 });

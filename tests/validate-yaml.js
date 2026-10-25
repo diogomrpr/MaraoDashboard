@@ -304,7 +304,7 @@ for (const expected of [
   'customElements?.get("home-assistant")',
   "await waitForHomeAssistantRegistry();",
   "registerMaraoCards();",
-  'import(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`).then(module => module.registerMaraoCameraEventCards())',
+  'import(new URL(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`, import.meta.url)).then(module => module.registerMaraoCameraEventCards())',
 ]) {
   if (!frontendSource.includes(expected)) {
     hasError = true;

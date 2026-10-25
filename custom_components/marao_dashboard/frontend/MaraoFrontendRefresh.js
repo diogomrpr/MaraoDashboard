@@ -54,7 +54,8 @@ export async function clearFrontendCaches(host, signal) {
       if (url.origin === origin && (['/', host.location.pathname].includes(url.pathname)
         || /^\/(frontend_latest|frontend_es5|static|marao_dashboard_static)\//.test(url.pathname)
         || url.pathname === '/api/marao_dashboard/frontend.js'
-        || url.pathname.startsWith('/api/marao_dashboard/frontend/'))) await cache.delete(request);
+        || url.pathname.startsWith('/api/marao_dashboard/frontend/')
+        || host.MaraoFrontendPackage && url.pathname.startsWith(new URL(host.MaraoFrontendPackage.rootURL).pathname))) await cache.delete(request);
     }
   }
 }
@@ -84,7 +85,7 @@ export function refreshFrontend({ host = window, isDirty = () => host.isDirtySta
     let response;
     try {
       // HA dashboard views reject HEAD (405); its static asset route supports an uncached, read-only probe.
-      const probeURL = new URL('/marao_dashboard_static/MaraoFrontendRefresh.js', host.location.origin);
+      const probeURL = new URL(host.MaraoFrontendPackage?.manifestURL || '/marao_dashboard_static/MaraoFrontendRefresh.js', host.location.origin);
       response = await bounded(() => host.fetch(probeURL.href, { method: 'HEAD', cache: 'no-store', credentials: 'same-origin', redirect: 'error', signal }), 5000, signal);
     } catch (error) { if (signal.aborted) throw error; throw failure('offline'); }
     if (!response.ok) throw failure('offline');

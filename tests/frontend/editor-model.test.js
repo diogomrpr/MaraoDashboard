@@ -366,7 +366,8 @@ test('energy formatting validates shape and actual units without rewriting draft
   }
   const graph={name:'Energy',rooms:[],pages:{custom:[{name:'Custom',path:'custom',cards:[{type:'custom:marao-card',template:'md_graph_card',entity:'sensor.power',variables:{display_unit:'kW',graph_entity:'sensor.history'}}]}]}};
   assert.match(validateConfig(graph,0,entities,units).join(' '),/incompatible/);
-  assert.match(validateConfig(config,0,[],units).join(' '),/source unit/);
+  assert.match(validateConfig(config,0,[{entity_id:'sensor.power',unit_of_measurement:'V'}],units).join(' '),/source unit/);
+  assert.deepEqual(validateConfig(config,0,[],units),[]);
   delete config.rooms[0].entities[0].variables.display_unit;
   assert.deepEqual(validateConfig(config,0,[],units),[]);
 });

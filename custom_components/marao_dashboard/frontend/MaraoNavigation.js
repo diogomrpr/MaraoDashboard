@@ -1,5 +1,5 @@
-const [refreshModule, updatesModule] = await Promise.all([
-  'MaraoFrontendRefresh.js', 'MaraoFrontendUpdates.js',
+const [refreshModule, updatesModule, themeModule] = await Promise.all([
+  'MaraoFrontendRefresh.js', 'MaraoFrontendUpdates.js', 'MaraoTheme.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
 const { bindNavbarRefresh, refreshFrontend } = refreshModule;
 const { createFrontendUpdates } = updatesModule;
@@ -11,19 +11,21 @@ export function beginFrontendInteraction() {
     globalThis.window?.dispatchEvent?.(new Event('marao-interaction-settled'));
   };
 }
-function updateFrontendClient(hass) {
-  if (!globalThis.window?.addEventListener || !hass?.connection?.subscribeMessage) return;
+export function updateFrontendClient(hass) {
+  if (!globalThis.window?.addEventListener || !(window.MaraoFrontendPackage ? hass?.connection?.subscribeEvents : hass?.connection?.subscribeMessage)) return;
   frontendUpdates ||= createFrontendUpdates({
-    loadedVersion: new URL(import.meta.url).searchParams.get('v'),
+    loadedVersion: window.MaraoFrontendPackage?.identity || new URL(import.meta.url).searchParams.get('v'),
     context: () => {
       const dashboard = window.location.pathname.split('/')[1];
       const record = [...navigationRecords].find(item => !item.released && item.dashboard === dashboard);
-      return { dashboard, active: Boolean(record?.root.isConnected && !record.surface.preview),
-        get blocked() { return Boolean(activeServices || window.isDirtyState || record?.root.lovelace?.editMode
+      const editor = !record && [...fullscreenUsers].find(owner=>owner.isConnected && owner._config?.dashboard_root===dashboard && typeof owner._frontendStatus==='function');
+      return { dashboard, active: Boolean(record?.root.isConnected && !record.surface.preview || editor),
+        get blocked() { return Boolean(activeServices || window.isDirtyState || [...(window.MaraoEditorPanels || [])].some(panel => panel._dirty || panel._busy) || record?.root.lovelace?.editMode
           || record?.surface._refreshing || record?.surface._open
           || findElements('marao-dashboard-panel').some(panel => panel._dirty || panel._busy)
           || findElements('marao-popup-card').some(popup => popup._open)); },
         status: state => {
+          if (editor) {editor._frontendStatus(state);return;}
           if (!record?.surface._refreshing && record?.surface._refreshFeedbackState !== 'hold') record?.surface._refreshFeedback(state);
         } };
     },
@@ -172,6 +174,7 @@ export class MaraoNavbarCard extends BaseElement {
   set hass(value) {
     const previousThemes = this._hass?.themes, previousEditing = this._editing;
     this._hass = value;
+    if (this._navigationRecord) themeModule.applyTheme(this._navigationRecord.root, value);
     if (this._navigationRecord) cameraPreloader?.(this._navigationRecord);
     if (!this.preview) updateFrontendClient(value);
     if (this._surface && this._hostPath === window.location.pathname) { copyNavigationTheme(this, this._surface); this._surface.hass = value; }
@@ -299,7 +302,7 @@ export class MaraoNavbarCard extends BaseElement {
     if (!this._refreshEligible()) { this._refreshFeedback(''); return; }
     this._refreshing = true; this._closeOverflow(false); this._updateCurrent();
     return refreshFrontend({
-      isDirty: () => window.isDirtyState || findElements('marao-dashboard-panel').some(panel => panel._dirty),
+      isDirty: () => window.isDirtyState || [...(window.MaraoEditorPanels || [])].some(panel => panel._dirty || panel._busy) || findElements('marao-dashboard-panel').some(panel => panel._dirty),
       onStatus: state => this._refreshFeedback(state),
     }).catch(() => { /* The operation already renders its localized error. */ }).finally(() => { this._refreshing = false; this._updateCurrent(); });
   }
@@ -422,6 +425,7 @@ function copyNavigationTheme(host, surface) {
 function updateNavigation(record, config, host) {
   if (!record || record.released) return;
   const surface = record.surface;
+  themeModule.applyTheme(record.root, host?._hass || surface._hass);
   if (host) { record.host = host; copyNavigationTheme(host, surface); }
   config = {...config, type:'custom:marao-navbar-card'};
   const identity = JSON.stringify(config);
@@ -431,6 +435,7 @@ function updateNavigation(record, config, host) {
 function releaseNavigation(record) {
   if (!record || record.released) return;
   record.released = true; navigationRecords.delete(record); navigationOwners.delete(record.root);
+  themeModule.releaseTheme(record.root);
   record.cameraPreload?.dispose(); record.observer?.disconnect(); cancelAnimationFrame(record.frame); record.surface.remove();
 }
 function syncNavigation(record) {
@@ -484,6 +489,10 @@ function claimNavigation(host) {
 }
 
 export const fullscreenUsers = new Set();
+export function maraoDashboardActive(pathname = window.location.pathname) {
+  const root = String(pathname).split('/')[1];
+  return [...fullscreenUsers].some(navbar=>navbar.isConnected && !navbar.preview && navbar._config?.dashboard_root === root);
+}
 function setStyle(node, property, value, priority = '') {
   if (node.style.getPropertyValue(property) !== value || node.style.getPropertyPriority(property) !== priority) node.style.setProperty(property, value, priority);
 }
@@ -532,9 +541,10 @@ function applyFullscreen() {
   const owned = new Map();
   const activeNavbars = new Set();
   for (const navbar of fullscreenUsers) {
-    if (!navbar.isConnected || !navbar.getClientRects().length) continue;
+    const nativeActive = navbar._config?.dashboard_root === window.location.pathname.split('/')[1];
+    if (!navbar.isConnected || !nativeActive && !navbar.getClientRects().length) continue;
     navbar._syncContext?.();
-    const active = navbar._config.routes.some((route) => {
+    const active = nativeActive || navbar._config.routes.some((route) => {
       const path = new URL(route.url || route.path || "#", window.location.href).pathname;
       const root = `/${path.split("/")[1]}`;
       return root !== "/" && (window.location.pathname === root || window.location.pathname.startsWith(`${root}/`));
@@ -591,16 +601,18 @@ function applyFullscreen() {
     }
   }
 }
-function registerFullscreen(element) {
+export function registerFullscreen(element) {
   fullscreenUsers.add(element);
   applyFullscreen();
+  window.dispatchEvent(new Event('marao-dashboard-activity'));
   if (fullscreenUsers.size > 1) return;
   window.addEventListener("location-changed", applyFullscreen);
   window.addEventListener("popstate", applyFullscreen);
 }
-function unregisterFullscreen(element) {
+export function unregisterFullscreen(element) {
   fullscreenUsers.delete(element);
   applyFullscreen();
+  window.dispatchEvent(new Event('marao-dashboard-activity'));
   if (fullscreenUsers.size) return;
   window.removeEventListener("location-changed", applyFullscreen);
   window.removeEventListener("popstate", applyFullscreen);

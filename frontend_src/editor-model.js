@@ -582,8 +582,9 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
           const sources = template === "md_switch_card" ? [options.power_entity] : [entity || load];
           const graph = options.graph_entity || item.graph_entity;
           if (graph && ["md_graph_card", "md_toggle_graph_card"].includes(template)) sources.push(graph);
-          if (sources.some(source => !Object.hasOwn(units, metadata.get(source)))) errors.push("A supported source unit is required for conversion.");
-          else if (sources.some(source => units[metadata.get(source)][0] !== units[target][0])) errors.push("Display unit is incompatible with the source reading.");
+          const known = sources.filter(source => metadata.get(source) != null && metadata.get(source) !== '');
+          if (known.some(source => !Object.hasOwn(units, metadata.get(source)))) errors.push("A supported source unit is required for conversion.");
+          else if (known.some(source => units[metadata.get(source)][0] !== units[target][0])) errors.push("Display unit is incompatible with the source reading.");
         }
       }
     }
@@ -617,7 +618,7 @@ export function validatePages(config, catalog) {
   const safePath = value => typeof value === 'string' && /^[a-z0-9][a-z0-9_-]*$/.test(value);
   const safeId = value => typeof value === 'string' && /^[a-z][a-z0-9_-]{0,63}$/.test(value);
   const entityId = value => typeof value === 'string' && /^[a-z0-9_]+\.[a-z0-9_]+$/.test(value);
-  const freeRoles = new Set(['md_title_card', 'md_navigation_card', 'md_room_card', 'md_entity_group_card', 'md_scene_collection_card']);
+  const freeRoles = new Set(['md_title_card', 'md_navigation_card', 'md_room_card', 'md_entity_group_card', 'md_scene_collection_card', 'md_header_card', 'md_glance_card']);
   const templates = new Map((catalog?.cards || []).map(card => [card.id, card.domains]));
   if (['overview', 'rooms'].some(key => Object.hasOwn(config, key))) errors.push('Mixed legacy and canonical page configuration.');
   if (!Array.isArray(config.pages) || !config.pages.length) return [...errors, 'Keep at least one page.'];
@@ -635,6 +636,7 @@ export function validatePages(config, catalog) {
       pageIds.add(page.id);
     }
     if (Object.hasOwn(page, 'subview') && typeof page.subview !== 'boolean') errors.push('Page subview must be a boolean.');
+    if (Object.hasOwn(page, 'custom_content') && (!Array.isArray(page.custom_content) || page.custom_content.some(fragment => !object(fragment) || typeof fragment.yaml !== 'string' || fragment.popup_hash != null && !/^#[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(fragment.popup_hash)))) errors.push('Custom content needs inline YAML and an optional existing popup.');
     if (['icon', 'area'].some(key => page[key] != null && typeof page[key] !== 'string')) errors.push('Page icon and area must be strings.');
     if (Object.hasOwn(page, 'sections') && ['entities', 'cards', 'columns'].some(key => Object.hasOwn(page, key))) errors.push('A page cannot mix sections with flat entities, cards or columns.');
     const sections = Object.hasOwn(page, 'sections') ? page.sections : [page];
@@ -973,6 +975,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
       type: 'object', required: ['name', 'path'], properties: {
         ...content, path: paths, id: { type: 'string', pattern: '^[a-z][a-z0-9_-]{0,63}$' },
         area: { type: 'string' }, subview: { type: 'boolean' },
+        custom_content: { type:'array', items:{type:'object',required:['yaml'],properties:{yaml:{type:'string'},popup_hash:{type:'string',pattern:'^#[a-zA-Z0-9][a-zA-Z0-9_-]*$'}},additionalProperties:true} },
         sections: { type: 'array', items: { type: 'object', properties: content, additionalProperties: true } },
       }, allOf: [{ if: { required: ['sections'] }, then: { not: { anyOf: ['entities', 'cards', 'columns'].map(key => ({ required: [key] })) } } }],
       additionalProperties: true,

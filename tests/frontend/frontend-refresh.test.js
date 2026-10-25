@@ -23,7 +23,7 @@ function environment(t, overrides = {}) {
 }
 const request = url => ({ url });
 
-function automatic(t, { version = 'one', storage = new Map() } = {}) {
+function automatic(t, { version = 'one', storage = new Map(), native = false } = {}) {
   const host = new EventTarget(), doc = new EventTarget();
   doc.visibilityState = 'visible'; host.document = doc; host.navigator = { onLine: true };
   host.setTimeout = setTimeout; host.console = { warn() {} };
@@ -31,6 +31,13 @@ function automatic(t, { version = 'one', storage = new Map() } = {}) {
   const view = { dashboard: 'marao-dashboard', active: true, blocked: false };
   const statuses = [], refreshes = []; let receive, removed = 0, reject;
   const connection = { subscribeMessage: async callback => { receive = callback; return () => { removed++; }; } };
+  let installedVersion = version, checks = 0;
+  if (native) {
+    host.MaraoFrontendPackage={manifestURL:'http://ha.invalid/hacsfiles/example/MaraoFrontend.release.json'};
+    host.fetch=async()=>{checks++;return {ok:true,json:async()=>({identity:installedVersion})};};
+    connection.subscribeEvents=async(callback,type)=>{assert.equal(type,'lovelace_updated');receive=callback;return()=>{removed++;};};
+    delete connection.subscribeMessage;
+  }
   const hass = { connected: true, connection };
   const controller = createFrontendUpdates({ host, loadedVersion: version,
     context: () => ({ ...view, status: value => statuses.push(value) }),
@@ -41,8 +48,19 @@ function automatic(t, { version = 'one', storage = new Map() } = {}) {
   controller.update(hass); t.after(() => controller.destroy());
   return { controller, host, doc, view, storage, statuses, refreshes, hass,
     send: (payload = {}) => receive({ dashboard: 'marao-dashboard', fingerprint: 'one', ...payload }),
-    reject: code => { reject = code; }, removed: () => removed };
+    reject: code => { reject = code; }, removed: () => removed,
+    install: identity => {installedVersion=identity;}, checks:()=>checks, nativeEvent: data=>receive({data}) };
 }
+
+test('native configuration events use HA rendering while graph changes defer and refresh once', async t => {
+  const e=automatic(t,{native:true,version:'a'.repeat(64)});await flush();assert.equal(e.checks(),1);
+  e.nativeEvent({url_path:'another-dashboard'});await flush();assert.equal(e.checks(),1);
+  e.nativeEvent({url_path:'marao-dashboard'});await flush();assert.equal(e.checks(),2);assert.equal(e.refreshes.length,0);
+  e.view.blocked=true;e.install('b'.repeat(64));e.host.dispatchEvent(new Event('focus'));await flush();
+  assert.equal(e.refreshes.length,0);assert.equal(e.statuses.at(-1),'deferred');
+  e.view.blocked=false;e.host.dispatchEvent(new Event('marao-interaction-settled'));await flush();assert.equal(e.refreshes.length,1);
+  e.host.dispatchEvent(new Event('focus'));await flush();assert.equal(e.refreshes.length,1);
+});
 
 test('automatic save refresh is unconditional, deduplicated and independent of matching versions', async t => {
   const e = automatic(t); await flush(); e.send(); await flush(); assert.equal(e.refreshes.length, 0);

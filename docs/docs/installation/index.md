@@ -6,6 +6,10 @@ nav_order: 1
 
 # Installation
 
+The frontend-only successor is under development. Existing integration users must
+follow the separate [guided migration](native-migration.md) when that package is
+available. The instructions below describe the released legacy integration.
+
 Marao Dashboard is distributed as a self-contained HACS custom **Integration**.
 
 Install in this order:

@@ -14,6 +14,7 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.components.http.const import KEY_HASS
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+from homeassistant.config_entries import SOURCE_IMPORT
 from homeassistant.helpers.service import async_register_admin_service
 
 from .live import FixtureLiveView
@@ -27,6 +28,10 @@ async def async_setup(hass, config):
     """Expose the normal Frigate API using synthetic, authenticated local media."""
     if "frigate/events/get" in hass.data.get("websocket_api", {}):
         raise RuntimeError("The disposable Frigate fixture cannot replace a real provider")
+    if not hass.config_entries.async_entries(DOMAIN):
+        hass.data.setdefault(DOMAIN, {})["registry_ready"] = hass.async_create_task(
+            hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_IMPORT}, data={})
+        )
     websocket_api.async_register_command(hass, events)
     hass.http.register_view(FixtureMediaView)
     hass.http.register_view(FixtureLiveView)
@@ -80,6 +85,11 @@ async def async_setup(hass, config):
     async_register_admin_service(hass, DOMAIN, "reject_action", reject_action, vol.Schema({
         vol.Optional("entity_id"): "sensor.marao_dashboard_test_temperature",
     }))
+    return True
+
+
+async def async_setup_entry(hass, entry):
+    """Own synthetic fixture devices independently of the product integration."""
     return True
 
 

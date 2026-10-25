@@ -7,6 +7,10 @@ nav_order: 1.4
 
 # Update Marao Dashboard
 
+The frontend-only successor is under development. Existing integration users must
+follow the separate [guided migration](native-migration.md) when that package is
+available. The instructions below describe the released legacy integration.
+
 1. Create a Home Assistant backup.
 2. In HACS, open Marao Dashboard and select **Update**.
 3. Review the release notes for configuration or migration steps.

@@ -9,6 +9,11 @@ const check = process.argv.includes("--check");
 
 const generatedFiles = [
   "MaraoDashboardPanel.js",
+  "MaraoNativeModel.js",
+  "MaraoNativeDashboard.js",
+  "MaraoTheme.js",
+  "MaraoSourceImport.js",
+  "marao-owned-assets.json",
   "MaraoLovelaceEditor.js",
   "YAML.LICENSE.txt",
   "MaraoDashboardPanel.css",
@@ -40,10 +45,16 @@ function listFiles(root, prefix = "") {
 async function build() {
   const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), "marao-editor-"));
   try {
+    const ownedAssets = [...new Set([...listFiles(frontendRoot), ...generatedFiles])].filter(file => !/(?:^|\/)(?:\.DS_Store|__pycache__)(?:\/|$)|\.py[co]$/.test(file)).sort();
+    fs.writeFileSync(path.join(outputRoot,'marao-owned-assets.json'),JSON.stringify(ownedAssets)+'\n');
     const result = await esbuild.build({
       entryPoints: {
         MaraoLovelaceEditor: path.join(repoRoot, "frontend_src", "lovelace-editor.js"),
         MaraoDashboardPanel: path.join(repoRoot, "frontend_src", "MaraoDashboardPanel.js"),
+        MaraoNativeModel: path.join(repoRoot, "frontend_src", "native-session.js"),
+        MaraoNativeDashboard: path.join(repoRoot, "frontend_src", "native-strategy.js"),
+        MaraoTheme: path.join(repoRoot, "frontend_src", "native-theme.js"),
+        MaraoSourceImport: path.join(repoRoot, "frontend_src", "source-import.js"),
         MaraoDashboardEditorLabels: path.join(repoRoot, "frontend_src", "editor-labels.js"),
         MaraoHistoryData: path.join(repoRoot, "frontend_src", "history-data.js"),
         MaraoHistoryChart: path.join(repoRoot, "frontend_src", "history-chart.js"),
@@ -61,6 +72,16 @@ async function build() {
       minify: true,
       metafile: true,
       plugins: [{
+        name: "marao-owned-assets",
+        setup(build) {
+          build.onLoad({filter:/[/\\]marao-owned-assets\.json$/}, () => ({contents:JSON.stringify(ownedAssets),loader:'json'}));
+        },
+      }, {
+        name: "marao-owned-theme",
+        setup(build) {
+          build.onLoad({filter:/[/\\]themes[/\\]MaraoDashboard[/\\]marao-dashboard\.yaml$/}, ({path:filename}) => ({contents:JSON.stringify(require('yaml').parse(fs.readFileSync(filename,'utf8'))),loader:'json'}));
+        },
+      }, {
         name: "monaco-http-clipboard",
         setup(build) {
           build.onLoad({ filter: /[/\\]platform[/\\]clipboard[/\\]browser[/\\]clipboardService\.js$/ }, ({ path: filename }) => {
@@ -82,7 +103,7 @@ async function build() {
         throw new Error("Monaco must remain outside the eager Visual import graph.");
       }
       const limit = file.endsWith(".js") ? 144 * 1024 : 32 * 1024;
-      if (details.bytes > limit) throw new Error(`Eager editor asset exceeds its ${limit}-byte budget: ${path.basename(file)}`);
+      if (details.bytes > limit) throw new Error(`Eager editor asset is ${details.bytes} bytes; exceeds its ${limit}-byte budget: ${path.basename(file)}`);
     }
     for (const [file, details] of Object.entries(result.metafile.outputs)) {
       if (!file.endsWith('MaraoHistoryChart.js') && Object.keys(details.inputs).some(input => /node_modules\/(chart\.js|@kurkle\/color)\//.test(input))) {
