@@ -172,7 +172,7 @@ async function checkSliderHeaders() {
       page.on('pageerror', error => errors.push(error.message));
       page.on('console', message => { if (require('./camera-request-ledger').isManualCameraConsoleMessage(message)) return; if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
       page.on('response', response => { if (require('./camera-request-ledger').isManualCameraTransport(response.url())) return; if (response.status() >= 400) errors.push('HTTP ' + response.status() + ': ' + new URL(response.url()).pathname); });
-      const routes = ['card-test', ...(scenario.name === 'iphone-normal' ? ['living-room', 'native-example'] : [])];
+      const routes = ['card-test-all', ...(scenario.name === 'iphone-normal' ? ['living-room', 'native-example'] : [])];
       const checked = [];
       for (const route of routes) {
         await page.goto(config.url + '/marao-dashboard/' + route, { waitUntil: 'domcontentloaded' });
@@ -182,16 +182,16 @@ async function checkSliderHeaders() {
         await applyVisualPreferences(page, scenario, theme);
         assert.deepEqual(await emulationIssues(page, scenario, theme), []);
         const rendered = await page.locator('marao-card').evaluateAll(cards => cards.map(card => card._config?.template));
-        for (const family of route === 'card-test' ? families : ['md_light_card']) assert.ok(rendered.includes(family), route + ': missing ' + family);
+        for (const family of route === 'card-test-all' ? families : ['md_light_card']) assert.ok(rendered.includes(family), route + ': missing ' + family);
         assert.deepEqual(await layoutIssues(page, families), [], route);
-        if (route === 'card-test') {
+        if (route === 'card-test-all') {
           await sliderHeaderChecks(page, output, scenario, theme);
         }
         if (route === 'native-example') {
           await page.locator('marao-native-light-card').first().evaluate(element => { element.preview = true; });
           assert.deepEqual(await layoutIssues(page, families), [], 'Read-only native preview');
         }
-        if (route !== 'card-test') {
+        if (route !== 'card-test-all') {
           const card = page.locator('marao-card').filter({ has: page.locator('input[data-slider-key^="md_light_card:"]') }).first();
           await card.scrollIntoViewIfNeeded();
           await captureScreenshot(card, { path: path.join(output, route + '-' + theme + '.png'), scale: 'device' });
@@ -270,7 +270,7 @@ async function main() {
     });
 
     await page.goto(
-      `${baseUrl}/marao-dashboard/card-test?marao_alignment=${Date.now()}`,
+      `${baseUrl}/marao-dashboard/card-test-all?marao_alignment=${Date.now()}`,
       { waitUntil: "domcontentloaded" },
     );
     const appleTvCard = page.locator("marao-card").filter({

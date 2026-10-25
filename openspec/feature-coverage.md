@@ -233,3 +233,14 @@ preservation lives in `editor-panel.test.js`; generated power/energy/access
 configuration checks live in `test_page_generation.py`; isolated marker/alias
 and collision assertions live in `test_retired_authoring.py`. The backup helper
 retains its historical name because JSON and drag/overflow checks still use it.
+
+### Sensor thresholds and secondary interaction feedback
+
+Optional sensor `background_thresholds` are catalog-backed, validated in the shared
+frontend model/runtime helper and Python page model, and preserved by generation.
+Shared sensor appearance compares source values and uses contrasting literal-color
+foreground. Access slides show request-local blue dispatch/pending/checkmark feedback
+with explicit service outcomes. Builder-supported switch/climate/graph history uses
+compact icon/default-hold entry; lights retain color controls only. Targeted checks:
+card visibility, editor model/panel/JSON, security outcomes, generator threshold
+preservation, and the reviewed gallery/upgrade inventory.

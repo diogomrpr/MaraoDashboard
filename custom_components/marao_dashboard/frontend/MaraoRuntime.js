@@ -399,6 +399,13 @@ const TRANSLATIONS = {
     "light.picker": "Change color for {name}",
     "light.color": "Color",
     "light.invalid_color_background": "Use light color as background must be a boolean.",
+    "Background thresholds must be a list.": "Background thresholds must be a list.",
+    "Background thresholds require a sensor entity.": "Background thresholds require a sensor entity.",
+    "Each background threshold must be an object.": "Each background threshold must be an object.",
+    "Threshold values must be finite numbers.": "Threshold values must be finite numbers.",
+    "Threshold values must be strictly increasing.": "Threshold values must be strictly increasing.",
+    "Threshold colors must use #RRGGBB.": "Threshold colors must use #RRGGBB.",
+
     "light.color_temperature": "White temperature",
     "light.warm": "Warm",
     "light.cool": "Cool",
@@ -434,6 +441,8 @@ const TRANSLATIONS = {
     "access.hold_1_second": "Hold 1 second",
     "access.hold_to_activate": "Hold to {action}",
     "access.open": "Open",
+    "access.sending": "Sending…",
+    "access.sent": "Request sent",
     "access.slide_required": "Use the access slide to open or unlock.",
     "access.invalid_behavior": "Access behavior is incompatible with the selected entity.",
     "access.native_service": "Access opener must use its selected entity's native opening service",
@@ -631,6 +640,13 @@ const TRANSLATIONS = {
     "light.picker": "Alterar a cor de {name}",
     "light.color": "Cor",
     "light.invalid_color_background": "Usar a cor da luz como fundo tem de ser um valor booleano.",
+    "Background thresholds must be a list.": "Os limiares do fundo têm de ser uma lista.",
+    "Background thresholds require a sensor entity.": "Os limiares do fundo exigem uma entidade sensor.",
+    "Each background threshold must be an object.": "Cada limiar do fundo tem de ser um objeto.",
+    "Threshold values must be finite numbers.": "Os valores dos limiares têm de ser números finitos.",
+    "Threshold values must be strictly increasing.": "Os valores dos limiares têm de ser estritamente crescentes.",
+    "Threshold colors must use #RRGGBB.": "As cores dos limiares têm de usar #RRGGBB.",
+
     "light.color_temperature": "Temperatura de branco",
     "light.warm": "Quente",
     "light.cool": "Frio",
@@ -666,6 +682,8 @@ const TRANSLATIONS = {
     "access.hold_1_second": "Premir 1 segundo",
     "access.hold_to_activate": "Manter premido para {action}",
     "access.open": "Abrir",
+    "access.sending": "A enviar…",
+    "access.sent": "Pedido enviado",
     "access.slide_required": "Use o deslizador para abrir ou destrancar.",
     "access.invalid_behavior": "O comportamento de acesso é incompatível com a entidade selecionada.",
     "access.native_service": "A abertura de acesso deve usar o serviço nativo da entidade selecionada.",
@@ -832,7 +850,7 @@ const MARAO_SLIDE_COMPLETE_AT = 0.92;
 
 class MaraoSlideToOpen extends HTMLElement {
   static get observedAttributes() {
-    return ["state"];
+    return ["state", "entity"];
   }
 
   constructor() {
@@ -844,10 +862,13 @@ class MaraoSlideToOpen extends HTMLElement {
     this._horizontalIntent = false;
     this._hapticMilestones = new Set();
     this._completionTimer = null;
+    this._feedback = "";
+    this._feedbackGeneration = 0;
   }
 
   setConfig(config) {
     this._resetGesture(this.shadowRoot?.querySelector(".track"));
+    this._clearFeedback();
     this._config = config || {};
     this._actionError = "";
     this._actionRequest = (this._actionRequest || 0) + 1;
@@ -856,6 +877,7 @@ class MaraoSlideToOpen extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    if (!this._targetReady()) this._clearFeedback();
     if (this._disabled()) this._resetGesture(this.shadowRoot?.querySelector(".track"));
     if (this._pointerId === null) this._render();
   }
@@ -870,7 +892,9 @@ class MaraoSlideToOpen extends HTMLElement {
     this._fitAccessGrid();
     this._cancelHiddenSlide ||= event => {
       if (event.type === "visibilitychange" && !globalThis.document?.hidden) return;
+      this._clearFeedback();
       this._resetGesture(this.shadowRoot?.querySelector(".track"));
+      this._render();
     };
     for (const type of ["location-changed", "popstate"]) globalThis.window?.addEventListener?.(type, this._cancelHiddenSlide);
     globalThis.document?.addEventListener?.("visibilitychange", this._cancelHiddenSlide);
@@ -890,13 +914,13 @@ class MaraoSlideToOpen extends HTMLElement {
     this._actionError = "";
     this._actionRequest = (this._actionRequest || 0) + 1;
     clearTimeout(this._completionTimer);
+    this._clearFeedback();
     this._resetGesture(this.shadowRoot?.querySelector(".track"));
   }
 
-  attributeChangedCallback(_name, oldValue, newValue) {
+  attributeChangedCallback(name, oldValue, newValue) {
     if (oldValue !== newValue) {
-      this._actionError = "";
-      this._actionRequest = (this._actionRequest || 0) + 1;
+      if (name === "entity") { this._clearFeedback(); this._actionError = ""; this._actionRequest = (this._actionRequest || 0) + 1; }
       if (this._pointerId === null) this._render();
     }
   }
@@ -920,11 +944,15 @@ class MaraoSlideToOpen extends HTMLElement {
   }
 
   _disabled() {
+    return this._sending || this._feedback === "accepted" || this._feedback === "fading" || !this._targetReady();
+  }
+
+  _targetReady() {
     const hass = this._hassInstance();
     const alarm = this._alarmOwner();
-    return this._sending || alarm && (alarm._alarmBusy || alarm._actionLive === false || this._state() === 'disarmed') || !hass?.states?.[this._entityId()] || !this._state()
+    return !(alarm && (alarm._alarmBusy || alarm._actionLive === false || this._state() === 'disarmed') || !hass?.states?.[this._entityId()] || !this._state()
       || !serviceConnectionReady(hass) || !serviceTargetReady(hass, this._entityId())
-      || !alarm && !accessOpenerService(this._entityId(), this._openerOptions().action_service);
+      || !alarm && !accessOpenerService(this._entityId(), this._openerOptions().action_service));
   }
 
   _openerOptions() {
@@ -963,10 +991,11 @@ class MaraoSlideToOpen extends HTMLElement {
   _render() {
     if (!this.shadowRoot) return;
     const disabled = this._disabled();
-    const label = this._label();
+    const label = this._feedback === "sending" ? localize("access.sending", this._hassInstance()) : ["accepted","fading"].includes(this._feedback) ? localize("access.sent", this._hassInstance()) : this._label();
     const semanticLabel = this._semanticLabel(label);
     const owner = this.getRootNode()?.host;
-    const problem = owner?._callService ? null : cardProblem({ entity: this._entityId() }, this._hassInstance(), { error: this._actionError });
+    const problem = cardProblem({ entity: this._entityId() }, this._hassInstance(), { error: owner?._actionError || this._actionError });
+    const feedback = problem ? "" : this._feedback;
     const markup = `
       <style>
         :host { position: relative; z-index: 2; display: block; width: 100%; container: marao-access / inline-size; pointer-events: auto; --marao-slide-foreground: var(--primary-text-color); }
@@ -990,6 +1019,14 @@ class MaraoSlideToOpen extends HTMLElement {
         @keyframes marao-slide-complete {
           50% { box-shadow: inset 0 0 0 4px var(--marao-slide-foreground); }
         }
+        .track.feedback { background:var(--color-blue); --marao-slide-foreground:var(--color-black,#000); }
+        .track.feedback .thumb { background:var(--color-black,#000);color:var(--color-blue); }
+        .track.sending { animation:marao-access-pulse .25s ease-out, marao-access-shimmer 1.6s .25s ease-in-out infinite; }
+        .track.accepted { animation:marao-access-pulse .25s ease-out; }
+        .track.fading { animation:marao-access-fade .18s ease-out forwards; }
+        @keyframes marao-access-pulse { 50% { filter:brightness(1.15);box-shadow:inset 0 0 0 3px var(--color-black,#000); } }
+        @keyframes marao-access-shimmer { 50% { box-shadow:inset 0 0 0 6px color-mix(in srgb,var(--color-black,#000) 15%,transparent); } }
+        @keyframes marao-access-fade { to { background:var(--secondary-background-color); } }
         .label {
           position: relative;
           display: grid;
@@ -1037,13 +1074,13 @@ class MaraoSlideToOpen extends HTMLElement {
           background: var(--ha-card-background);
         }
         @media (prefers-reduced-motion: reduce) {
-          .track.completing { animation: none; }
+          .track.completing, .track.feedback { animation: none; }
         }
       </style>
       <div${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}>
-      <div class="track" role="slider" tabindex="${disabled ? -1 : 0}" aria-label="${escapeHtml(semanticLabel)}" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0%" aria-disabled="${disabled}">
-        <span class="label"${problem ? ' style="visibility:hidden"' : ""}>${escapeHtml(label)}</span>${problem ? `<span class="problem" role="status" style="right:52px">${escapeHtml(problemLabel(problem, this._hassInstance()))}</span><button class="slide-details" data-slide-details type="button" aria-label="${escapeHtml(problem.reason)}">ⓘ</button>` : ""}
-        <span class="thumb"><ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon></span>
+      <div class="track${feedback ? ` feedback ${feedback}` : ''}" role="slider" tabindex="${disabled ? -1 : 0}" aria-label="${escapeHtml(semanticLabel)}" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0%" aria-disabled="${disabled}">
+        <span class="label" role="status"${problem ? ' style="visibility:hidden"' : ""}>${escapeHtml(label)}</span>${problem ? `<span class="problem" role="status" style="right:52px">${escapeHtml(problemLabel(problem, this._hassInstance()))}</span><button class="slide-details" data-slide-details type="button" aria-label="${escapeHtml(problem.reason)}">ⓘ</button>` : ""}
+        <span class="thumb"><ha-icon icon="${feedback === 'sending' ? 'mdi:progress-clock' : ['accepted','fading'].includes(feedback) ? 'mdi:check' : 'mdi:chevron-right'}" aria-hidden="true"></ha-icon></span>
       </div>
 
       </div>
@@ -1200,6 +1237,12 @@ class MaraoSlideToOpen extends HTMLElement {
     }
   }
 
+  _clearFeedback() {
+    clearTimeout(this._completionTimer);
+    this._feedback = "";
+    this._feedbackGeneration = (this._feedbackGeneration || 0) + 1;
+  }
+
   _animateCompletion() {
     const track = this.shadowRoot?.querySelector(".track");
     if (!track) return;
@@ -1222,13 +1265,28 @@ class MaraoSlideToOpen extends HTMLElement {
       return;
     }
     const [domain, service] = accessOpenerService(entityId, this._openerOptions().action_service).split(".");
+    this._clearFeedback();
+    const generation = this._feedbackGeneration, config = this._config;
     this._sending = true;
-    this._animateCompletion();
     const owner = this.getRootNode()?.host;
-    haptic("heavy");
+    const outcome = status => {
+      if (generation !== this._feedbackGeneration || config !== this._config || entityId !== this._entityId() || this._actionLive === false) return;
+      if (status === 'sent') { this._feedback = 'sending'; haptic('heavy'); }
+      else if (status === 'success' && this._targetReady()) {
+        this._feedback = 'accepted';
+        this._completionTimer = setTimeout(() => {
+          this._feedback = 'fading'; this._render();
+          this._completionTimer = setTimeout(() => { this._feedback = ''; this._render(); }, 180);
+        }, 1000);
+      } else this._feedback = '';
+      this._render();
+    };
     try {
-      if (owner?._callService) await owner._callService(domain, service, { entity_id: entityId }, undefined, { accessSlide: true });
-      else await callServiceWithNotification(hass, domain, service, { entity_id: entityId }, serviceOutcome(this), undefined, { accessSlide: true });
+      if (owner?._callService) await owner._callService(domain, service, { entity_id: entityId }, undefined, { accessSlide: true }, outcome);
+      else {
+        const report = serviceOutcome(this);
+        await callServiceWithNotification(hass, domain, service, { entity_id: entityId }, (status,error) => { report(status,error); outcome(status); }, undefined, { accessSlide: true });
+      }
     } finally { this._sending = false; if (this.isConnected) this._render(); }
   }
 

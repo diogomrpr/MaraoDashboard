@@ -44,8 +44,9 @@ function composeDashboard(config, view) {
   if (cards.some((card) => typeof card === "string")) throw new Error("Gallery includes must be ordinary card objects.");
   if (dashboard.config_version === 2 && Array.isArray(dashboard.pages)) {
     dashboard.pages = [
-      ...dashboard.pages.filter(page => page.path !== 'card-test'),
-      { id: 'card-test', name: 'Cases', path: 'card-test', icon: 'mdi:test-tube', output_path: 'views/custom/01-cases.yaml', sections: [
+      ...dashboard.pages.filter(page => page.path !== 'card-test' && !page.path?.startsWith('card-test-')),
+      ...require('./gallery-pages').galleryPages({...view,cards}),
+      { id: 'card-test-all', name: 'Combined test cases', path: 'card-test-all', icon: 'mdi:test-tube', subview:true, output_path: 'views/custom/card-test-all.yaml', sections: [
         ...(view.entities || []).map(entity => ({ entities: [entity] })), ...cards.map(card => ({ cards: [card] })),
       ] },
     ];
@@ -342,7 +343,7 @@ async function prepare(config = readConfig(), { dryRun = false } = {}) {
     }
     const fixtureSource = () => fingerprint(__dirname, (file) =>
       file.startsWith("custom_components/") || file.startsWith("dashboard/") ||
-      ["cases.js", "cases.json", "marao_dashboard_card_test_helpers.yaml", "marao_dashboard_test_dashboard.json"].includes(file));
+      ["cases.js", "cases.json", "gallery-pages.js", "marao_dashboard_card_test_helpers.yaml", "marao_dashboard_test_dashboard.json"].includes(file));
     const fixtureVersion = fixtureSource();
     const fixture = stageFixtures(integrationRoot, path.join(stagingDirectory, "deploy"));
     for (const domain of fixture.domains) {

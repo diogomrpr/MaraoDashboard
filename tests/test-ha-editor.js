@@ -444,7 +444,7 @@ async function weatherChecks(context, scenario, theme, config) {
   page.on('console',m=>{if(['warning','error'].includes(m.type()))diagnostic(m.text(),require('./camera-request-ledger').isManualCameraConsoleMessage(m));});
   page.on('requestfailed',r=>diagnostic(r.failure()?.errorText,require('./camera-request-ledger').isManualCameraTransport(r.url())));
   try {
-    for(const route of ['overview','card-test']) {
+    for(const route of ['overview','card-test-all']) {
       await page.goto(config.url+'/marao-dashboard/'+route);
       await page.locator('marao-card').first().waitFor({state:'visible'});
       await applyVisualPreferences(page,scenario,theme);
@@ -839,7 +839,7 @@ async function independentRoomChecks(page, panel, client, scenario, theme) {
     await panel.evaluate(p => p.__roomRestoreHass());
     const empty = await panel.evaluate(p => `${p._model.pages.findIndex(page => page.path === 'empty-room')}:1`);
     await open(empty); await capture('empty-area'); await close();
-    const custom = await panel.evaluate(p => `${p._model.pages.findIndex(page => page.path === 'card-test')}:0`);
+    const custom = await panel.evaluate(p => `${p._model.pages.findIndex(page => page.path === 'card-test-all')}:0`);
     await open(custom, 'custom');
     await panel.locator('ha-dialog #entity-search').fill('MARAО-NO-MATCH');
     await capture('custom-search'); await close();

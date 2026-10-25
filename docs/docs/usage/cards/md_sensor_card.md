@@ -38,3 +38,24 @@ For example, a W sensor with `display_unit: kW` and `display_precision: 2` shows
 [shared energy format contract](index.md#energy-reading-format) for unit choices,
 raw history handling and incompatible metadata. Nonnumeric states keep their
 normal presentation.
+
+## Background thresholds
+
+In the builder, add **Background thresholds** with a numeric threshold and a color.
+Colors apply from each threshold upward; below the first threshold, the card keeps
+its normal background. Values use the sensor's source unit before display conversion
+or rounding. Review your bounds if the sensor's source unit changes.
+
+```yaml
+variables:
+  background_thresholds:
+    - value: 40
+      color: "#75C89B"
+    - value: 60
+      color: "#BD4242"
+```
+
+For humidity, 40–59.99% uses green and 60% upward uses red. Enter bounds in strictly
+increasing order and opaque `#RRGGBB` colors. Text and icons use a contrasting color.
+Removing all rows restores normal appearance. Unknown/unavailable states keep their
+neutral treatment; nonnumeric states and binary sensors retain existing behavior.

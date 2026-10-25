@@ -765,7 +765,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       loading: this._selected?.status === "loading" || this._status === "loading",
     });
     const reason = problem && problem.kind !== "loading" && (unavailable || this._status === "error")
-      ? `<p class="message" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="${problem.kind === "neutral" ? "mdi:help-circle-outline" : "mdi:alert-circle-outline"}" aria-hidden="true"></ha-icon> ${escapeHtml(problemLabel(problem, this._hass))}<button type="button" data-action="details" aria-label="${escapeHtml(problem.reason)}">${escapeHtml(localize("common.details", this._hass, {}, "Details"))}</button></p>` : "";
+      ? `<p class="message" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="${problem.kind === "neutral" ? "mdi:help-circle-outline" : "mdi:alert-circle-outline"}" aria-hidden="true"></ha-icon> ${escapeHtml(problemLabel(problem, this._hass))}<button type="button" data-action="details" aria-label="${escapeHtml(problem.reason)}"><ha-icon icon="mdi:information-outline" aria-hidden="true"></ha-icon></button></p>` : "";
     const status = !this._hass?.states ? localize("common.loading", this._hass, {}, "Loading…")
       : unavailable ? localize(`common.${unavailable}`, this._hass, {}, unavailable === "unknown" ? "Unknown" : "Unavailable")
       : this._status === "loading" ? localize("camera_events.loading_events", this._hass, {}, "Loading events…")
@@ -910,7 +910,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     const description = detail.event.provider === "netatmo" && text(detail.event.label)
       ? `<small>${escapeHtml(detail.event.label)}</small>` : "";
     const feedback = detail.status === "loading" ? localize("camera_events.loading_event", this._hass, {}, "Loading event…") : localize("common.error", this._hass, {}, "Error");
-    return `<section class="detail"><div class="detail-media">${detail.status === "loading" || detail.status === "error" ? `<p class="message" role="${detail.status === "error" ? "alert" : "status"}">${escapeHtml(feedback)}${detail.status === "error" ? `<button type="button" data-action="details" aria-label="${escapeHtml(detail.error)}">${escapeHtml(localize("common.details", this._hass, {}, "Details"))}</button>` : ""}</p>` : media}</div><div class="detail-meta"><strong>${label}</strong><small>${date}</small>${description}</div></section>`;
+    return `<section class="detail"><div class="detail-media">${detail.status === "loading" || detail.status === "error" ? `<p class="message" role="${detail.status === "error" ? "alert" : "status"}">${escapeHtml(feedback)}${detail.status === "error" ? `<button type="button" data-action="details" aria-label="${escapeHtml(detail.error)}"><ha-icon icon="mdi:information-outline" aria-hidden="true"></ha-icon></button>` : ""}</p>` : media}</div><div class="detail-meta"><strong>${label}</strong><small>${date}</small>${description}</div></section>`;
   }
 
   _handleMediaError(event) {

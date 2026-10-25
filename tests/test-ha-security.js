@@ -107,7 +107,7 @@ async function main() {
       assert.equal(await page.locator('[data-alarm-code]').count(), 0, 'Closed popup retained PIN input');
 
       for (const format of ['text', 'no_code']) {
-        await navigate(page, '/marao-dashboard/card-test#page-card-test-alarm-' + format + '-popup');
+        await navigate(page, '/marao-dashboard/card-test-all#page-card-test-all-alarm-' + format + '-popup');
         const sheet = page.locator('.marao-popup-sheet');
         await sheet.locator('[data-alarm-action="alarm_arm_night"]').waitFor();
         assert.equal(await sheet.locator('[data-alarm-code]').count(), 1, 'Retain the PIN slot to keep the card size stable');
@@ -119,7 +119,7 @@ async function main() {
         if (format === 'text') assert.equal(await sheet.locator('[data-alarm-code]').getAttribute('inputmode'), 'text');
         await page.locator('.marao-popup-close').tap();
       }
-      await navigate(page, '/marao-dashboard/card-test');
+      await navigate(page, '/marao-dashboard/card-test-all');
       for (const domain of ['button', 'switch', 'script']) {
         const target = domain + '.marao_dashboard_test_' + (domain === 'switch' ? 'switch' : 'opener');
         const card = page.locator('marao-card').filter({ has: page.locator('marao-slide-to-open') });

@@ -241,7 +241,7 @@ async function main() {
         if (url.pathname.startsWith('/api/history/period/')) requests.push(url);
       });
       try {
-        await page.goto(config.url + '/marao-dashboard/card-test');
+        await page.goto(config.url + '/marao-dashboard/card-test-all');
         await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor();
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);

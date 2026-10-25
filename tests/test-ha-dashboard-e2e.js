@@ -857,7 +857,7 @@ async function checkOverviewPopups(page, config, screenshotRoot) {
     await assertCurrentFrontend(page);
     await sheet.locator('.marao-popup-close').tap();
     await page.waitForFunction(() => !location.hash);
-    await page.goto(config.url + '/marao-dashboard/card-test', { waitUntil: 'domcontentloaded' });
+    await page.goto(config.url + '/marao-dashboard/card-test-all', { waitUntil: 'domcontentloaded' });
     await page.goto(config.url + '/marao-dashboard/overview#overview-lights', { waitUntil: 'domcontentloaded' });
     await checkEmpty();
     await sheet.locator('.marao-popup-close').tap();
@@ -1085,7 +1085,7 @@ async function checkDisconnected(browser, config, functionalCompleted = false) {
     if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`);
   });
   try {
-    await page.goto(`${config.url}/marao-dashboard/card-test`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${config.url}/marao-dashboard/card-test-all`, { waitUntil: "domcontentloaded" });
     const action = cardAction(page, "Switch + graph");
     await action.waitFor({ state: "visible" });
     await assertCurrentFrontend(page);
@@ -1732,7 +1732,7 @@ async function main() {
     try {
       for (const theme of ['light', 'dark']) {
         if (theme === 'dark') { await browser.close(); browser = await chromium.launch(); ({ context, page, errors } = await createSession(theme)); }
-        await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${baseUrl}/marao-dashboard/card-test-all`, { waitUntil: 'domcontentloaded' });
         const action = cardAction(page, 'Switch + graph');
         assert.equal(await cardByTitle(page, 'Switch + graph').evaluate(card => card._config.entity), entity, 'Toggle must target the safe fixture');
         await action.waitFor({ state: 'visible' }); await assertCurrentFrontend(page);
@@ -1764,7 +1764,7 @@ async function main() {
         coldAssets = await page.evaluate(() => performance.getEntriesByType('resource').filter(entry => entry.name.includes('/MaraoHistoryChart.js')).length);
         assert.equal(coldAssets, 0, 'Ordinary Home load fetched the detailed Chart.js bundle');
       }
-      await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${baseUrl}/marao-dashboard/card-test-all`, { waitUntil: 'domcontentloaded' });
       await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
       await assertCurrentFrontend(page); await applyVisualPreferences(page, scenario, requestedTheme);
       await require('./history-detail-checks').checkHistoryDetails(page, serviceCalls, { scenario, theme: requestedTheme, geometryOnly, coldAssets });
@@ -1789,7 +1789,7 @@ async function main() {
           await assertNoBrowserErrors(selectedCheck + '/closed context');
           browser = await chromium.launch(); ({ context, page, errors } = await createSession(theme));
         }
-        await page.goto(`${baseUrl}/marao-dashboard/${cameraLiveOnly ? 'entrance' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${baseUrl}/marao-dashboard/${cameraLiveOnly ? 'entrance' : 'card-test-all'}`, { waitUntil: 'domcontentloaded' });
         await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         if (selectedCheck === 'history') await checkHistoryCases(page);
@@ -1823,7 +1823,7 @@ async function main() {
   }
   if (process.argv.includes('--media-only')) {
     try {
-      await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${baseUrl}/marao-dashboard/card-test-all`, { waitUntil: 'domcontentloaded' });
       await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
       await assertCurrentFrontend(page);
       await checkMediaRecovery(page, serviceCalls, path.join(screenshotRoot, 'media-recovery'));
@@ -1836,7 +1836,7 @@ async function main() {
     try {
       for (const theme of ['light','dark']) {
         if (theme === 'dark') { await browser.close(); browser = await chromium.launch(); ({ context, page, errors } = await createSession(theme)); }
-        await page.goto(`${baseUrl}/marao-dashboard/card-test`);
+        await page.goto(`${baseUrl}/marao-dashboard/card-test-all`);
         await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);
@@ -1859,7 +1859,7 @@ async function main() {
           browser = await chromium.launch();
           ({ context, page, errors } = await createSession(theme));
         }
-        await page.goto(`${baseUrl}/marao-dashboard/${cameraLiveOnly ? 'entrance' : 'card-test'}`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${baseUrl}/marao-dashboard/${cameraLiveOnly ? 'entrance' : 'card-test-all'}`, { waitUntil: 'domcontentloaded' });
         await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
         await assertCurrentFrontend(page);
         await applyVisualPreferences(page, scenario, theme);
@@ -1894,7 +1894,7 @@ async function main() {
       await assertCurrentFrontend(page);
       await checkOverviewPopups(page, config, captureScreenshots ? screenshotRoot : null);
       await checkGeneratedMedia(page, config, captureScreenshots ? screenshotRoot : null);
-      await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: "domcontentloaded" });
+      await page.goto(`${baseUrl}/marao-dashboard/card-test-all`, { waitUntil: "domcontentloaded" });
       await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible" });
       await checkCardContent(page, serviceCalls);
       await assertNoBrowserErrors("Popup and card content checks");
@@ -1902,7 +1902,7 @@ async function main() {
       return;
     }
     if (process.argv.includes("--actions-only")) {
-      await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: "domcontentloaded" });
+      await page.goto(`${baseUrl}/marao-dashboard/card-test-all`, { waitUntil: "domcontentloaded" });
       await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible" });
       await assertCurrentFrontend(page);
       for (const theme of ['light', 'dark']) {
@@ -1978,12 +1978,12 @@ async function main() {
     if (await housePowerGraph.count() !== 1 || !await housePowerGraph.isVisible() || await housePowerGraph.locator("polyline.line").count() !== 1) {
       throw new Error("House Power did not render Marao's visible SVG background graph.");
     }
-    const cardTestView = (dashboard.config.views || []).find((view) => view.path === "card-test");
+    const cardTestView = (dashboard.config.views || []).find((view) => view.path === "card-test-all");
     const cardTestSerialized = JSON.stringify(cardTestView);
     for (const type of ["custom:marao-card", "custom:marao-popup-card", "custom:marao-navbar-card"]) {
       if (!cardTestSerialized.includes(type)) throw new Error(`Card test dashboard is missing ${type}.`);
     }
-    await page.goto(`${baseUrl}/marao-dashboard/card-test`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${baseUrl}/marao-dashboard/card-test-all`, { waitUntil: "domcontentloaded" });
     await page.locator("marao-navbar-card:not([data-marao-navbar-placeholder])").first().waitFor({ state: "visible" });
     await assertCurrentFrontend(page);
     // The dedicated history visit holds the initial request to prove loading;

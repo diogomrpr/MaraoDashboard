@@ -107,6 +107,7 @@
     },
     "md_sensor_card": {
       "options": [
+        "background_thresholds",
         "md_card_color",
         "on_icon",
         "off_icon",
@@ -1530,6 +1531,7 @@
         "control-grid-sections"
       ],
       "identities": [
+        null,
         null,
         null,
         null,

@@ -1,5 +1,7 @@
 import { canonicalCard, canonicalTemplate, legacyTemplates } from '../custom_components/marao_dashboard/frontend/MaraoNames.js';
 export { canonicalCard, canonicalTemplate };
+import { sensorThresholdError } from '../custom_components/marao_dashboard/frontend/MaraoSensorThresholds.js';
+export { sensorThresholdError };
 import { validatePowerDevices } from './history-data.js';
 export function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -549,6 +551,7 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
     const domain = typeof entity === "string" ? entity.split(".")[0] : undefined;
     const template = item.template || ({sensor: "md_sensor_card", switch: "md_switch_card", input_boolean: "md_switch_card"})[domain];
     const options = direct ? item : item.variables;
+    if (canonicalTemplate(template) === 'md_sensor_card' && (!item.type || item.type === 'custom:marao-card') && options) { const error = sensorThresholdError(options, entity); if (error) errors.push(error); }
     if (template === 'md_fan_card' && domain === 'cover') {
       const live = (entities || []).find(value => value.entity_id === entity);
       if (['door','garage','gate'].includes(live?.device_class || item.device_class) || /door|garage|gate/.test(`${entity} ${item.name || ''} ${live?.name || ''}`.toLowerCase())) errors.push('Use an access card for doors, garages and gates.');
@@ -684,6 +687,7 @@ export function validatePages(config, catalog) {
         }
         if (card.template === 'md_energy_period_card' && !['day', 'month'].includes(options.period ?? 'day')) errors.push('Energy period must be day or month.');
         if (card.template === 'md_energy_period_card') errors.push(...validateEnergyOptions(options));
+        if (card.template === 'md_sensor_card') { const error = sensorThresholdError(options, card.entity_id); if (error) errors.push(error); }
         if (card.template === 'md_graph_card') errors.push(...validatePowerDevices(options, options.graph_entity || card.entity_id));
         if (card.template === 'md_wallbox_current_card' && Object.hasOwn(options, 'shortcuts') && (!Array.isArray(options.shortcuts) || options.shortcuts.length > 3 || options.shortcuts.some(value => typeof value !== 'number' || !Number.isFinite(value)))) errors.push('Charging shortcuts require at most three finite numbers.');
         if (card.template === 'md_light_card' && Object.hasOwn(options, 'use_light_color') && typeof options.use_light_color !== 'boolean') errors.push('Use light color as background must be a boolean.');
@@ -767,6 +771,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
     if (field.kind === 'entity') schema = binding(field.domains, field.device_classes);
     else if (field.kind === 'boolean') schema = { type: 'boolean' };
     else if (['number', 'energy_precision'].includes(field.kind)) schema = { type: 'number', ...(field.key === 'cost_per_kwh' ? { minimum: 0 } : {}) };
+    else if (field.kind === 'sensor_thresholds') return { type: 'array', items: { ...object({ value: { type: 'number' }, color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' } }), required: ['value', 'color'] }, description: field.label };
     else if (field.kind === 'number_list') return { type: 'array', items: { type: 'number' }, description: field.description || field.label };
     else if (field.kind === 'power_devices') return { type: 'array', items: { ...object({ entity_id: binding(['sensor']), name: { type: 'string' } }), required: ['entity_id'] }, description: field.label };
     else if (field.kind === 'energy_sub_entities') return { type: 'array', items: { ...object({ entity_id: binding(['sensor']), name: { type: 'string' }, cost_entity: { anyOf: [binding(['sensor']), { enum: ['', null] }] } }), required: ['entity_id'] }, description: field.label };

@@ -48,3 +48,16 @@ A source reading of 1500 W displays as `2 kW`; the primary switch state and acti
 payload remain unchanged. Without the new keys, `power_unit: kW` would only label
 that reading `1500 kW`. Enabling either new key uses the actual source unit instead
 of that legacy label. See [energy reading format](index.md#energy-reading-format).
+
+## Opening history
+
+When the builder-supported graph is enabled, tap the card's icon with its small
+chart indicator to open history. You can also hold the card for 600 ms when no
+explicit hold action is configured. A short tap keeps its normal card action;
+opening history never toggles the device or changes a setting. Plain graph cards
+also keep their normal history-opening tap unless a custom tap action replaces it.
+
+The extra full-width History row is omitted. Loading, errors and explicit retry
+remain available in the existing history/problem UI. Hidden icons stay hidden,
+and a custom hold (including `action: none`) replaces the default hold. If both
+entry paths are deliberately overridden, restore one to regain default access.

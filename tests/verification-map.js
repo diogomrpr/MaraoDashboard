@@ -156,6 +156,7 @@ const components = {
 };
 
 const rules = [
+  [/^custom_components\/marao_dashboard\/frontend\/MaraoSensorThresholds\.js$/, ['labels', 'editor-model', 'generator']],
   [/^tests\/frontend\/canonical-pages\.fixture\.json$/, ['card-namespace']],
   [/^ha-test\/upgrade\/fixtures\/namespace-v1-(?:input|expected|provenance)\.json$/, ['card-namespace']],
   [/^custom_components\/marao_dashboard\/(card_names\.py|frontend\/MaraoNames\.js)$|^tests\/(frontend\/card-names\.test\.js|components\/marao_dashboard\/test_card_names\.py)$/, ['card-namespace']],
@@ -192,6 +193,7 @@ const rules = [
   [/^custom_components\/marao_dashboard\/frontend\/MaraoDashboardJsonEditor\./, ['json-editor']],
   [/^tests\/test-ha-native\.js$|^tests\/frontend\/(marao-native|retired-authoring)\.test\.js$|^tests\/components\/marao_dashboard\/test_(native|retired_authoring)\.py$/, ['retired-authoring']],
   [/^tests\/native-backup\.js$/, ['verification']],
+  [/^ha-test\/gallery-pages\.js$/, ['gallery']],
   [/^ha-test\/native-cases\.js$/, ['retired-authoring', 'gallery']],
   [/^frontend_src\/(native-model|MaraoNativeCards|MaraoNativeCardEditor)\.js$/, ['retired-authoring']],
   [/^frontend_src\/editor-labels\.js$/, 'editor-labels'],

@@ -2097,6 +2097,30 @@
       "cards": [
         {
           "type": "custom:marao-card",
+          "template": "md_sensor_card",
+          "entity": "sensor.marao_dashboard_test_humidity",
+          "name": "Humidity · background thresholds",
+          "variables": {
+            "background_thresholds": [
+              {
+                "value": 40,
+                "color": "#75C89B"
+              },
+              {
+                "value": 60,
+                "color": "#BD4242"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "custom:marao-control-grid",
+      "columns": 1,
+      "cards": [
+        {
+          "type": "custom:marao-card",
           "template": "md_alarm_controls_card",
           "entity": "alarm_control_panel.marao_dashboard_test_alarm_no_code",
           "name": "Alarm · dropdown",

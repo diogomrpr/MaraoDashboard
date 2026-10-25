@@ -218,3 +218,5 @@ pages; choose a lower-quality Dashboard stream where appropriate. Popup video
 and events still load only when opened. Background playback stops when leaving
 that dashboard or hiding the browser tab, and resumes when eligible. Slow camera
 startup or browser playback restrictions can still require loading or a tap.
+
+Additional event/error details use a compact information icon. The problem reason remains visible; refresh, retry and load-more controls keep their existing behavior.

@@ -1006,7 +1006,19 @@
               },
               {
                 "entity_id": "sensor.marao_dashboard_test_humidity",
-                "name": "Humidity"
+                "name": "Humidity",
+                "variables": {
+                  "background_thresholds": [
+                    {
+                      "value": 40,
+                      "color": "#75C89B"
+                    },
+                    {
+                      "value": 60,
+                      "color": "#BD4242"
+                    }
+                  ]
+                }
               },
               {
                 "entity_id": "sensor.marao_dashboard_test_energy_format_mixed",

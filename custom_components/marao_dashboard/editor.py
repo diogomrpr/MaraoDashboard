@@ -227,6 +227,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             "domains": ["sensor", "binary_sensor"],
             "description": "Show sensor state, last change, and state-aware colors.",
             "variables": [
+                _field("background_thresholds", "Background thresholds", "sensor_thresholds"),
                 _field("md_card_color", "Active color", "color"),
                 _field("on_icon", "On icon", "icon", advanced=True),
                 _field("off_icon", "Off icon", "icon", advanced=True),

@@ -500,3 +500,17 @@ test('light color background is optional and round-trips without default writes'
     assert.deepEqual(serializeConfig(normalizeConfig(config)),before);
   }
 });
+
+test('sensor threshold validation and round trips preserve omission, zero, unknown fields and explicit emptiness', async () => {
+  const {sensorThresholdError}=await import('../../frontend_src/editor-model.js');
+  for(const rows of [[{value:-1.5,color:'#FFFFFF',future:{keep:1}},{value:0,color:'#000000'}],[]]) {
+    const source={config_version:2,name:'Safe',landing_page:'home',pages:[{path:'home',name:'Home',entities:[{id:'humidity',template:'md_sensor_card',entity_id:'sensor.safe',variables:{background_thresholds:rows,unknown:7}}]}]};
+    assert.equal(sensorThresholdError(source.pages[0].entities[0].variables,'sensor.safe'),'');
+    assert.deepEqual(serializeConfig(normalizeConfig(source)),source);
+  }
+  assert.equal(sensorThresholdError({},'sensor.safe'),'');
+  for(const value of [true,'4',Infinity,NaN,null]) assert.match(sensorThresholdError({background_thresholds:[{value,color:'#abcdef'}]},'sensor.safe'),/finite numbers/);
+  for(const rows of [[{value:2,color:'#ffffff'},{value:2,color:'#000000'}],[{value:2,color:'#ffffff'},{value:1,color:'#000000'}]]) assert.match(sensorThresholdError({background_thresholds:rows},'sensor.safe'),/increasing/);
+  assert.match(sensorThresholdError({background_thresholds:[{value:0,color:'red'}]},'sensor.safe'),/#RRGGBB/);
+  assert.match(sensorThresholdError({background_thresholds:[{value:0,color:'#ffffff'}]},'binary_sensor.safe'),/sensor entity/);
+});

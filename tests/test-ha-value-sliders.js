@@ -175,7 +175,7 @@ async function main() {
         calls.push({ domain:message.domain, service: message.service, entities: Array.isArray(entities) ? entities : [entities] });
       }));
       const run = `${scenario.name}-${theme}`;
-      await page.goto(`${config.url}/marao-dashboard/card-test?marao_sliders=${run}`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${config.url}/marao-dashboard/card-test-all?marao_sliders=${run}`, { waitUntil: 'domcontentloaded' });
       await page.locator(`input[data-slider-key="${cases.at(-1).template}:${cases.at(-1).entity}"]`).waitFor({ state: 'visible' });
       await assertCurrentFrontend(page);
       await applyVisualPreferences(page, scenario, theme);
@@ -199,7 +199,7 @@ async function main() {
         for (const example of cases.filter((entry) => entry.sliderPercentage === 50)) {
           for (const pointer of ['mouse', 'touch']) await checkPointerInteraction(page, context, config, example, calls, pointer);
         }
-        await page.goto(`${config.url}/marao-dashboard/card-test#marao-dashboard-test-value-sliders-popup`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${config.url}/marao-dashboard/card-test-all#marao-dashboard-test-value-sliders-popup`, { waitUntil: 'domcontentloaded' });
         try {
           await page.locator('.marao-popup-sheet input[type="range"]').first().waitFor({ state: 'visible' });
         } catch (error) {
@@ -249,7 +249,7 @@ async function main() {
         try {
           // The Home lighting popup intentionally includes only active members.
           await api(config, 'POST', '/api/services/input_boolean/turn_on', { entity_id: fixtureLight });
-          for (const view of ['card-test#marao-dashboard-test-lights-popup', 'card-test#marao-dashboard-test-blinds-popup', 'living-room', 'overview#overview-lights', 'overview#overview-blinds']) {
+          for (const view of ['card-test-all#marao-dashboard-test-lights-popup', 'card-test-all#marao-dashboard-test-blinds-popup', 'living-room', 'overview#overview-lights', 'overview#overview-blinds']) {
             await page.goto(`${config.url}/marao-dashboard/${view}`, { waitUntil: 'domcontentloaded' });
             await page.locator(view.includes('#') ? '.marao-popup-sheet input[type="range"]' : 'marao-card input[type="range"]').first().waitFor({ state: 'attached' });
             await applyVisualPreferences(page, scenario, theme);

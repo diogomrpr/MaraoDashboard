@@ -140,7 +140,7 @@ async function main() {
           calls.push({ domain: message.domain, service: message.service, entities: Array.isArray(targets) ? targets : [targets] });
         }));
         const names = {};
-        for (const view of ['card-test', 'rooms']) {
+        for (const view of ['card-test-all', 'rooms']) {
           await page.goto(config.url + '/marao-dashboard/' + view);
           await page.locator('marao-card .room-bottom').first().waitFor();
           await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({ state: 'visible' });
@@ -152,7 +152,7 @@ async function main() {
           for (const [index, name] of names[view].entries()) await capture(page, namedCard(page, name), `${run}-${view}-${index}`, scenario, theme);
           await page.evaluate(() => document.fonts.ready);
         }
-        await page.goto(config.url + '/marao-dashboard/card-test');
+        await page.goto(config.url + '/marao-dashboard/card-test-all');
         await page.locator('[data-room-lights-off]').first().waitFor();
         await applyVisualPreferences(page, scenario, theme);
         await actions(page, calls, run, scenario, theme); await page.evaluate(() => document.fonts.ready);

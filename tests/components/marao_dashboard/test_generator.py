@@ -1823,3 +1823,26 @@ def test_cover_group_uses_one_ventilation_filter_without_rewriting_explicit_memb
     popup = _entity_group_popup(resolved)
     assert popup["entity_group"]["entities"] == ["cover.explicit"]
     assert group == original
+
+
+def test_sensor_thresholds_validate_and_preserve_released_and_nested_options():
+    from copy import deepcopy
+    from custom_components.marao_dashboard.page_model import validate_sensor_thresholds, validate_pages
+    from custom_components.marao_dashboard.editor import EDITOR_CATALOG
+    templates = {card['id']: card['domains'] for card in EDITOR_CATALOG['cards']}
+    for options in ({'future': 7}, {'background_thresholds': []}, {'background_thresholds': [{'value': -1.5, 'color': '#FFFFFF', 'future': {'keep': 1}}, {'value': 0, 'color': '#000000'}]}):
+        card = {'id': 'humidity', 'template': 'md_sensor_card', 'entity_id': 'sensor.safe', 'variables': deepcopy(options)}
+        before = deepcopy(card)
+        source = {'config_version': 2, 'name': 'Safe', 'landing_page': 'home', 'pages': [{'path': 'home', 'name': 'Home', 'entities': [card]}]}
+        validate_pages(source, templates)
+        assert generator._entity_card(card)['variables'].items() >= options.items()
+        assert card == before
+        assert generator._entity_card({**card, 'template': 'hc_sensor_card'})['variables'].items() >= options.items()
+    for value in (True, '4', None, float('inf'), float('nan')):
+        with pytest.raises(ValueError, match='finite numbers'):
+            validate_sensor_thresholds({'background_thresholds': [{'value': value, 'color': '#ffffff'}]}, 'sensor.safe')
+    for rows in ([{'value': 2, 'color': '#ffffff'}, {'value': 2, 'color': '#000000'}], [{'value': 2, 'color': '#ffffff'}, {'value': 1, 'color': '#000000'}]):
+        with pytest.raises(ValueError, match='increasing'):
+            validate_sensor_thresholds({'background_thresholds': rows}, 'sensor.safe')
+    with pytest.raises(ValueError, match='sensor entity'):
+        generator._entity_card({'template': 'md_sensor_card', 'entity_id': 'binary_sensor.safe', 'variables': {'background_thresholds': [{'value': 0, 'color': '#ffffff'}]}})

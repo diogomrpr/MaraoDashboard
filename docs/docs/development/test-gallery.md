@@ -10,7 +10,11 @@ nav_order: 5
 The disposable Home Assistant exposes one Marao dashboard at
 `/marao-dashboard`. Its normal Home, Rooms, Security, Energy, Wallbox, Media,
 Appliances, and room-detail views exercise realistic generated layouts. The
-Cases view at `/marao-dashboard/card-test` is the exhaustive visual contract.
+Cards index at `/marao-dashboard/card-test` links to an individual page for each
+card, with each shortcut named after that card. Each page collects its existing
+variations and popup examples and includes a Back to cards shortcut. The combined
+view at `/marao-dashboard/card-test-all` retains the exhaustive layout for automated
+checks; it is a subview and does not add another navbar entry.
 All routes and popups stay within that dashboard.
 
 The two-column access examples reuse the safe lock and open-only helpers. Narrow

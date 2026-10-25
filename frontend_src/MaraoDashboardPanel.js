@@ -1,6 +1,6 @@
 import { bindCardDrag } from "./editor-drag.js";
 import "./panel.css";
-import { cameraTitleFields, formData, patchForm, sameFormValue } from "./editor-model.js";
+import { cameraTitleFields, formData, patchForm, sameFormValue, sensorThresholdError } from "./editor-model.js";
 
 import {
   cardForEntity,
@@ -1546,9 +1546,11 @@ class MaraoDashboardPanel extends HTMLElement {
     const initialData = clone(data);
     const content = dialog.querySelector(".dialog-content");
     const variables = this._expandedFields(selected.variables).map(field => selected.id === "md_fan_card" && field.key === "enable_slider" && data.entity_id.startsWith("cover.") ? {...field,label:"Opening slider"} : field);
-    const basic = variables.filter((field) => !field.advanced && !['energy_sub_entities','power_devices'].includes(field.kind));
-    const advanced = variables.filter((field) => field.advanced && !['energy_sub_entities','power_devices'].includes(field.kind));
-    content.innerHTML = `<div id="card-form"></div><div id="summary" class="summary"></div>${selected.scene_collection ? '<div id="scene-order"></div>' : ''}${selected.id === 'md_energy_period_card' ? '<div id="energy-breakdown"></div>' : ''}${selected.id === 'md_graph_card' ? '<div id="power-devices"></div>' : ''}${selected.id === 'md_media_card' ? `<ha-button data-media-options>${this._l('Apple TV options')}</ha-button>` : ''}${advanced.length ? `<ha-expansion-panel id="advanced-panel" outlined><div slot="header">${this._t("advanced")}</div><div id="advanced-form" class="advanced-form"></div></ha-expansion-panel>` : ""}<div class="dialog-actions"><ha-button data-close>${this._t("cancel")}</ha-button><ha-button data-save appearance="filled">${existing ? this._t("update") : this._t("create")}</ha-button></div>`;
+    const basic = variables.filter((field) => !field.advanced && !['energy_sub_entities','power_devices','sensor_thresholds'].includes(field.kind));
+    const advanced = variables.filter((field) => field.advanced && !['energy_sub_entities','power_devices','sensor_thresholds'].includes(field.kind));
+    content.innerHTML = `<div id="card-form"></div><div id="summary" class="summary"></div>${selected.id === 'md_sensor_card' ? '<div id="sensor-thresholds"></div>' : ''}${selected.scene_collection ? '<div id="scene-order"></div>' : ''}${selected.id === 'md_energy_period_card' ? '<div id="energy-breakdown"></div>' : ''}${selected.id === 'md_graph_card' ? '<div id="power-devices"></div>' : ''}${selected.id === 'md_media_card' ? `<ha-button data-media-options>${this._l('Apple TV options')}</ha-button>` : ''}${advanced.length ? `<ha-expansion-panel id="advanced-panel" outlined><div slot="header">${this._t("advanced")}</div><div id="advanced-form" class="advanced-form"></div></ha-expansion-panel>` : ""}<div class="dialog-actions"><ha-button data-close>${this._t("cancel")}</ha-button><ha-button data-save appearance="filled">${existing ? this._t("update") : this._t("create")}</ha-button></div>`;
+    const renderThresholds = () => { if (selected.id === 'md_sensor_card') this._renderEnergySubEntities(content.querySelector('#sensor-thresholds'), clone(data.var__background_thresholds || []), value => { data.var__background_thresholds = value; }, false, data.entity_id); };
+    renderThresholds();
     if (selected.id === 'md_graph_card') this._renderEnergySubEntities(content.querySelector('#power-devices'), clone(data.var__power_devices || []), value => { data.var__power_devices = value; }, true);
     if (selected.id === 'md_energy_period_card') this._renderEnergySubEntities(content.querySelector('#energy-breakdown'), clone(data.var__sub_entities || []), value => { data.var__sub_entities = value; });
     const renderCollection = () => {
@@ -1567,7 +1569,9 @@ class MaraoDashboardPanel extends HTMLElement {
     let appleTV = clone(existing?.apple_tv);
     if (selected.id === 'md_media_card') content.querySelector('[data-media-options]').addEventListener('click', () => this._openMediaOptions({ entity_id: data.entity_id, apple_tv: appleTV }, value => { appleTV = value; }));
     const changed = (value) => {
+      const previousEntity = data.entity_id;
       Object.assign(data, value);
+      if (previousEntity !== data.entity_id) renderThresholds();
       if (selected.id === 'md_fan_card') {
         const form = content.querySelector('#card-form ha-form');
         const label = this._l(data.entity_id.startsWith('cover.') ? 'Opening slider' : 'Speed slider');
@@ -1618,6 +1622,7 @@ class MaraoDashboardPanel extends HTMLElement {
           if (!existing || !sameFormValue(initialData[key], data[key])) this._writeVariable(variablesObject, field, data[key]);
         } }
         catch (error) { this._renderSummary(content.querySelector('#summary'), target, selected, roomIndex, cardIndex, kind, this._error(error)); return; }
+        if (selected.id === 'md_sensor_card') { const error = sensorThresholdError(variablesObject, data.entity_id); if (error) { this._renderSummary(content.querySelector('#summary'), target, selected, roomIndex, cardIndex, kind, this._l(error)); return; } }
         if (Object.keys(variablesObject).length) entity.variables = variablesObject; else delete entity.variables;
         if (memberOptions) { delete entity.__simple; this._closeDialog(dialog); memberOptions.save(entity); return; }
         const container = this._editableContainer(kind, roomIndex);
@@ -1626,27 +1631,32 @@ class MaraoDashboardPanel extends HTMLElement {
     });
   }
 
-  _renderEnergySubEntities(host, values, changed, power = false) {
+  _renderEnergySubEntities(host, values, changed, power = false, thresholdEntity = null) {
+    const threshold = thresholdEntity !== null;
+    const notify = () => {
+      changed(values);
+      if (threshold) host.querySelector('[data-list-error]').textContent = this._l(sensorThresholdError({background_thresholds:values}, thresholdEntity));
+    };
     const render = () => {
-      host.innerHTML = `<h3>${this._l(power ? 'Power devices' : 'Energy breakdown')}</h3><div data-energy-rows></div><ha-button data-energy-add>${this._t('add')}</ha-button>`;
+      host.innerHTML = `<h3>${this._l(threshold ? 'Background thresholds' : power ? 'Power devices' : 'Energy breakdown')}</h3>${threshold ? `<p>${this._l('Colors apply from each threshold upward, in source units. Below the first threshold the normal background is used.')} ${esc(this._hass?.states?.[thresholdEntity]?.attributes?.unit_of_measurement || '')}</p>` : ''}<div data-energy-rows></div><p data-list-error role="alert"></p><ha-button data-energy-add>${this._t('add')}</ha-button>`;
       const rows = host.querySelector('[data-energy-rows]');
       if (!Array.isArray(values)) rows.textContent = this._l(power ? 'Power devices must be a list.' : 'Energy breakdown must be a list.');
       else values.forEach((member, index) => {
         const row = document.createElement('div'); row.className = 'advanced-form';
         if (!member || typeof member !== 'object' || Array.isArray(member)) row.textContent = this._l(power ? 'Choose a power sensor for each device.' : 'Energy breakdown entries must be objects.');
         else {
-          const data = { entity_id: member.entity_id || '', name: member.name || '', cost_entity: member.cost_entity || '' };
-          this._mountForm(row, data, [
+          const data = threshold ? {value:member.value, color:member.color} : { entity_id: member.entity_id || '', name: member.name || '', cost_entity: member.cost_entity || '' };
+          this._mountForm(row, data, threshold ? [this._schema('value','Threshold',{number:{mode:'box',step:0.1}},true), this._schema('color','Background color',{text:{type:'color'}},true)] : [
             this._schema('entity_id', power ? 'Power sensor (W/kW)' : 'Energy sensor', { entity: { domain: ['sensor'] } }, true),
             this._schema('name', 'Display name', { text: {} }),
             ...(power ? [] : [this._schema('cost_entity', 'Cost sensor (optional)', { entity: { domain: ['sensor'] } })]),
           ], value => {
             const next = { ...values[index] };
-            for (const key of power ? ['entity_id', 'name'] : ['entity_id', 'name', 'cost_entity']) {
-              if (value[key] === (next[key] || '')) continue;
-              if (value[key] || key === 'entity_id') next[key] = value[key]; else delete next[key];
+            for (const key of threshold ? ['value','color'] : power ? ['entity_id', 'name'] : ['entity_id', 'name', 'cost_entity']) {
+              if (value[key] === (next[key] ?? '')) continue;
+              if (threshold || value[key] || key === 'entity_id') next[key] = value[key]; else delete next[key];
             }
-            Object.assign(data, value); values[index] = next; changed(values);
+            Object.assign(data, value); values[index] = next; notify();
           });
         }
         const controls = document.createElement('div'); controls.className = 'row-actions';
@@ -1655,13 +1665,14 @@ class MaraoDashboardPanel extends HTMLElement {
           this._moveHaptic();
           if (button.dataset.action === 'delete') values.splice(index, 1);
           else values = moveItem(values, index, index + (button.dataset.action === 'up' ? -1 : 1));
-          changed(values); render();
+          notify(); render();
         }));
         row.append(controls); rows.append(row);
       });
       host.querySelector('[data-energy-add]').addEventListener('click', () => {
-        this._moveHaptic(); values = [...(Array.isArray(values) ? values : []), { entity_id: '' }]; changed(values); render();
+        this._moveHaptic(); values = [...(Array.isArray(values) ? values : []), threshold ? {value:Number.isFinite(values?.at(-1)?.value) ? values.at(-1).value + 10 : 0,color:'#75C89B'} : { entity_id: '' }]; notify(); render();
       });
+      if (threshold) host.querySelector('[data-list-error]').textContent = this._l(sensorThresholdError({background_thresholds:values}, thresholdEntity));
     };
     render();
   }

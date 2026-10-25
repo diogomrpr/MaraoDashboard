@@ -28,7 +28,7 @@ async function main() {
     const saved = await client.call({ type: 'marao_dashboard/config/get' });
     const dashboard = await client.call({ type: 'lovelace/config', url_path: 'marao-dashboard', force: true });
     const views = dashboard.views.filter(hasNumericCard);
-    assert.ok(views.some(view => view.path === 'card-test'), 'Missing numeric Cases');
+    assert.ok(views.some(view => view.path === 'card-test-all'), 'Missing numeric Cases');
     for (const scenario of profiles) for (const theme of themes) {
       const run = `${scenario.name}-${theme}`, output = path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), 'climate-layout', run);
       fs.rmSync(output, { recursive: true, force: true });

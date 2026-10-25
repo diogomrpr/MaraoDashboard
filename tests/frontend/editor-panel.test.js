@@ -1088,3 +1088,22 @@ test('card catalog search matches localized names and descriptions without chang
   assert.equal(selected[2], 'md_access_card'); assert.equal(selected[3], 'page');
   assert.equal(p._source(), before, 'Searching must not change the dashboard draft');
 });
+
+test('threshold row editor preserves zero and unknown data and leaves explicit emptiness after removal', () => {
+  const p=new Panel();p._hass={states:{'sensor.humidity':{attributes:{unit_of_measurement:'%'}}}};
+  const bindings=[], rows=[], buttons=new Map();let add, rowChange, last;
+  const element=()=>({dataset:{action:'delete'},addEventListener(_type,callback){this.click=callback;}});
+  const error={textContent:''};
+  const host={set innerHTML(_value){rows.length=0;add=element();},querySelector(selector){return selector==='[data-energy-rows]'?{append:row=>rows.push(row)}:selector==='[data-list-error]'?error:add;}};
+  const previous=context.document;
+  context.document={createElement(){return {className:'',append(control){this.controls=control;},set innerHTML(_value){},querySelectorAll(){return [{dataset:{action:'delete'},addEventListener(_type,cb){this.click=cb;buttons.set(rows.length,this);}}];}};}};
+  p._mountForm=(_row,data,_schema,changed)=>{bindings.push(data);rowChange=changed;};
+  p._moveHaptic=()=>{};
+  try {
+    p._renderEnergySubEntities(host,[{value:0,color:'#ffffff',future:{keep:7}}],value=>last=value,false,'sensor.humidity');
+    assert.equal(bindings[0].value,0);
+    rowChange({value:1.5,color:'#ffffff'});assert.equal(last[0].value,1.5);assert.equal(last[0].future.keep,7);
+    buttons.get(0).click();assert.equal(last.length,0);
+    add.click();assert.equal(last[0].value,0);assert.equal(error.textContent,'');
+  } finally {context.document=previous;}
+});

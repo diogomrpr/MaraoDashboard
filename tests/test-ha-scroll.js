@@ -92,7 +92,7 @@ async function main() {
         await page.locator('.marao-popup-close').tap();
         if (process.argv.includes('--covers-only')) continue;
       }
-      for (const route of ['overview#overview-maintenance', 'card-test#marao-dashboard-test-maintenance-popup']) {
+      for (const route of ['overview#overview-maintenance', 'card-test-all#marao-dashboard-test-maintenance-popup']) {
         await page.goto(config.url + '/marao-dashboard/' + route);
         console.log(name + ': loaded ' + route);
         const sheet = page.locator('.marao-popup-sheet');
@@ -124,7 +124,7 @@ async function main() {
         if (route.startsWith('overview') && scenario.name === 'iphone-normal') await page.screenshot({path:path.join(output,name+'-maintenance.png'),scale:'css'});
         await page.locator('.marao-popup-close').tap();
         await sheet.waitFor({state:'detached'});
-        if (route.startsWith('card-test')) {
+        if (route.startsWith('card-test-all')) {
           const scroller = await page.locator('marao-card').first().evaluateHandle(card => {
             for (let element=card; element; element=element.assignedSlot || element.parentElement || element.getRootNode()?.host) {
               if (element.scrollHeight > element.clientHeight + 1 && ['auto','scroll'].includes(getComputedStyle(element).overflowY)) return element;

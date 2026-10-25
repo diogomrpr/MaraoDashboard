@@ -152,3 +152,13 @@ Strict access open/unlock sliders use a rounded track and round arrow handle,
 without a progressing background fill. Drag from anywhere on the handle,
 including its edges; the label fades during travel and returns on reset. Track
 taps, incomplete slides and scrolling gestures never execute the access action.
+
+## Access slide feedback
+
+Completing a valid door, gate or lock opening slide requests a strong vibration
+and pulses the slider blue. A gentle blue shimmer indicates the command is being
+sent. Home Assistant's acceptance shows a checkmark and **Request sent** for about
+one second before returning to the reported device state. Acceptance does not
+prove the physical access point moved. Errors and unavailable states take priority;
+there are no automatic retries. Reduced-motion clients use static color and icons.
+Physical vibration depends on client support; visual feedback remains available.

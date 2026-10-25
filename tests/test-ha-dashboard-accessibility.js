@@ -257,7 +257,7 @@ async function inspectFullscreenLifecycle(page) {
     const deadline = Date.now() + 15000;
     while (editorRequests.size && Date.now() < deadline) await page.waitForTimeout(50);
     if (editorRequests.size) throw new Error('Editor asset requests did not finish before route disposal');
-    await page.evaluate(() => {history.pushState(null,'','/marao-dashboard/card-test');window.dispatchEvent(new CustomEvent('location-changed'));});
+    await page.evaluate(() => {history.pushState(null,'','/marao-dashboard/card-test-all');window.dispatchEvent(new CustomEvent('location-changed'));});
     await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])').waitFor({state:'visible'});
     await page.waitForFunction(() => {
       const find=root=>{if(!root)return;const nav=root.querySelector?.('marao-navbar-card:not([data-marao-navbar-placeholder])');if(nav)return nav;for(const e of root.querySelectorAll?.('*')||[]){const nav=find(e.shadowRoot);if(nav)return nav;}};
@@ -1123,7 +1123,7 @@ async function main() {
       if (!options.preview) {
         for (const file of fs.readdirSync(output)) if (file.startsWith(`${runName}-`)) fs.rmSync(path.join(output, file));
       }
-      const initialView = options.pagesOnly ? dashboard.views.find(view => view.path !== 'card-test')?.path : 'card-test';
+      const initialView = options.pagesOnly ? dashboard.views.find(view => !view.path?.startsWith('card-test'))?.path : 'card-test-all';
       if (!initialView) throw new Error('Missing saved dashboard page.');
       await page.goto(`${baseUrl}/marao-dashboard/${initialView}?marao_accessibility=${runName}`, { waitUntil: "domcontentloaded" });
       try {
@@ -1184,7 +1184,7 @@ async function main() {
       await applyVisualPreferences(page, scenario, theme);
       if (options.focused) {
         let inspected = 0;
-        const views = options.pages ? dashboard.views.filter(view => view.path !== 'card-test') : [{ path: initialView }];
+        const views = options.pages ? dashboard.views.filter(view => !view.path?.startsWith('card-test')) : [{ path: initialView }];
         for (const view of views) {
           if (view.path !== initialView) {
             await page.evaluate(route => { history.pushState(null, '', route); window.dispatchEvent(new CustomEvent('location-changed')); }, '/marao-dashboard/' + view.path);
@@ -1273,7 +1273,7 @@ async function main() {
       issues = issues.concat(await inspectPopups(page, scenario, theme, output, runName, captures, [], popupBehavior, checkedBehaviors));
       if (errors.length || issues.length) throw new Error(`${runName} failed:\n${[...errors, ...issues].map((item) => `- ${item}`).join("\n")}`);
       }
-      if (options.pages) for (const view of dashboard.views.filter(view => view.path !== 'card-test')) {
+      if (options.pages) for (const view of dashboard.views.filter(view => !view.path?.startsWith('card-test'))) {
         await page.evaluate(() => document.fonts.ready);
         await page.evaluate(route => { history.pushState(null, '', route); window.dispatchEvent(new CustomEvent('location-changed')); }, '/marao-dashboard/' + view.path);
         await page.waitForFunction(({ root, expected }) => root.config?.views?.[root._curView]?.path === expected, {
@@ -1296,7 +1296,7 @@ async function main() {
       await cameraLedger?.stopForClose();
       if (errors.length) throw new Error(`${runName}: ${errors.join('\n')}`);
       fs.writeFileSync(path.join(output, runName + '-result.json'), JSON.stringify({ profile: scenario.name, theme,
-        pages: options.pages ? dashboard.views.filter(view => view.path !== 'card-test').map(view => view.path) : [],
+        pages: options.pages ? dashboard.views.filter(view => !view.path?.startsWith('card-test')).map(view => view.path) : [],
         gallery: !options.pagesOnly, screenshots: captures, passed: true }), { mode: 0o600 });
       console.log(`${runName}: ${options.pagesOnly ? 'saved-page' : 'gallery'} and popup checks passed.`);
       await context.close();

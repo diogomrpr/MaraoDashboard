@@ -50,6 +50,28 @@ def access_template(card: dict[str, Any]) -> str | None:
     return ACCESS_ROLES[mode]
 
 
+def validate_sensor_thresholds(options: dict[str, Any], entity: str = "") -> None:
+    if "background_thresholds" not in options:
+        return
+    rows = options["background_thresholds"]
+    if not isinstance(rows, list):
+        raise ValueError("Background thresholds must be a list.")
+    if rows and not entity.startswith("sensor."):
+        raise ValueError("Background thresholds require a sensor entity.")
+    previous = -math.inf
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("Each background threshold must be an object.")
+        value = row.get("value")
+        if type(value) not in (int, float) or not math.isfinite(value):
+            raise ValueError("Threshold values must be finite numbers.")
+        if value <= previous:
+            raise ValueError("Threshold values must be strictly increasing.")
+        if not isinstance(row.get("color"), str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", row["color"]):
+            raise ValueError("Threshold colors must use #RRGGBB.")
+        previous = value
+
+
 def validate_light_options(options: dict[str, Any]) -> None:
     if "use_light_color" in options and type(options["use_light_color"]) is not bool:
         raise ValueError("Use light color as background must be a boolean.")
@@ -236,6 +258,8 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                     presets = options["shortcuts"]
                     if not isinstance(presets, list) or len(presets) > 3 or any(type(value) not in (int, float) or not math.isfinite(value) for value in presets):
                         raise ValueError("Charging shortcuts require at most three finite numbers")
+                if role == "md_sensor_card":
+                    validate_sensor_thresholds(options, entity or "")
                 if role == "md_light_card":
                     validate_light_options(options)
                 if role == "md_camera_card":

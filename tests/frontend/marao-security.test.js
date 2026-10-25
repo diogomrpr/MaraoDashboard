@@ -316,3 +316,37 @@ test('damper defaults and explicit ventilation selections survive metadata refre
   assert.deepEqual(validateConfig(config,2,[{entity_id:'cover.airflow',device_class:'shutter'}],{},catalog),[]);
   assert.match(validateConfig(config,2,[{entity_id:'cover.airflow',device_class:'gate'}],{},catalog).join(' '),/access card/);
 });
+
+test('access feedback follows explicit outcomes, preserves state and cannot confirm failed or obsolete requests', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  const pulses=[];
+  const names=['HTMLElement','MARAO_SLIDE_INTENT_PX','MARAO_SLIDE_COMPLETE_AT','serviceConnectionReady','serviceTargetReady','accessOpenerService','haptic','callServiceWithNotification','serviceOutcome','fitNativeGrid'];
+  const Slide=new Function(...names,dashboard.slice(dashboard.indexOf('class MaraoSlideToOpen'),dashboard.indexOf('if (!customElements.get("marao-slide-to-open"))'))+';return MaraoSlideToOpen;')(globalThis.HTMLElement,10,.92,runtime.serviceConnectionReady,runtime.serviceTargetReady,accessOpenerService,value=>pulses.push(value),runtime.callServiceWithNotification,runtime.serviceOutcome,runtime.fitNativeGrid);
+  for(const parent of [false,true]) for(const result of ['success','error','hidden','unavailable','skipped']) {
+    let resolve,reject,calls=0;
+    const pending=new Promise((yes,no)=>{resolve=yes;reject=no;});
+    const hass={states:{'lock.safe':{state:'locked',attributes:{}}},callService:()=>{calls++;return pending;}};
+    const slide=new Slide();slide.attributes={entity:'lock.safe'};slide._hass=hass;slide.isConnected=true;slide._actionLive=true;slide._render=()=>{};
+    if(parent || result==='skipped') {
+      const owner=new MaraoCard();owner.setConfig({template:'md_access_slide_action_card',entity:'lock.safe'});owner._hass=hass;owner._render=()=>{};owner._actionLive=true;
+      if(result==='skipped') owner._callService=async(_d,_s,_data,_target,_intent,observe)=>observe('skipped');
+      slide.getRootNode=()=>({host:owner});
+    }
+    const before=pulses.length,work=slide._trigger();
+    if(result==='skipped') {await work;assert.equal(slide._feedback,'');assert.equal(calls,0);assert.equal(pulses.length,before);continue;}
+    assert.equal(slide._feedback,'sending');assert.equal(slide._disabled(),true);assert.equal(pulses.length,before+1);
+    await slide._trigger();assert.equal(calls,1);
+    slide.hass={...hass,states:{...hass.states}};assert.equal(slide._feedback,'sending');
+    if(result==='hidden') slide._clearFeedback();
+    if(result==='unavailable') slide.hass={...hass,connected:false};
+    if(result==='error') reject(Error('Fixture refused'));else resolve();
+    await work;
+    if(result==='success') {
+      assert.equal(slide._feedback,'accepted');assert.equal(slide._state(),'locked');
+      t.mock.timers.tick(1000);assert.equal(slide._feedback,'fading');
+      t.mock.timers.tick(180);assert.equal(slide._feedback,'');assert.equal(slide._disabled(),false);
+    } else {assert.equal(slide._feedback,'');t.mock.timers.tick(2000);assert.equal(slide._feedback,'');}
+    assert.equal(pulses.length,before+1);assert.equal(calls,1);
+    slide._clearFeedback();
+  }
+});

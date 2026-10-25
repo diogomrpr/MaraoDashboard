@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const YAML = require('yaml');
-const { concreteCases, expandGallery, expandHelpers, validateCoverage, popupCases, manifest } = require('../../ha-test/cases.js');
+const { concreteCases, expandGallery, expandHelpers, validateCoverage, popupCases, manifest, walkCards } = require('../../ha-test/cases.js');
 const helpers = expandHelpers(YAML.parse(fs.readFileSync(new URL('../../ha-test/marao_dashboard_card_test_helpers.yaml', import.meta.url), 'utf8')));
 const view = expandGallery(YAML.parse(fs.readFileSync(new URL('../../ha-test/dashboard/views/00-card-test.yaml', import.meta.url), 'utf8')));
 
@@ -14,13 +14,13 @@ test('Cases isolates editable card heights while preserving every example and in
   const source = require('../../ha-test/marao_dashboard_test_dashboard.json');
   const original = structuredClone(source);
   const composed = composeDashboard(source, view);
-  const sections = composed.pages.find(page => page.path === 'card-test').sections;
+  const sections = composed.pages.find(page => page.path === 'card-test-all').sections;
   const editable = sections.filter(section => section.entities);
   assert.equal(editable.length, view.entities.length);
   assert.ok(editable.every(section => section.entities.length === 1));
   assert.deepEqual(editable.flatMap(section => section.entities), view.entities);
   assert.deepEqual(sections.flatMap(section => section.cards || []), view.cards);
-  assert.deepEqual(composed.pages.filter(page => page.path !== 'card-test'), source.pages.filter(page => page.path !== 'card-test'));
+  assert.deepEqual(composed.pages.filter(page => !page.path.startsWith('card-test')), source.pages.filter(page => page.path !== 'card-test'));
   assert.deepEqual(composeDashboard(composed, view), composed);
   assert.deepEqual(source, original);
 });
@@ -556,4 +556,34 @@ test('realistic pages and Cases share a long explicit navbar without another das
   }]);
   const paths = new Set([...source.pages.map(page=>page.path),'card-test']);
   for (const route of source.navigation) assert.ok(paths.has(typeof route==='string'?route:route.url.split('/').at(-1)));
+});
+
+test('card index names every shortcut after its page and keeps every independent variation reachable', () => {
+  const {composeDashboard}=require('../../ha-test/prepare');
+  const {cardKind}=require('../../ha-test/gallery-pages');
+  const config=composeDashboard(require('../../ha-test/marao_dashboard_test_dashboard.json'),view);
+  const pages=config.pages.filter(page=>page.path.startsWith('card-test-')&&page.path!=='card-test-all');
+  const index=config.pages.find(page=>page.path==='card-test');
+  const links=index.sections.flatMap(section=>section.cards||[]);
+  assert.equal(links.length,pages.length);
+  assert.equal(new Set(pages.map(page=>page.path)).size,pages.length);
+  for(const page of pages) {
+    const link=links.find(link=>link.tap_action.navigation_path==='/marao-dashboard/'+page.path);
+    assert.equal(link.name,page.name);
+    assert.equal(page.sections[0].cards[0].tap_action.navigation_path,'/marao-dashboard/card-test');
+    assert.equal(page.subview,true);
+    const hashes=new Set();
+    walkCards(page,card=>{if(card.type==='custom:marao-popup-card')hashes.add(card.hash);});
+    walkCards(page,card=>{
+      const target=card.variables?.popup_hash || card.tap_action?.navigation_path;
+      if(target?.startsWith('#') && popupCases(view).some(popup=>popup.hash===target))assert.ok(hashes.has(target),`${page.name}: ${target}`);
+    });
+  }
+  for(const example of concreteCases()) {
+    const key=cardKind(example),path='card-test-'+key.replace(/^custom:/,'').replace(/[^a-z0-9]+/g,'-');
+    const page=pages.find(page=>page.path===path);assert.ok(page,example.name);
+    let found=false;walkCards(page,card=>{if(card.entity===example.entity&&card.name===example.name)found=true;});
+    assert.ok(found,example.name);
+  }
+  assert.deepEqual(composeDashboard(config,view),config);
 });

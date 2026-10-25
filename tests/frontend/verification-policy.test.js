@@ -13,7 +13,7 @@ test('nine reviewed geometry profiles retain nine light cases and representative
   assert.deepEqual(cases.filter(row => row.theme === 'dark').map(row => [row.profile, row.dimensions]), [['iphone-normal', ['appearance']]]);
   for (const theme of ['light', 'dark']) assert.ok(cases.some(row => row.theme === theme && row.dimensions.includes('appearance')));
   assert.deepEqual(cases.find(row => row.theme === 'light' && row.profile === 'iphone-normal').routes,
-    ['/marao-dashboard/card-test', '/marao-dashboard/living-room', '/marao-dashboard/native-example']);
+    ['/marao-dashboard/card-test-all', '/marao-dashboard/living-room', '/marao-dashboard/native-example']);
   for (const device of ['iphone', 'android']) assert.ok(selected.some(check => check.id === 'sliders:' + device));
   for (const check of selected.filter(check => check.id.startsWith('sliders:'))) {
     assert.equal(check.cases[0].theme, 'both'); assert.equal(check.cases[0].themeIndependent, false);

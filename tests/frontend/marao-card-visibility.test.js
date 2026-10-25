@@ -132,9 +132,9 @@ test('graph cards open history from the whole card without a redundant visible b
     card._hass = { states: { 'sensor.test': { state: '21', attributes: {}, last_reported: String(report) } } };
     card._render();
     assert.doesNotMatch(surface.childNodes[0].markup, /class="history-control"/);
-    assert.match(surface.childNodes[0].markup, /class="card-action" type="button" data-history-open/);
-    button ||= card.shadowRoot.querySelector('[data-history-open]');
-    assert.equal(card.shadowRoot.querySelector('[data-history-open]'), button);
+    assert.match(surface.childNodes[0].markup, /class="card-action" type="button" data-card-action/);
+    button ||= card.shadowRoot.querySelector('[data-card-action]');
+    assert.equal(card.shadowRoot.querySelector('[data-card-action]'), button);
   }
   button.dispatchEvent(new Event('click'));
   assert.deepEqual(opened, [button], 'One tap must open History only once');
@@ -2106,4 +2106,40 @@ test('light color background is opt-in, authoritative and limited to available l
   assert.equal(appearance().background,'#abcdef');
   for (const value of ['off','unknown','unavailable']) assert.equal(stateAppearance('md_light_card',value,config,hass).background,undefined);
   assert.throws(()=>new MaraoCard().setConfig({...config,variables:{use_light_color:'true'}}),/boolean/);
+});
+
+test('sensor thresholds match source boundaries, contrast and live availability without altering other families', () => {
+  const config = {template:'md_sensor_card',entity:'sensor.humidity',variables:{background_thresholds:[{value:-5.5,color:'#ffffff'},{value:0,color:'#000000'},{value:40,color:'#75C89B'},{value:60,color:'#BD4242'}]}};
+  for (const [reading,color] of [['-6',undefined],['-5.5','#ffffff'],['0','#000000'],['39.9','#000000'],['40','#75C89B'],['59.96','#75C89B'],['60','#BD4242']]) {
+    const result=stateAppearance('md_sensor_card',reading,config);
+    assert.equal(result.background,color,reading);
+    if(color) assert.equal(result.stateText,result.text);
+  }
+  assert.equal(stateAppearance('md_sensor_card','-5.5',config).text,'#000');
+  assert.equal(stateAppearance('md_sensor_card','0',config).text,'#fff');
+  for(const reading of ['','  ','not numeric','Infinity','NaN','unknown','unavailable']) assert.equal(stateAppearance('md_sensor_card',reading,config).background,undefined);
+  assert.equal(stateAppearance('md_battery_card','10',config).background,'var(--color-red)');
+  const card=new MaraoCard(); card.setConfig(config); card.hass={states:{'sensor.humidity':{state:'60',attributes:{unit_of_measurement:'%'}}}};
+  card.hass={...card.hass,states:{'sensor.humidity':{state:'unknown',attributes:{}}}};
+  assert.match(card.shadowRoot.innerHTML,/data-problem="neutral"/);
+  assert.throws(()=>card.setConfig({...config,variables:{background_thresholds:[{value:'40',color:'#ffffff'}]}}),/finite numbers/);
+});
+
+test('builder history cards use compact independent icon triggers and retain explicit and hidden choices', () => {
+  for(const template of ['md_switch_card','md_climate_card','md_toggle_graph_card','md_graph_card']) {
+    const entity=template==='md_switch_card'?'switch.safe':template==='md_climate_card'?'climate.safe':'sensor.power';
+    const card=new MaraoCard(); let held=false;
+    card._bindHoldAction=(_button,_surface,_run,_tap,duration)=>{held=duration===600;};
+    const actionButton={addEventListener(){},focus(){}};
+    card.shadowRoot.querySelector=selector=>selector==='[data-card-action]'?actionButton:null;
+    card.setConfig({template,entity,variables:{show_graph:true,graph_entity:'sensor.power',toggle_entity:'switch.safe'}});
+    card.hass={callService(){throw Error('Opening history cannot send a service');},states:{[entity]:{state:'on',attributes:{}},'sensor.power':{state:'55',attributes:{unit_of_measurement:'W'}},'switch.safe':{state:'on',attributes:{}}}};
+    assert.match(card.shadowRoot.innerHTML,/data-history-open[^>]*class="icon"/);
+    assert.doesNotMatch(card.shadowRoot.innerHTML,/class="history-control"/);
+    assert.equal(held,true,template);
+    held=false;card.setConfig({...card._config,hold_action:{action:'none'}});assert.equal(held,false);
+    card.setConfig({...card._config,show_icon:false});assert.doesNotMatch(card.shadowRoot.innerHTML,/data-history-open[^>]*class="icon"/);
+  }
+  const light=new MaraoCard();light.setConfig({template:'md_light_card',entity:'light.safe'});light.hass={states:{'light.safe':{state:'on',attributes:{supported_color_modes:['hs']}}}};
+  assert.match(light.shadowRoot.innerHTML,/data-light-color/);assert.doesNotMatch(light.shadowRoot.innerHTML.split('</style>')[1],/data-history-open/);
 });

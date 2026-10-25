@@ -1,4 +1,14 @@
 export const PT_LABELS = {
+  "Background thresholds": "Limiares do fundo",
+  "Threshold": "Limiar",
+  "Colors apply from each threshold upward, in source units. Below the first threshold the normal background is used.": "As cores aplicam-se a partir de cada limiar, nas unidades de origem. Abaixo do primeiro limiar é usado o fundo normal.",
+  "Background thresholds must be a list.": "Os limiares do fundo têm de ser uma lista.",
+  "Background thresholds require a sensor entity.": "Os limiares do fundo exigem uma entidade sensor.",
+  "Each background threshold must be an object.": "Cada limiar do fundo tem de ser um objeto.",
+  "Threshold values must be finite numbers.": "Os valores dos limiares têm de ser números finitos.",
+  "Threshold values must be strictly increasing.": "Os valores dos limiares têm de ser estritamente crescentes.",
+  "Threshold colors must use #RRGGBB.": "As cores dos limiares têm de usar #RRGGBB.",
+
   "Home Assistant card": "Cartão do Home Assistant",
   "Home Assistant card YAML": "YAML do cartão do Home Assistant",
   "Manual YAML": "YAML manual",
@@ -364,7 +374,6 @@ export const PT_LABELS = {
   "Mode popup hash": "Endereço do popup de modo",
   "Speed slider": "Controlo de velocidade",
   "Background artwork": "Imagem de fundo",
-  "Background color": "Cor de fundo",
   "Popup hash": "Endereço do popup",
   "Active color": "Cor ativa",
   "On icon": "Ícone ligado",

@@ -747,6 +747,9 @@ def _validate_energy_formatting(value: Any, registry: list[dict[str, Any]], *, v
             item.get("type") in (None, "custom:marao-card")
             and (template in ENERGY_FORMAT_TEMPLATES or load_source)
         )
+        if template == "md_sensor_card" and item.get("type") in (None, "custom:marao-card") and isinstance(options, dict):
+            from .page_model import validate_sensor_thresholds
+            validate_sensor_thresholds(options, entity_id or "")
         if template == "md_graph_card" and item.get("type") in (None, "custom:marao-card") and isinstance(options, dict) and "power_devices" in options:
             from .page_model import validate_power_devices
             main = options.get("graph_entity") or entity_id
@@ -2540,6 +2543,9 @@ def _entity_card(entity: dict[str, Any]) -> dict[str, Any]:
     variables = dict(
         entity.get("variables") if isinstance(entity.get("variables"), dict) else {}
     )
+    if template == "md_sensor_card":
+        from .page_model import validate_sensor_thresholds
+        validate_sensor_thresholds(variables, entity["entity_id"])
     if template == "md_light_card":
         from .page_model import validate_light_options
         validate_light_options(variables)
