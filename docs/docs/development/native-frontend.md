@@ -6,13 +6,18 @@ parent: Development
 
 # Native frontend transition
 
-Implementation is in progress in OpenSpec change
-`move-marao-to-native-frontend`. The candidate is installed on disposable
-`192.168.0.28` with the legacy Python package/config entry absent. The original
-59-page source survived native UI import, unchanged and edited builder saves,
-independent disk comparison, restart and a matching v0.21.1 rollback followed by
-native restoration. Same-repository HACS installation and actual next-update proof
-remain pending. The earlier request-override probe is separate feasibility evidence.
+The breaking stable release is **v0.22.0**, in the existing
+`diogomrpr/MaraoDashboard` repository. The disposable instance now runs the
+**v0.22.1-beta.1 update-test prerelease**, installed through actual HACS after
+v0.22.0. Native saves, independent disk comparison, restart retention, matching
+legacy rollback, native read/write permissions and same-repository handoff passed.
+The update retained a real unsaved Monaco draft, deferred client refresh until
+explicit discard, then loaded the coherent new editor/worker graph at the same
+route. The same authenticated Core connection stayed open with no stop event;
+this establishes no restart during the update without claiming access to a host PID.
+No browser errors, failed resources or legacy backend requests were observed.
+Camera playback/physical devices and the remaining visual watch list stay manual.
+The OpenSpec change remains open for that acceptance review.
 
 The target reuses `diogomrpr/MaraoDashboard` as a HACS Dashboard repository, a Home Assistant dashboard
 strategy, native configuration storage and the existing Visual/JSON builder.
@@ -30,7 +35,7 @@ recordings without inferred detection types; playback remains a manual check.
 | Native server saves/events | `lovelace/config/save`, `lovelace_updated` | Installed unchanged/edited saves, exact disk comparison and restart retention passed. A temporary non-admin account could read the disclosed source and was denied a save; it was deleted afterward. Session tests cover failure retention, single-flight and already-stale refusal. Simultaneous writers retain HA's native limit. |
 | Source visibility | Readable through authenticated native config APIs | Hidden/admin-only editor controls do not make source private. Import and cutover require explicit review; path-only hints cannot detect every secret. |
 | Resource registration | Native storage UI or existing YAML list | The disposable uses `resource_mode: yaml`: resource writes are intentionally absent. Append only the owned URL, use native `lovelace.reload_resources` and preserve mode/unrelated resources. This requires no Marao backend. |
-| HACS Dashboard files | Flat files in repository `dist/` | Installed downloader and local package checks cover flat assets. Actual removal of an Integration registration allowed Dashboard validation of the same repository; it rejected v0.21.1's legacy layout. Complete registration/install and the next HACS update require a frontend-compatible latest stable release and remain unverified. |
+| HACS Dashboard files | Flat files in repository `dist/` | Actual same-repository remove/re-add and v0.22.0 installation passed, followed by a HACS update to v0.22.1-beta.1 without restart. HACS prefers any attached release assets; attach the complete flat graph with the converter. The initial converter-only download failed readiness and was corrected; it is retained as failed evidence. |
 | Netatmo browse metadata | Native camera unique ID and `events/<camera>/<epoch>` | [HA 2026.10.0 camera code](https://github.com/home-assistant/core/blob/2026.10.0/homeassistant/components/netatmo/camera.py) stores events by event time and builds the camera unique ID from its ID/type; [native media source](https://github.com/home-assistant/core/blob/2026.10.0/homeassistant/components/netatmo/media_source.py) exposes those IDs. Metadata-only tests verify matching and safe decimal epochs. No provider title is parsed for detections. |
 
 HA can acknowledge a normal save and notify clients before disk persistence is
@@ -49,7 +54,7 @@ still needs exact private backups and independent persisted/restart proof.
 | Native envelope | 1 | Strategy metadata wrapping the complete exact `source_json` string. |
 | Native compiler contract | 1 | Source-to-native strategy compilation contract. |
 | Legacy generated contract | 3 | Existing owned YAML/markers used only to recognize retained legacy output. |
-| Repository release | 0.21.1 baseline | The current legacy package baseline; it is not the source/envelope version or a new native release. |
+| Repository release | 0.22.0 stable; 0.22.1-beta.1 update test | v0.21.1 remains the immutable legacy rollback baseline. Package labels are separate from source/envelope versions. |
 | Frontend graph | SHA-256 identity | Owned source/assets/build-rule identity, independent of release labels. |
 
 ## Local artifacts
@@ -119,9 +124,9 @@ upgrade receipts keep their existing isolated verification path.
 Before completion, the original dashboard root must survive native import,
 independent disk comparison, restart retention, matching package-plus-data rollback
 and retained-runtime checks. Old clients need a full HA refresh/reopen, after
-exporting drafts. The final gate is an actual second HACS Dashboard update with
-unchanged HA process/start identity. Local builds and browser request overrides
-do not establish installation or those pending gates.
+exporting drafts. The second HACS Dashboard update passed with one uninterrupted Core session,
+unchanged source/settings, draft deferral and a coherent new graph. Local builds
+and browser request overrides remain separate from this actual-install evidence.
 
 ## Retired backend consumers
 

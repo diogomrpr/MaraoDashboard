@@ -22,8 +22,17 @@ and a client refresh. Do not repeat this migration for normal frontend updates.
 
 The disposable development installation retained its original 59-page source,
 settings and files through native saves, independent disk comparison, restart and
-matching legacy rollback. No camera playback or physical-device acceptance is
-claimed by that verification.
+matching legacy rollback. The same repository was removed from HACS as Integration,
+re-added as Dashboard and installed as v0.22.0. A real HACS update to the test
+prerelease v0.22.1-beta.1 retained an open draft until explicit discard, then loaded
+the new editor/worker graph without an HA restart or integration reload. Source,
+routes and settings stayed unchanged. One authenticated Core WebSocket session
+remained connected throughout; no stop event, browser error or retired backend
+request was observed. v0.22.0 remains the latest stable release.
+
+No camera playback or physical-device acceptance is claimed. Removal requires one
+restart; an additional restart after import is a retention check, and rollback can
+require further restarts. Later normal Dashboard updates do not use those steps.
 
 ## 1. Keep a recoverable original
 

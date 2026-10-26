@@ -1,5 +1,63 @@
 # Implementation progress
 
+## Published result — 2026-10-26
+
+The user explicitly authorized a breaking stable release. **v0.22.0 is published
+in the existing repository**, with the converter, complete frontend release assets,
+migration/rollback instructions and the same dashboard root. No repository was
+created. The exact stable candidate passed 63 selected serial unit checks, GitHub
+unit CI, HACS Dashboard validation and hassfest, and was installed before release.
+
+Actual HACS remove/re-add as Dashboard and v0.22.0 installation passed. A second
+actual HACS download to **v0.22.1-beta.1** passed with a real unsaved builder draft:
+refresh deferred until explicit discard, then loaded the new editor/worker graph
+at the same route. Source/settings/resources remained unchanged, with no retired
+backend requests, browser errors or failed resources. A single authenticated Core
+WebSocket stayed open, with no stop event; this proves no restart during that
+update without claiming a host PID measurement. The test prerelease passed ten
+selected serial publication checks and exact-commit GitHub unit/HACS/hassfest CI.
+The disposable instance retains that successful test prerelease; v0.22.0 remains
+latest stable. Private proof: `hacs-stable-install.json`, `hacs-next-update.json`
+and `final-readiness.json` under `installed-baseline/`.
+
+The first live stable download failed readiness: attaching only the converter
+made installed HACS prefer that release asset over `dist/`. It installed no
+frontend and the manifest returned 404. The source/resource remained unchanged.
+The release was completed with every verified frontend file; the partial package
+was removed/re-added through supported HACS operations, and complete installation
+then passed. Historical failures remain in `hacs-first-download-failure.json` and
+earlier notes. Complete asset inventory/hash checks and the stricter package
+regression prevent repeating the incomplete/stale staging mistake. No old tags,
+HACS implementation or private registry were rewritten.
+
+The release asset set contains the manifest, entry, all 60 content-identified
+files and (stable only) the offline converter. The tagged source tree also retains
+an earlier unused staging graph; it is not attached or loaded. Current source
+staging removes that extra graph and asserts exact generated inventory.
+
+The original native import/save, persisted/restart proof and successful matching
+legacy rollback remain valid development evidence. Final readiness checks retained
+all 4,425 legacy file/hash/mode entries. All 254 captured helper states were
+preserved or restored; one safe gallery opener counter needed restoration from
+0 to its original 2. No device action was issued. No
+Marao Python integration is installed/loaded. Temporary permission-test accounts
+and browser contexts were removed. Source formats 0/1/2 and historical native
+storage use immutable independent fixtures; the ten-baseline replay is labeled
+conversion replay, not ten installed historical packages.
+
+Remaining unchecked tasks concern broader hands-on runtime/visual/cached-client
+acceptance. They are not claimed passed, and the change is not archived. The
+repository contract leaves routine phone/appearance testing to the user; camera
+playback/transport is permanently manual-only. No new broad release campaign ran.
+The synthetic camera-media-shaper check was mistakenly selected by the earlier
+gate and failed on loopback permissions; it is now excluded by the explicit
+manual-only policy and a regression assertion. Camera code/security/provider
+metadata checks remain selected. No camera transport success is claimed.
+
+Earlier pending-publication/new-repository paragraphs below are historical and
+superseded by this dated result. They are retained to keep failures and decisions
+traceable.
+
 ## Current repository decision and live HACS gate
 
 The user selected **the existing `diogomrpr/MaraoDashboard` repository**, accepting
