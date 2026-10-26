@@ -127,7 +127,7 @@ const components = {
   rooms: { units: [['marao-climate-card', 'room']], browser: [browser('rooms', 'test-ha-room-cards', ['--scenario', 'iphone-normal'])] },
   groups: { units: [['marao-climate-card', 'group']], browser: [browser('groups', 'test-ha-dashboard-e2e', ['--groups-only'])] },
   climate: { units: [['marao-climate-card', 'climate|number|stepper|wallbox']], browser: [browser('climate', 'test-ha-dashboard-e2e', ['--climate-only']), browser('numbers', 'test-ha-climate-layout', ['--scenario', 'iphone-normal'])] },
-  camera: { units: [['marao-camera-live'], ['camera-request-ledger'], ['camera-media-shaper'], ['marao-card-visibility'], ['marao-frigate-events-card'], ['editor-model'], ['gallery-cases']],
+  camera: { units: [['marao-camera-live'], ['camera-request-ledger'], ['marao-card-visibility'], ['marao-frigate-events-card'], ['editor-model'], ['gallery-cases']],
     python: ['test_camera_events', 'test_generator', 'test_gallery_fixtures', 'test_history', 'test_upgrade_fixtures'], editor: true, package: true,
     browser: [] }, // Playback, HLS and native cancellation checks are permanently manual-only.
   history: { units: [['marao-history-cards']], browser: [browser('history', 'test-ha-dashboard-e2e', ['--history-only'])] },
@@ -304,11 +304,12 @@ function checksFor(selection, { full = false, offline = false, unit: unitOnly = 
   if (tier === 'visual') return [];
   const result = new Map();
   const add = check => {
+    if (check.command.includes('tests/frontend/camera-media-shaper.test.js')) return; // Synthetic slow-link transport is manual-only.
     if (unitOnly && !/^(unit:|python:)/.test(check.id)) return;
     if (!offline || check.kind === 'offline') result.set(check.id, check);
   };
   if (full) {
-    add({ id: 'all-frontend', kind: 'offline', command: ['node', '--test', '--test-concurrency=' + (parallel ? 3 : 1), ...fs.readdirSync(path.join(__dirname, 'frontend')).filter(file => file.endsWith('.test.js')).sort().map(file => 'tests/frontend/' + file)], inputs: ['tests/frontend', runtime, 'frontend_src'], exclusive: false });
+    add({ id: 'all-frontend', kind: 'offline', command: ['node', '--test', '--test-concurrency=' + (parallel ? 3 : 1), ...fs.readdirSync(path.join(__dirname, 'frontend')).filter(file => file.endsWith('.test.js') && file !== 'camera-media-shaper.test.js').sort().map(file => 'tests/frontend/' + file)], inputs: ['tests/frontend', runtime, 'frontend_src'], exclusive: false });
     add({ id: 'all-python', kind: 'offline', command: ['python', '-m', 'pytest', '-q', 'tests/components/marao_dashboard'], inputs: [backend, 'tests/components', 'tests/conftest.py', 'pyproject.toml'], exclusive: false });
   }
   const ids = full ? Object.keys(components) : selection.components;

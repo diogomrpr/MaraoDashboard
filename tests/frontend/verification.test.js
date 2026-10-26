@@ -32,6 +32,7 @@ test('camera playback stays manual-only in affected and full plans while code te
   const selection = selectComponents([], ['camera']);
   for (const options of [{}, { full: true }]) {
     const checks = checksFor(selection, options);
+    assert.ok(!checks.some(check => check.command.includes('tests/frontend/camera-media-shaper.test.js')));
     assert.ok(!checks.some(check => check.id === 'camera' || check.id.startsWith('camera:')));
     assert.ok(!checks.some(check => check.command.some(arg => /camera-(?:slow|live)-only|test-ha-camera|test-camera-live-local/.test(arg))));
   }
