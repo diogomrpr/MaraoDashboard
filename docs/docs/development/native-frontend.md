@@ -72,14 +72,19 @@ runtime gate prevents duplicate frontend entries from registering competing
 runtime graphs. A full HA refresh/reopen is required at the manual retirement
 boundary; already released legacy code is not retroactively changed.
 
-Use tagged repository contents. Do not attach a matching single JS release asset:
-HACS can select only that file. Do not rely on integration-only ZIP release
-handling for Dashboard repositories. Keep the existing repository: remove its HACS
-Integration registration completely, then add it as Dashboard. Installed HACS
-validates the latest stable tag before version/beta selection, so a frontend
-prerelease alone cannot bootstrap this handoff while v0.21.1 is stable. Stable
-publication requires the reviewable candidate, required checks and authorization;
-do not modify historical releases or private HACS files to bypass validation.
+Commit the complete flat `dist/` graph with the source and use an immutable tag.
+**If a release has any attached asset (including the converter), attach every
+file in `dist/` as a separate release asset too.** Installed HACS prefers release
+assets whenever any exist, even if none match the entry filename. A converter-only
+release therefore installs no frontend; a single entry file omits dependencies.
+Before publication, compare asset names/hashes with `MaraoFrontend.release.json`.
+Do not use integration ZIP handling for the Dashboard package.
+
+Keep the existing repository: remove its HACS Integration registration completely,
+then add it as Dashboard. Installed HACS validates the latest stable tag before
+version/beta selection, so a frontend prerelease alone cannot bootstrap this
+handoff while v0.21.1 is stable. Historical tags remain unchanged. The user
+explicitly authorized the breaking v0.22.0 stable release on 2026-10-26.
 
 The offline converter bundles its font, license, styles and script with a restrictive
 content security policy. It retains answers in page memory and clears them when

@@ -29,6 +29,7 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     const manifest=JSON.parse(fs.readFileSync(path.join(directory,'dist','MaraoFrontend.release.json')));
     const published=path.resolve('dist/MaraoFrontend.release.json');
     if (fs.existsSync(published)) {
+      assert.deepEqual(fs.readdirSync('dist').sort(),fs.readdirSync(path.join(directory,'dist')).sort(),'Published graph contains missing or obsolete assets');
       assert.deepEqual(JSON.parse(fs.readFileSync(published)),manifest,'Rebuild build:hacs before committing a release');
       assert.equal(JSON.parse(fs.readFileSync('hacs.json')).filename,'MaraoFrontend.js');
       for (const file of [...Object.keys(manifest.files),'MaraoFrontend.release.json']) assert.ok(fs.readFileSync(path.resolve('dist',file)).equals(fs.readFileSync(path.join(directory,'dist',file))),'Published asset differs: '+file);

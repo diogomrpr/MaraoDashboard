@@ -37,7 +37,7 @@ async function buildFrontend(destination = path.join(root,'ha-test/.cache/native
   for (const file of files) digest.update(file+'\0').update(fs.readFileSync(path.join(frontend,file)));
   const identity = digest.digest('hex');
   fs.rmSync(destination,{recursive:true,force:true});
-  // HACS downloads all of dist from the tag; a matching release JS asset would select only that file.
+  // Any attached release asset makes HACS prefer assets: upload the entire flat graph together.
   const dist = path.join(destination,'dist');
   fs.mkdirSync(dist,{recursive:true});
   const names = Object.fromEntries(files.map(file=>[file,`${identity}--${file.replaceAll('/','--')}`]));
@@ -66,7 +66,7 @@ async function buildFrontend(destination = path.join(root,'ha-test/.cache/native
   fs.writeFileSync(path.join(dist,'MaraoFrontend.release.json'),JSON.stringify({identity,package_version:version,compiler_contract:1,files:hashes})+'\n');
   fs.writeFileSync(path.join(destination,'hacs.json'),JSON.stringify({name:'Marao Dashboard',filename:'MaraoFrontend.js',render_readme:true,homeassistant:'2026.10.0'})+'\n');
   fs.copyFileSync(path.join(root,'LICENSE'),path.join(destination,'LICENSE'));
-  fs.writeFileSync(path.join(destination,'README.md'),'# Marao Dashboard\n\n**BREAKING v0.22.0:** existing Integration installations must follow [MIGRATION.md](MIGRATION.md) before changing packages. Do not update the old Integration in place. Keep the same repository and original dashboard address. Download the offline converter from the release assets.\n\nInstall this repository as a HACS Dashboard repository. The resource is `MaraoFrontend.js`. Requires Home Assistant 2026.10.0 or newer.\n\nAll runtime assets are in `dist/`. Releases must use tagged repository content; do not attach a single JavaScript download or a ZIP release.\n\nExisting integration installations require the guided [migration procedure](MIGRATION.md) before removal. Export drafts, back up exact package/data, convert offline and retain the original dashboard address. No new legacy Integration release is required.\n');
+  fs.writeFileSync(path.join(destination,'README.md'),'# Marao Dashboard\n\n**BREAKING v0.22.0:** existing Integration installations must follow [MIGRATION.md](MIGRATION.md) before changing packages. Do not update the old Integration in place. Keep the same repository and original dashboard address. Download the offline converter from the release assets.\n\nInstall this repository as a HACS Dashboard repository. The resource is `MaraoFrontend.js`. Requires Home Assistant 2026.10.0 or newer.\n\nAll runtime assets are in `dist/`. Commit this graph under the release tag. If attaching any release asset (including the converter), attach every dist file too: HACS prefers release assets over tagged files. Do not attach only the entry JavaScript or use an integration ZIP.\n\nExisting integration installations require the guided [migration procedure](MIGRATION.md) before removal. Export drafts, back up exact package/data, convert offline and retain the original dashboard address. No new legacy Integration release is required.\n');
   fs.copyFileSync(path.join(root,'docs/docs/installation/native-migration.md'),path.join(destination,'MIGRATION.md'));
   const attribution = fs.readFileSync(path.join(root,'README.md'),'utf8').split('\n').find(line=>line.startsWith('Inspired by '));
   if(attribution) fs.appendFileSync(path.join(destination,'README.md'),'\n'+attribution+'\n');
