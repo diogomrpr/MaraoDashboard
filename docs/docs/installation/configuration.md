@@ -75,6 +75,189 @@ use its normal keyboard commands. A collapsed indicator marks hidden content;
 folding changes only the view. Save & Generate still validates and saves the full
 document, including hidden fields. Unchanged Visual/JSON switches retain folds.
 
+## Home Assistant cards
+
+Choose **Add card → Home Assistant** to search Home Assistant's native picker,
+including custom cards that register themselves with it. Use **Manual YAML** for
+an installed card that is absent from the picker. Marao loads existing resources;
+install and configure any custom card in Home Assistant first.
+
+The card dialog uses Home Assistant's visual and YAML editors with a non-interactive
+preview. Cards without a visual editor open in YAML mode. If HA's editor cannot
+load, use the basic YAML text editor or Retry. Add/Update changes your local draft;
+Cancel discards dialog edits. Only **Save & Generate** persists the dashboard.
+
+Cards can be edited, moved, reordered, deleted and duplicated with other cards.
+Automatic sections give them full width; fixed-column sections preserve mixed
+order. Their appearance, actions, visibility and errors belong to Home Assistant.
+
+Format-2 JSON stores the entire configuration as a string:
+
+```json
+{
+  "id": "welcome",
+  "template": "ha_card",
+  "yaml": "type: markdown\ntitle: Welcome\ncontent: Hello from Home Assistant\n"
+}
+```
+
+Place this descriptor in a page or section's `entities` list. Unchanged YAML,
+including comments, survives unchanged saves. Making a visual
+configuration change can reformat YAML and remove comments. Native settings and
+unknown descriptor fields are retained; entity IDs and navigation paths inside
+YAML are user-managed. Existing raw `cards` objects keep their current behavior.
+
+YAML must contain one mapping with a nonempty `type`. Quote state strings such as
+`"on"` and `"off"`; ordinary anchors and merges work. Duplicate keys, recursive
+aliases and non-JSON values are rejected before writes. Inline configuration
+instead of using `!include`, `!secret` or other file directives. A missing custom
+resource remains a visible Home Assistant card error without deleting its source.
+
+## Moving cards in Visual
+
+Drag a card's dotted handle to a position before, between or after other cards.
+Pickup and holding still keep the page steady, including near the sticky header
+or bottom edge. After pickup, move deliberately toward an edge to start scrolling;
+hold there to continue. Moving away stops scrolling, and a fresh approach starts
+it again. You can move cards into another section of the same expanded page,
+including an empty section. Release to place
+it; Escape or a cancelled gesture leaves the draft unchanged. Scrolling elsewhere
+on the row works normally.
+
+The arrows move one position at a time. **Move to section** offers a destination
+section and a position before a named card or at the end, using ordinary controls.
+Cards with the same entity remain separate occurrences with their own settings.
+Raw Lovelace `cards` stay in their authored section and are edited in JSON.
+
+Automatic layout still groups by type. Choose fixed columns in **Edit layout**
+when you want an exact mixed order. Moving does not change section widths or
+save anything until **Save & Generate**. **Discard changes** restores the saved
+source. The disposable Studio example includes mixed widths, duplicate lighting
+cards, independent detail sheets and an empty section for trying these moves.
+
+## Ordered page format
+
+Dashboard source format **2** stores every page in
+one ordered `pages` array. `landing_page` names an existing page path. The
+landing view is generated first; the remaining views retain their saved order.
+Navbar entries are a separate ordered list of page references or labeled URLs,
+without a count limit. An empty navbar list stays empty.
+
+```json
+{
+  "config_version": 2,
+  "name": "My home",
+  "landing_page": "home",
+  "navigation": ["home"],
+  "pages": [
+    {
+      "id": "home",
+      "name": "Home",
+      "path": "home",
+      "icon": "mdi:home",
+      "sections": [
+        {
+          "columns": 1,
+          "entities": [
+            {"id": "heading", "template": "md_title_card", "name": "Living room"}
+          ]
+        },
+        {
+          "columns": 2,
+          "entities": [
+            {"id": "lamp", "entity_id": "light.living_room", "template": "md_light_card"},
+            {"id": "office-link", "template": "md_navigation_card", "name": "Office", "page": "office"}
+          ],
+          "cards": [{"type": "markdown", "content": "A saved note"}]
+        }
+      ]
+    },
+    {"id": "office", "name": "Office", "path": "office", "area": "office", "entities": []}
+  ]
+}
+```
+
+A page uses either flat `entities`/`cards`/`columns` or ordered `sections`, never
+both. Each section uses the same container fields. Fixed grids accept one to
+six columns and retain mixed card order; omitting columns uses the existing
+automatic domain layout. Empty and absent selections remain empty or absent.
+Titles, shortcuts, room shortcuts, Entity Groups and scene collections may be
+entity-free. Other descriptors require a compatible entity before generation;
+unfinished template cards must be bound or removed.
+
+Page paths are unique lowercase letters, numbers, underscores or hyphens.
+Optional page and local card IDs start with a letter and use the same characters;
+card IDs are unique within a page. Names and icons belong to that occurrence,
+so editing a title does not rename a Home Assistant entity. Unknown fields,
+raw cards, ordering and explicit options remain in the saved document. An
+optional `area` only supplies suggestions; it does not synchronize membership.
+
+The ordered upgrade first imports legacy room membership from format 0 to 1,
+then converts format 1 to 2. Existing Home, Rooms, room, custom and optional
+guided pages become ordinary descriptors. Only absent legacy selections receive
+their historical defaults; explicit empty access, player and group lists win.
+Old options without a current composition role remain in `legacy_page_options`
+as non-operative data. Legacy `output_path` metadata stays as retained source data. Native saves do
+not write generated YAML files. Supply protected YAML fragments to the offline
+converter before migration; backups and read-only preview rules still apply.
+
+Generated popup identities use the page path, local card ID and popup role.
+Compatible explicit hashes are retained and checked for collisions, including
+nested group popups. Migration retains historical owned filenames where
+possible. Custom external URLs remain opaque; unresolved known page references
+must be retargeted or removed explicitly before saving.
+
+The admin-only **Marao Dashboard Editor** is an internal view under the same
+dashboard root. Its **Visual** tab starts with the page manager. Every
+page uses the same card and section controls, including Home, Rooms, Security,
+Energy, Wallbox and Media. Expand a page to add, edit, remove or reorder its cards,
+change section columns, and move or remove sections. Empty pages stay empty.
+
+**Add page** offers Empty, Home, Rooms, Room, Security, Energy, Wallbox and Media.
+Templates populate the new local draft once, using real available entities and
+saved media preferences. Optional roles without a binding are omitted. Bind or
+remove an unbound required Alarm, House Power, Charging Current or Media card
+before saving. Later registry changes or repeated generation never refill a saved
+page. Choose Room with a suggestion area to import its current selection once;
+choosing Rooms creates independent shortcuts to the current room-page drafts.
+
+Page order, **Landing page** and navbar order are independent. **Pin to navbar**
+and **Unpin** change only the menu; unpinning retains the page and all its cards.
+The navbar stays in one row. When selected routes exceed the safe screen width,
+the rightmost **More destinations** button opens a matching vertical icon menu.
+The menu scrolls internally for longer lists and closes on selection, a second
+toggle, an outside tap or Escape. Its selected destination stays in configured
+order; More indicates when the current page belongs to overflow. New pages are
+pinned normally, while existing unpinned pages stay unpinned.
+Renaming a path updates owned page and popup links. Duplicating regenerates local
+card/popup identities and creates an unpinned copy with independent options.
+
+**Add card** offers **By card type** and **By entity**. Search by name or entity ID
+across all areas. Associated pages offer suggestions from their optional area;
+changing that area leaves saved cards untouched. Opening Add refreshes metadata
+once without replacing the local draft. Card options include names/icons,
+entities, selected Room lights, explicit native scenes, energy periods/history,
+charging presets, media apps and secondary remote bindings. Confirming an edit
+changes the draft; it does not save or actuate an entity.
+
+The **JSON** tab edits the same document, with folding, formatting, validation,
+schema help and entity suggestions. Switching tabs preserves unknown fields,
+raw Lovelace cards, selections, order and explicit empty or absent content.
+Supported older JSON uses the shared read-only migration preview when switching
+to Visual. Invalid or newer JSON remains untouched for correction. Card identities
+are retained when content is edited or reordered, so existing popup links keep
+pointing to the same card; an unchanged round trip retains the original shorthand.
+
+A fresh Visual session opens only the landing page. Each page can be expanded independently; closing it releases its controls without changing the draft. New and duplicated pages open for editing. Expansion is a session preference and is never saved. Local card edits refresh their section while unrelated page controls and General inputs stay in place.
+
+Changes remain local until **Save & Generate**. The title, save action and tabs
+stay visible while scrolling. **More actions** contains Discard changes
+and Open dashboard; the latter opens the saved dashboard in another tab.
+Individual-card deletion is immediate and local, without confirmation. Whole-page
+deletion requires confirmation naming that page. The final page cannot be deleted;
+landing/menu/shortcut references need an explicit replacement or removal first.
+Unresolved popup links must be repaired before deleting their owning page.
+
 ### Energy display choices
 
 A guided Energy slot can retain its entity options while selecting a display unit
