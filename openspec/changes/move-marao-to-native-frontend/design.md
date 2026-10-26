@@ -183,7 +183,7 @@ Implementation is complete only when compiler/source parity, accepted privacy/se
 
 ## Open Questions
 
-- Repository choice is settled: retain `diogomrpr/MaraoDashboard`. The first frontend stable version/publication timing remains a separately authorized release step; it must precede the complete real HACS re-add and subsequent-update proof.
+- Repository choice is settled: retain `diogomrpr/MaraoDashboard`. The user authorized stable v0.22.0 publication as breaking on 2026-10-26; it must precede the complete real HACS re-add and subsequent-update proof.
 - The minimum supported stable HA/Marketplace versions and exact migration restart count are results of the specified compatibility/install proof, and must be documented before release; no optimistic values are promised here.
 
 ## Implementation order and readiness
