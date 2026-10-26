@@ -157,7 +157,9 @@ the migration source. The disposable instance keeps only `/marao-dashboard`, wit
 Cases at `/marao-dashboard/card-test`.
 
 Check the saved source, original first view, all configured navigation entries and
-custom content. The Marao editor is at the `editor_path` recorded in the converted
+custom content. Administrators open the editor with **Edit dashboard** at the top
+of the landing page, even when the cache reset button is disabled. The Marao editor
+is at the `editor_path` recorded in the converted
 `strategy` object, for example `/marao-dashboard/marao-editor`; collisions receive a
 different internal path while user view paths stay unchanged. Confirm the dashboard
 survives a restart and the Python package/config entry is absent before declaring

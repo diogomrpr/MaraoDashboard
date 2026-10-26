@@ -20,6 +20,10 @@ strategy:
   type: custom:marao-dashboard
 ```
 
+Administrators can select **Edit dashboard** (**Editar painel**) at the top of
+the landing page to open the Marao editor. This labelled link stays visible when
+the optional cache reset button is hidden. Regular users do not see it.
+
 Open the generated Marao editor view to configure pages. Discovery creates a
 starter only when source is absent. Later registry changes never refill saved
 pages or explicit empty selections. Existing installations instead import the
@@ -38,7 +42,8 @@ retaining the draft. Visual/JSON switches, validation and preview do not save.
 Unknown/raw fields, explicit emptiness, names and saved order remain intact.
 
 Use **Save & Generate** for one explicit native HA save, **Discard** to return to
-the saved source, and **Open dashboard** to view the result. Invalid source and
+the saved source, and **Open dashboard** to view the result inside Home Assistant.
+A successful save returns to the dashboard; errors keep the editor open. Invalid source and
 reported save errors retain the draft. An already changed native baseline blocks
 saving and lets you export the draft; simultaneous cross-device saves retain
 HA's own last-writer limit. Export before replacing or importing source.
@@ -252,7 +257,8 @@ A fresh Visual session opens only the landing page. Each page can be expanded in
 
 Changes remain local until **Save & Generate**. The title, save action and tabs
 stay visible while scrolling. **More actions** contains Discard changes
-and Open dashboard; the latter opens the saved dashboard in another tab.
+and Open dashboard; the latter opens the saved dashboard within the app, retaining
+the unsaved draft for when you return to the editor.
 Individual-card deletion is immediate and local, without confirmation. Whole-page
 deletion requires confirmation naming that page. The final page cannot be deleted;
 landing/menu/shortcut references need an explicit replacement or removal first.

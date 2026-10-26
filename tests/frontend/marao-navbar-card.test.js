@@ -61,7 +61,7 @@ test("navbar retains full-size controls in one row and a separately bounded vert
   assert.match(source, /min-width:48px;width:48px;height:48px/);
   assert.match(source, /height:60px/);
   assert.match(source, /overscroll-behavior:contain;touch-action:pan-y/);
-  assert.doesNotMatch(source.slice(source.indexOf('export class MaraoNavbarCard'),source.indexOf('const fullscreenUsers')), /flex-wrap:wrap/);
+  assert.doesNotMatch(source.slice(source.indexOf('export class MaraoNavbarCard'),source.indexOf('  _syncPageRefresh()')), /flex-wrap:wrap/);
   assert.doesNotMatch(source, /padding-bottom:calc\(192px/);
 });
 
@@ -225,16 +225,17 @@ test('refresh button follows the configured main view including dashboard-root a
 });
 
 
-test('main-page cache recovery belongs to scrollable page flow and cleans up on navigation', async () => {
+test('landing-page actions keep admin editor access independent of refresh and clean up on navigation', async () => {
   const { MaraoNavbarCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
   const originalDocument=globalThis.document,originalWindow=globalThis.window;
   const view=()=>({children:[],prepend(row){row.remove();this.children.unshift(row);row.parentNode=this;}});
   let currentView=view(), calls=0, eligible=true, inert=false;
-  globalThis.window={location:{href:'http://disposable.test/marao-dashboard/home',pathname:'/marao-dashboard/home'}};
+  globalThis.window={location:{href:'http://disposable.test/marao-dashboard/home',pathname:'/marao-dashboard/home'},dispatchEvent(){}};
   globalThis.document={createElement(){
-    const button=new EventTarget();button.setAttribute=(name,value)=>{button[name]=value;};
+    const control=()=>{const node=new EventTarget();let text='';node.textWrites=0;Object.defineProperty(node,'textContent',{get:()=>text,set:value=>{text=value;node.textWrites++;}});node.setAttribute=(name,value)=>{node[name]=value;};node.getAttribute=name=>node[name];node.removeAttribute=name=>{delete node[name];};return node;};
+    const button=control(),editor=control();
     return {setAttribute(){},closest(){return inert?{}:null;},
-      attachShadow(){return this.shadowRoot={innerHTML:'',querySelector:()=>button};},
+      attachShadow(){return this.shadowRoot={innerHTML:'',querySelector:selector=>selector==='a'?editor:button};},
       remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(item=>item!==this);this.parentNode=null;}};
   }};
   const lovelace={config:{views:[{path:'home'},{path:'energy'}]}};
@@ -256,5 +257,22 @@ test('main-page cache recovery belongs to scrollable page flow and cleans up on 
     lovelace.editMode=true;sync();assert.equal(currentView.children.length,0);lovelace.editMode=false;
     owner._surface={};sync();assert.equal(currentView.children.length,0,'A retained navbar placeholder cannot add a duplicate page button');delete owner._surface;
     sync();owner.isConnected=false;sync();assert.equal(currentView.children.length,0);
+    owner.isConnected=true;owner._config={show_cache_reset:false,routes:[],dashboard_root:'renamed-dashboard',editor_path:'marao-editor-editor'};
+    owner._hass={user:{is_admin:true},language:'pt'};globalThis.window.location.pathname='/renamed-dashboard/home';sync();
+    const editor=row.shadowRoot.querySelector('a');
+    assert.equal(currentView.children[0],row,'An empty navbar and hidden refresh still provide editor access');
+    assert.equal(button.hidden,true);assert.equal(editor.hidden,false);assert.equal(editor.textContent,'Editar painel');
+    assert.equal(editor.getAttribute('href'),'/renamed-dashboard/marao-editor-editor');
+    const writes=editor.textWrites;sync();sync();assert.equal(editor.textWrites,writes,'Stable labels must not retrigger the view child-list observer');
+    const activate=()=>{const event=new Event('click',{cancelable:true});editor.dispatchEvent(event);return event.defaultPrevented;};
+    eligible=false;assert.equal(activate(),false,'The native page link stays usable with an empty navbar');
+    inert=true;assert.equal(activate(),true);inert=false;
+    owner.preview=true;sync();assert.equal(activate(),true);owner.preview=false;
+    owner._hass.user.is_admin=false;sync();assert.equal(currentView.children.length,0);
+    assert.equal(activate(),true,'Retained links cannot activate after admin access is lost');
+    owner._config.show_cache_reset=true;sync();assert.equal(button.hidden,false);assert.equal(editor.hidden,true);assert.equal(editor.getAttribute('href'),undefined);
+    owner._hass={user:{is_admin:true},language:'en'};sync();assert.equal(editor.textContent,'Edit dashboard');
+    owner.isConnected=false;sync();assert.equal(activate(),true);
+
   }finally{globalThis.document=originalDocument;globalThis.window=originalWindow;}
 });

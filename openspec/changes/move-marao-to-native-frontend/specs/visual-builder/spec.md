@@ -3,16 +3,34 @@
 ## MODIFIED Requirements
 
 ### Requirement: Local drafts and explicit save
-Changes SHALL remain local until Save & Generate validates, compiles and submits the complete native document. Discard changes SHALL reload the saved source; Open dashboard SHALL open the native result. Validation and reported save errors SHALL retain the draft with readable feedback. Native save success/readback SHALL NOT be presented as independent disk-durability proof.
+Changes SHALL remain local until Save & Generate validates, compiles and submits the complete native document. Discard changes SHALL reload the saved source; Open dashboard SHALL open the native result within the current Home Assistant app, retaining the local draft. A successful native save SHALL return to the saved landing page. Applying changes inside HA dashboard settings SHALL remain there until HA saves those settings. Validation and reported save errors SHALL retain the draft with readable feedback. Native save success/readback SHALL NOT be presented as independent disk-durability proof.
 
 #### Scenario: A user edits a card but has not saved
 - **WHEN** the existing dashboard is opened
 - **THEN** it continues displaying the last successfully saved configuration
 - **AND** the editor draft remains local until explicit save
 
+#### Scenario: Open dashboard stays within Home Assistant
+- **WHEN** an administrator selects Open dashboard in the editor
+- **THEN** the saved landing page opens through HA's internal navigation in the current app or browser tab
+- **AND** no new window, browser tab or external browser is opened
+- **AND** the complete unsaved draft remains available when returning to the editor in the same session
+- **AND** loading, busy or detached editors cannot initiate this navigation
+
+#### Scenario: Save and generate returns to the dashboard
+- **WHEN** HA acknowledges a successful Save & Generate for the current editor document
+- **THEN** Marao clears the saved draft's dirty and busy state and opens the saved landing page through the same internal navigation
+- **AND** the destination uses the current dashboard root and saved landing-page path
+- **AND** a detached editor or superseded document does not redirect the user
+
+#### Scenario: Applying dashboard settings requires HA's settings save
+- **WHEN** the strategy editor applies changes inside HA's dashboard settings
+- **THEN** Marao remains in those settings so the administrator can complete HA's separate save
+- **AND** applying the strategy is not presented as a completed native dashboard save
+
 #### Scenario: HA reports a save failure
 - **WHEN** HA's native API returns an error for a valid draft
-- **THEN** the user sees the failure and retains the complete Visual/JSON draft for retry or export
+- **THEN** the editor remains open with a readable failure and the complete Visual/JSON draft for retry or export
 - **AND** Marao emits no additional successful-save refresh; any HA-originated update retains its native semantics
 
 ### Requirement: Administrative replacement confirmation
@@ -199,7 +217,13 @@ Marao SHALL keep its own Visual and JSON builder, card catalog, page/section/car
 - **AND** edits preserve unknown/raw fields, order, names, options, explicit emptiness and deletions
 
 ### Requirement: Editor route within the owned dashboard
-The frontend editor SHALL be reachable within the existing dashboard root through a noncolliding internal route. It SHALL preserve configured user page paths and navigation, restrict editing controls to administrators and rely on HA authorization for writes. Migration SHALL disclose the replacement of the old standalone editor-panel URL.
+The frontend editor SHALL use a noncolliding route under the existing dashboard root and a visible localized admin landing-page link independent of cache-reset visibility or configured navbar entries. It SHALL preserve user page paths and navigation, restrict editing controls to administrators and rely on HA authorization for writes. Migration SHALL disclose replacement of the old standalone editor URL.
+
+#### Scenario: An administrator opens the editor from the dashboard
+- **WHEN** an administrator views the landing page with the native HA top bar hidden
+- **THEN** a visible localized Edit dashboard link opens the actual noncolliding editor route under the current dashboard root
+- **AND** hiding the optional cache-reset button or configuring an empty navbar does not hide editor access
+- **AND** regular users have no editor-access link
 
 #### Scenario: A user page resembles the internal editor path
 - **WHEN** the frontend selects its editor route

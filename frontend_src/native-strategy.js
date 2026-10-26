@@ -52,7 +52,10 @@ export class MaraoDashboardStrategy extends HTMLElement {
     for (const view of result.views) {
       if (view.theme === 'Marao Dashboard') delete view.theme;
       const navbar = view.cards.at(-1)?.cards?.find(card=>card.type === 'custom:marao-navbar-card');
-      if (navbar) navbar.dashboard_root = root;
+      if (navbar) {
+        navbar.dashboard_root = root;
+        if (hass.user?.is_admin) navbar.editor_path = converted.document.strategy.editor_path;
+      }
     }
     // HA retains the active numeric view index during saves; keep the editor after the landing view.
     if (hass.user?.is_admin) result.views.splice(1,0,{title:language(hass)?'Editar dashboard':'Edit dashboard',path:converted.document.strategy.editor_path,type:'panel',subview:true,cards:[{type:'custom:marao-dashboard-editor-card',dashboard_root:root}]});
@@ -90,6 +93,7 @@ class MaraoEditorCard extends HTMLElement {
         panel.nativeSession = new NativeSession(this._hass,this._config.dashboard_root);
         cache.set(key,panel);
       }
+      panel.navigate = navigation.navigate;
       drafts.add(panel); this._panel = panel; panel.hass = this._hass; this.shadowRoot.replaceChildren(panel);
       if (panel._loaded && !panel._dirty && !panel._busy) await panel._load(true);
     } catch (error) { if (this.isConnected && epoch === this._epoch) loadError(this,error); }
@@ -132,6 +136,7 @@ class MaraoStrategyEditor extends HTMLElement {
       panel.nativeSession.onChange = config => {
         this._config = config; this.dispatchEvent(new CustomEvent('config-changed',{detail:{config},bubbles:true,composed:true}));
       };
+      panel.navigate = navigation.navigate;
       drafts.add(panel); this._panel = panel; panel.hass = this._hass; this.shadowRoot.replaceChildren(panel);
       if (changed && panel._loaded) {
         if (panel._dirty || panel._busy) panel._setStatus(panel._t('externalChange'),'error');

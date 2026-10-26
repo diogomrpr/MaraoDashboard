@@ -320,3 +320,42 @@ Until that answer, no repository, tag or release is created. Native migration,
 actual persisted/restart/rollback behavior, complete retained runtime and real
 Dashboard-to-Dashboard update proof remain pending. Current changes remain
 **not installed / not ready for test**.
+
+## Editor discoverability repair — 2026-10-26
+
+The native editor existed without a visible dashboard entry point. The shared
+landing-page action row now includes a labelled, localized administrator-only
+editor link using the strategy's actual root/noncolliding path. It remains when
+cache reset is hidden or navigation is empty. Ordinary users, previews and inert
+content cannot activate it. Native link navigation retains the existing unsaved
+work warning; stable label updates avoid a child-list redraw loop.
+
+Thirteen existing targeted navbar/strategy checks pass. The final local graph
+`5bfb08c0f114cfa8e738f02fe572d2544c13126b80f16c96e60f6bf82ed09df8`
+is installed on the disposable instance without saving source or restarting HA.
+In the user's Chrome tab, the Portuguese “Editar painel” link was clicked from
+Overview and the actual editor loaded with Visual/JSON and Save controls. The
+working editor is left open; diagnostics and the obsolete failed tab were closed.
+Intermediate failures and final proof remain privately recorded in
+`ha-test/.artifacts/native-frontend/editor-access-browser.json`. No new release
+was published; regular-user browser login and phone layouts were not repeated.
+
+
+### 2026-10-26 — Editor navigation stays inside Home Assistant
+
+Removed the editor's new-window dashboard target. Both native editor hosts now
+supply the existing Marao/HA navigation helper, so Open dashboard changes the
+current HA route and retains the cached unsaved draft. A successful native save
+returns to the saved landing page after acknowledgment and busy-state cleanup.
+Rejected/superseded saves retain the editor; Apply within HA dashboard settings
+stays there until HA saves those settings. The source/document format is unchanged.
+
+Installed graph `2bc1d8daf7b4fdacac79ab3df1acf467fcc11e675974b9f22053bf11ecb91e3d`
+on disposable `192.168.0.28`. The existing editor-panel and native-strategy suites
+passed 71 tests serially, including failure/reattach handling and settings Apply.
+In Chrome, Open dashboard and unchanged Save & Generate each returned to
+`/marao-dashboard/overview` in the same tab. Native API comparison against the
+exact pre-save backup confirmed the complete dashboard document was unchanged.
+Closed the obsolete test tab and left the working dashboard open. The mobile
+Companion app itself was not available for verification; no release was published.
+Private installation/browser receipts are under `ha-test/.artifacts/native-frontend/editor-return-*`.

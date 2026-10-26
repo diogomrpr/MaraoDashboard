@@ -29,7 +29,7 @@ test('native editor isolates users/roots, retains same-user drafts and reconcile
     globalThis.document={createElement:name=>new (registry.get(name) || Element)()};
     fs.copyFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoSource.js',import.meta.url),path.join(directory,'MaraoSource.js'));
     fs.copyFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoNames.js',import.meta.url),path.join(directory,'MaraoNames.js'));
-    fs.writeFileSync(path.join(directory,'MaraoNavigation.js'),'export const updateFrontendClient=()=>{};export const navigationLocalize=key=>key;export const fullscreenUsers=new Set();export const registerFullscreen=element=>fullscreenUsers.add(element);export const unregisterFullscreen=element=>fullscreenUsers.delete(element);');
+    fs.writeFileSync(path.join(directory,'MaraoNavigation.js'),'export const navigate=()=>{};export const updateFrontendClient=()=>{};export const navigationLocalize=key=>key;export const fullscreenUsers=new Set();export const registerFullscreen=element=>fullscreenUsers.add(element);export const unregisterFullscreen=element=>fullscreenUsers.delete(element);');
     fs.writeFileSync(path.join(directory,'MaraoTheme.js'),'export const applyTheme=()=>{},releaseTheme=()=>{};');
     fs.writeFileSync(path.join(directory,'MaraoDashboardPanel.js'),'export {};');
     fs.writeFileSync(path.join(directory,'MaraoNativeModel.js'),`import {createEnvelope} from './MaraoSource.js';export const convertDocument=(text,context)=>({document:createEnvelope(JSON.parse(text).strategy.source_json,context.dashboardRoot,JSON.parse(text)),compiled:compileDashboard(JSON.parse(JSON.parse(text).strategy.source_json))});export class NativeSession {constructor(hass,root,options={}) {Object.assign(this,{hass,root,strategy:options.strategy});}}; export const metadataSnapshot=()=>({}); export const compileDashboard=source=>({views:source.pages.map(page=>({path:page.path,theme:'Marao Dashboard',cards:[{cards:[{type:'custom:marao-navbar-card',routes:[]}]}]}))});`);
@@ -41,6 +41,7 @@ test('native editor isolates users/roots, retains same-user drafts and reconcile
     globalThis.location={pathname:'/renamed-dashboard/home'};
     const output=await Strategy.generate(config,{...hass,panels:{'renamed-dashboard':{component_name:'lovelace'}}});
     assert.equal(output.views.at(-1).type,'panel');assert.equal(output.views[0].cards[0].cards[0].dashboard_root,'renamed-dashboard');
+    assert.equal(output.views[0].cards[0].cards[0].editor_path,output.views[1].path);
     for (const extra of [[],[{name:'Added',path:'added',entities:[]}]]) {
       const generated=await Strategy.generate({...config,source_json:JSON.stringify({...source,pages:[...source.pages,...extra]})},hass);
       assert.equal(generated.views[0].path,'home');
@@ -48,14 +49,17 @@ test('native editor isolates users/roots, retains same-user drafts and reconcile
       assert.deepEqual(generated.views.filter(view=>!view.subview).map(view=>view.path),['home',...extra.map(page=>page.path)]);
     }
     delete globalThis.location;
-    assert.equal((await Strategy.generate(config,{...hass,user:{is_admin:false}})).views.length,1);
+    const regular=await Strategy.generate(config,{...hass,user:{is_admin:false}});
+    assert.equal(regular.views.length,1);assert.equal(regular.views[0].cards[0].cards[0].editor_path,undefined);
     const collision={...source,pages:[{name:'User page',path:'marao-editor',entities:[]}]};
-    assert.equal((await Strategy.generate({...config,source_json:JSON.stringify(collision)},hass)).views.at(-1).path,'marao-editor-editor');
+    const colliding=await Strategy.generate({...config,source_json:JSON.stringify(collision)},hass);
+    assert.equal(colliding.views.at(-1).path,'marao-editor-editor');
+    assert.equal(colliding.views[0].cards[0].cards[0].editor_path,'marao-editor-editor');
     const Card=registry.get('marao-dashboard-editor-card'), card=new Card();
     card.setConfig({dashboard_root:'marao-dashboard'});card.hass=hass;await card._mount();
     while(card._mounting) await new Promise(resolve=>setTimeout(resolve,0));
     const panel=card._panel;assert.ok(panel);panel._dirty=true;
-    const navigation=await import(pathToFileURL(path.join(directory,'MaraoNavigation.js')));assert.equal(navigation.fullscreenUsers.has(card),true);
+    const navigation=await import(pathToFileURL(path.join(directory,'MaraoNavigation.js')));assert.equal(navigation.fullscreenUsers.has(card),true);assert.equal(card._panel.navigate,navigation.navigate);
     card.disconnectedCallback();card.connectedCallback();assert.equal(card._panel,panel);
     let prevented=false;listeners.beforeunload({preventDefault:()=>{prevented=true;}});assert.equal(prevented,true);
     card.hass={...hass,user:{id:'viewer',is_admin:false}};

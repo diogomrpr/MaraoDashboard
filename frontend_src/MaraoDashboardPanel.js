@@ -268,7 +268,7 @@ class MaraoDashboardPanel extends HTMLElement {
             <ha-button id="import-source">${this._t("importSource")}</ha-button>
             <ha-button id="export-source">${this._t("exportSource")}</ha-button>
             <ha-button id="discard">${this._t("discard")}</ha-button>
-            <a id="open-dashboard" href="#" target="_blank" rel="noopener">${this._t("open")}</a>
+            <a id="open-dashboard" href="#">${this._t("open")}</a>
               </div>
             </details>
           </div>
@@ -296,7 +296,8 @@ class MaraoDashboardPanel extends HTMLElement {
       else this._load(true);
     });
     this.shadowRoot.getElementById("open-dashboard").addEventListener("click", (event) => {
-      if (!this._loaded || this._busy) event.preventDefault();
+      event.preventDefault();
+      this._openDashboard();
     });
     this._updateHeader();
     this.shadowRoot.getElementById("save").addEventListener("click", () => this._save());
@@ -363,7 +364,6 @@ class MaraoDashboardPanel extends HTMLElement {
         this._visualReady = false;
         this._renderVisual();
         this._savedSource = this._source(); this._jsonDraft = null; this._dirty = false;
-        this.shadowRoot.getElementById("open-dashboard").href = payload.dashboard_url;
         this._dashboardUrl = payload.dashboard_url;
         this._pageTemplates = payload.page_templates;
         if (this._monaco) this._setEditorSource(this._savedSource);
@@ -414,6 +414,7 @@ class MaraoDashboardPanel extends HTMLElement {
     root.getElementById("discard").disabled = this._busy || !this._dirty;
     root.getElementById("import-source").disabled = this._busy || !this._loaded;
     root.getElementById("export-source").disabled = !this._loaded;
+    root.getElementById("open-dashboard").href = this._dashboardUrl || "#";
     root.getElementById("open-dashboard").setAttribute("aria-disabled", String(this._busy || !this._loaded));
     root.querySelectorAll("[data-tab]").forEach(button => { button.disabled = this._busy || !this._loaded; });
   }
@@ -1317,6 +1318,10 @@ class MaraoDashboardPanel extends HTMLElement {
 
   _setEditorSource(source) { if (!this._monaco || this._monaco.getValue() === source) return; this._jsonViewState = null; this._settingEditor = true; this._monaco.setValue(source); this._settingEditor = false; }
 
+  _openDashboard() {
+    if (this.isConnected && this._loaded && !this._busy) this.navigate(this._dashboardUrl);
+  }
+
   async _save() {
     this._cardDrag?.cancel();
     if (this._busy || !this._loaded) return;
@@ -1349,12 +1354,12 @@ class MaraoDashboardPanel extends HTMLElement {
       this._model = normalizeConfig(JSON.parse(result.config || source)); this._documentEpoch++;
       this._jsonDraft = null; this._pageTemplates = null;
       this._savedSource = this._source(); this._dirty = false;
-      this.shadowRoot.getElementById('open-dashboard').href = result.dashboard_url;
       this._dashboardUrl = result.dashboard_url;
       this._setEditorSource(this._savedSource); this._renderVisual(); this._updateHeader();
       this._setStatus(this._t(this.nativeSession?.strategy ? 'applied' : 'clean'), 'success');
     } catch (error) { if (sameDocument()) { if (!this._contextReady) this._contextFailure(error); else this._setStatus(this._error(error), 'error'); } }
     finally { if (accepted || sameDocument() || this.isConnected && lifecycle === this._lifecycle) this._setBusy(false); }
+    if (accepted && !session?.strategy) this._openDashboard();
   }
 
   _discard() {

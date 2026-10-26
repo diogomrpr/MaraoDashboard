@@ -48,6 +48,7 @@ function panel(config) {
   confirmations = [];
   const p = new Panel();
   p.nativeSession = persistence(p);
+  p.navigations = []; p.navigate = path => { assert.equal(p._busy, false); if (path) p.navigations.push(path); };
   p._labelModule = { PT_LABELS, MOVE_PT_LABELS };
   p._model = model.normalizeConfig(config);
   p._savedSource = p._source();
@@ -745,6 +746,7 @@ test('Save enters its guard before context, preserves latest edits and dispatche
   assert.equal(JSON.parse(messages[1].config).name, 'Latest before Save');
   assert.equal(p._busy, false); assert.equal(p._dirty, false);
   assert.equal(p._monaco, undefined);
+  assert.deepEqual(p.navigations, ['/marao-dashboard/home']);
 });
 
 test('context failure and superseded documents release Save without generation or lost drafts', async () => {
@@ -758,6 +760,7 @@ test('context failure and superseded documents release Save without generation o
     await saving;
     assert.equal(messages.length, 1); assert.equal(p._source(), before);
     assert.equal(p._dirty, true); assert.equal(p._busy, false);
+    assert.deepEqual(p.navigations, []);
   }
 });
 
@@ -1134,5 +1137,30 @@ test('native save acknowledgment reconciles the retained draft after HA reattach
     await saving;assert.equal(writes,1);assert.equal(p._busy,false);
     assert.equal(p._dirty,failed);assert.equal(p._model.name,'Saved once');
     assert.equal(p.status.kind,failed?'error':'success');
+    assert.deepEqual(p.navigations, failed ? [] : ['/marao-dashboard/home']);
   }
+});
+
+
+test('Open dashboard stays in HA, retains the draft, and refuses busy or obsolete panels', () => {
+  const p=panel(canonical());p.isConnected=true;p._loaded=true;p._dirty=true;
+  p._dashboardUrl='/custom-dashboard/landing';const before=p._source();
+  p._openDashboard();
+  assert.deepEqual(p.navigations,['/custom-dashboard/landing']);
+  assert.equal(p._source(),before);assert.equal(p._dirty,true);
+  for(const [key,value] of [['_busy',true],['_loaded',false],['isConnected',false],['_dashboardUrl','']]) {
+    const original=p[key];p[key]=value;p._openDashboard();p[key]=original;
+  }
+  assert.equal(p.navigations.length,1);
+  assert.doesNotMatch(source,/<a id="open-dashboard"[^>]*target=/);
+});
+
+test('Apply in dashboard settings stays until HA saves those settings',async()=>{
+  const p=loadingPanel(message=>Promise.resolve({config:message.config,dashboard_url:'/custom-dashboard/home'}));
+  const config=canonical();config.pages[0].sections[0].entities=[];config.pages[1].entities=[];
+  p._model=model.normalizeConfig(config);p._loaded=true;p._contextReady=true;p._catalog={cards:[],config_version:2};p._entities=[];
+  p.nativeSession.strategy={type:'custom:marao-dashboard'};
+  await p._save();
+  assert.equal(p.status.kind,'success');assert.equal(p._dirty,false);
+  assert.deepEqual(p.navigations,[]);
 });

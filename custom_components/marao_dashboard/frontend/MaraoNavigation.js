@@ -308,7 +308,10 @@ export class MaraoNavbarCard extends BaseElement {
   }
   _syncPageRefresh() {
     const view = this._view(), lovelace = this._root()?.lovelace;
-    if (!this.isConnected || this._surface || this.preview || this._editing || this._config?.show_cache_reset === false || lovelace?.editMode || !view
+    const showRefresh = this._config?.show_cache_reset !== false;
+    const editorURL = this._hass?.user?.is_admin && this._config?.dashboard_root && this._config?.editor_path
+      ? `/${encodeURIComponent(this._config.dashboard_root)}/${encodeURIComponent(this._config.editor_path)}` : '';
+    if (!this.isConnected || this._surface || this.preview || this._editing || !showRefresh && !editorURL || lovelace?.editMode || !view
       || !navbarMainPage(lovelace?.config || lovelace?.rawConfig)) {
       this._pageRefresh?.remove(); return;
     }
@@ -317,10 +320,16 @@ export class MaraoNavbarCard extends BaseElement {
       row.setAttribute('data-marao-page-refresh', '');
       // HA flexes every view child; keep the refresh row from absorbing spare height.
       row.attachShadow({ mode: 'open' }).innerHTML = `<style>
-        :host{display:flex;flex-direction:row!important;justify-content:flex-end;box-sizing:border-box;width:100%;height:60px;min-height:60px;min-width:0;flex:none!important;padding:12px 12px 0}
+        :host{display:flex;flex-direction:row!important;justify-content:flex-end;flex-wrap:wrap;gap:8px;box-sizing:border-box;width:100%;min-height:60px;min-width:0;flex:none!important;padding:12px 12px 0;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}
         button{display:grid;place-items:center;box-sizing:border-box;min-width:48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow,0 1px 6px rgba(0,0,0,.12));cursor:pointer;appearance:none;-webkit-appearance:none;-webkit-tap-highlight-color:transparent}
-        button:active:not(:disabled){transform:scale(.92)}button:disabled{opacity:.5;cursor:default}button:focus{outline:none}
-      </style><button type="button" class="frontend-refresh"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-2.6L20 7M4 17l2.4 2.6A7 7 0 0 0 17.9 17"/></svg></button>`;
+        a{display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:48px;min-width:48px;max-width:100%;padding:8px 16px;border-radius:24px;font:inherit;font-weight:600;line-height:1.35;overflow-wrap:anywhere;text-align:center;text-decoration:none;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow,0 1px 6px rgba(0,0,0,.12));-webkit-tap-highlight-color:transparent}
+        button:active:not(:disabled),a:active{transform:scale(.92)}button:disabled{opacity:.5;cursor:default}button:focus,a:focus{outline:none}button[hidden],a[hidden]{display:none}
+      </style><a class="frontend-editor" hidden></a><button type="button" class="frontend-refresh"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-2.6L20 7M4 17l2.4 2.6A7 7 0 0 0 17.9 17"/></svg></button>`;
+      const editor = row.shadowRoot.querySelector('a');
+      editor.addEventListener('click', event => {
+        if (!this._hass?.user?.is_admin || !editor.getAttribute('href') || !this.isConnected || !row.parentNode || this.preview || this._editing || this._root()?.lovelace?.editMode || row.closest('[inert]')) { event.preventDefault(); return; }
+        haptic('heavy');
+      });
       row.shadowRoot.querySelector('button').addEventListener('click', () => {
         if (!this._refreshEligible() || row.closest('[inert]')) return;
         haptic('heavy'); this._refreshFrontend();
@@ -328,7 +337,13 @@ export class MaraoNavbarCard extends BaseElement {
     }
     if (this._pageRefresh.parentNode !== view) view.prepend(this._pageRefresh);
     const refresh = this._pageRefresh.shadowRoot.querySelector('button');
+    refresh.hidden = !showRefresh;
     refresh.disabled = Boolean(this._refreshing);
+    const editor = this._pageRefresh.shadowRoot.querySelector('a');
+    editor.hidden = !editorURL;
+    const editorLabel = localize('navigation.edit', this._hass);
+    if (editor.textContent !== editorLabel) editor.textContent = editorLabel;
+    if (editorURL) editor.setAttribute('href', editorURL); else editor.removeAttribute('href');
     refresh.setAttribute('aria-label', localize(this._refreshing ? 'navigation.refresh.refreshing' : 'navigation.refresh.action', this._hass));
   }
   _updateCurrent() {
