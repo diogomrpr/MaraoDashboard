@@ -9,36 +9,51 @@
 
 Marao Dashboard builds a complete, phone-friendly Home Assistant dashboard from
 a visual/JSON editor. It combines editable pages and sections, reusable cards
-and pop-up controls, a coordinated theme, and local version history.
+and pop-up controls, and a coordinated light/dark appearance.
+
+## Breaking change in v0.22.0
+
+Marao is now a frontend-only HACS **Dashboard** package, using Home Assistant's
+native dashboard storage. **Existing Integration installations must migrate
+manually. Do not select Update on the old Integration entry.** Keep the same
+repository and dashboard address; follow the [migration and rollback guide](docs/docs/installation/native-migration.md).
+
+Download [marao-converter.html](https://github.com/diogomrpr/MaraoDashboard/releases/download/v0.22.0/marao-converter.html),
+open it locally, paste your old JSON and select Translate. It works without
+Home Assistant or a server and asks only for missing information. Keep an exact
+private package/data backup before removing anything. The one-time migration
+needs a Home Assistant restart. Later Dashboard updates need a client refresh.
+
+Configuration History/Restore is removed; sensor charts remain. Netatmo supports
+basic native recordings without typed detection filters. Native dashboard source
+is readable by authenticated Home Assistant users; review private values before
+importing, even when the dashboard is hidden or restricted to administrators.
 
 ## Highlights
 
-- Add, duplicate and edit every page, section and card from an admin-only Home
-  Assistant panel. Start with Home, Rooms, Security, Energy, Wallbox or Media.
-- Keep explicit room membership, configure Entity Groups and energy units, and
-  choose a landing page independently of the five navbar pins.
-- Generate a complete YAML dashboard while preserving marked custom-card
-  sections between rebuilds.
-- Use a responsive Marao theme and consistent controls for common Home
-  Assistant domains.
-- Add live camera previews with optional Frigate or UniFi Protect event pop-ups.
-- Restore recent generated dashboard versions from local history.
+- Edit ordered pages, sections and cards in the existing Visual/JSON builder.
+- Keep explicit room membership, Entity Groups, energy units and custom content.
+- Use project-owned cards, floating navigation, popovers and scoped styling.
+- Save through Home Assistant's native dashboard APIs, with no Marao Python backend.
+- Convert supported historical JSON through one maintained incremental converter.
 
 ## Installation
 
-Marao Dashboard is a self-contained HACS custom **Integration**. Its generated
-cards, floating navigation, bottom-sheet popovers, theme, and fullscreen shell
-runtime are served by Marao itself.
+Requires stable Home Assistant **2026.10.0 or newer** and HACS.
+Existing users must complete the [migration guide](docs/docs/installation/native-migration.md) first.
 
 1. Add `https://github.com/diogomrpr/MaraoDashboard` to HACS as a custom
-   **Integration** repository and download Marao Dashboard.
-2. Restart Home Assistant.
-3. Go to **Settings > Devices & services > Add integration**, then add
-   **Marao Dashboard**.
-4. Open the Marao Dashboard Editor from the sidebar and generate the dashboard.
+   **Dashboard** repository and download Marao Dashboard.
+2. Verify the JavaScript module resource
+   `/hacsfiles/MaraoDashboard/MaraoFrontend.js` is registered once, then refresh HA.
+   YAML-managed resources use `lovelace.reload_resources` after editing the list.
+3. Create an editable dashboard in **Settings → Dashboards**, select Marao's
+   dashboard strategy, and open its Marao editor to configure your pages.
+   For a converted installation, paste the complete converter output into HA's
+   native raw configuration editor instead.
 
-See the [full documentation](https://diogomrpr.github.io/MaraoDashboard/) for
-configuration, camera-provider requirements, updates, and troubleshooting.
+See the [full documentation](https://diogomrpr.github.io/MaraoDashboard/) for setup,
+configuration, camera-provider requirements, updates and troubleshooting.
 
 ## Development
 
@@ -63,8 +78,8 @@ disposable environment described in the
 [development guide](docs/docs/development/local-development.md) and must never
 target a live Home Assistant instance. Configure its URL, administrator long-lived
 token, and SSH access in the ignored `ha-test/local.json`. `npm run ha:sync`
-builds and installs the current working tree, creates safe demonstration entities,
-and generates the complete test dashboard. Browser tests prepare it automatically.
+builds and installs the current working tree. On a migrated dashboard, frontend
+preparation preserves saved source and does not reset fixtures or restart HA.
 Publication runs affected unit tests only. Install the final release candidate,
 including version metadata, on the disposable instance before publishing.
 Reuse development browser and upgrade results; additional integration, full-suite
@@ -72,15 +87,16 @@ and complete mobile-matrix testing require an explicit request. Changes to saved
 data or generated ownership still need appropriate compatibility and recovery
 verification during development.
 
-Frontend changes need an integration reload and browser refresh; backend changes
-need a Home Assistant restart. Preparation handles both.
+Frontend updates need a browser refresh. The development-only Python fixtures
+may need a restart when their code changes; they are not part of the product.
 
 Marao does not install, update, replace, or remove unrelated HACS cards.
 
 ## Repository layout
 
-- `custom_components/marao_dashboard/` — Marao integration and packaged runtime,
-  theme, and generator source.
+- `custom_components/marao_dashboard/` — editable runtime source and frozen legacy
+  integration/generator reference for compatibility and rollback.
+- `dist/` — generated HACS Dashboard files; no Python is installed by this package.
 - `frontend_src/` — editable dashboard-editor source and build scripts.
 - `tests/` — automated integration, frontend, and browser checks.
 - `ha-test/` — disposable-instance preparation, safe fixtures, and full Cases view.

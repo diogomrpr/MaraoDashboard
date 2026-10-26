@@ -66,12 +66,19 @@ async function buildFrontend(destination = path.join(root,'ha-test/.cache/native
   fs.writeFileSync(path.join(dist,'MaraoFrontend.release.json'),JSON.stringify({identity,package_version:version,compiler_contract:1,files:hashes})+'\n');
   fs.writeFileSync(path.join(destination,'hacs.json'),JSON.stringify({name:'Marao Dashboard',filename:'MaraoFrontend.js',render_readme:true})+'\n');
   fs.copyFileSync(path.join(root,'LICENSE'),path.join(destination,'LICENSE'));
-  fs.writeFileSync(path.join(destination,'README.md'),'# Marao Dashboard\n\nInstall this repository as a HACS Dashboard repository. The resource is `MaraoFrontend.js`. Requires Home Assistant 2026.10.0 or newer.\n\nAll runtime assets are in `dist/`. Releases must use tagged repository content; do not attach a single JavaScript download or a ZIP release.\n\nExisting integration installations require the guided [migration procedure](MIGRATION.md) before removal. Export drafts, back up exact package/data, convert offline and retain the original dashboard address. No new legacy Integration release is required.\n');
+  fs.writeFileSync(path.join(destination,'README.md'),'# Marao Dashboard\n\n**BREAKING v0.22.0:** existing Integration installations must follow [MIGRATION.md](MIGRATION.md) before changing packages. Do not update the old Integration in place. Keep the same repository and original dashboard address. Download the offline converter from the release assets.\n\nInstall this repository as a HACS Dashboard repository. The resource is `MaraoFrontend.js`. Requires Home Assistant 2026.10.0 or newer.\n\nAll runtime assets are in `dist/`. Releases must use tagged repository content; do not attach a single JavaScript download or a ZIP release.\n\nExisting integration installations require the guided [migration procedure](MIGRATION.md) before removal. Export drafts, back up exact package/data, convert offline and retain the original dashboard address. No new legacy Integration release is required.\n');
   fs.copyFileSync(path.join(root,'docs/docs/installation/native-migration.md'),path.join(destination,'MIGRATION.md'));
   const attribution = fs.readFileSync(path.join(root,'README.md'),'utf8').split('\n').find(line=>line.startsWith('Inspired by '));
   if(attribution) fs.appendFileSync(path.join(destination,'README.md'),'\n'+attribution+'\n');
   assertPackageBoundary(destination);
   return {destination,identity,files:files.length};
 }
-if (require.main === module) (process.argv.includes('--frontend') ? buildFrontend() : buildConverter()).then(result => console.log(result)).catch(error => {console.error(error.message);process.exitCode=1;});
+if (require.main === module) (async () => {
+  if (!process.argv.includes('--frontend')) return buildConverter();
+  const result = await buildFrontend();
+  fs.rmSync(path.join(root,'dist'),{recursive:true,force:true});
+  fs.cpSync(path.join(result.destination,'dist'),path.join(root,'dist'),{recursive:true});
+  fs.copyFileSync(path.join(result.destination,'hacs.json'),path.join(root,'hacs.json'));
+  return result;
+})().then(result => console.log(result)).catch(error => {console.error(error.message);process.exitCode=1;});
 module.exports = {buildConverter,buildFrontend};

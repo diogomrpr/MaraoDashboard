@@ -57,6 +57,9 @@ still needs exact private backups and independent persisted/restart proof.
 Developers build editor bundles with `npm run build:editor`, then run
 `node frontend_src/build-native.cjs --frontend` for Dashboard repository staging
 or `node frontend_src/build-native.cjs` for the self-contained offline HTML.
+The frontend CLI also replaces the versioned root `dist/` and `hacs.json`. Commit
+that complete reproducible graph with the source; HACS downloads only `dist/`,
+not the legacy reference code. Do not hand-edit generated distribution files.
 End users receive that ready-to-open HTML; they do not need Node, HA login,
 another server or Marao's HA builder to convert pasted JSON.
 
@@ -118,7 +121,9 @@ do not establish installation or those pending gates.
 ## Retired backend consumers
 
 The released v0.21.1 Python tree is frozen reference/rollback code. Native releases
-are staged by `build:hacs`; they contain no `custom_components` package. Do not
+are staged by `build:hacs`; HACS downloads only the flat `dist/` files and
+installs no `custom_components` package. The repository retains legacy source
+for compatibility checks and rollback reference, outside the downloaded graph. Do not
 publish the working frontend tree as a new legacy Integration release.
 
 | Released entry point | Native replacement or removal | Migration action |

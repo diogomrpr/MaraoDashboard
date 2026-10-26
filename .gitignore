@@ -48,7 +48,7 @@ yarn-error.log*
 ha-test/.cache/
 ha-test/.artifacts/
 tests/.artifacts/
-dist/
+# Root dist is the versioned HACS Dashboard package.
 _site/
 docs/_site/
 docs/.jekyll-cache/

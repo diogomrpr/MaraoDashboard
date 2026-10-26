@@ -33,6 +33,15 @@ the new native branch was reached before the existing active-upgrade guard. The
 guard now runs before either preparation branch; its five focused preservation
 checks pass. This does not itself establish that the whole publication gate passed.
 
+The subsequent isolated clean **0.22.0 candidate** passed all **64 selected
+unit-only publication checks**, serially, against v0.21.1. Its final graph
+`770170e16552b9d206944300f78983622bc0a428b2fbbe807278b35c57465075`
+was installed on the disposable instance with complete served-asset and unchanged
+native-source checks, without an HA restart. The reviewable package and private
+readiness record are under `ha-test/.artifacts/native-frontend/same-repo-candidate/`.
+It remains unpublished; exact public HACS metadata validation, the successful
+same-repository Dashboard installation and later HACS update remain pending.
+
 Implementation was explicitly authorized on 2026-10-25 for the complete
 frontend-only transition, including the offline converter. The user requires
 clarification when an unresolved decision prevents sufficient confidence.

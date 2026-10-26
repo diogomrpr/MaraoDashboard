@@ -158,6 +158,7 @@ const components = {
 
 const rules = [
   [/^tests\/test-native-frontend-local\.js$/, ['native-source']],
+  [/^dist\//, ['native-source']],
   [/^(?:custom_components\/marao_dashboard\/frontend\/(?:Marao(?:Source|NativeModel|NativeDashboard|Theme|SourceImport)\.js|marao-(?:catalog|generator-labels|owned-assets)\.json|MaraoFonts\.css|fonts\/.*)|frontend_src\/(?:compile-dashboard|native-model|native-metadata|native-session|native-strategy|native-theme|native-dependencies|source-import|convert-document|converter|build-native)\.(?:js|cjs|html)|tests\/frontend\/(?:native-(?:source|compiler|session|strategy|dependencies|package)|converter)\.test\.js|tests\/components\/marao_dashboard\/test_frontend_compiler\.py|tests\/test-converter-local\.js)$/, ['native-source']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoSensorThresholds\.js$/, ['labels', 'editor-model', 'generator']],
   [/^tests\/frontend\/canonical-pages\.fixture\.json$/, ['card-namespace']],

@@ -7,61 +7,34 @@ nav_order: 1.2
 
 # Download with HACS
 
-Marao Dashboard is a custom HACS **Integration** repository. HACS installs the
-integration under `custom_components/marao_dashboard`. When its config entry is
-loaded, Home Assistant serves Marao's dashboard runtime, editor, and
-camera-events card directly from `/marao_dashboard_static` through its frontend
-and static APIs.
+Marao v0.22.0 and later use category **Dashboard**. If this repository is already
+installed as Integration, complete the [breaking migration](native-migration.md)
+first: remove the old package and custom-repository registration before re-adding
+the same URL. A normal Update on the old entry does not perform this migration.
 
-## Before you start
+## New installation
 
-- Install and configure [HACS](https://www.hacs.xyz/docs/use/).
-- Create a Home Assistant backup.
-- Make sure you can restart Home Assistant and edit `configuration.yaml` if a
-  manual recovery is needed.
+1. Use stable Home Assistant **2026.10.0 or newer** and configured [HACS](https://www.hacs.xyz/docs/use/).
+2. Open HACS → three-dot menu → **Custom repositories**.
+3. Add `https://github.com/diogomrpr/MaraoDashboard` with category **Dashboard**.
+4. Open Marao Dashboard and select **Download**.
+5. Verify `/hacsfiles/MaraoDashboard/MaraoFrontend.js` is registered **once** as a
+   JavaScript module, then refresh Home Assistant or reopen the companion app.
 
-## Add the custom repository
+HACS downloads the complete flat `dist/` graph into
+`www/community/MaraoDashboard`. No Marao Python integration is installed, and you
+do not add Marao in Devices & services. Unrelated cards/resources remain unchanged.
 
-1. Open HACS.
-2. Select the three-dot menu, then **Custom repositories**.
-3. Enter `https://github.com/diogomrpr/MaraoDashboard`.
-4. Select **Integration** as the category and add the repository.
-5. Search for **Marao Dashboard**, open it, and select **Download**.
-6. Restart Home Assistant after the download finishes.
+With HA-managed resources, use HACS or **Settings → Dashboards → Resources**
+(advanced mode may be needed). If resources are already YAML-managed, preserve
+that mode and the other entries; append only:
 
-HACS installs the integration here:
-
-```text
-custom_components/
-└── marao_dashboard/
+```yaml
+- url: /hacsfiles/MaraoDashboard/MaraoFrontend.js
+  type: module
 ```
 
-The repository's tests, development dependencies, safe demonstration entities,
-and local connection settings are outside this directory and are not installed
-by HACS. The bundled editor assets and their license are runtime files.
-
-After setup, Marao stores its generated dashboard and local history under the
-Home Assistant configuration directory, and installs its theme in Home
-Assistant's standard theme directory:
-
-```text
-dashboard/
-└── MaraoDashboard/
-    ├── dashboard.json
-    ├── dashboard/
-    │   ├── dashboard.yaml
-    │   └── views/
-    └── .history/
-
-themes/
-└── MaraoDashboard/
-    └── marao-dashboard.yaml
-```
-
-Unrelated HACS card bundles remain under their own directories and are not
-modified by Marao.
-
-Do not add a Marao JavaScript resource manually. The integration registers its
-own modules with Home Assistant when it loads.
-
-Continue with the [configuration guide]({{ '/docs/installation/configuration.html' | relative_url }}).
+Run the built-in `lovelace.reload_resources` action after editing the YAML list.
+A normal frontend download/resource refresh needs no HA restart. Continue with
+[configuration](configuration.md); existing users instead import their converted
+complete native document through the migration guide.

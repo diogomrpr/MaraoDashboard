@@ -27,6 +27,13 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     const asset=path.join(directory,'dist',first.identity+'--MaraoNativeDashboard.js');
     assert.ok(fs.existsSync(asset));assert.ok(fs.existsSync(path.join(directory,'dist','MaraoFrontend.js')));
     const manifest=JSON.parse(fs.readFileSync(path.join(directory,'dist','MaraoFrontend.release.json')));
+    const published=path.resolve('dist/MaraoFrontend.release.json');
+    if (fs.existsSync(published)) {
+      assert.deepEqual(JSON.parse(fs.readFileSync(published)),manifest,'Rebuild build:hacs before committing a release');
+      assert.equal(JSON.parse(fs.readFileSync('hacs.json')).filename,'MaraoFrontend.js');
+      for (const file of [...Object.keys(manifest.files),'MaraoFrontend.release.json']) assert.ok(fs.readFileSync(path.resolve('dist',file)).equals(fs.readFileSync(path.join(directory,'dist',file))),'Published asset differs: '+file);
+    }
+
     for (const [file,hash] of Object.entries(manifest.files)) assert.equal(createHash('sha256').update(fs.readFileSync(path.join(directory,'dist',file))).digest('hex'),hash);
     assert.equal(fs.existsSync(path.join(directory,'MaraoFrontend.js')),false);
     assert.equal(JSON.parse(fs.readFileSync(path.join(directory,'hacs.json'))).content_in_root,undefined);

@@ -7,21 +7,23 @@ nav_order: 1.6
 
 # Move an existing installation to the frontend package
 
-The frontend candidate is installed on the disposable development instance. Its
-native saves, restart retention and matching legacy rollback have been checked.
-The Dashboard package will use the existing `diogomrpr/MaraoDashboard` repository.
-HACS remove/re-add and update verification is in progress. The live probe reached
-Dashboard validation but rejected the current stable v0.21.1 Integration layout;
-the first frontend-compatible stable release must exist before this procedure.
-These instructions describe the guided manual migration selected for this major change;
-do not remove a working installation until the complete frontend package and
-converter are available and verified.
+**v0.22.0 is a breaking transition from Integration to Dashboard.** Keep the
+existing `diogomrpr/MaraoDashboard` repository. **Do not update the old Integration
+in place.** Follow the steps below separately for every Home Assistant instance.
+They preserve the dashboard address and saved configuration through a guided
+manual migration. Export drafts and keep a recoverable backup before removal.
 
-Run this procedure separately for each Home Assistant instance. The converter
-needs only a browser: no Home Assistant login, dashboard builder, local server,
-command line or intermediate Marao release. Migration needs administrator access
-and a one-time Home Assistant restart. Later updates use its **Dashboard**
-package and a browser refresh; the actual HACS update proof is still pending.
+Download the [v0.22.0 converter](https://github.com/diogomrpr/MaraoDashboard/releases/download/v0.22.0/marao-converter.html)
+and open the HTML file locally. It needs only a browser: no Home Assistant login,
+dashboard builder, local server, command line or intermediate Marao release.
+Migration needs administrator access, stable HA **2026.10.0 or newer**, and a
+one-time Home Assistant restart. Later updates use the HACS **Dashboard** package
+and a client refresh. Do not repeat this migration for normal frontend updates.
+
+The disposable development installation retained its original 59-page source,
+settings and files through native saves, independent disk comparison, restart and
+matching legacy rollback. No camera playback or physical-device acceptance is
+claimed by that verification.
 
 ## 1. Keep a recoverable original
 
@@ -90,7 +92,9 @@ inputs refuse conversion and leave the original unchanged.
 
 ## 3. Remove the old integration, then restart
 
-Obtain and verify the complete frontend stable package before starting removal.
+Download the converter and verify that HACS/GitHub offers stable **v0.22.0 or later**
+before starting removal. The package must contain `dist/MaraoFrontend.js` and its
+complete accompanying assets.
 Keep its resource disabled until the old frontend bootstrap is removed.
 If HACS still identifies the latest stable as v0.21.1, stop here: adding the
 repository as Dashboard will fail its package-layout check. A prerelease alone
@@ -163,8 +167,8 @@ and compare current state with the migration changes. Remove only the newly owne
 native registration/resource, reinstall the **exact saved old integration package**,
 restore its matching JSON/generated/custom files and owned registration/settings,
 and restart HA as required. Keep the exact old package in your private backup:
-once the latest stable contains only the frontend layout, HACS may also refuse
-adding that repository as Integration before an old version can be selected.
+after this category change, do not rely on HACS accepting the repository as
+Integration before an old version can be selected.
 In that case restore the saved `custom_components/marao_dashboard` directory
 manually, then add its HA config entry; do not alter HACS's private registry or
 relabel a published release. Restore YAML dashboard registrations in normal block style:
@@ -201,4 +205,4 @@ não crie outro dashboard nem substitua dados por uma configuração inicial.
 Para regressar, guarde primeiro as novas alterações nativas. Restaure o pacote
 antigo exato juntamente com os seus dados e definições próprias, sem substituir
 alterações alheias. Os reinícios desta migração são pontuais; as atualizações
-seguintes do pacote frontend ficam sujeitas à prova HACS sem reiniciar o HA.
+seguintes usam o pacote Dashboard e uma atualização do cliente, sem reiniciar o HA.
