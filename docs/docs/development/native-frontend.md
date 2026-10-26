@@ -7,8 +7,10 @@ parent: Development
 # Native frontend transition
 
 The breaking stable release is **v0.22.0**, in the existing
-`diogomrpr/MaraoDashboard` repository. The disposable instance now runs the
-**v0.22.1-beta.1 update-test prerelease**, installed through actual HACS after
+`diogomrpr/MaraoDashboard` repository. **v0.22.1** adds visible administrator editor
+access and in-app dashboard navigation after Open dashboard or successful save.
+Its final versioned candidate is installed before publication. The earlier
+**v0.22.1-beta.1 update-test prerelease** was installed through actual HACS after
 v0.22.0. Native saves, independent disk comparison, restart retention, matching
 legacy rollback, native read/write permissions and same-repository handoff passed.
 The update retained a real unsaved Monaco draft, deferred client refresh until
@@ -54,7 +56,7 @@ still needs exact private backups and independent persisted/restart proof.
 | Native envelope | 1 | Strategy metadata wrapping the complete exact `source_json` string. |
 | Native compiler contract | 1 | Source-to-native strategy compilation contract. |
 | Legacy generated contract | 3 | Existing owned YAML/markers used only to recognize retained legacy output. |
-| Repository release | 0.22.0 stable; 0.22.1-beta.1 update test | v0.21.1 remains the immutable legacy rollback baseline. Package labels are separate from source/envelope versions. |
+| Repository release | 0.22.1; 0.22.0 breaking transition; 0.22.1-beta.1 update test | v0.21.1 remains the immutable legacy rollback baseline. Package labels are separate from source/envelope versions. |
 | Frontend graph | SHA-256 identity | Owned source/assets/build-rule identity, independent of release labels. |
 
 ## Local artifacts

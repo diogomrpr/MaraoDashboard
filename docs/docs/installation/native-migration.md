@@ -13,7 +13,7 @@ in place.** Follow the steps below separately for every Home Assistant instance.
 They preserve the dashboard address and saved configuration through a guided
 manual migration. Export drafts and keep a recoverable backup before removal.
 
-Download the [v0.22.0 converter](https://github.com/diogomrpr/MaraoDashboard/releases/download/v0.22.0/marao-converter.html)
+Download the [v0.22.1 converter](https://github.com/diogomrpr/MaraoDashboard/releases/download/v0.22.1/marao-converter.html)
 and open the HTML file locally. It needs only a browser: no Home Assistant login,
 dashboard builder, local server, command line or intermediate Marao release.
 Migration needs administrator access, stable HA **2026.10.0 or newer**, and a
@@ -28,7 +28,8 @@ prerelease v0.22.1-beta.1 retained an open draft until explicit discard, then lo
 the new editor/worker graph without an HA restart or integration reload. Source,
 routes and settings stayed unchanged. One authenticated Core WebSocket session
 remained connected throughout; no stop event, browser error or retired backend
-request was observed. v0.22.0 remains the latest stable release.
+request was observed. v0.22.1 adds visible administrator editor access and in-app
+Open dashboard/save navigation. Already migrated installations update normally.
 
 No camera playback or physical-device acceptance is claimed. Removal requires one
 restart; an additional restart after import is a retention check, and rollback can
