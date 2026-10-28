@@ -21,7 +21,7 @@ export function updateFrontendClient(hass) {
       const editor = !record && [...fullscreenUsers].find(owner=>owner.isConnected && owner._config?.dashboard_root===dashboard && typeof owner._frontendStatus==='function');
       return { dashboard, active: Boolean(record?.root.isConnected && !record.surface.preview || editor),
         get blocked() { return Boolean(activeServices || window.isDirtyState || [...(window.MaraoEditorPanels || [])].some(panel => panel._dirty || panel._busy) || record?.root.lovelace?.editMode
-          || record?.surface._refreshing || record?.surface._open
+          || record?.surface._refreshing || record?.surface._open || record?.surface._maintenance
           || findElements('marao-dashboard-panel').some(panel => panel._dirty || panel._busy)
           || findElements('marao-popup-card').some(popup => popup._open)); },
         status: state => {
@@ -37,6 +37,9 @@ const text = (value, fallback = "") => String(value ?? fallback);
 const esc = value => text(value).replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
 export const navigationTranslations = {
   "en": {
+    "navigation.maintenance.title": "Maintenance",
+    "navigation.maintenance.hold": "Hold to open maintenance",
+    "navigation.maintenance.close": "Close maintenance",
     "navigation.label": "Marao navigation",
     "navigation.more": "More destinations",
     "navigation.open": "Additional destinations",
@@ -59,6 +62,9 @@ export const navigationTranslations = {
     "navigation.invalid_native": "Native card configuration must be an object"
   },
   "pt": {
+    "navigation.maintenance.title": "Manutenção",
+    "navigation.maintenance.hold": "Mantenha premido para abrir a manutenção",
+    "navigation.maintenance.close": "Fechar manutenção",
     "navigation.label": "Navegação Marao",
     "navigation.more": "Mais destinos",
     "navigation.open": "Destinos adicionais",
@@ -140,6 +146,7 @@ export class MaraoNavbarCard extends BaseElement {
       || typeof (route.url || route.path) !== 'string' || !(route.url || route.path).trim()
       || typeof route.label !== 'string' || !route.label.trim())) throw new Error(localize("navigation.invalid_entry", this._hass));
     this._closeOverflow(false);
+    this._closeMaintenance(false);
     this._config = { ...config, routes }; this._render();
   }
   connectedCallback() {
@@ -160,6 +167,7 @@ export class MaraoNavbarCard extends BaseElement {
     applyFullscreen();
   }
   disconnectedCallback() {
+    this._closeMaintenance(false);
     this._pageRefresh?.remove();
     if (this._surface) { queueMicrotask(() => syncNavigation(this._surface._navigationRecord)); return; }
     if (this._navigationRecord && !this._navigationRecord.root.isConnected) releaseNavigation(this._navigationRecord);
@@ -190,11 +198,12 @@ export class MaraoNavbarCard extends BaseElement {
   }
   _view() { return this._root()?.shadowRoot?.querySelector('#view'); }
   _syncContext() {
+    if (this._maintenance && !this._maintenanceValid(this._maintenance)) this._closeMaintenance(false);
     const editing = Boolean(this._root()?.lovelace?.editMode);
     if (this._isSurface) this.hidden = Boolean(editing || this.preview);
     if (editing !== this._editing) { this._editing = editing; this._refreshGesture?.cancel(); this._closeOverflow(false); this._updateCurrent(); }
   }
-  _locationChanged = () => { if (this._navigationRecord) syncNavigation(this._navigationRecord); this._refreshGesture?.cancel(); this._closeOverflow(false); this._updateCurrent(); this._scheduleLayout(); };
+  _locationChanged = () => { this._closeMaintenance(false); if (this._navigationRecord) syncNavigation(this._navigationRecord); this._refreshGesture?.cancel(); this._closeOverflow(false); this._updateCurrent(); this._scheduleLayout(); };
   _scheduleLayout = () => {
     if (this._frame != null || !this.isConnected) return;
     this._frame = requestAnimationFrame(() => { this._frame = null; if (this.isConnected) this._layout(); });
@@ -227,6 +236,7 @@ export class MaraoNavbarCard extends BaseElement {
   }
   _render() {
     if (!this.shadowRoot) return;
+    this._closeMaintenance(true);
     if (!this._isSurface && this._surface && !this.preview) {
       this._pageRefresh?.remove();
       this.setAttribute('data-marao-navbar-placeholder', '');
@@ -263,7 +273,7 @@ export class MaraoNavbarCard extends BaseElement {
     </style><div class="bounds" aria-hidden="true"></div><div class="refresh-feedback" role="status" hidden><span></span><progress max="1" hidden></progress></div><nav class="nav surface">${routes.slice(0, this._visibleCount).map((route, i) => this._link(route, i, true)).join('')}${overflow ? '<button type="button" data-overflow aria-expanded="false" aria-controls="marao-overflow"><ha-icon icon="mdi:dots-horizontal"></ha-icon></button>' : ''}</nav>`;
     this._refreshGesture = bindNavbarRefresh(this.shadowRoot.querySelector('.nav'), {
       eligible: () => this._refreshEligible(), haptic: () => haptic('heavy'),
-      progress: value => this._refreshFeedback(value == null ? '' : 'hold', value), complete: () => this._refreshFrontend(),
+      progress: value => this._refreshFeedback(value == null ? '' : 'hold', value), complete: target => this._completeRefreshHold(target),
     });
     this._bindLinks(this.shadowRoot.querySelector('.nav'));
     this.shadowRoot.querySelector('[data-overflow]')?.addEventListener('click', () => {
@@ -282,10 +292,89 @@ export class MaraoNavbarCard extends BaseElement {
       this._closeOverflow(target.pathname === window.location.pathname && Boolean(target.hash)); haptic('heavy'); navigate(href);
     }));
   }
-  _refreshEligible() {
+  _refreshEligible(ownedDialog) {
     if (!this.isConnected || this.preview || this._root()?.lovelace?.editMode || this._refreshing || !this.getClientRects().length) return false;
     for (let node = this; node; node = node.parentElement || node.getRootNode()?.host) if (node.inert) return false;
+    if (this._maintenance && this._maintenance.dialog !== ownedDialog) return false;
+    if (findElements('dialog,ha-dialog,marao-popup-card').some(node => node !== ownedDialog
+      && (node.localName === 'dialog' ? node.matches(':modal') : node.open || node._open))) return false;
     return true;
+  }
+  _completeRefreshHold(target) {
+    if (!this._refreshEligible()) return;
+    if (this._hass?.user?.is_admin) this._openMaintenance(target);
+    else this._refreshFrontend();
+  }
+  _editorURL() {
+    return this._config.dashboard_root && this._config.editor_path
+      ? `/${encodeURIComponent(this._config.dashboard_root)}/${encodeURIComponent(this._config.editor_path)}` : '';
+  }
+  _maintenanceValid(session) {
+    return this._maintenance === session && this._hass?.user?.is_admin
+      && session.user === (this._hass.user.id || this._hass.user) && session.root === this._root()
+      && session.path === window.location.href && session.editor === this._editorURL()
+      && session.view === this._view() && session.host === this._navigationRecord?.host
+      && !this._surface && !this._navigationRecord?.released && this._refreshEligible(session.dialog);
+  }
+  _openMaintenance(target) {
+    if (!this._hass?.user?.is_admin || !this._refreshEligible()) return;
+    this._closeOverflow(false); this._refreshFeedback('');
+    const dialog = document.createElement('dialog');
+    dialog.className = 'maintenance'; dialog.setAttribute('aria-labelledby', 'maintenance-title');
+    dialog.innerHTML = `<style>
+      dialog.maintenance{position:fixed;inset:auto 0 0;margin:0 auto;box-sizing:border-box;width:calc(100% - ${safeArea("left")} - ${safeArea("right")});max-width:var(--marao-maintenance-width,480px);max-height:calc(100dvh - max(50px,${safeArea("top")}));padding:16px 12px ${navbarBottomGap()};border:0;border-radius:22px 22px 0 0;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);font:inherit;overflow:auto;overscroll-behavior:contain;pointer-events:auto;animation:maintenance-up .2s ease-out}
+      dialog.maintenance::backdrop{background:rgba(0,0,0,.5)}
+      .maintenance header{display:flex;align-items:center;gap:8px;margin-bottom:12px}.maintenance h2{flex:1;min-width:0;margin:0;font-size:var(--font-size-primary,1.25rem);line-height:1.35;overflow-wrap:anywhere}
+      .maintenance button{display:flex;justify-content:center;align-items:center;width:100%;min-width:48px;min-height:48px;height:auto;aspect-ratio:auto;margin-top:8px;padding:12px 16px;border-radius:24px;background:var(--primary-color);color:var(--text-primary-color,var(--active-text-color));font:inherit;font-size:var(--font-size-primary,1.125rem);line-height:1.35;overflow-wrap:anywhere}
+      .maintenance .close{flex:0 0 48px;width:48px;height:48px;margin:0;padding:0;border-radius:50%;font-size:1.5rem}
+      @keyframes maintenance-up{from{transform:translateY(100%)}to{transform:translateY(0)}}@media(prefers-reduced-motion:reduce){dialog.maintenance{animation:none}}
+    </style><header><h2 id="maintenance-title">${esc(localize('navigation.maintenance.title', this._hass))}</h2><button type="button" class="close" aria-label="${esc(localize('navigation.maintenance.close', this._hass))}">×</button></header>${this._editorURL() ? `<button type="button" data-edit>${esc(localize('navigation.edit', this._hass))}</button>` : ''}<button type="button" data-refresh>${esc(localize('navigation.refresh.action', this._hass))}</button>`;
+    const session = this._maintenance = { dialog, user: this._hass.user.id || this._hass.user, root: this._root(),
+      path: window.location.href, editor: this._editorURL(), view: this._view(), host: this._navigationRecord?.host,
+      restore: focusRestorer(target || this.shadowRoot.querySelector('[aria-current=page],.nav button') || deepActiveElement()) };
+    const select = action => {
+      const valid = this._maintenanceValid(session);
+      if (this._maintenance !== session) return;
+      this._closeMaintenance(valid);
+      if (!valid || !this._refreshEligible()) return;
+      haptic('heavy');
+      if (action === 'edit' && session.editor) navigate(session.editor);
+      else if (action === 'refresh') this._refreshFrontend();
+    };
+    dialog.querySelector('[data-edit]')?.addEventListener('click', () => select('edit'));
+    dialog.querySelector('[data-refresh]').addEventListener('click', () => select('refresh'));
+    const dismiss = () => { if (this._maintenance === session) this._closeMaintenance(true); };
+    dialog.querySelector('.close').addEventListener('click', () => { if (this._maintenance === session) { haptic('heavy'); dismiss(); } });
+    dialog.addEventListener('cancel', event => { event.preventDefault(); dismiss(); });
+    dialog.addEventListener('close', dismiss);
+    dialog.addEventListener('click', event => {
+      const box = dialog.getBoundingClientRect();
+      if (event.target === dialog && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)) dismiss();
+    });
+    session.check = () => { if (this._maintenance === session && !this._maintenanceValid(session)) this._closeMaintenance(false); };
+    session.listeners = new AbortController();
+    document.addEventListener('focusin', session.check, {capture:true, signal:session.listeners.signal});
+    this.shadowRoot.append(dialog);
+    const view = findElements('hui-masonry-view,hui-sections-view', this._view())[0];
+    const column = view?.shadowRoot?.querySelector('#columns > div:first-child, hui-section, .section');
+    const width = column?.getBoundingClientRect().width;
+    if (width > 0) dialog.style.setProperty('--marao-maintenance-width', `${Math.round(width)}px`);
+    const style = document.body.style;
+    session.overflow = [style.getPropertyValue('overflow'), style.getPropertyPriority('overflow')];
+    style.setProperty('overflow', 'hidden');
+    dialog.showModal();
+  }
+  _closeMaintenance(restore) {
+    const session = this._maintenance; if (!session) return;
+    this._maintenance = null;
+    session.listeners.abort();
+    session.dialog.close(); session.dialog.remove();
+    const style = document.body.style;
+    if (style.getPropertyValue('overflow') === 'hidden') {
+      if (session.overflow[0]) style.setProperty('overflow', ...session.overflow);
+      else style.removeProperty('overflow');
+    }
+    if (restore) queueMicrotask(() => { if (this._refreshEligible()) session.restore(); });
   }
   _refreshFeedback(state, value) {
     this._refreshFeedbackState = state;
@@ -293,9 +382,10 @@ export class MaraoNavbarCard extends BaseElement {
     const messages = { hold: 'Hold to refresh frontend', refreshing: 'Refreshing frontend…', deferred: 'Dashboard refresh waiting until controls and edits are finished.', unsaved: 'Save or discard changes before refreshing.', offline: 'Cannot reach Home Assistant. Try again.', interrupted: 'Refresh interrupted. Try again.', failed: 'Refresh failed. Try again.' };
     feedback.hidden = !state;
     const key = messages[state] ? state : 'failed';
-    feedback.querySelector('span').textContent = state ? localize(`navigation.refresh.${key}`, this._hass, {}, messages[key]) : '';
+    const holdKey = this._hass?.user?.is_admin ? 'navigation.maintenance.hold' : 'navigation.refresh.hold';
+    feedback.querySelector('span').textContent = state ? localize(state === 'hold' ? holdKey : `navigation.refresh.${key}`, this._hass, {}, messages[key]) : '';
     const bar = feedback.querySelector('progress'); bar.hidden = state !== 'hold';
-    bar.setAttribute('aria-label', localize('navigation.refresh.hold', this._hass, {}, messages.hold));
+    bar.setAttribute('aria-label', localize(holdKey, this._hass, {}, messages.hold));
     if (value != null) bar.value = value;
   }
   _refreshFrontend() {
@@ -309,9 +399,7 @@ export class MaraoNavbarCard extends BaseElement {
   _syncPageRefresh() {
     const view = this._view(), lovelace = this._root()?.lovelace;
     const showRefresh = this._config?.show_cache_reset !== false;
-    const editorURL = this._hass?.user?.is_admin && this._config?.dashboard_root && this._config?.editor_path
-      ? `/${encodeURIComponent(this._config.dashboard_root)}/${encodeURIComponent(this._config.editor_path)}` : '';
-    if (!this.isConnected || this._surface || this.preview || this._editing || !showRefresh && !editorURL || lovelace?.editMode || !view
+    if (!this.isConnected || this._surface || this.preview || this._editing || !showRefresh || lovelace?.editMode || !view
       || !navbarMainPage(lovelace?.config || lovelace?.rawConfig)) {
       this._pageRefresh?.remove(); return;
     }
@@ -322,14 +410,8 @@ export class MaraoNavbarCard extends BaseElement {
       row.attachShadow({ mode: 'open' }).innerHTML = `<style>
         :host{display:flex;flex-direction:row!important;justify-content:flex-end;flex-wrap:wrap;gap:8px;box-sizing:border-box;width:100%;min-height:60px;min-width:0;flex:none!important;padding:12px 12px 0;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}
         button{display:grid;place-items:center;box-sizing:border-box;min-width:48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow,0 1px 6px rgba(0,0,0,.12));cursor:pointer;appearance:none;-webkit-appearance:none;-webkit-tap-highlight-color:transparent}
-        a{display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:48px;min-width:48px;max-width:100%;padding:8px 16px;border-radius:24px;font:inherit;font-weight:600;line-height:1.35;overflow-wrap:anywhere;text-align:center;text-decoration:none;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow,0 1px 6px rgba(0,0,0,.12));-webkit-tap-highlight-color:transparent}
-        button:active:not(:disabled),a:active{transform:scale(.92)}button:disabled{opacity:.5;cursor:default}button:focus,a:focus{outline:none}button[hidden],a[hidden]{display:none}
-      </style><a class="frontend-editor" hidden></a><button type="button" class="frontend-refresh"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-2.6L20 7M4 17l2.4 2.6A7 7 0 0 0 17.9 17"/></svg></button>`;
-      const editor = row.shadowRoot.querySelector('a');
-      editor.addEventListener('click', event => {
-        if (!this._hass?.user?.is_admin || !editor.getAttribute('href') || !this.isConnected || !row.parentNode || this.preview || this._editing || this._root()?.lovelace?.editMode || row.closest('[inert]')) { event.preventDefault(); return; }
-        haptic('heavy');
-      });
+        button:active:not(:disabled){transform:scale(.92)}button:disabled{opacity:.5;cursor:default}button:focus{outline:none}
+      </style><button type="button" class="frontend-refresh"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-2.6L20 7M4 17l2.4 2.6A7 7 0 0 0 17.9 17"/></svg></button>`;
       row.shadowRoot.querySelector('button').addEventListener('click', () => {
         if (!this._refreshEligible() || row.closest('[inert]')) return;
         haptic('heavy'); this._refreshFrontend();
@@ -339,11 +421,6 @@ export class MaraoNavbarCard extends BaseElement {
     const refresh = this._pageRefresh.shadowRoot.querySelector('button');
     refresh.hidden = !showRefresh;
     refresh.disabled = Boolean(this._refreshing);
-    const editor = this._pageRefresh.shadowRoot.querySelector('a');
-    editor.hidden = !editorURL;
-    const editorLabel = localize('navigation.edit', this._hass);
-    if (editor.textContent !== editorLabel) editor.textContent = editorLabel;
-    if (editorURL) editor.setAttribute('href', editorURL); else editor.removeAttribute('href');
     refresh.setAttribute('aria-label', localize(this._refreshing ? 'navigation.refresh.refreshing' : 'navigation.refresh.action', this._hass));
   }
   _updateCurrent() {

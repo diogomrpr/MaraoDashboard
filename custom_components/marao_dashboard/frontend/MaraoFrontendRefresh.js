@@ -154,7 +154,8 @@ export function bindNavbarRefresh(nav, { eligible, progress, complete, haptic })
     if (!gesture || !eligible() || doc.visibilityState === 'hidden') { cancel(); return; }
     const remaining = NAVBAR_HOLD_MS - (host.performance.now() - gesture.started);
     if (remaining > 0) { finishTimer = setTimeout(finish, remaining); return; }
-    suppress(gesture.id); gesture = null; stopTracking(); haptic(); progress(1); complete();
+    const target = gesture.target;
+    suppress(gesture.id); gesture = null; stopTracking(); haptic(); progress(1); complete(target);
   };
   const move = event => {
     if (!gesture || event.pointerId !== gesture.id) return;
@@ -174,7 +175,7 @@ export function bindNavbarRefresh(nav, { eligible, progress, complete, haptic })
     if (event.isPrimary === false || (event.button !== undefined && event.button !== 0) || !eligible()) return;
     pointerStarted = true;
     clearSuppression();
-    gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, started: host.performance.now(), armed: false };
+    gesture = { target: event.target?.closest?.('button,a'), id: event.pointerId, x: event.clientX, y: event.clientY, started: host.performance.now(), armed: false };
     for (const [type, listener] of tracking) doc.addEventListener(type, listener, true);
     host.addEventListener('blur', cancel);
     armTimer = setTimeout(() => {

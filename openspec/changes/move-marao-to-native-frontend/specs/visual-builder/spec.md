@@ -217,12 +217,12 @@ Marao SHALL keep its own Visual and JSON builder, card catalog, page/section/car
 - **AND** edits preserve unknown/raw fields, order, names, options, explicit emptiness and deletions
 
 ### Requirement: Editor route within the owned dashboard
-The frontend editor SHALL use a noncolliding route under the existing dashboard root and a visible localized admin landing-page link independent of cache-reset visibility or configured navbar entries. It SHALL preserve user page paths and navigation, restrict editing controls to administrators and rely on HA authorization for writes. Migration SHALL disclose replacement of the old standalone editor URL.
+The frontend editor SHALL use a noncolliding route under the existing dashboard root. Administrators SHALL access it through the navbar maintenance menu, or its direct address when navigation is empty, independently of cache-reset visibility. It SHALL preserve page paths and navigation, restrict editing controls to administrators and rely on HA authorization for writes. Migration SHALL disclose replacement of the old standalone editor URL.
 
 #### Scenario: An administrator opens the editor from the dashboard
-- **WHEN** an administrator views the landing page with the native HA top bar hidden
-- **THEN** a visible localized Edit dashboard link opens the actual noncolliding editor route under the current dashboard root
-- **AND** hiding the optional cache-reset button or configuring an empty navbar does not hide editor access
+- **WHEN** an administrator completes the three-second navbar hold with the native HA top bar hidden
+- **THEN** the localized Edit dashboard maintenance action opens the actual noncolliding editor route under the current dashboard root
+- **AND** hiding the optional cache-reset button does not hide maintenance; empty navigation retains the direct editor address
 - **AND** regular users have no editor-access link
 
 #### Scenario: A user page resembles the internal editor path

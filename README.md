@@ -18,7 +18,7 @@ native dashboard storage. **Existing Integration installations must migrate
 manually. Do not select Update on the old Integration entry.** Keep the same
 repository and dashboard address; follow the [migration and rollback guide](docs/docs/installation/native-migration.md).
 
-Download [marao-converter.html](https://github.com/diogomrpr/MaraoDashboard/releases/download/v0.22.2/marao-converter.html),
+Download [marao-converter.html](https://github.com/diogomrpr/MaraoDashboard/releases/download/v0.22.3/marao-converter.html),
 open it locally, paste your old JSON and select Translate. It works without
 Home Assistant or a server and asks only for missing information. Keep an exact
 private package/data backup before removing anything. The one-time migration

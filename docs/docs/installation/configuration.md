@@ -20,9 +20,17 @@ strategy:
   type: custom:marao-dashboard
 ```
 
-Administrators can select **Edit dashboard** (**Editar painel**) at the top of
-the landing page to open the Marao editor. This labelled link stays visible when
-the optional cache reset button is hidden. Regular users do not see it.
+Administrators can hold anywhere on the bottom navbar for three seconds to open
+**Maintenance** (**Manutenção**), then select **Edit dashboard** (**Editar painel**)
+or **Clear cache and refresh**. Regular users keep the direct cache-clear/refresh
+action on the same hold. Ordinary short taps still navigate. The optional top
+cache reset button keeps its direct refresh action for either role.
+
+There is no permanent editor button. Hiding the optional cache reset button does
+not disable maintenance. If navigation is deliberately empty, open or bookmark
+the dashboard's actual internal editor address (normally
+`/marao-dashboard/marao-editor`). Use the current dashboard root and editor path;
+existing page names may require a different editor path to avoid a collision.
 
 Open the generated Marao editor view to configure pages. Discovery creates a
 starter only when source is absent. Later registry changes never refill saved
