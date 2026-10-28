@@ -1800,7 +1800,7 @@ export class MaraoCard extends BaseElement {
     const interactionState = toggleEntity ? stateOf(this._hass, toggleEntity) : state;
     const binary = entityGroup || kind === "md_room_card" && !roomLights.length ? null : binaryState(summary ? "binary_sensor.marao_summary" : toggleEntity || entity, interactionState, kind);
     const binaryLayout = binary !== null || binaryState(summary ? 'binary_sensor.marao_summary' : toggleEntity || entity, { state: domainOf(entity) === 'lock' ? 'locked' : kind === 'md_washing_machine_card' ? 'idle' : 'off' }, kind) !== null;
-    const redundantState = binary !== null && (!toggleEntity || toggleEntity === entity) && (!summary || summary.state === 'off' && serviceTargetReady(this._hass, variables.summary_entities));
+    const redundantState = kind !== "md_access_card" && binary !== null && (!toggleEntity || toggleEntity === entity) && (!summary || summary.state === 'off' && serviceTargetReady(this._hass, variables.summary_entities));
     const pictureURL = ["md_camera_card", "md_media_card"].includes(kind) && state.state !== "off" ? text(state.attributes?.entity_picture) : "";
     if (pictureURL !== this._mediaURL) { this._mediaURL = pictureURL; this._mediaError = ""; }
     const formatting = energyFormatting(variables);

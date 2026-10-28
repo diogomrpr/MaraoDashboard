@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: On-demand administrator editor access
-Administrators SHALL access the existing dashboard editor from the navbar maintenance menu when configured editor-route metadata exists, without a permanent dashboard editor shortcut. Access SHALL retain custom dashboard roots, collision-safe paths, current draft behavior and Home Assistant authorization. An empty navbar SHALL leave the existing direct editor route intact without creating new navigation entries.
+Administrators SHALL access the existing dashboard editor from the navbar maintenance menu when configured editor-route metadata exists, alongside the optional administrator pencil shortcut defined by `configurable-main-page-shortcuts`. Access SHALL retain custom dashboard roots, collision-safe paths, current draft behavior and Home Assistant authorization. An empty navbar SHALL leave the existing direct editor route intact without creating new navigation entries.
 
 #### Scenario: An administrator selects Edit dashboard
 - **WHEN** an authorized administrator chooses Edit dashboard in the maintenance menu
@@ -22,4 +22,4 @@ Administrators SHALL access the existing dashboard editor from the navbar mainte
 #### Scenario: Navigation is empty
 - **WHEN** an administrator deliberately configures no navbar routes
 - **THEN** the direct editor address remains valid and documented as the bookmark fallback
-- **AND** no persistent editor button or replacement dashboard is created
+- **AND** no fabricated navbar entry or replacement dashboard is created

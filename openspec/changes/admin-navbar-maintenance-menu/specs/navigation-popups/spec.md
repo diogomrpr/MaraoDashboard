@@ -145,15 +145,15 @@ The maintenance sheet SHALL use modal semantics, localized names, at least 48px 
 - **WHEN** the navbar is ineligible because another modal or edit/preview context owns input
 - **THEN** holding cannot open the maintenance sheet or refresh through that protection
 
-### Requirement: No permanent dashboard editor shortcut
-Normal dashboard pages SHALL have no persistent Edit dashboard link, button or editor-only spacing row. Removing editor access from that row SHALL preserve the existing optional cache-reset button and show_cache_reset semantics. Configured navbar routes, deliberate empty navigation and editor routes SHALL remain unchanged.
+### Requirement: Maintenance remains independent of main-page shortcuts
+The navbar Maintenance hold SHALL remain available independently of main-page shortcut visibility. Configured navbar routes, deliberate empty navigation and editor routes SHALL remain unchanged. Main-page pencil visibility is superseded by `configurable-main-page-shortcuts`, which permits a configurable administrator shortcut enabled by default.
 
-#### Scenario: Cache reset visibility changes
-- **WHEN** show_cache_reset is true, false or omitted on the main page
-- **THEN** its existing optional refresh button follows that setting without a permanent editor link
-- **AND** hiding cache reset does not disable administrator hold-menu access when a navbar exists
+#### Scenario: Main-page shortcuts are hidden
+- **WHEN** either or both main-page shortcuts are hidden
+- **THEN** administrator hold-menu access remains available when a navbar exists
+- **AND** regular users retain direct hold refresh
 
 #### Scenario: No navbar routes exist
 - **WHEN** navigation is explicitly empty
-- **THEN** no hidden hold target, fabricated route or persistent editor shortcut is inserted
-- **AND** the existing direct editor route remains available to an authorized administrator
+- **THEN** no hidden hold target or fabricated route is inserted
+- **AND** the direct editor route and any enabled administrator pencil shortcut remain available

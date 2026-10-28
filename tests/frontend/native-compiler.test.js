@@ -62,3 +62,20 @@ test('duplicated popup cards compile independently with exact fixed-column order
   assert.deepEqual(cards[0].cards.map(card => card.tap_action.navigation_path), ['#external', '#external']);
   assert.deepEqual(input, before);
 });
+
+
+test('main-page shortcut flags preserve absence and explicit false through source conversion and compilation',async()=>{
+  const {convertDocument}=await import('../../frontend_src/convert-document.js');
+  for(const flags of [{},{show_cache_reset:false,show_editor_button:false},{show_cache_reset:false,show_editor_button:true}]) {
+    const input={...structuredClone(source),...flags,future:{keep:[]}},text=JSON.stringify(input);
+    const result=convertDocument(text,{dashboardRoot:'renamed-dashboard'});
+    assert.deepEqual(result.source,input);assert.equal(result.sourceText,text);
+    const nav=result.compiled.views[0].cards.find(card=>card.type==='vertical-stack').cards[0];
+    for(const key of ['show_cache_reset','show_editor_button']) {
+      assert.equal(Object.hasOwn(nav,key),Object.hasOwn(flags,key));
+      if(Object.hasOwn(flags,key))assert.equal(nav[key],flags[key]);
+    }
+    assert.deepEqual(nav.routes,[]);
+  }
+  assert.throws(()=>convertDocument(JSON.stringify({...source,show_editor_button:'false'})),/boolean/);
+});

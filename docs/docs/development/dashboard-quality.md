@@ -459,7 +459,7 @@ restoration retain their confirmations.
   must remain readable in light and dark modes.
 - The state and action cannot be ambiguous or encoded only by color.
 
-Normal binary cards omit redundant on/off, stable lock and running/idle lines, retaining substantive labels, readings, counts, metadata and historical intervals. Use existing active/inactive backgrounds and configured or native icons without an additional round on/off badge, as requested by the user. Preserve localized accessible state even when icons are hidden. Explicit `show_state: true` does not restore redundant text, and `show_state: false` keeps its normal-state meaning. Keep icon-only intent based on configured fields, and use the actual toggle for graph state cues.
+Except Access summary cards, normal binary cards omit redundant on/off, stable lock and running/idle lines, retaining substantive labels, readings, counts, metadata and historical intervals. Use existing active/inactive backgrounds and configured or native icons without an additional round on/off badge, as requested by the user. Preserve localized accessible state even when icons are hidden. Explicit `show_state: true` does not restore redundant text, and `show_state: false` keeps its normal-state meaning. Access summary cards retain localized current lock state by default, matching cover access cards; explicit `show_state: false` hides that normal state text. Keep icon-only intent based on configured fields, and use the actual toggle for graph state cues.
 
 ### Room cards
 

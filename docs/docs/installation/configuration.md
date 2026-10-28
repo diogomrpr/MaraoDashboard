@@ -20,17 +20,20 @@ strategy:
   type: custom:marao-dashboard
 ```
 
-Administrators can hold anywhere on the bottom navbar for three seconds to open
-**Maintenance** (**Manutenção**), then select **Edit dashboard** (**Editar painel**)
-or **Clear cache and refresh**. Regular users keep the direct cache-clear/refresh
-action on the same hold. Ordinary short taps still navigate. The optional top
-cache reset button keeps its direct refresh action for either role.
+Administrators can open the editor with the **pencil button** beside Clear cache
+at the top of the main page. Both shortcuts are enabled by default. The pencil
+is hidden for regular users and uses this dashboard's actual editor address.
 
-There is no permanent editor button. Hiding the optional cache reset button does
-not disable maintenance. If navigation is deliberately empty, open or bookmark
-the dashboard's actual internal editor address (normally
-`/marao-dashboard/marao-editor`). Use the current dashboard root and editor path;
-existing page names may require a different editor path to avoid a collision.
+Administrators can also hold anywhere on the bottom navbar for three seconds to
+open **Maintenance** (**Manutenção**), then choose **Edit dashboard** (**Editar
+painel**) or **Clear cache and refresh**. Regular users keep direct cache clearing
+and refresh on the same hold. Ordinary short taps still navigate.
+
+The two shortcuts can be hidden independently in General settings; the navbar
+hold remains available while navigation exists. If navigation is deliberately
+empty and the pencil is hidden, open or bookmark the actual internal editor
+address (normally `/marao-dashboard/marao-editor`). Use the current dashboard root
+and collision-safe editor path.
 
 Open the generated Marao editor view to configure pages. Discovery creates a
 starter only when source is absent. Later registry changes never refill saved
@@ -64,8 +67,10 @@ The JSON tab uses Microsoft's standard Monaco typography, sizing, light/dark
 themes and native widgets. Ctrl+F, Ctrl+H, Ctrl+Space and F1 provide its normal
 search, replace, suggestions and command palette. Marao does not restyle Monaco.
 
-**General → Show cache reset button** controls the optional main-page refresh
-shortcut (`show_cache_reset: false` hides it). Automatic package checks and the
+**General → Show cache reset button** and **Show editor button** control the
+main-page shortcuts independently (`show_cache_reset: false` and
+`show_editor_button: false`). Omitted flags mean enabled. The adjacent helper
+explains the three-second navbar Maintenance alternative. Automatic package checks and the
 three-second navbar hold remain available. See [updating](update.md).
 
 Marao applies its own scoped light/dark styling and bundled Montserrat font.

@@ -95,25 +95,30 @@ test('native notifications retain a dirty draft, refresh clean data and unsubscr
   assert.equal(removed,1);assert.equal(loads,1);
 });
 
-test('General cache reset toggle preserves its default, explicit false and unrelated settings', () => {
+test('General main-page button toggles preserve defaults, explicit false and unrelated settings', () => {
   for (const source of [{name:'Legacy',rooms:[]}, canonical()]) {
     const p=panel({...source,future:{keep:[]}}), before=p._source();
     let form;
     p._mountForm=(host,data,schema,changed)=>{form={data,schema,changed};};
     p._mountGeneralForm({});
-    assert.equal(form.data.show_cache_reset,true);
+    assert.equal(form.data.show_cache_reset,true);assert.equal(form.data.show_editor_button,true);
     assert.equal(p._source(),before,'Opening General must not write a default');
     assert.deepEqual(JSON.parse(JSON.stringify(form.schema.find(field=>field.name==='show_cache_reset').selector)),{boolean:{}});
-    form.changed({...form.data,show_cache_reset:false});
+    assert.deepEqual(Array.from(form.schema).filter(field=>field.name.startsWith('show_')).map(field=>field.name),['show_cache_reset','show_editor_button']);
+    assert.match(form.schema.find(field=>field.name==='show_editor_button').helper,/navbar.*3 seconds/);
+    form.changed({...form.data,show_cache_reset:false,show_editor_button:false});
     const saved=JSON.parse(p._source());
-    assert.equal(saved.show_cache_reset,false);
+    assert.equal(saved.show_cache_reset,false);assert.equal(saved.show_editor_button,false);
     assert.deepEqual(saved.future,{keep:[]});
-    p._mountGeneralForm({});assert.equal(form.data.show_cache_reset,false);
+    p._mountGeneralForm({});assert.equal(form.data.show_cache_reset,false);assert.equal(form.data.show_editor_button,false);
     assert.ok(!model.validateConfig(saved,2).some(error=>error.includes('cache reset')));
     assert.ok(model.validateConfig({...saved,show_cache_reset:'false'},2).some(error=>error.includes('must be a boolean')));
+    assert.ok(model.validateConfig({...saved,show_editor_button:'false'},2).some(error=>error.includes('Show editor button must be a boolean')));
+    p._hass.language='pt';p._mountGeneralForm({});assert.match(form.schema.find(field=>field.name==='show_editor_button').helper,/3 segundos/);
   }
   const schema=model.buildJsonSchema({cards:[],pages:{},config_version:2},[]);
   assert.equal(schema.allOf[0].then.properties.show_cache_reset.type,'boolean');
+  assert.equal(schema.allOf[0].then.properties.show_editor_button.type,'boolean');
 });
 
 test('unchanged Visual/JSON switching retains exact text, model history and view state', async () => {
@@ -553,9 +558,10 @@ test('a replaced document, busy mode or JSON tab rejects a pending move', () => 
 
 test('restored editor focus cannot reveal an off-screen control, while keyboard focus still can', () => {
   const p = panel(canonical()), visual = {}, reveals = [], focuses = [];
+  let modalOpen = false;
   p.shadowRoot = {
     getElementById: () => visual,
-    querySelector: () => ({ getBoundingClientRect: () => ({ bottom: 100 }) }),
+    querySelector: selector => selector === 'ha-dialog' ? modalOpen ? {} : null : ({ getBoundingClientRect: () => ({ bottom: 100 }) }),
   };
   const target = {
     localName: 'button', style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 48 }),
@@ -574,6 +580,12 @@ test('restored editor focus cannot reveal an off-screen control, while keyboard 
   target.localName = 'div'; p._pressedPath = [target];
   p._revealFocusedControl({ composedPath: () => [target, visual] });
   assert.equal(reveals.length, 1, 'Safari ancestor focus cannot scroll a pressed child out from under the pointer');
+  modalOpen = true;
+  p._revealFocusedControl({ composedPath: () => [target, visual] });
+  assert.equal(reveals.length, 1, 'Native dialog focus restoration must not move the underlying page');
+  modalOpen = false;
+  p._revealFocusedControl({ composedPath: () => [target, visual] });
+  assert.equal(reveals.length, 2, 'Keyboard reveal resumes after the dialog closes');
   assert.throws(() => p._focusWithoutScroll({ focus() { throw new Error('Detached focus'); } }), /Detached focus/);
   assert.equal(p._restoringFocus, false, 'A failed restoration must not disable subsequent keyboard reveal');
 });
@@ -1327,3 +1339,23 @@ test('section disclosure is independent, retained through page-body recreation a
   assert.equal(p._closedSections.has(first), false, 'Detached toggle cannot override the current section');
   delete page.sections;
 }));
+
+test('dialog footer actions move outside scrolling content without replacing their handlers', async t => {
+  const previous=context.customElements.whenDefined;
+  context.customElements.whenDefined=async()=>{};
+  t.after(()=>{context.customElements.whenDefined=previous;});
+  const p=panel(canonical()),before=p._source();let clicks=0;
+  const button=Object.assign(new EventTarget(),{localName:'ha-button',isConnected:true,children:[]});
+  button.addEventListener('click',()=>clicks++);
+  const actions={localName:'div',isConnected:true,children:[button]};
+  const form={localName:'div',isConnected:true,children:[]};
+  const content={localName:'div',isConnected:true,children:[form,actions]};
+  const dialog={localName:'ha-dialog',isConnected:true,children:[content],shadowRoot:{children:[]},
+    querySelector:selector=>selector==='.dialog-actions'?actions:null,
+    append(node){content.children=content.children.filter(child=>child!==node);this.children.push(node);}};
+  await p._containForm(dialog);
+  assert.equal(actions.slot,'footer');
+  assert.deepEqual(dialog.children,[content,actions]);assert.deepEqual(content.children,[form]);
+  button.dispatchEvent(new Event('click'));assert.equal(clicks,1);
+  assert.equal(p._source(),before);
+});

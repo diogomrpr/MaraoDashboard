@@ -134,7 +134,7 @@ ha-dialog { --ha-icon-button-size: 48px; }
 .dialog-content textarea[data-import-json] { box-sizing: border-box; width: 100%; min-height: 180px; resize: vertical; font: inherit; background: var(--card-background-color); color: var(--primary-text-color); border: 1px solid var(--divider-color); border-radius: 12px; padding: 12px; }
 .import-ack { display: flex; align-items: center; min-height: 48px; gap: 12px; overflow-wrap: anywhere; }
 .import-ack input { flex: none; width: 48px; height: 48px; }
-.dialog-actions { position: sticky; bottom: 0; z-index: 1; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 18px; padding: 12px 2px 4px; background: var(--card-background-color); }
+.dialog-actions { box-sizing: border-box; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; width: 100%; margin: 0; padding: 12px 24px max(16px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))); background: var(--card-background-color); }
 .dialog-actions ha-button { min-width: min(100%, 10ch); }
 .native-card-action { min-width: 48px; min-height: 48px; font: inherit; border: 0; border-radius: 12px; padding: 8px 16px; background: var(--secondary-background-color); color: var(--primary-text-color); cursor: pointer; }
 .native-card-action:disabled { opacity: .5; cursor: default; }

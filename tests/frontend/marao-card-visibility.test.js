@@ -1853,6 +1853,19 @@ test('binary cards omit the round badge and preserve state for native, static an
   if (variant.show_icon === false) assert.match(html, /class="binary-state" role="img"/);
  }
 });
+test('lock access summaries keep localized state visible and respect explicit state hiding',()=>{
+ const entity='lock.test';
+ for(const [language,labels] of [['en',{locked:'Locked',unlocked:'Unlocked'}],['pt',{locked:'Trancado',unlocked:'Destrancado'}]]) {
+  const card=new MaraoCard();card.setConfig({template:'md_access_card',entity,name:'Door',show_icon:false,variables:{popup_hash:'#access'}});
+  for(const value of ['locked','unlocked']) {
+   card.hass={language,callService(){assert.fail('Rendering must not actuate a lock');},formatEntityState:state=>labels[state.state],states:{[entity]:{state:value,attributes:{}}}};
+   assert.match(card.shadowRoot.innerHTML,new RegExp(`<div class="state">${labels[value]}<\\/div>`));
+   assert.match(card.shadowRoot.innerHTML,/navigation_path|data-card-action/);
+  }
+  card.setConfig({...card._config,show_state:false});
+  assert.doesNotMatch(card.shadowRoot.innerHTML,/<div class="state">/);
+ }
+});
 test('binary state hiding retains configured labels, numeric readings and metadata without dangling prefixes',()=>{
  const entity='switch.test', states={[entity]:{state:'on',attributes:{}},'sensor.power':{state:'120',attributes:{unit_of_measurement:'W'}}};
  for(const variables of [{custom_label:'Status: ',md_label_prefix:'Power: '},{md_label_prefix:'Status '}]) assert.doesNotMatch(renderBinary({entity,variables},states),/<div class="state">/);

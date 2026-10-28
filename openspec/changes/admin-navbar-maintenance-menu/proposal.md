@@ -36,3 +36,5 @@ The unfinished `move-marao-to-native-frontend` delta currently requires a perman
 Non-goals: changing the hold duration, repurposing route taps, removing the optional cache-reset button, adding Home-only gestures, new sidebar dashboards, automatic saving, editor authorization changes or a release.
 
 Planning baseline: `e9840fa40de4750a2f267bca7fce02e698d3cc14` (v0.22.2). Preserve unrelated untracked duplicate source/helper files. This request creates planning artifacts only.
+
+The subsequent `configurable-main-page-shortcuts` decision supersedes the no-permanent-shortcut placement clause: an optional administrator pencil button is enabled by default. Maintenance behavior and its guards remain unchanged.

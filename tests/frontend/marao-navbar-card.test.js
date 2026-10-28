@@ -225,21 +225,21 @@ test('refresh button follows the configured main view including dashboard-root a
 });
 
 
-test('landing-page refresh respects visibility without a permanent editor link', async () => {
+test('landing-page shortcuts have independent visibility and guarded admin editor navigation', async () => {
   const { MaraoNavbarCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
   const originalDocument=globalThis.document,originalWindow=globalThis.window;
   const view=()=>({children:[],prepend(row){row.remove();this.children.unshift(row);row.parentNode=this;}});
-  let currentView=view(), calls=0, eligible=true, inert=false;
-  globalThis.window={location:{href:'http://disposable.test/marao-dashboard/home',pathname:'/marao-dashboard/home'},dispatchEvent(){}};
+  let currentView=view(), calls=0, eligible=true, inert=false;const navigations=[];
+  globalThis.window={location:{href:'http://disposable.test/marao-dashboard/home',pathname:'/marao-dashboard/home'},history:{pushState(_state,_title,path){navigations.push(path);}},dispatchEvent(){}};
   globalThis.document={createElement(){
     const control=()=>{const node=new EventTarget();let text='';node.textWrites=0;Object.defineProperty(node,'textContent',{get:()=>text,set:value=>{text=value;node.textWrites++;}});node.setAttribute=(name,value)=>{node[name]=value;};node.getAttribute=name=>node[name];node.removeAttribute=name=>{delete node[name];};return node;};
     const button=control(),editor=control();
     return {setAttribute(){},closest(){return inert?{}:null;},
-      attachShadow(){return this.shadowRoot={innerHTML:'',querySelector:selector=>selector==='a'?editor:button};},
+      attachShadow(){return this.shadowRoot={innerHTML:'',querySelector:selector=>selector==='a'||selector==='.frontend-editor'?editor:button};},
       remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(item=>item!==this);this.parentNode=null;}};
   }};
   const lovelace={config:{views:[{path:'home'},{path:'energy'}]}};
-  const owner={isConnected:true,_root:()=>({lovelace}),_view:()=>currentView,_refreshEligible:()=>eligible,_refreshFrontend:()=>{calls++;}};
+  const owner={isConnected:true,_root:()=>({lovelace}),_view:()=>currentView,_editorURL(){return MaraoNavbarCard.prototype._editorURL.call(this);},_refreshEligible:()=>eligible,_refreshFrontend:()=>{calls++;}};
   const sync=()=>MaraoNavbarCard.prototype._syncPageRefresh.call(owner);
   try{
     sync();const row=owner._pageRefresh,button=row.shadowRoot.querySelector('button');
@@ -259,11 +259,19 @@ test('landing-page refresh respects visibility without a permanent editor link',
     sync();owner.isConnected=false;sync();assert.equal(currentView.children.length,0);
     owner.isConnected=true;owner._config={show_cache_reset:false,routes:[],dashboard_root:'renamed-dashboard',editor_path:'marao-editor-editor'};
     owner._hass={user:{is_admin:true},language:'pt'};globalThis.window.location.pathname='/renamed-dashboard/home';sync();
-    assert.equal(currentView.children.length,0,'Hidden refresh with empty routes leaves no editor row or spacing');
-    assert.doesNotMatch(row.shadowRoot.innerHTML,/<a|frontend-editor/);
-    owner._config.show_cache_reset=true;sync();assert.equal(currentView.children[0],row);
-    owner._hass.user.is_admin=false;sync();assert.equal(currentView.children[0],row,'Refresh visibility is independent of role');
-    owner._config={};sync();assert.equal(currentView.children[0],row,'Omitted setting keeps refresh enabled');
+    const editor=row.shadowRoot.querySelector('.frontend-editor');
+    assert.equal(currentView.children[0],row,'An admin pencil remains usable with empty routes and hidden cache reset');
+    assert.equal(editor.hidden,false);assert.equal(button.hidden,true);assert.equal(editor['aria-label'],'Editar painel');
+    assert.match(row.shadowRoot.innerHTML,/<button[^>]*class="frontend-editor"><svg/);
+    editor.dispatchEvent(new Event('click'));assert.deepEqual(navigations,['/renamed-dashboard/marao-editor-editor']);
+    owner._hass.user.is_admin=false;editor.dispatchEvent(new Event('click'));assert.equal(navigations.length,1,'Stale regular-user controls cannot navigate');sync();assert.equal(currentView.children.length,0);
+    owner._hass.user.is_admin=true;owner._config.show_editor_button=false;sync();assert.equal(currentView.children.length,0,'Both hidden shortcuts leave no spacing row');
+    editor.dispatchEvent(new Event('click'));assert.equal(navigations.length,1);
+    owner._config.show_cache_reset=true;sync();assert.equal(currentView.children[0],row);assert.equal(editor.hidden,true);assert.equal(button.hidden,false);
+    delete owner._config.show_editor_button;sync();assert.equal(editor.hidden,false);assert.equal(button.hidden,false);
+    owner._config.show_editor_button=false;editor.dispatchEvent(new Event('click'));assert.equal(navigations.length,1,'Visibility changes apply before repaint');
+    owner._hass.user.is_admin=false;sync();assert.equal(editor.hidden,true);
+    owner._config={};sync();assert.equal(currentView.children[0],row,'Omitted settings retain cache access without editor route metadata');assert.equal(editor.hidden,true);
 
   }finally{globalThis.document=originalDocument;globalThis.window=originalWindow;}
 });
@@ -337,4 +345,21 @@ test('maintenance actions recheck role and ownership, close once and retain refr
     assert.equal(navigationLocalize('navigation.maintenance.hold','en'),'Hold to open maintenance');
     assert.match(navigationLocalize('navigation.maintenance.hold','pt'),/manutenção/);
   } finally {globalThis.document=previous.document;globalThis.window=previous.window;}
+});
+
+test('main-page actions remain eligible without visible navbar routes but retain modal and preview guards',async()=>{
+  const {MaraoNavbarCard}=await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
+  const previous=globalThis.document;let modal=false;
+  globalThis.document={querySelectorAll:selector=>selector==='*'?[]:modal?[{localName:'dialog',matches:()=>true}]:[]};
+  const owner={isConnected:true,_root:()=>null,getClientRects:()=>[],getRootNode:()=>({})};
+  const row={getClientRects:()=>[{}],getRootNode:()=>({})};
+  const eligible=target=>MaraoNavbarCard.prototype._refreshEligible.call(owner,undefined,target);
+  try{
+    assert.equal(eligible(),false);assert.equal(eligible(row),true);
+    row.inert=true;assert.equal(eligible(row),false);row.inert=false;
+    owner.preview=true;assert.equal(eligible(row),false);owner.preview=false;
+    modal=true;assert.equal(eligible(row),false);
+    const card={_closeOverflow(){},_closeMaintenance(){},_render(){}};
+    assert.throws(()=>MaraoNavbarCard.prototype.setConfig.call(card,{routes:[],show_editor_button:'false'}),/boolean/);
+  }finally{globalThis.document=previous;}
 });

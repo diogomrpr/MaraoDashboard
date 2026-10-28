@@ -1,3 +1,4 @@
+import { MAIN_PAGE_BUTTONS } from './editor-model.js';
 import labels from '../custom_components/marao_dashboard/frontend/marao-generator-labels.json' with { type: 'json' };
 import { appleTVOptions, copy, defaultTemplate, domain, entries, friendly, isAccess, object, sections, slug } from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
 import { catalog, normalizeSource, validateSource } from './native-model.js';
@@ -174,7 +175,7 @@ export function compileDashboard(input, { entities = [], areas = [], roomEntitie
     if (overrides.url && !overrides.label_key && ![`/${root}/${path}`, `/marao-${config.slug}/${path}`].includes(overrides.url)) route.url = overrides.url;
     return route;
   });
-  const navbar = { type: 'vertical-stack', cards: [{ type: 'custom:marao-navbar-card', routes, ...(own(config, 'show_cache_reset') ? { show_cache_reset: config.show_cache_reset } : {}) }] };
+  const navbar = { type: 'vertical-stack', cards: [{ type: 'custom:marao-navbar-card', routes, ...Object.fromEntries(MAIN_PAGE_BUTTONS.filter(([key]) => own(config, key)).map(([key]) => [key, config[key]])) }] };
   const domains = ['sensor', 'binary_sensor', 'camera', 'lock', 'cover', 'climate', 'fan', 'switch', 'input_boolean', 'media_player', 'vacuum', 'number', 'input_number', 'light', 'navigation', 'entity_group'];
   const compact = new Set(['sensor', 'binary_sensor', 'switch', 'input_boolean', 'number', 'input_number', 'light', 'navigation', 'entity_group']);
   const views = [...config.pages.filter(page => page.path === config.landing_page), ...config.pages.filter(page => page.path !== config.landing_page)].map(page => {

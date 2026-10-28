@@ -1,4 +1,7 @@
 export const PT_LABELS = {
+  "Show editor button": "Mostrar botão do editor",
+  "Show editor button must be a boolean.": "Mostrar botão do editor tem de ser um valor booleano.",
+  "Hold the navbar for 3 seconds to open Maintenance.": "Mantenha a barra de navegação premida durante 3 segundos para abrir o menu de manutenção.",
   "Background thresholds": "Limiares do fundo",
   "Threshold": "Limiar",
   "Colors apply from each threshold upward, in source units. Below the first threshold the normal background is used.": "As cores aplicam-se a partir de cada limiar, nas unidades de origem. Abaixo do primeiro limiar é usado o fundo normal.",

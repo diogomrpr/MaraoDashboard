@@ -10,7 +10,7 @@ export const dropdownStyles = `
 .marao-dropdown-options[popover]{position:fixed;inset:auto;margin:0}
 .marao-dropdown-options[hidden],.marao-dropdown-options[popover]:not(:popover-open){display:none}
 .marao-dropdown-options button[aria-checked=true]{box-shadow:inset 0 0 0 2px var(--primary-color);font-weight:var(--font-weight-primary,700)}
-.marao-dropdown-options button[aria-checked=false] ha-icon{visibility:hidden}
+.marao-dropdown-options button[aria-checked=false] ha-icon[icon="mdi:check"]{visibility:hidden}
 `;
 
 export function bindDropdown(picker, { trigger, menu, choices, value, activeElement, haptic, onSelect, onTab }) {

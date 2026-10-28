@@ -1,6 +1,6 @@
 import { bindCardDrag } from "./editor-drag.js";
 import "./panel.css";
-import { cameraTitleFields, formData, patchForm, sameFormValue, sensorThresholdError } from "./editor-model.js";
+import { cameraTitleFields, formData, patchForm, sameFormValue, sensorThresholdError, MAIN_PAGE_BUTTONS } from "./editor-model.js";
 
 import {
   cardForEntity,
@@ -310,7 +310,7 @@ class MaraoDashboardPanel extends HTMLElement {
   _revealFocusedControl(event) {
     const path = event.composedPath(), target = path[0];
     const pressed = this._pressedPath?.includes(target); this._pressedPath = null;
-    if (this._restoringFocus || !path.includes(this.shadowRoot.getElementById('visual-view'))) return;
+    if (this._restoringFocus || this.shadowRoot.querySelector('ha-dialog') || !path.includes(this.shadowRoot.getElementById('visual-view'))) return;
     // Safari can focus an expansion-panel ancestor while its child button is pressed.
     if (pressed) return;
     // Native field reveal otherwise considers content behind the sticky header visible.
@@ -776,15 +776,16 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   _mountGeneralForm(host) {
-    const data = { name: this._model.name || "", slug: this._model.slug || "", theme: this._model.theme || "", icon: this._model.icon || "", show_cache_reset: this._model.show_cache_reset !== false, ...(this._model.config_version === 2 ? { landing_page: this._model.landing_page } : {}) };
+    const config = this._model, pages = config.config_version === 2;
+    const data = { name: config.name || "", slug: config.slug || "", theme: config.theme || "", icon: config.icon || "", ...Object.fromEntries(MAIN_PAGE_BUTTONS.map(([key]) => [key, config[key] !== false])), ...(pages ? { landing_page: config.landing_page } : {}) };
     const themes = Object.keys(this._hass?.themes?.themes || {}).sort().map((theme) => ({ value: theme, label: theme }));
     this._mountForm(host, data, [
       this._schema("name", "Dashboard name", { text: {} }, true),
       this._schema("slug", "URL slug", { text: {} }),
       this._schema("theme", "Theme", { select: { mode: "dropdown", custom_value: true, options: themes } }),
       this._schema("icon", "Icon", { icon: {} }),
-      this._schema("show_cache_reset", "Show cache reset button", { boolean: {} }),
-      ...(this._model.config_version === 2 ? [this._schema('landing_page', 'Landing page', { select: { mode: 'dropdown', options: this._availablePages().map(page => ({ value: page.path, label: page.name })) } }, true)] : []),
+      ...MAIN_PAGE_BUTTONS.map(([key, label], index) => ({ ...this._schema(key, label, { boolean: {} }), helper: index ? this._l('Hold the navbar for 3 seconds to open Maintenance.') : '' })),
+      ...(pages ? [this._schema('landing_page', 'Landing page', { select: { mode: 'dropdown', options: this._availablePages().map(page => ({ value: page.path, label: page.name })) } }, true)] : []),
     ], (value) => {
       const landing = this._model.landing_page;
       Object.assign(this._model, value);
@@ -1982,39 +1983,45 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   async _containForm(element) {
-    if (element.localName.startsWith("ha-")) {
-      await customElements.whenDefined(element.localName);
+    const tag = element.localName;
+    if (tag.startsWith("ha-")) {
+      await customElements.whenDefined(tag);
       await element.updateComplete;
     }
     if (!element.isConnected) return;
-    if (element.localName === 'ha-selector-boolean' && !element.shadowRoot.querySelector('style[data-marao-boolean]')) {
+    const shadow = element.shadowRoot;
+    if (tag === 'ha-dialog') {
+      const actions = element.querySelector('.dialog-actions');
+      if (actions) { actions.slot = 'footer'; element.append(actions); }
+    }
+    if (tag === 'ha-selector-boolean' && !shadow.querySelector('style[data-marao-boolean]')) {
       const style = document.createElement('style'); style.dataset.maraoBoolean = '';
       style.textContent = '.primary,.secondary{line-height:1.35;overflow-wrap:anywhere}[slot="label"]{min-width:0}ha-switch::part(base){min-width:48px;min-height:48px}';
-      element.shadowRoot.append(style);
+      shadow.append(style);
     }
-    if (element.localName === 'ha-formfield' && !element.shadowRoot.querySelector('style[data-marao-formfield]')) {
+    if (tag === 'ha-formfield' && !shadow.querySelector('style[data-marao-formfield]')) {
       const style = document.createElement('style'); style.dataset.maraoFormfield = '';
       style.textContent = '.mdc-form-field{min-height:48px;gap:12px}.mdc-label{min-width:0;flex:1;line-height:1.35}';
-      element.shadowRoot.append(style);
+      shadow.append(style);
     }
-    if (element.localName === "ha-dialog-header" && !element.shadowRoot.querySelector('style[data-marao-dialog]')) {
+    if (tag === "ha-dialog-header" && !shadow.querySelector('style[data-marao-dialog]')) {
       const style = document.createElement('style'); style.dataset.maraoDialog = '';
       style.textContent = ':host .header-content{white-space:normal;overflow-wrap:anywhere}:host .header-title{height:auto}';
-      element.shadowRoot.append(style);
+      shadow.append(style);
     }
-    if (element.localName === "ha-dropdown-item") element.style.minHeight = "48px";
+    if (tag === "ha-dropdown-item") element.style.minHeight = "48px";
     // Native multiple-entity pickers otherwise retain the selected name's minimum width.
-    if (element.localName === "ha-entity-picker") { element.style.minWidth = "0"; element.style.maxWidth = "100%"; }
-    if (element.localName === "ha-icon-button") element.style.setProperty("--ha-icon-button-size", "48px");
-    if (element.localName === 'ha-switch') { element.style.minWidth = '48px'; element.style.minHeight = '48px'; }
-    if (element.localName === "ha-picker-field") { element.style.display = "block"; element.style.container = "marao-picker / inline-size"; }
-    if (element.localName === "ha-combo-box-item" && element.getRootNode().host?.localName === "ha-picker-field") {
+    if (tag === "ha-entity-picker") { element.style.minWidth = "0"; element.style.maxWidth = "100%"; }
+    if (tag === "ha-icon-button") element.style.setProperty("--ha-icon-button-size", "48px");
+    if (tag === 'ha-switch') { element.style.minWidth = '48px'; element.style.minHeight = '48px'; }
+    if (tag === "ha-picker-field") { element.style.display = "block"; element.style.container = "marao-picker / inline-size"; }
+    if (tag === "ha-combo-box-item" && element.getRootNode().host?.localName === "ha-picker-field") {
       // Native selected rows have zero padding and a fixed height that clips enlarged labels.
       element.style.setProperty("--md-list-item-two-line-container-height", "calc(var(--font-size-primary,1rem) * 1.5 + var(--font-size-caption,.8rem) * 1.2 + 24px)");
       element.style.setProperty("--md-list-item-top-space", "12px");
       element.style.setProperty("--md-list-item-bottom-space", "12px");
       for (const label of element.querySelectorAll('[slot="overline"]')) label.style.lineHeight = "1.2";
-      const item = element.shadowRoot.querySelector('md-item');
+      const item = shadow.querySelector('md-item');
       await item?.updateComplete;
       if (item?.shadowRoot && !item.shadowRoot.querySelector('style[data-marao-picker]')) {
         // Trailing native controls move below the text when they would consume its width.
@@ -2023,7 +2030,7 @@ class MaraoDashboardPanel extends HTMLElement {
         item.shadowRoot.append(style);
       }
     }
-    if (element.localName === "ha-input") {
+    if (tag === "ha-input") {
       const root = element.getRootNode();
       if (!root.querySelector('style[data-marao-fields]')) {
         // HA's exported input parts otherwise retain a 56px field at enlarged text sizes.
@@ -2032,7 +2039,7 @@ class MaraoDashboardPanel extends HTMLElement {
         root.append(style);
       }
     }
-    await Promise.all([...element.children, ...(element.shadowRoot?.children || [])].map((child) => this._containForm(child)));
+    await Promise.all([...element.children, ...(shadow?.children || [])].map((child) => this._containForm(child)));
   }
 
   _variableSchema(field, sourceId) {
