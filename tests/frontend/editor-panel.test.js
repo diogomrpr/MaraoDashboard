@@ -746,7 +746,9 @@ test('Save enters its guard before context, preserves latest edits and dispatche
   assert.equal(JSON.parse(messages[1].config).name, 'Latest before Save');
   assert.equal(p._busy, false); assert.equal(p._dirty, false);
   assert.equal(p._monaco, undefined);
-  assert.deepEqual(p.navigations, ['/marao-dashboard/home']);
+  assert.deepEqual(p.navigations, [], 'Saving stays in the editor');
+  p._openDashboard();
+  assert.deepEqual(p.navigations, ['/marao-dashboard/home'], 'The explicit back button still opens the saved dashboard');
 });
 
 test('context failure and superseded documents release Save without generation or lost drafts', async () => {
@@ -1123,13 +1125,15 @@ test('threshold row editor preserves zero and unknown data and leaves explicit e
   } finally {context.document=previous;}
 });
 
-test('native save acknowledgment reconciles the retained draft after HA reattaches its view',async()=>{
-  for(const failed of [false,true]) {
+test('native save stays in Visual or JSON and reconciles the retained draft after HA reattaches its view',async()=>{
+  for(const tab of ['visual','json']) for(const failed of [false,true]) {
     let finish, reject, entered;const started=new Promise(resolve=>{entered=resolve;});let writes=0;
     const p=loadingPanel(message=>{assert.equal(message.type,'native/save');writes++;return new Promise((resolve,fail)=>{finish=()=>resolve({config:message.config,dashboard_url:'/marao-dashboard/home'});reject=fail;entered();});});
     const config=canonical();config.pages[0].sections[0].entities=[];config.pages[1].entities=[];
     p._model=model.normalizeConfig(config);p._loaded=true;p._contextReady=true;p._catalog={cards:[],config_version:2};p._entities=[];
     p._savedSource=p._source();p._model.name='Saved once';p._setDirty();
+    p._tab=tab;
+    if(tab==='json'){let draft=p._source();p._monaco={getValue:()=>draft,setValue:value=>{draft=value;}};}
     const saving=p._save();await started;
     // Native HA can replace the view before returning the save response.
     p._lifecycle++;p._busy=false;
@@ -1137,7 +1141,8 @@ test('native save acknowledgment reconciles the retained draft after HA reattach
     await saving;assert.equal(writes,1);assert.equal(p._busy,false);
     assert.equal(p._dirty,failed);assert.equal(p._model.name,'Saved once');
     assert.equal(p.status.kind,failed?'error':'success');
-    assert.deepEqual(p.navigations, failed ? [] : ['/marao-dashboard/home']);
+    assert.deepEqual(p.navigations, [], 'Save never opens the dashboard automatically');
+    assert.equal(p._tab,tab,'Saving keeps the active editor tab');
   }
 });
 

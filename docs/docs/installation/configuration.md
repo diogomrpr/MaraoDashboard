@@ -54,7 +54,8 @@ Use the **Save & Generate** save icon for one explicit native HA save. The leftm
 without saving the draft. Header action icons share the filled circular design;
 there is no Discard button. Import and Export JSON are icon buttons shown only in the
 **JSON** tab; there is no extra-options dropdown.
-A successful save returns to the dashboard; errors keep the editor open. Invalid source and
+A successful save keeps the editor open in the current Visual or JSON tab. Use
+the back arrow to open the dashboard when you want to leave the editor. Invalid source and
 reported save errors retain the draft. An already changed native baseline blocks
 saving and lets you export the draft; simultaneous cross-device saves retain
 HA's own last-writer limit. Export before replacing or importing source.

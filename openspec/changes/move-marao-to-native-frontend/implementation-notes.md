@@ -359,3 +359,21 @@ exact pre-save backup confirmed the complete dashboard document was unchanged.
 Closed the obsolete test tab and left the working dashboard open. The mobile
 Companion app itself was not available for verification; no release was published.
 Private installation/browser receipts are under `ha-test/.artifacts/native-frontend/editor-return-*`.
+
+### 2026-10-28 — Save keeps the editor open
+
+The user superseded the successful-save return behavior above. Save & Generate
+now reconciles saved source and clears dirty/busy state while keeping the current
+Visual or JSON tab open. Only the explicit back/Open dashboard button navigates.
+Native save validation, failure retention and settings Apply remain unchanged;
+no source format, persistence API or migration changes are introduced.
+
+Starting commit: `ca6e4796732a085ec705d6025ac1c2df64193d4d`. The shared panel
+serves the internal editor and strategy-settings host. Task snapshot:
+`/private/tmp/editor-save-stays.json`; unrelated duplicate files were preserved.
+Five focused existing editor-panel checks pass, covering Visual/JSON saves,
+retained-view acknowledgment, error/supersession, explicit navigation and settings
+Apply. The regenerated editor passes its size budget. Installation uses the
+frontend-only helper on disposable `192.168.0.28`; served-asset/readiness checks
+confirm installation. Browser/phone inspection remains manual: save in either
+tab and confirm the editor stays open; use the back arrow to leave explicitly.

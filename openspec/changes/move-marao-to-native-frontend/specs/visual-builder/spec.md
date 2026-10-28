@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Local drafts and explicit save
-Changes SHALL remain local until Save & Generate validates, compiles and submits the complete native document. Discard changes SHALL reload the saved source; Open dashboard SHALL open the native result within the current Home Assistant app, retaining the local draft. A successful native save SHALL return to the saved landing page. Applying changes inside HA dashboard settings SHALL remain there until HA saves those settings. Validation and reported save errors SHALL retain the draft with readable feedback. Native save success/readback SHALL NOT be presented as independent disk-durability proof.
+Changes SHALL remain local until Save & Generate validates, compiles and submits the complete native document. Discard changes SHALL reload the saved source; Open dashboard SHALL open the native result within the current Home Assistant app, retaining the local draft. A successful native save SHALL keep the current Visual or JSON editor open without navigation. Applying changes inside HA dashboard settings SHALL remain there until HA saves those settings. Validation and reported save errors SHALL retain the draft with readable feedback. Native save success/readback SHALL NOT be presented as independent disk-durability proof.
 
 #### Scenario: A user edits a card but has not saved
 - **WHEN** the existing dashboard is opened
@@ -17,10 +17,10 @@ Changes SHALL remain local until Save & Generate validates, compiles and submits
 - **AND** the complete unsaved draft remains available when returning to the editor in the same session
 - **AND** loading, busy or detached editors cannot initiate this navigation
 
-#### Scenario: Save and generate returns to the dashboard
+#### Scenario: Save and generate stays in the editor
 - **WHEN** HA acknowledges a successful Save & Generate for the current editor document
-- **THEN** Marao clears the saved draft's dirty and busy state and opens the saved landing page through the same internal navigation
-- **AND** the destination uses the current dashboard root and saved landing-page path
+- **THEN** Marao clears the saved draft's dirty and busy state and retains the current editor view and tab
+- **AND** no navigation occurs until the user explicitly selects Open dashboard, which uses the current dashboard root and saved landing-page path
 - **AND** a detached editor or superseded document does not redirect the user
 
 #### Scenario: Applying dashboard settings requires HA's settings save

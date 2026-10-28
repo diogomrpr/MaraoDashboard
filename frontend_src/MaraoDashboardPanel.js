@@ -1369,7 +1369,6 @@ class MaraoDashboardPanel extends HTMLElement {
       this._setStatus(this._t(this.nativeSession?.strategy ? 'applied' : 'clean'), 'success');
     } catch (error) { if (sameDocument()) { if (!this._contextReady) this._contextFailure(error); else this._setStatus(this._error(error), 'error'); } }
     finally { if (accepted || sameDocument() || this.isConnected && lifecycle === this._lifecycle) this._setBusy(false); }
-    if (accepted && !session?.strategy) this._openDashboard();
   }
 
   _discard() {
