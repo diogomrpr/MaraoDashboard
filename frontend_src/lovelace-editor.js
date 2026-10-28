@@ -14,6 +14,15 @@ function labelButton(text, action) {
   button.addEventListener('click', action); return button;
 }
 
+function resourceErrors(panel, failures) {
+  return failures.map(failure => {
+    const error = document.createElement('p'); error.setAttribute('role', 'alert');
+    error.className = 'native-resource-error';
+    error.textContent = panel._l('Could not load dashboard resource:') + ' ' + failure.url;
+    return error;
+  });
+}
+
 export async function mountPicker(panel, dialog, roomIndex, kind) {
   const host = dialog.querySelector('[data-ha-picker]');
   if (host.dataset.loading || host.querySelector('hui-card-picker')) return;
@@ -21,7 +30,7 @@ export async function mountPicker(panel, dialog, roomIndex, kind) {
   const active = () => dialog.isConnected && dialog.open && model === panel._model && epoch === panel._documentEpoch && revision === panel._revision;
   host.dataset.loading = 'true'; host.textContent = panel._l('Loading Home Assistant cards…');
   try {
-    const lovelace = await loadLovelaceEditor(panel._hass, panel._dashboardUrl);
+    const { config: lovelace, resourceErrors: failures } = await loadLovelaceEditor(panel._hass, panel._dashboardUrl);
     if (!active()) return;
     const picker = context(document.createElement('hui-card-picker'), panel);
     picker.lovelace = lovelace;
@@ -31,7 +40,7 @@ export async function mountPicker(panel, dialog, roomIndex, kind) {
       const config = event.detail.config;
       panel._closeDialog(dialog); openEditor(panel, roomIndex, null, kind, config.type === 'manual' ? { type: '' } : config);
     });
-    host.replaceChildren(picker);
+    host.replaceChildren(...resourceErrors(panel, failures), picker);
   } catch (failure) {
     if (!active()) return;
     const error = document.createElement('p'); error.setAttribute('role', 'alert');
@@ -47,7 +56,7 @@ export function openEditor(panel, roomIndex, cardIndex, kind, initial = { type: 
   const dialog = panel._dialog(panel._l('Home Assistant card'));
   const active = () => dialog.isConnected && dialog.open && model === panel._model && epoch === panel._documentEpoch && revision === panel._revision;
   const content = dialog.querySelector('.dialog-content');
-  content.innerHTML = '<div class="add-tabs" data-modes></div><p data-loading role="status"></p><div data-editor></div><p data-error role="alert"></p><div data-preview inert></div><div class="dialog-actions"></div>';
+  content.innerHTML = '<div class="add-tabs" data-modes></div><p data-loading role="status"></p><div data-resource-errors></div><div data-editor></div><p data-error role="alert"></p><div data-preview inert></div><div class="dialog-actions"></div>';
   const host = content.querySelector('[data-editor]'), error = content.querySelector('[data-error]');
   const loading = content.querySelector('[data-loading]'), previewHost = content.querySelector('[data-preview]');
   const actions = content.querySelector('.dialog-actions'), modes = content.querySelector('[data-modes]');
@@ -120,8 +129,10 @@ export function openEditor(panel, roomIndex, cardIndex, kind, initial = { type: 
     if (loadingNative) return;
     loadingNative = true; loading.textContent = panel._l('Loading Home Assistant cards…');
     try {
-      lovelace = await loadLovelaceEditor(panel._hass, panel._dashboardUrl);
+      const loaded = await loadLovelaceEditor(panel._hass, panel._dashboardUrl);
       if (!active()) return;
+      lovelace = loaded.config;
+      content.querySelector('[data-resource-errors]').replaceChildren(...resourceErrors(panel, loaded.resourceErrors));
       loading.textContent = ''; visualButton.disabled = false;
       if (!changed && config) showVisual();
       else if (!changed) showYaml();

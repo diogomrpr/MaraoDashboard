@@ -515,3 +515,25 @@ test('sensor threshold validation and round trips preserve omission, zero, unkno
   assert.match(sensorThresholdError({background_thresholds:[{value:0,color:'red'}]},'sensor.safe'),/#RRGGBB/);
   assert.match(sensorThresholdError({background_thresholds:[{value:0,color:'#ffffff'}]},'binary_sensor.safe'),/sensor entity/);
 });
+
+test('duplicateCard preserves authored configuration while separating identities and owned popup links', async () => {
+  const { duplicateCard } = await import('../../frontend_src/editor-model.js');
+  const original = { id: 'group', template: 'md_entity_group_card', name: 'Same name', entities: [{ entity_id: 'climate.safe', id: 'member', variables: { mode_selector_hash: '#member-modes' } }],
+    variables: { popup_hash: '#group-popup', empty: [], tap_action: { navigation_path: '#group-popup' }, hold_action: { navigation_path: '#external' } }, future: { keep: [] } };
+  const container = { entities: [original, { id: 'next', template: 'md_title_card' }] }, draft = { pages: [container] };
+  const before = structuredClone(original), copy = duplicateCard(draft, container, 0);
+  assert.equal(container.entities.length, 3); assert.equal(container.entities[1], copy); assert.equal(container.entities[2].id, 'next');
+  assert.notEqual(copy.id, original.id); assert.equal(copy.name, original.name);
+  assert.notEqual(copy.variables.popup_hash, original.variables.popup_hash);
+  assert.equal(copy.variables.tap_action.navigation_path, copy.variables.popup_hash);
+  assert.equal(copy.variables.hold_action.navigation_path, '#external');
+  assert.notEqual(copy.entities[0].variables.mode_selector_hash, original.entities[0].variables.mode_selector_hash);
+  assert.equal(copy.entities[0].id, 'member');
+  copy.variables.empty.push('changed'); copy.future.keep.push('changed');
+  assert.deepEqual(original, before);
+  const yaml = '# comment\ntype: markdown\ncontent: "#group-popup"\n';
+  container.entities.push({ template: 'ha_card', yaml, future: { empty: [] } });
+  const embedded = duplicateCard(draft, container, 3);
+  assert.equal(embedded.yaml, yaml); assert.deepEqual(embedded.future, { empty: [] });
+  assert.ok(embedded.id); assert.equal(duplicateCard(draft, container, 99), null);
+});

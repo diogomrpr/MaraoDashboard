@@ -45,7 +45,7 @@ export function bindCardDrag(root, { sourceFor, commit, header, label, haptic })
     const top = header().bottom, bottom = s.scroll === document.scrollingElement ? innerHeight : Math.min(innerHeight, s.scroll.getBoundingClientRect().bottom);
     if (s.y < top || s.y > bottom) return;
     for (const list of root.querySelectorAll('[data-card-list]')) {
-      if (list.dataset.movePage !== s.source.key || !list.getClientRects().length) continue;
+      if (list.closest('.page-section:not([open])') || list.dataset.movePage !== s.source.key || !list.getClientRects().length) continue;
       const bounds = list.getBoundingClientRect();
       if (s.x < bounds.left || s.x > bounds.right || s.y < bounds.top || s.y > bounds.bottom) continue;
       const rows = [...list.querySelectorAll(':scope > [data-card-drag]')];

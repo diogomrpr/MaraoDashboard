@@ -297,17 +297,54 @@ function replaceOwnedReferences(value, oldPath, newPath, dashboardRoot) {
   for (const key of ['navigation_path', 'url']) {
     if (value[key] === `${dashboardRoot}/${oldPath}`) value[key] = `${dashboardRoot}/${newPath}`;
   }
-  for (const key of ['popup_hash', 'mode_selector_hash', 'hash', 'navigation_path']) {
+  for (const key of popupReferences) {
     if (typeof value[key] === 'string' && value[key].startsWith(`#page-${oldPath}-`)) value[key] = `#page-${newPath}-${value[key].slice(`#page-${oldPath}-`.length)}`;
   }
   Object.values(value).forEach(item => replaceOwnedReferences(item, oldPath, newPath, dashboardRoot));
 }
+
+const popupKeys = ['popup_hash', 'mode_selector_hash'];
+const popupReferences = [...popupKeys, 'hash', 'navigation_path'];
 
 export function renamePage(model, index, path, dashboardRoot) {
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(path) || model.pages.some((page, position) => position !== index && page.path === path)) throw new Error('Each page requires a unique safe path.');
   const oldPath = model.pages[index].path;
   model.pages[index].path = path;
   renamePageReferences(model, oldPath, path, dashboardRoot);
+}
+
+function visitObjects(value, visit) {
+  if (!value || typeof value !== 'object') return;
+  visit(value);
+  Object.values(value).forEach(child => visitObjects(child, visit));
+}
+
+function replacePopupReferences(value, hashes) {
+  visitObjects(value, item => {
+    for (const key of popupReferences) if (hashes.has(item[key])) item[key] = hashes.get(item[key]);
+  });
+}
+
+export function duplicateCard(model, container, index) {
+  const source = container.entities?.[index];
+  if (!source || typeof source !== 'object') return null;
+  const copy = clone(source), existing = JSON.stringify(model), hashes = new Map();
+  do { copy.id = newEntityGroupId().replace('group-', 'card-'); } while (existing.includes(JSON.stringify(copy.id)));
+  copy.__localId = copy.id;
+  const definitions = card => {
+    if (!card || typeof card !== 'object' || card.template === 'ha_card') return;
+    for (const owner of [card, card.variables]) for (const key of popupKeys) {
+      const old = owner?.[key];
+      if (typeof old !== 'string' || hashes.has(old)) continue;
+      let next = `#${copy.id}-${hashes.size}`;
+      while (existing.includes(JSON.stringify(next))) next += '-copy';
+      hashes.set(old, next);
+    }
+    (card.entities || []).forEach(definitions);
+  };
+  definitions(copy); replacePopupReferences(copy, hashes);
+  container.entities.splice(index + 1, 0, copy);
+  return copy;
 }
 
 export function duplicatePage(model, index, name, dashboardRoot) {
@@ -322,31 +359,17 @@ export function duplicatePage(model, index, name, dashboardRoot) {
   for (const container of pageContainers(page)) {
     for (const card of container.entities || []) {
       card.id = newEntityGroupId().replace('group-', 'card-');
-      const visit = item => {
-        if (Array.isArray(item)) { item.forEach(visit); return; }
-        if (!item || typeof item !== 'object') return;
-        for (const key of ['popup_hash', 'mode_selector_hash']) {
+      visitObjects(card, item => {
+        for (const key of popupKeys) {
           if (typeof item[key] === 'string') hashes.set(item[key], `#page-${path}-${card.id}-${key === 'mode_selector_hash' ? 'modes' : 'popup'}${hashes.size ? '-' + hashes.size : ''}`);
         }
-        Object.values(item).forEach(visit);
-      };
-      visit(card);
+      });
     }
-    const visitRaw = item => {
-      if (Array.isArray(item)) { item.forEach(visitRaw); return; }
-      if (!item || typeof item !== 'object') return;
+    visitObjects(container.cards || [], item => {
       if (item.type === 'custom:marao-popup-card' && typeof item.hash === 'string') hashes.set(item.hash, `#page-${path}-raw-${hashes.size + 1}-popup`);
-      Object.values(item).forEach(visitRaw);
-    };
-    visitRaw(container.cards || []);
+    });
   }
-  const replaceHashes = value => {
-    if (Array.isArray(value)) { value.forEach(replaceHashes); return; }
-    if (!value || typeof value !== 'object') return;
-    for (const key of ['popup_hash', 'mode_selector_hash', 'hash', 'navigation_path']) if (hashes.has(value[key])) value[key] = hashes.get(value[key]);
-    Object.values(value).forEach(replaceHashes);
-  };
-  replaceHashes(page);
+  replacePopupReferences(page, hashes);
   replaceOwnedReferences(page, oldPath, path, dashboardRoot);
   model.pages.splice(index + 1, 0, page);
   return page;

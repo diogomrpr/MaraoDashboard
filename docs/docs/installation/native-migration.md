@@ -13,7 +13,7 @@ in place.** Follow the steps below separately for every Home Assistant instance.
 They preserve the dashboard address and saved configuration through a guided
 manual migration. Export drafts and keep a recoverable backup before removal.
 
-Download the [v0.22.1 converter](https://github.com/diogomrpr/MaraoDashboard/releases/download/v0.22.1/marao-converter.html)
+Download the [v0.22.2 converter](https://github.com/diogomrpr/MaraoDashboard/releases/download/v0.22.2/marao-converter.html)
 and open the HTML file locally. It needs only a browser: no Home Assistant login,
 dashboard builder, local server, command line or intermediate Marao release.
 Migration needs administrator access, stable HA **2026.10.0 or newer**, and a

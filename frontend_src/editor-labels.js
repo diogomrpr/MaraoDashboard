@@ -291,6 +291,7 @@ export const PT_LABELS = {
   "Native migration produced invalid dashboard output": "A migração nativa produziu uma configuração inválida do dashboard.",
   "Resources changed during dashboard cleanup": "Os recursos foram alterados durante a limpeza do dashboard.",
   "Legacy resource persistence failed": "Não foi possível guardar os recursos antigos.",
+  "Could not load dashboard resource:": "Não foi possível carregar o recurso do dashboard:",
   "A legacy resource changed independently during recovery": "Um recurso antigo foi alterado por outra operação durante a recuperação.",
   "A legacy resource has no recoverable identity": "Um recurso antigo não tem uma identificação que permita recuperá-lo.",
   "Cannot retain the existing resource baseline": "Não foi possível guardar a versão anterior dos recursos.",
@@ -456,6 +457,7 @@ export function editorLabel(label, hass) {
 }
 
 export const MOVE_PT_LABELS = {
+  "Duplicate card": "Duplicar cartão",
   "Edit card": "Editar cartão",
   "Edit page": "Editar página",
   "Drag card": "Arrastar cartão",
@@ -469,6 +471,5 @@ export const MOVE_PT_LABELS = {
   "At the end": "No fim",
   "Card moved. Save & Generate to apply.": "Cartão movido. Guarde e gere para aplicar.",
   "The card changed. Close and try again.": "O cartão foi alterado. Feche e tente novamente.",
-  "Drag the handle to move a card. Use arrows or Move to section without dragging.": "Arraste a pega para mover um cartão. Use as setas ou Mover para secção sem arrastar.",
   "Automatic layout groups cards by type. Choose fixed columns for exact mixed order.": "A disposição automática agrupa os cartões por tipo. Escolha colunas fixas para uma ordem mista exata.",
 };

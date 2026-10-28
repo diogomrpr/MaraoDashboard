@@ -1,9 +1,76 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 import { parseCardYaml, cardYaml, validateCardYaml } from '../../frontend_src/lovelace-model.js';
 import { normalizeConfig, serializeConfig, validateConfig, movePageCard, duplicatePage, buildJsonSchema } from '../../frontend_src/editor-model.js';
 const fixture = JSON.parse(fs.readFileSync(new URL('./lovelace-cards.fixture.json', import.meta.url)));
+
+function editorLoader() {
+  const resourceFailure = new Error('Module download failed');
+  const calls = [];
+  let nativeFailure = false;
+  const resources = [{ type: 'module', url: '/good.js' }, { type: 'module', url: 'https://user:secret@example.invalid/broken.js?token=private#secret' }, { type: 'css', url: '/style.css' }];
+  class Element {
+    constructor(tag) { this.tag = tag; this.dataset = {}; this.children = []; this.listeners = {}; this.attributes = {}; }
+    setAttribute(name, value) { this.attributes[name] = value; }
+    addEventListener(name, callback) { this.listeners[name] = callback; }
+    replaceChildren(...children) { this.children = children; }
+    querySelector(tag) { return this.children.find(child => child.tag === tag); }
+    async _fetchConfig() {}
+    dispatchEvent() { this.listeners['show-dialog']({ stopPropagation() {}, detail: { dialogImport: () => nativeFailure ? Promise.reject(new Error('Required native editor failed')) : Promise.resolve() } }); }
+  }
+  const context = vm.createContext({
+    URL, Promise, setTimeout, clearTimeout, location: { origin: 'https://ha.invalid' },
+    customElements: { get: () => true }, CustomEvent: class {},
+    document: { createElement: tag => new Element(tag) },
+    importResource: async url => { calls.push(url); if (url.includes('broken.js')) throw resourceFailure; },
+  });
+  const loader = fs.readFileSync(new URL('../../frontend_src/lovelace-loader.js', import.meta.url), 'utf8')
+    .replace('export function', 'function').replace('import(new URL(resource.url, location.origin).href)', 'importResource(new URL(resource.url, location.origin).href)');
+  vm.runInContext(loader, context);
+  const editor = fs.readFileSync(new URL('../../frontend_src/lovelace-editor.js', import.meta.url), 'utf8')
+    .replace(/^import .*;$/mg, '').replace(/^export \{.*;$/mg, '').replaceAll('export async function', 'async function').replaceAll('export function', 'function');
+  vm.runInContext(editor, context);
+  const hass = { loadFragmentTranslation: async () => {}, panels: { 'marao-dashboard': {} }, callWS: async () => resources };
+  return { context, hass, calls, resources, resourceFailure, Element, failNative: value => { nativeFailure = value; }, load: () => vm.runInContext('loadLovelaceEditor', context)(hass, '/marao-dashboard') };
+}
+
+test('successful configured modules load without resource errors', async () => {
+  const harness = editorLoader();
+  harness.resources.splice(1, 1);
+  assert.equal((await harness.load()).resourceErrors.length, 0);
+  assert.equal(harness.calls.length, 1);
+});
+
+test('failed optional module remains visible beside a usable native picker and is retained on reuse', async () => {
+  const harness = editorLoader();
+  const loaded = await harness.load();
+  assert.equal(loaded.config.views[0].cards[0].type, 'markdown');
+  assert.equal(loaded.resourceErrors.length, 1);
+  assert.equal(loaded.resourceErrors[0].error, harness.resourceFailure);
+  assert.equal(loaded.resourceErrors[0].url, 'https://example.invalid/broken.js');
+  assert.equal(await harness.load(), loaded);
+  assert.equal(harness.calls.length, 2);
+  const panel = { _hass: harness.hass, _dashboardUrl: '/marao-dashboard', _l: text => text };
+  const host = new harness.Element('host');
+  const dialog = { isConnected: true, open: true, querySelector: () => host };
+  await vm.runInContext('mountPicker', harness.context)(panel, dialog, 0, 'page');
+  assert.equal(host.children[0].attributes.role, 'alert');
+  assert.equal(host.children[0].textContent, 'Could not load dashboard resource: https://example.invalid/broken.js');
+  assert.equal(host.children[1].tag, 'hui-card-picker');
+  assert.equal(host.children[1].lovelace, loaded.config);
+  assert.equal(host.dataset.loading, undefined);
+});
+
+test('required native editor failure still rejects and permits an explicit retry', async () => {
+  const harness = editorLoader();
+  harness.failNative(true);
+  await assert.rejects(harness.load(), /Required native editor failed/);
+  harness.failNative(false);
+  assert.equal((await harness.load()).resourceErrors.length, 1);
+  assert.equal(harness.calls.length, 4);
+});
 
 test('native YAML parses HA states, aliases and merges without losing custom options', () => {
   assert.deepEqual(parseCardYaml(fixture.source), fixture.expected);

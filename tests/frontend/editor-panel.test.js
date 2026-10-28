@@ -634,7 +634,7 @@ test('native icon actions retain semantic labels, boundary state and dispatch co
   const markup = p._iconButton('mdi:arrow-up', 'Move up', 'card-up', '0:1', true, 2, 'page');
   assert.match(markup, /^<button type="button" class="icon-action"/);
   for (const attribute of ['aria-label="Move up"', 'data-action="card-up"', 'data-room="0:1"', 'data-card="2"', 'data-kind="page"', ' disabled']) assert.ok(markup.includes(attribute));
-  assert.match(markup, /<ha-icon icon="mdi:arrow-up"><\/ha-icon><\/button>$/);
+  assert.match(markup, /<ha-icon icon="mdi:arrow-up" aria-hidden="true"><\/ha-icon><\/button>$/);
   assert.ok(!p._iconButton('mdi:delete-outline', 'Delete card', 'card-delete', '0').includes(' disabled'));
 });
 
@@ -1164,3 +1164,161 @@ test('Apply in dashboard settings stays until HA saves those settings',async()=>
   assert.equal(p.status.kind,'success');assert.equal(p._dirty,false);
   assert.deepEqual(p.navigations,[]);
 });
+
+async function pageBodyCase(run) {
+  const saved = { create: context.document.createElement, listener: context.document.addEventListener, resize: context.ResizeObserver, drag: context.bindCardDrag };
+  class Node {
+    constructor() { this.children = []; this.dataset = {}; this.listeners = {}; this.isConnected = true; this.innerHTML = ''; }
+    addEventListener(type, action) { this.listeners[type] = action; }
+    querySelectorAll() { return []; }
+    replaceChildren() { this.children = []; this.innerHTML = ''; }
+    append(node) { this.children.push(node); }
+    insertBefore(node, before) { this.children = this.children.filter(value => value !== node); const i = this.children.indexOf(before); this.children.splice(i < 0 ? this.children.length : i, 0, node); }
+    querySelector() { return { dataset: {}, addEventListener: (_event, action) => { this.retry = action; } }; }
+  }
+  try {
+    context.document.createElement = () => new Node();
+    context.document.addEventListener = () => {};
+    context.ResizeObserver = class { observe() {} disconnect() {} };
+    context.bindCardDrag = () => ({ dispose() {} });
+    const requests = [];
+    const p = loadingPanel(() => new Promise((resolve, reject) => requests.push({ resolve, reject })));
+    p._model = model.normalizeConfig({ config_version: 2, name: 'Unsaved', landing_page: 'home', navigation: [], pages: [
+      { name: 'Home', path: 'home', entities: [] }, { name: 'Other', path: 'other', entities: [{ entity_id: 'light.pending', name: 'Kept' }] }] });
+    p._loaded = true; p._dirty = true; p._jsonDraft = '{ "untouched": [] }';
+    p._sectionHeader = () => 'Section'; p._entityList = section => section.entities.map(card => card.name).join(',');
+    p._renderShell = () => {}; p.addEventListener = () => {}; p.style = { setProperty() {} };
+    p.shadowRoot = { getElementById: () => ({ firstElementChild: {} }), querySelector: () => null, querySelectorAll: () => [] };
+    const page = p._model.pages[1], entry = { body: new Node(), sections: new Map(), panel: { expanded: true } };
+    p._openPages = new Set([page]); p._pageEntries = new Map([[page, entry]]);
+    const before = p._source(), json = p._jsonDraft;
+    const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
+    const payload = { editor: { catalog: { cards: [] }, entities: [], areas: [] } };
+    await run({ p, page, entry, requests, flush, payload });
+    assert.equal(p._source(), before); assert.equal(p._jsonDraft, json); assert.equal(p._dirty, true);
+  } finally {
+    context.document.createElement = saved.create; context.document.addEventListener = saved.listener;
+    context.ResizeObserver = saved.resize; context.bindCardDrag = saved.drag;
+  }
+}
+
+for (const settleOldFirst of [false, true]) test(`reopened page body resumes interrupted context (${settleOldFirst ? 'completed' : 'pending'} old response)`, async () => pageBodyCase(async ({ p, page, entry, requests, flush, payload }) => {
+  p._renderPageBody(entry, page, 1, new Set()); await flush();
+  p.isConnected = false; p.disconnectedCallback();
+  if (settleOldFirst) { requests[0].resolve(payload); await flush(); }
+  p.isConnected = true; p.connectedCallback(); await flush();
+  assert.equal(requests.length, 2, 'Reconnection must replace interrupted page-body work');
+  requests[1].resolve(payload); await flush();
+  assert.match([...entry.sections.values()][0].innerHTML, /Kept/);
+  if (!settleOldFirst) { requests[0].reject(new Error('Obsolete request')); await flush(); }
+  assert.equal(p._contextError, undefined);
+  assert.match([...entry.sections.values()][0].innerHTML, /Kept/);
+}));
+
+test('page-body collapse, ready reconnect and explicit retry preserve current work', async () => pageBodyCase(async ({ p, page, entry, requests, flush, payload }) => {
+  p._renderPageBody(entry, page, 1, new Set()); await flush();
+  p._openPages.delete(page); p._clearPageBody(entry);
+  requests[0].resolve(payload); await flush();
+  assert.equal(entry.body.children.length, 0, 'Collapsed content stays unmounted');
+  p._openPages.add(page); p.isConnected = false; p.disconnectedCallback();
+  p.isConnected = true; p.connectedCallback(); await flush();
+  assert.equal(requests.length, 1, 'Ready metadata needs no new request');
+  assert.match([...entry.sections.values()][0].innerHTML, /Kept/);
+  p._contextReady = false; p._contextPayload = null;
+  p._renderPageBody(entry, page, 1, new Set()); await flush();
+  requests[1].reject(new Error('Current failure')); await flush();
+  assert.match(entry.body.innerHTML, /Current failure/);
+  entry.body.retry(); await flush();
+  requests[2].resolve(payload); await flush();
+  assert.match([...entry.sections.values()][0].innerHTML, /Kept/);
+}));
+
+test('old page-body success cannot settle a newer pending attempt', async () => pageBodyCase(async ({ p, page, entry, requests, flush, payload }) => {
+  p._renderPageBody(entry, page, 1, new Set()); await flush();
+  p.isConnected = false; p.disconnectedCallback(); p.isConnected = true; p.connectedCallback(); await flush();
+  const current = entry.pending;
+  requests[0].resolve(payload); await flush();
+  assert.equal(entry.pending, current); assert.equal(entry.sections.size, 0);
+  requests[1].resolve(payload); await flush();
+  assert.match([...entry.sections.values()][0].innerHTML, /Kept/);
+}));
+
+test('duplicate card action is local, adjacent and uses the selected flat or section coordinates', () => {
+  for (const position of ['0:0', '1:0']) {
+    const p = panel(canonical()); p._catalog.cards = [];
+    const sourceBefore = p._source();
+    let refreshed; p._refreshCards = (kind, coordinate) => { refreshed = [kind, coordinate]; };
+    const container = p._editableContainer('page', position), original = container.entities[0];
+    p._roomAction({ dataset: { action: 'card-duplicate', kind: 'page', room: position, card: '0' } });
+    assert.deepEqual(refreshed, ['page', position]); assert.equal(p._dirty, true);
+    const copy = container.entities[1]; assert.notEqual(copy.id, original.id); assert.equal(copy.name, original.name);
+    copy.name = 'Independent'; assert.notEqual(original.name, copy.name);
+    assert.ok(p._entityRow(copy, position, 1, 'page').includes('Duplicate card'));
+    p._hass.language = 'pt'; assert.ok(p._entityRow(copy, position, 1, 'page').includes('Duplicar cartão'));
+    p._roomAction({ dataset: { action: 'card-delete', kind: 'page', room: position, card: '1' } });
+    assert.equal(p._source(), sourceBefore);
+  }
+});
+
+test('icon toolbar preserves names, icon children and active-tab transfer visibility', async () => {
+  const p = panel(canonical()); p._loaded = true; p.isConnected = true;
+  const nodes = new Map();
+  const node = id => {
+    if (!nodes.has(id)) nodes.set(id, { id, textContent: 'icon child', attributes: {}, setAttribute(key, value) { this.attributes[key] = value; }, append() {}, querySelector() { return node('feedback-text'); } });
+    return nodes.get(id);
+  };
+  const page = node('page'); node('retry').parentElement = page;
+  p.shadowRoot = { getElementById: node, querySelector: selector => selector === '.page' ? page : node(selector), querySelectorAll: () => [] };
+  const update = () => Panel.prototype._updateHeader.call(p);
+  update();
+  assert.equal(node('json-actions').hidden, true); assert.equal(node('save').textContent, 'icon child');
+  assert.equal(node('save').attributes['aria-label'], 'Save & Generate');
+  p._hass.language = 'pt'; p.nativeSession.strategy = {}; update();
+  assert.equal(node('save').attributes['aria-label'], p._t('apply')); assert.equal(node('open-dashboard').attributes['aria-label'], 'Abrir dashboard');
+  p._ensureMonaco = async () => { throw new Error('Module unavailable'); };
+  await p._switchTab('json'); update(); assert.equal(node('json-actions').hidden, true);
+  p._monaco = { layout() {}, getValue: () => '{ invalid' }; p._setEditorSource = () => {}; p._ensureMonaco = async () => {};
+  await p._switchTab('json'); update(); assert.equal(node('json-actions').hidden, false);
+  await p._switchTab('visual'); update(); assert.equal(p._tab, 'json'); assert.equal(node('json-actions').hidden, false);
+  p._catalog.config_version = 2; p._catalog.cards = [];
+  p._monaco.getValue = () => JSON.stringify(model.serializeConfig(p._model));
+  let status; p._setStatus = message => { status = message; };
+  await p._switchTab('visual'); update(); assert.equal(p._tab, 'visual', status); assert.equal(node('json-actions').hidden, true);
+  p._busy = true; update(); assert.equal(node('save').disabled, true); assert.equal(node('open-dashboard').disabled, true);
+  assert.match(p._headerButton('save', 'mdi:content-save', 'save'), /<ha-icon icon="mdi:content-save" aria-hidden="true">/);
+});
+
+
+test('header offers filled Open then Save icons without a Discard control', () => {
+  const shell = source.slice(source.indexOf('  _renderShell()'), source.indexOf('  _revealFocusedControl('));
+  assert.ok(shell.indexOf("_headerButton('open-dashboard', 'mdi:arrow-left'") < shell.indexOf("_headerButton('save', 'mdi:content-save'"));
+  assert.doesNotMatch(shell, /_headerButton\('discard'/);
+  assert.doesNotMatch(shell, /getElementById\("discard"\)/);
+});
+
+
+test('section disclosure is independent, retained through page-body recreation and never changes the draft', async () => pageBodyCase(async ({ p, page, entry }) => {
+  p._contextReady = true;
+  const first = { entities: page.entities }, second = { entities: [] };
+  page.sections = [first, second];
+  const before = p._source();
+  let cancelled = 0; p._cardDrag = { cancel() { cancelled++; } };
+  p._renderPageBody(entry, page, 1, new Set());
+  const opened = entry.sections.get(first), other = entry.sections.get(second);
+  assert.equal(opened.open, true); assert.equal(other.open, true);
+  assert.match(opened.innerHTML, /<summary class="card-heading">/);
+  opened.open = false; opened.listeners.toggle();
+  assert.equal(p._closedSections.has(first), true); assert.equal(other.open, true); assert.equal(cancelled, 1);
+  assert.equal(p._source(), before);
+  p._clearPageBody(entry); p._renderPageBody(entry, page, 1, new Set());
+  assert.equal(entry.sections.get(first).open, false); assert.equal(entry.sections.get(second).open, true);
+  page.sections.reverse(); p._renderPageBody(entry, page, 1, new Set());
+  assert.equal(entry.sections.get(first).open, false);
+  const header = Panel.prototype._sectionHeader.call(p, page, 1, 1);
+  assert.match(header, /class="section-number" aria-label="Section 2">2<\/h3>/);
+  const closed = entry.sections.get(first); closed.open = true; closed.listeners.toggle();
+  assert.equal(p._closedSections.has(first), false);
+  opened.isConnected = false; opened.open = false; opened.listeners.toggle();
+  assert.equal(p._closedSections.has(first), false, 'Detached toggle cannot override the current section');
+  delete page.sections;
+}));

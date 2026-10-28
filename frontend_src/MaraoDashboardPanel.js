@@ -10,6 +10,7 @@ import {
   createPage,
   deletePage,
   duplicatePage,
+  duplicateCard,
   configuredEntityIds,
   entityCandidates,
   entityGroupMemberCompatible,
@@ -44,7 +45,7 @@ const TEXT = {
     save: "Save & Generate", apply: "Apply to dashboard settings", applied: "Applied. Save the dashboard settings to finish.", discard: "Discard changes", open: "Open dashboard",
     navigation: "Navigation bar", addNavPage: "Add page", general: "General", overview: "Overview", rooms: "Rooms", pages: "Pages", addRoom: "Add room", addCustomPage: "Add custom page",
     addCard: "Add card", noCards: "No cards yet.", dirty: "Unsaved changes", clean: "Saved",
-    format: "Format JSON", collapse: "Collapse region", expand: "Expand region", advanced: "Advanced options", cancel: "Cancel", more: "More actions",
+    format: "Format JSON", collapse: "Collapse region", expand: "Expand region", advanced: "Advanced options", cancel: "Cancel",
     jsonIconsFailed: 'JSON icons could not load.',
     create: "Create", update: "Update", delete: "Delete", duplicate: "Duplicate",
     edit: "Edit", add: "Add", chooseCard: "Choose a card",
@@ -64,7 +65,7 @@ const TEXT = {
     save: "Guardar e gerar", apply: "Aplicar às definições do dashboard", applied: "Aplicado. Guarde as definições do dashboard para concluir.", discard: "Descartar alterações", open: "Abrir dashboard",
     navigation: "Barra de navegação", addNavPage: "Adicionar página", general: "Geral", overview: "Resumo", rooms: "Divisões", pages: "Páginas", addRoom: "Adicionar divisão", addCustomPage: "Adicionar página personalizada",
     addCard: "Adicionar cartão", noCards: "Ainda não existem cartões.", dirty: "Alterações por guardar", clean: "Guardado",
-    format: "Formatar JSON", collapse: "Recolher região", expand: "Expandir região", advanced: "Opções avançadas", cancel: "Cancelar", more: "Mais ações",
+    format: "Formatar JSON", collapse: "Recolher região", expand: "Expandir região", advanced: "Opções avançadas", cancel: "Cancelar",
     jsonIconsFailed: 'Não foi possível carregar os ícones JSON.',
     create: "Criar", update: "Atualizar", delete: "Eliminar", duplicate: "Duplicar",
     edit: "Editar", add: "Adicionar", chooseCard: "Escolha um cartão",
@@ -102,6 +103,7 @@ class MaraoDashboardPanel extends HTMLElement {
     this._tab = "visual";
     this._expandedSections = { rooms: true, pages: true };
     this._collapsedRooms = new Set();
+    this._closedSections = new WeakSet();
     this._openPages = new Set();
     this._pageEntries = new Map();
   }
@@ -180,6 +182,7 @@ class MaraoDashboardPanel extends HTMLElement {
     });
     if (this._loaded && !this.shadowRoot.getElementById("visual-view").firstElementChild) this._renderVisual();
     if (this._loaded) {
+      for (const [page, entry] of this._pageEntries) if (this._openPages.has(page)) this._renderPageBody(entry, page, this._model.pages.indexOf(page), new Set());
       if (this._hass?.connection) this._scheduleMetadataRefresh();
       this._nativeVisualReady().then(() => {
         if (!this.isConnected) return;
@@ -196,6 +199,7 @@ class MaraoDashboardPanel extends HTMLElement {
     this._cardDrag?.dispose(); this._cardDrag = null;
     this._headerResize?.disconnect();
     this._lifecycle += 1;
+    for (const entry of this._pageEntries.values()) if (entry.pending) this._clearPageBody(entry);
     this._activityEvents?.abort();
     this._cancelIdleStage?.();
     this._interacting = false; this._scrolling = false;
@@ -251,41 +255,37 @@ class MaraoDashboardPanel extends HTMLElement {
     return loading;
   }
 
+  _headerButton(id, icon, key) {
+    return this._iconButton(icon, this._t(key), id, null);
+  }
+
   _renderShell() {
     if (this.shadowRoot.innerHTML) return;
     this.shadowRoot.innerHTML = `
-      <link rel="stylesheet" href="${PANEL_CSS}">
-      <main class="page">
-        <header class="editor-header">
-        <div class="toolbar">
-          <div class="title"><img class="brand-mark" src="${this._hass?.themes?.darkMode ? BRAND_MARK_DARK : BRAND_MARK}" alt="" aria-hidden="true" width="32" height="32"><h1>${this._t("editorTitle")}</h1></div>
-          <span id="dirty" class="dirty"></span>
-          <div class="actions">
-            <ha-button id="save" appearance="filled">${this._t("save")}</ha-button>
-            <details class="secondary-actions">
-              <summary aria-label="${this._t("more")}"><ha-icon icon="mdi:dots-vertical"></ha-icon></summary>
-              <div class="secondary-menu">
-            <ha-button id="import-source">${this._t("importSource")}</ha-button>
-            <ha-button id="export-source">${this._t("exportSource")}</ha-button>
-            <ha-button id="discard">${this._t("discard")}</ha-button>
-            <a id="open-dashboard" href="#">${this._t("open")}</a>
-              </div>
-            </details>
-          </div>
-        </div>
-        <div class="tabs" role="tablist">
-          <button class="tab" data-tab="visual" role="tab" aria-selected="true">${this._t("visual")}</button>
-          <button class="tab" data-tab="json" role="tab" aria-selected="false">${this._t("json")}</button>
-        </div>
-        <div id="load-feedback" class="load-feedback" hidden><span role="status"></span></div>
-        </header>
-        <section id="visual-view" class="view"></section>
-        <section id="json-view" class="view" hidden>
-          <div class="json-shell"><div id="monaco"></div></div>
-        </section>
-        <div id="status" class="status" role="status">${this._t("loading")}</div>
-        <ha-button id="retry" hidden>${this._t("retry")}</ha-button>
-      </main>`;
+<link rel="stylesheet" href="${PANEL_CSS}">
+<main class="page">
+<header class="editor-header">
+<div class="toolbar">
+<div class="title"><img class="brand-mark" src="${this._hass?.themes?.darkMode ? BRAND_MARK_DARK : BRAND_MARK}" alt="" aria-hidden="true" width="32" height="32"><h1>${this._t("editorTitle")}</h1></div>
+<span id="dirty" class="dirty"></span>
+<div class="actions">
+<div class="primary-actions">${this._headerButton('open-dashboard', 'mdi:arrow-left', 'open')}${this._headerButton('save', 'mdi:content-save', 'save')}</div>
+</div>
+</div>
+<div class="tabs" role="tablist">
+<button class="tab" data-tab="visual" role="tab" aria-selected="true">${this._t("visual")}</button>
+<button class="tab" data-tab="json" role="tab" aria-selected="false">${this._t("json")}</button>
+<div id="json-actions" class="actions" hidden>${this._headerButton('import-source', 'mdi:import', 'importSource')}${this._headerButton('export-source', 'mdi:export', 'exportSource')}</div>
+</div>
+<div id="load-feedback" class="load-feedback" hidden><span role="status"></span></div>
+</header>
+<section id="visual-view" class="view"></section>
+<section id="json-view" class="view" hidden>
+<div class="json-shell"><div id="monaco"></div></div>
+</section>
+<div id="status" class="status" role="status">${this._t("loading")}</div>
+<ha-button id="retry" hidden>${this._t("retry")}</ha-button>
+</main>`;
     this.shadowRoot.addEventListener("focusin", event => this._revealFocusedControl(event));
     this.shadowRoot.querySelectorAll("[data-tab]").forEach((tab) =>
       tab.addEventListener("click", () => this._switchTab(tab.dataset.tab)));
@@ -301,21 +301,9 @@ class MaraoDashboardPanel extends HTMLElement {
     });
     this._updateHeader();
     this.shadowRoot.getElementById("save").addEventListener("click", () => this._save());
-    this.shadowRoot.getElementById("discard").addEventListener("click", () => this._discard());
     this.shadowRoot.getElementById("import-source").addEventListener("click", () => this._importSource());
     this.shadowRoot.getElementById("export-source").addEventListener("click", () => this._exportSource());
-    this.shadowRoot.querySelector(".secondary-menu").addEventListener("click", () => {
-      this.shadowRoot.querySelector(".secondary-actions").open = false;
-      this._focusWithoutScroll(this.shadowRoot.querySelector(".secondary-actions summary"));
-    });
-    this.shadowRoot.addEventListener("pointerdown", (event) => {
-      this._pressedPath = event.composedPath();
-      const menu = this.shadowRoot.querySelector(".secondary-actions");
-      if (!event.composedPath().includes(menu)) menu.open = false;
-    });
-    this.shadowRoot.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") this.shadowRoot.querySelector(".secondary-actions").open = false;
-    });
+    this.shadowRoot.addEventListener("pointerdown", event => { this._pressedPath = event.composedPath(); });
     this.shadowRoot.addEventListener('click', event => this._iconActionHaptic(event), { capture: true });
   }
 
@@ -408,14 +396,16 @@ class MaraoDashboardPanel extends HTMLElement {
     if (retry.parentElement !== parent) parent.append(retry);
     root.getElementById("dirty").textContent = this._dirty ? this._t("dirty") : "";
     root.querySelector(".title h1").textContent = this._t("editorTitle");
-    root.querySelector(".secondary-actions summary").setAttribute("aria-label", this._t("more"));
-    for (const [id, key] of [["save", "save"], ["discard", "discard"], ["import-source", "importSource"], ["export-source", "exportSource"], ["open-dashboard", "open"], ["retry", "retry"]]) root.getElementById(id).textContent = this._t(id === "save" && this.nativeSession?.strategy ? "apply" : key);
+    for (const [id, key] of [["save", "save"], ["import-source", "importSource"], ["export-source", "exportSource"], ["open-dashboard", "open"]]) {
+      const label = this._t(id === "save" && this.nativeSession?.strategy ? "apply" : key);
+      root.getElementById(id).setAttribute('aria-label', label);
+    }
+    root.getElementById('retry').textContent = this._t('retry');
+    root.getElementById('json-actions').hidden = this._tab !== 'json';
     root.getElementById("save").disabled = this._busy || !this._loaded;
-    root.getElementById("discard").disabled = this._busy || !this._dirty;
     root.getElementById("import-source").disabled = this._busy || !this._loaded;
     root.getElementById("export-source").disabled = !this._loaded;
-    root.getElementById("open-dashboard").href = this._dashboardUrl || "#";
-    root.getElementById("open-dashboard").setAttribute("aria-disabled", String(this._busy || !this._loaded));
+    root.getElementById("open-dashboard").disabled = this._busy || !this._loaded;
     root.querySelectorAll("[data-tab]").forEach(button => { button.disabled = this._busy || !this._loaded; });
   }
 
@@ -521,32 +511,43 @@ class MaraoDashboardPanel extends HTMLElement {
   }
 
   _sectionHeader(page, index, sectionIndex) {
-    const position = `${index}:${sectionIndex}`;
-    return `<h3>${this._l('Section')} ${sectionIndex + 1}</h3><span class="grow"></span><div class="row-actions">${this._iconButton('mdi:arrow-up', 'Move up', 'section-up', position, !page.sections || sectionIndex === 0)}${this._iconButton('mdi:arrow-down', 'Move down', 'section-down', position, !page.sections || sectionIndex === pageContainers(page).length - 1)}${this._iconButton('mdi:view-grid-outline', 'Edit layout', 'section-edit', position)}${this._iconButton('mdi:delete-outline', 'Delete section', 'section-delete', position, !page.sections)}</div>`;
+    const sections = pageContainers(page), columns = sections[sectionIndex].columns;
+    return `<h3 class="section-number" aria-label="${esc(this._l('Section'))} ${sectionIndex + 1}">${sectionIndex + 1}</h3><span class=section-layout role=img aria-label="${esc(this._l('Columns'))}: ${columns || this._l('Automatic')}"><ha-icon icon="mdi:${columns ? 'view-column-outline' : 'auto-fix'}"></ha-icon>${columns || ''}</span><div class="row-actions">${[
+      ['arrow-up', 'Move up', 'up', !page.sections || sectionIndex === 0],
+      ['arrow-down', 'Move down', 'down', !page.sections || sectionIndex === sections.length - 1],
+      ['view-grid-outline', 'Edit layout', 'edit'],
+      ['delete-outline', 'Delete section', 'delete', !page.sections],
+    ].map(([icon, label, action, disabled]) => this._iconButton('mdi:' + icon, label, 'section-' + action, `${index}:${sectionIndex}`, disabled)).join('')}</div>`;
+  }
+
+  _clearPageBody(entry) {
+    entry.pending = null; entry.body.replaceChildren(); entry.sections.clear(); entry.add = null;
   }
 
   _renderPageBody(entry, page, index, changed) {
     const sections = pageContainers(page);
     if (!this._contextReady && sections.some(section => (section.entities || []).some(entity => entity.entity_id && !this._displayEntityIds?.has(entity.entity_id)))) {
       if (!entry.pending) {
-        entry.body.innerHTML = `<p role="status">${this._t('metadataLoading')}</p>`; entry.pending = true;
-        const lifecycle = this._lifecycle, model = this._model;
+        this._clearPageBody(entry);
+        entry.body.innerHTML = `<p role="status">${this._t('metadataLoading')}</p>`;
+        const attempt = entry.pending = {}, lifecycle = this._lifecycle, epoch = this._documentEpoch, model = this._model;
+        const current = () => entry.pending === attempt && this.isConnected && lifecycle === this._lifecycle && epoch === this._documentEpoch && model === this._model && this._openPages.has(page) && this._pageEntries.get(page) === entry;
         this._ensureEditorContext().then(() => {
-          if (this.isConnected && lifecycle === this._lifecycle && model === this._model && this._model.pages.includes(page) && this._openPages.has(page) && this._pageEntries.get(page) === entry) {
-            entry.body.replaceChildren(); entry.pending = false;
-            this._renderPageBody(entry, page, this._model.pages.indexOf(page), new Set(sections));
-          }
+          if (!current()) return;
+          this._clearPageBody(entry);
+          this._renderPageBody(entry, page, this._model.pages.indexOf(page), new Set(sections));
         }).catch(error => {
-          if (!entry.body.isConnected || model !== this._model) return;
-          entry.pending = false;
+          if (!current()) return;
+          entry.pending = null;
           entry.body.innerHTML = `<p role="alert">${esc(this._t('metadataFailed') + this._error(error))}</p><ha-button data-context-retry>${this._t('retry')}</ha-button>`;
           entry.body.querySelector('[data-context-retry]').addEventListener('click', () => { this._contextError = null; this._renderPageBody(entry, page, this._model.pages.indexOf(page), new Set(sections)); });
         });
       }
       return;
     }
-    if (entry.pending) { entry.pending = false; entry.body.replaceChildren(); }
+    if (entry.pending) this._clearPageBody(entry);
     if (!entry.add) {
+      entry.body.replaceChildren();
       entry.add = document.createElement('ha-button'); entry.add.dataset.action = 'section-add';
       entry.add.textContent = this._l('Add section'); entry.body.append(entry.add);
     }
@@ -556,11 +557,17 @@ class MaraoDashboardPanel extends HTMLElement {
       const position = `${index}:${sectionIndex}`;
       let element = entry.sections.get(section);
       if (!element) {
-        element = document.createElement('section'); element.className = 'page-section';
+        element = document.createElement('details'); element.className = 'page-section';
+        element.open = !this._closedSections.has(section);
+        element.addEventListener('toggle', () => {
+          if (!element.isConnected) return;
+          this._cardDrag?.cancel();
+          this._closedSections[element.open ? 'delete' : 'add'](section);
+        });
         entry.sections.set(section, element); changed.add(section);
       }
       const coordinates = `${position}:${sections.length}:${Boolean(page.sections)}`;
-      if (changed.has(section)) { element._headerMarkup = this._sectionHeader(page, index, sectionIndex); element.innerHTML = `<div class="card-heading">${this._sectionHeader(page, index, sectionIndex)}</div>${this._entityList(section, position, 'page')}${section.cards?.length ? `<p class="helper">${this._l('Raw cards are retained and editable in JSON.')} (${section.cards.length})</p>` : ''}<ha-button data-action="card-add" data-kind="page" data-room="${position}">${this._t('addCard')}</ha-button>`; }
+      if (changed.has(section)) { element._headerMarkup = this._sectionHeader(page, index, sectionIndex); element.innerHTML = `<summary class="card-heading">${this._sectionHeader(page, index, sectionIndex)}</summary>${this._entityList(section, position, 'page')}${section.cards?.length ? `<p class="helper">${this._l('Raw cards are retained and editable in JSON.')} (${section.cards.length})</p>` : ''}${this._iconButton('mdi:plus', this._t('addCard'), 'card-add', position, false, null, 'page')}`; }
       else if (element._coordinates !== coordinates) {
         const heading = element.querySelector('.card-heading');
         const markup = this._sectionHeader(page, index, sectionIndex);
@@ -585,7 +592,7 @@ class MaraoDashboardPanel extends HTMLElement {
     this._pageEntries ||= new Map();
     const pages = this._model.pages;
     for (const [page, entry] of this._pageEntries) if (!pages.includes(page)) {
-      entry.article.remove(); this._pageEntries.delete(page); this._openPages.delete(page);
+      this._clearPageBody(entry); entry.article.remove(); this._pageEntries.delete(page); this._openPages.delete(page);
     }
     pages.forEach((page, index) => {
       let entry = this._pageEntries.get(page);
@@ -603,7 +610,7 @@ class MaraoDashboardPanel extends HTMLElement {
             this._openPages.delete(page);
             const focused = this.shadowRoot.activeElement;
             if (focused && entry.body.contains(focused)) this._focusWithoutScroll(entry.header);
-            entry.body.replaceChildren(); entry.sections.clear(); entry.add = null;
+            this._clearPageBody(entry);
           }
         });
       }
@@ -846,7 +853,7 @@ class MaraoDashboardPanel extends HTMLElement {
         <div class="room-body">
           ${this._entityList(room, roomIndex)}
           ${room.entities?.length ? "" : `<div class="empty">${this._t("noCards")}</div>`}
-          <ha-button data-action="card-add" data-room="${roomIndex}">${this._t("addCard")}</ha-button>
+          ${this._iconButton('mdi:plus', this._t('addCard'), 'card-add', roomIndex)}
         </div>
         </ha-expansion-panel>
       </article>`).join("")}</ha-sortable>`;
@@ -882,6 +889,7 @@ class MaraoDashboardPanel extends HTMLElement {
         ${this._iconButton("mdi:arrow-down", "Move down", "card-down", roomIndex, cardIndex === container.entities.length - 1, cardIndex, kind)}
         ${kind === "page" && pageContainers(this._model.pages[Number(String(roomIndex).split(":")[0])]).length > 1 ? this._iconButton("mdi:tray-arrow-down", "Move to section", "card-move", roomIndex, false, cardIndex, kind) : ""}
         ${this._iconButton("mdi:pencil", "Edit card", "card-edit", roomIndex, false, cardIndex, kind)}
+        ${this._iconButton("mdi:content-copy", "Duplicate card", "card-duplicate", roomIndex, false, cardIndex, kind)}
         ${this._iconButton("mdi:delete-outline", this._t("delete"), "card-delete", roomIndex, false, cardIndex, kind)}
       </div>
     </div>`;
@@ -891,15 +899,15 @@ class MaraoDashboardPanel extends HTMLElement {
     const columns = Number.isInteger(container.columns) ? Math.min(6, Math.max(1, container.columns)) : null;
     const layout = columns ? ` data-columns="${columns}" style="--editor-columns:${columns}"` : "";
     const [pageIndex, sectionIndex = 0] = String(index).split(':').map(Number);
-    return `<p class="helper move-guidance">${this._l('Drag the handle to move a card. Use arrows or Move to section without dragging.')}${!columns ? ' ' + this._l('Automatic layout groups cards by type. Choose fixed columns for exact mixed order.') : ''}</p><div class="entity-list" data-card-list data-move-page="${kind}:${pageIndex}" data-move-section="${sectionIndex}"${layout}>${(container.entities || []).map((entity, cardIndex) => this._entityRow(entity, index, cardIndex, kind)).join("") || `<div class="empty">${this._l('Drop a card here')}</div>`}</div>`;
+    return `${!columns ? `<p class="helper move-guidance">${this._l('Automatic layout groups cards by type. Choose fixed columns for exact mixed order.')}</p>` : ''}<div class="entity-list" data-card-list data-move-page="${kind}:${pageIndex}" data-move-section="${sectionIndex}"${layout}>${(container.entities || []).map((entity, cardIndex) => this._entityRow(entity, index, cardIndex, kind)).join("") || `<div class="empty">${this._l('Drop a card here')}</div>`}</div>`;
   }
 
   _iconButton(icon, label, action, room, disabled = false, card = null, kind = "room") {
-    return `<button type="button" class="icon-action" data-action="${action}" data-room="${room}" data-kind="${kind}" ${card == null ? "" : `data-card="${card}"`} aria-label="${esc(this._l(label))}" ${disabled ? "disabled" : ""}><ha-icon icon="${icon}"></ha-icon></button>`;
+    return `<button type="button" class="icon-action" ${room === null ? `id="${action}"` : `data-action="${action}" data-room="${room}" data-kind="${kind}" ${card == null ? "" : `data-card="${card}"`}`} aria-label="${esc(this._l(label))}" ${disabled ? "disabled" : ""}><ha-icon icon="${icon}" aria-hidden="true"></ha-icon></button>`;
   }
 
   _iconActionHaptic(event) {
-    const button = event.composedPath().find(element => element.classList?.contains('icon-action') || element.classList?.contains('native-card-action'));
+    const button = event.composedPath().find(element => element.classList?.contains('icon-action') || element.classList?.contains('native-card-action') || element.matches?.('.page-section > summary'));
     if (button && !button.disabled && !this._busy && !button.closest('[inert]')) this._moveHaptic();
   }
 
@@ -931,6 +939,7 @@ class MaraoDashboardPanel extends HTMLElement {
     if (action === "card-add") return this._openCardGallery(roomIndex, kind);
     if (action === "card-move") return this._openMoveDialog(roomIndex, cardIndex);
     if (action === "card-edit") return this._openCardEditor(roomIndex, cardIndex, null, kind);
+    if (action === "card-duplicate" && !duplicateCard(this._model, this._editableContainer(kind, roomIndex), cardIndex)) return;
     if (action === "card-delete") this._editableContainer(kind, roomIndex).entities.splice(cardIndex, 1);
     if (action === "card-up" || action === "card-down") {
       const source = this._cardSource(kind, roomIndex, cardIndex);
@@ -1071,7 +1080,7 @@ class MaraoDashboardPanel extends HTMLElement {
           <div class="room-body">
             ${this._entityList(page, index, "custom")}
             ${page.entities?.length ? "" : `<div class="empty">${this._t("noCards")}</div>`}
-            <ha-button data-action="card-add" data-room="${index}" data-kind="custom">${this._t("addCard")}</ha-button>
+            ${this._iconButton('mdi:plus', this._t('addCard'), 'card-add', index, false, null, 'custom')}
           </div>
         </ha-expansion-panel>
       </article>`).join("") : `<div class="empty">No custom pages yet.</div>`}`;
@@ -1200,6 +1209,7 @@ class MaraoDashboardPanel extends HTMLElement {
       this._setEditorSource(this._jsonDraft ?? this._source());
     }
     this._tab = tab;
+    this._updateHeader();
     this.shadowRoot.querySelectorAll("[data-tab]").forEach((button) => button.setAttribute("aria-selected", String(button.dataset.tab === tab)));
     this.shadowRoot.getElementById("visual-view").hidden = tab !== "visual";
     this.shadowRoot.getElementById("json-view").hidden = tab !== "json";
@@ -1527,7 +1537,7 @@ class MaraoDashboardPanel extends HTMLElement {
       if (!Array.isArray(payload.editor?.entities) || !Array.isArray(payload.editor?.areas) || !Array.isArray(payload.editor?.catalog?.cards)) throw new Error(this._t('metadataFailed'));
       if (this.isConnected && lifecycle === this._lifecycle && epoch === this._documentEpoch) this._contextPayload = { ...payload, epoch };
       return { ...payload, epoch };
-    }).catch(error => { if (lifecycle === this._lifecycle) this._contextError = error; throw error; });
+    }).catch(error => { if (this.isConnected && lifecycle === this._lifecycle && epoch === this._documentEpoch) this._contextError = error; throw error; });
     this._contextRequest = request;
     request.finally(() => { if (this._contextRequest === request) this._contextRequest = null; }).catch(() => {});
     return request;

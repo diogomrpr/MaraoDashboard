@@ -41,8 +41,11 @@ JSON prepares during idle time or when opened; failed loading offers Retry while
 retaining the draft. Visual/JSON switches, validation and preview do not save.
 Unknown/raw fields, explicit emptiness, names and saved order remain intact.
 
-Use **Save & Generate** for one explicit native HA save, **Discard** to return to
-the saved source, and **Open dashboard** to view the result inside Home Assistant.
+Use the **Save & Generate** save icon for one explicit native HA save. The leftmost
+**Open dashboard** left-arrow icon opens the saved result inside Home Assistant
+without saving the draft. Header action icons share the filled circular design;
+there is no Discard button. Import and Export JSON are icon buttons shown only in the
+**JSON** tab; there is no extra-options dropdown.
 A successful save returns to the dashboard; errors keep the editor open. Invalid source and
 reported save errors retain the draft. An already changed native baseline blocks
 saving and lets you export the draft; simultaneous cross-device saves retain
@@ -117,6 +120,28 @@ YAML must contain one mapping with a nonempty `type`. Quote state strings such a
 aliases and non-JSON values are rejected before writes. Inline configuration
 instead of using `!include`, `!secret` or other file directives. A missing custom
 resource remains a visible Home Assistant card error without deleting its source.
+If a configured dashboard module fails to load, Marao identifies the failed
+resource beside the card picker and editor while keeping available cards usable.
+Failures in Home Assistant's required editor components still offer Retry and
+manual YAML editing.
+
+Use the filled circular **+** button to add a card to a page or section.
+Each editor section has a rounded boundary and a header with its number in a
+badge, with a columns icon and its count beside it, or an automatic-layout icon. This
+layout indication stays visible when the section is collapsed. Tap the header or use its native keyboard disclosure to collapse or expand
+the section independently; its tools remain available while collapsed. Sections
+start expanded and retain their choice while the same draft is kept in the editor.
+Fresh panels and accepted document replacements can start expanded again. Cards and their **+** button stay inside that boundary; **Add section** sits
+outside the section containers and adds another section to the page.
+
+## Duplicating cards in Visual
+
+Use the **Duplicate card** copy icon on a card row to insert an independent copy
+immediately after it in the same section or flat page. The copy keeps its name,
+settings and exact embedded YAML; its generated popups have independent targets.
+Editing or deleting one copy leaves the other unchanged. Duplication changes only
+the draft: **Save & Generate** persists it. Fixed-column sections retain this exact order; automatic
+layouts keep their existing grouping by card type.
 
 ## Moving cards in Visual
 

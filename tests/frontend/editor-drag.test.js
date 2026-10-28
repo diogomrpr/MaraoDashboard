@@ -29,13 +29,13 @@ import vm from 'node:vm';
 const controllerSource = fs.readFileSync(new URL('../../frontend_src/editor-drag.js', import.meta.url), 'utf8');
 function controller() {
   const frames = new Map(), captures = new Set(), classes = new Set(), cues = new Set(), commits = [];
-  let nextFrame = 0, haptics = 0, headerBottom = 100, viewportHeight = 800;
+  let nextFrame = 0, haptics = 0, headerBottom = 100, viewportHeight = 800, collapsed = false;
   const scrollHost = new EventTarget();
   Object.assign(scrollHost, { scrollTop: 500, scrollHeight: 2000, clientHeight: 800, getBoundingClientRect: () => ({ top: 0, bottom: viewportHeight }) });
   const row = { classList: { add: x => classes.add(x), remove: x => classes.delete(x) }, getBoundingClientRect: () => rect(0, 100, 300, 700) };
   const handle = { closest: selector => selector === '[data-card-handle]' ? handle : row,
     setPointerCapture: id => captures.add(id), hasPointerCapture: id => captures.has(id), releasePointerCapture: id => captures.delete(id) };
-  const list = { dataset: { movePage: 'page:0', moveSection: '0' }, getClientRects: () => [1],
+  const list = { closest: () => collapsed ? {} : null, dataset: { movePage: 'page:0', moveSection: '0' }, getClientRects: () => [1],
     getBoundingClientRect: row.getBoundingClientRect, querySelectorAll: () => [row] };
   const root = new EventTarget();
   Object.assign(root, { host: scrollHost, querySelectorAll: () => [list], append: cue => cues.add(cue) });
@@ -58,6 +58,7 @@ function controller() {
   };
   const tick = (count = 1) => { for (let i = 0; i < count; i++) { const ready = [...frames]; frames.clear(); ready.forEach(([, callback]) => callback()); } };
   return { send, tick, binding, frames, captures, classes, cues, commits, scrollHost, get haptics() { return haptics; },
+    collapse() { collapsed = true; },
     activate(y, diagonal = false) { send('pointerdown', 30, y); send('pointermove', 40, y + (diagonal ? 10 : 0)); },
     resize(height, header = headerBottom) { viewportHeight = height; headerBottom = header; globalEvents.dispatchEvent(new Event('resize')); },
   };
@@ -149,4 +150,11 @@ test('valid release commits once with the current insertion boundary and consume
   assert.equal(c.commits.length, 1); assert.equal(c.commits[0][1], 0); assert.equal(c.commits[0][2], 0);
   assert.equal(c.haptics, 2); assert.equal(c.frames.size, 0); assert.equal(c.captures.size, 0);
   c.send('click', 40, 450); assert.equal(c.haptics, 2); c.binding.dispose();
+});
+
+
+test('collapsed section content is never a drop target even with retained geometry', () => {
+  const c = controller(); c.collapse(); c.activate(450); c.send('pointerup', 40, 450);
+  assert.equal(c.commits.length, 0); assert.equal(c.cues.size, 0);
+  c.binding.dispose();
 });

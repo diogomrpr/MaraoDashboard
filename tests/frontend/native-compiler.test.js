@@ -47,3 +47,18 @@ test('modern released baselines retain complete independent source/output target
     assert.equal(read(record.input),text);
   }
 });
+
+test('duplicated popup cards compile independently with exact fixed-column order', async () => {
+  const { duplicateCard } = await import('../../frontend_src/editor-model.js');
+  const input = structuredClone(source);
+  const section = { columns: 2, entities: [{ id: 'climate', template: 'md_climate_card', entity_id: 'climate.safe', name: 'Original', variables: { mode_selector_hash: '#owned-modes', target_step: 1 }, tap_action: { action: 'navigate', navigation_path: '#external' } }] };
+  input.pages[0].sections = [section];
+  const copy = duplicateCard(input, section, 0); copy.name = 'Independent'; copy.variables.target_step = 2;
+  const before = structuredClone(input), compiled = compileDashboard(input);
+  const cards = compiled.views[0].cards, sheets = cards.filter(card => card.type === 'custom:marao-popup-card');
+  assert.equal(sheets.length, 2); assert.notEqual(sheets[0].hash, sheets[1].hash);
+  assert.deepEqual(cards[0].cards.map(card => card.name), ['Original', 'Independent']);
+  assert.deepEqual(cards[0].cards.map(card => card.variables.target_step), [1, 2]);
+  assert.deepEqual(cards[0].cards.map(card => card.tap_action.navigation_path), ['#external', '#external']);
+  assert.deepEqual(input, before);
+});

@@ -56,7 +56,7 @@ still needs exact private backups and independent persisted/restart proof.
 | Native envelope | 1 | Strategy metadata wrapping the complete exact `source_json` string. |
 | Native compiler contract | 1 | Source-to-native strategy compilation contract. |
 | Legacy generated contract | 3 | Existing owned YAML/markers used only to recognize retained legacy output. |
-| Repository release | 0.22.1; 0.22.0 breaking transition; 0.22.1-beta.1 update test | v0.21.1 remains the immutable legacy rollback baseline. Package labels are separate from source/envelope versions. |
+| Repository release | 0.22.2; 0.22.0 breaking transition; 0.22.1-beta.1 update test | v0.21.1 remains the immutable legacy rollback baseline. Package labels are separate from source/envelope versions. |
 | Frontend graph | SHA-256 identity | Owned source/assets/build-rule identity, independent of release labels. |
 
 ## Local artifacts

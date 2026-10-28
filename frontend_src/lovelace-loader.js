@@ -26,7 +26,14 @@ async function load(hass, dashboardUrl) {
   if (panel._errorMsg) throw new Error(panel._errorMsg);
   const resources = await hass.callWS({ type: 'lovelace/resources' });
   // HA owns classic scripts/styles. Modules are cached by the browser and can be awaited safely.
-  await Promise.all(resources.filter(resource => resource.type === 'module').map(resource => import(new URL(resource.url, location.origin).href)));
+  const modules = resources.filter(resource => resource.type === 'module');
+  const results = await Promise.allSettled(modules.map(resource => import(new URL(resource.url, location.origin).href)));
+  const resourceErrors = results.flatMap((result, index) => {
+    if (result.status === 'fulfilled') return [];
+    const url = new URL(modules[index].url, location.origin);
+    // Identify the resource without displaying credentials or query-string secrets.
+    return [{ url: url.origin + url.pathname, error: result.reason }];
+  });
   const config = { views: [{ cards: [{ type: 'markdown', content: '' }] }] };
   const view = document.createElement('hui-view');
   view.hass = hass; view.index = 0; view.lovelace = { config, saveConfig: () => { throw new Error('Read-only editor bootstrap'); } };
@@ -43,5 +50,5 @@ async function load(hass, dashboardUrl) {
   if (imports.length !== 2) throw new Error('Home Assistant card editor could not load.');
   await Promise.all(imports);
   if (!customElements.get('hui-card-picker') || !customElements.get('hui-card-element-editor')) throw new Error('Home Assistant card editor could not load.');
-  return config;
+  return { config, resourceErrors };
 }
