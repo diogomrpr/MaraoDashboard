@@ -16,6 +16,37 @@ export function historyText(options, key) {
   return translated && translated !== key ? translated : (language.startsWith('pt') ? PT[key] : null) || key;
 }
 
+export function readableGraphColor(host, preferred, { background, tint } = {}) {
+  const computed = getComputedStyle(host), probe = (host.ownerDocument || document).createElement('span');
+  host.append(probe);
+  const resolve = color => { probe.style.color = ''; probe.style.color = color; return getComputedStyle(probe).color; };
+  const rgb = color => {
+    const match = /^rgba?\(([^)]+)\)$/.exec(color);
+    if (!match) return null;
+    const values = match[1].trim().split(/[\s,/]+/).map(Number);
+    return values.length >= 3 && values.every(Number.isFinite) ? [...values.slice(0, 3), values[3] ?? 1] : null;
+  };
+  const mix = (color, base, opacity = 1) => color ? color.slice(0, 3).map((value, index) => value * color[3] * opacity + base[index] * (1 - color[3] * opacity)) : base;
+  const luminance = color => color.reduce((sum, channel, index) => {
+    const value = channel / 255;
+    return sum + [.2126, .7152, .0722][index] * (value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+  }, 0);
+  try {
+    const surface = rgb(resolve(computed.getPropertyValue('--ha-card-background').trim() || computed.getPropertyValue('--card-background-color').trim() || '#fff')) || [255, 255, 255, 1];
+    let base = mix(rgb(resolve(background || computed.backgroundColor || 'transparent')), surface.slice(0, 3));
+    // Match the card tint's final opacity when selecting the trace color.
+    if (tint) base = mix(rgb(resolve(tint)), base, .3);
+    const baseLuminance = luminance(base);
+    for (const candidate of [preferred, computed.getPropertyValue('--primary-color').trim() || '#506F79', computed.color, '#000', '#fff']) {
+      const resolved = resolve(candidate), color = rgb(resolved);
+      if (!color) continue;
+      const foreground = luminance(mix(color, base));
+      if ((Math.max(foreground, baseLuminance) + .05) / (Math.min(foreground, baseLuminance) + .05) >= 3) return resolved;
+    }
+    return '#000';
+  } finally { probe.remove(); }
+}
+
 export const historyLayoutStyles = `
 .marao-history-chart{font-family:Montserrat,var(--primary-font-family,sans-serif);color:var(--primary-text-color);min-width:0;overflow-wrap:anywhere}
 .marao-history-chart *{box-sizing:border-box}.marao-history-chart .history-plot{position:relative;min-width:0;height:clamp(200px,36vh,300px)}

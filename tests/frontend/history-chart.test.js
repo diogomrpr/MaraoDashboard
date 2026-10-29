@@ -34,7 +34,7 @@ function fixture(options={}){
   const context=vm.createContext({...data,Chart:FakeChart,LineController:'line',LineElement:'lineElement',PointElement:'point',BarController:'bar',BarElement:'barElement',LinearScale:'linear',Filler:'fill',
     chartColor,document:doc,ResizeObserver:Observer,IntersectionObserver:VisibilityObserver,AbortController,CustomEvent,
     requestAnimationFrame:callback=>{frames.set(++frameId,callback);return frameId;},cancelAnimationFrame:id=>frames.delete(id),
-    getComputedStyle:element=>({color:options.theme?.[/^var\((--[^)]+)\)$/.exec(element.style.color)?.[1]]||element.style.color||options.theme?.['--primary-text-color']||'#233044',fontSize:'16px',getPropertyValue:key=>options.theme?.[key]||''})});
+    getComputedStyle:element=>({color:chartColor(options.theme?.[/^var\((--[^)]+)\)$/.exec(element.style.color)?.[1]]||element.style.color||options.theme?.['--primary-text-color']||'#233044').rgbString(),fontSize:'16px',getPropertyValue:key=>options.theme?.[key]||''})});
   context.powerStateAt=powerStateAt;
   vm.runInContext(layoutSource.replaceAll('export ', '') + '\n' + source.replace(/^import .*;\n/gm,'').replaceAll('export function','function')+'\nglobalThis.create=createHistoryChart;',context);
   const container=new Element('div'),end=Date.parse('2026-10-18T12:00:00Z');
@@ -274,19 +274,19 @@ test('history traces replace invisible colors without changing readings or line 
   const theme={'--ha-card-background':'#fff','--primary-color':'#506F79','--primary-text-color':'#263338','--active-text-color':'#fff'};
   const f=fixture({theme,color:'var(--active-text-color)'}),chart=f.instances[0];
   try{
-    assert.equal(chart.data.datasets[0].borderColor,'#506F79');
-    assert.equal(chart.data.datasets[1].backgroundColor,'#506F79');
+    assert.equal(chart.data.datasets[0].borderColor,chartColor('#506F79').rgbString());
+    assert.equal(chart.data.datasets[1].backgroundColor,chartColor('#506F79').rgbString());
     assert.deepEqual(chart.data.datasets[0].data.map(point=>point.y),f.samples.map(sample=>sample.value));
     f.renderer.update({color:'rgba(255, 255, 255, 0)'});
-    assert.equal(chart.data.datasets[0].borderColor,'#506F79');
+    assert.equal(chart.data.datasets[0].borderColor,chartColor('#506F79').rgbString());
     f.renderer.update({color:'#AD4E6C',showLine:false,showFill:false});
-    assert.equal(chart.data.datasets[0].borderColor,'#AD4E6C');
+    assert.equal(chart.data.datasets[0].borderColor,chartColor('#AD4E6C').rgbString());
     assert.equal(chart.data.datasets[0].borderWidth,0);assert.equal(chart.data.datasets[0].fill,false);
     Object.assign(theme,{'--ha-card-background':'#17282E','--primary-color':'#A6C2CB','--primary-text-color':'#F1F3EC'});
     f.renderer.update({color:'#000'});
-    assert.equal(chart.data.datasets[0].borderColor,'#A6C2CB');
+    assert.equal(chart.data.datasets[0].borderColor,chartColor('#A6C2CB').rgbString());
     f.renderer.update({color:'#fff'});
-    assert.equal(chart.data.datasets[0].borderColor,'#fff','White remains valid on a dark sheet');
+    assert.equal(chart.data.datasets[0].borderColor,chartColor('#fff').rgbString(),'White remains valid on a dark sheet');
   }finally{f.renderer.destroy();}
 });
 
@@ -300,16 +300,16 @@ test('all ten landscape colors stay shared across power lines, legends and energ
     breakdown:{items:light.map((_,index)=>({name:`Device ${index+1}`,value:1}))}});
   try{
     for(const [index,color] of light.entries()){
-      assert.equal(f.instances[0].data.datasets[index+1].borderColor,color);
-      assert.ok(f.elements('span').some(node=>node.style.background===color));
-      assert.ok(f.findClass('history-donut').style.background.includes(color));
+      assert.equal(f.instances[0].data.datasets[index+1].borderColor,chartColor(color).rgbString());
+      assert.ok(f.elements('span').some(node=>node.style.background===chartColor(color).rgbString()));
+      assert.ok(f.findClass('history-donut').style.background.includes(chartColor(color).rgbString()));
     }
     Object.assign(theme,{'--ha-card-background':'#17282E','--primary-text-color':'#F1F3EC','--primary-color':dark[0],...tokens(dark)});
     f.renderer.update({});
     for(const [index,color] of dark.entries()){
-      assert.equal(f.instances[0].data.datasets[index+1].borderColor,color);
-      assert.ok(f.elements('span').some(node=>node.style.background===color));
-      assert.ok(f.findClass('history-donut').style.background.includes(color));
+      assert.equal(f.instances[0].data.datasets[index+1].borderColor,chartColor(color).rgbString());
+      assert.ok(f.elements('span').some(node=>node.style.background===chartColor(color).rgbString()));
+      assert.ok(f.findClass('history-donut').style.background.includes(chartColor(color).rgbString()));
     }
   }finally{f.renderer.destroy();}
 });
@@ -322,7 +322,7 @@ test('power comparisons share the plot without smoothing peaks and report select
     series:[{id:'house',name:'House',samples},{id:'fridge',name:'Fridge',color:'#f00',samples:[{time:end-3600000,value:40},{time:end,value:80}]}]});
   try{
     const chart=f.instances[0];assert.equal(chart.data.datasets.length,3);assert.equal(chart.data.datasets[0].stepped,true);
-    assert.equal(chart.data.datasets[0].data[1].y,9000);assert.equal(chart.data.datasets[2].borderColor,'#f00');
+    assert.equal(chart.data.datasets[0].data[1].y,9000);assert.equal(chart.data.datasets[2].borderColor,chartColor('#f00').rgbString());
     assert.equal(chart.options.scales.y.ticks.callback(500),'500');assert.equal(f.findClass('history-unit').hidden,false);
     chart.options.onClick({x:end-1800000});
     const rows=f.findClass('history-comparison').children;assert.equal(rows[1].children.at(-1).textContent,'40 W');

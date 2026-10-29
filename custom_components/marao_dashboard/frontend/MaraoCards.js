@@ -8,7 +8,7 @@ const { lightColorCapabilities, lightColorAppearance, colorForeground } = lightC
 export { lightColorCapabilities };
 const { sensorThresholdError, sensorThresholdColor } = sensorThresholds;
 const { canonicalCard, canonicalTemplate } = names;
-const { createHistoryPlaceholder, createPowerToolbar } = historyLayout;
+const { createHistoryPlaceholder, createPowerToolbar, readableGraphColor } = historyLayout;
 export { createHistoryPlaceholder };
 const { MaraoNavbarCard, safeArea, navbarBottomGap, navbarRouteCurrent, navbarPartition, haptic, navigate, fullscreenUsers, findElements, focusRestorer, focusableElements, deepActiveElement, FOCUSABLE, beginFrontendInteraction } = navigationModule;
 export { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic, focusRestorer };
@@ -1001,7 +1001,8 @@ function cardStyles() {
     }
     .hold-progress { position:absolute; inset:1px; z-index:4; width:calc(100% - 2px); height:calc(100% - 2px); overflow:visible; pointer-events:none; }
     .hold-progress rect { width:calc(100% - 3px); height:calc(100% - 3px); rx:calc(var(--ha-card-border-radius,20px) - 2.5px); fill:none; stroke:var(--marao-accent-color,var(--primary-color)); stroke-width:3px; stroke-dasharray:100; stroke-dashoffset:100; opacity:0; }
-    .graph-background { position:absolute; inset:0; z-index:0; display:block; width:100%; height:100%; pointer-events:none; opacity:.30; background:var(--marao-graph-background,transparent); }
+    .graph-background { position:absolute; inset:0; z-index:0; display:block; width:100%; height:100%; pointer-events:none; opacity:.30; }
+    .graph-background .tint { fill:var(--marao-graph-background,transparent); }
     .graph-background .fill { fill:var(--marao-graph-color,var(--marao-card-text-color,var(--marao-accent-color,var(--primary-color)))); opacity:.16; }
     .graph-background .line { fill:none; stroke:var(--marao-graph-color,var(--marao-card-text-color,var(--marao-accent-color,var(--primary-color)))); stroke-width:2.25; vector-effect:non-scaling-stroke; }
     .graph-card .state { font-size:calc(var(--font-size-primary,1.125rem) * 1.12); font-weight:var(--font-weight-primary,700); }
@@ -1687,7 +1688,16 @@ export class MaraoCard extends BaseElement {
       const fill = variables.show_graph_fill !== false ? `<polygon class="fill" points="${points[0].split(',')[0]},100 ${points.join(' ')} ${points.at(-1).split(',')[0]},100"></polygon>` : '';
       return fill + (variables.show_graph_line !== false ? `<polyline class="line" points="${points.join(' ')}"></polyline>` : '');
     }).join('');
-    return `<svg class="graph-background" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${markup}</svg>`;
+    return `<svg class="graph-background" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect class="tint" width="100" height="100"></rect>${markup}</svg>`;
+  }
+
+  _syncGraphColor(card, variables) {
+    const graph = this.shadowRoot.querySelector('.graph-background');
+    if (!graph) return;
+    const color = text(variables.graph_color).trim() || 'var(--marao-chart-2,var(--color-purple))';
+    graph.style.setProperty('--marao-graph-color', readableGraphColor(card, color, {
+      background: getComputedStyle(card).backgroundColor, tint: text(variables.graph_background).trim(),
+    }));
   }
 
   _graphEntity() {
@@ -2030,6 +2040,7 @@ export class MaraoCard extends BaseElement {
       }
       if (text(variables.graph_color).trim()) card.style.setProperty("--marao-graph-color", text(variables.graph_color).trim());
       if (text(variables.graph_background).trim()) card.style.setProperty("--marao-graph-background", text(variables.graph_background).trim());
+      if (showsGraph) this._syncGraphColor(card, variables);
     }
     this._syncSceneDropdown(entity, controlsDisabled);
     if (contentChanged === false) {

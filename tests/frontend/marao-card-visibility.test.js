@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { bindDropdown } from '../../custom_components/marao_dashboard/frontend/MaraoDropdown.js';
+import { color as chartColor } from 'chart.js/helpers';
 
 globalThis.HTMLElement = class {
   getRootNode() { return {}; }
@@ -502,6 +503,70 @@ test("graph cards keep a single recorder history request and append live data", 
   assert.match(card.shadowRoot.innerHTML, /<polyline class="line"/);
   assert.match(card.shadowRoot.innerHTML, /130 W/);
   assert.match(source, /history\/period\/\$\{start\.toISOString\(\)\}/);
+});
+
+test('background graph colors follow the rendered card surface, active states and transparent tint', t => {
+  const card = new MaraoCard(), { surface } = retainedCardDOM(t, card);
+  const properties = new Map(), graphProperties = new Map(), graph = { style: { setProperty: (key, value) => graphProperties.set(key, value) } };
+  surface.style = { setProperty: (key, value) => properties.set(key, value) };
+  surface.ownerDocument = { createElement: () => ({ style: {}, remove() { surface.childNodes = surface.childNodes.filter(node => node !== this); } }) };
+  const query = card.shadowRoot.querySelector;
+  card.shadowRoot.querySelector = selector => selector === '.graph-background' ? graph : query(selector);
+  const theme = { '--ha-card-background':'#fff', '--primary-color':'#506F79', '--primary-text-color':'#263338', '--marao-chart-2':'#8E5B83' };
+  const previousComputedStyle = globalThis.getComputedStyle;
+  t.after(() => { globalThis.getComputedStyle = previousComputedStyle; });
+  globalThis.getComputedStyle = element => ({
+    color: chartColor(element === surface ? properties.get('--marao-card-text-color') || theme['--primary-text-color'] : theme[/^var\((--[^,)]+)/.exec(element.style.color)?.[1]] || element.style.color || theme['--primary-text-color']).rgbString(),
+    backgroundColor: chartColor(properties.get('--marao-card-background') || theme['--ha-card-background']).rgbString(),
+    getPropertyValue: key => theme[key] || '',
+  });
+  const now = Date.now(), samples = [{ time:now-1000, value:1 }, { time:now, value:2 }];
+  card._config = { template:'md_toggle_graph_card', entity:'sensor.power', variables:{ toggle_entity:'switch.safe', graph_color:'#fff', active_color:'#fff', active_content_color:'#263338', inactive_background:'#fff', inactive_name_color:'#263338' } };
+  const state = enabled => ({ states: { 'sensor.power':{ state:'2', attributes:{} }, 'switch.safe':{ state:enabled, attributes:{} } } });
+  card._graphHistory.set('sensor.power', []);
+  card._graphValues = () => ({ values:samples, error:false });
+  card._hass = state('off'); card._render();
+  assert.equal(graphProperties.get('--marao-graph-color'), chartColor('#506F79').rgbString());
+  card._config.variables.active_color = '#17282E'; card._config.variables.active_content_color = '#fff';
+  card._hass = state('on'); card._render();
+  assert.equal(graphProperties.get('--marao-graph-color'), chartColor('#fff').rgbString(), 'White stays visible on an active dark card');
+  card._config.variables.graph_color = '#17282E'; card._render();
+  assert.equal(graphProperties.get('--marao-graph-color'), chartColor('#fff').rgbString(), 'A graph matching the active surface uses contrasting text');
+  card._config.variables.graph_color = '#777'; card._config.variables.graph_background = '#000';
+  card._hass = state('off'); card._render();
+  assert.equal(graphProperties.get('--marao-graph-color'), chartColor('#263338').rgbString(), 'Tint composition must be included in contrast');
+  card._config.variables.graph_color = '#AD4E6C'; card._config.variables.graph_background = '';
+  card._render();
+  assert.equal(graphProperties.get('--marao-graph-color'), chartColor('#AD4E6C').rgbString());
+  delete card._config.variables.graph_color;
+  card._render();
+  assert.equal(graphProperties.get('--marao-graph-color'), chartColor('#8E5B83').rgbString(), 'Default graphs use muted purple rather than the switch accent');
+  theme['--marao-chart-2'] = '#CCA2C4';
+  card._config.variables.inactive_background = '#17282E'; card._render();
+  assert.equal(graphProperties.get('--marao-graph-color'), chartColor('#CCA2C4').rgbString());
+  assert.deepEqual(samples, [{ time:now-1000, value:1 }, { time:now, value:2 }]);
+});
+
+test('dense card traces stay in the background without adding a separate plot area', () => {
+  const card = new MaraoCard(), now = Date.now();
+  card._config = { template:'md_switch_card', entity:'switch.safe', name:'Switch + graph', variables:{ power_entity:'sensor.power', show_graph:true } };
+  card._hass = { states: { 'switch.safe':{ state:'off', attributes:{} }, 'sensor.power':{ state:'145', attributes:{ unit_of_measurement:'W' } } } };
+  card._graphValues = () => ({ values:[{ time:now-1000, value:0 }, { time:now, value:145 }], error:false });
+  card._graphHistory.set('sensor.power', [{ state:'145' }]);card._render();
+  const content = card.shadowRoot.innerHTML.split('</style>')[1];
+  assert.match(content, /^<ha-card[^>]*><svg class="graph-background"/);
+  assert.ok(content.indexOf('class="graph-background"') < content.indexOf('class="title"'));
+  assert.ok(content.indexOf('class="graph-background"') < content.indexOf('data-history-open'));
+  assert.doesNotMatch(content, /graph-space/);
+  for (const state of ['loading','empty','error','unavailable']) {
+    card._graphHistory.delete('sensor.power');card._graphErrors.clear();
+    if (state === 'empty') card._graphHistory.set('sensor.power', []);
+    if (state === 'error') card._graphErrors.add('sensor.power');
+    if (state === 'unavailable') card._hass.states['sensor.power'].state = 'unavailable';
+    card._render();
+    assert.doesNotMatch(card.shadowRoot.innerHTML, /graph-space/, state);
+    assert.doesNotMatch(card.shadowRoot.innerHTML, /class="graph-background"/, state);
+  }
 });
 
 test("graph cards sample full history to a card-scale trace", () => {

@@ -8,7 +8,8 @@ parent: Cards
 # Graph Card
 
 `md_graph_card` shows a sensor's live numeric reading over Marao's own
-24-hour background trace. The trace reads Home Assistant recorder history once
+24-hour background trace. Its muted purple color and low opacity keep labels and
+icons prominent. The trace reads Home Assistant recorder history once
 for the card, appends the current state, and needs no native history-graph card
 or other frontend resource. If no numeric history is available, the current
 reading remains visible and the background stays neutral.
@@ -37,7 +38,7 @@ Reported media or history failures affect the whole card and keep a readable rea
 
 | Variable | Default | Required | Description |
 |----------|---------|----------|------------|
-| graph_color | Theme card text/accent color | No | Color for the graph line and fill. |
+| graph_color | Muted purple chart palette | No | Color for the graph line and fill, with a readable contrast fallback. |
 | graph_background | Transparent | No | Optional tint behind the graph, without replacing the card's state background. |
 | show_graph_line | true | No | Show the graph line. |
 | show_graph_fill | true | No | Show the graph fill. |

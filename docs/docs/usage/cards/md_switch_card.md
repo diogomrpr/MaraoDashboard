@@ -28,7 +28,7 @@ With the `md_switch_card` you can control your switch. It gives the ability to a
 | power_entity | / | No | The entity that shows the power consumption. |
 | power_unit | Entity unit or W | No | Legacy label only; does not convert the reading. New formatting takes precedence. |
 | show_graph | false | No | If true, a graph will be shown as background. NOTE: It will not show if there is no Power Entity given! |
-| graph_color | Theme text/accent color | No | The color will be used for the graph. Line, fill or both. |
+| graph_color | Muted purple chart palette | No | Graph line and fill color, with a readable contrast fallback. |
 | show_graph_line | true | No | If true, a line will be shown in the graph. |
 | show_graph_fill | false | No | If true, the graph will be filled. |
 

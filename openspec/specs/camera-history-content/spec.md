@@ -72,6 +72,17 @@ primary content. Empty or failed history SHALL leave the trace neutral, not fabr
 - **THEN** the numeric source's detail opens without dispatching a toggle or the configured card action
 - **AND** its actual toggle target retains independent state and availability handling
 
+#### Scenario: A background trace blends into its card
+- **WHEN** a graph color has insufficient contrast against the card's current surface, including an active state or configured background tint
+- **THEN** the trace uses the same readable-color selection as numeric detail before applying its decorative background opacity
+- **AND** the subtle fill and tint, readable custom colors, line/fill choices, recorded values and card actions remain preserved
+
+#### Scenario: A dense trace competes with card content
+- **WHEN** a card shows a graph alongside labels, readings, icons or controls
+- **THEN** the trace fills the card background at 30% opacity, matching the approved House Power appearance while keeping primary content readable
+- **AND** its default color uses the theme's muted purple chart palette with a readable contrast fallback
+- **AND** showing or hiding history adds no separate plot area or card height
+
 #### Scenario: Additional project-owned background history trace contracts
 - **WHEN** a numeric graph card renders with configured history options
 - **THEN** Compact previews SHALL remain non-interactive and provide a separate visible History control for numeric detail without replacing existing card actions.

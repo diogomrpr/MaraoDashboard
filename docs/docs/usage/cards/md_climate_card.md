@@ -39,7 +39,7 @@ card restores the reported setting and shows “Change not confirmed”.
 | setpoint_label | Localized target temperature | Accessible name for the target stepper. |
 | show_graph | false | Show a temperature history graph behind the card. |
 | graph_entity | Empty | Sensor entity supplying the graph. |
-| graph_color | Theme text/accent color | Graph line and fill color. |
+| graph_color | Muted purple chart palette | Graph line and fill color, with a readable contrast fallback. |
 
 ## State colors
 

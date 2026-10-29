@@ -47,7 +47,7 @@ Reported media or history failures affect the whole card and keep a readable rea
 | <span class="entry-type-marao_dashboard"></span> show_graph_fill | true | No | true |
 | <span class="entry-type-marao_dashboard"></span> show_graph_line | true | No | true |
 | <span class="entry-type-marao_dashboard"></span> show_icon | true | No | true |
-| <span class="entry-type-marao_dashboard"></span> graph_color | Theme card text/accent color | No | var(--color-orange) |
+| <span class="entry-type-marao_dashboard"></span> graph_color | Muted purple chart palette | No | var(--color-orange) |
 | <span class="entry-type-marao_dashboard"></span> graph_background | Transparent | No | rgba(255, 255, 255, 0.08) |
 
 ## More info
