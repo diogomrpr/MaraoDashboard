@@ -11,7 +11,28 @@ export function createHistoryChart(container, initial) {
   const { make, root, total, totalTitle, totalValue, reading, value, timestamp, unit, plot, canvas, windows, windowButtons, actions, reset, previous, navigationLabel, next, stats, summaries, status, coverage, retry, comparison, breakdown } = createHistoryLayout(container, initial);
   let options = initial, chart, selectedTime, reportedTime, hours=24, destroyed=false, visible=[], drawError, scrollFrame, inViewport=true;
   const events = new AbortController();
-  const seriesColor = index => getComputedStyle(root).getPropertyValue(`--marao-chart-${index % 10 + 1}`).trim() || `hsl(${(210 + index * 137.5) % 360} 55% 48%)`;
+  const readableColor = preferred => {
+    const computed=getComputedStyle(root), probe=make('span','',root);
+    const resolve=color=>{probe.style.color='';probe.style.color=color;return getComputedStyle(probe).color;};
+    const background=chartColor(resolve(computed.getPropertyValue('--ha-card-background').trim() || computed.getPropertyValue('--card-background-color').trim() || '#fff')).rgb;
+    const luminance=rgb=>[rgb.r,rgb.g,rgb.b].reduce((sum,channel,index)=>{
+      const value=channel/255;
+      return sum+[.2126,.7152,.0722][index]*(value<=.04045?value/12.92:((value+.055)/1.055)**2.4);
+    },0);
+    const base=luminance(background);
+    const contrast=color=>{
+      const rgb=chartColor(color).rgb;if(!rgb)return 0;
+      const foreground=luminance(Object.fromEntries(['r','g','b'].map(key=>[key,rgb[key]*rgb.a+background[key]*(1-rgb.a)])));
+      return (Math.max(foreground,base)+.05)/(Math.min(foreground,base)+.05);
+    };
+    // Card colors can disappear against the detail sheet; require visible non-text contrast.
+    let resolved;
+    for(const candidate of [preferred,computed.getPropertyValue('--primary-color').trim() || '#506F79',computed.color,'#000','#fff']){
+      resolved=resolve(candidate);if(contrast(resolved)>=3)break;
+    }
+    probe.remove();return resolved;
+  };
+  const seriesColor = index => readableColor(getComputedStyle(root).getPropertyValue(`--marao-chart-${index % 10 + 1}`).trim() || `hsl(${(210 + index * 137.5) % 360} 55% 48%)`);
   const language = () => options.hass?.locale?.language || options.hass?.language || 'en';
   const text = key => historyText(options, key);
   const formatter = () => new Intl.DateTimeFormat(language(), { timeZone:options.hass?.config?.time_zone || 'UTC',
@@ -54,8 +75,7 @@ export function createHistoryChart(container, initial) {
     const bounds=plot.getBoundingClientRect();if(bounds.width<=0||bounds.height<=0)return;
     const computed=getComputedStyle(root), tone=computed.color || '#263338', grid=computed.getPropertyValue('--divider-color').trim() || '#7B8C91';
     const color=options.color || options.series?.[0]?.color || computed.getPropertyValue('--primary-color').trim() || '#506F79';
-    // Resolve theme variables through the DOM before passing a canvas color to Chart.js.
-    const probe=make('span','',root);probe.style.color=color;const trace=getComputedStyle(probe).color;probe.remove();
+    const trace=readableColor(color);
     const data=options.bars ? visible.map((sample,index)=>({x:midpoint(sample,index),y:sample.value}))
       : reduceSamples(visible,Math.max(32,Math.floor(bounds.width*2))).map(sample=>({x:sample.time,y:sample.value}));
     const holdLastState=points=>{
@@ -78,7 +98,7 @@ export function createHistoryChart(container, initial) {
     if(options.power)for(const [index,item] of (options.series||[]).entries()){
       if(!index)continue;
       const points=reduceSamples((item.samples||[]).filter(sample=>sample.time>=currentRange.start&&sample.time<=currentRange.end),Math.max(32,Math.floor(bounds.width*2))).map(sample=>({x:sample.time,y:sample.value}));
-      datasets.push({type:'line',data:holdLastState(points),borderColor:item.color||seriesColor(index),borderWidth:2,pointRadius:0,spanGaps:false,tension:0,stepped:true,fill:false});
+      datasets.push({type:'line',data:holdLastState(points),borderColor:item.color?readableColor(item.color):seriesColor(index),borderWidth:2,pointRadius:0,spanGaps:false,tension:0,stepped:true,fill:false});
     }
     const chartOptions={responsive:true,maintainAspectRatio:false,animation:false,parsing:false,normalized:true,devicePixelRatio:Math.min(globalThis.devicePixelRatio||1,3),events:['click'],
       onClick:event=>{
@@ -158,7 +178,7 @@ export function createHistoryChart(container, initial) {
       const rows=[];
       for(const [index,item] of options.series.entries()){
         const row=make('div'),heading=make('span','history-item-heading',row),swatch=make('span','history-swatch',heading);row.setAttribute('role','listitem');
-        swatch.style.background=item.color||(!index?options.color||'var(--primary-color)':seriesColor(index));swatch.setAttribute('aria-hidden','true');
+        swatch.style.background=item.color?readableColor(item.color):!index?readableColor(options.color||'var(--primary-color)'):seriesColor(index);swatch.setAttribute('aria-hidden','true');
         make('span','',heading).textContent=item.name;
         const sample=Number.isFinite(selectedTime)?powerStateAt(item.samples||[],selectedTime):null;
         const reading=make('span',item.problem?'history-item-problem':'',row);

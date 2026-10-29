@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { color as chartColor } from 'chart.js/helpers';
 import * as data from '../../frontend_src/history-data.js';
 import { powerStateAt } from '../../frontend_src/power-history.js';
 const layoutSource=fs.readFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoHistoryLayout.js',import.meta.url),'utf8');
@@ -31,9 +32,9 @@ function fixture(options={}){
   class Observer{constructor(callback){this.callback=callback;observers.push(this);}observe(){}disconnect(){this.disconnected=true;}}
   class VisibilityObserver{constructor(callback){this.callback=callback;visibilityObservers.push(this);}observe(){}disconnect(){this.disconnected=true;}}
   const context=vm.createContext({...data,Chart:FakeChart,LineController:'line',LineElement:'lineElement',PointElement:'point',BarController:'bar',BarElement:'barElement',LinearScale:'linear',Filler:'fill',
-    chartColor:value=>({alpha:()=>({rgbString:()=>value})}),document:doc,ResizeObserver:Observer,IntersectionObserver:VisibilityObserver,AbortController,CustomEvent,
+    chartColor,document:doc,ResizeObserver:Observer,IntersectionObserver:VisibilityObserver,AbortController,CustomEvent,
     requestAnimationFrame:callback=>{frames.set(++frameId,callback);return frameId;},cancelAnimationFrame:id=>frames.delete(id),
-    getComputedStyle:element=>({color:element.style.color||'#233044',fontSize:'16px',getPropertyValue:key=>options.theme?.[key]||''})});
+    getComputedStyle:element=>({color:options.theme?.[/^var\((--[^)]+)\)$/.exec(element.style.color)?.[1]]||element.style.color||options.theme?.['--primary-text-color']||'#233044',fontSize:'16px',getPropertyValue:key=>options.theme?.[key]||''})});
   context.powerStateAt=powerStateAt;
   vm.runInContext(layoutSource.replaceAll('export ', '') + '\n' + source.replace(/^import .*;\n/gm,'').replaceAll('export function','function')+'\nglobalThis.create=createHistoryChart;',context);
   const container=new Element('div'),end=Date.parse('2026-10-18T12:00:00Z');
@@ -269,11 +270,31 @@ test('local chart assets use selective registration and ship both exact dependen
   }
 });
 
+test('history traces replace invisible colors without changing readings or line and fill preferences',()=>{
+  const theme={'--ha-card-background':'#fff','--primary-color':'#506F79','--primary-text-color':'#263338','--active-text-color':'#fff'};
+  const f=fixture({theme,color:'var(--active-text-color)'}),chart=f.instances[0];
+  try{
+    assert.equal(chart.data.datasets[0].borderColor,'#506F79');
+    assert.equal(chart.data.datasets[1].backgroundColor,'#506F79');
+    assert.deepEqual(chart.data.datasets[0].data.map(point=>point.y),f.samples.map(sample=>sample.value));
+    f.renderer.update({color:'rgba(255, 255, 255, 0)'});
+    assert.equal(chart.data.datasets[0].borderColor,'#506F79');
+    f.renderer.update({color:'#AD4E6C',showLine:false,showFill:false});
+    assert.equal(chart.data.datasets[0].borderColor,'#AD4E6C');
+    assert.equal(chart.data.datasets[0].borderWidth,0);assert.equal(chart.data.datasets[0].fill,false);
+    Object.assign(theme,{'--ha-card-background':'#17282E','--primary-color':'#A6C2CB','--primary-text-color':'#F1F3EC'});
+    f.renderer.update({color:'#000'});
+    assert.equal(chart.data.datasets[0].borderColor,'#A6C2CB');
+    f.renderer.update({color:'#fff'});
+    assert.equal(chart.data.datasets[0].borderColor,'#fff','White remains valid on a dark sheet');
+  }finally{f.renderer.destroy();}
+});
+
 test('all ten landscape colors stay shared across power lines, legends and energy donuts after a theme change',()=>{
   const light=['#506F79','#8E5B83','#39755B','#947023','#A15F43','#79776D','#317F7B','#5476A4','#AD4E6C','#77659F'];
   const dark=['#A6C2CB','#CCA2C4','#91C9AA','#E2CD91','#DDA582','#C1BCAF','#80C6C0','#9FBCE8','#E49FB4','#B9ACE0'];
   const tokens=colors=>Object.fromEntries(colors.map((color,index)=>[`--marao-chart-${index+1}`,color]));
-  const theme={'--primary-color':light[0],...tokens(light)};
+  const theme={'--ha-card-background':'#fff','--primary-text-color':'#263338','--primary-color':light[0],...tokens(light)};
   const end=Date.parse('2026-10-18T12:00:00Z'),samples=[{time:end-1000,value:1},{time:end,value:2}];
   const f=fixture({theme,power:true,samples,range:{start:end-1000,end},series:light.map((_,index)=>({name:`Device ${index+1}`,samples})),
     breakdown:{items:light.map((_,index)=>({name:`Device ${index+1}`,value:1}))}});
@@ -283,7 +304,7 @@ test('all ten landscape colors stay shared across power lines, legends and energ
       assert.ok(f.elements('span').some(node=>node.style.background===color));
       assert.ok(f.findClass('history-donut').style.background.includes(color));
     }
-    Object.assign(theme,{'--primary-color':dark[0],...tokens(dark)});
+    Object.assign(theme,{'--ha-card-background':'#17282E','--primary-text-color':'#F1F3EC','--primary-color':dark[0],...tokens(dark)});
     f.renderer.update({});
     for(const [index,color] of dark.entries()){
       assert.equal(f.instances[0].data.datasets[index+1].borderColor,color);

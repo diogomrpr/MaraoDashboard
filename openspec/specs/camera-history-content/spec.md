@@ -250,6 +250,11 @@ Details SHALL use Marao theme and scalable typography with sparse time labels an
 - **THEN** axes, trace, selection and surrounding text update coherently and retain readable contrast
 - **AND** existing graph colors and line/fill preferences remain meaningful
 
+#### Scenario: A card's graph color disappears against its detail sheet
+- **WHEN** a configured graph color has less than 3:1 contrast against the sheet background, including white on a light sheet or black on a dark sheet
+- **THEN** the chart uses a readable theme color for the trace and selected marker, with matching series swatches
+- **AND** readable configured colors, line/fill preferences, saved configuration and historical values remain unchanged
+
 ### Requirement: Local on-demand chart lifecycle
 Detailed chart code SHALL load from integration-owned assets only when numeric detail is opened. Repeated opens SHALL share the module load and reuse compatible history. Module/history failures SHALL have readable explicit retry without automatic loops. Unavailable sources SHALL remain neutral. Closing, source/route replacement or removal SHALL release chart resources and invalidate stale completions.
 
