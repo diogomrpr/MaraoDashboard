@@ -218,7 +218,10 @@ the action it affects.
   below. Hidden titles/icons and icon-only intent remain respected.
 - The Wallbox maximum-current card uses the approved large current reading above
   its optional title, with the shared up/down buttons in a vertical pill at right.
-  Keep the default background neutral; preserve configured shortcuts and colors.
+  Keep the default background neutral; preserve configured shortcuts and use
+  their positional colors only for the shortcut matching the reported value.
+  Unselected shortcuts stay neutral, with the selected outline and semantic
+  pressed state retained as additional cues.
 - Give other visible Marao card titles the full content width in their first row.
   Put icons, readings and controls below them, including climate steppers, Wallbox
   shortcuts and separate history, energy and camera-event headers.

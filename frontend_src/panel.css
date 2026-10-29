@@ -219,6 +219,13 @@ ha-dialog { --ha-icon-button-size: 48px; }
 .page-section .section-number { display: grid; place-items: center; width: max(32px, 2em); height: max(32px, 2em); flex: 0 0 auto; padding: 0; border-radius: 50%; background: var(--primary-color); color: var(--text-primary-color); font-variant-numeric: tabular-nums; }
 .page-section .entity-row { border-color: color-mix(in srgb, var(--divider-color) 65%, transparent); background: var(--card-background-color); }
 .page-section + .page-section, .page-section + [data-action="section-add"] { margin-top: 24px; }
+.energy-contributors { display: grid; gap: 12px; }
+.energy-contributor + .energy-contributor { margin-top: 0; }
+.energy-contributor > summary.card-heading { flex-wrap: wrap; gap: 8px; }
+.energy-contributor > summary > .entity-main { flex: 1 1 12ch; }
+.energy-contributor > summary > .row-actions { margin-inline-start: auto; }
+.energy-contributor > summary::after { align-self: center; }
+.energy-contributor > .advanced-form { padding: 8px 0 0; }
 @media (max-width: 600px) {
   .page-section { --section-padding: 8px; }
 }

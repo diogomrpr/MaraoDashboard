@@ -284,6 +284,15 @@ entities, selected Room lights, explicit native scenes, energy periods/history,
 charging presets, media apps and secondary remote bindings. Confirming an edit
 changes the draft; it does not save or actuate an entity.
 
+In an energy card's **Energy breakdown** (**Distribuição de energia**), each
+existing contributor starts as a collapsed group showing its name and sensor ID.
+Tap its heading to edit the energy sensor, display name and optional cost sensor
+inline. Groups open independently; a newly added contributor opens immediately.
+Move up/down and delete remain available in the header. Expansion follows entries
+while editing and reordering, resets when the card dialog is reopened and is never
+saved. Cancel discards the card dialog's changes; confirming updates the local
+dashboard draft until **Save & Generate**.
+
 The **JSON** tab edits the same document, with folding, formatting, validation,
 schema help and entity suggestions. Switching tabs preserves unknown fields,
 raw Lovelace cards, selections, order and explicit empty or absent content.

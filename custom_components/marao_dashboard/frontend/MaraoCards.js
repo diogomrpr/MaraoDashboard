@@ -970,10 +970,9 @@ function cardStyles() {
     .exhaust-actions:empty {display:none;}
     .wallbox-shortcuts { grid-area:wallbox; z-index:2; display:grid; grid-template-columns:repeat(auto-fit,minmax(48px,1fr)); gap:8px; width:100%; margin-top:8px; pointer-events:auto; }
     .wallbox-shortcuts button, .exhaust-actions button { min-width:48px; min-height:48px; background:var(--opacity-contrast-100,color-mix(in srgb,currentColor 14%,transparent)); color:var(--primary-text-color,#141414); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-black,#000) 12%,transparent); font-size:var(--font-size-primary,1.125rem); font-weight:var(--font-weight-primary,700); }
-    .wallbox-shortcuts button { background:var(--color-blue); color:var(--color-black); }
-    .wallbox-shortcuts button:nth-child(2) { background:var(--color-teal); }
-    .wallbox-shortcuts button:nth-child(3) { background:var(--color-gold); }
-    .wallbox-shortcuts button[aria-pressed="true"] { box-shadow:inset 0 0 0 3px var(--color-black); }
+    .wallbox-shortcuts button[aria-pressed="true"]:not(:disabled) { background:var(--color-blue); color:var(--color-black); box-shadow:inset 0 0 0 3px var(--color-black); }
+    .wallbox-shortcuts button[aria-pressed="true"]:not(:disabled):nth-child(2) { background:var(--color-teal); }
+    .wallbox-shortcuts button[aria-pressed="true"]:not(:disabled):nth-child(3) { background:var(--color-gold); }
     .wallbox-shortcuts button:disabled { background:var(--secondary-background-color); color:var(--disabled-text-color); box-shadow:none; }
     .control.climate-number-control { align-self:stretch; }
     .number-stepper { display:grid; justify-items:center; gap:2px; min-width:84px; width:auto; max-width:42vw; padding:4px; box-sizing:border-box; border-radius:999px; background:var(--button-card-background,var(--secondary-background-color)); }

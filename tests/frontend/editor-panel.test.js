@@ -1077,11 +1077,107 @@ test('energy breakdown editing keeps a private draft and preserves ordered unkno
   assert.ok(!forms[0].schema.some(field => field.name === 'var__sub_entities'));
   members.reverse(); members[1].name = 'Renamed'; update(members);
   const saved = () => JSON.parse(JSON.stringify(p._model.pages[0].sections[0].entities[0]));
+  handlers['[data-close]click']();
   assert.deepEqual(saved(), original, 'Cancelling the dialog leaves the document untouched');
-  forms[0].changed({ ...forms[0].data, var__cost_per_kwh: 0 }); handlers['[data-save]click']();
+  p._openCardEditor('0:0', 0, null, 'page');
+  assert.deepEqual(JSON.parse(JSON.stringify(members)), original.variables.sub_entities, 'Reopening starts from the unchanged card');
+  members.reverse(); members[1].name = 'Renamed'; update(members);
+  forms.at(-1).changed({ ...forms.at(-1).data, var__cost_per_kwh: 0 }); handlers['[data-save]click']();
   assert.deepEqual(saved().variables, { future: true, cost_per_kwh: 0, sub_entities: [original.variables.sub_entities[1], { ...original.variables.sub_entities[0], name: 'Renamed' }] });
   update([]); handlers['[data-save]click']();
   assert.deepEqual(saved().variables.sub_entities, []);
+});
+
+test('energy contributor disclosures stay local, keep live forms and follow row actions', () => {
+  const p = panel(canonical()), previous = context.document;
+  let focused, changes = 0, last;
+  // Extend the panel's native-element stub with the nodes used by this list.
+  class Node {
+    constructor(localName = 'div') { this.localName = localName; this.children = []; this.listeners = {}; this.open = false; this.dataset = {}; }
+    append(...children) { this.children.push(...children); }
+    replaceChildren(...children) { this.children = children; }
+    addEventListener(type, callback) { this.listeners[type] = callback; }
+    focus() { focused = this; }
+    fire(type, detail) {
+      const event = { detail, preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } };
+      this.listeners[type]?.(event); return event;
+    }
+    set innerHTML(value) {
+      this.children = []; this.markup = value;
+      if (value.includes('data-energy-rows')) {
+        this.nodes = { '[data-energy-rows]': new Node(), '[data-list-error]': new Node(), '[data-energy-add]': new Node('ha-button') };
+      } else if (value.includes('class="entity-name"')) {
+        this.nodes = { '.entity-name': new Node(), '.entity-meta': new Node() };
+      }
+      for (const [markup, action] of value.matchAll(/<button\b[^>]*data-action="([^"]+)"[^>]*>/g)) {
+        const button = new Node('button'); button.dataset.action = action; button.disabled = /\sdisabled[\s>]/.test(markup); this.append(button);
+      }
+    }
+    querySelector(selector) {
+      if (this.nodes?.[selector]) return this.nodes[selector];
+      return this.children.find(child => selector === child.localName || selector === `[data-action="${child.dataset.action}"]`)
+        || this.children.map(child => child.querySelector(selector)).find(Boolean);
+    }
+    querySelectorAll() { return this.children.filter(child => child.dataset.action); }
+  }
+  context.document = { createElement: name => new Node(name) };
+  p._containForm = async () => {}; p._focusWithoutScroll = node => node.focus();
+  p._entities = [{ entity_id: 'sensor.heating', name: 'Heating' }];
+  p._hass.states = { 'sensor.lighting': { attributes: { friendly_name: 'Lighting' } } };
+  const original = [{ entity_id: 'sensor.heating', future: [] }, { entity_id: 'sensor.lighting', name: 'My lights', cost_entity: 'sensor.cost' }];
+  const host = new Node(), changed = value => { changes++; last = value; };
+  const rows = () => host.querySelector('[data-energy-rows]').children;
+  const heading = row => row.querySelector('summary');
+  const label = row => row.querySelector('.entity-name').textContent;
+  const form = row => row.querySelector('ha-form');
+  try {
+    p._renderEnergySubEntities(host, structuredClone(original), changed);
+    assert.deepEqual(rows().map(row => [row.localName, row.open, label(row)]), [['details', false, 'Heating'], ['details', false, 'My lights']]);
+    assert.equal(rows()[0].querySelector('.entity-meta').textContent, 'sensor.heating');
+    const first = rows()[0], second = rows()[1], nativeForm = form(first), input = new Node('input');
+    assert.deepEqual(Array.from(nativeForm.schema, field => field.name), ['entity_id', 'name', 'cost_entity']);
+    first.open = true; second.open = true; first.open = false;
+    assert.equal(second.open, true, 'Native disclosures operate independently');
+    assert.equal(changes, 0); assert.equal(p._dirty, false);
+    first.open = true; nativeForm.append(input); input.value = 'Uncommitted input'; input.focus();
+    nativeForm.fire('value-changed', { value: { entity_id: 'sensor.heating', name: 'Renamed', cost_entity: '' } });
+    assert.equal(label(first), 'Renamed'); assert.equal(form(first), nativeForm);
+    assert.equal(focused, input); assert.equal(input.value, 'Uncommitted input');
+    nativeForm.fire('value-changed', { value: { entity_id: 'sensor.lighting', name: '', cost_entity: '' } });
+    assert.equal(label(first), 'Lighting'); assert.equal(first.open, true);
+    assert.equal(first.querySelector('.entity-meta').textContent, 'sensor.lighting');
+    second.open = false;
+    const move = second.querySelector('[data-action="up"]').fire('click');
+    assert.equal(move.prevented, true); assert.equal(move.stopped, true);
+    assert.equal(changes, 3, 'Each field update and move notifies once');
+    assert.deepEqual(rows().map(row => [label(row), row.open]), [['My lights', false], ['Lighting', true]]);
+    assert.equal(focused, heading(rows()[0]), 'A move to its boundary focuses the disclosure instead of a disabled action');
+    assert.equal(rows()[0].querySelector('[data-action="up"]').disabled, true);
+    assert.equal(rows()[1].querySelector('[data-action="down"]').disabled, true);
+    p._hass.language = 'pt';
+    host.querySelector('[data-energy-add]').fire('click');
+    assert.deepEqual(rows().map(row => row.open), [false, true, true]);
+    assert.equal(label(rows()[2]), 'Nova entidade de energia');
+    assert.match(model.validateEnergyOptions({ sub_entities: last }).join(' '), /Choose an energy sensor/);
+    rows()[2].open = false;
+    assert.match(model.validateEnergyOptions({ sub_entities: last }).join(' '), /Choose an energy sensor/, 'Collapsing does not bypass list validation');
+    const deletion = rows()[0].querySelector('[data-action="delete"]').fire('click');
+    assert.equal(deletion.prevented, true); assert.equal(deletion.stopped, true);
+    assert.deepEqual(rows().map(row => row.open), [true, false]);
+    assert.deepEqual(JSON.parse(JSON.stringify(last)), [{ entity_id: 'sensor.lighting', future: [] }, { entity_id: '' }]);
+    assert.deepEqual(original[0].future, []);
+    p._renderEnergySubEntities(host, last, changed);
+    assert.ok(rows().every(row => !row.open), 'A reopened editor resets disclosure state');
+    rows()[0].querySelector('[data-action="delete"]').fire('click');
+    rows()[0].querySelector('[data-action="delete"]').fire('click');
+    assert.deepEqual(Array.from(last), []); assert.equal(focused, host.querySelector('[data-energy-add]'));
+    p._renderEnergySubEntities(host, structuredClone(original), changed, true);
+    assert.ok(rows().every(row => row.localName === 'div' && !heading(row)), 'Power devices keep their existing full forms');
+    assert.deepEqual(Array.from(form(rows()[0]).schema, field => field.name), ['entity_id', 'name']);
+    p._renderEnergySubEntities(host, [{ value: 0, color: '#ffffff' }], changed, false, 'sensor.heating');
+    assert.equal(rows()[0].localName, 'div');
+    assert.deepEqual(Array.from(form(rows()[0]).schema, field => field.name), ['value', 'color']);
+  } finally { context.document = previous; }
 });
 
 test('a dismissed card picker cannot block adding cards to any section', () => {

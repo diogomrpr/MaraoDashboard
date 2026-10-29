@@ -95,6 +95,7 @@ export const PT_LABELS = {
   "Power device names must be text.": "Os nomes dos dispositivos têm de ser texto.",
   "Power devices require power sensors in W or kW.": "Os dispositivos requerem sensores de potência em W ou kW.",
   "Energy breakdown": "Distribuição de energia",
+  "New energy contributor": "Nova entidade de energia",
   "Energy sensor": "Sensor de energia",
   "Cost sensor (optional)": "Sensor de custo (opcional)",
   "Calculate cost from energy": "Calcular custo a partir da energia",
