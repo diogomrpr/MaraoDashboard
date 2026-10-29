@@ -878,7 +878,7 @@ test("media app shortcuts fill the card with artwork without a visible title", (
 });
 
 test("media app branding recognizes sources, ships real icons and preserves custom shortcuts", async () => {
-  for (const [source, id, extension = "png"] of [["NETFLIX", "netflix", "svg"], ["Spotify", "spotify", "svg"], ["com.google.ios.youtube", "youtube"], ["Disney+", "disney-plus"], ["Amazon Prime Video", "prime-video"], ["com.apple.TVWatchList", "apple-tv"], ["Plex", "plex"], ["MEO", "meo", "svg"], ["meo go", "meo", "svg"], ["pt.sapo.mobile.iphone.tmn.meomobile", "meo", "svg"]]) {
+  for (const [source, id, extension = "png"] of [["NETFLIX", "netflix", "svg"], ["Spotify", "spotify", "svg"], ["com.google.ios.youtube", "youtube"], ["Disney+", "disney-plus"], ["Amazon Prime Video", "prime-video"], ["com.apple.TVWatchList", "apple-tv"], ["Plex", "plex", "svg"], ["MEO", "meo", "svg"], ["meo go", "meo", "svg"], ["pt.sapo.mobile.iphone.tmn.meomobile", "meo", "svg"]]) {
     const config = { template: "md_media_app_card", entity: "media_player.apple_tv", name: "My app", icon: "mdi:play-box-outline", show_state: false, variables: { app_source: source } };
     const before = structuredClone(config);
     assert.equal(mediaAppBrand(config).id, id);
@@ -910,10 +910,11 @@ test("wallbox current card uses a large stepper and optional shortcuts", () => {
     name: "Charging Current",
     variables: { shortcuts: [6, 12, 16, 20] },
   });
-  card.hass = {
+  const hass = {
     callService: (...args) => calls.push(args),
     states: { "input_number.wallbox_current": { state: "22", attributes: { unit_of_measurement: "A" } } },
   };
+  card.hass = hass;
   assert.equal((card.shadowRoot.innerHTML.match(/data-current-shortcut=/g) || []).length, 3);
   assert.match(card.shadowRoot.innerHTML, /class="number-stepper wallbox-stepper"/);
   assert.match(card.shadowRoot.innerHTML, />22<small> A<\/small><\/output>/);
@@ -931,7 +932,21 @@ test("wallbox current card uses a large stepper and optional shortcuts", () => {
   assert.doesNotMatch(source, /\.climate-stepper \{[^}]*min-width:/);
   assert.match(source, /\.wallbox-stepper \{[^}]*background:var\(--ha-card-background,var\(--card-background-color,#fff\)\);[^}]*color:var\(--primary-text-color,#141414\);/);
   assert.match(source, /\.wallbox-shortcuts \{[^}]*pointer-events:auto;/);
-  assert.match(source, /\.wallbox-shortcuts button[^\{]*\{[^}]*background:var\(--opacity-contrast-100,color-mix\(in srgb,currentColor 14%,transparent\)\);[^}]*color:var\(--primary-text-color,#141414\);/);
+  const update = (value, extra = {}) => {
+    card.hass = { ...hass, ...extra, states: { "input_number.wallbox_current": { state: value, attributes: { unit_of_measurement: "A" } } } };
+    return card.shadowRoot.innerHTML;
+  };
+  for (const value of ['12', '16']) {
+    const markup = update(value);
+    for (const shortcut of [6, 12, 16]) assert.match(markup, new RegExp(`data-current-shortcut="${shortcut}" aria-pressed="${shortcut === Number(value)}"`));
+  }
+  for (const [value, extra] of [['10', {}], ['unknown', {}], ['unavailable', {}], ['12', { connected: false }]]) {
+    const markup = update(value, extra);
+    assert.doesNotMatch(markup, /data-current-shortcut="[^"]+" aria-pressed="true"/);
+    if (value !== '10') for (const shortcut of [6, 12, 16]) assert.match(markup, new RegExp(`data-current-shortcut="${shortcut}" aria-pressed="false" disabled`));
+  }
+  assert.deepEqual(calls, [], 'Reported state updates must never send a preset');
+  card.hass = hass;
   return card._setNumberValue("input_number.wallbox_current", 12).then(() => {
     assert.deepEqual(calls, [["input_number", "set_value", { entity_id: "input_number.wallbox_current", value: 12 }, undefined, false]]);
   });
@@ -1114,7 +1129,6 @@ test("access actions use tap or a cancellable 1.2 second hold as configured", ()
   assert.match(heldMarkup, /data-card-action data-hold-action aria-label="Hold to Lock"/);
   assert.match(heldMarkup, /class="hold-progress"/);
   assert.match(heldMarkup, /<div class="climate">Hold to Lock<\/div>/);
-  assert.match(source, /\["pointerup", "pointerleave", "pointercancel"\]/);
   assert.equal(ACCESS_HOLD_MS, 1200);
   assert.match(source, /this\._holdCompleted = false;\s+haptic\("heavy"\);/);
   assert.match(source, /variables\?\.action_label_key/);
@@ -1706,10 +1720,12 @@ test("focus follows the live replacement when HA rerenders during native slot re
 
 test("touch actions establish their live invoking control before opening a popup", () => {
   const button = new EventTarget();
-  let focused = false;
+  let focused = false, calls = 0;
   button.focus = () => { focused = true; };
-  new MaraoCard()._bindTapAction(button, null, () => assert.equal(focused, true));
+  new MaraoCard()._bindTapAction(button, null, () => {assert.equal(focused, true);calls++;});
   button.dispatchEvent(new Event("click"));
+  assert.equal(calls,1,'Action runs immediately, without waiting for feedback');
+  button.disabled=true;button.dispatchEvent(new Event('click'));assert.equal(calls,1);
 });
 
 test("HA updates retain focus on the corresponding live card action", () => {
@@ -2192,4 +2208,18 @@ test('access popup owns the live state and action cards retain only their action
   assert.equal(JSON.stringify(popup._config), saved);
   popup._config = {entity,cards:[{type:'custom:marao-card',template:'md_sensor_card',entity}]};
   assert.equal(popup._accessEntity(), '');
+});
+
+test('inline Now playing follows current media, clears stale items and honors artwork preferences',()=>{
+ const card=new MaraoCard();card.setConfig({entity:'media_player.safe',template:'md_media_card',tap_action:{action:'none'},variables:{now_playing:true,media_display:'inline'}});
+ const attributes={media_title:'First item',media_artist:'Artist',source:'App',entity_picture:'/synthetic-art.png'};
+ const report=(state,attrs=attributes,extra={})=>{card.hass={states:{'media_player.safe':{state,attributes:attrs}},...extra};return card.shadowRoot.innerHTML.split('</style>')[1];};
+ assert.match(report('playing'),/data-now-playing>First item · Artist · App/);
+ assert.match(report('paused'),/First item/);
+ assert.match(report('playing',{...attributes,media_title:'Next item'}),/Next item/);
+ for(const state of ['idle','off','standby'])assert.doesNotMatch(report(state),/First item|media-artwork/);
+ assert.match(report('playing',{}),/Media details unavailable/);
+ assert.doesNotMatch(report('unknown'),/First item|media-artwork/);
+ assert.doesNotMatch(report('playing',attributes,{connected:false}),/First item|media-artwork/);
+ card._config.variables.md_show_background_art=false;assert.doesNotMatch(report('playing'),/class="media-artwork"/);
 });

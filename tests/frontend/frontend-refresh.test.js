@@ -62,6 +62,25 @@ test('native configuration events use HA rendering while graph changes defer and
   e.host.dispatchEvent(new Event('focus'));await flush();assert.equal(e.refreshes.length,1);
 });
 
+test('native cached drafts survive suspension and offline reconnect before one coherent refresh', async t => {
+  const e=automatic(t,{native:true,version:'a'.repeat(64)});await flush();
+  e.view.blocked=true;e.doc.dispatchEvent(pointer('pointerdown'));
+  e.install('b'.repeat(64));e.nativeEvent({url_path:'marao-dashboard'});await flush();
+  e.doc.visibilityState='hidden';e.doc.dispatchEvent(new Event('visibilitychange'));
+  e.host.navigator.onLine=false;e.controller.update({...e.hass,connected:false});await flush();
+  assert.equal(e.refreshes.length,0);assert.equal(e.storage.size,0);
+  e.doc.visibilityState='visible';e.doc.dispatchEvent(new Event('visibilitychange'));await flush();
+  assert.equal(e.refreshes.length,0);
+  e.host.navigator.onLine=true;e.controller.update(e.hass);e.host.dispatchEvent(new Event('online'));await flush();
+  assert.equal(e.refreshes.length,0,'The old draft must still block an update');
+  e.view.blocked=false;e.host.dispatchEvent(new Event('marao-interaction-settled'));await flush();
+  assert.equal(e.refreshes.length,1);
+  for(const name of ['focus','pageshow','online'])e.host.dispatchEvent(new Event(name));
+  await flush();assert.equal(e.refreshes.length,1,'Foreground events cannot loop the reload');
+  const fresh=automatic(t,{native:true,version:'b'.repeat(64),storage:e.storage});await flush();
+  assert.equal(fresh.refreshes.length,0,'The new graph must settle without another reload');
+});
+
 test('automatic save refresh is unconditional, deduplicated and independent of matching versions', async t => {
   const e = automatic(t); await flush(); e.send(); await flush(); assert.equal(e.refreshes.length, 0);
   e.send({ request_id: 'save-a' }); await flush(); assert.equal(e.refreshes.length, 1);
@@ -216,14 +235,17 @@ function navbar(t) {
   const e = environment(t), nav = new EventTarget(); nav.ownerDocument = e.doc;
   nav.getBoundingClientRect = () => ({ left: 0, top: 0, right: 200, bottom: 60 });
   let eligible = true, completed = 0, haptics = 0, progress = null;
-  const binding = bindNavbarRefresh(nav, { eligible: () => eligible, progress: value => { progress = value; }, complete: () => completed++, haptic: () => haptics++ });
-  return { ...e, nav, binding, disable: () => { eligible = false; }, state: () => ({ completed, haptics, progress }) };
+  const feedback=[];
+  const binding = bindNavbarRefresh(nav, { eligible: () => eligible, progress: value => { progress = value; }, complete: () => completed++, haptic: () => haptics++,
+    feedback:{start:()=>feedback.push('start'),release:()=>feedback.push('release'),cancel:()=>feedback.push('cancel')} });
+  return { ...e, nav, binding, feedback, disable: () => { eligible = false; }, state: () => ({ completed, haptics, progress }) };
 }
 
 test('3000ms gesture completes once, consumes a late release and permits the next ordinary tap', t => {
   const e = navbar(t); e.nav.dispatchEvent(pointer('pointerdown')); t.mock.timers.tick(500);
   assert.equal(e.state().haptics, 1); t.mock.timers.tick(2499); assert.equal(e.state().completed, 0);
   t.mock.timers.tick(1); assert.equal(e.state().completed, 1); assert.equal(e.state().haptics, 2);
+  assert.deepEqual(e.feedback,['start','cancel'],'Completed holds retain their own completion feedback');
   t.mock.timers.tick(10000); e.doc.dispatchEvent(pointer('pointerup'));
   const click = pointer('click'); e.nav.dispatchEvent(click); assert.equal(click.defaultPrevented, true);
   e.nav.dispatchEvent(pointer('pointerdown')); t.mock.timers.tick(80); e.doc.dispatchEvent(pointer('pointerup'));
@@ -233,8 +255,10 @@ test('3000ms gesture completes once, consumes a late release and permits the nex
 test('short taps and keyboard activation retain native semantics; armed partial holds cancel', t => {
   const e = navbar(t); e.nav.dispatchEvent(pointer('pointerdown')); t.mock.timers.tick(50); e.doc.dispatchEvent(pointer('pointerup'));
   const short = pointer('click'); e.nav.dispatchEvent(short); assert.equal(short.defaultPrevented, false);
+  assert.deepEqual(e.feedback,['start','release']);
   e.nav.dispatchEvent(pointer('pointerdown')); t.mock.timers.tick(700); e.doc.dispatchEvent(pointer('pointerup'));
   const partial = pointer('click'); e.nav.dispatchEvent(partial); assert.equal(partial.defaultPrevented, true);
+  assert.deepEqual(e.feedback,['start','release','start','cancel']);
   const keyboard = pointer('click', { detail: 0, pointerId: -1 }); e.nav.dispatchEvent(keyboard); assert.equal(keyboard.defaultPrevented, false);
   t.mock.timers.tick(5000); assert.equal(e.state().completed, 0); assert.equal(e.state().progress, null); e.binding.destroy();
 });

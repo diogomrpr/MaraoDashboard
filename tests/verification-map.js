@@ -9,7 +9,7 @@ const unit = (file, pattern) => ({ id: 'unit:' + file + (pattern ? ':' + pattern
   inputs: [...(file === 'verification' ? ['tests/verification-map.js'] : []), 'tests/frontend/' + file + '.test.js', 'tests/frontend/package.json', 'custom_components/package.json', runtime, 'frontend_src',
     ...(file === 'accessibility-profiles' ? ['tests/test-ha-dashboard-accessibility.js'] : []),
     ...(file === 'camera-request-ledger' ? ['tests/camera-request-ledger.js'] : []),
-    ...(/verification|upgrade|release-gate/.test(file) ? ['ha-test', 'tests/verify-release.js', 'tests/verify-publish.js', 'tests/test-ha-upgrade.js', 'tests/verification-browser.js', 'tests/native-reconnect-exception.js'] : [])], exclusive: false });
+    ...(/verification|upgrade|release-gate/.test(file) ? ['ha-test', 'tests/verify-release.js', 'tests/verify-publish.js', 'tests/test-ha-upgrade.js', 'tests/verification-browser.js'] : [])], exclusive: false });
 const python = file => ({ id: 'python:' + file, kind: 'offline', command: ['python', '-m', 'pytest', '-q', 'tests/components/marao_dashboard/' + file + '.py'],
   inputs: ['tests/components/marao_dashboard/' + file + '.py', backend, 'tests/conftest.py', 'pyproject.toml'], exclusive: false });
 const browser = (id, file, args = [], exclusive = true) => ({ id, kind: 'browser', command: ['node', 'tests/' + file + '.js', ...args],
@@ -25,6 +25,8 @@ const families = {
   camera: ['md_camera_card'], history: ['md_graph_card', 'md_timeline_card', 'md_toggle_graph_card'],
 };
 const components = {
+  'press-feedback': { units: [['press-feedback'], ['marao-card-visibility', 'room child activation|dual-action hold|hold completion|active holds|access actions use|touch actions establish|shared dropdown floats|themed scene dropdown'], ['marao-navbar-card'], ['frontend-refresh', 'gesture|short taps|released after'], ['floor-plan'], ['marao-frigate-events-card', 'entity availability disables|type filters|event heading retains']], editor: true, package: true },
+  'floor-plan': { units: [['floor-plan'], ['editor-model'], ['editor-panel'], ['native-compiler']], editor: true, package: true },
   'native-source': { units: [['native-source'], ['native-compiler'], ['native-session'], ['native-strategy'], ['native-dependencies'], ['native-package'], ['converter']], python: ['test_frontend_compiler'], editor: true, upgrade: true },
   'navbar-startup': { units: [['frontend-refresh'], ['marao-navbar-card'], ['marao-history-cards'], ['marao-text-scale'], ['gallery-cases'], ['package-boundary']],
     python: [], editor: true,
@@ -123,7 +125,7 @@ const components = {
   navbar: { units: [['marao-navbar-card']], profiles: ['iphone-normal', 'iphone-landscape', 'narrow-320'], browser: [browser('safe-area', 'test-ha-dashboard-accessibility', ['--safe-area'])] },
   actions: { units: [['marao-climate-card', 'action|hold|slide|dispatch|disabled|unavailable']],
     browser: [browser('actions', 'test-ha-dashboard-e2e', ['--actions-only'])] },
-  connection: { units: [['marao-climate-card', 'connection|disconnected|unavailable'], ['dashboard-e2e-analysis']], browser: [browser('native-reconnect', 'test-ha-dashboard-e2e', ['--disconnect-only'])] },
+  connection: { units: [['marao-climate-card', 'connection|disconnected|unavailable'], ['dashboard-e2e-analysis', 'retired reconnect']] },
   rooms: { units: [['marao-climate-card', 'room']], browser: [browser('rooms', 'test-ha-room-cards', ['--scenario', 'iphone-normal'])] },
   groups: { units: [['marao-climate-card', 'group']], browser: [browser('groups', 'test-ha-dashboard-e2e', ['--groups-only'])] },
   climate: { units: [['marao-climate-card', 'climate|number|stepper|wallbox']], browser: [browser('climate', 'test-ha-dashboard-e2e', ['--climate-only']), browser('numbers', 'test-ha-climate-layout', ['--scenario', 'iphone-normal'])] },
@@ -157,7 +159,9 @@ const components = {
 };
 
 const rules = [
-  [/^tests\/test-native-frontend-local\.js$/, ['native-source']],
+  [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoFloorPlan(?:Card|Text|Editor)?\.js|frontend_src\/floor-plan-editor\.js|tests\/frontend\/floor-plan\.test\.js|ha-test\/floor-plan.*)$/, ['floor-plan']],
+  [/^tests\/test-native-frontend-(?:local|acceptance)\.js$/, ['native-source']],
+  [/^tests\/test-frontend-upgrade-cache-local\.js$/, ['native-source', 'frontend-refresh']],
   [/^dist\//, ['native-source']],
   [/^(?:custom_components\/marao_dashboard\/frontend\/(?:Marao(?:Source|NativeModel|NativeDashboard|Theme|SourceImport)\.js|marao-(?:catalog|generator-labels|owned-assets)\.json|MaraoFonts\.css|fonts\/.*)|frontend_src\/(?:compile-dashboard|native-model|native-metadata|native-session|native-strategy|native-theme|native-dependencies|source-import|convert-document|converter|build-native)\.(?:js|cjs|html)|tests\/frontend\/(?:native-(?:source|compiler|session|strategy|dependencies|package)|converter)\.test\.js|tests\/components\/marao_dashboard\/test_frontend_compiler\.py|tests\/test-converter-local\.js)$/, ['native-source']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoSensorThresholds\.js$/, ['labels', 'editor-model', 'generator']],
@@ -220,6 +224,7 @@ const rules = [
   [/^frontend_src\/(build-|json-editor)/, ['packaging', 'editor-ui']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoDashboardPanel\./, ['editor-ui']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoCards\.js$/, 'shared'],
+  [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoPressFeedback\.js|tests\/frontend\/press-feedback\.test\.js)$/, ['press-feedback']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoDropdown\.js$/, ['chart-details']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoDashboard\.js$/, 'shared'],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoFrigateEventsCard\.js$/, ['camera']],
@@ -269,7 +274,7 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     if (ids === 'editor-labels') ids = declared.includes('editor-drag') ? ['editor-ui', 'editor-drag'] : ['editor-ui'];
     if (ids === 'shared') {
       if (!declared.length && !conservativeShared) throw new Error(file + ': declare --component after reviewing the shared-component diff.');
-      const consumers = ['card-namespace', 'navbar-startup', 'frontend-refresh', 'chart-details', 'control-grid', 'battery-groups', 'access-label', 'slider-headers', 'navbar-overflow', 'security', 'labels', 'slider', 'light', 'light-color', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
+      const consumers = ['press-feedback', 'card-namespace', 'navbar-startup', 'frontend-refresh', 'chart-details', 'control-grid', 'battery-groups', 'access-label', 'slider-headers', 'navbar-overflow', 'security', 'labels', 'slider', 'light', 'light-color', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
       ids = declared.length ? declared.filter(id => consumers.includes(id)) : consumers;
       if (!ids.length) throw new Error(file + ': a runtime component is required; documentation scope cannot omit its checks.');
     }
@@ -294,9 +299,9 @@ function inspectionFor(selection) {
     'control-grid': [...families.slider, ...families.climate, 'md_sensor_card'],
     'chart-details': [...families.history, 'md_energy_period_card'], energy: ['md_energy_period_card'],
   };
-  const editor = ids.some(id => id.startsWith('editor-') || id === 'json-editor');
+  const editor = ids.some(id => id.startsWith('editor-') || id === 'camera-editor' || id === 'json-editor');
   const selectedFamilies = [...new Set(ids.flatMap(id => aliases[id] || components[id].templates || families[id] || []))];
-  const unresolved = ids.filter(id => ['actions', 'connection', 'labels', 'scroll', 'camera-editor'].includes(id));
+  const unresolved = ids.filter(id => ['actions', 'connection', 'labels', 'scroll'].includes(id));
   return { components: ids, families: selectedFamilies, editor, unresolved };
 }
 

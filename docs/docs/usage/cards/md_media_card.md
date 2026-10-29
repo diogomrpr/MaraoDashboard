@@ -66,8 +66,8 @@ volume services are used.
 App shortcuts show the logo across the full square card, without a visible title
 or normal player-state line. The configured app name remains the accessible button
 label. Unavailable players still show a readable warning and disable launching.
-Enabled app tiles show a pointer cursor, a theme-colored edge and a slight lift
-on hover. Pressing adds the same edge and a short compression on mouse or touch;
+Enabled app tiles show a pointer cursor, a soft theme-colored outer shadow and a slight lift
+on hover. Pressing adds a softer shadow and a short compression on mouse or touch;
 disabled tiles keep their neutral appearance. These cues apply to both page and
 popup shortcuts.
 
@@ -94,3 +94,23 @@ while cancellation or moving outside the control sends neither.
 | md_show_background_art | true | No | Show available Home Assistant artwork behind the summary. |
 | md_background_color | var(--color-purple) | No | Background when artwork is absent or disabled. |
 | popup_hash | `#media` | No | Marao popup hash for manually authored dashboards. Generated dashboards set a unique value. |
+
+## Display controls on the dashboard
+
+Set **Display** to **On dashboard** to show a Now playing section followed by the
+existing playback controls. Configured Apple TV players also show their ordered
+apps, directional remote and volume controls. A dedicated one-column section is
+recommended; changing Display never changes section columns or sibling order.
+
+Now playing follows HA's current title, artist, album/series or source details,
+playback state and enabled artwork. Paused playback keeps the current item;
+idle/off shows Nothing playing. Incomplete active metadata and unavailable playback
+have distinct feedback. Artwork can still be disabled with the existing option.
+
+The optional JSON setting is `variables.media_display: inline` or `popup`.
+Missing means Popup and is not inserted by unrelated edits. Each occurrence can
+choose independently. Switching back preserves app/remote options and restores
+the popup. Explicit external popup definitions remain saved. If another authored
+link still targets an automatic sheet removed by inline mode, Save reports that
+link instead of silently breaking or retargeting it. Inline controls reuse the
+same availability guards, errors, short/long commands and service targets as Popup.

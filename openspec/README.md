@@ -187,10 +187,10 @@ to satisfy the tool. An artifact status of `done` means its file exists; unfinis
 task checkboxes still mean the work has not been done. OpenSpec validation checks
 specification structure, not application correctness or release eligibility.
 
-The initial open change is
-[confirm-home-assistant-reconnect-fix](changes/confirm-home-assistant-reconnect-fix/proposal.md).
-Its tasks are deliberately uncompleted. Creating it does not run an upgrade,
-publish a release, or waive a failing check.
+The initial native Home Assistant reconnect follow-up was cancelled at the
+user's request on 2026-10-29. Its outage check and upstream-version expiry probe
+are retired; it is no longer pending. The [dated context](project-context.md#retired-native-home-assistant-reconnect-verification)
+retains the historical failure without claiming the upstream issue was fixed.
 
 [Standalone native authoring is retired](changes/remove-native-dashboard-authoring/proposal.md).
 The earlier [native editing change](changes/support-native-dashboard-editing/proposal.md)

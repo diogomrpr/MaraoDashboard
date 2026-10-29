@@ -15,7 +15,7 @@ and disconnected cameras stay neutral and clear old media. Tap an available
 card to open its generated popup with live video above Frigate, UniFi Protect or Netatmo events.
 
 Choose **Dashboard stream** (the existing camera entity) and **Popup stream** in
-the builder or native card editor. Select a lower-quality camera entity for the
+the dashboard builder. Select a lower-quality camera entity for the
 dashboard and a higher-quality entity for the popup. An empty Popup stream uses
 the dashboard entity. Both views use exactly the selected entity; quality does
 not change automatically. Home Assistant uses native WebRTC when supported, with
@@ -28,7 +28,7 @@ button. OS rotation lock still applies. Unready video or unsupported viewing sho
 a readable reason.
 
 Healthy playback shows only the video and an optional slim title row above it.
-The dashboard builder and native card editor expose **Title** and **Show title**
+The dashboard builder exposes **Title** and **Show title**
 together in the basic form; `name` sets the title and
 `show_name: false` removes its whole row while retaining the saved name. Titles
 are visible by default and wrap when needed. Legacy camera icon, state and label

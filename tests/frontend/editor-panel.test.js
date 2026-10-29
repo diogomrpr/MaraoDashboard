@@ -26,6 +26,9 @@ const context = vm.createContext({
 // Execute the actual panel with only browser/Monaco imports omitted.
 vm.runInContext(source.slice(source.indexOf("const TEXT =")).replaceAll("import.meta.url", '"https://example.invalid/MaraoDashboardPanel.js?v=test"'), context);
 
+// Keep native validation real while isolating this VM from browser module loading.
+Panel.prototype._validateConfig = async (...args) => model.validateConfig(...args);
+
 test("vacuum native command data is editable and survives sibling option changes", () => {
   const p = new Panel();
   const fields = p._expandedFields([{ key: "action_1", label: "Action 1", kind: "vacuum_action" }]);

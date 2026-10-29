@@ -164,8 +164,8 @@ Shared visit duration is counted once. Historical reports remain immutable.
 
 Every focused live batch prepares and validates the current installation; an old receipt
 cannot establish current package/source/fixture identities. Cleanup, final visual
-inspection, conditional upgrades, exact-commit CI and reconnect-exception expiry
-are never cached. Version-3 reports retain their original whole-proof validator
+inspection, conditional upgrades and exact-commit CI are never cached.
+Version-3 reports retain their original whole-proof validator
 and cannot supply per-check reuse.
 
 Capture policy is `failure` by default, `review` for representative successes,
@@ -264,8 +264,9 @@ before expensive work; the runner does not install remote tools automatically.
 `npm run verify:publish` and `npm run verify:release` require affected checks and
 applicable exact-commit CI. Packaging/editor asset/HACS/hassfest checks apply to
 their changed inputs. Selected failures and known relevant violations block
-publication. The approved native reconnect exception remains narrowly scoped,
-with raw evidence and an expiry check whenever it is applied.
+publication. The native Home Assistant reconnect outage check and its version
+expiry probe were retired at the user's request on 2026-10-29. Historical failure
+records remain retained; other selected failures still fail normally.
 
 UI-only releases do not automatically replay historical installations. Persistence,
 migration, generated-output ownership or installation changes require matching

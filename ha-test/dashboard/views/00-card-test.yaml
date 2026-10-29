@@ -187,22 +187,22 @@ cards:
         cards:
           - type: custom:marao-card
             template: md_access_card
-            entity: sensor.marao_dashboard_test_locking
+            entity: lock.marao_dashboard_test_case_lock_locking
             name: Locking
             tap_action: { action: none }
           - type: custom:marao-card
             template: md_access_card
-            entity: sensor.marao_dashboard_test_unlocking
+            entity: lock.marao_dashboard_test_case_lock_unlocking
             name: Unlocking
             tap_action: { action: none }
           - type: custom:marao-card
             template: md_access_card
-            entity: sensor.marao_dashboard_test_opening
+            entity: cover.marao_dashboard_test_case_cover_opening
             name: Opening
             tap_action: { action: none }
           - type: custom:marao-card
             template: md_access_card
-            entity: sensor.marao_dashboard_test_closing
+            entity: cover.marao_dashboard_test_case_cover_closing
             name: Closing
             tap_action: { action: none }
 

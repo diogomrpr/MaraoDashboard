@@ -1,4 +1,9 @@
+import { FLOOR_PT_LABELS } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlanText.js';
 export const PT_LABELS = {
+  ...FLOOR_PT_LABELS,
+  "On dashboard": "No dashboard", "Floor Plan": "Planta",
+  "Upload a room image and place light controls and illuminated strips.": "Carregue uma imagem da divisão e posicione luzes e fitas iluminadas.",
+  "Display": "Apresentação", "popup": "Popup", "inline": "No dashboard", "Popup or On dashboard. Missing keeps Popup.": "Popup ou no dashboard. Por omissão, Popup.", "Choose Popup or On dashboard.": "Escolha Popup ou No dashboard.",
   "Show editor button": "Mostrar botão do editor",
   "Show editor button must be a boolean.": "Mostrar botão do editor tem de ser um valor booleano.",
   "Hold the navbar for 3 seconds to open Maintenance.": "Mantenha a barra de navegação premida durante 3 segundos para abrir o menu de manutenção.",

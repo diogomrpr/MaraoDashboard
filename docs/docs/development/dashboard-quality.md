@@ -306,6 +306,15 @@ Simple, short animations are required when they explain an action or state:
 popup entrance, direct slider movement, press progress, and immediate action
 acknowledgment. Do not add continuous or ornamental animation.
 
+Dashboard tap targets share `MaraoPressFeedback.js`: an immediate neutral surface
+highlight and slight inward movement of noninteractive icon/content, followed by
+a short smooth release. Quick taps remain perceptible without delaying actions
+or haptics. Keep the outer surface, hit area, text layout and spatial anchors
+fixed; never scale an interactive button or card. Animate only the intended
+enabled target, cancel on scrolling or lifecycle/availability loss, and retain
+specialized hold/slide owners. Reduced Motion keeps the stationary highlight and
+removes content movement, including when the preference changes during a press.
+
 ## Semantics and touch
 
 - Use native `button`, `input`, links, and dialog semantics where practical.
@@ -721,12 +730,13 @@ for two columns at 18px or 20px primary text, and 272px at 22px. Narrow cards
 wrap content and grow vertically; control targets and room icons keep their sizes.
 Substantially enlarged text still reduces the column count. Logo-only media-app groups
 use an 80px cell minimum because their labels remain accessible rather than
-visible; three app shortcuts therefore fit on phone widths. Their controls remain
-at least 48px square; compact availability/error feedback fits inside the tile. Mixed
+visible; three app shortcuts therefore fit on phone widths. App surfaces stay
+80px square with 18px corners, centered in their cells rather than expanding to
+fill them; compact availability/error feedback fits inside the tile. Mixed
 groups retain the ordinary floor. This does not cap content
 height. Preferred columns reflow together before
 controls become cramped; incomplete rows keep their normal width. All Marao
-content families fill their cells, including native primary hosts and detailed
+content families except app shortcuts fill their cells, including native primary hosts and detailed
 history/event surfaces. Headings use intrinsic structural rows; navbar and popup
 definitions remain outside content sizing. Raw configurations keep their factory
 and internals; raw siblings do not disable owned surface equality. Independently

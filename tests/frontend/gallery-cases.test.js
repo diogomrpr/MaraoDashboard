@@ -9,6 +9,17 @@ const { concreteCases, expandGallery, expandHelpers, validateCoverage, popupCase
 const helpers = expandHelpers(YAML.parse(fs.readFileSync(new URL('../../ha-test/marao_dashboard_card_test_helpers.yaml', import.meta.url), 'utf8')));
 const view = expandGallery(YAML.parse(fs.readFileSync(new URL('../../ha-test/dashboard/views/00-card-test.yaml', import.meta.url), 'utf8')));
 
+test('gallery access examples bind compatible native fake entities instead of state-only sensors', async () => {
+  const { accessCardConfig } = await import('../../custom_components/marao_dashboard/frontend/MaraoCards.js');
+  walkCards(view, card => {
+    if (card.type === 'custom:marao-card') assert.doesNotThrow(() => accessCardConfig(card), card.name);
+  });
+  const targets = [];
+  walkCards(view, card => { if (['Locking', 'Unlocking', 'Opening', 'Closing'].includes(card.name)) targets.push(card.entity); });
+  assert.deepEqual(targets, ['lock.marao_dashboard_test_case_lock_locking', 'lock.marao_dashboard_test_case_lock_unlocking',
+    'cover.marao_dashboard_test_case_cover_opening', 'cover.marao_dashboard_test_case_cover_closing']);
+});
+
 test('Cases isolates editable card heights while preserving every example and intentional layout', () => {
   const { composeDashboard } = require('../../ha-test/prepare.js');
   const source = require('../../ha-test/marao_dashboard_test_dashboard.json');

@@ -19,7 +19,7 @@ and affected runtime before changing their shape.
 
 | Card | Existing behavior/options | Contract |
 | --- | --- | --- |
-| `md_camera_card` | HA picture preview, generated events sheet; `popup_hash`, `event_provider`, Frigate camera/instance, Protect media source, Netatmo typed events/HLS recordings, `event_limit` | [Camera/history](specs/camera-history-content/spec.md) |
+| `md_camera_card` | Native live preview, optional `popup_stream_entity`, generated popup video above events, fullscreen; `popup_hash`, `event_provider`, Frigate camera/instance, Protect media source, native Netatmo recordings, `event_limit` | [Camera/history](specs/camera-history-content/spec.md); [explicit streams](changes/adapt-camera-quality-to-bandwidth/specs/camera-history-content/spec.md) |
 | `md_light_card` | Toggle, supported brightness, `enable_slider`, `card_color`, `custom_label` | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
 | `md_cover_card` | State and position with confirmed fill/target thumb, `card_color`; separate access classification | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
 | `md_climate_card` | Mode/current/target, single mode or generated mode sheet, single/range target stepping; graph entity/color, `show_graph`, `show_mode_buttons`, `setpoint_label`, `mode_selector_hash` | [Cards](specs/card-behaviors/spec.md), [values](specs/value-numeric-controls/spec.md), [history](specs/camera-history-content/spec.md) |
@@ -108,7 +108,7 @@ card. Home links to it through an entity-free shortcut. The release mobile runne
 | Per-card energy conversion/precision, mixed source units and past nonnumeric states without false conversion errors; numeric metadata failures remain explicit | [Cards](specs/card-behaviors/spec.md), [history](specs/camera-history-content/spec.md); [format checks](../tests/frontend/marao-energy-format.test.js), [safe history fixtures](../ha-test/custom_components/history/__init__.py), [energy browser checks](../tests/test-ha-energy-format.js) |
 | One disposable dashboard, exhaustive Cases and realistic counterparts, safe entities/providers, private credentials/artifacts, current-workspace preparation | [Gallery/release](specs/gallery-release-verification/spec.md); [preparation](../ha-test/prepare.js), [dashboard JSON](../ha-test/marao_dashboard_test_dashboard.json), [Cases YAML](../ha-test/dashboard/views/00-card-test.yaml), [coverage](../ha-test/cases.json), [gallery checks](../tests/frontend/gallery-cases.test.js) |
 | Mobile/text/theme matrix, final affected-card visual gate, meaningful focused tests, HACS boundary, exact-commit CI and honest limits | [Workflow](specs/repository-workflow/spec.md), [gallery/release](specs/gallery-release-verification/spec.md); [commands](../package.json), [mobile runner](../tests/test-ha-dashboard-accessibility.js), [package checks](../tests/frontend/package-boundary.test.js) |
-| Native HA reconnect race and approved temporary exception | [Dated context](project-context.md), [pending change](changes/confirm-home-assistant-reconnect-fix/proposal.md); unresolved; the user-approved exception retains raw native failure/subscription evidence and expires when the fix is stable; other gates still apply |
+| Retired native HA reconnect verification | [Dated context](project-context.md#retired-native-home-assistant-reconnect-verification); outage injection, stable-fix expiry probe and follow-up retired by user request on 2026-10-29; disconnected-action unit checks remain |
 
 ## Upgrade coverage responsibility
 
@@ -244,3 +244,33 @@ with explicit service outcomes. Builder-supported switch/climate/graph history u
 compact icon/default-hold entry; lights retain color controls only. Targeted checks:
 card visibility, editor model/panel/JSON, security outcomes, generator threshold
 preservation, and the reviewed gallery/upgrade inventory.
+
+## Floor-plan and inline media development coverage
+
+`floor-plan` selects the image-coordinate/model/upload/runtime checks in
+`tests/frontend/floor-plan.test.js` plus relevant editor/compiler checks.
+The fixtures use a synthetic image and safe helper lights under `ha-test/`.
+Uploaded native image IDs are resolved into ignored disposable state. Source
+format 2 and the immutable released native baselines remain unchanged.
+
+Inline media reuses the existing controls. Targeted native-compiler checks cover
+mode parity, independent occurrences, exact remote/volume/seek targets and orphaned
+popup-link rejection; the shared card checks cover Now playing updates, empty and
+unavailable states and artwork opt-out. Appearance and physical-device checks
+remain manual; none of these declarations claim a comprehensive browser pass.
+
+## Shared touch press feedback
+
+`press-feedback` selects the shared lifecycle/quick-tap/nesting assertions in
+[`press-feedback.test.js`](../tests/frontend/press-feedback.test.js) and narrow
+existing action, hold, dropdown, navbar, event-control and floor-plan checks.
+[`MaraoPressFeedback.js`](../custom_components/marao_dashboard/frontend/MaraoPressFeedback.js)
+owns only visual acknowledgement and cancellation; components retain actions and
+haptics. Global observation runs only while feedback is active. The owned-asset
+build discovers this local module automatically.
+
+Existing `/marao-dashboard/card-test` controls, room lights-off buttons, climate
+dropdowns, media shortcuts, floor-plan examples and the shared navbar provide
+manual examples. No new fixtures are needed. Check quick taps, nested actions,
+native scrolling, fixed outer geometry and stationary Reduced Motion feedback;
+camera playback/transport and embedded native controls are outside this change.

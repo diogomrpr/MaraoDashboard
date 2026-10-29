@@ -8,7 +8,7 @@ On 2026-10-21 the user superseded automatic adaptation with explicit dashboard/p
 
 Keep existing `entity_id` (native `entity`) as dashboard video and event identity. No new defaults are written to saved sources. Add `variables.popup_stream_entity` as an optional camera-domain selector in the basic form. Absent/null/empty means the dashboard entity; malformed or non-camera values are validation errors. Preserve unknown fields, titles including explicit hidden/empty titles, provider overrides, custom actions, order and raw cards. Format/config-entry/package versions do not change.
 
-The existing generator builds the usual popup hash and header, then an untitled `hc_camera_card` for the selected popup entity with `tap_action: {action: fullscreen}`, followed by the unchanged events card. Manual dashboards can use the same card and action in an authored popup. A popup does not infer or switch qualities.
+The native frontend compiler builds the usual popup hash and header, then an untitled `md_camera_card` for the selected popup entity with `tap_action: {action: fullscreen}`, followed by the unchanged events card. Manual dashboards can use the same card and action in an authored popup. A popup does not infer or switch qualities. The dashboard builder owns Visual/JSON authoring; standalone native card editors were retired by the native-frontend change.
 
 ## Playback and lifecycle
 

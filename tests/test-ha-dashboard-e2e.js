@@ -139,6 +139,14 @@ async function titleLayoutIssues(page, families = [], subtree) {
       || config.template === 'md_access_hold_action_card' && /^(lock|cover)\./.test(config.entity || '')
       || config.template?.startsWith('md_access_') && ['lock.unlock', 'cover.open_cover'].includes(service);
     const compact = parent.classList.contains('compact-copy'), header = compact ? parent.parentElement : null;
+    if (parent.classList.contains('access-close-action')) {
+      const body = parent.getBoundingClientRect(), icon = parent.querySelector('.access-action-icon')?.getBoundingClientRect();
+      const expectedWidth = contentWidth - 96 - 2 * parseFloat(style.columnGap);
+      if (Math.abs(rect.width - expectedWidth) > 1 || Math.abs(rect.left + rect.width / 2 - body.left - body.width / 2) > 1) issues.push(`${name}: close label is not centered in its reserved action column`);
+      if (!icon || icon.width !== 48 || icon.height !== 48 || icon.right > rect.left - 4
+        || Math.abs(icon.top + icon.height / 2 - rect.top - rect.height / 2) > 1) issues.push(`${name}: leading decorative access icon overlaps or misaligns`);
+      return issues;
+    }
     if (compact) {
       const body = header.closest('.body'), icon = header.querySelector(':scope > .icon');
       const copy = parent.getBoundingClientRect(), head = header.getBoundingClientRect(), picture = icon?.getBoundingClientRect();
@@ -259,6 +267,9 @@ async function scrollDashboard(page, { screenshotPrefix, onSegment } = {}) {
 
 async function checkStateCases(page, serviceCalls) {
   const cases = concreteCases();
+  await page.evaluate(() => window.MaraoDashboardRuntime?.ready);
+  await page.locator('marao-energy-period-card').first().waitFor({ state: 'visible' });
+  await page.locator('marao-state-timeline-card').first().waitFor({ state: 'visible' });
   const result = await page.locator("marao-card,marao-energy-period-card,marao-state-timeline-card").evaluateAll((cards, examples) => {
     const failures = [];
     const states = document.querySelector("home-assistant").hass.states;
@@ -284,7 +295,14 @@ async function checkStateCases(page, serviceCalls) {
         }
       };
       root.querySelectorAll("*").forEach(visit);
-      const actions = controls.filter(control => !control.matches('[data-problem-details],[data-card-details],[data-slide-details]'));
+      const actions = controls.filter(control => {
+        if (control.matches('[data-problem-details],[data-card-details],[data-slide-details]')) return false;
+        // A usable, independently bound sensor may still open its read-only history.
+        const graph = card._config.variables?.graph_entity || card._config.entity;
+        const independentHistory = control.matches('[data-history-open]') && graph !== example.entity
+          && states[graph] && !['unknown', 'unavailable'].includes(states[graph].state);
+        return !independentHistory;
+      });
       if (actions.some((control) => !control.disabled && control.getAttribute("aria-disabled") !== "true")) {
         failures.push(`${example.id}: unknown/unavailable/missing entity has an enabled control`);
       }
@@ -1003,168 +1021,6 @@ async function checkCardContent(page, serviceCalls) {
   await page.waitForURL("**/marao-dashboard/rooms");
 }
 
-async function checkDisconnected(browser, config, functionalCompleted = false) {
-  const { scenarios, contextOptionsForScenario, configurePageEmulation } = require('./test-ha-dashboard-accessibility');
-  const scenario = dashboardScenario(process.argv, scenarios);
-  const context = await browser.newContext(contextOptionsForScenario(scenario, 'light'));
-  const token = accessToken(config);
-  await context.addInitScript(setBrowserToken, {
-    ...token, hassUrl: config.url, clientId: `${config.url}/`, expires: Date.now() + token.expires_in * 1000,
-  });
-  await context.addInitScript(() => {
-    window.__maraoUnhandledRejections = [];
-    window.addEventListener("unhandledrejection", ({ reason }) => {
-      if (reason?.message) window.__maraoUnhandledRejections.push(`${reason.code || reason.name || "Error"}: ${reason.message}${reason.stack ? `\n${reason.stack}` : ""}`);
-    });
-  });
-  const page = await context.newPage();
-  await configurePageEmulation(context, page, scenario);
-  const entity = "switch.marao_dashboard_test_switch";
-  const errors = [];
-  const transportEvents = [];
-  const manualCameraDiagnostics = [];
-  const manualCameraDiagnostic = message => {
-    manualCameraDiagnostics.push(message);
-    fs.writeFileSync(path.join(require('./verification-browser').artifactDirectory('dashboard-e2e'), 'disconnect-manual-camera.json'), JSON.stringify(manualCameraDiagnostics), { mode: 0o600 });
-  };
-  const serviceCalls = [];
-  let original;
-  const subscriptions = [];
-  const nativeFailures = [];
-  let connection = 0;
-  let phase = "connected";
-  const transports = [];
-  // Chromium's HTTP offline emulation does not reliably block WebSocket
-  // reconnects. Cut the real transport and reject retries until recovery.
-  await context.routeWebSocket(`${config.url.replace(/^http/, "ws")}/api/websocket`, async (socket) => {
-    if (phase === "offline") {
-      transportEvents.push("Home Assistant WebSocket retry blocked during outage");
-      await socket.close({ code: 1013, reason: "Marao test outage" });
-      return;
-    }
-    const server = socket.connectToServer();
-    const connectionId = ++connection;
-    transports.push({ socket, server });
-    socket.onMessage((payload) => {
-      const message = JSON.parse(String(payload));
-      if (/subscribe|stream/.test(message.type)) subscriptions.push({ phase, connection: connectionId, type: message.type, id: message.id, subscription: message.subscription });
-      const targets = message.target?.entity_id ?? message.service_data?.entity_id;
-      if (message.type === "call_service" && (Array.isArray(targets) ? targets.includes(entity) : targets === entity)) serviceCalls.push(message.service);
-      server.send(payload);
-    });
-    server.onMessage(payload => {
-      const messages = JSON.parse(String(payload));
-      for (const message of Array.isArray(messages) ? messages : [messages]) {
-        if (message.type === 'result' && message.success === false) nativeFailures.push({ connection: connectionId, id: message.id, code: message.error?.code, message: message.error?.message });
-      }
-      socket.send(payload);
-    });
-  });
-  const expectedOfflineError = (message) => phase === "offline" && (
-    /ERR_INTERNET_DISCONNECTED|ERR_NETWORK_CHANGED|ERR_NETWORK_IO_SUSPENDED/.test(message)
-    || /WebSocket connection to ['"].*\/api\/websocket.*failed/.test(message)
-  );
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (!["warning", "error"].includes(message.type())) return;
-    if (require('./camera-request-ledger').isManualCameraConsoleMessage(message)) { manualCameraDiagnostic(message.text()); return; }
-    if (expectedOfflineError(message.text())) transportEvents.push(message.text());
-    else {
-      const source = message.location().url;
-      errors.push(`${message.text()}${source ? ` (${new URL(source).pathname})` : ""}`);
-    }
-  });
-  page.on("requestfailed", (request) => {
-    const message = `${request.failure()?.errorText}: ${new URL(request.url()).pathname}`;
-    if (require('./camera-request-ledger').isManualCameraTransport(request.url())) { manualCameraDiagnostic(message); return; }
-    if (expectedOfflineError(message)) transportEvents.push(message);
-    else errors.push(message);
-  });
-  page.on("response", (response) => {
-    if (require('./camera-request-ledger').isManualCameraTransport(response.url())) { if (response.status() >= 400) manualCameraDiagnostic(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`); return; }
-    if (response.status() >= 400) errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`);
-  });
-  try {
-    await page.goto(`${config.url}/marao-dashboard/card-test-all`, { waitUntil: "domcontentloaded" });
-    const action = cardAction(page, "Switch + graph");
-    await action.waitFor({ state: "visible" });
-    await assertCurrentFrontend(page);
-    if (await action.isDisabled()) throw new Error("The safe switch action was disabled before disconnection.");
-    original = await page.evaluate((id) => document.querySelector("home-assistant").hass.states[id].state, entity);
-    const warning = await page.evaluate(() => document.querySelector("home-assistant").hass.localize("ui.notification_toast.connection_lost"));
-    if (!warning) throw new Error("Home Assistant did not provide its localized connection warning.");
-    // HA loads its native notification component on first use. Load it while
-    // online so the deliberate outage does not block that JavaScript download.
-    const readiness = "Marao connection test ready";
-    await page.evaluate((message) => {
-      document.querySelector("home-assistant").dispatchEvent(new CustomEvent("hass-notification", {
-        bubbles: true, composed: true, detail: { message },
-      }));
-    }, readiness);
-    await page.getByText(readiness, { exact: true }).and(page.locator(".message")).waitFor({ state: "visible" });
-    await page.getByText(readiness, { exact: true }).and(page.locator(".message")).waitFor({ state: "hidden" });
-    phase = "offline";
-    await context.setOffline(true);
-    for (const transport of transports) {
-      await transport.server.close({ code: 1001, reason: "Marao test outage" });
-      await transport.socket.close({ code: 1001, reason: "Marao test outage" });
-    }
-    transportEvents.push("Home Assistant WebSocket closed during outage");
-    await page.waitForFunction(() => document.querySelector("home-assistant")?.hass?.connected === false);
-    for (const title of ["Switch + graph", "Light + slider", "Number", "Arm away · hold", "Open-only door"]) {
-      await cardByTitle(page, title).scrollIntoViewIfNeeded();
-      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-      const disabled = await cardByTitle(page, title).locator('button:not([data-card-details]):not([data-problem-details]),input,select,[role="slider"]').evaluateAll((controls) =>
-        controls.length > 0 && controls.every((control) => control.disabled || control.getAttribute("aria-disabled") === "true")
-      );
-      if (!disabled) throw new Error(`${title}: disconnected fixture controls remained enabled.`);
-    }
-    const before = serviceCalls.length;
-    await action.evaluate((element) => element.click());
-    await page.waitForTimeout(150);
-    if (serviceCalls.length !== before) throw new Error("A disconnected control dispatched a service call.");
-    await page.getByText(warning, { exact: true }).and(page.locator(".message")).waitFor({ state: "visible", timeout: 5000 });
-    const next = original === "on" ? "off" : "on";
-    await api(config, "POST", `/api/services/switch/turn_${next}`, { entity_id: entity });
-    phase = "recovering";
-    await context.setOffline(false);
-    await page.waitForFunction(({ id, state }) => {
-      const hass = document.querySelector("home-assistant")?.hass;
-      return hass?.connected === true && hass.states[id]?.state === state;
-    }, { id: entity, state: next });
-    phase = "connected";
-    if (await action.isDisabled()) throw new Error("Fixture action did not recover after reconnecting.");
-    await page.getByText(warning, { exact: true }).and(page.locator(".message")).waitFor({ state: "hidden" });
-    const authoritative = await api(config, "GET", `/api/states/${entity}`);
-    const rendered = await cardByTitle(page, "Switch + graph").evaluate((card) => ({
-      state: card._hass.states[card._config.entity].state,
-      active: card.shadowRoot.querySelector('ha-card')?.dataset.binaryState,
-      semanticState: card.shadowRoot.querySelector('.icon[role="img"]')?.getAttribute('aria-label'),
-      problem: card.shadowRoot.querySelector('[data-problem]')?.dataset.problem,
-    }));
-    if (rendered.state !== authoritative.state || rendered.active !== String(authoritative.state === 'on') || !rendered.semanticState || rendered.problem) throw new Error("Recovered card did not render authoritative state.");
-    if (!transportEvents.length) throw new Error("The fault injection did not produce an observed transport disconnection.");
-    const rejections = await page.evaluate(() => window.__maraoUnhandledRejections);
-    const evidencePath = process.argv.find(arg => arg.startsWith('--reconnect-evidence='))?.slice(21);
-    if (evidencePath) {
-      assert.ok(path.isAbsolute(evidencePath), 'Reconnect evidence must use an absolute private path');
-      fs.writeFileSync(evidencePath, JSON.stringify({ version: 1, target: config.url, checked_at: new Date().toISOString(), functional_completed: functionalCompleted,
-        ...(process.argv.includes('--disconnect-only') ? { scope: 'connection-only' } : {}),
-        safe_actions_disabled: true, disconnected_dispatches: 0, authoritative_recovery: true, errors, rejections, subscriptions, native_failures: nativeFailures, manual_camera_transport: manualCameraDiagnostics }), { mode: 0o600 });
-    }
-    if (errors.length || rejections.length) {
-      const error = new Error(`Disconnect scenario produced unexpected browser errors:\n${[...errors, ...rejections].join("\n")}\nSubscription lifecycle: ${JSON.stringify(subscriptions)}`);
-      error.stage = 'disconnect-browser-errors';
-      throw error;
-    }
-    console.log("Live disconnect and authoritative recovery OK (disabled actions dispatched zero services).");
-  } finally {
-    await context.setOffline(false);
-    if (original !== undefined) await api(config, "POST", `/api/services/switch/turn_${original}`, { entity_id: entity });
-    await context.close();
-  }
-}
-
 async function captureClimateFeedback(page, name, target, output, visualProfile) {
   const assert = require("node:assert/strict");
   if (!output) return;
@@ -1646,6 +1502,7 @@ async function checkEntityGroups(page, serviceCalls, output, scenario, theme, co
 }
 
 async function main() {
+  if (process.argv.some(arg => arg === '--disconnect-only' || arg.startsWith('--reconnect-evidence'))) throw new Error('Native Home Assistant reconnect verification has been retired by user instruction.');
   if (process.argv.some(arg => ['--camera-only', '--camera-live-only', '--camera-slow-only'].includes(arg))) throw new Error('Camera playback and transport validation is manual-only by user instruction.');
   const captureScreenshots = process.argv.includes("--screenshots");
   const screenshotRoot = require('./verification-browser').artifactDirectory('dashboard-e2e');
@@ -1658,10 +1515,6 @@ async function main() {
   const baseUrl = config.url.replace(/\/$/, "");
   const tokens = await accessToken(config, baseUrl);
   let browser = await chromium.launch();
-  if (process.argv.includes("--disconnect-only")) {
-    try { await checkDisconnected(browser, config); } finally { await browser.close(); }
-    return;
-  }
   const { applyVisualPreferences, scenarios, contextOptionsForScenario, configurePageEmulation } = require('./test-ha-dashboard-accessibility');
   let scenario;
   try { scenario = dashboardScenario(process.argv, scenarios); }
@@ -2347,7 +2200,6 @@ async function main() {
       }
     }
     console.log(`Gallery interactions and page screenshots OK (${checks.length} generated views; ${cardTest.maraoCards} gallery cards).`);
-    await checkDisconnected(browser, config, true);
     const popupCount = (serialized.match(/custom:marao-popup-card/g) || []).length;
     console.log(`Marao Dashboard e2e OK (${checks.length} generated view(s); ${cardTest.maraoCards} card-test cards; ${coloredCards} state-colored cards; ${popupCount} generated popup configuration(s))`);
     if (captureScreenshots) console.log(`Dashboard screenshots: ${screenshotRoot}`);
@@ -2360,9 +2212,7 @@ if (require.main === module) main().catch((error) => {
   const output = path.join(process.env.MARAO_TEST_ARTIFACT_ROOT || path.join(__dirname, '.artifacts'), 'dashboard-e2e');
   fs.mkdirSync(output, { recursive: true });
   fs.writeFileSync(path.join(output, 'failure.txt'), error.stack || error.message, { mode: 0o600 });
-  const evidencePath = process.argv.find(arg => arg.startsWith('--reconnect-evidence='))?.slice(21);
-  if (evidencePath && path.isAbsolute(evidencePath)) fs.writeFileSync(evidencePath + '.exit.json', JSON.stringify({ stage: error.stage || null, message: error.message }), { mode: 0o600 });
   console.error(error.message || error); process.exitCode = 1;
 });
 
-module.exports = { captureClimateFeedback, climateFeedbackSnapshot, buildViewChecks, checkDisconnected, checkHistoryCases, installHistoryLoadingGate, conditionalCardIsActive, dashboardNavigationViolations, dashboardScenario, isDelayedCameraRequest, refreshDelayedCameraLoading, waitForCameraEvents, measureCenteredIcons, normalizedPathname, scrollDashboard, titleLayoutIssues };
+module.exports = { captureClimateFeedback, climateFeedbackSnapshot, buildViewChecks, checkHistoryCases, checkStateCases, installHistoryLoadingGate, conditionalCardIsActive, dashboardNavigationViolations, dashboardScenario, isDelayedCameraRequest, refreshDelayedCameraLoading, waitForCameraEvents, measureCenteredIcons, normalizedPathname, scrollDashboard, titleLayoutIssues };

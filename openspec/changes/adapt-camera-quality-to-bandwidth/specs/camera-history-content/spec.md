@@ -10,10 +10,16 @@ Available camera cards SHALL start muted inline live video through Home Assistan
 - **THEN** its configured popup stream starts above events associated with the original dashboard entity
 - **AND** provider overrides, names and custom actions remain preserved
 
+#### Scenario: A supported camera card becomes visible
+- **WHEN** an available camera with a supported live source is displayed outside an editing preview
+- **THEN** the existing card shows its available still image while its native player starts muted inline live video automatically
+- **AND** it switches to live playback when ready without a new card, setting or user activation unless autoplay is blocked
+- **AND** the rendered media advances over time rather than remaining an image or event clip
+
 ## ADDED Requirements
 
 ### Requirement: Explicit dashboard and popup streams
-Builder and native editor SHALL expose a camera-domain Dashboard stream and optional Popup stream. The dashboard stream SHALL retain the existing entity field. Popup stream SHALL use `variables.popup_stream_entity`; absent, null or empty SHALL select the dashboard entity without writing a default or migrating saved data. Invalid non-camera bindings SHALL be rejected. Neither stream SHALL be silently replaced by another quality.
+The dashboard builder SHALL expose a camera-domain Dashboard stream and optional Popup stream in its visual form and preserve both through Visual/JSON editing. The dashboard stream SHALL retain the existing entity field. Popup stream SHALL use `variables.popup_stream_entity`; absent, null or empty SHALL select the dashboard entity without writing a default or migrating saved data. Invalid non-camera bindings SHALL be rejected. Neither stream SHALL be silently replaced by another quality.
 
 #### Scenario: An existing card has no popup stream
 - **WHEN** it is edited or generated

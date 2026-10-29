@@ -131,7 +131,7 @@ export function refreshFrontend({ host = window, isDirty = () => host.isDirtySta
   return operation;
 }
 
-export function bindNavbarRefresh(nav, { eligible, progress, complete, haptic }) {
+export function bindNavbarRefresh(nav, { eligible, progress, complete, haptic, feedback }) {
   const doc = nav.ownerDocument, host = doc.defaultView;
   let gesture, armTimer, finishTimer, frame, suppressed, pointerStarted = false;
   const clearSuppression = () => { suppressed = null; };
@@ -143,7 +143,7 @@ export function bindNavbarRefresh(nav, { eligible, progress, complete, haptic })
   const suppress = pointerId => { suppressed = pointerId; };
   const cancel = () => {
     if (!gesture) return;
-    suppress(gesture.id); gesture = null; stopTracking(); progress(null);
+    suppress(gesture.id); gesture = null; stopTracking(); feedback?.cancel(); progress(null);
   };
   const paint = () => {
     if (!gesture || !eligible() || doc.visibilityState === 'hidden') { cancel(); return; }
@@ -155,7 +155,7 @@ export function bindNavbarRefresh(nav, { eligible, progress, complete, haptic })
     const remaining = NAVBAR_HOLD_MS - (host.performance.now() - gesture.started);
     if (remaining > 0) { finishTimer = setTimeout(finish, remaining); return; }
     const target = gesture.target;
-    suppress(gesture.id); gesture = null; stopTracking(); haptic(); progress(1); complete(target);
+    suppress(gesture.id); gesture = null; stopTracking(); feedback?.cancel(); haptic(); progress(1); complete(target);
   };
   const move = event => {
     if (!gesture || event.pointerId !== gesture.id) return;
@@ -166,7 +166,7 @@ export function bindNavbarRefresh(nav, { eligible, progress, complete, haptic })
   const end = event => {
     if (!gesture || event.pointerId !== gesture.id) return;
     if (event.type === 'pointercancel' || gesture.armed) { cancel(); return; }
-    gesture = null; stopTracking(); progress(null);
+    gesture = null; stopTracking(); feedback?.release(); progress(null);
   };
   const second = event => { if (gesture && event.pointerId !== gesture.id) cancel(); };
   const tracking = [['pointermove', move], ['pointerup', end], ['pointercancel', end], ['pointerdown', second], ['scroll', cancel], ['visibilitychange', cancel]];
@@ -176,6 +176,7 @@ export function bindNavbarRefresh(nav, { eligible, progress, complete, haptic })
     pointerStarted = true;
     clearSuppression();
     gesture = { target: event.target?.closest?.('button,a'), id: event.pointerId, x: event.clientX, y: event.clientY, started: host.performance.now(), armed: false };
+    feedback?.start(gesture.target,event);
     for (const [type, listener] of tracking) doc.addEventListener(type, listener, true);
     host.addEventListener('blur', cancel);
     armTimer = setTimeout(() => {

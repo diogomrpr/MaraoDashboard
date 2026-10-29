@@ -118,8 +118,7 @@ expose private configuration, credentials or media.
 Each push/tag/release SHALL invoke the publication gate. It MAY reuse complete
 exact-candidate browser evidence after validating coverage, private capture
 hashes, cleanup and the live restored prepared installation. Changed, failed,
-incomplete or stale evidence SHALL block reuse. Native-exception expiry SHALL
-be rechecked before publication.
+incomplete or stale evidence SHALL block reuse.
 
 #### Scenario: The verified candidate is pushed, tagged and released
 - **WHEN** its candidate, source, target and complete private proof remain valid

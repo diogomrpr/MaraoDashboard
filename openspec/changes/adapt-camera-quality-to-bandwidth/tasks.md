@@ -13,5 +13,5 @@ The user superseded the unfinished automatic-quality design on 2026-10-21. Its e
 - [x] 2 Add camera-only popup stream selector, explicit dashboard stream labels and aligned validation; preserve missing/null/empty and unknown options without a migration.
 - [x] 3 Generate popup live video before unchanged provider events with fullscreen activation; use exact selected entities and native HA transport, preserving buffering and cleanup.
 - [x] 4 Remove superseded experimental HLS engine, backend endpoints and dependency; retain native signaling ownership fixes.
-- [ ] 5 Verify focused preservation/generation/native playback/fullscreen behavior and update safe gallery, realistic page and usage documentation.
-- [ ] 6 Inspect current disposable mobile/320px/landscape behavior, clear relevant diagnostics, restore temporary safe state and leave current successful assets installed. Compare requested acceptance with evidence; no publication or production changes.
+- [x] 5 Verify focused preservation/generation/native playback/fullscreen behavior and update safe gallery, realistic page and usage documentation.
+- [x] 6 Inspect current disposable mobile/320px/landscape behavior, clear relevant diagnostics, restore temporary safe state and leave current successful assets installed. Compare requested acceptance with evidence; no publication or production changes.

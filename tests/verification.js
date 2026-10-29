@@ -286,11 +286,6 @@ async function runPlan(plan, options = {}) {
       console.log('Selected check: ' + check.id);
       if (options.upgradeReport && check.id === 'preserved-upgrade') {
         await require('./verify-release').verifyRelease(options.upgradeReport, { publish: false, scope: plan });
-      } else if (check.id.startsWith('e2e:') || check.id === 'native-reconnect') {
-        const config = require('../ha-test/client').readConfig();
-        await require('./native-reconnect-exception').e2eWithApprovedException(config, jobDirectory, check.id === 'native-reconnect' ? 'light' : check.id.slice(4), {
-          MARAO_TEST_ARTIFACT_ROOT: jobDirectory, ...(receipt ? { MARAO_BATCH_RECEIPT: receipt } : {}) }, {
-            args: check.id === 'native-reconnect' ? ['--disconnect-only'] : [], signal: controller.signal });
       } else await new Promise((resolve, reject) => {
         const env = { ...process.env, MARAO_TEST_ARTIFACT_ROOT: jobDirectory,
           ...(receipt && check.id !== 'preserved-upgrade' ? { MARAO_BATCH_RECEIPT: receipt } : {}),

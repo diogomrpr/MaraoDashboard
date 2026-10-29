@@ -12,6 +12,7 @@ await waitForHomeAssistantRegistry();
 const cardsModule = await import(new URL(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
 const { loadHistoryChart, createHistoryPlaceholder, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, fitNativeGrid, updateCardSurface, problemLabel, showCardDetails, layoutState, registerMaraoCards } = cardsModule;
 registerMaraoCards();
+await import(new URL(`./MaraoFloorPlanCard.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
 
 const MARAO_FONT_URL = new URL(`./MaraoFonts.css${MARAO_RESOURCE_QUERY}`,import.meta.url).href;
 
@@ -270,6 +271,8 @@ const TRANSLATIONS = {
     "common.closing": "Closing",
     "common.running": "Running",
     "common.idle": "Idle",
+    "media.nothing_playing": "Nothing playing",
+    "media.metadata_missing": "Media details unavailable",
     "media.previous": "Previous",
     "media.play_pause": "Play/pause",
     "media.next": "Next",
@@ -512,6 +515,8 @@ const TRANSLATIONS = {
     "common.closing": "A fechar",
     "common.running": "Em execução",
     "common.idle": "Inativo",
+    "media.nothing_playing": "Nada a reproduzir",
+    "media.metadata_missing": "Detalhes indisponíveis",
     "media.previous": "Anterior",
     "media.play_pause": "Reproduzir/pausar",
     "media.next": "Seguinte",

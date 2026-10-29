@@ -12,6 +12,8 @@ position plus elapsed playback, then clamp to duration and send numeric data.
 App cards SHALL use `hc_media_app_card` and select the configured source.
 App shortcuts SHALL show full-card square app artwork without a visible title or
 normal player-state line, retaining semantic app names and visible problem reasons.
+Visible app surfaces SHALL remain 80 CSS pixels square with 18px corners, centered
+in their grid cells rather than expanding with the popup width.
 Bundled brand artwork SHALL include MEO (also recognized as MEO Go); unknown apps
 SHALL retain their configured icon. Saved source values and custom names remain unchanged.
 
@@ -24,9 +26,21 @@ SHALL retain their configured icon. Saved source values and custom names remain 
 - **WHEN** the popup has room for three 80px app cells and their gaps
 - **THEN** its six shortcuts form two rows using the shared responsive app layout
 - **AND** their names, source values, order and launch actions remain intact
+- **AND** each visible app tile stays 80px square as the popup becomes wider
 
 #### Scenario: App shortcuts respond as buttons
 - **WHEN** an enabled shortcut is hovered with a pointer
-- **THEN** it shows a hand cursor, a themed edge over its artwork and a slight lift
+- **THEN** it shows a hand cursor, a soft themed shadow around its rounded surface and a slight lift
 - **WHEN** an enabled shortcut is pressed with pointer or touch input
-- **THEN** it shows the themed edge and a short compression, while disabled shortcuts receive no interactive treatment
+- **THEN** it shows a softer outer shadow and a short compression, while disabled shortcuts receive no interactive treatment
+
+#### Scenario: Additional media and Apple TV controls contracts
+- **WHEN** a configured media player or app shortcut is rendered or activated
+- **THEN** Relative rewind/forward SHALL compute authoritative
+position plus elapsed playback, then clamp to duration and send numeric data.
+- **AND** App cards SHALL use `hc_media_app_card` and select the configured source.
+- **AND** App shortcuts SHALL show full-card square app artwork without a visible title or
+normal player-state line, retaining semantic app names and visible problem reasons.
+- **AND** Bundled brand artwork SHALL include MEO (also recognized as MEO Go); unknown apps
+SHALL retain their configured icon.
+- **AND** Saved source values and custom names remain unchanged.

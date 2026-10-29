@@ -14,6 +14,12 @@ Development and release verification SHALL use the smallest covering unit/static
 - **THEN** its relevant rendering/localization and difficult text-layout checks execute
 - **AND** unrelated camera, slider, reconnect, editor-save and historical live-upgrade checks do not execute
 
+#### Scenario: Additional meaningful focused checks contracts
+- **WHEN** development, integration or publication checks are selected
+- **THEN** Explicitly requested integration verification of icon-only/shared action geometry SHALL select relevant alignment checks; changed sliders SHALL select relevant slider checks within that requested scope.
+- **AND** Visibility SHALL NOT replace dispatch or data-preservation assertions.
+- **AND** Publication SHALL use affected unit tests and applicable metadata validation, reusing development integration evidence.
+
 ### Requirement: Mobile release matrix
 Default release verification SHALL select mobile profiles for affected UI contracts, preserving isolated touch/device settings, typography and native HA compatibility. Layout coverage SHALL include affected cards at 320px and relevant text/zoom, theme, portrait and landscape conditions. Theme-independent geometry SHALL use one reference theme with representative appearance/state coverage in both themes. The full matrix SHALL remain available only through explicit comprehensive verification.
 
@@ -40,6 +46,10 @@ Default release verification SHALL select mobile profiles for affected UI contra
 - **WHEN** a layout change selects enlarged-text and zoom coverage
 - **THEN** 200% text and 200% browser zoom remain distinct cases
 - **AND** selected normal, bold and bold-plus-200% text cases are not removed merely because one enlarged case passes
+
+#### Scenario: Additional mobile release matrix contracts
+- **WHEN** the user explicitly requests mobile integration verification
+- **THEN** The full matrix SHALL remain available only through explicit comprehensive verification.
 
 ### Requirement: Interaction and resource verification
 Selected browser checks SHALL verify the changed contract: relevant cold loads, scrolling, safe-area/navbar clearance, popup focus/scroll/close, availability/errors, external state changes, single dispatch and gesture cancellation. Connection changes SHALL retain native warning and exception assertions. Failures SHALL retain screenshots and raw diagnostics; success captures SHALL be representative unless exhaustive captures were explicitly requested.
@@ -69,15 +79,20 @@ Selected browser checks SHALL verify the changed contract: relevant cold loads, 
 ### Requirement: Publication gate and exact-commit CI
 Pushes, tags and releases SHALL require successful checks for all affected changes and applicable exact-commit CI, including relevant packaging, assets, hassfest and HACS. Publication SHALL NOT implicitly require full-suite, full-matrix or unrelated preserved-install checks. Failed selected checks and known relevant violations SHALL block publication. Valid scoped evidence SHALL be reusable for unchanged inputs; approved native exceptions SHALL remain explicit and time-limited.
 
-#### Scenario: The native reconnect check still fails for a future release
-- **WHEN** changed connection behavior selects that check during publication preparation
-- **THEN** raw assertions and native evidence are retained
-- **AND** only the explicitly approved stale-unsubscribe exception applies while its stable upstream fix remains unavailable
+#### Scenario: Verification runs after native reconnect checks are retired
+- **WHEN** affected, full, upgrade or publication verification is selected
+- **THEN** it does not inject the retired native HA reconnect outage or probe upstream fix delivery
+- **AND** disconnected-action unit tests and ordinary failure reporting remain available
 
 #### Scenario: A release contains several completed implementation batches
 - **WHEN** publication scope is computed
 - **THEN** all changes since the previous released baseline and their shared consumers are included
 - **AND** a clean working tree cannot produce an empty scope merely because no files are currently uncommitted
+
+#### Scenario: Additional publication gate and exact-commit CI contracts
+- **WHEN** a push, tag or release is prepared
+- **THEN** Failed selected checks and known relevant violations SHALL block publication.
+- **AND** Valid scoped evidence SHALL be reusable for unchanged inputs; accepted exceptions SHALL remain explicit.
 
 #### Scenario: Candidate or selected inputs change after verification
 - **WHEN** publication evidence is checked

@@ -1,3 +1,4 @@
+import catalog from '../../custom_components/marao_dashboard/frontend/marao-catalog.json' with {type:'json'};
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -536,4 +537,13 @@ test('duplicateCard preserves authored configuration while separating identities
   const embedded = duplicateCard(draft, container, 3);
   assert.equal(embedded.yaml, yaml); assert.deepEqual(embedded.future, { empty: [] });
   assert.ok(embedded.id); assert.equal(duplicateCard(draft, container, 99), null);
+});
+
+test('media presentation survives independent editing and rejects unsupported choices',()=>{
+ const make=value=>({config_version:2,name:'Test',landing_page:'home',pages:[{name:'Home',path:'home',entities:[{template:'md_media_card',entity_id:'media_player.safe',variables:value===undefined?{}:{media_display:value},apple_tv:{remote_entity:'remote.safe',apps:[{source:'one',extra:[]}]},future:{keep:[]}}]}]});
+ for(const value of [undefined,'popup','inline']) {
+  const input=make(value);assert.deepEqual(serializeConfig(normalizeConfig(input)),input);
+  assert.deepEqual(validateConfig(input,2,[],{},catalog),[]);
+ }
+ assert.ok(validateConfig(make('bad'),2,[],{},catalog).some(error=>error.includes('Popup or On dashboard')));
 });

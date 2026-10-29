@@ -152,6 +152,6 @@ test('the live upgrade and release gate are outside routine scripts and workflow
     for (const match of scripts[name].matchAll(/npm (?:run )?([a-z][a-z0-9:-]*)/g)) if (scripts[match[1]]) visit(match[1]);
   };
   for (const name of ['test', 'test:static', 'verify:publish', 'preversion']) visit(name);
-  for (const file of ['tests/verify-publish.js', 'tests/native-reconnect-exception.js']) assert.doesNotMatch(fs.readFileSync(path.join(root, file), 'utf8'), /test-ha-upgrade|test:ha:upgrade|verify:release/);
+  assert.doesNotMatch(fs.readFileSync(path.join(root, 'tests/verify-publish.js'), 'utf8'), /test-ha-upgrade|test:ha:upgrade|verify:release/);
   for (const file of fs.readdirSync(path.join(root, '.github/workflows'))) assert.doesNotMatch(fs.readFileSync(path.join(root, '.github/workflows', file), 'utf8'), /npm run (?:verify:release|test:ha:upgrade)/);
 });

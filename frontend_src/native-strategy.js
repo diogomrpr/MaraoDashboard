@@ -51,8 +51,9 @@ export class MaraoDashboardStrategy extends HTMLElement {
     // Scoped native styling owns the bundled theme; retain deliberate other named themes.
     for (const view of result.views) {
       if (view.theme === 'Marao Dashboard') delete view.theme;
-      const navbar = view.cards.at(-1)?.cards?.find(card=>card.type === 'custom:marao-navbar-card');
-      if (navbar) {
+      let navbar = view.cards.at(-1);
+      while (navbar?.cards && navbar.type !== 'custom:marao-navbar-card') navbar = navbar.cards.at(-1);
+      if (navbar?.type === 'custom:marao-navbar-card') {
         navbar.dashboard_root = root;
         if (hass.user?.is_admin) navbar.editor_path = converted.document.strategy.editor_path;
       }

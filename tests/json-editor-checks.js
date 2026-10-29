@@ -58,7 +58,7 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
     Object.defineProperty(p, 'hass', { configurable: true, set(value) {
       last = value;
       descriptor.set.call(this, { ...value,
-        callWS(message) { if (message.type === 'marao_dashboard/config/generate' || message.type === 'call_service') p._jsonTestMutations.push(message.type); return value.callWS(message); },
+        callWS(message) { if (['marao_dashboard/config/generate', 'lovelace/config/save', 'call_service'].includes(message.type)) p._jsonTestMutations.push(message.type); return value.callWS(message); },
         callService(...args) { p._jsonTestMutations.push('call_service'); throw new Error('JSON editing dispatched an entity service'); },
       });
     } });
@@ -149,17 +149,17 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
     await suggestion.waitFor({ state: 'visible' }); await geometry(panel); await suggestion.tap();
     const valueSuggestion = panel.locator('.suggest-widget .monaco-list-row').filter({ hasText: /^false$/ }).first();
     await valueSuggestion.waitFor({ state: 'visible' }); await valueSuggestion.tap();
-    await page.waitForFunction(p => { try { return JSON.parse(p._monaco.getValue()).pages[0].sections[0].entities[0].variables.enable_slider !== undefined; } catch { return false; } }, await panel.elementHandle());
+    await page.waitForFunction(p => { try { return JSON.parse(p._monaco.getValue()).pages[0].sections[0].entities.find(card => card.id === 'first').variables.enable_slider !== undefined; } catch { return false; } }, await panel.elementHandle());
     const accepted = JSON.parse(await text()), expected = JSON.parse(source);
-    assert.equal(typeof accepted.pages[0].sections[0].entities[0].variables.enable_slider, 'boolean');
-    accepted.pages[0].sections[0].entities[0].variables.enable_slider = false;
+    assert.equal(typeof accepted.pages[0].sections[0].entities.find(card => card.id === 'first').variables.enable_slider, 'boolean');
+    accepted.pages[0].sections[0].entities.find(card => card.id === 'first').variables.enable_slider = false;
     assert.deepEqual(accepted, expected, 'Completion changed neighboring unknown/raw/empty/ordered command data');
     const completedText = await text(), beforeStart = completionSource.indexOf('"variables": {'), afterStart = completedText.indexOf('"variables": {');
     assert.equal(completionSource.slice(0, beforeStart), completedText.slice(0, afterStart));
     assert.equal(completionSource.slice(completionSource.indexOf('}', beforeStart) + 1), completedText.slice(completedText.indexOf('}', afterStart) + 1));
 
     const dynamic = JSON.parse(source); dynamic.pages[0].path = 'renamed-studio'; dynamic.landing_page = '';
-    dynamic.pages[0].sections[0].entities[0].entity_id = '';
+    dynamic.pages[0].sections[0].entities.find(card => card.id === 'first').entity_id = '';
     await setSource(JSON.stringify(dynamic, null, 2) + '\n');
     await page.waitForTimeout(200);
     const hints = await panel.evaluate(async p => {
@@ -228,7 +228,10 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
     await panel.evaluate(p => p._monaco.focus()); await page.keyboard.press('F8');
     await panel.locator('.zone-widget .message').first().waitFor({ state: 'visible' });
     await page.waitForFunction(({ p, line }) => p._monaco.getTopForLineNumber(line + 2) > p._monaco.getTopForLineNumber(line), { p: await panel.elementHandle(), line: foldLine });
-    assert.equal(await panel.evaluate(p => p._monaco.getSelection().startLineNumber), source.split('\n').findIndex(line => line.includes('"enable_slider": false')) + 1);
+    const diagnosticLine = await panel.evaluate(p => p._monaco.getSelection().startLineNumber);
+    const cardLine = source.split('\n').findIndex(line => line.includes('"id": "first"')) + 1;
+    const optionLine = source.split('\n').findIndex(line => line.includes('"enable_slider": false')) + 1;
+    assert.ok(diagnosticLine >= cardLine && diagnosticLine <= optionLine, 'Stock F8 must reveal the invalid card or its option');
     await page.keyboard.press('Escape');
     await setSource(source);
     await page.waitForFunction(p => !p.shadowRoot.querySelector('.squiggly-error,.squiggly-warning'), await panel.elementHandle());
@@ -241,7 +244,7 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
       const original = p._hass, source = p._monaco.getValue();
       try {
         p._hass = { ...original, callWS: async message => {
-          if (message.type === 'marao_dashboard/config/generate') throw new Error('Injected JSON save failure');
+          if (['marao_dashboard/config/generate', 'lovelace/config/save'].includes(message.type)) throw new Error('Injected JSON save failure');
           return original.callWS(message);
         } };
         await p._save();
@@ -250,8 +253,10 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
       p._setStatus('', '');
     });
     await panel.locator('[data-tab="visual"]').tap();
+    await page.waitForFunction(p => p._tab === 'visual', await panel.elementHandle());
     await panel.evaluate(p => { p._model.name = 'Changed in Visual'; p._setDirty(); p._renderVisual(); });
     await panel.locator('[data-tab="json"]').tap();
+    await page.waitForFunction(p => p._tab === 'json', await panel.elementHandle());
     assert.equal(JSON.parse(await text()).name, 'Changed in Visual', 'Changed Visual source was not synchronized');
     page.once('dialog', dialog => dialog.accept());
     await panel.evaluate(p => p._discard());
@@ -272,7 +277,8 @@ async function jsonEditorChecks(page, panel, { output, scenario, theme, client, 
     }
     assert.deepEqual(await panel.evaluate(p => {
       const root=p.shadowRoot, save=root.getElementById('save'), box=save.getBoundingClientRect(), failures=[];
-      for (const x of [box.left+4,box.left+box.width/2,box.right-4]) for (const y of [box.top+4,box.top+box.height/2,box.bottom-4]) {
+      // Sample the visible round button, rather than its transparent corners.
+      for (const x of [.25,.5,.75].map(fraction=>box.left+box.width*fraction)) for (const y of [.25,.5,.75].map(fraction=>box.top+box.height*fraction)) {
         const hit=root.elementFromPoint(x,y);
         if(hit!==save && !save.contains(hit)) failures.push('A Monaco widget covers Save');
       }

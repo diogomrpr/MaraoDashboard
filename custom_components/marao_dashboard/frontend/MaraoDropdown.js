@@ -1,10 +1,10 @@
-export const dropdownStyles = `
+const {bindPressFeedback,pressStyles}=await import(new URL(`./MaraoPressFeedback.js${new URL(import.meta.url).search}`,import.meta.url));
+export const dropdownStyles = `${pressStyles}
 .marao-dropdown{position:relative;min-width:0}
 .marao-dropdown button{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;width:100%;min-width:48px;padding:12px;border:0;border-radius:12px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;text-align:start;cursor:pointer;overflow-wrap:anywhere}
 .marao-dropdown>button[aria-haspopup=menu]{background:var(--ha-card-background,var(--card-background-color));box-shadow:inset 0 0 0 1px var(--divider-color)}
 .marao-dropdown button:disabled{opacity:.5;cursor:default}
 .marao-dropdown button:focus{outline:none}
-.marao-dropdown button:active:not(:disabled){transform:scale(.98)}
 .marao-dropdown ha-icon{flex:0 0 24px;--mdc-icon-size:24px;pointer-events:none}
 .marao-dropdown-options{box-sizing:border-box;position:absolute;inset:calc(100% + 4px) 0 auto;z-index:3;display:grid;gap:4px;padding:4px;border:0;border-radius:16px;max-height:360px;max-height:min(360px,60dvh);overflow:auto;overscroll-behavior:contain;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:0 4px 16px var(--opacity-contrast-200,rgba(0,0,0,.2));font:inherit}
 .marao-dropdown-options[popover]{position:fixed;inset:auto;margin:0}
@@ -16,6 +16,7 @@ export const dropdownStyles = `
 export function bindDropdown(picker, { trigger, menu, choices, value, activeElement, haptic, onSelect, onTab }) {
   const events = new AbortController(), listen = { signal: events.signal };
   let open = false;
+  const feedback=bindPressFeedback(picker);
   const floating = typeof menu.showPopover === 'function';
   if (floating) menu.setAttribute('popover', 'manual');
   const position = () => {
@@ -32,6 +33,7 @@ export function bindDropdown(picker, { trigger, menu, choices, value, activeElem
     menu.style.top = `${upwards ? Math.max(top + 12, rect.top - menu.offsetHeight - 4) : rect.bottom + 4}px`;
   };
   function close(focus = false) {
+    feedback.cancel();
     if (open && floating && menu.matches(':popover-open')) menu.hidePopover();
     open = false; menu.hidden = true; trigger.setAttribute('aria-expanded', 'false');
     if (focus) trigger.focus({ preventScroll: true });
@@ -77,5 +79,5 @@ export function bindDropdown(picker, { trigger, menu, choices, value, activeElem
     if (trigger.disabled) close(); else position();
   };
   close(); sync();
-  return { element: picker, sync, close, get open() { return open; }, destroy() { close(); events.abort(); } };
+  return { element: picker, sync, close, get open() { return open; }, destroy() { close(); feedback.destroy(); events.abort(); } };
 }

@@ -153,7 +153,7 @@ Safari, VoiceOver, TalkBack, or OS high-contrast inspection is claimed. Automate
 geometry, screenshots and lifecycle checks cannot establish physical haptic
 strength. A future task must report its own checks and limits.
 
-## Unresolved native Home Assistant reconnect issue
+## Retired native Home Assistant reconnect verification
 
 The issue was reproduced on native `/profile` without opening Marao on Core
 2026.7.4. After a harmless notification loads the native toast, interrupting and
@@ -168,7 +168,7 @@ but the native exception failed the disconnect portion of the release gate.
 
 Upstream [Fix leaks on reconnect, #780](https://github.com/home-assistant/home-assistant-js-websocket/commit/4c5674c36cc898bbd38abc54b4d89777e37a8496)
 was merged on October 8. Its immediate replacement of the unsubscribe wrapper
-matches the observed race; confirmation for this reproduction is still required.
+matches the observed race; confirmation for this reproduction was planned.
 The frontend patch checked during review still pinned WebSocket library 9.7.1,
 predating that fix. Those are dated observations, not a claim about future releases.
 
@@ -178,11 +178,10 @@ with this documented issue. That exception applied to that release only. No HA
 source was patched, experimental frontend installed, or error assertion hidden.
 During the 0.6.0 release preparation the user separately allowed only this
 diagnosed stale-unsubscribe failure until its upstream fix reaches a stable
-frontend. Preserve raw failing assertions and native subscription evidence and
-recheck the delivery chain before applying the exception. All other publication
-and preserved-install requirements remain intact. The open change
-`confirm-home-assistant-reconnect-fix` retains the required verification without
-claiming the fix is delivered.
+frontend. Raw failing assertions and native subscription evidence were retained,
+and the delivery chain was checked before applying the exception. The follow-up
+`confirm-home-assistant-reconnect-fix` recorded the planned confirmation without
+claiming the fix was delivered.
 
 The official delivery check on 2026-10-12 found stable Core
 [2026.10.1](https://github.com/home-assistant/core/releases/tag/2026.10.1), whose
@@ -190,8 +189,26 @@ The official delivery check on 2026-10-12 found stable Core
 is 20260930.3, also the latest stable frontend. Its
 [lockfile](https://github.com/home-assistant/frontend/blob/20260930.3/pnpm-lock.yaml)
 still uses WebSocket 9.7.1; the identified fix is two commits ahead of that version.
-The fix remains undelivered and the confirmation tasks stay open. This check did
+At that date the fix was undelivered and the confirmation tasks stayed open. This check did
 not update Home Assistant or claim the reconnect defect is resolved.
+
+A delivery-chain recheck on 2026-10-29 found latest stable Core
+[2026.10.4](https://github.com/home-assistant/core/releases/tag/2026.10.4), whose
+[frontend requirement](https://github.com/home-assistant/core/blob/2026.10.4/homeassistant/components/frontend/manifest.json)
+remains 20260930.5, also the latest stable frontend. Its WebSocket dependency is
+still 9.7.1; the official commit comparison places the identified fix two commits
+ahead of that version. The requested confirmation was blocked on stable
+delivery. No disposable update or outage/recovery test was performed, and the
+existing diagnosed failure remained unresolved. The dated check receipt and
+original proposal are retained privately and in version history.
+
+Later on 2026-10-29 the user explicitly retired this verification. The native HA
+outage injection, reconnect exception wrapper and stable-fix expiry probe have
+been removed from standalone, full and upgrade checks. The pending confirmation
+proposal was cancelled, without marking its unfinished tasks complete or claiming
+the upstream issue fixed. Historical failure records remain retained. Product
+disconnected-action guards and their unit tests remain; other selected checks
+continue to report failures normally. No HA upgrade or runtime change was made.
 
 For development, capture the current dirty baseline with `test:affected -- --snapshot`
 and select subsequent task edits with `--since` and an explicit `visual`, `behavior`

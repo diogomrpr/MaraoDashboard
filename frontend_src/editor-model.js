@@ -1,3 +1,4 @@
+import { floorPlanErrors, floorPageErrors } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlan.js';
 import { canonicalCard, canonicalTemplate, legacyTemplates } from '../custom_components/marao_dashboard/frontend/MaraoNames.js';
 export { canonicalCard, canonicalTemplate };
 import { sensorThresholdError } from '../custom_components/marao_dashboard/frontend/MaraoSensorThresholds.js';
@@ -642,7 +643,7 @@ export function validatePages(config, catalog) {
   const safePath = value => typeof value === 'string' && /^[a-z0-9][a-z0-9_-]*$/.test(value);
   const safeId = value => typeof value === 'string' && /^[a-z][a-z0-9_-]{0,63}$/.test(value);
   const entityId = value => typeof value === 'string' && /^[a-z0-9_]+\.[a-z0-9_]+$/.test(value);
-  const freeRoles = new Set(['md_title_card', 'md_navigation_card', 'md_room_card', 'md_entity_group_card', 'md_scene_collection_card', 'md_header_card', 'md_glance_card']);
+  const freeRoles = new Set(['md_title_card', 'md_navigation_card', 'md_room_card', 'md_entity_group_card', 'md_scene_collection_card', 'md_header_card', 'md_glance_card', 'md_floor_plan_card']);
   const templates = new Map((catalog?.cards || []).map(card => [card.id, card.domains]));
   if (['overview', 'rooms'].some(key => Object.hasOwn(config, key))) errors.push('Mixed legacy and canonical page configuration.');
   if (!Array.isArray(config.pages) || !config.pages.length) return [...errors, 'Keep at least one page.'];
@@ -665,6 +666,7 @@ export function validatePages(config, catalog) {
     if (Object.hasOwn(page, 'sections') && ['entities', 'cards', 'columns'].some(key => Object.hasOwn(page, key))) errors.push('A page cannot mix sections with flat entities, cards or columns.');
     const sections = Object.hasOwn(page, 'sections') ? page.sections : [page];
     if (!Array.isArray(sections)) { errors.push('Page sections must be a list of objects.'); continue; }
+    errors.push(...floorPageErrors(page, sections.map(section => ({ ...section, entities: flattenEntities(section?.entities) }))));
     const ids = new Set();
     const entries = spec => {
       if (spec == null) return [];
@@ -694,6 +696,8 @@ export function validatePages(config, catalog) {
         if (['name', 'icon'].some(key => card[key] != null && typeof card[key] !== 'string')) errors.push('Card name and icon must be strings.');
         if (card.variables != null && !object(card.variables)) errors.push('Card options must be an object.');
         const options = object(card.variables) ? card.variables : {};
+        if (card.template === 'md_floor_plan_card') errors.push(...floorPlanErrors(options));
+        if (card.template === 'md_media_card' && Object.hasOwn(options, 'media_display') && !['popup', 'inline'].includes(options.media_display)) errors.push('Choose Popup or On dashboard.');
         if (["md_security_card", "md_alarm_controls_card"].includes(card.template) && Object.hasOwn(options, "alarm_layout") && !["dropdown", "grid"].includes(options.alarm_layout)) errors.push("Alarm layout must be dropdown or grid.");
         if (card.template === 'md_vacuum_card' && ['action_1', 'action_2', 'action_3'].some(key => object(options[key]) && Object.hasOwn(options[key], 'data') && !object(options[key].data))) errors.push('Vacuum action data must be an object');
         let accessRole = card.template;
@@ -872,7 +876,9 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
       },
     ],
   };
-  const cardValue = { anyOf: [...entityValue.anyOf, groupValue] };
+  const floorLight = { ...object({ id: {type:'string'}, entity_id: binding(['light']), name:{type:'string'}, icon:{type:'string'}, x:{type:'number',minimum:0,maximum:100}, y:{type:'number',minimum:0,maximum:100}, strip:object({ width:{type:'number',minimum:1,maximum:32}, points:{type:'array',minItems:2,items:{...object({x:{type:'number',minimum:0,maximum:100},y:{type:'number',minimum:0,maximum:100}}),required:['x','y']}} }) }), required:['id','entity_id','x','y'] };
+  const floorCard = { ...object({ template: {const:'md_floor_plan_card'}, id:{type:'string'}, name:{type:'string'}, variables:{...object({image_id:{type:'string',pattern:'^[a-f0-9]{32}$'},full_page:{type:'boolean'},lights:{type:'array',items:floorLight}}),required:['image_id','lights']} }), required:['template','variables'] };
+  const cardValue = { anyOf: [...entityValue.anyOf, groupValue, floorCard] };
   const rawCard = object({ type: suggested(['custom:marao-card', 'custom:marao-popup-card', 'custom:marao-navbar-card',
     'custom:marao-state-timeline-card', 'custom:marao-energy-period-card', 'grid', 'vertical-stack', 'horizontal-stack']),
     template: suggested((catalog.cards || []).map(card => card.id)), name: { type: 'string' },

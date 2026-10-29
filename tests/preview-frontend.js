@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { repoRoot, accessToken, setBrowserToken, assertCurrentFrontend } = require('../ha-test/client');
-const { inspectionFor, selectComponents, components } = require('./verification-map');
+const { inspectionFor, selectComponents } = require('./verification-map');
 
 const cardSelector = 'marao-card,marao-navbar-card,marao-state-timeline-card,marao-energy-period-card,marao-camera-events-card,marao-frigate-events-card';
 
@@ -24,7 +24,9 @@ function parseArgs(argv = process.argv.slice(2)) {
   if (options.watch && options.once) throw new Error('--watch and --once cannot be combined.');
   const inspection = inspectionFor(selectComponents([], options.components));
   if (options.families.length) {
-    const allowed = new Set([...components.native.templates, 'marao-navbar-card']);
+    if (inspection.editor) throw new Error('Editor previews do not select runtime card families.');
+    const catalog = JSON.parse(fs.readFileSync(path.join(repoRoot,'custom_components/marao_dashboard/frontend/marao-catalog.json'),'utf8'));
+    const allowed = new Set([...catalog.cards.map(card=>card.id), 'marao-navbar-card']);
     for (const family of options.families) {
       if (!allowed.has(family)) throw new Error('Unknown preview family: ' + family);
       if (inspection.families.length && !inspection.families.includes(family)) throw new Error(family + ' is outside the selected components.');

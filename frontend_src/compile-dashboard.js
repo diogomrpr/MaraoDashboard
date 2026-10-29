@@ -131,6 +131,15 @@ export function compileDashboard(input, { entities = [], areas = [], roomEntitie
   const pageCard = entity => {
     const item = { ...entity, name: name(entity) }, role = item.template, variables = item.variables || {};
     if (role === 'ha_card') return raw(parseCardYaml(item.yaml));
+    if (role === 'md_floor_plan_card') return { type:'custom:marao-floor-plan-card', name:item.name, ...copy(variables), lights_popup:`#page-${item._page_instance}-${item.id}-lights` };
+    if (role === 'md_media_card' && variables.media_display === 'inline') {
+      const summary = roomCard(item);
+      summary.variables = { ...summary.variables, now_playing: true };
+      summary.name = `${t('media.now_playing')} · ${item.name}`;
+      summary.tap_action = copy(item.tap_action || { action: 'none' });
+      for (const key of ['hold_action', 'double_tap_action']) if (own(item, key)) summary[key] = copy(item[key]);
+      return { type: 'vertical-stack', cards: [summary, ...createMediaContent(item, grid)] };
+    }
     if (role === 'md_entity_group_card') return groupCard(item);
     if (role === 'md_scene_collection_card') return { type: 'custom:marao-card', template: 'md_navigation_card', name: item.name, icon: item.icon || 'mdi:palette-outline', show_state: false, tap_action: navigate(variables.popup_hash) };
     let card;
@@ -154,13 +163,14 @@ export function compileDashboard(input, { entities = [], areas = [], roomEntitie
     if (['ha_card', 'md_access_slide_action_card', 'md_access_action_card'].includes(role)) return [];
     if (role === 'md_security_card' && !own(item, 'tap_action')) return [{ ...header(variables.popup_hash || hash('alarm', item.entity_id), item.entity_id, item.name, 'mdi:shield-home'), cards: [{ type: 'custom:marao-card', template: 'md_alarm_controls_card', entity: item.entity_id, name: item.name, ...(own(variables, 'alarm_layout') ? { variables: { alarm_layout: variables.alarm_layout } } : {}) }] }];
     if (role === 'md_entity_group_card') return groupPopups(item);
+    if (role === 'md_floor_plan_card') return [{ ...header(`#page-${item._page_instance}-${item.id}-lights`, null, item.name, 'mdi:lightbulb-group-outline'), cards: variables.lights.map(light => entityCard({...light,template:'md_light_card',variables:{enable_slider:false}})) }];
     if (role === 'md_scene_collection_card') return [{ ...header(variables.popup_hash, null, item.name, item.icon || 'mdi:palette-outline'), cards: entries(item.entities).length ? entries(item.entities).map(sceneCard) : [{ type: 'markdown', content: t('overview.scenes_empty') }] }];
     if (role === 'md_energy_period_card' || role === 'md_graph_card' && variables.history_popup) {
       const card = role === 'md_energy_period_card' ? energyCard(item, null, true) : catalog.energy_units[item.unit_of_measurement]?.[0] === 'power' || variables.power_devices?.length ? { type: 'custom:marao-power-history-card', entity: variables.graph_entity || item.graph_entity || item.entity_id, name: item.name, ...pick(variables, ['power_devices', 'display_unit', 'display_precision', 'graph_color']) } : { type: 'custom:marao-card', template: item.template || 'md_graph_card', entity: item.entity_id, name: item.name, icon: item.icon || 'mdi:flash', variables: { show_graph_fill: true, show_graph_line: true, show_icon: true, ...variables, ...(item.graph_entity && !variables.graph_entity ? { graph_entity: item.graph_entity } : {}) } };
       return [{ ...header(variables.popup_hash, item.entity_id, item.name, item.icon || 'mdi:flash'), cards: [card] }];
     }
     if (role === 'md_climate_card') return [climatePopup(item)];
-    if (role === 'md_media_card') return [mediaPopup(item)];
+    if (role === 'md_media_card') return variables.media_display === 'inline' ? [] : [mediaPopup(item)];
     if (role === 'md_camera_card') return [cameraPopup(item)];
     if (item.entity_id && isAccess(item) && (!openOnly(item) || variables.access_mode === 'popup')) return [accessPopup(item)];
     return [];
@@ -213,7 +223,8 @@ export function compileDashboard(input, { entities = [], areas = [], roomEntitie
     }
     validatePopupLinks(page, [...cards, ...sheets]);
     cards.push(...sheets, copy(navbar));
-    return { title: name(page), path: page.path, cards, ...pick(page, ['icon', 'subview']), theme: page.theme || config.theme };
+    const full = page._sections.flatMap(section => section.ordered_cards).find(card => card.template === 'md_floor_plan_card' && card.variables.full_page);
+    return { title: name(page), path: page.path, ...(full ? {type:'panel',cards:[{type:'vertical-stack',cards:[pageCard(full), ...sheets, copy(navbar)]}]} : {cards}), ...pick(page, ['icon', 'subview']), theme: page.theme || config.theme };
   });
   const rewrite = value => {
     if (rawCards.has(value)) return copy(value);
@@ -246,13 +257,17 @@ function validatePopupLinks(page, cards) {
   });
   visit(cards, card => {
     const links = [card.navigation_path];
-    if (['md_media_card', 'md_camera_card', 'md_access_card', 'md_entity_group_card', 'md_climate_card'].includes(card.template)) links.push(card.variables?.popup_hash, card.variables?.mode_selector_hash);
+    if (!(card.template === 'md_media_card' && card.variables?.media_display === 'inline') && ['md_media_card', 'md_camera_card', 'md_access_card', 'md_entity_group_card', 'md_climate_card'].includes(card.template)) links.push(card.variables?.popup_hash, card.variables?.mode_selector_hash);
     for (const link of links) if (typeof link === 'string' && /^#(?:page-|entity-group-|overview-|energy-|climate-mode-|access-|media-|camera-)/.test(link) && !hashes.has(link)) throw new Error(`Page ${page.name}: retarget or remove missing popup link.`);
   });
 }
 
 function createMediaPopup(entity, header, grid) {
-  const name = entity.name || friendly(entity.entity_id), options = appleTVOptions(entity);
+  return { ...header(entity.variables?.popup_hash || hash('media', entity.entity_id), entity.entity_id, entity.name || friendly(entity.entity_id), appleTVOptions(entity) ? 'mdi:remote-tv' : 'mdi:music'), cards: createMediaContent(entity, grid) };
+}
+
+function createMediaContent(entity, grid) {
+  const options = appleTVOptions(entity);
   const button = (icon, label, service, { primary = false, dpad = false, target, data, holdData, seekOffset } = {}) => {
     const action = { action: 'perform-action', perform_action: service, target: { entity_id: target || entity.entity_id }, haptic: 'heavy', ...(data ? { data } : {}), ...(seekOffset !== undefined ? { seek_offset: seekOffset } : {}) };
     const key = ({ 'media_player.media_previous_track': 'media.previous', 'media_player.media_play_pause': 'media.play_pause', 'media_player.media_next_track': 'media.next' })[service];
@@ -260,12 +275,12 @@ function createMediaPopup(entity, header, grid) {
   };
   const fixedGrid = cards => ({ type: 'grid', columns: 3, square: false, cards });
   const play = () => button('mdi:play', 'Play', 'media_player.media_play_pause', { primary: true });
-  if (!options) return { ...header(entity.variables?.popup_hash || hash('media', entity.entity_id), entity.entity_id, name, 'mdi:music'), cards: [fixedGrid([button('mdi:skip-previous', 'Previous', 'media_player.media_previous_track'), play(), button('mdi:skip-next', 'Next', 'media_player.media_next_track')])] };
+  if (!options) return [fixedGrid([button('mdi:skip-previous', 'Previous', 'media_player.media_previous_track'), play(), button('mdi:skip-next', 'Next', 'media_player.media_next_track')])];
   const remote = (command, icon, label = '', extra = {}) => button(icon, label, 'remote.send_command', { ...extra, target: options.remote_entity, data: { command }, ...(extra.hold ? { holdData: { command, hold_secs: 1 } } : {}) });
   const cards = [], apps = options.apps.filter(app => object(app) && app.source);
   if (apps.length) cards.push({ type: 'custom:marao-control-grid', columns: 3, square: false, cards: apps.map(app => ({ type: 'custom:marao-card', template: 'md_media_app_card', entity: entity.entity_id, name: app.name || app.source, icon: app.icon || 'mdi:play-box-outline', show_state: false, variables: { app_source: app.source } })) });
   cards.push(fixedGrid([remote('menu', 'mdi:arrow-u-left-top', 'Back'), remote('up', 'mdi:chevron-up', '', { dpad: true, hold: true }), remote('top_menu', 'mdi:home-outline', 'Home')]), fixedGrid([remote('left', 'mdi:chevron-left', '', { dpad: true, hold: true }), remote('select', 'mdi:checkbox-blank-circle', '', { primary: true, dpad: true, hold: true }), remote('right', 'mdi:chevron-right', '', { dpad: true, hold: true })]), fixedGrid([button('mdi:rewind-10', 'Back 10 seconds', 'media_player.media_seek', { seekOffset: -10 }), remote('down', 'mdi:chevron-down', '', { dpad: true, hold: true }), button('mdi:fast-forward-30', 'Forward 30 seconds', 'media_player.media_seek', { seekOffset: 30 })]));
   const volume = (command, icon, label, service) => String(options.volume_remote_entity || '').startsWith('remote.') ? button(icon, label, 'remote.send_command', { target: options.volume_remote_entity, data: { command } }) : button(icon, label, service, { target: options.volume_remote_entity });
   cards.push(fixedGrid([volume('KEY_VOLDOWN', 'mdi:volume-minus', 'Volume down', 'media_player.volume_down'), play(), volume('KEY_VOLUP', 'mdi:volume-plus', 'Volume up', 'media_player.volume_up')]));
-  return { ...header(entity.variables?.popup_hash || hash('media', entity.entity_id), entity.entity_id, name, 'mdi:remote-tv'), cards };
+  return cards;
 }

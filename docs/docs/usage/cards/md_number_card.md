@@ -34,5 +34,7 @@ Lights, covers, and fans keep their percentage sliders because those controls se
 
 The Wallbox `md_wallbox_current_card` variant presents a large current reading
 (such as **12 A**) above its optional title, with the up/down buttons in a vertical
-pill on the right. Configured current shortcuts remain below. It uses the same
+pill on the right. Configured current shortcuts remain below in blue, teal and
+gold, with an outline around the shortcut matching the reported current value.
+Unavailable or disconnected shortcuts are neutral and disabled. It uses the same
 entity limits, steps and service actions as the shared number control.

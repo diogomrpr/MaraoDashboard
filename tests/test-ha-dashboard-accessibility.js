@@ -620,13 +620,15 @@ async function layoutIssues(page, families = [], subtree) {
             if (links.slice(index + 1).some((other) => intersects(link, other))) issues.push("navbar touch targets overlap");
           }
         }
-        if (owned && visible(element) && element.matches?.('[data-history-retry],[data-graph-retry],[data-media-retry],.surface > .problem[role="status"],[data-alarm-action],[data-alarm-code],.alarm-body label')) {
+        const iconOnlyRetry = element.hasAttribute?.('data-graph-retry') && element.querySelector('ha-icon') && !element.textContent.trim();
+        if (owned && visible(element) && !iconOnlyRetry && element.matches?.('[data-history-retry],[data-graph-retry],[data-media-retry],.surface > .problem[role="status"],[data-alarm-action],[data-alarm-code],.alarm-body label')) {
           const probe = document.createElement('span');
           probe.style.cssText = 'font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500)';
           element.parentElement.append(probe);
           const expected = getComputedStyle(probe), actual = getComputedStyle(element);
           if (actual.fontSize !== expected.fontSize || actual.fontWeight !== expected.fontWeight || actual.fontFamily !== expected.fontFamily) {
-            issues.push(`${element.textContent.trim()}: status or Retry text does not follow shared scalable typography`);
+            const owner = element.getRootNode()?.host;
+            issues.push(`${owner?._config?.name || element.textContent.trim()}: ${element.localName}.${element.className}: status or Retry text does not follow shared scalable typography (${actual.fontSize}/${actual.fontWeight}/${actual.fontFamily}; expected ${expected.fontSize}/${expected.fontWeight}/${expected.fontFamily})`);
           }
           probe.remove();
         }
@@ -939,7 +941,7 @@ async function inspectPopups(page, scenario, theme, output, runName, captures = 
     }
     await page.waitForFunction(() => (document.querySelector("home-assistant")?.shadowRoot || document).querySelector(".marao-popup-content")?.children.length > 0);
     if (await sheet.locator('.body.icon-only').count()) await sheet.locator('.body.icon-only svg').first().waitFor({ state: 'visible' });
-    if ((await sheet.locator(".marao-popup-head > h2").textContent()).trim() !== popup.heading) issues.push(`${popup.name}: configured popup heading is missing`);
+    if ((await sheet.locator(".marao-popup-head h2").textContent()).trim() !== popup.heading) issues.push(`${popup.name}: configured popup heading is missing`);
     // Native cards mount before their asynchronous content renders.
     try {
       await page.waitForFunction(popupHasVisibleContent, await sheet.locator('.marao-popup-content').elementHandle(), { timeout: 10000 });

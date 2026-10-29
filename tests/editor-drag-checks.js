@@ -191,7 +191,7 @@ async function editorDragChecks(page, panel, { scenario, theme, output, client, 
       p.__moveEvents=new AbortController();p.shadowRoot.addEventListener('pointerdown',e=>{p.__movePointer=e.pointerId;},{capture:true,signal:p.__moveEvents.signal});
       p.addEventListener('haptic',e=>{p.__moveHaptics.push(e.detail);},{signal:p.__moveEvents.signal});
       Object.defineProperty(p,'hass',{configurable:true,set(value){last=value;descriptor.set.call(this,{...value,
-        callWS(message){if(message.type==='marao_dashboard/config/generate'||message.type==='call_service'){p.__moveWrites.push(message.type);if(p.__moveFail)return Promise.reject(new Error('Fixture save failure'));}return value.callWS(message);},
+        callWS(message){if(['marao_dashboard/config/generate','lovelace/config/save','call_service'].includes(message.type)){p.__moveWrites.push(message.type);if(p.__moveFail)return Promise.reject(new Error('Fixture save failure'));}return value.callWS(message);},
         callService(){p.__moveWrites.push('call_service');throw Error('Editor movement dispatched a service');}
       });}});p.hass=last;
       p.__restoreMoveMonitor=()=>{p.__moveEvents.abort();p._commitCardMove=commit;if(own)Object.defineProperty(p,'hass',own);else delete p.hass;descriptor.set.call(p,last);};

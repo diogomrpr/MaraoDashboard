@@ -29,7 +29,8 @@
     "common.lock": "Lock",
     "common.unlock": "Unlock",
     "camera.events": "Events",
-    "climate.mode_suffix": "Mode"
+    "climate.mode_suffix": "Mode",
+    "media.now_playing": "Now playing"
   },
   "pt": {
     "nav.home": "Início",
@@ -61,6 +62,7 @@
     "common.lock": "Trancar",
     "common.unlock": "Destrancar",
     "camera.events": "Eventos",
-    "climate.mode_suffix": "Modo"
+    "climate.mode_suffix": "Modo",
+    "media.now_playing": "A reproduzir"
   }
 }

@@ -13,3 +13,13 @@ Sheets SHALL scroll internally without background scrolling and keep the close c
 - **WHEN** the gesture targets the native range
 - **THEN** popup containment does not prevent horizontal value changes
 - **AND** the browser retains native touch handling for initial zero-vertical movement and boundary reversals
+
+#### Scenario: A user scrolls over the chart
+- **WHEN** a vertical touch gesture starts on the numeric plot
+- **THEN** the sheet scrolls normally while the background stays still
+- **AND** the gesture does not dispatch a card action or become a hidden chart pan
+
+#### Scenario: A user inspects a reading
+- **WHEN** the user taps the plot without scrolling
+- **THEN** the selected reading appears outside the plot
+- **AND** sheet scrolling, close clearance and page zoom remain usable

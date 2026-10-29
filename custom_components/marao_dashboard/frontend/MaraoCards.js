@@ -1,7 +1,8 @@
-const [dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities, names, sensorThresholds] = await Promise.all([
-  'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js', 'MaraoNames.js', 'MaraoSensorThresholds.js',
+const [dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities, names, sensorThresholds, pressModule] = await Promise.all([
+  'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js', 'MaraoNames.js', 'MaraoSensorThresholds.js', 'MaraoPressFeedback.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
 const { bindDropdown, dropdownStyles } = dropdownModule;
+const {bindPressFeedback,pressStyles,pressTarget} = pressModule;
 const { bindSlider, sliderMarkup, sliderStyles } = sliderModule;
 const { lightColorCapabilities, lightColorAppearance, colorForeground } = lightCapabilities;
 export { lightColorCapabilities };
@@ -52,7 +53,7 @@ const mediaApps = [
   { id: "disney-plus", sources: ["Disney+", "Disney Plus", "com.disney.disneyplus"], color: "#006d74", text: "#fff" },
   { id: "prime-video", sources: ["Prime Video", "Amazon Prime Video", "com.amazon.aiv.AIVApp"], color: "#0064b5", text: "#fff" },
   { id: "apple-tv", sources: ["TV", "Apple TV", "Apple TV+", "com.apple.tv", "com.apple.TVWatchList"], color: "#151515", text: "#fff" },
-  { id: "plex", sources: ["Plex", "com.plexapp.plex"], color: "#e5a00d", text: "#171717" },
+  { id: "plex", file: "plex.svg", sources: ["Plex", "com.plexapp.plex"], color: "#111111", text: "#fff" },
   { id: "meo", file: "meo.svg", sources: ["MEO", "MEO Go", "pt.sapo.mobile.iphone.tmn.meomobile"], color: "#2e26ff", text: "#fff" },
 ];
 
@@ -889,7 +890,6 @@ function cardStyles() {
     .body.access-close-action>.title { grid-area:auto; grid-column:2; grid-row:1; margin:0; font-size:calc(var(--font-size-primary,1.125rem) * 1.25); font-weight:700; }
 
 
-    ha-card.is-pressed { transform:scale(.985); }
     .card-action { position:absolute; inset:0; z-index:1; width:100%; height:100%; margin:0; padding:0; border:0; border-radius:inherit; background:transparent; color:transparent; cursor:pointer; }
     .card-action:disabled { cursor:default; }
     .problem-details { inset:14px 14px auto auto; width:48px;height:48px;z-index:4;color:var(--primary-text-color);background:var(--secondary-background-color); }
@@ -932,15 +932,12 @@ function cardStyles() {
     ha-card.title-surface { overflow:visible; background:transparent; box-shadow:none; }
     .body.title-card { display:block; min-height:0; padding:0 0 20px; }
     .body.title-card .title { font-size:calc(var(--font-size-primary,1.125rem) * 1.39); font-weight:800; }
+    :host ha-card:has(.media-app-card) { width:80px; max-width:100%; height:80px; margin-inline:auto; justify-self:center; align-self:center; border-radius:18px; transition:transform .12s ease,box-shadow .12s ease; }
     .body.media-app-card { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:0; min-height:48px; aspect-ratio:1; text-align:center; border-radius:inherit; }
-    .body.media-app-card::after { content:""; position:absolute; inset:0; z-index:3; border-radius:inherit; box-shadow:inset 0 0 0 0 var(--primary-color); pointer-events:none; transition:box-shadow .12s ease; }
     ha-card:has(.media-app-card):has(.card-action:not(:disabled)) { cursor:pointer; }
-    ha-card:has(.card-action:not(:disabled)).is-pressed .media-app-card::after { box-shadow:inset 0 0 0 3px var(--primary-color); }
     @media (hover:hover) and (pointer:fine) {
-      ha-card:has(.media-app-card):has(.card-action:not(:disabled)):hover { transform:translateY(-2px); }
-      ha-card:has(.card-action:not(:disabled)):hover .media-app-card::after { box-shadow:inset 0 0 0 3px var(--primary-color); }
+      ha-card:has(.media-app-card):has(.card-action:not(:disabled)):hover { transform:translateY(-2px); box-shadow:0 0 12px 3px color-mix(in srgb,var(--primary-color) 35%,transparent); }
     }
-    ha-card:has(.media-app-card):has(.card-action:not(:disabled)).is-pressed { transform:scale(.97); }
     .body.media-app-card .icon { width:100%; height:100%; flex:1; border-radius:0; background:transparent; --mdc-icon-size:clamp(48px,50cqi,96px); }
     .body.media-app-card .app-icon { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:cover; }
     .body.media-app-card .app-symbol { object-fit:contain; padding:18%; box-sizing:border-box; }
@@ -965,7 +962,6 @@ function cardStyles() {
     .body.glance-card .readings { margin:0; }
     .control { grid-area:control; z-index:2; display:flex; gap:8px; align-items:center; pointer-events:auto; }
     button { min-width:48px; min-height:48px; border:0; border-radius:12px; padding:10px 12px; color:inherit; background:var(--secondary-background-color); font:inherit; cursor:pointer; pointer-events:auto; transition:transform .12s ease,filter .12s ease; }
-    button:active:not(:disabled) { transform:scale(.96); filter:brightness(.96); }
     button:focus, input:focus { outline:none; }
     .climate-pending { grid-area:state; font-size:var(--font-size-secondary,1rem); line-height:1.25; height:1.25em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .body.climate-card:has(.climate-pending)>.state { visibility:hidden; }
@@ -974,10 +970,14 @@ function cardStyles() {
     .exhaust-actions:empty {display:none;}
     .wallbox-shortcuts { grid-area:wallbox; z-index:2; display:grid; grid-template-columns:repeat(auto-fit,minmax(48px,1fr)); gap:8px; width:100%; margin-top:8px; pointer-events:auto; }
     .wallbox-shortcuts button, .exhaust-actions button { min-width:48px; min-height:48px; background:var(--opacity-contrast-100,color-mix(in srgb,currentColor 14%,transparent)); color:var(--primary-text-color,#141414); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-black,#000) 12%,transparent); font-size:var(--font-size-primary,1.125rem); font-weight:var(--font-weight-primary,700); }
+    .wallbox-shortcuts button { background:var(--color-blue); color:var(--color-black); }
+    .wallbox-shortcuts button:nth-child(2) { background:var(--color-teal); }
+    .wallbox-shortcuts button:nth-child(3) { background:var(--color-gold); }
+    .wallbox-shortcuts button[aria-pressed="true"] { box-shadow:inset 0 0 0 3px var(--color-black); }
+    .wallbox-shortcuts button:disabled { background:var(--secondary-background-color); color:var(--disabled-text-color); box-shadow:none; }
     .control.climate-number-control { align-self:stretch; }
     .number-stepper { display:grid; justify-items:center; gap:2px; min-width:84px; width:auto; max-width:42vw; padding:4px; box-sizing:border-box; border-radius:999px; background:var(--button-card-background,var(--secondary-background-color)); }
     .number-stepper button { display:grid; place-items:center; width:48px; height:48px; padding:0; border-radius:50%; background:transparent; }
-    .number-stepper button:active { background:var(--marao-icon-background,var(--opacity-contrast-100,rgba(0,0,0,.08))); }
     .number-stepper ha-icon { --mdc-icon-size:25px; }
     .number-value { max-width:100%; min-width:max-content; margin:0; padding:0; border:0; opacity:.72; color:inherit; background:transparent; font:inherit; font-size:var(--font-size-caption,.9375rem); font-weight:var(--font-weight-primary,700); line-height:1.2; overflow-wrap:anywhere; white-space:nowrap; text-align:center; }
     .climate-stepper { height:100%; max-width:100%; padding:3px; align-content:space-between; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); }
@@ -1056,7 +1056,7 @@ function cardStyles() {
       .body.wallbox-card .wallbox-stepper { min-width:56px; width:56px; padding:4px; }
     }
     @container marao-card (max-width:160px) { .body.wallbox-card { padding-inline:4px; column-gap:4px; } }
-    @media (prefers-reduced-motion:reduce) { ha-card,button,.slider-thumb,.media-app-card::after { transition:none; } }
+    @media (prefers-reduced-motion:reduce) { ha-card,:host ha-card:has(.media-app-card),button,.slider-thumb { transition:none; } }
   `;
 }
 
@@ -1179,6 +1179,7 @@ export class MaraoCard extends BaseElement {
     this._cancelSliderGesture();
     if (historyIdentity(this._config) !== historyIdentity(config)) { this._graphRequests.clear(); this._graphHistory.clear(); this._graphErrors.clear(); this._graphData = null; this._ownedGraphRecords = null; } this._config = { ...config }; if (previousGraph !== this._graphEntity()) this._activeHistoryPopup?._invalidateHistory(); this._actionError = ""; this._mediaError = ""; this._mediaURL = ""; this._actionRequest = (this._actionRequest || 0) + 1; this._subscribeClimate(); this._observeGraph(); this._render(); }
   connectedCallback() {
+    this._ensurePress();
     this._nativeGridItem = fitNativeGrid(this, 76); // 48px control plus the normal 14px side insets.
     this._observeGraph();
     this._actionLive = true; this._climateConnected = true; this._subscribeClimate();
@@ -1246,6 +1247,7 @@ export class MaraoCard extends BaseElement {
   }
   get hass() { return this._hass; }
   disconnectedCallback() {
+    this._press?.destroy(); this._press = null;
     this._nativeGridItem?.removeAttribute('data-marao-grid-76'); this._nativeGridItem = null;
     this._graphObserver?.disconnect(); this._graphObserver = null; this._graphVisible = undefined;
     this._detailsPopup?._close(false);
@@ -1318,9 +1320,11 @@ export class MaraoCard extends BaseElement {
   }
 
   _setMarkup(markup, bindings) {
+    this._ensurePress();
     const surface = this.shadowRoot.querySelector('ha-card');
     if (surface && bindings !== undefined && this._renderedMarkup === markup
       && this._renderedBindings === bindings && this._renderedConfig === this._config) return false;
+    this._press.cancel();
     if (!surface) {
       this.shadowRoot.innerHTML = markup;
       this._renderedMarkup = markup; this._renderedBindings = bindings; this._renderedConfig = this._config;
@@ -1422,7 +1426,7 @@ export class MaraoCard extends BaseElement {
       .alarm-actions.grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible}
       .alarm-disarm {grid-column:1/-1;width:100%}
       .alarm-action { position:relative; min-width:0; border-radius:16px; }
-      .alarm-action button { position:relative; width:100%; height:max(72px,calc(2.5em + 24px)); padding:12px; border-radius:16px; font:inherit; overflow-wrap:anywhere; user-select:none; -webkit-user-select:none; touch-action:manipulation; color:var(--primary-text-color); background:var(--ha-card-background,var(--card-background-color)); }
+      .alarm-action button { position:relative; width:100%; min-height:max(72px,calc(2.5em + 24px)); padding:12px; border-radius:16px; font:inherit; overflow-wrap:anywhere; user-select:none; -webkit-user-select:none; touch-action:manipulation; color:var(--primary-text-color); background:var(--ha-card-background,var(--card-background-color)); }
       .alarm-action button:disabled { opacity:.6; background:var(--secondary-background-color); }
       .alarm-body label { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; overflow-wrap:anywhere; }
       .alarm-body input { box-sizing:border-box; width:100%; min-width:0; height:max(48px,calc(1.25em + 20px)); min-height:48px; padding:10px; border:1px solid currentColor; border-radius:12px; background:var(--ha-card-background,var(--card-background-color)); color:inherit; font:inherit; outline:none; }
@@ -1843,7 +1847,7 @@ export class MaraoCard extends BaseElement {
       ? (Array.isArray(config.variables?.shortcuts) ? config.variables.shortcuts : []).map(Number).filter(Number.isFinite).slice(0, 3)
       : [];
     const shortcutButtons = shortcuts.length
-      ? `<div class="wallbox-shortcuts" role="group" aria-label="${esc(localize("wallbox.shortcuts", this._hass, {}, "Charging current shortcuts"))}">${shortcuts.map((shortcut) => `<button type="button" data-current-shortcut="${shortcut}"${controlsDisabled ? " disabled" : ""}>${esc(shortcut)}${esc(state.attributes?.unit_of_measurement || "A")}</button>`).join("")}</div>`
+      ? `<div class="wallbox-shortcuts" role="group" aria-label="${esc(localize("wallbox.shortcuts", this._hass, {}, "Charging current shortcuts"))}">${shortcuts.map((shortcut) => `<button type="button" data-current-shortcut="${shortcut}" aria-pressed="${!controlsDisabled && !loading && Number(state.state) === shortcut}"${controlsDisabled ? " disabled" : ""}>${esc(shortcut)}${esc(state.attributes?.unit_of_measurement || "A")}</button>`).join("")}</div>`
       : "";
     const roomLightsControlDisabled = loading || !serviceReady || !serviceTargetReady(this._hass, roomLights);
     const roomLightsOffLabel = localize("room.turn_off_lights", this._hass, { name: this._label(entity, config, state) }, `Turn off all lights in ${this._label(entity, config, state)}`);
@@ -1863,7 +1867,7 @@ export class MaraoCard extends BaseElement {
     if (camera && this.preview) media = `<div class="camera-preview">${!interactionUnavailable && pictureURL ? `<img src="${esc(pictureURL)}" alt="${esc(this._label(entity, config, state))}">` : ''}<span>${esc(localize(!interactionUnavailable && pictureURL ? 'camera.snapshot' : loading ? 'common.loading' : 'common.unavailable', this._hass))}</span></div>`;
 
     const range = this._range(entity, state, kind, controlsDisabled);
-    const artwork = !problem && kind === "md_media_card" && mediaAvailable && variables.md_show_background_art !== false && state.attributes?.entity_picture
+    const artwork = !problem && kind === "md_media_card" && (!variables.now_playing || !["idle", "off", "standby"].includes(value)) && mediaAvailable && variables.md_show_background_art !== false && state.attributes?.entity_picture
       ? `<div class="media-artwork" aria-hidden="true"><img src="${esc(state.attributes.entity_picture)}" alt=""></div>` : "";
     const glance = kind === "md_glance_card";
     let readings = glance ? [1,2,3].filter((index) => variables[`entity${index}`]).map((index) => readingMarkup(variables[`entity${index}`], variables[`entity${index}_name`], variables[`entity${index}_icon`], this._hass)).join("") : "";
@@ -1880,6 +1884,12 @@ export class MaraoCard extends BaseElement {
     }
     if (kind === "md_media_card") {
       details = `<div class="climate${mediaAvailable && state.attributes?.media_title ? '' : ' placeholder'}">${esc(mediaAvailable ? [state.attributes.media_title, state.attributes.media_artist].filter(Boolean).join(' · ') || '—' : '—')}</div>`;
+      if (variables.now_playing) {
+        const empty = ['idle', 'off', 'standby'].includes(value);
+        const attrs = state.attributes || {};
+        const current = [attrs.media_title, attrs.media_artist, attrs.media_album_name || attrs.media_series_title, attrs.source || attrs.app_name].filter(Boolean);
+        details = `<div class="climate" data-now-playing>${esc(problem ? '' : empty ? localize('media.nothing_playing', this._hass, {}, 'Nothing playing') : current.join(' · ') || localize('media.metadata_missing', this._hass, {}, 'Media details unavailable'))}</div>`;
+      }
     }
     if (kind === "md_header_card") {
       details = `<div class="climate">${esc(new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: this._hass?.config?.time_zone }).format(new Date()))}</div>`;
@@ -2139,14 +2149,21 @@ export class MaraoCard extends BaseElement {
     restoreFocus?.();
   }
 
+  _ensurePress() {
+    this._press ||= bindPressFeedback(this.shadowRoot,{resolve:event=>{
+      const button=pressTarget(this.shadowRoot,event,'button');
+      if(!button||button.hasAttribute?.('data-marao-hold')||button.closest?.('.marao-dropdown'))return null;
+      if(!button.classList?.contains('card-action'))return button;
+      const surface=button.closest('ha-card');
+      return {target:button,surface,content:surface.querySelector('.icon,.title')};
+    }});
+  }
   _bindTapAction(button, card, run) {
-    const release = () => card?.classList.remove("is-pressed");
-    button.addEventListener("pointerdown", () => { if (!button.disabled) card?.classList.add("is-pressed"); });
-    for (const eventName of ["pointerup", "pointerleave", "pointercancel"]) button.addEventListener(eventName, release);
-    button.addEventListener("click", () => { release(); button.focus?.({ preventScroll: true }); run(); });
+    button.addEventListener("click", () => { if(button.disabled)return; button.focus?.({ preventScroll: true }); run(); });
   }
 
   _bindHoldAction(button, card, run, shortTap = null, duration = ACCESS_HOLD_MS) {
+    button.setAttribute?.('data-marao-hold','');
     let suppressClick = false;
     let origin;
     const start = (event) => {
@@ -2157,7 +2174,7 @@ export class MaraoCard extends BaseElement {
       this._holdControl = card;
       this._holdCompleted = false;
       haptic("heavy");
-      card?.classList.add("is-pressed");
+      if(shortTap)this._press?.start({target:button,surface:card,content:card?.querySelector('.icon,.title')},event);
       const startedAt = globalThis.performance?.now?.() ?? Date.now();
       const draw = (now) => {
         if (!this._holdActive || this._holdCompleted) return;
@@ -2173,6 +2190,7 @@ export class MaraoCard extends BaseElement {
         globalThis.cancelAnimationFrame?.(this._holdFrame);
         this._holdFrame = null;
         this._setHoldProgress(100);
+        this._press?.cancel();
         this._suppressHoldClick = true;
         run();
       }, duration);
@@ -2184,8 +2202,8 @@ export class MaraoCard extends BaseElement {
     const cancel = () => { suppressClick = true; this._cancelHold(); };
     const finish = () => {
       const tapped = this._holdActive && !this._holdCompleted;
-      cancel();
-      if (tapped) shortTap?.();
+      suppressClick = true;this._cancelHold(!tapped||!shortTap);
+      if (tapped && shortTap) {this._press?.release();shortTap();}
     };
     button.addEventListener("pointerdown", start);
     button.addEventListener("pointermove", (event) => {
@@ -2219,7 +2237,8 @@ export class MaraoCard extends BaseElement {
     }
   }
 
-  _cancelHold() {
+  _cancelHold(cancelFeedback = true) {
+    if(cancelFeedback)this._press?.cancel();
     if (this._holdScrollCancel) globalThis.window?.removeEventListener('scroll', this._holdScrollCancel, true);
     this._holdScrollCancel = null;
     clearTimeout(this._holdTimer);
@@ -2229,9 +2248,7 @@ export class MaraoCard extends BaseElement {
     this._holdActive = false;
     this._holdCompleted = false;
     this._setHoldProgress(0);
-    this._holdControl?.classList.remove("is-pressed");
     this._holdControl = null;
-    this.shadowRoot?.querySelector("ha-card")?.classList.remove("is-pressed");
   }
 
   _performAction(action, entity) {
@@ -2669,7 +2686,7 @@ export class MaraoPopupCard extends BaseElement {
     const closeLabel = localize("popup.close", this._hass, {}, "Close popup");
     const accessEntity = this._accessEntity();
     const overlay = document.createElement("div"); overlay.className = "marao-popup-overlay";
-    overlay.innerHTML = `<style>${controlGridStyles(".marao-popup-content.control-grid")}@keyframes marao-popup-slide-up{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}.marao-popup-overlay{position:fixed;inset:0;z-index:1100;display:flex;align-items:flex-end;box-sizing:border-box;padding:max(50px, ${safeArea("top")}) ${safeArea("right")} 0 ${safeArea("left")};background:rgba(0,0,0,.42);font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}.marao-popup-sheet{--marao-popup-card-padding:8px;--marao-popup-detail-title-display:${title && this._config.cards?.length === 1 && this._config.cards[0].name === title ? 'none' : 'block'};box-sizing:border-box;width:100%;max-width:${maxWidth};height:${esc(height)};max-height:min(${esc(this._config.max_height)}, 100%);margin:0 auto;overflow:auto;padding:0 8px ${navbarBottomGap()};border-radius:22px 22px 0 0;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);overscroll-behavior:contain;animation:marao-popup-slide-up .28s cubic-bezier(.2,.8,.2,1) both}.marao-popup-head{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;padding:20px 12px 12px;background:inherit;z-index:1}.marao-popup-head h2{min-width:0;margin:0;font-size:var(--font-size-primary,1.25rem);line-height:1.2;overflow-wrap:anywhere} .marao-popup-sheet[data-access-entity] .marao-popup-head{box-sizing:border-box;min-height:112px;padding:22px 12px;align-items:center}.marao-popup-sheet[data-access-entity] .marao-popup-head h2{font-size:calc(var(--font-size-primary,1.125rem) * 1.25)}.marao-popup-sheet[data-access-entity] .marao-popup-access-state{font-size:var(--font-size-primary,1.125rem)}.marao-popup-heading{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;flex:1}.marao-popup-copy{display:grid;gap:4px;flex:1;text-align:left;min-width:min(100%,calc(var(--font-size-primary,1.125rem) * 3))}.marao-popup-access-state{font-size:var(--font-size-secondary,1rem);line-height:1.4;overflow-wrap:anywhere}.marao-popup-state-icon{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border-radius:50%;background:var(--marao-icon-background,var(--opacity-contrast-100,rgba(0,0,0,.08)));color:var(--marao-icon-color,var(--icon-color));--mdc-icon-size:28px}.marao-popup-state-icon ha-state-icon{display:inline-flex;width:28px;height:28px}.marao-popup-close{flex:0 0 48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;font-size:1.5rem;background:var(--secondary-background-color);color:inherit;cursor:pointer;transition:transform .12s ease,filter .12s ease}.marao-popup-close:active{transform:scale(.92);filter:brightness(.96)}.marao-popup-close:focus,.marao-popup-sheet:focus{outline:none}.marao-popup-content>p{min-width:0;font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.4;overflow-wrap:anywhere}.marao-popup-content[hidden]{display:none}.marao-popup-content{display:grid;min-width:0;gap:8px;isolation:isolate}@media(max-width:240px){.marao-popup-sheet{padding-left:4px;padding-right:4px}}@media(prefers-reduced-motion:reduce){.marao-popup-sheet{animation:none}.marao-popup-close{transition:none}}</style><section class="marao-popup-sheet"${accessEntity ? ` data-access-entity="${esc(accessEntity)}"` : ""} role="dialog" aria-modal="true" aria-label="${esc(title || this._config.name || localize("popup.title", this._hass, {}, "Marao popup"))}" tabindex="-1"><div class="marao-popup-head">${accessEntity ? `<div class="marao-popup-heading"><span class="marao-popup-state-icon" aria-hidden="true"><ha-state-icon data-access-icon></ha-state-icon></span><div class="marao-popup-copy"><h2>${esc(title)}</h2><div class="marao-popup-access-state" data-access-state><span role="status"></span></div></div></div>` : `<h2>${esc(title)}</h2>`}<button class="marao-popup-close" type="button" aria-label="${esc(closeLabel)}" title="${esc(closeLabel)}">×</button></div><div class="marao-popup-content"></div></section>`;
+    overlay.innerHTML = `<style>${pressStyles}${controlGridStyles(".marao-popup-content.control-grid")}@keyframes marao-popup-slide-up{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}.marao-popup-overlay{position:fixed;inset:0;z-index:1100;display:flex;align-items:flex-end;box-sizing:border-box;padding:max(50px, ${safeArea("top")}) ${safeArea("right")} 0 ${safeArea("left")};background:rgba(0,0,0,.42);font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}.marao-popup-sheet{--marao-popup-card-padding:8px;--marao-popup-detail-title-display:${title && this._config.cards?.length === 1 && this._config.cards[0].name === title ? 'none' : 'block'};box-sizing:border-box;width:100%;max-width:${maxWidth};height:${esc(height)};max-height:min(${esc(this._config.max_height)}, 100%);margin:0 auto;overflow:auto;padding:0 8px ${navbarBottomGap()};border-radius:22px 22px 0 0;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);overscroll-behavior:contain;animation:marao-popup-slide-up .28s cubic-bezier(.2,.8,.2,1) both}.marao-popup-head{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;padding:20px 12px 12px;background:inherit;z-index:1}.marao-popup-head h2{min-width:0;margin:0;font-size:var(--font-size-primary,1.25rem);line-height:1.2;overflow-wrap:anywhere} .marao-popup-sheet[data-access-entity] .marao-popup-head{box-sizing:border-box;min-height:112px;padding:22px 12px;align-items:center}.marao-popup-sheet[data-access-entity] .marao-popup-head h2{font-size:calc(var(--font-size-primary,1.125rem) * 1.25)}.marao-popup-sheet[data-access-entity] .marao-popup-access-state{font-size:var(--font-size-primary,1.125rem)}.marao-popup-heading{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;flex:1}.marao-popup-copy{display:grid;gap:4px;flex:1;text-align:left;min-width:min(100%,calc(var(--font-size-primary,1.125rem) * 3))}.marao-popup-access-state{font-size:var(--font-size-secondary,1rem);line-height:1.4;overflow-wrap:anywhere}.marao-popup-state-icon{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border-radius:50%;background:var(--marao-icon-background,var(--opacity-contrast-100,rgba(0,0,0,.08)));color:var(--marao-icon-color,var(--icon-color));--mdc-icon-size:28px}.marao-popup-state-icon ha-state-icon{display:inline-flex;width:28px;height:28px}.marao-popup-close{flex:0 0 48px;width:48px;height:48px;padding:0;border:0;border-radius:50%;font-size:1.5rem;background:var(--secondary-background-color);color:inherit;cursor:pointer;transition:transform .12s ease,filter .12s ease}.marao-popup-close:focus,.marao-popup-sheet:focus{outline:none}.marao-popup-content>p{min-width:0;font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.4;overflow-wrap:anywhere}.marao-popup-content[hidden]{display:none}.marao-popup-content{display:grid;min-width:0;gap:8px;isolation:isolate}@media(max-width:240px){.marao-popup-sheet{padding-left:4px;padding-right:4px}}@media(prefers-reduced-motion:reduce){.marao-popup-sheet{animation:none}.marao-popup-close{transition:none}}</style><section class="marao-popup-sheet"${accessEntity ? ` data-access-entity="${esc(accessEntity)}"` : ""} role="dialog" aria-modal="true" aria-label="${esc(title || this._config.name || localize("popup.title", this._hass, {}, "Marao popup"))}" tabindex="-1"><div class="marao-popup-head">${accessEntity ? `<div class="marao-popup-heading"><span class="marao-popup-state-icon" aria-hidden="true"><ha-state-icon data-access-icon></ha-state-icon></span><div class="marao-popup-copy"><h2>${esc(title)}</h2><div class="marao-popup-access-state" data-access-state><span role="status"></span></div></div></div>` : `<h2>${esc(title)}</h2>`}<button class="marao-popup-close" type="button" aria-label="${esc(closeLabel)}" title="${esc(closeLabel)}">×</button></div><div class="marao-popup-content"></div></section>`;
     overlay.addEventListener("click", (event) => { if (event.target === overlay) this._close(true); });
     overlay.querySelector(".marao-popup-close").addEventListener("click", () => { haptic("heavy"); this._close(true); });
     overlay.addEventListener("keydown", (event) => {
@@ -2680,6 +2697,7 @@ export class MaraoPopupCard extends BaseElement {
     // entity icons. Keep popup children inside that provider boundary.
     const root = document.querySelector?.("home-assistant")?.shadowRoot || document.body;
     root.append(overlay);
+    this._popupPress = bindPressFeedback(overlay);
     this._overlay = overlay;
     this._syncTheme();
     this._updateAccessHeader();
@@ -2851,6 +2869,7 @@ export class MaraoPopupCard extends BaseElement {
     }
     this._headerObserver?.disconnect(); this._headerObserver = null;
     this._columnObserver?.disconnect(); this._columnObserver = null;
+    this._popupPress?.destroy(); this._popupPress = null;
     this._open = false; this._overlay?.remove(); this._overlay = null; this._restoreBackground();
     this._childrenRenderId++; this._groupChildren?.clear(); this._groupHelpers = null; this._groupEmpty = null;
     if (updateHash && window.location.hash === text(this._config.hash)) {

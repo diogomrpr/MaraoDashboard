@@ -33,6 +33,32 @@ test('generated access popup keeps strict opener and explicit safe lock action',
   assert.deepEqual(popup.cards[0].cards.map(card => [card.template, card.entity, card.variables.action_service]), [['md_access_slide_action_card', 'lock.safe', 'lock.unlock'], ['md_access_action_card', 'lock.safe', 'lock.lock']]);
 });
 
+test('camera popup selects its video independently while retaining dashboard identity, events and saved options', () => {
+  for (const popupStream of [undefined, null, '', 'camera.front_high']) {
+    const input = structuredClone(source);
+    const camera = { id: 'front', template: 'md_camera_card', entity_id: 'camera.front_low', name: 'Entrance', show_name: false,
+      tap_action: { action: 'navigate', navigation_path: '#custom-camera' }, unknown: { keep: [] },
+      variables: { popup_hash: '#custom-camera', event_provider: 'unifiprotect', unifi_protect_media_source: 'media-source://unifiprotect/fixture:browse:front', event_limit: 24, future: { keep: [] } } };
+    if (popupStream !== undefined) camera.variables.popup_stream_entity = popupStream;
+    input.pages[0].sections[0].entities = [camera];
+    const before = structuredClone(input), view = compileDashboard(input).views[0];
+    const dashboard = view.cards[0].cards[0];
+    const popup = view.cards.find(card => card.type === 'custom:marao-popup-card');
+    assert.equal(dashboard.entity, 'camera.front_low');
+    assert.equal(dashboard.show_name, false);
+    assert.deepEqual(dashboard.tap_action, camera.tap_action);
+    assert.deepEqual(dashboard.variables, camera.variables);
+    assert.equal(popup.hash, '#custom-camera');
+    assert.equal(popup.entity, 'camera.front_low');
+    assert.deepEqual(popup.cards, [
+      { type: 'custom:marao-card', template: 'md_camera_card', entity: popupStream || 'camera.front_low', name: 'Entrance', show_name: false, tap_action: { action: 'fullscreen' } },
+      { type: 'custom:marao-camera-events-card', entity: 'camera.front_low', title: 'Events', event_provider: 'unifiprotect', unifi_protect_media_source: 'media-source://unifiprotect/fixture:browse:front', limit: 24 },
+    ]);
+    assert.deepEqual(view.cards.find(card => card.type === 'markdown'), source.pages[0].sections[1].cards[0]);
+    assert.deepEqual(input, before);
+  }
+});
+
 test('modern released baselines retain complete independent source/output targets and frozen provenance', async () => {
   const fs=await import('node:fs'), {createHash}=await import('node:crypto'), {convertDocument}=await import('../../frontend_src/convert-document.js');
   const base=new URL('../../ha-test/upgrade/fixtures/',import.meta.url), read=name=>fs.readFileSync(new URL(name,base),'utf8');
@@ -78,4 +104,28 @@ test('main-page shortcut flags preserve absence and explicit false through sourc
     assert.deepEqual(nav.routes,[]);
   }
   assert.throws(()=>convertDocument(JSON.stringify({...source,show_editor_button:'false'})),/boolean/);
+});
+
+test('inline media reuses popup controls and preserves independent modes and app targets',()=>{
+ const input=structuredClone(source);const card={id:'player',template:'md_media_card',entity_id:'media_player.safe',name:'TV',unknown:{keep:[]},apple_tv:{remote_entity:'remote.safe',volume_remote_entity:'media_player.volume',apps:[{name:'Two',source:'two'},{name:'One',source:'one'}]}};
+ input.pages[0].sections=[{columns:1,entities:[card]}];
+ const popup=compileDashboard(input).views[0].cards.find(c=>c.type==='custom:marao-popup-card');
+ const before=structuredClone(input);card.variables={media_display:'inline'};
+ const view=compileDashboard(input).views[0];const inline=view.cards[0];assert.equal(inline.type,'vertical-stack');assert.equal(inline.cards[0].variables.now_playing,true);assert.equal(inline.cards[0].tap_action.action,'none');
+ assert.deepEqual(inline.cards.slice(1),popup.cards);assert.ok(!view.cards.some(c=>c.type==='custom:marao-popup-card'));
+ assert.deepEqual(card.apple_tv,before.pages[0].sections[0].entities[0].apple_tv);
+ input.pages[0].sections[0].entities.push({...structuredClone(card),id:'other',variables:{media_display:'popup'}});
+ const mixed=compileDashboard(input).views[0];assert.equal(mixed.cards.filter(c=>c.type==='custom:marao-popup-card').length,1);
+ const actions=[];const walk=v=>{if(Array.isArray(v))v.forEach(walk);else if(v&&typeof v==='object'){if(v.perform_action)actions.push(v);Object.values(v).forEach(walk);}};walk(inline);
+ assert.ok(actions.some(a=>a.perform_action==='remote.send_command'&&a.target.entity_id==='remote.safe'));
+ assert.ok(actions.some(a=>a.perform_action==='media_player.volume_up'&&a.target.entity_id==='media_player.volume'));
+ assert.ok(actions.some(a=>a.perform_action==='media_player.media_seek'&&a.seek_offset===30));
+});
+test('inline generic media and removed popup links fail preflight without source changes',()=>{
+ const input=structuredClone(source);input.pages[0].sections=[{columns:1,entities:[{template:'md_media_card',id:'audio',entity_id:'media_player.safe',variables:{media_display:'inline'}}]}];
+ assert.equal(compileDashboard(input).views[0].cards[0].cards.length,2);
+ input.pages[0].sections[0].cards=[{type:'button',tap_action:{action:'navigate',navigation_path:'#page-home-audio-popup'}}];
+ const before=structuredClone(input);assert.throws(()=>compileDashboard(input),/missing popup link/);assert.deepEqual(input,before);
+ input.pages[0].sections[0].entities[0].variables.media_display='popup';assert.doesNotThrow(()=>compileDashboard(input));
+ input.pages[0].sections[0].entities[0].variables.media_display='bad';assert.throws(()=>compileDashboard(input),/Popup or On dashboard/);
 });

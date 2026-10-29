@@ -140,10 +140,10 @@ test dependencies and secrets. Test providers SHALL never overwrite real provide
 ### Requirement: Publication gate and exact-commit CI
 Push, tag and release verification SHALL require only affected unit tests across the complete change set and applicable exact-commit Tests/hassfest/HACS validation. Integration/browser/mobile/upgrade checks SHALL be reused from development without fresh report requirements and SHALL run at release only on explicit request. Publication SHALL NOT implicitly require the full suite, full mobile matrix or unrelated preserved-install checks.
 
-#### Scenario: The native reconnect check still fails for a future release
-- **WHEN** the user explicitly requests connection integration checks during publication preparation
-- **THEN** raw assertions and native evidence are retained
-- **AND** only the explicitly approved stale-unsubscribe exception applies while its stable upstream fix remains unavailable
+#### Scenario: Verification runs after native reconnect checks are retired
+- **WHEN** affected, full, upgrade or publication verification is selected
+- **THEN** it does not inject the retired native HA reconnect outage or probe upstream fix delivery
+- **AND** disconnected-action unit tests and ordinary failure reporting remain available
 
 #### Scenario: A release contains several completed implementation batches
 - **WHEN** publication scope is computed
@@ -158,7 +158,7 @@ Push, tag and release verification SHALL require only affected unit tests across
 #### Scenario: Additional publication gate and exact-commit CI contracts
 - **WHEN** a push, tag or release is prepared
 - **THEN** Failed selected checks and known relevant violations SHALL block publication.
-- **AND** Valid scoped evidence SHALL be reusable for unchanged inputs; an approved native exception SHALL remain explicit and time-limited.
+- **AND** Valid scoped evidence SHALL be reusable for unchanged inputs; accepted exceptions SHALL remain explicit.
 
 ### Requirement: Honest evidence and limits
 Reports SHALL identify selected and excluded features, components, checks, profiles, baselines, execution mode, results and durations. Focused evidence SHALL NOT be labeled full-suite success. Reports SHALL distinguish automated Chromium profiles from actual phones/Safari. VoiceOver, TalkBack, OS high contrast, desktop acceptance and real-device actuation remain outside acceptance; physical haptic strength SHALL NOT be claimed from browser automation.
@@ -281,7 +281,7 @@ Affected verification SHALL support explicit reuse of completed checks from priv
 #### Scenario: Publication includes reused checks
 - **WHEN** all current required cases pass through fresh execution or validated reuse
 - **THEN** the final report identifies each reused source result and binds all validated coverage to the clean final commit
-- **AND** applicable exact-commit CI and approved exception expiry checks remain required; new preserved-install proof is not an ordinary release prerequisite
+- **AND** applicable exact-commit CI remains required; new preserved-install proof is not an ordinary release prerequisite
 
 #### Scenario: Additional reusable completed checks contracts
 - **WHEN** completed private evidence is supplied for reuse

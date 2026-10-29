@@ -1,5 +1,69 @@
 # Implementation progress
 
+## Final acceptance — 2026-10-29
+
+All **71/71 tasks are complete**. This pass began at
+`df63f39c8da1b48dd4fa9e15a7d88c4ac8386d84`, snapshot
+`/private/tmp/native-frontend-finish.json`. The final workspace frontend is
+installed on disposable `192.168.0.28`, identity
+`52e693abbc949caf34d383089e5c1f536eed79c3fd7f98548a8d6dad15075519`.
+No new release, push, archive, HA restart or fixture reset was performed.
+Earlier incomplete-status paragraphs below are historical.
+
+The remaining acceptance uncovered and corrected two presentation defects:
+the full-height native editor inherited 92px of navbar clearance, allowing a
+keyboard resize to scroll its toolbar offscreen; and custom alarm hold labels
+could outgrow a fixed-height button at enlarged text sizes. The shared fullscreen
+owner now omits navbar clearance for the editor, restoring original view styles
+on exit. Alarm buttons retain their minimum size and grow with wrapped content.
+Monaco's stock presentation and action/security semantics remain unchanged.
+
+Four old gallery state demonstrations used sensor entities with access-card
+behavior. Their base YAML and eight copies across the two installed Cases views
+now bind the existing compatible fake lock/cover entities. Exact native storage,
+source and compiled-output backups precede that scoped native save; every other
+source byte, storage permissions, page and option is retained. Native and disk
+readback confirm the intended edit. No helper or device action was dispatched.
+
+| Closed task | Selected evidence |
+| --- | --- |
+| 9.1 | All 35 retained catalog roles map to their compiled gallery representation; 231 native state cases, raw HA cards and explicit labels were checked on the installed frontend. The 396 selected serial unit checks cover family/material-option behavior, compilation, actual targets, availability, shared sheets/navbar, inline media, floor plans and raw/unknown data. |
+| 9.2 | Installed Visual/JSON, stock Monaco tools, real native HA button-card editing, drag/move, unopened-source preservation, import/export, discard, failed saves, successful saves retaining either tab, and ordinary entity-update input/focus/selection/scroll retention passed. On 2026-10-29 the user separately confirmed Open dashboard stays inside the Companion app and Save retains the editor. This is user confirmation, not agent phone inspection. |
+| 9.4 | The real tagged v0.14.2 flat and v0.14.3/v0.21.1 API module graphs were replayed in an isolated loopback browser host. Deferred modules/workers fail visibly after retirement, the pre-removal manual draft copy is retained, and the documented full refresh/reopen loads the coherent current native graph while retaining preferences. Raw retired-endpoint failures remain in private evidence. Native suspension/offline/reconnect/foreground and single-refresh behavior have a dedicated regression, supplementing the earlier actual HACS update and draft/worker proof. |
+| 9.5 | Installed Chromium mobile emulation passed narrow-320/light, iPhone-normal/dark, bold plus 200% text/light, 200% page zoom/light and landscape/light. Existing checks cover slider headers, live access headings, leading decorative icons, centered close labels, contained controls, modal behavior and shared navbar/sheet spacing. Representative current light/dark captures were inspected. The 17 alarm checks passed again after the button-height fix. |
+
+The browser adapters reuse existing editor, state, slider/header and popup checks;
+they use real installed assets and native storage, without browser resource
+overrides. Obsolete first-card indexes, asynchronous tab assumptions, flat access
+heading selectors, square-corner hit samples, generic title geometry and
+text-font expectations for an icon-only Retry were corrected to assert the
+current documented controls. Initial failed attempts remain private failures;
+they are not presented as passing runs. The new installed acceptance runner is
+separate from the earlier read-only feasibility probe.
+
+The legacy replay is released **client-module replay**, with a detached released
+panel/draft stand-in and an explicitly modeled manual JSON copy. It does not
+claim three historical HA/package installations, an automatic legacy export,
+a new retirement fence or physical legacy Companion sessions. Current editor
+export is exercised separately. The real preserved v0.21.1 migration, exact
+rollback/restart and later actual HACS update evidence was reused, not repeated.
+
+Only the selected five appearance profiles ran; this is not the full mobile
+matrix or comprehensive suite. No physical haptic, additional phone-engine or
+camera playback/transport success is claimed. Camera acceptance remains manual,
+and the previously documented native/camera exceptions retain their original
+status. Ordinary later changes continue to use AGENTS.md's minimal policy.
+
+Private receipts: `tests/.artifacts/native-frontend/1793267069831/` (editor),
+`1793267631388/` (native card), `1793267147019/` (runtime),
+`1793268563712/` (final appearance), `tests/.artifacts/native-retirement/report.json`
+(three legacy clients), and
+`ha-test/.artifacts/native-frontend/finish-gallery-c69be698-4cf4-4cca-a44c-f92a925a5194/`
+(exact gallery backup/readback). Per-run identities distinguish the intermediate
+editor/runtime graph from the final alarm-presentation graph. The later CSS-only
+change does not alter editor/source/action logic. A consolidated private finish
+receipt records these identities, selected results and the installation check.
+
 ## Published result — 2026-10-26
 
 The user explicitly authorized a breaking stable release. **v0.22.0 is published
@@ -377,3 +441,50 @@ Apply. The regenerated editor passes its size budget. Installation uses the
 frontend-only helper on disposable `192.168.0.28`; served-asset/readiness checks
 confirm installation. Browser/phone inspection remains manual: save in either
 tab and confirm the editor stays open; use the back arrow to leave explicitly.
+
+### Resumed acceptance review
+
+Resumed from `df63f39c8da1b48dd4fa9e15a7d88c4ac8386d84`, snapshot
+`/private/tmp/native-frontend-resume.json`. Native authoring and runtime were
+already implemented and installed. This pass preserved the intervening media,
+floor-plan, editor and shared touch-feedback work; it made no runtime, saved-data,
+package-version or public API changes.
+
+The retained v0.21.1 installed-package proof was audited against all 74 released
+file hashes, with the exact released commit and no missing/extra package files.
+Recorded restart retention and matching package-plus-data rollback assertions
+remain valid. This reuses the actual preserved-install evidence and does not
+relabel fixture replay as another live migration or repeat the cutover/restarts.
+Task 8.4 now points to completed evidence instead of remaining unchecked.
+
+Ninety-one targeted offline checks pass: 20 native compiler/session/package/backup,
+17 editor draft/save/navigation, 35 refresh/dependency, one stock-Monaco, 17 access
+gesture/feedback and one preview-scope regression. These establish the reviewed
+source/output and shared runtime paths; they are not an exhaustive gallery,
+historical-client or physical-app acceptance report.
+
+The selected existing preview initially failed before contacting HA because it
+referenced the removed native-authoring component registry. Family validation now
+uses the current shipped card catalog, with editor-only scopes kept separate.
+Camera-editor correctly selects the builder. Its narrow regression passes.
+The subsequent 320px light-theme Entrance preview used installed graph
+`125aeacb26b20d19897ed4295edc4459665546eb35d781f799239c901f72806e`
+and reported no browser diagnostics. The capture was inspected for scoped
+Montserrat/theme, contained widths and the floating navbar. Dark/fresh/migrated
+style ownership and restoration are covered by the selected native theme/package
+assertions; this is not a claim of physical-phone or additional theme screenshots.
+No device action, fixture reset, Home Assistant restart or camera transport test
+was performed. The current successful assets remain installed.
+
+Tasks 4.5 and 9.3 are recorded against these selected theme/Monaco/spacing and
+native-compiled/shared-action checks. The change is **67/71 complete**. Tasks
+9.1, 9.2, 9.4 and 9.5 remain unchecked for their broader retained-family,
+Companion-app, historical cached-client and appearance acceptance. Current
+AGENTS.md leaves routine phone/visual testing with the user and does not authorize
+an implicit comprehensive campaign. Phone save/navigation confirmation was
+requested separately; no positive response is assumed. Legacy bootstrap errors,
+manual camera playback/transport and upstream exceptions remain honestly distinct
+from passing checks. The change is not archived.
+
+Private evidence: `ha-test/.artifacts/native-frontend/resume-evidence-*.json`,
+original `installed-baseline/` receipts, and the private frontend-preview capture.

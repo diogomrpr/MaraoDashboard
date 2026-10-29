@@ -265,7 +265,7 @@ async function functionalChecks(config, format, directory, receiptPath, report, 
     saveReport();
   };
   for (const theme of coverage.themes) {
-    const result = await require('./native-reconnect-exception').e2eWithApprovedException(config, directory, theme, env);
+    const result = await child(process.execPath, ['tests/test-ha-dashboard-e2e.js', '--screenshots', '--theme=' + theme], directory, 'e2e-' + theme, env);
     record(['states', 'actions', 'content', 'camera', 'media', 'history', 'climate', 'native-surfaces'], ['iphone-normal'], [theme], result);
   }
   await child(process.execPath, ['tests/test-ha-dashboard-e2e.js', '--groups-only'], directory, 'entity-group-actions', env);

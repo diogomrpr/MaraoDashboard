@@ -1,3 +1,4 @@
+export {validateConfig} from './editor-model.js';
 import { convertDocument } from './convert-document.js';
 import { compileDashboard } from './compile-dashboard.js';
 import { catalog, normalizeSource } from './native-model.js';

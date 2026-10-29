@@ -421,3 +421,16 @@ Entity IDs, names, actions, third-party card YAML and unknown options are retain
 If both spellings of an owned option are present with different values, remove
 that ambiguity before saving. Archived history and released source fixtures are
 kept unchanged.
+
+### Interactive room plans and inline media
+
+[Floor Plan](../usage/cards/md_floor_plan_card.md) lets you upload a room image,
+place live light toggles and trace illuminated strips in the visual card editor.
+Full page requires the plan to be its page's only visible content card and keeps
+the floating navbar accessible. Image uploads store files in HA independently of
+saving the dashboard arrangement; exported source contains references only.
+
+[Media](../usage/cards/md_media_card.md) offers Popup (default) or On dashboard.
+On dashboard includes live Now playing information and the same playback/Apple TV
+controls. Use a one-column section for expanded controls without changing other
+cards' layouts.

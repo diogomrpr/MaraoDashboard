@@ -133,9 +133,9 @@ SHALL retain semantic names.
 
 #### Scenario: App shortcuts respond as buttons
 - **WHEN** an enabled shortcut is hovered with a pointer
-- **THEN** it shows a hand cursor, a themed edge over its artwork and a slight lift
+- **THEN** it shows a hand cursor, a soft themed shadow around its rounded surface and a slight lift
 - **WHEN** an enabled shortcut is pressed with pointer or touch input
-- **THEN** it shows the themed edge and a short compression, while disabled shortcuts receive no interactive treatment
+- **THEN** it shows a softer outer shadow and a short compression, while disabled shortcuts receive no interactive treatment
 
 #### Scenario: Additional media and Apple TV controls contracts
 - **WHEN** a configured media player or app shortcut is rendered or activated

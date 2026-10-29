@@ -66,3 +66,9 @@ test('an empty, corrupt or newer native source never falls back to starter conte
     await assert.rejects(new NativeSession(f.hass,'marao-dashboard',{strategy}).read());
   }
 });
+
+test('inline media orphan popup preflight retains native source and dispatches no save',async()=>{
+ const f=fixture(),session=new NativeSession(f.hass,'marao-dashboard');await session.read();const baseline=structuredClone(session.baseline);
+ const next=JSON.parse(text);next.pages[0].entities=[{id:'audio',template:'md_media_card',entity_id:'media_player.safe',variables:{media_display:'inline'}}];next.pages[0].cards=[{type:'button',tap_action:{action:'navigate',navigation_path:'#page-home-audio-popup'}}];
+ await assert.rejects(session.save(JSON.stringify(next)),/missing popup link/);assert.deepEqual(session.baseline,baseline);assert.equal(f.document.strategy.source_json,text);assert.equal(f.calls.some(call=>call.type==='lovelace/config/save'),false);
+});

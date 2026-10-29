@@ -78,7 +78,7 @@ Replace unnecessarily broad input sets with reviewed transitive file/module depe
 
 Live identities include target, source/fixture assumptions, relevant served assets, Home Assistant frontend identity, Playwright/browser identity and emulation settings. A new candidate receives current preparation/validation; an old receipt is never copied as the current installation proof. Unrelated candidate changes can preserve a result only when the reviewed dependency projection and live conditions still match. Unattributable environment or installation drift invalidates dependent browser results. Cleanup, preparation and required final visual inspection are always current, not cached.
 
-Preserved-install evidence, exact-commit CI and native reconnect exception expiry continue through their existing validators; this reuse feature does not synthesize, extend or substitute that proof.
+Preserved-install evidence and exact-commit CI continue through their existing validators; this reuse feature does not synthesize, extend or substitute that proof. The native reconnect outage check and its exception expiry probe were retired by user request on 2026-10-29.
 
 Alternative: accept an old report's required list, relabel its commit, or keep global candidate hashing as the sole reuse test. The first two weaken proof; the last prevents useful reuse after an unrelated repair. Instead compute requirements independently, validate each eligible result and bind the resulting report to the current candidate.
 

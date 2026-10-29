@@ -37,6 +37,22 @@ Iteration SHALL batch related tasks and use the smallest checks covering impleme
 - **THEN** required checks are recomputed and only failed, missing or invalidated cases execute again
 - **AND** reuse never replaces required cleanup, final affected-card inspection or applicable publication validation
 
+#### Scenario: Presentation-only development is complete
+- **WHEN** the latest applicable project assets are installed on the disposable instance, show the requested result and relevant diagnostics are clear
+- **THEN** code review and a short manual watch list are sufficient; agent browser inspection is optional
+- **AND** any selected inspection covers only layouts relevant to the edit
+- **AND** the agent stops without broadening checks for reassurance
+
+#### Scenario: Behavior or a sensitive contract changes
+- **WHEN** an edit changes events, state, gestures, security, saved data or installation
+- **THEN** the smallest relevant assertions demonstrate nontrivial behavior or the concrete sensitive risk
+- **AND** security dispatch/cancellation and data preservation/recovery are not replaced by visibility
+
+#### Scenario: Additional focused checks and final visual inspection contracts
+- **WHEN** a contributor selects development or publication verification
+- **THEN** Publication SHALL run affected unit tests and applicable metadata checks, reusing development integration results.
+- **AND** Broader integration, comprehensive suites and parallel tests SHALL require explicit user requests.
+
 ## ADDED Requirements
 
 ### Requirement: Persistent default verification command

@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const require = createRequire(import.meta.url);
 const {
@@ -24,6 +25,19 @@ const {
   titleLayoutIssues,
 } = require("../test-ha-dashboard-e2e.js");
 const { visibleBounds } = require("../test-ha-room-cards.js");
+
+test('retired reconnect flags stop before any Home Assistant preparation', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-retired-reconnect-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  for (const flag of ['--disconnect-only', '--reconnect-evidence=' + path.join(directory, 'old-evidence.json')]) {
+    const result = spawnSync(process.execPath, [require.resolve('../test-ha-dashboard-e2e.js'), flag], {
+      env: { ...process.env, MARAO_TEST_ARTIFACT_ROOT: directory }, encoding: 'utf8', timeout: 10000,
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /reconnect verification has been retired by user instruction/);
+  }
+  assert.equal(fs.existsSync(path.join(directory, 'old-evidence.json')), false);
+});
 
 test('camera event failure diagnostics retain the original timeout and release its exact handle', async () => {
   const {expect}=require('playwright/test'),originalPoll=expect.poll;

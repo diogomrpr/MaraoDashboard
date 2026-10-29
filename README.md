@@ -18,7 +18,7 @@ native dashboard storage. **Existing Integration installations must migrate
 manually. Do not select Update on the old Integration entry.** Keep the same
 repository and dashboard address; follow the [migration and rollback guide](docs/docs/installation/native-migration.md).
 
-Download [marao-converter.html](https://github.com/diogomrpr/MaraoDashboard/releases/download/v0.22.5/marao-converter.html),
+Download [marao-converter.html](https://github.com/diogomrpr/MaraoDashboard/releases/download/v0.23.0/marao-converter.html),
 open it locally, paste your old JSON and select Translate. It works without
 Home Assistant or a server and asks only for missing information. Keep an exact
 private package/data backup before removing anything. The one-time migration
@@ -32,6 +32,8 @@ importing, even when the dashboard is hidden or restricted to administrators.
 ## Highlights
 
 - Edit ordered pages, sections and cards in the existing Visual/JSON builder.
+- Upload a floor plan and place light buttons and illuminated strip overlays visually.
+- Keep media controls in their popup or show them directly on the dashboard.
 - Keep explicit room membership, Entity Groups, energy units and custom content.
 - Use project-owned cards, floating navigation, popovers and scoped styling.
 - Save through Home Assistant's native dashboard APIs, with no Marao Python backend.

@@ -101,7 +101,7 @@ Affected verification SHALL support explicit reuse of completed checks from priv
 #### Scenario: Publication includes reused checks
 - **WHEN** all current required cases pass through fresh execution or validated reuse
 - **THEN** the final report identifies each reused source result and binds all validated coverage to the clean final commit
-- **AND** applicable exact-commit CI, conditional preserved-install proof and the approved exception expiry checks remain required
+- **AND** applicable exact-commit CI and conditional preserved-install proof remain required
 
 ### Requirement: Measurable scoped execution
 Private scoped reports SHALL distinguish logical coverage from physical visits, fresh executions and reused results. They SHALL record selection and equivalence reasons, per-check durations, total wall time and capture counts. Reused results SHALL retain original execution time and provenance separately from current validation time. Reports SHALL preserve failures and representative successes without claiming unexecuted coverage or unmeasured speedups.

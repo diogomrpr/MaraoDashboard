@@ -10,6 +10,17 @@ const { changedFiles, checkIdentity, dependencyInputs, makePlan, parseArgs, sche
 const { selectComponents, checksFor } = require('../verification-map');
 const YAML = require('yaml');
 
+test('connection and full plans omit the retired native reconnect check and keep disconnected-action units', () => {
+  const selection = selectComponents([], ['connection']);
+  const connection = checksFor(selection);
+  assert.ok(connection.some(check => check.id.startsWith('unit:marao-climate-card')));
+  assert.ok(connection.every(check => check.kind === 'offline'));
+  for (const check of checksFor(selection, { full: true })) {
+    assert.notEqual(check.id, 'native-reconnect');
+    assert.ok(!check.command.some(arg => /--disconnect-only|--reconnect-evidence/.test(arg)));
+  }
+});
+
 test('inferred generated staging is not a source identity, while source and explicitly declared inputs still invalidate proof', t => {
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'marao-input-scope-'));
   t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));

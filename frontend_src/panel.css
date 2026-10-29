@@ -128,7 +128,7 @@ ha-sortable { display: block; }
 .status { min-height: 24px; padding: 12px 2px 0; color: var(--secondary-text-color); }
 .status.success { color: var(--success-color); }
 .status.error { color: var(--error-color); }
-.dialog-content { width: min(640px, calc(100vw - 96px)); max-width: 100%; min-width: 0; padding: 4px 2px; }
+.dialog-content { width: min(960px, calc(100vw - 96px)); max-width: 100%; min-width: 0; padding: 4px 2px; }
 ha-dialog { --ha-icon-button-size: 48px; }
 .dialog-content > *, .dialog-content ha-form, .dialog-content ha-expansion-panel { max-width: 100%; min-width: 0; }
 .dialog-content textarea[data-import-json] { box-sizing: border-box; width: 100%; min-height: 180px; resize: vertical; font: inherit; background: var(--card-background-color); color: var(--primary-text-color); border: 1px solid var(--divider-color); border-radius: 12px; padding: 12px; }
@@ -161,6 +161,7 @@ ha-dialog { --ha-icon-button-size: 48px; }
 .summary span { color: var(--secondary-text-color); font-size: .8125em; }
 .advanced { margin-top: 12px; border-top: 1px solid var(--divider-color); padding-top: 12px; }
 .advanced-form { padding: 8px 16px 16px; }
+#advanced-panel { margin-top: 24px; }
 .history-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--divider-color); }
 .history-row > div { flex: 1 1 12ch; min-width: 0; overflow-wrap: anywhere; }
 .history-row:last-child { border-bottom: 0; }

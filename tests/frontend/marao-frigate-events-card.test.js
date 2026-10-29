@@ -8,6 +8,7 @@ let source = await fs.readFile(
 );
 const cardsSource = (await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url), 'utf8')).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 source = source.replace('await import(new URL(`./MaraoCards.js${new URL(import.meta.url).search}`, import.meta.url))', `await import("data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}")`);
+source = source.replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoFrigateEventsCard.js', import.meta.url).href));
 globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
 const dashboardSource = await fs.readFile(
   new URL("../../custom_components/marao_dashboard/frontend/MaraoRuntime.js", import.meta.url),
@@ -88,7 +89,6 @@ test("Frigate event helpers normalize API data and build safe integration URLs",
 test("camera event actions keep a visible 48px target and strong feedback", () => {
   assert.match(source, /\.icon-button \{ justify-self: end; width: 48px; min-width: 48px; height: 48px;/);
   assert.match(source, /MaraoDashboard\?\.haptic\?\.\("heavy"\)/);
-  assert.match(source, /\.icon-button:active \{ transform: scale\(\.94\); \}/);
   assert.match(source, /button:disabled \{ cursor: default; opacity: \.55;/);
   assert.doesNotMatch(source, /:focus-visible/);
   assert.match(MaraoFrigateEventsCard.styles, /grid-template-columns: minmax\(0, 1fr\)/);
@@ -96,7 +96,7 @@ test("camera event actions keep a visible 48px target and strong feedback", () =
   assert.match(MaraoFrigateEventsCard.styles, /top: var\(--marao-popup-header-height, 0px\)/);
   assert.match(MaraoFrigateEventsCard.styles, /\.filters \{[^}]*overflow-x: auto/);
   assert.match(MaraoFrigateEventsCard.styles, /\.filter, \.more \{ min-width: 48px; min-height: 48px/);
-  assert.doesNotMatch(MaraoFrigateEventsCard.styles, /@media/);
+  assert.doesNotMatch(MaraoFrigateEventsCard.styles, /@media\s*\([^)]*(?:width|height)/);
 });
 
 test("camera event UI routes visible copy through complete English and Portuguese catalogs", () => {

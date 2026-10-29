@@ -8,6 +8,7 @@ Media-page app shortcuts were made compact, but generated Apple TV popups still 
 
 - Use the existing responsive Marao control grid with three preferred app columns in generated media popups.
 - Reuse the existing logo-only 80px minimum and narrower-host reflow.
+- Cap visible app surfaces at 80px square with rounded corners, centered inside their cells, following the user's 2026-10-28 size refinement.
 - Preserve ordered app names, sources, launch actions, availability feedback and remote controls.
 
 ## Capabilities

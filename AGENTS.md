@@ -222,10 +222,11 @@ keep future work in changes and archive only completed, verified work.
   without making them gates. Keep camera code, configuration, event-provider,
   security and data-preservation tests; non-camera failures still block release.
   Never use a production instance to perform the user's manual checks.
-- The user also permits the diagnosed native Home Assistant stale-unsubscribe
-  reconnect failure until its upstream fix reaches a stable frontend. Preserve raw
-  assertions/native evidence and check expiry when applying it. Other selected
-  checks and required cleanup remain binding.
+- The native Home Assistant reconnect outage check and its upstream-fix expiry
+  probe are retired at the user's request (2026-10-29), including full and upgrade
+  runs. Preserve historical failure evidence without requiring a future HA update
+  or reconnect confirmation. Keep disconnected-action unit tests and ordinary
+  failure reporting in the remaining checks.
 - Keep routine completion reports concise and honest about selected, omitted,
   automated and manually inspected coverage. Use detailed reports only for releases,
   final stabilization or material security/safety work.

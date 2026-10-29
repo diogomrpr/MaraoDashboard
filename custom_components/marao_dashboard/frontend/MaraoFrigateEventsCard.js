@@ -1,3 +1,4 @@
+const {bindPressFeedback,pressStyles}=await import(new URL(`./MaraoPressFeedback.js${new URL(import.meta.url).search}`,import.meta.url));
 const HTMLElementBase = globalThis.HTMLElement || class {};
 const { cardProblem, problemStyle, problemLabel, showCardDetails } = await import(new URL(`./MaraoCards.js${new URL(import.meta.url).search}`, import.meta.url));
 
@@ -291,6 +292,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   disconnectedCallback() {
+    this._press?.destroy();this._press=null;
     this._detailsPopup?._close(false);
     this._connected = false;
     this._loadedKey = "";
@@ -784,6 +786,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   _render() {
+    this._press ||= bindPressFeedback(this.shadowRoot);
     if (!this.shadowRoot || !this._config) return;
     const unavailable = this._unavailableState();
     const ready = Boolean(this._hass?.states) && !unavailable && this._status === "ready";
@@ -951,7 +954,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     this._render();
   }
 
-  static styles = `
+  static styles = `${pressStyles}
     :host { display: block; color: var(--primary-text-color); font-family: var(--primary-font-family, Montserrat, Roboto, system-ui, sans-serif); }
     :host([data-marao-control-cell]) { display:grid; min-width:0; }
     :host([data-marao-control-cell]) ha-card { height:100%; box-sizing:border-box; }
@@ -965,18 +968,15 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     .filter { flex: 0 0 auto; }
     .filter[aria-pressed="true"] { color: var(--text-primary-color, #fff); background: var(--primary-color); font-weight: var(--font-weight-primary, 700); }
     .more { display: block; margin: 16px auto 0; }
-    .filter:active, .more:active { transform: scale(.96); }
     h2 { margin: 0; overflow-wrap: anywhere; font-size: var(--font-size-primary, 1.125rem); font-weight: var(--font-weight-primary, 700); }
     main { position:relative;box-sizing:border-box;height:clamp(240px,60vh,600px);overflow-y:auto;padding:0 12px 12px; }
     main>.state, main>.problem:not(:empty) { position:absolute;inset:0;display:grid;place-items:center; }
     .message button { display:block;min-width:48px;min-height:48px;margin:8px auto 0;border:0;border-radius:12px;background:var(--secondary-background-color); }
     button { font: inherit; color: inherit; }
     .icon-button { justify-self: end; width: 48px; min-width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; cursor: pointer; font-size: max(1.5rem, var(--font-size-primary, 1.125rem)); transition: transform .12s ease, background-color .12s ease; }
-    .icon-button:active { transform: scale(.94); }
     .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
     .event { display: block; width: 100%; min-width: 0; min-height: 48px; padding: 0; overflow: hidden; text-align: left; border: 0; border-radius: var(--ha-card-border-radius, 12px); background: var(--secondary-background-color); cursor: pointer; transition: transform .12s ease; }
     button:focus { outline: none; }
-    .event:active { transform: scale(.985); }
     button:disabled { cursor: default; opacity: .55; transform: none; }
     .thumbnail { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: var(--divider-color); }
     .thumbnail img { width: 100%; height: 100%; object-fit: cover; }

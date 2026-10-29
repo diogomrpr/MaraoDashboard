@@ -159,6 +159,12 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
   assert.equal(header.style.getPropertyValue("display"), "none");
   functions.unregisterFullscreen(second);
   assert.deepEqual(header.style.values.get("display"), ["flex", "important"]);
+  const editor = { ...navbar(), localName: 'marao-dashboard-editor-card', _config: { dashboard_root: 'marao-dashboard' } };
+  functions.registerFullscreen(editor);
+  assert.equal(header.style.getPropertyValue('display'), 'none');
+  assert.equal(currentView.style.getPropertyValue('padding-bottom'), '0px', 'The native full-height editor must not inherit runtime navbar clearance');
+  functions.unregisterFullscreen(editor);
+  assert.equal(currentView.style.values.size, 0, 'Leaving the editor restores the native view spacing');
   const preview = navbar(); root.lovelace = {config:{},editMode:true};
   functions.registerFullscreen(preview);
   assert.equal(header.style.getPropertyValue('display'),'flex','HA editing keeps the toolbar');
@@ -244,7 +250,7 @@ test('landing-page shortcuts have independent visibility and guarded admin edito
   try{
     sync();const row=owner._pageRefresh,button=row.shadowRoot.querySelector('button');
     assert.equal(currentView.children[0],row);
-    assert.doesNotMatch(row.shadowRoot.innerHTML,/position:(?:fixed|sticky|absolute)/);
+    assert.doesNotMatch(row.shadowRoot.innerHTML.match(/:host\{[^}]*\}/)[0],/position:(?:fixed|sticky|absolute)/);
     sync();assert.equal(currentView.children.length,1);
     owner._config={show_cache_reset:false};sync();assert.equal(currentView.children.length,0,'Disabling the button removes its entire spacing row');
     owner._config.show_cache_reset=true;sync();assert.equal(currentView.children[0],row);

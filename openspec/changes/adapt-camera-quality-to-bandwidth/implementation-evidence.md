@@ -147,3 +147,85 @@ all succeeded. Scoped local gate and restored disposable state were reconfirmed
 before publication. Startup milestone S1/S2 is complete. The full adaptive
 change remains open: no automatic upgrades, bandwidth probe, aggregate shaping
 or continuity-safe promotion is claimed.
+
+## Explicit-stream follow-up (2026-10-29)
+
+Started at `df63f39c8da1b48dd4fa9e15a7d88c4ac8386d84` with the existing dirty
+worktree preserved; scope snapshot is `/private/tmp/camera-explicit-finish.json`.
+Affected consumers reviewed: builder camera form/JSON model, native compiler,
+shared camera runtime/fullscreen, popup events, and the existing synthetic
+Security/Cases examples. No persisted format, default or runtime change was
+needed in this follow-up.
+
+Four focused Node tests passed: title/options preservation across editing and
+duplication; optional camera-only popup binding validation; existing low/high
+gallery examples; and a new native compiler regression covering exact dashboard
+and popup entities, events identity/provider/limit, video-before-events order,
+fullscreen action, custom actions, raw content and source preservation. Missing,
+null and empty popup bindings retain the dashboard stream without saved defaults.
+The selector plan was reviewed; broader Python, transport and browser suites were
+not selected. Documentation and change artifacts now match native frontend
+ownership and retired standalone card editors. The omitted existing visible-camera
+scenario was restored to the delta; strict OpenSpec validation passed.
+
+At the user's explicit request, Chrome was opened on disposable
+`192.168.0.28:8123/marao-dashboard/security`, using only synthetic camera media.
+Dashboard preview and popup video were visibly playing; the popup showed the
+Entrance camera video above its synthetic provider event. Native fullscreen
+opened with controls, and Escape returned to the same popup and event list.
+This was a Chrome responsive preview at 400px, not a physical-phone check.
+Exact decoded low/high dimensions and native session identity were not measured;
+the configured entity targets are covered by the compiler assertion. No camera,
+lock, gate or alarm services were actuated.
+
+The remaining 320px/landscape inspection is pending: Chrome control/capture
+returned `noWindowsAvailable`, `elementHasNoFrame` and a ScreenCaptureKit error,
+and DevTools focus made the inspected document hidden, suspending playback.
+Collapsed/stale captures and the subsequent blank reload were not counted as
+product layout failures or passing checks. DevTools was closed and a fresh
+computer-control session established; foreground access was requested from the
+user. Earlier native camera playback/cancellation exceptions remain exceptions,
+not passing checks. No synthetic transport/latency/cancellation harness was run.
+
+The lightweight installer reconfirmed current assets and readiness on the
+disposable instance, identity
+`52e693abbc949caf34d383089e5c1f536eed79c3fd7f98548a8d6dad15075519`
+(`/private/tmp/camera-explicit-install.log`). No publication or production change
+was made. Task 5 is complete; task 6 stays open until the remaining requested
+layout check and UI cleanup can be confirmed.
+
+### Remaining Chrome inspection completed (2026-10-29)
+
+The user installed the ChatGPT Chrome extension and requested another attempt.
+The extension appeared in Chrome but was not exposed as a connected browser to
+the computer-use tool. Native Chrome control worked on this attempt. Docking
+DevTools beside the page kept the inspected document visible; observing field
+focus/selection before typing resolved the responsive-toolbar input problem.
+
+At a confirmed **320×817 CSS pixels**, the popup title, close control, live video,
+event filters and synthetic event preview fit within the sheet. At **817×320**,
+the video remained contained and internal scrolling reached events while the
+header/close control stayed available. Activating the landscape video opened
+native fullscreen with contained playback and native controls. The native Exit
+fullscreen control returned to the same popup with video and events present.
+These are Chrome responsive-mode observations, not physical-phone or OS-rotation
+testing. Exact decoded stream dimensions/session identity remain unmeasured.
+
+All console levels were inspected. The only additional messages were two
+non-passive `touchstart` notices attributed to HA's `home-assistant-main.ts:48`;
+no Marao console exception was observed. While restoring the viewport after
+closing the popup, the dashboard preview showed its readable startup timeout.
+One explicit Retry restored visible synthetic playback. This transient failure
+is retained as an observed limitation; this inspection does not establish that
+native camera startup is failure-free or change the standing manual-only
+transport policy. No transport stress or cancellation harness was run.
+
+Fullscreen and the popup were closed. The responsive preset was restored to
+400×790, the console filter to Default levels, and DevTools to its original
+undocked layout before closing it. The disposable Security page was left open
+with the recovered dashboard preview. No saved dashboard or helper state was
+changed. The loaded runtime still reported installed identity `52e693a…5519`
+(full identity above); documentation-only follow-up needed no reinstallation.
+Task 6 is complete. All eight tracked tasks are complete, with the transient
+startup timeout and upstream notices recorded rather than relabelled as clean
+transport evidence. No archive, publication or production action was performed.

@@ -223,9 +223,12 @@ npm run test:ha:alignment
 npm run test:ha:sliders
 npm run test:ha:e2e -- --actions-only
 npm run test:ha:e2e -- --ui-only --screenshots
-npm run test:ha:e2e -- --disconnect-only
 npm run ha:preview -- --component slider-headers --scenario iphone-normal --theme light
 ```
+
+The native Home Assistant reconnect outage check and upstream-fix version probe
+were retired at the user's request on 2026-10-29. The `connection` scope retains
+disconnected-action unit checks; full and upgrade runs do not inject that outage.
 
 The alignment check opens the Apple TV and generic media popups and verifies that
 icon-only controls are centered within 0.5 CSS pixels. It also checks the loaded resource

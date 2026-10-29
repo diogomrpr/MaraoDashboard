@@ -751,6 +751,16 @@
       "description": "Media controls with artwork and generated popup controls.",
       "variables": [
         {
+          "key": "media_display",
+          "label": "Display",
+          "kind": "select",
+          "options": [
+            "popup",
+            "inline"
+          ],
+          "description": "Popup or On dashboard. Missing keeps Popup."
+        },
+        {
           "key": "md_show_background_art",
           "label": "Background artwork",
           "kind": "boolean",
@@ -1716,6 +1726,15 @@
         }
       ],
       "hidden": true
+    },
+    {
+      "id": "md_floor_plan_card",
+      "label": "Floor Plan",
+      "icon": "mdi:floor-plan",
+      "domains": [],
+      "entity_optional": true,
+      "description": "Upload a room image and place light controls and illuminated strips.",
+      "variables": []
     }
   ],
   "pages": {

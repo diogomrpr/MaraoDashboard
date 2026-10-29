@@ -30,7 +30,6 @@ import {
   renamePage,
   serializeConfig,
   slugify,
-  validateConfig,
 } from "./editor-model.js";
 
 const PANEL_ASSET_VERSION = new URL(import.meta.url).search;
@@ -1189,12 +1188,13 @@ class MaraoDashboardPanel extends HTMLElement {
           if (!this.isConnected || lifecycle !== this._lifecycle || this._requestedTab !== 'visual') return;
           parsed = JSON.parse(payload.config);
         }
-        const errors = validateConfig(parsed, this._catalog.config_version, this._entities, this._catalog.energy_units, this._catalog);
+        const errors = await this._validateConfig(parsed, this._catalog.config_version, this._entities, this._catalog.energy_units, this._catalog);
         if (errors.length) throw new Error(errors.map((error) => this._l(error)).join(" "));
         if (Array.isArray(parsed.pages) && parsed.pages.some(page => pageContainers(page).some(section => flattenEntities(section.entities).some(card => card.template === 'ha_card' && !this._haCardLabels?.[card.yaml])))) {
           (await this._loadHaCardModule()).validateCardYaml(parsed);
           if (!this.isConnected || lifecycle !== this._lifecycle || model !== this._model || this._requestedTab !== 'visual') return;
         }
+        if (!this.isConnected || lifecycle !== this._lifecycle || model !== this._model || this._requestedTab !== 'visual') return;
         const next = normalizeConfig(parsed);
         const changed = JSON.stringify(serializeConfig(next)) !== JSON.stringify(serializeConfig(this._model));
         this._jsonDraft = legacy ? null : jsonSource;
@@ -1351,7 +1351,8 @@ class MaraoDashboardPanel extends HTMLElement {
         if (!current()) return;
         parsed = JSON.parse(preview.config);
       }
-      const errors = validateConfig(parsed, this._catalog.config_version, this._entities, this._catalog.energy_units, this._catalog);
+      const errors = await this._validateConfig(parsed, this._catalog.config_version, this._entities, this._catalog.energy_units, this._catalog);
+      if (!current()) return;
       if (errors.length) throw new Error(errors.map(error => this._l(error)).join(' '));
       if (Array.isArray(parsed.pages) && parsed.pages.some(page => pageContainers(page).some(section => flattenEntities(section.entities).some(card => card.template === 'ha_card')))) {
         (await this._loadHaCardModule()).validateCardYaml(parsed);
@@ -1596,6 +1597,10 @@ class MaraoDashboardPanel extends HTMLElement {
     if (!this._contextReady) return this._withEditorContext(() => this._openCardEditor(roomIndex, cardIndex, selectedCardId, kind, prefilledEntity, memberOptions));
     const existing = memberOptions ? memberOptions.entity : cardIndex == null ? null : this._editableContainer(kind, roomIndex).entities[cardIndex];
     if (existing?.template === 'ha_card') return this._openHaCardEditor(roomIndex, cardIndex, kind);
+    if ((selectedCardId || existing?.template) === 'md_floor_plan_card') {
+      const model = this._model, epoch = this._documentEpoch, revision = this._revision;
+      return import(new URL(`./MaraoFloorPlanEditor.js${PANEL_ASSET_VERSION}`, import.meta.url).href).then(module => { if (this.isConnected && model === this._model && epoch === this._documentEpoch && revision === this._revision) module.openFloorPlanEditor(this, roomIndex, cardIndex, kind); }).catch(error => this._setStatus(this._error(error), 'error'));
+    }
     if (selectedCardId === 'md_entity_group_card' || existing?.template === 'md_entity_group_card') return this._openEntityGroupEditor(roomIndex, cardIndex, kind);
     const metadata = entityMeta(this._entities, existing?.entity_id);
     const selected = this._catalog.cards.find((card) => card.id === (selectedCardId || existing?.template || (existing?.page ? "md_navigation_card" : ""))) || cardForEntity(this._catalog, metadata || existing) || this._catalog.cards[0];
@@ -1661,7 +1666,7 @@ class MaraoDashboardPanel extends HTMLElement {
     this._renderSummary(content.querySelector("#summary"), shortcut ? data.page : data.entity_id, selected, roomIndex, cardIndex, kind);
     renderCollection();
     content.querySelector("[data-close]").addEventListener("click", () => { this._closeDialog(dialog); memberOptions?.cancel(); });
-    content.querySelector("[data-save]").addEventListener("click", () => {
+    content.querySelector("[data-save]").addEventListener("click", async () => {
         const target = shortcut ? data.page : data.entity_id;
         if (!target && (shortcut || !selected.entity_optional)) { this._renderSummary(content.querySelector("#summary"), "", selected, roomIndex, cardIndex, kind, shortcut ? "Select a page first." : "Select an entity first."); return; }
         if (data.entity_id && !/^[a-z0-9_]+\.[a-z0-9_]+$/.test(data.entity_id)) {
@@ -1812,11 +1817,15 @@ class MaraoDashboardPanel extends HTMLElement {
     });
     search.addEventListener('input', render);
     content.querySelector('[data-close]').addEventListener('click', () => this._closeDialog(dialog));
-    content.querySelector('[data-save]').addEventListener('click', () => {
+    content.querySelector('[data-save]').addEventListener('click', async () => {
       const value = current();
       const validation = kind === 'page' ? { config_version: 2, name: this._model.name, landing_page: 'group', pages: [{ name: 'Group', path: 'group', entities: [value] }] } : kind === 'overview' ? { name: this._model.name, rooms: [], overview: { entity_groups: [value] } }
         : { name: this._model.name, rooms: [{ name: 'Group', entities: [value] }] };
-      const errors = validateConfig(validation, this._catalog.config_version, this._entities, this._catalog.energy_units, this._catalog);
+      const ownerModel = this._model, ownerEpoch = this._documentEpoch;
+      let errors;
+      try { errors = await this._validateConfig(validation, this._catalog.config_version, this._entities, this._catalog.energy_units, this._catalog); }
+      catch (error) { if (dialog.isConnected && dialog.open) content.querySelector('#group-error').textContent = this._error(error); return; }
+      if (!this.isConnected || !dialog.open || ownerModel !== this._model || ownerEpoch !== this._documentEpoch) return;
       if (errors.length) { content.querySelector('#group-error').textContent = errors.map(error => this._l(error)).join(' '); return; }
       const container = this._editableContainer(kind, roomIndex);
       if (cardIndex == null) container.entities = [...container.entities, value]; else container.entities[cardIndex] = value;
@@ -1951,7 +1960,7 @@ class MaraoDashboardPanel extends HTMLElement {
 
   _dialog(title) {
     this._cardDrag?.cancel();
-    const dialog = document.createElement("ha-dialog"); dialog.open = true; dialog.heading = this._l(title); dialog.headerTitle = this._l(title);
+    const dialog = document.createElement("ha-dialog"); dialog.width = "large"; dialog.open = true; dialog.heading = this._l(title); dialog.headerTitle = this._l(title);
     const invoking = this.shadowRoot.activeElement, lifecycle = this._lifecycle, model = this._model;
     dialog.innerHTML = `<div class="dialog-content"></div>`; dialog.addEventListener("closed", () => {
       dialog.remove();
@@ -2042,9 +2051,14 @@ class MaraoDashboardPanel extends HTMLElement {
     await Promise.all([...element.children, ...(shadow?.children || [])].map((child) => this._containForm(child)));
   }
 
+  async _validateConfig(...args) {
+    const module = await import(new URL(`./MaraoNativeModel.js${PANEL_ASSET_VERSION}`, import.meta.url).href);
+    return module.validateConfig(...args);
+  }
+
   _variableSchema(field, sourceId) {
     let selector = { text: {} };
-    if (field.kind === "select") selector = { select: { mode: 'dropdown', options: field.options.map(value => ({ value, label: this._l(({ auto: 'Automatic', popup: 'Popup', slide: 'Slide to open', close: 'Close or lock', hold: 'Security hold', dropdown: 'Dropdown', grid: 'Grid' })[value] || value) })) } };
+    if (field.kind === "select") selector = { select: { mode: 'dropdown', options: field.options.map(value => ({ value, label: this._l(({ auto: 'Automatic', popup: 'Popup', inline: 'On dashboard', slide: 'Slide to open', close: 'Close or lock', hold: 'Security hold', dropdown: 'Dropdown', grid: 'Grid' })[value] || value) })) } };
     if (field.kind === "boolean") selector = { boolean: {} };
     if (field.kind === "entity") selector = { entity: { domain: field.domains || [], multiple: Boolean(field.multiple) } };
     if (field.kind === "energy_period") selector = { select: { mode: 'dropdown', options: [{ value: 'day', label: this._l('Day') }, { value: 'month', label: this._l('Month') }] } };

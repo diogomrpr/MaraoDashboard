@@ -1,0 +1,35 @@
+# Tasks
+
+## 1. Shared press feedback
+
+- [x] 1.1 Record the fresh implementation commit, dirty-state snapshot (`npm run test:affected -- --snapshot /private/tmp/marao-touch-feedback.json`), acceptance cases and affected consumers from the design; verify the task scope excludes concurrent media/floor-plan edits and has no persisted/API changes.
+- [x] 1.2 Add the shared press-feedback binding, release timing and lifecycle cleanup without action or haptic dispatch; add a small offline behavioral regression for quick release, interrupted/repeated presses, disabling and disposal, verifying no stale feedback survives or clears a newer press.
+- [x] 1.3 Add theme-aware highlight/content-motion styles with fixed outer geometry and stationary Reduced Motion behavior; update the quality guide's animation guidance and verify by source review that no interactive surface is scaled, position transforms remain independent, and reduced-motion rules remove movement rather than just transitions.
+
+## 2. Adopt across dashboard controls
+
+- [x] 2.1 Integrate the shared feedback into `MaraoCards.js` card taps, nested actions and popup buttons, preserving focus restoration and existing hold/slide ownership; extend the existing targeted action tests to verify nested isolation, immediate exactly-once dispatch, scroll/cancel behavior and unchanged haptic ownership. Reuse the existing hold cancellation/completion test if that binding changes.
+- [x] 2.2 Adopt the same feedback in `MaraoNavigation.js`, `MaraoDropdown.js`, `MaraoFrigateEventsCard.js` and `MaraoFloorPlanCard.js`; verify through source review that floating options and standalone buttons participate, old competing press transforms are removed, and navigation refresh holds, floor-plan anchors and embedded native controls are preserved.
+- [x] 2.3 Include the helper in the existing frontend build/owned-asset pipeline and verification map as needed; update the feature-coverage documentation and identify existing realistic-page/card-test examples for card, nested action, dropdown and navbar feedback. Verify references resolve and reuse existing fixtures unless a concrete acceptance case is missing.
+
+## 3. Verify and install the final frontend
+
+- [x] 3.1 Review the actual task diff and use `test:affected --since /private/tmp/marao-touch-feedback.json --tier behavior --component <reviewed IDs> --plan` to confirm scope, resolving any new-helper mapping. Build applicable assets and run the smallest selected offline behavioral checks serially after the related edits; verify quick-tap cleanup, single dispatch and any touched safety guard without starting a browser or camera test campaign.
+- [x] 3.2 Sync the final compatible frontend once with the existing `ha-test/prepare-frontend.js` `prepareFrontend()` path to disposable `192.168.0.28`; verify served assets and readiness, preserve test configuration/helper state, and leave successful assets installed. If compatibility requires full preparation, use the documented full sync path only for that concrete need. Report installation failure as not installed / not ready for test.
+- [x] 3.3 Compare the delivered behavior and evidence with both delta specs; hand off the test URL with a short manual watch list for quick taps, nested actions, scrolling, fixed touch geometry and Reduced Motion. Record what was checked and what remains for the user's phone inspection; no additional automated suites are implied by this checklist.
+
+## Workflow follow-up
+
+- Before any separately requested push, tag or release, run the unit-only `npm run verify:publish` gate across that release candidate; reuse development evidence and do not add integration/full testing without an explicit request.
+- Archive only after implementation, required installation and selected verification are complete; synchronize these delta requirements into the baseline at that point.
+
+## Implementation record
+
+- Baseline: `df63f39c8da1b48dd4fa9e15a7d88c4ac8386d84`; snapshot `/private/tmp/marao-touch-feedback.json` includes prior media artwork/hover, floor-plan editor/runtime, navbar route metadata, editor and generated-asset work. Preserve those changes; this task adds feedback only.
+- Acceptance: immediate perceptible quick-tap feedback without delaying or duplicating dispatch/haptics; only the intended enabled target responds; scrolling, cancellation, disabling and lifecycle loss clear feedback; outer touch geometry and spatial anchors stay fixed; Reduced Motion retains a stationary highlight; strict slide/hold and native embedded controls retain their owners.
+- Shared consumers: MaraoCards actions/nested controls/popups, navbar routes/overflow/maintenance, shared dropdown triggers/floating options, event-card actions and floor-plan buttons, in native/generated/popup/preview hosts. No saved fields, public APIs, generator output or migration changes are required.
+- Verification: 50 distinct targeted assertions pass serially: 5 shared-feedback lifecycle checks, 14 navbar checks, 14 floor-plan checks, 11 selected card/action/dropdown/popup checks, 3 navbar hold checks and 3 event availability/filter/heading checks. The final helper availability/ancestor-cleanup adjustment passed its five checks again. No browser, phone or camera playback/transport inspection was performed.
+- Scope review: `/private/tmp/touch-final-plan.log` has no unresolved mappings. Reviewed file selection excludes concurrent `MaraoHistoryChart.js` changes; prior media/floor-plan/editor work remains outside task assertions. Derived owned-asset/package changes include all current assets. The shared module is discovered by the existing build; editor reproducibility, native asset build, strict change validation and source whitespace checks pass.
+- Source review: outer touch surfaces and floor-plan translation stay fixed, with only a neutral highlight and noninteractive content scale. Reduced Motion removes the scale immediately. Hold owners drive their own feedback hooks without an extra pointer owner; strict slides/embedded native internals are excluded. Actions and strong haptics retain their existing owners. An observed idle-listener warning was fixed by observing global events and availability only while feedback is active; final checks contain no warnings.
+- Installation: compatible `prepareFrontend()` sync installed identity `125aeacb26b20d19897ed4295edc4459665546eb35d781f799239c901f72806e` on disposable `192.168.0.28` with current served assets/readiness confirmed. Configuration and helper state were preserved; no full preparation, fixture reset or browser watch was needed.
+- Acceptance handoff: both deltas are represented by shared lifecycle/nesting assertions, existing exact dispatch/haptic/hold checks and the reviewed geometry/Reduced Motion CSS. Reload `http://192.168.0.28:8123/marao-dashboard`; inspect quick taps, a nested room action, scrolling cancellation, fixed buttons/plan anchors and stationary Reduced Motion on the user's phone before archiving. Visual/physical feel remains manual, not claimed as an automated pass.

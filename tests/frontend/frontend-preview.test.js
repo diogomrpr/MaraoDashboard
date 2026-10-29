@@ -12,6 +12,9 @@ test('preview requires a bounded known component and one valid profile', () => {
   assert.deepEqual(options.inspection.families, ['md_light_card']);
   assert.equal(options.scenario.viewport.width, 320);
   assert.equal(options.theme, 'light');
+  const selected = parseArgs(['--component','popup','--family','md_access_card','--once']);
+  assert.deepEqual(selected.inspection.families,['md_access_card']);
+  assert.equal(parseArgs(['--component','camera-editor']).inspection.editor,true);
 });
 
 test('each selected family must have a visible example, unrelated cards are ignored', () => {

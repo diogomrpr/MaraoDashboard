@@ -32,7 +32,7 @@ test('native editor isolates users/roots, retains same-user drafts and reconcile
     fs.writeFileSync(path.join(directory,'MaraoNavigation.js'),'export const navigate=()=>{};export const updateFrontendClient=()=>{};export const navigationLocalize=key=>key;export const fullscreenUsers=new Set();export const registerFullscreen=element=>fullscreenUsers.add(element);export const unregisterFullscreen=element=>fullscreenUsers.delete(element);');
     fs.writeFileSync(path.join(directory,'MaraoTheme.js'),'export const applyTheme=()=>{},releaseTheme=()=>{};');
     fs.writeFileSync(path.join(directory,'MaraoDashboardPanel.js'),'export {};');
-    fs.writeFileSync(path.join(directory,'MaraoNativeModel.js'),`import {createEnvelope} from './MaraoSource.js';export const convertDocument=(text,context)=>({document:createEnvelope(JSON.parse(text).strategy.source_json,context.dashboardRoot,JSON.parse(text)),compiled:compileDashboard(JSON.parse(JSON.parse(text).strategy.source_json))});export class NativeSession {constructor(hass,root,options={}) {Object.assign(this,{hass,root,strategy:options.strategy});}}; export const metadataSnapshot=()=>({}); export const compileDashboard=source=>({views:source.pages.map(page=>({path:page.path,theme:'Marao Dashboard',cards:[{cards:[{type:'custom:marao-navbar-card',routes:[]}]}]}))});`);
+    fs.writeFileSync(path.join(directory,'MaraoNativeModel.js'),`import {createEnvelope} from './MaraoSource.js';import {compileDashboard} from ${JSON.stringify(new URL('../../frontend_src/compile-dashboard.js',import.meta.url).href)};export const convertDocument=(text,context)=>({document:createEnvelope(JSON.parse(text).strategy.source_json,context.dashboardRoot,JSON.parse(text)),compiled:compileDashboard(JSON.parse(JSON.parse(text).strategy.source_json))});export class NativeSession {constructor(hass,root,options={}) {Object.assign(this,{hass,root,strategy:options.strategy});}}; export const metadataSnapshot=()=>({});`);
     fs.copyFileSync(new URL('../../frontend_src/native-strategy.js',import.meta.url),path.join(directory,'strategy.js'));
     const {MaraoDashboardStrategy:Strategy}=await import(pathToFileURL(path.join(directory,'strategy.js')));
     const source={config_version:2,name:'Safe',landing_page:'home',navigation:[],pages:[{name:'Home',path:'home',entities:[]}]};
@@ -51,10 +51,20 @@ test('native editor isolates users/roots, retains same-user drafts and reconcile
     delete globalThis.location;
     const regular=await Strategy.generate(config,{...hass,user:{is_admin:false}});
     assert.equal(regular.views.length,1);assert.equal(regular.views[0].cards[0].cards[0].editor_path,undefined);
-    const collision={...source,pages:[{name:'User page',path:'marao-editor',entities:[]}]};
+    const collision={...source,landing_page:'marao-editor',pages:[{name:'User page',path:'marao-editor',entities:[]}]};
     const colliding=await Strategy.generate({...config,source_json:JSON.stringify(collision)},hass);
     assert.equal(colliding.views.at(-1).path,'marao-editor-editor');
     assert.equal(colliding.views[0].cards[0].cards[0].editor_path,'marao-editor-editor');
+    const plan={name:'Plan',path:'plan',sections:[{entities:[{template:'md_floor_plan_card',id:'plan',variables:{image_id:'a'.repeat(32),lights:[],full_page:true}}]}]};
+    for(const landing of ['home','plan'])for(const isAdmin of [true,false]) {
+      const generated=await Strategy.generate({...config,source_json:JSON.stringify({...source,landing_page:landing,show_editor_button:false,pages:[...source.pages,plan]})},{...hass,user:{id:isAdmin?'admin':'regular',is_admin:isAdmin}});
+      const editor=generated.views.find(view=>view.subview);
+      for(const view of generated.views.filter(view=>!view.subview)) {
+        let navbar=view.cards.at(-1);while(navbar?.type!=='custom:marao-navbar-card'&&navbar?.cards)navbar=navbar.cards.at(-1);
+        assert.equal(navbar.dashboard_root,'marao-dashboard',`${view.path} must retain dashboard ownership`);
+        assert.equal(navbar.editor_path,isAdmin?editor.path:undefined,`${view.path} must expose the actual editor route only for administrators, regardless of landing page or shortcut visibility`);
+      }
+    }
     const Card=registry.get('marao-dashboard-editor-card'), card=new Card();
     card.setConfig({dashboard_root:'marao-dashboard'});card.hass=hass;await card._mount();
     while(card._mounting) await new Promise(resolve=>setTimeout(resolve,0));

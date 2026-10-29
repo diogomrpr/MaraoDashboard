@@ -153,6 +153,12 @@ The navbar Maintenance hold SHALL remain available independently of main-page sh
 - **THEN** administrator hold-menu access remains available when a navbar exists
 - **AND** regular users retain direct hold refresh
 
+#### Scenario: A full-page plan is the main page
+- **WHEN** an administrator completes a navbar hold on a full-page floor plan or an ordinary page, including the landing page
+- **THEN** the maintenance menu offers Edit dashboard using the actual configured editor route
+- **AND** nested layout wrappers and hidden main-page shortcuts do not remove that action
+- **AND** regular users never receive administrator editor access
+
 #### Scenario: No navbar routes exist
 - **WHEN** navigation is explicitly empty
 - **THEN** no hidden hold target or fabricated route is inserted

@@ -9,7 +9,6 @@ import { validatePages } from '../../frontend_src/editor-model.js';
 
 const require = createRequire(import.meta.url);
 const { addResourceSentinel, unrelatedConfiguration, assertUnrelatedEntries, extendedSource, patchRegistration, plan, validateVisualReviews, withRecovery } = require('../test-ha-upgrade');
-const { readKnownFailure, undeliveredFix, validateKnownFailure } = require('../native-reconnect-exception');
 const { assertHistoricalBindings, historicalEntityAliases, historicalEntities, isolateHistoricalText } = require('../../ha-test/upgrade/prepared');
 const { referencedEntities } = require('../../ha-test/prepare');
 const YAML = require('yaml');
@@ -24,6 +23,14 @@ test('native upgrade replay includes modern released contracts and labels data r
   assert.ok(result.every(row=>row.passed&&row.customRoot&&row.repeatConversion));
   const source='{"config_version":999}';
   await assert.rejects(verifyNativeConversions({rows:[{baseline:'future',source}]}));assert.equal(source,'{"config_version":999}');
+});
+
+test('upgrade functional child failures remain failures with their private diagnostic', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-functional-failure-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const { child } = require('../test-ha-upgrade');
+  await assert.rejects(child(process.execPath, ['-e', "console.error('Functional check failed'); process.exitCode = 1;"], directory, 'functional'), /functional failed; inspect its private log/);
+  assert.match(fs.readFileSync(path.join(directory, 'functional.log'), 'utf8'), /Functional check failed/);
 });
 
 test('restart readiness waits for active Supervisor Core jobs, closes connections and supports unsupervised Core', async () => {
@@ -228,42 +235,4 @@ test('representative visual review requires its exact preserved captures and fin
   for (const change of [row => row.rows.pop(), row => { row.rows[0].passed = false; }, row => { row.rows[0].captures_sha256 = 'stale'; }, row => { row.candidate = { commit: 'other' }; }, row => row.rows.push(row.rows[0])]) {
     const invalid = structuredClone(review); change(invalid); assert.throws(() => validateVisualReviews(invalid, report));
   }
-});
-
-const nativeEvidence = () => ({ version: 1, target: config.url, functional_completed: true, safe_actions_disabled: true, disconnected_dispatches: 0, authoritative_recovery: true,
-  errors: ['Object (/frontend_latest/app.native.js)'], rejections: ['not_found: Subscription not found.'],
-  subscriptions: [{ phase: 'connected', connection: 1, type: 'persistent_notification/subscribe', id: 37 }, { phase: 'recovering', connection: 2, type: 'persistent_notification/subscribe', id: 22 },
-    { phase: 'connected', connection: 2, type: 'unsubscribe_events', id: 43, subscription: 37 }], native_failures: [{ connection: 2, id: 43, code: 'not_found', message: 'Subscription not found.' }] });
-
-test('approved exception accepts only the exact native stale subscription failure after successful product checks', () => {
-  validateKnownFailure(nativeEvidence(), config.url);
-  const rawObject = nativeEvidence(); rawObject.errors = ['Object']; validateKnownFailure(rawObject, config.url);
-  for (const change of [row => { row.functional_completed = false; }, row => row.errors.push('Other error'), row => { row.errors[0] = 'Object (/marao_dashboard_static/MaraoCards.js)'; },
-    row => { row.disconnected_dispatches = 1; }, row => { row.authoritative_recovery = false; }, row => { row.subscriptions[2].subscription = 40; }, row => { row.native_failures[0].id = 99; },
-    row => { row.native_failures = []; }, row => { row.native_failures[0].connection = 1; }, row => { row.subscriptions[0].type = 'subscribe_events'; }, row => { row.subscriptions[1].connection = 1; }]) {
-    const row = nativeEvidence(); change(row); assert.throws(() => validateKnownFailure(row, config.url));
-  }
-});
-
-test('an earlier product failure remains a blocker with its original diagnostic even without native evidence', t => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-native-failure-'));
-  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-  const file = path.join(directory, 'native.json');
-  fs.writeFileSync(file + '.exit.json', JSON.stringify({ stage: null, message: 'Climate feedback failed' }));
-  assert.throws(() => readKnownFailure(file, config.url), /outside the approved native reconnect scenario: Climate feedback failed/);
-  const evidence = nativeEvidence();
-  fs.writeFileSync(file, JSON.stringify(evidence));
-  fs.writeFileSync(file + '.exit.json', JSON.stringify({ stage: 'disconnect-browser-errors',
-    message: `Disconnect scenario produced unexpected browser errors:\n${[...evidence.errors, ...evidence.rejections].join('\n')}\nSubscription lifecycle: ${JSON.stringify(evidence.subscriptions)}` }));
-  readKnownFailure(file, config.url);
-});
-
-test('native exception expires when the fix reaches either supported stable frontend', async () => {
-  const get = delivered => async url => ({ ok: true, async json() {
-    if (url.includes('/compare/')) return delivered ? { status: 'behind', behind_by: 1, ahead_by: 0 } : { status: 'ahead', behind_by: 0, ahead_by: 2 };
-    if (url.includes('manifest.json')) return { requirements: ['home-assistant-frontend==20260930.3'] };
-    return { prerelease: false, tag_name: url.includes('/core/') ? '2026.10.1' : '20260930.3' };
-  }, async text() { return 'home-assistant-js-websocket:\n      specifier: 9.7.1\n      version: 9.7.1\n'; } });
-  assert.equal((await undeliveredFix(get(false))).checks[0].websocket, '9.7.1');
-  await assert.rejects(undeliveredFix(get(true)), /exception has expired/);
 });

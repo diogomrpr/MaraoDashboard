@@ -79,3 +79,12 @@ asset inventory comes from the build. Unknown old server files and retired
 Marao service calls block conversion, with locations rather than content values.
 Private-setting hints likewise report locations only and cannot find every
 secret. Native imports still require an explicit source-visibility review.
+
+### Additive floor-plan descriptors
+
+`md_floor_plan_card` adds image references and per-light geometry to source format
+2 without rewriting historical sources. Optional `variables.full_page` applies
+only to that new descriptor. Old inputs retain their compiled output. Image files
+are HA-owned assets outside source exports; never delete them when a draft/card is
+cancelled, copied or removed. A downgrade restores the matching package and exact
+pre-feature source, retaining native image assets and recovery data.

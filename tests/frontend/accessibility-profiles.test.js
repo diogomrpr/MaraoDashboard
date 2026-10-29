@@ -374,8 +374,13 @@ test('success capture sampling keeps the full mobile matrix and distinct popup l
 test("browser checks report failed resources and activate cards through their controls", () => {
   const accessibilitySource = fs.readFileSync(path.join(repoRoot, "tests/test-ha-dashboard-accessibility.js"), "utf8");
   const e2eSource = fs.readFileSync(path.join(repoRoot, "tests/test-ha-dashboard-e2e.js"), "utf8");
+  const ledgerSource = fs.readFileSync(path.join(repoRoot, "tests/camera-request-ledger.js"), "utf8");
+  assert.match(accessibilitySource, /page\.on\("requestfailed"/);
+  assert.match(e2eSource, /managedCameraLedger\(context, page/);
+  assert.match(e2eSource, /await page\.__cameraRequestLedger\?\.assert\(\)/);
+  assert.match(ledgerSource, /page\.on\('requestfailed'/);
+  assert.match(ledgerSource, /assert\.equal\(rejected\.length, 0, `Unexpected non-camera request failures/);
   for (const source of [accessibilitySource, e2eSource]) {
-    assert.match(source, /page\.on\("requestfailed"/);
     assert.match(source, /response\.status\(\) >= 400|response\.status\(\) < 400/);
   }
   assert.match(accessibilitySource, /await control\.tap\(/);
