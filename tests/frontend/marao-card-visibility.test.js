@@ -793,6 +793,25 @@ test("action cards honor icon-only visibility flags", () => {
   assert.match(source, /\.body\.icon-only \{[^}]*display:flex;[^}]*align-items:center;[^}]*justify-content:center;[^}]*gap:0;/);
 });
 
+test('informational cards stay passive unless an action or problem needs details', () => {
+  const card = new MaraoCard();
+  const hass = { states: { 'sensor.test': { state: '21', attributes: {} } } };
+  for (const template of ['md_sensor_card', 'md_glance_card', 'md_number_card']) {
+    for (const tap_action of [undefined, { action: 'none' }]) {
+      card.setConfig({ template, entity: 'sensor.test', name: 'Reading', tap_action });
+      card.hass = hass;
+      assert.doesNotMatch(card.shadowRoot.innerHTML, /<button\b[^>]*data-card-(?:details|action)\b/, template);
+    }
+  }
+  card.setConfig({ template: 'md_sensor_card', entity: 'sensor.test', tap_action: { action: 'more-info' } });
+  card.hass = hass;
+  assert.match(card.shadowRoot.innerHTML, /<button\b[^>]*data-card-action\b/);
+  card.setConfig({ template: 'md_sensor_card', entity: 'sensor.test' });
+  card.hass = { states: { 'sensor.test': { state: 'unavailable', attributes: {} } } };
+  assert.match(card.shadowRoot.innerHTML, /<button\b[^>]*data-problem-details\b/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /<button\b[^>]*data-card-details\b/);
+});
+
 test("title cards render as text-only section headings", () => {
   const card = new MaraoCard();
   card.setConfig({

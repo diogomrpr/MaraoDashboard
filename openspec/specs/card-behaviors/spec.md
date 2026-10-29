@@ -189,6 +189,11 @@ inventing actions for informational-only content.
 - **WHEN** the card renders its actual fixture state
 - **THEN** the warning remains readable alongside progress/state rather than relying on color alone
 
+#### Scenario: An informational card has no tap action
+- **WHEN** a healthy card has no configured or family-specific tap action, or its tap action is explicitly `none`
+- **THEN** tapping its title or unused surface does not open a generic copy of the displayed information
+- **AND** configured actions, family-specific controls and popups, and problem-detail controls retain their existing behavior
+
 ### Requirement: Header, glance and forecast detail
 Headers SHALL retain localized date in HA's time zone plus optional person and
 air-quality readings. Glance SHALL support one through three independently named

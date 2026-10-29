@@ -1983,7 +1983,6 @@ export class MaraoCard extends BaseElement {
     const graphCard = showsGraph && kind === "md_graph_card";
     const graphPrimaryHistory = graphCard && !action && !config.tap_action;
     if (graphPrimaryHistory) actionControl = `<button class="card-action" type="button" data-card-action aria-label="${esc(localize('history.title', this._hass, {}, 'History'))}"${this.preview || this._graphAvailability(graphEntity) ? ' disabled' : ''}></button>`;
-    if (!action && !secondaryHold && !camera && !titleCard && !iconOnly && !graphCard) actionControl += `<button class="card-action" type="button" data-card-details aria-label="${esc(localize('common.details', this._hass, {}, 'Details'))}"></button>`;
     if (feedback) actionControl += `<button class="card-action problem-details" type="button" data-problem-details aria-label="${esc(problem.reason)}"></button>`;
     const coverActions = exhaust ? `<div class="exhaust-actions">${[['open_cover',1,'access.open','Open'],['close_cover',2,'common.close','Close']].filter(([,feature]) => Number(state.attributes?.supported_features) & feature).map(([service,,key,fallback]) => `<button type="button" data-exhaust-action="${service}" aria-label="${esc(localize('actions.for_target', this._hass, {action:localize(key,this._hass,{},fallback),name:this._label(entity,config,state)}, `${fallback} ${this._label(entity,config,state)}`))}"${controlsDisabled ? ' disabled' : ''}>${esc(localize(key,this._hass,{},fallback))}</button>`).join('')}</div>` : '';
     const holdProgress = holdAction || alternateHold ? '<svg class="hold-progress" aria-hidden="true" focusable="false"><rect x="1.5" y="1.5" pathLength="100"></rect></svg>' : "";
@@ -2038,11 +2037,6 @@ export class MaraoCard extends BaseElement {
       return;
     }
     this.shadowRoot.querySelector('[data-problem-details]')?.addEventListener('click', event => { event.stopPropagation(); showCardDetails(this, problem.reason, event.currentTarget); });
-    this.shadowRoot.querySelector('[data-card-details]')?.addEventListener('click', event => {
-      event.stopPropagation();
-      const detail = [...this.shadowRoot.querySelectorAll('.title,.state,.climate,.reading,.number-value')].filter(node => !node.classList.contains('placeholder')).map(node => node.textContent.trim()).filter(Boolean).join('\n');
-      showCardDetails(this, problem?.reason || detail, event.currentTarget);
-    });
     this.shadowRoot.querySelectorAll('[data-history-open]').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); if (!button.disabled) this._openHistory(button); }));
     this.shadowRoot.querySelector('[data-light-color]')?.addEventListener('click', event => { event.stopPropagation(); this._openLightColor(event.currentTarget); });
     const actionButton = this.shadowRoot.querySelector("[data-card-action]");
