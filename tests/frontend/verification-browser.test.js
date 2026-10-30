@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 const require = createRequire(import.meta.url);
 const { selectSamples } = require('../verification-browser');
-const { parseArgs } = require('../test-ha-dashboard-accessibility');
+const { parseArgs, fullscreenLifecyclePlan } = require('../test-ha-dashboard-accessibility');
 const { changedHelpers, prepareBatch, readBatchSnapshot } = require('../../ha-test/prepared-batch');
 const { candidateIdentity, validatePreparedReceipt } = require('../../ha-test/upgrade/prepared');
 
@@ -26,6 +26,12 @@ test('browser scope and parallel controls are explicit', () => {
   assert.deepEqual(options.families, ['md_light_card', 'md_fan_card']);
   assert.equal(options.popups, true); assert.equal(options.parallel, true);
   assert.equal(parseArgs(['--popup-hash', '#fixture']).popupHash, '#fixture');
+});
+
+test('current native shell checks use ordinary editing without requiring the retired builder', () => {
+  assert.deepEqual(fullscreenLifecyclePlan({nativeFrontend:true,ordinary:true}),{routes:['/config/dashboard'],nativeEdit:true});
+  assert.deepEqual(fullscreenLifecyclePlan({nativeFrontend:true,ordinary:false}),{routes:['/config/dashboard'],nativeEdit:false});
+  assert.deepEqual(fullscreenLifecyclePlan(),{routes:['/config/dashboard','/marao-dashboard-editor'],nativeEdit:false});
 });
 
 test('batch preparation happens once and its ordinary receipt cannot stand in for upgrade proof', async () => {

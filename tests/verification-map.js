@@ -15,8 +15,7 @@ const python = file => ({ id: 'python:' + file, kind: 'offline', command: ['pyth
 const browser = (id, file, args = [], exclusive = true) => ({ id, kind: 'browser', command: ['node', 'tests/' + file + '.js', ...args],
   inputs: [runtime, 'tests/' + file + '.js', 'tests/test-ha-dashboard-accessibility.js', 'tests/test-ha-dashboard-e2e.js', 'ha-test',
     ...(file === 'test-ha-dashboard-e2e' && args.some(arg => ['--camera-only', '--camera-live-only'].includes(arg)) ? ['tests/camera-live-native-checks.js', 'tests/camera-request-ledger.js'] : []),
-    ...(file === 'test-ha-card-alignment' && args.includes('--access-label') ? ['tests/test-ha-ui-batch.js'] : []),
-    ...(['test-ha-editor', 'test-ha-card-alignment'].includes(file) ? ['tests/test-ha-editor.js', 'tests/json-editor-checks.js', 'tests/editor-drag-checks.js', 'tests/editor-rendering-checks.js', 'tests/editor-preload-checks.js'] : [])], exclusive });
+    ...(file === 'test-ha-card-alignment' && args.includes('--access-label') ? ['tests/test-ha-ui-batch.js'] : [])], exclusive });
 const families = {
   security: ['md_security_card', 'md_alarm_controls_card', 'md_access_slide_action_card', 'md_access_card'],
   slider: ['md_light_card', 'md_fan_card', 'md_cover_card'],
@@ -27,7 +26,7 @@ const families = {
 const components = {
   'press-feedback': { units: [['press-feedback'], ['marao-card-visibility', 'room child activation|dual-action hold|hold completion|active holds|access actions use|touch actions establish|shared dropdown floats|themed scene dropdown'], ['marao-navbar-card'], ['frontend-refresh', 'gesture|short taps|released after'], ['floor-plan'], ['marao-frigate-events-card', 'entity availability disables|type filters|event heading retains']], editor: true, package: true },
   'floor-plan': { units: [['floor-plan'], ['editor-model'], ['editor-panel'], ['native-compiler']], editor: true, package: true },
-  'native-source': { units: [['native-source'], ['native-compiler'], ['native-session'], ['native-strategy'], ['native-dependencies'], ['native-package'], ['converter']], python: ['test_frontend_compiler'], editor: true, upgrade: true },
+  'native-source': { units: [['native-source'], ['native-compiler'], ['native-session'], ['native-strategy'], ['native-dependencies'], ['native-package'], ['native-cards'], ['native-card-editor'], ['native-bootstrap'], ['native-edit-context'], ['dashboard-settings'], ['ordinary-conversion'], ['ordinary-session'], ['ordinary-migration-ui'], ['converter']], python: ['test_frontend_compiler'], editor: true, upgrade: true },
   'navbar-startup': { units: [['frontend-refresh'], ['marao-navbar-card'], ['marao-history-cards'], ['marao-text-scale'], ['gallery-cases'], ['package-boundary']],
     python: [], editor: true,
     browser: [
@@ -57,8 +56,7 @@ const components = {
       ...['narrow-320','iphone-landscape','iphone-text-200','iphone-page-zoom-200','iphone-bold-text-200'].map(profile => browser('chart-details:ha:' + profile, 'test-ha-dashboard-e2e', ['--chart-details-only', '--chart-geometry', '--scenario=' + profile, '--theme=light', '--screenshots=' + (['narrow-320','iphone-bold-text-200'].includes(profile) ? 'review' : 'failure')]))] },
   'editor-preload': { units: [['editor-panel'], ['editor-model'], ['canonical-page-model'], ['json-editor']],
     python: ['test_init', 'test_security', 'test_page_migration', 'test_upgrade_fixtures'], editor: true,
-    browser: [browser('editor-preload:startup', 'test-ha-editor', ['--preload', '--startup', '--json-tools', '--scenario=iphone-normal']),
-      ...['narrow-320', 'iphone-landscape', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200'].map(profile => browser('editor-preload:' + profile, 'test-ha-editor', ['--json-geometry', '--scenario=' + profile]))] },
+    browser: [] }, // Historical builder behavior remains offline-only; its runtime is no longer shipped.
   'slider-headers': { units: [['marao-card-visibility'], ['marao-text-scale'], ['marao-climate-card', 'slider|brightness|percentage|cover'], ['marao-security'], ['gallery-cases']],
     python: ['test_gallery_fixtures'], templates: [...families.slider, 'md_access_slide_action_card'],
     browser: [
@@ -78,20 +76,9 @@ const components = {
     ] },
   'lovelace-cards': { units: [['lovelace-model'], ['marao-control-grid'], ['editor-panel']], python: ['test_card_yaml', 'test_history'], editor: true, browser: [] },
   'editor-rendering': { units: [['editor-model'], ['canonical-page-model'], ['page-manager-model'], ['editor-panel'], ['editor-drag'], ['json-editor']],
-    python: ['test_page_generation', 'test_page_migration'], editor: true,
-    browser: [
-      ...['iphone-normal', 'android-normal', 'narrow-320', 'iphone-landscape', 'android-landscape', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200'].map(profile => browser('editor-rendering:' + profile, 'test-ha-editor', [profile === 'iphone-normal' ? '--rendering' : '--rendering-geometry', '--scenario=' + profile, ...(profile === 'iphone-normal' ? ['--drag', '--drag-save'] : profile === 'android-normal' ? ['--drag', '--portuguese'] : ['--drag-geometry'])])),
-      browser('editor-rendering:pages', 'test-ha-editor', ['--pages', '--scenario=iphone-normal']),
-      browser('editor-rendering:json', 'test-ha-editor', ['--json-tools', '--json-save', '--scenario=iphone-normal']),
-      {...browser('editor-json-appearance', 'test-ha-editor', ['--json-geometry', '--scenario=iphone-normal', '--theme=dark', '--screenshots=review']),
-        cases: [{id:'editor-json:dark:appearance',assertion:'json-editor',profile:'iphone-normal',theme:'dark',engine:'chromium',dimensions:['appearance','geometry'],themeIndependent:false,
-          reason:'Stock Monaco/native widget appearance retains an explicit dark geometry check.'}]},
-      browser('editor-rendering:alignment', 'test-ha-card-alignment', ['--editor-rendering']),
-    ] },
+    python: ['test_page_generation', 'test_page_migration'], editor: true, browser: [] },
   'json-editor': { units: [['json-editor'], ['editor-model'], ['canonical-page-model'], ['editor-panel']], editor: true,
-    browser: [browser('json-alignment', 'test-ha-card-alignment', ['--json-editor']),
-      ...['iphone-normal', 'android-normal', 'narrow-320', 'iphone-landscape', 'android-landscape', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200'].map(profile =>
-      browser('json-editor:' + profile, 'test-ha-editor', ['--json-tools', '--scenario=' + profile, ...(profile === 'iphone-normal' ? ['--json-save', '--startup', '--portuguese'] : [])]))],
+    browser: [],
   },
   'retired-authoring': { units: [['retired-authoring']], python: ['test_retired_authoring'], browser: [] },
   'camera-editor': { units: [['editor-panel']], python: ['test_page_generation'], editor: true, browser: [] },
@@ -135,13 +122,10 @@ const components = {
   history: { units: [['marao-history-cards']], browser: [browser('history', 'test-ha-dashboard-e2e', ['--history-only'])] },
   energy: { units: [['marao-energy-format']], browser: [browser('energy', 'test-ha-energy-format', ['--scenario', 'iphone-normal'])] },
   'editor-drag': { units: [['editor-drag'], ['canonical-page-model'], ['editor-panel']], python: ['test_page_generation', 'test_page_migration'], editor: true,
-    browser: [browser('editor-drag:iphone-normal', 'test-ha-editor', ['--drag', '--drag-save', '--scenario=iphone-normal']),
-      browser('editor-drag:android-normal', 'test-ha-editor', ['--drag', '--portuguese', '--scenario=android-normal']),
-      browser('editor-drag:alignment', 'test-ha-card-alignment', ['--editor-drag']),
-      ...['narrow-320', 'iphone-landscape', 'android-landscape', 'iphone-bold', 'iphone-text-200', 'iphone-page-zoom-200', 'iphone-bold-text-200'].map(profile => browser('editor-drag:' + profile, 'test-ha-editor', ['--drag-geometry', '--scenario=' + profile]))] },
+    browser: [] },
   'editor-model': { units: [['editor-model'], ['page-manager-model'], ['canonical-page-model']] },
   'card-namespace': { units: [['card-names'], ['marao-security'], ['retired-authoring']], python: ['test_card_names', 'test_page_migration'] },
-  'editor-ui': { units: [['editor-panel']], browser: [browser('editor', 'test-ha-editor', ['--scenario=iphone-normal', '--header'])], editor: true },
+  'editor-ui': { units: [['editor-panel']], browser: [], editor: true },
   generator: { python: ['test_generator', 'test_page_generation'], upgrade: true },
   migration: { python: ['test_page_migration', 'test_native_storage_migration', 'test_release_replay_recovery', 'test_upgrade_fixtures'], upgrade: true },
   lifecycle: { python: ['test_init', 'test_config_flow', 'test_config_patch', 'test_frontend_assets'], upgrade: true },
@@ -159,7 +143,11 @@ const components = {
 };
 
 const rules = [
+  [/^custom_components\/marao_dashboard\/frontend\/(?:MaraoNative(?:Bootstrap|Cards|CardEditor|Model|Dashboard|Context)\.js|MaraoDashboardSettings\.js|MaraoOrdinaryMigration\.js|MaraoDashboard(?:EditorLabels|EditorWorker|JsonEditor|JsonPreparation|JsonWorker|Panel)\.(?:js|css)|MonacoEditor\.LICENSE\.txt|assets\/codicon-[A-Z0-9]+\.ttf)$/, ['native-source']],
   [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoFloorPlan(?:Card|Text|Editor)?\.js|frontend_src\/floor-plan-editor\.js|tests\/frontend\/floor-plan\.test\.js|ha-test\/floor-plan.*)$/, ['floor-plan']],
+  [/^(?:frontend_src\/(?:dashboard-settings(?:-dialog)?|native-bootstrap|native-cards|card-composition|native-card-editor|card-form-tools|ordinary-model|ordinary-session|ordinary-migration-ui|legacy-model)\.js|tests\/frontend\/(?:dashboard-settings|ordinary-[\w-]+|native-cards|native-card-editor|native-bootstrap|card-composition)\.test\.js)$/, ['native-source', 'navbar']],
+  [/^ha-test\/upgrade\/fixtures\/(?:ordinary-baseline|v0\.23\.4-ordinary-(?:envelope|expected|source))\.json$/, ['native-source']],
+  [/^tests\/frontend\/native-edit-context\.test\.js$|^custom_components\/marao_dashboard\/frontend\/MaraoNativeContext\.js$/, ['native-source']],
   [/^tests\/test-native-frontend-(?:local|acceptance)\.js$/, ['native-source']],
   [/^tests\/test-frontend-upgrade-cache-local\.js$/, ['native-source', 'frontend-refresh']],
   [/^dist\//, ['native-source']],

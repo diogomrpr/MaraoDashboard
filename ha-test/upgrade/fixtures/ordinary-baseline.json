@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "tag": "v0.23.4",
+  "commit": "02b78d09fb24056219a05e7a548e11724492aae6",
+  "release_url": "https://github.com/diogomrpr/MaraoDashboard/releases/tag/v0.23.4",
+  "evidence": "Synthetic safe source authored against the released v0.23.4 format-2/envelope-1 contract. Not a captured user dashboard or live installation. Expected ordinary target was independently specified without executing or importing candidate conversion/compiler code. Exact original and provenance are asserted separately from active target.",
+  "released_source_sha256": "16359b11a8d87f189dc37550433502d06dbf2af1fbe6a66027fcfacd8c765a55",
+  "released_compiler_sha256": "f2ab604928f4decb053e023009c2037dd52e18940117d62d706d0eae2230939c",
+  "files": {
+    "v0.23.4-ordinary-source.json": "5bcf93be6d5ca8398ef50254117dd168bbc00e4520f5ef5f12c9d0359e06bc4d",
+    "v0.23.4-ordinary-envelope.json": "5ecc1e8a00ea339dd22c68f1e81f92dd13e008e961140f0fe063380f32a3d293",
+    "v0.23.4-ordinary-expected.json": "7156f147546928e18d1e0849d5702d2749f572e3695de3f0a9aed05aef24fe4b"
+  },
+  "coverage": [
+    "same root and landing order",
+    "unknown source/envelope/descriptor fields",
+    "explicit empty section",
+    "ordered energy breakdown rows",
+    "number presets",
+    "embedded YAML exact text and raw native card",
+    "full-page floor plan with positioned strip",
+    "native five-column container",
+    "duplicate entity occurrences",
+    "custom navbar entries and settings"
+  ]
+}

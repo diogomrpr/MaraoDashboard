@@ -55,6 +55,7 @@ export const navigationTranslations = {
     "navigation.refresh.failed": "Refresh failed. Try again.",
     "navigation.refresh.deferred": "Dashboard refresh waiting until controls and edits are finished.",
     "navigation.edit": "Edit dashboard",
+    "navigation.settings": "Marao settings",
     "navigation.loading_error": "Dashboard content could not load",
     "navigation.card_name": "Navbar",
     "navigation.invalid_routes": "Navigation routes must be a list",
@@ -81,6 +82,7 @@ export const navigationTranslations = {
     "navigation.refresh.failed": "Falha ao atualizar. Tente novamente.",
     "navigation.refresh.deferred": "A atualização aguarda que termine os controlos e a edição.",
     "navigation.edit": "Editar painel",
+    "navigation.settings": "Definições Marao",
     "navigation.loading_error": "Não foi possível carregar o conteúdo do painel",
     "navigation.card_name": "Barra de navegação",
     "navigation.invalid_routes": "Os destinos de navegação têm de ser uma lista",
@@ -262,7 +264,7 @@ export class MaraoNavbarCard extends BaseElement {
     const bottom = navbarBottomGap();
     this.shadowRoot.innerHTML = `<style>${pressStyles}
       :host{display:block;height:128px;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}
-      :host([data-empty]){display:none}:host([data-preview]){height:auto}
+      :host([hidden]),:host([data-empty]){display:none!important}:host([data-preview]){height:auto}
       .bounds{position:fixed;visibility:hidden;pointer-events:none;inset:${safeArea("top")} calc(12px + ${safeArea("right")}) ${safeArea("bottom")} calc(12px + ${safeArea("left")})}
       .surface{pointer-events:auto;display:flex;gap:clamp(2px,.5vw,4px);box-sizing:border-box;padding:6px 10px;border-radius:999px;background:var(--ha-card-background,var(--card-background-color));box-shadow:0 8px 30px rgba(0,0,0,.22)}
       .nav{position:fixed;z-index:1001;left:var(--marao-navbar-left,50%);bottom:${bottom};transform:translateX(-50%);flex-wrap:nowrap;justify-content:center;width:max-content;max-width:var(--marao-navbar-width,calc(100vw - 24px - ${safeArea("left")} - ${safeArea("right")}));height:60px}
@@ -316,8 +318,14 @@ export class MaraoNavbarCard extends BaseElement {
     else this._refreshFrontend();
   }
   _editorURL() {
+    if (this._config.native_editor && this._root()?.lovelace?.setEditMode) return 'native';
     return this._config.dashboard_root && this._config.editor_path
       ? `/${encodeURIComponent(this._config.dashboard_root)}/${encodeURIComponent(this._config.editor_path)}` : '';
+  }
+  _openEditor() {
+    if (!this._hass?.user?.is_admin) return;
+    if (this._config.native_editor) {this._root()?.lovelace?.setEditMode(true);this._syncContext();applyFullscreen();}
+    else {const url=this._editorURL();if(url)navigate(url);}
   }
   _maintenanceValid(session) {
     return this._maintenance === session && this._hass?.user?.is_admin
@@ -348,10 +356,16 @@ export class MaraoNavbarCard extends BaseElement {
       this._closeMaintenance(valid);
       if (!valid || !this._refreshEligible()) return;
       haptic('heavy');
-      if (action === 'edit' && session.editor) navigate(session.editor);
+      if (action === 'edit' && session.editor) this._openEditor();
+      else if (action === 'settings' && this._config.native_editor) {
+        import(new URL(`./MaraoDashboardSettings.js${new URL(import.meta.url).search}`,import.meta.url)).then(module=>module.openDashboardSettings(this._root(),target)).catch(error=>{this._refreshFeedback('failed');console.error('Marao settings could not load',error);});
+      }
       else if (action === 'refresh') this._refreshFrontend();
     };
     dialog.querySelector('[data-edit]')?.addEventListener('click', () => select('edit'));
+    if (this._config.native_editor) {
+      const settings=document.createElement('button');settings.type='button';settings.textContent=localize('navigation.settings',this._hass);settings.addEventListener('click',()=>select('settings'));dialog.querySelector('[data-refresh]').before(settings);
+    }
     dialog.querySelector('[data-refresh]').addEventListener('click', () => select('refresh'));
     const dismiss = () => { if (this._maintenance === session) this._closeMaintenance(true); };
     dialog.querySelector('.close').addEventListener('click', () => { if (this._maintenance === session) { haptic('heavy'); dismiss(); } });
@@ -431,7 +445,7 @@ export class MaraoNavbarCard extends BaseElement {
       });
       row.shadowRoot.querySelector('.frontend-editor').addEventListener('click', () => {
         if (!current() || !this._hass?.user?.is_admin || this._config?.show_editor_button === false) return;
-        const url = this._editorURL(); if (url) { haptic('heavy'); navigate(url); }
+        if (this._editorURL()) { haptic('heavy'); this._openEditor(); }
       });
     }
     this._pagePress ||= bindPressFeedback(this._pageRefresh.shadowRoot);
@@ -515,6 +529,7 @@ const navigationRecords = new Set();
 const navigationOwners = new WeakMap();
 function configuredNavbar(root) {
   const config = root.lovelace?.config || root.lovelace?.rawConfig;
+  if (root._maraoDashboardNavigation) return root._maraoDashboardNavigation;
   if (!Array.isArray(config?.views)) return undefined;
   const path = window.location.pathname.split('/')[2];
   const view = path ? config.views.find((view, index) => String(view.path ?? index) === path)
@@ -527,6 +542,23 @@ function configuredNavbar(root) {
     return null;
   };
   return find(view);
+}
+// Ordinary native dashboards own one surface independently of view/card mounting.
+export function setDashboardNavigation(root, config) {
+  let record = navigationOwners.get(root);
+  if (!config) {
+    delete root._maraoDashboardNavigation;
+    if (record?.nativeDashboard) releaseNavigation(record);
+    return;
+  }
+  root._maraoDashboardNavigation=config;
+  if (!record) {
+    const surface=document.createElement('marao-navbar-card');surface._isSurface=true;
+    surface.setAttribute('data-marao-navigation-surface','');surface.style.cssText='position:fixed;top:0;left:0;width:100%;height:1px;pointer-events:none;z-index:1001';
+    record={root,surface,dashboard:config.dashboard_root,nativeDashboard:true};surface._navigationRecord=record;
+    navigationOwners.set(root,record);navigationRecords.add(record);updateNavigation(record,config);root.shadowRoot.prepend(surface);
+  } else {record.nativeDashboard=true;updateNavigation(record,config);}
+  syncNavigation(record);record.surface._syncContext();record.surface._syncPageRefresh();record.surface._scheduleLayout();applyFullscreen();
 }
 function copyNavigationTheme(host, surface) {
   if (!globalThis.getComputedStyle) return;
@@ -668,6 +700,7 @@ function applyFullscreen() {
     let root = navbar;
     while (root && root.localName !== "hui-root") root = root.parentElement || root.getRootNode()?.host;
     if (navbar.preview || root?.lovelace?.editMode) continue;
+    if (navbar._config?.native_editor && navbar._hass?.user?.is_admin && !navbar._config.routes.length && navbar._config.show_editor_button === false) continue;
     activeNavbars.add(navbar);
     const view = root?.shadowRoot?.querySelector("#view");
     const pageFlow = navbarMainPage(root?.lovelace?.config || root?.lovelace?.rawConfig, window.location) ? ["flex-direction"] : [];

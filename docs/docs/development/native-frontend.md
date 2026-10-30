@@ -6,6 +6,26 @@ parent: Development
 
 # Native frontend transition
 
+## Current authoring boundary
+
+The `use-home-assistant-dashboard-editor` change replaces the strategy-owned
+Visual/Monaco builder with ordinary Home Assistant views, sections and cards.
+`native-cards.js` exposes the existing catalog, `native-card-editor.js` owns shared
+forms, and `native-bootstrap.js` attaches the one dashboard-wide navbar from the
+versioned root `marao` settings. Its isolated host boundary uses HA's `hui-root`
+controller lifecycle and native `lovelace.setEditMode`; unsupported metadata
+remains untouched and leaves native editing available.
+
+Existing strategies render read-only and offer explicit staged conversion through
+`ordinary-model.js` and `ordinary-session.js`. Exact original text, opaque fields
+and source-only options remain in inert provenance/recovery exports. Native
+layout owns outer sizing and visibility. See [current editing](../usage/native-dashboard.md)
+and [conversion/recovery](../installation/native-migration.md).
+
+The sections below retain evidence for the earlier integration-to-frontend
+transition. Their builder/Monaco behavior describes those released packages;
+it does not require those authoring modules in the current download.
+
 The breaking stable release is **v0.22.0**, in the existing
 `diogomrpr/MaraoDashboard` repository. **v0.22.1** adds visible administrator editor
 access and in-app dashboard navigation after Open dashboard or successful save.

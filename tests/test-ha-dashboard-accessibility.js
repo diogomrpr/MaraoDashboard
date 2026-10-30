@@ -215,13 +215,24 @@ async function inspectSafeAreaSheets(context, page, output, runName) {
   }
 }
 
+function fullscreenLifecyclePlan({ nativeFrontend = false, ordinary = false } = {}) {
+  return { routes: nativeFrontend || ordinary ? ['/config/dashboard'] : ['/config/dashboard', '/marao-dashboard-editor'], nativeEdit: ordinary };
+}
+
 async function inspectFullscreenLifecycle(page) {
+  const context = await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])').evaluate(navbar => {
+    let root = navbar; while (root && root.localName !== 'hui-root') root = root.parentElement || root.getRootNode()?.host;
+    const config = root?.lovelace?.rawConfig || root?.lovelace?.config;
+    return { nativeFrontend: Boolean(window.MaraoFrontendPackage), ordinary: config?.marao?.version === 1 && Array.isArray(config.views) && !config.strategy,
+      returnPath: location.pathname + location.search };
+  });
+  const lifecycle = fullscreenLifecyclePlan(context);
   const editorRequests = new Set();
   const started = request => { if (/MaraoDashboard(?:Json|EditorWorker)/.test(new URL(request.url()).pathname)) editorRequests.add(request); };
   const finished = request => editorRequests.delete(request);
   page.on('request', started); page.on('requestfinished', finished); page.on('requestfailed', finished);
   try {
-  for (const route of ['/config/dashboard', '/marao-dashboard-editor']) {
+  for (const route of lifecycle.routes) {
     await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])').evaluate(navbar => {
       let root=navbar;while(root&&root.localName!=='hui-root')root=root.parentElement||root.getRootNode()?.host;
       window.__safeOwned={view:root.shadowRoot.querySelector('#view'),header:root.shadowRoot.querySelector('.header')};
@@ -257,13 +268,27 @@ async function inspectFullscreenLifecycle(page) {
     const deadline = Date.now() + 15000;
     while (editorRequests.size && Date.now() < deadline) await page.waitForTimeout(50);
     if (editorRequests.size) throw new Error('Editor asset requests did not finish before route disposal');
-    await page.evaluate(() => {history.pushState(null,'','/marao-dashboard/card-test-all');window.dispatchEvent(new CustomEvent('location-changed'));});
+    await page.evaluate(route => {history.pushState(null,'',route);window.dispatchEvent(new CustomEvent('location-changed'));}, context.returnPath);
     await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder])').waitFor({state:'visible'});
     await page.waitForFunction(() => {
       const find=root=>{if(!root)return;const nav=root.querySelector?.('marao-navbar-card:not([data-marao-navbar-placeholder])');if(nav)return nav;for(const e of root.querySelectorAll?.('*')||[]){const nav=find(e.shadowRoot);if(nav)return nav;}};
       let root=find(document);while(root&&root.localName!=='hui-root')root=root.parentElement||root.getRootNode()?.host;
       return root?.shadowRoot.querySelector('.header')?.style.display==='none';
     });
+  }
+  if (lifecycle.nativeEdit) {
+    const root = page.locator('hui-root').last();
+    try {
+      await root.evaluate(root => root.lovelace.setEditMode(true));
+      await page.waitForFunction(root => {
+        const header = root.shadowRoot?.querySelector('.header');
+        return root.lovelace.editMode && header && getComputedStyle(header).display !== 'none';
+      }, await root.elementHandle());
+      await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({state:'hidden'});
+    } finally {
+      await root.evaluate(root => root.lovelace.setEditMode(false));
+    }
+    await page.locator('marao-navbar-card:not([data-marao-navbar-placeholder]) nav').waitFor({state:'visible'});
   }
   } finally {
     page.off('request', started); page.off('requestfinished', finished); page.off('requestfailed', finished);
@@ -1339,6 +1364,7 @@ module.exports = {
   inspectPopups,
   layoutIssues,
   inspectFullscreenLifecycle,
+  fullscreenLifecyclePlan,
   parseArgs,
   popupFocusFailure,
   popupHasVisibleContent,

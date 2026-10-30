@@ -19,17 +19,13 @@ test('nine reviewed geometry profiles retain nine light cases and representative
     assert.equal(check.cases[0].theme, 'both'); assert.equal(check.cases[0].themeIndependent, false);
   }
 });
-test('compatible gallery assertions share visits and delegated alignment has canonical coverage', () => {
+test('compatible gallery assertions share visits without retired builder browser coverage', () => {
   const checks = checksFor(selectComponents([], ['slider-headers', 'access-label', 'battery-groups', 'editor-rendering']));
   const gallery = checks.find(check => check.id === 'gallery:iphone-normal:light');
   for (const flag of ['--slider-headers', '--access', '--battery']) assert.ok(gallery.command.includes(flag));
   assert.equal(gallery.cases.length, 3);
-  const monaco = checks.find(check => check.id === 'editor-json-appearance');
-  assert.equal(monaco.cases[0].theme, 'dark');
-  assert.ok(monaco.command.includes('--json-geometry'));
-  assert.ok(!checks.some(check => check.id === 'editor-rendering:alignment'));
-  const narrow = checks.find(check => check.id === 'editor-rendering:narrow-320');
-  assert.deepEqual(narrow.cases[0].aliases, ['editor-rendering:alignment']);
+  assert.ok(!checks.some(check=>check.kind==='browser' && /editor-json|editor-rendering/.test(check.id)));
+  assert.ok(checks.some(check=>check.id==='unit:editor-model'));
   assert.ok(checks.find(check => check.id === 'gallery:narrow-320:light').command.includes('--geometry-only'));
 });
 test('unreviewed theme-sensitive checks and explicit full mode retain their coverage', () => {

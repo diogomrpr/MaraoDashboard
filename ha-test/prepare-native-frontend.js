@@ -15,7 +15,22 @@ async function nativeState(config,connect=client.connect) {
   try {
     assert.equal((await connection.call({type:'auth/current_user'})).is_admin,true,'Native preparation needs the disposable administrator');
     const dashboard=await connection.call({type:'lovelace/config',url_path:'marao-dashboard',force:true});
-    if (dashboard.strategy?.type !== 'custom:marao-dashboard') return null;
+    const strategy = dashboard.strategy?.type === 'custom:marao-dashboard';
+    const ordinary = !Object.hasOwn(dashboard, 'strategy') && Object.hasOwn(dashboard, 'marao');
+    if (!strategy && !ordinary) return null;
+    let views;
+    if (ordinary) {
+      const {readDashboardSettings}=await import('../frontend_src/dashboard-settings.js');
+      readDashboardSettings(dashboard);
+      assert.ok(Array.isArray(dashboard.views),'Ordinary Marao dashboards need native views');
+      views=dashboard.views;
+    } else {
+      const {unwrapDocument}=await import('../custom_components/marao_dashboard/frontend/MaraoSource.js');
+      const {source}=unwrapDocument(dashboard);
+      assert.equal(dashboard.strategy.dashboard_root,'marao-dashboard','Keep the existing disposable dashboard root');
+      views=source.pages;
+    }
+    assert.equal(views?.filter(page=>page.path==='card-test').length,1,'Keep one Cases view under the native dashboard');
     const entries=await connection.call({type:'config_entries/get'});
     assert.ok(!entries.some(entry=>entry.domain==='marao_dashboard'),'Remove the legacy integration before native preparation');
     assert.ok(!entries.some(entry=>['frigate','unifiprotect','netatmo'].includes(entry.domain)),'Native preview requires safe provider fixtures');
@@ -25,10 +40,7 @@ async function nativeState(config,connect=client.connect) {
     assert.equal(owned[0].type,'module','The native resource must be a JavaScript module');
     const folder=owned[0].url.split('/')[2];
     assert.match(folder,/^[a-zA-Z0-9_-]+$/,'Unsafe native resource folder');
-    const {unwrapDocument}=await import('../custom_components/marao_dashboard/frontend/MaraoSource.js');
-    const {source}=unwrapDocument(dashboard);
-    assert.equal(source.pages.filter(page=>page.path==='card-test').length,1,'Keep one Cases view under the native dashboard');
-    return {dashboard,folder};
+    return {dashboard,folder,authoring:ordinary?'ordinary':'strategy'};
   } finally {connection.close();}
 }
 
@@ -47,7 +59,10 @@ async function prepareNativeFrontend(config,state,dependencies={}) {
   const guard=()=>ssh(config,rootGuard(base)+'\n'+[base+'/www',community,destination,receipt,base+'/custom_components',base+'/custom_components/marao_dashboard'].map(file=>'test ! -L '+quote(file)+' || exit 1').join('\n')+'\n'+
     'test ! -e '+quote(base+'/custom_components/marao_dashboard')+' && test ! -e '+quote(base+'/.marao-upgrade-active.json')+' && test ! -L '+quote(base+'/.marao-upgrade-active.json'));
   guard();
-  const preview=convertDocument(JSON.stringify(state.dashboard),{dashboardRoot:'marao-dashboard'});
+  // Ordinary native edits are the sole active configuration. Never regenerate
+  // them from immutable migration provenance during preparation or preview.
+  const ordinary=!Object.hasOwn(state.dashboard,'strategy');
+  const preview=ordinary?{compiled:structuredClone(state.dashboard)}:convertDocument(JSON.stringify(state.dashboard),{dashboardRoot:'marao-dashboard'});
   const editorIdentity=client.fingerprint(path.join(root,'frontend_src'));
   (dependencies.build || buildEditor)(root);
   const {buildFrontend}=require('../frontend_src/build-native.cjs');
@@ -77,7 +92,8 @@ mv ${quote(stage+'/frontend')} ${quote(destination)}
 trap - 0 1 2 15`,{allowFailure:true});
       assert.equal(swapped.status,0,swapped.status===2?'Native swap and recovery both failed':'Native frontend swap failed');
     }
-    for (const name of ['MaraoFrontend.js','MaraoFrontend.release.json',version+'--MaraoNativeDashboard.js',version+'--MaraoDashboard.js',version+'--MaraoDashboardJsonWorker.js']) {
+    for (const name of ['MaraoFrontend.js','MaraoFrontend.release.json',...['MaraoNativeDashboard.js','MaraoNativeBootstrap.js','MaraoNativeCards.js','MaraoNativeCardEditor.js','MaraoOrdinaryMigration.js','MaraoDashboard.js'].map(file=>version+'--'+file)]) {
+      assert.ok(Object.hasOwn(assets,name),'Missing native frontend entry: '+name);
       const text=await api(config,'GET','/hacsfiles/'+state.folder+'/'+name,undefined,{text:true});
       assert.equal(hash(text),assets[name],'Served native asset is stale: '+name);
     }
@@ -97,7 +113,8 @@ trap - 0 1 2 15`,{allowFailure:true});
       guard();ssh(config,'umask 077 && cat > '+quote(pending),{input:JSON.stringify(updated)+'\n'});ssh(config,'mv '+quote(pending)+' '+quote(receipt));
     }
     if(staged) ssh(config,'rm -rf '+quote(stage));
-    return {config,version,dashboard:current.dashboard,previewDashboard:preview.compiled,editorURL:'/marao-dashboard/'+preview.document.strategy.editor_path,frontendRoot,assets,installed:true,mode:'native'};
+    const editorURL=ordinary?'/marao-dashboard/'+encodeURIComponent(state.dashboard.views[0]?.path ?? '0'):'/marao-dashboard/'+preview.document.strategy.editor_path;
+    return {config,version,dashboard:current.dashboard,previewDashboard:preview.compiled,editorURL,frontendRoot,assets,installed:true,mode:'native',authoring:ordinary?'ordinary':'strategy'};
   } catch(error) {throw new Error(error.message+(staged?'; recovery data retained at '+stage:''));}
   finally {fs.rmSync(temporary,{recursive:true,force:true});}
 }

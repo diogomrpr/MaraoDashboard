@@ -1,5 +1,7 @@
 import { FLOOR_PT_LABELS } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlanText.js';
 export const PT_LABELS = {
+  "Add": "Adicionar", "Delete": "Eliminar", "Edit": "Editar", "Update": "Atualizar", "Create": "Criar", "Cancel": "Cancelar",
+  "Advanced options": "Opções avançadas", "Unknown": "Desconhecida", "Unavailable": "Indisponível",
   ...FLOOR_PT_LABELS,
   "On dashboard": "No dashboard", "Floor Plan": "Planta",
   "Upload a room image and place light controls and illuminated strips.": "Carregue uma imagem da divisão e posicione luzes e fitas iluminadas.",

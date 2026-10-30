@@ -1,5 +1,15 @@
 # Baseline feature coverage
 
+Current authoring is defined by [use-home-assistant-dashboard-editor](changes/use-home-assistant-dashboard-editor/proposal.md).
+The builder/backend rows below retain historical coverage and do not restore
+retired runtime dependencies. Ordinary native authoring uses
+[`native-cards.js`](../frontend_src/native-cards.js),
+[`native-card-editor.js`](../frontend_src/native-card-editor.js),
+[`native-bootstrap.js`](../frontend_src/native-bootstrap.js) and
+[`ordinary-model.js`](../frontend_src/ordinary-model.js). Focused catalog/editor,
+shared-settings and conversion/session tests live alongside the existing runtime
+checks in `tests/frontend/`; the selector map tracks those current owners.
+
 The initial inventory was reviewed against v0.5.1 on 2026-10-09. Updated on
 2026-10-11 for the 0.6.0 implementation candidate: ordered editable pages,
 explicit room membership, Entity Groups, energy formatting and shared problem

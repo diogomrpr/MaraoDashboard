@@ -27,6 +27,13 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     const asset=path.join(directory,'dist',first.identity+'--MaraoNativeDashboard.js');
     assert.ok(fs.existsSync(asset));assert.ok(fs.existsSync(path.join(directory,'dist','MaraoFrontend.js')));
     const manifest=JSON.parse(fs.readFileSync(path.join(directory,'dist','MaraoFrontend.release.json')));
+    const stableImage='MaraoAsset--brand--mark.svg';
+    assert.ok(fs.readFileSync(path.join(directory,'dist',stableImage)).equals(fs.readFileSync('custom_components/marao_dashboard/frontend/brand/mark.svg')));
+    for(const name of ['MaraoNativeCards.js','MaraoNativeCardEditor.js','MaraoNativeBootstrap.js','MaraoDashboardSettings.js','MaraoOrdinaryMigration.js']) assert.ok(fs.existsSync(path.join(directory,'dist',first.identity+'--'+name)),name+' must ship in the complete native graph');
+    for(const name of ['YAML.LICENSE.txt','ChartJS.LICENSE.txt','KurkleColor.LICENSE.txt','MaraoHistoryChart.js']) assert.ok(fs.existsSync(path.join(directory,'dist',first.identity+'--'+name)),name+' must remain available');
+    assert.ok(Object.keys(manifest.files).every(file=>!/MaraoDashboardPanel|MaraoDashboardJson|MaraoDashboardEditorWorker|MonacoEditor|codicon-/.test(file)),'Retired builder/Monaco assets must not ship');
+    const legacyModel=await import(pathToFileURL(path.join(directory,'dist',first.identity+'--MaraoNativeModel.js')));
+    assert.deepEqual(Object.keys(legacyModel).sort(),['convertDocument','metadataSnapshot'],'Historical source support must not expose an active builder session');
     const published=path.resolve('dist/MaraoFrontend.release.json');
     if (fs.existsSync(published)) {
       assert.deepEqual(fs.readdirSync('dist').sort(),fs.readdirSync(path.join(directory,'dist')).sort(),'Published graph contains missing or obsolete assets');
@@ -41,7 +48,7 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     assert.ok(fs.readdirSync(path.join(directory,'dist'),{withFileTypes:true}).every(entry=>entry.isFile()));
     const {AssetURL}=await import(pathToFileURL(path.join(directory,'dist',first.identity+'--MaraoAssetURL.js')));
     const base=pathToFileURL(fs.realpathSync(asset)).href;
-    for (const file of ['MaraoDashboardJsonWorker.js','brand/mark.svg','fonts/Montserrat.ttf','MaraoTheme.js']) {
+    for (const file of ['MaraoNativeCardEditor.js','MaraoOrdinaryMigration.js','MaraoNativeBootstrap.js','brand/mark.svg','fonts/Montserrat.ttf','MaraoTheme.js']) {
       const url=new AssetURL('./'+file+'?v=old',base);
       assert.equal(path.basename(url.pathname),first.identity+'--'+file.replaceAll('/','--'));
       assert.ok(fs.existsSync(url));assert.ok(url instanceof AssetURL);assert.ok(url instanceof URL);
@@ -53,6 +60,7 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     assert.equal(fs.existsSync(path.join(directory,'dist','obsolete.js')),false);
     assert.ok(fs.existsSync(path.join(directory,'dist',first.identity+'--fonts--OFL.txt')));
     const next=await buildFrontend(directory,'0.22.0-beta.2');assert.notEqual(next.identity,first.identity);
+    assert.ok(fs.existsSync(path.join(directory,'dist',stableImage)),'Persisted ordinary image addresses survive a package identity change');
     assert.equal(JSON.parse(fs.readFileSync(path.join(directory,'dist','MaraoFrontend.release.json'))).package_version,'0.22.0-beta.2');
   } finally {fs.rmSync(directory,{recursive:true,force:true});}
 });

@@ -231,6 +231,14 @@ test('refresh button follows the configured main view including dashboard-root a
 });
 
 
+test('ordinary dashboard editing dispatches the native edit action with current privileges', async () => {
+  const {MaraoNavbarCard}=await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
+  let edits=0;
+  const owner=Object.assign(Object.create(MaraoNavbarCard.prototype),{_config:{native_editor:true},_hass:{user:{is_admin:true}},_root:()=>({lovelace:{setEditMode(value){assert.equal(value,true);edits++;}}}),_syncContext(){}});
+  assert.equal(owner._editorURL(),'native');owner._openEditor();assert.equal(edits,1);
+  owner._hass.user.is_admin=false;owner._openEditor();assert.equal(edits,1);
+});
+
 test('landing-page shortcuts have independent visibility and guarded admin editor navigation', async () => {
   const { MaraoNavbarCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
   const originalDocument=globalThis.document,originalWindow=globalThis.window;
@@ -245,7 +253,7 @@ test('landing-page shortcuts have independent visibility and guarded admin edito
       remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(item=>item!==this);this.parentNode=null;}};
   }};
   const lovelace={config:{views:[{path:'home'},{path:'energy'}]}};
-  const owner={isConnected:true,_root:()=>({lovelace}),_view:()=>currentView,_editorURL(){return MaraoNavbarCard.prototype._editorURL.call(this);},_refreshEligible:()=>eligible,_refreshFrontend:()=>{calls++;}};
+  const owner={isConnected:true,_root:()=>({lovelace}),_view:()=>currentView,_editorURL(){return MaraoNavbarCard.prototype._editorURL.call(this);},_openEditor:MaraoNavbarCard.prototype._openEditor,_syncContext(){},_refreshEligible:()=>eligible,_refreshFrontend:()=>{calls++;}};
   const sync=()=>MaraoNavbarCard.prototype._syncPageRefresh.call(owner);
   try{
     sync();const row=owner._pageRefresh,button=row.shadowRoot.querySelector('button');

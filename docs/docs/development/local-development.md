@@ -8,8 +8,9 @@ nav_order: 2
 # Local development
 
 Development and browser tests use a disposable Home Assistant instance. Full
-preparation installs the current working tree, creates safe entities and generates
-one dashboard at `/marao-dashboard`. Routine frontend preview syncs current frontend
+preparation installs the current working tree and safe fixture entities. The single
+ordinary HA dashboard at `/marao-dashboard` retains its saved views and card configuration.
+Routine frontend preview syncs current frontend
 files to an already compatible installation and leaves successful changes installed.
 Agents working on this
 repository may connect only to `192.168.0.28`; the same tools let developers
@@ -34,7 +35,7 @@ node -e "require('./ha-test/prepare-frontend').prepareFrontend().catch(error => 
 ```
 
 Use `ha:preview` instead when already inspecting the UI. Use full `npm run ha:sync`
-only for initial setup or backend/fixture/generated-configuration changes needing
+only for initial setup or changed fixture/backend preparation needing
 full preparation. Batch changes requiring a restart. The sync's current-asset and
 readiness checks suffice for installation confirmation; no extra browser suite is
 required. Preserve user test configuration and helper state where applicable.
@@ -64,11 +65,11 @@ python -m pip install -r tests/requirements.txt
 npx playwright install chromium
 ```
 
-HACS users do not run these commands. HACS downloads only
-`custom_components/marao_dashboard/`; development tools, tests, test dependencies,
-and fixtures live outside the installed integration. `npm run build:hacs` builds
-the editor and stages the validated integration under
-`ha-test/.cache/dist/custom_components/marao_dashboard/`.
+HACS users do not run these commands. The Dashboard package downloads the flat
+`dist/` frontend graph; development tools, tests and safe fixture integrations stay
+outside that package. `npm run build:hacs` builds/stages the native frontend and
+committed distribution graph. The frozen Python integration remains rollback/reference
+source and is not installed by current Dashboard releases.
 
 ## Configure a disposable instance
 
@@ -76,7 +77,7 @@ the editor and stages the validated integration under
    directory and take a baseline backup or VM snapshot.
 2. Create a dedicated administrator user. In that user's profile, create a
    **Long-Lived Access Token**. Administrator access is required for setup,
-   dashboard generation, integration reloads, and restart actions.
+   native configuration changes, explicit conversion and fixture preparation/restarts.
 3. Configure key-based SSH access and accept the instance's verified host key.
    The SSH account must be able to write its Home Assistant configuration directory.
    Preserved-upgrade checks also require `python3` in that SSH environment. If
@@ -109,43 +110,44 @@ npm run ha:sync
 The dry run inspects local configuration and reports the deployment plan without
 building, writing files, or contacting Home Assistant. The real command builds
 from the working tree, validates the HACS installation boundary, deploys through
-SSH, installs fixture integrations and helpers, ensures Marao is configured,
-and generates the realistic pages and Cases view. It waits for readiness and
+SSH and prepares the owned fixture integrations/helpers when needed. On a compatible
+ordinary native installation it preserves saved dashboard configuration; conversion
+or replacement of product pages is never an implicit frontend-sync operation. It waits for readiness and
 checks deployed files, frontend resources, routes, and entities before succeeding.
 It records successful deployment state only after these checks pass.
 Deployment staging uses a fresh private system temporary folder and removes it
 on success or failure. It checks the staged package against the working tree;
 synchronized workspace caches are not deployment inputs. The ordinary HACS build
-still writes its inspectable package under `ha-test/.cache/dist/`.
+retains its inspectable native package under `ha-test/.cache/native-frontend/`.
 
 Focused live test batches use compatible preparation once and verify current
-assets. The lightweight `ha:preview` synchronizes only frontend files and reloads
-Marao when changed before refreshing the real HA page. It does not reset helpers,
-explicitly generate dashboards or restart HA. Normal entry reload may update
-generated output/history. Missing or incompatible
+assets. The lightweight `ha:preview` synchronizes only frontend files and refreshes
+the real HA page when assets change. It does not reset helpers, convert or replace
+native configuration, generate YAML, reload an integration or restart HA. Missing or incompatible
 setup fails with an instruction to prepare explicitly; preview never silently
-falls back to full preparation. Fixtures and generated test configuration belong
+falls back to full preparation. Fixtures and owned test configuration belong
 to the canonical files in the repo, so use those for lasting fixture changes.
 
 | Changed files | Preparation action |
 | --- | --- |
-| Frontend modules, styles, fonts, images, or theme | Reload Marao; refresh the browser |
-| Dashboard configuration or Cases cards | Regenerate and refresh the dashboard |
-| Integration/fixture Python, manifests, backend translations, or helper definitions | Restart Home Assistant and wait for readiness |
+| Frontend modules, styles, fonts, images, or scoped theme | Sync the coherent asset graph; refresh the browser |
+| Native dashboard configuration or Cases cards | Use an explicit native save or backed-up fixture/conversion operation; refresh as needed |
+| Fixture Python or helper definitions requiring preparation | Prepare explicitly; restart only when changed fixture code requires it |
 | Initial installation or dashboard registration | Restart when required |
 | Only tests or documentation | Verify current deployment; no restart |
 
-Frontend URLs include a fingerprint of the actual frontend files. Reloading the
-integration recalculates it, so the browser requests the new modules and workers.
-Routine sync refreshes the bundled Marao theme copy and reloads it when changed;
-local edits to `themes/MaraoDashboard` can be replaced. Unrelated themes remain
-intact. Python changes require a restart because reloading an integration does not reliably
-re-import every Python module.
+Frontend readiness verifies the installed package identity and served files against
+the current coherent hashed graph. A native dashboard is recognized from its
+ordinary views and versioned Marao settings; compatible asset sync preserves that
+source, registration and helper state. Scoped styles/fonts come from the package;
+frontend sync does not replace named HA theme files. Only changed development fixture
+Python may require a restart. An unconverted legacy installation requires the
+explicit migration procedure instead of an automatic asset-only handoff.
 
 For initial setup or backend/fixture changes, run `npm run ha:sync`, then open
-`http://YOUR-TEST-HOST:8123/marao-dashboard/overview` or
+`http://YOUR-TEST-HOST:8123/marao-dashboard` or
 `/marao-dashboard/card-test` using your configured base URL. For routine frontend
-work, use the persistent preview below. It verifies backend compatibility, builds
+work, use the persistent preview below. It verifies native-installation compatibility, builds
 assets when needed, synchronizes frontend files and verifies the served versions.
 Keep the test instance current with the latest applicable project changes before
 completion. Successful assets stay installed after inspection, a preview error or
@@ -176,8 +178,9 @@ npm run ha:preview -- --component slider-headers --watch --scenario iphone-norma
 The preview stays open with only selected components in scope. For generic shared
 scopes such as actions, labels, connection or scroll, also choose a representative
 consumer with `--family <template IDs>`; the family must belong to the scope.
-Inspect editor and runtime-card scopes separately. Camera form changes use the visual builder editor scope. Standalone native
-authoring has been retired; generated runtime previews remain separate.
+Inspect native card-editor forms and runtime cards separately. Camera form changes
+use the native card configuration dialog; the whole-dashboard Visual/Monaco builder
+is retired. Native editing must keep its toolbar and previews inert.
 `--watch` serializes and debounces frontend edits, syncs their files to HA and
 refreshes the browser; it does not attempt to replace already registered
 custom elements in place. Use `--once` for a bounded
@@ -211,7 +214,8 @@ npm run test:affected -- --snapshot /private/tmp/marao-task.json
 npm run test:affected -- --since /private/tmp/marao-task.json --tier visual --component slider-headers --plan
 ```
 
-Visual work needs current inspection without an automatic suite. Behavior work
+Visual-only work needs code review and a short manual watch list; agent browser
+inspection is optional. Behavior work
 adds selected offline checks and the exact interaction assertion when relevant;
 sensitive contracts retain focused coverage. Existing narrow check commands
 remain available for deliberate use, for example:
@@ -233,8 +237,8 @@ disconnected-action unit checks; full and upgrade runs do not inject that outage
 The alignment check opens the Apple TV and generic media popups and verifies that
 icon-only controls are centered within 0.5 CSS pixels. It also checks the loaded resource
 fingerprint, narrow layouts, action/state-label contrast in both themes, and
-essential readings at 200% text. Select it for affected focused/publication
-verification; a presentation-only development edit may use targeted inspection.
+essential readings at 200% text. Select it only for explicitly requested focused integration verification;
+publication defaults to affected unit checks and reuses development evidence.
 The slider check covers only light, fan, and cover value sliders across the mobile
 profiles and both themes. It checks endpoint alignment, distinct surfaces,
 contrast, confirmed versus target values, and one service call per completed
@@ -254,19 +258,14 @@ viewports. Keep that metadata current when upgrading Playwright: older iOS
 user agents can select Home Assistant's legacy frontend and introduce native
 warnings unrelated to the dashboard layout.
 
-After `ha:sync`, run `node tests/test-ha-editor.js --header --delete --startup --fold --weather` for the
-focused editor check, adding `--matrix` for the supported mobile/theme/text
-profiles. It asserts actual scrolling before pinned-header geometry, uses safe
-local drafts, checks explicit Save/reload and restores the original disposable
-source bytes. Backup, diagnostics and screenshots stay in ignored
-`tests/.artifacts/editor/`. History generated by those explicit saves stays
-immutable. Editor UI changes do not affect runtime cards, and no gallery reseed
-runs inside this check. Add `--surfaces` to capture General/Overview, pages, menus, settled
-native dialogs and loading/retry feedback. The folding implementation also
-corrected the safe weather fixture to the native `weather.*` domain; `--weather`
-inspects its affected Weather/Header Cases and realistic Overview example.
-The editor's shared form boundary constrains native entity-picker
-minimum widths and retains 48px clear controls without replacing HA selectors.
+For native editor changes, select the existing card editor/model assertions, such
+as `tests/frontend/native-card-editor.test.js`, and the affected specialized form
+checks. The shared form boundary keeps compatible selectors and preserves active
+inputs across ordinary HA updates. The former `test-ha-editor.js` Visual/Monaco
+checks and startup/folding measurements are historical; they are not native
+editor acceptance steps. Routine appearance and real-phone testing belong to the
+user. If a targeted agent inspection is needed, open the actual native card
+configuration dialog on current installed assets once.
 
 The broader local layers are `npm run test:static` and `npm run test:python`.
 Static checks verify the committed editor bundle without rewriting it, run
@@ -342,16 +341,17 @@ for that paperwork. Archive only completed, verified work.
 OpenSpec is free development tooling; it does not change the Home Assistant
 runtime or replace the repository quality contract and application checks.
 
-1. Trace its builder field, Python validation/generation, runtime card, shared
-   control, theme, and translations. Fix reusable behavior in its shared source.
+1. Trace its native card field, shared validation/composition, runtime card, shared
+   control, scoped theme and translations. Fix reusable behavior in its shared source.
 2. Identify affected shared consumers and capture a private task snapshot,
    preserving pre-existing dirty work and reviewing concurrent hunk ownership.
 3. Edit the source files described in the
    [architecture guide]({{ '/docs/development/index.html' | relative_url }}).
-   Run `npm run build:editor` after editing the visual editor source.
+   Run `npm run build:editor` after editing native editor/composition source;
+   the build owns generated frontend files.
 4. When supported behavior changes, add stable state examples, safe helper definitions, popup/action variants,
    and coverage entries in `ha-test/`. Place a representative example on a
-   realistic generated page as well as Cases. See
+   realistic native page as well as Cases when those distinct placements matter. See
    [gallery coverage]({{ '/docs/development/test-gallery.html' | relative_url }}).
 5. Preview `npm run test:affected -- --since <snapshot> --tier <tier> --plan`,
    resolving shared-file scope with reviewed components. Visual work needs no
@@ -380,11 +380,12 @@ runtime or replace the repository quality contract and application checks.
   fingerprint must match the prepared workspace. Clear the device's Home
   Assistant frontend cache only if a refresh still leaves an old session.
 - **Legacy resource Repair:** remove only the exact legacy resource entries
-  listed by Marao. Keep unrelated resources and Google Fonts. Reload Marao or
-  restart after a manual YAML edit; a Lovelace resource reload alone does not
-  clear the Repair.
+  identified by the migration guide. Keep unrelated resources and themes,
+  use native resource reload/refresh for current frontend resources, and follow
+  the explicit legacy migration/recovery procedure for old Integration remnants.
 - **Missing state example or entity:** update its canonical fixture and coverage
-  entry, then prepare again. Do not hand-edit the generated dashboard to mask it.
+  entry, then prepare the affected fixtures explicitly. Preserve native user edits;
+  do not replace the dashboard to hide a missing fixture.
 
 ### Controlled climate fixtures
 
@@ -398,82 +399,23 @@ different mode. Each fixture owns its state and pending jobs, which cancel on
 removal. These controls live only in `ha-test/`; use safe fixtures on
 `192.168.0.28`, never household equipment.
 
-### Editor startup measurements
+### Historical builder measurements
 
-Run `node tests/measure-ha-editor.js before` on the prepared disposable instance
-for three cold and three warm iPhone-profile samples. Readiness requires the
-populated, enabled General name input and entity rows. The ignored JSON report
-records panel definition, shell, management response, Visual DOM, native-control
-readiness, resource sizes/counts and long tasks without response bodies/tokens.
-On 2026-10-10, before deferring Monaco, median cold readiness was 992ms
-(shell-to-ready 415ms; management 258ms); warm readiness was 436ms
-(shell-to-ready 303ms; management 236ms). These Chromium-emulation measurements
-are local to the disposable instance, not physical-phone performance claims.
+The retired Visual/Monaco builder was measured on 2026-10-10. Before deferred
+Monaco, median cold readiness was 992ms and warm readiness 436ms; matched final
+samples measured 790ms cold and 432ms warm. Those local Chromium-emulation results
+are retained as historical evidence, not native editor performance claims or a
+requirement to rerun startup, worker-failure or 26-profile editor checks.
 
-The Visual panel and deferred JSON editor have separate editable entries in
-`frontend_src/MaraoDashboardPanel.js` and `frontend_src/json-editor.js`. The build
-owns their generated JavaScript/CSS, local workers, hashed fonts and license.
-Its import graph rejects eager Monaco and enforces 144 KiB JavaScript / 32 KiB
-CSS budgets. JSON assets and workers carry the current panel fingerprint.
-The JSON tab uses stock Monaco presentation: default monospace typography,
-`vs`/`vs-dark` themes, native gutter folding, minimap, search, suggestions and
-inline diagnostic widgets. Do not add custom gutter widgets, line-spacing view
-zones, docked search or internal widget CSS. This is the user's explicit editor
-exception to Marao typography/touch geometry; surrounding app controls retain
-Marao's UI rules. `ariaContainerElement` keeps native announcements in the styled
-shadow root, and `editContext: false` retains reliable textarea typing/paste.
+Current native editors live in `frontend_src/native-card-editor.js` with shared
+field/list forms in `card-form-tools.js` and the floor-plan placement editor.
+Their module is lazy-loaded from the named card adapters. HA owns its native
+editor presentation and save workflow; no active Marao Monaco asset is required.
 
-Local catalog/schema assistance and URI/version/request-guarded diagnostics live
-in `json-editor.js` and `json-language.js`; they add no editor presentation.
-Shared `$defs` and disjoint template branches keep large documents manageable.
-The installed Portuguese NLS pack has empty entries; `json-locale.js` supplies
-exposed native-widget strings before initialization. Review its pinned message
-indices when updating Monaco. Remote schema requests remain disabled.
-
-`ha-test/json-editor-example.json` uses existing Studio/Cases entities with
-unknown/raw/empty/nested values. Run `node tests/test-ha-editor.js --json-tools
---scenario=iphone-normal`; `--json-save` adds exact backed-up Save/reload and
-restoration. The `json-editor` component selects focused mobile/text/zoom checks.
-Initial configuration and JSON loading expose English/Portuguese status and an
-explicit Retry action; ordinary HA updates do not repeatedly retry failures.
-Visual stays usable during JSON loading, and delayed completion respects the
-latest draft and requested tab. Leaving the panel disposes the editor; reopening
-recreates it from the retained draft.
-
-After the final editor build, matched measurements gave cold readiness 790ms
-(shell-to-ready 352ms; management 247ms), and warm readiness 432ms
-(shell-to-ready 315ms; management 247ms). Cold startup improved; the warm
-samples varied and showed essentially unchanged performance. Run `node tests/measure-ha-editor.js after` for a
-matched comparison after deployment. The JSON module pays its own first-open
-cost, separately from Visual readiness.
-
-The read-only larger-document sample repeats safe rooms five times (102 entity
-rows): median synchronous Visual rendering was 15ms cold / 13ms warm and complete native-form
-readiness was 180ms cold / 145ms warm. The management response remains the main
-part of the shell-to-ready gap; these samples did not establish another Visual
-rendering bottleneck that warrants changing the native controls or backend API.
-First JSON activation measured 452ms cold / 115ms warm; a repeated switch took
-10ms cold / 9ms warm. The check asserts that no JSON asset loads before JSON is requested
-and saved configuration is unchanged.
-
-The focused editor check injects one failed module, stylesheet and worker request
-in separate browser contexts, verifies explicit Retry and keeps the deliberately
-failed-resource evidence private. Normal interactions must have zero browser
-warnings/errors/failed resources. Monaco's JSON worker bridge registers features
-before standalone services initialize; its worker error event makes initial
-failure recoverable. The build applies one checked clipboard guard to the pinned
-Monaco implementation: on HTTP the unavailable Clipboard API cannot install its
-iPhone workaround, so existing native copy/paste fallbacks remain usable.
-Folding uses public editor actions and JSON worker ranges, with touch controls
-instead of small hover gutter targets. `--weather` inspects only Weather/Header
-examples on Overview and Cases after the native weather fixture correction.
-
-The final 26-profile editor check covers both themes, all mobile text/zoom
-profiles, saved-source restoration, native dialogs and deferred-asset retries.
-Native HA/Web Awesome typography inherits Marao's scalable tokens; exported
-input parts and selected-picker row tokens retain space for enlarged labels,
-including label line heights that scale with their text.
-Use `--scenario=iphone-bold-text-200` for a focused two-theme editor iteration.
+A short manual watch list for changed forms is entity/name editing, preservation
+of YAML-only options and native layout/visibility, floor-plan marker/strip editing,
+and inline energy contributor expansion/reordering. Record what was actually
+inspected; neither unit success nor this watch list claims phone visual coverage.
 
 The safe-area regression uses `node tests/test-ha-dashboard-accessibility.js
 --safe-area` on the disposable instance. It clears Marao emulation overrides
@@ -489,31 +431,34 @@ the active container resolved a 47px HA inset but had zero top padding and its
 first card began at 19px. Its navbar ended at 840px in an 844px viewport, ignoring
 the app's 34px bottom inset. The safe 50dvh slider sheet retained a 48px close
 control. The source is current-version Chromium emulation, not a physical app.
-The affected set is the full current generated dashboard and Cases: 495 nested
+The recorded affected set at that time was the generated dashboard and Cases: 495 nested
 gallery card objects, all 34 required Marao templates, generic Marao cards,
 camera-events, energy-period and state-timeline cards, native grids/entities/
-stacks, 51 popup hosts and their contents, and the generated navbar. Keep this
-inventory derived from `cases.json`/expanded fixtures rather than treating these
-dated counts as a fixed contract.
+stacks, 51 popup hosts and their contents, and the generated navbar. Derive current
+scope from current fixtures rather than treating these dated counts as a contract.
 The Cases gallery includes separate delayed, rejected, unconfirmed and corrected
 single/range controls, a shared delayed mode sheet, and a delayed thermostat in
 Living Room. Run `node tests/test-ha-dashboard-e2e.js --climate-only` for the
 focused interaction check. Fixture reset cancels outstanding confirmation tasks
 before restoring the baseline, so cleanup cannot be overwritten by a late report.
 Run `npm run test:ha:climate-layout` to inspect every climate, number and Wallbox
-current control on the generated pages and in their popups across the mobile
-profiles and both themes. Use `-- --scenario android-text-200` for a focused
+current control on the current native pages and in their popups across the mobile
+profiles and both themes only when that integration coverage is explicitly requested.
+Use `-- --scenario android-text-200` for a focused
 enlarged-text check. Values must stay inside the rounded controls and numeric
 buttons must retain their 48-pixel touch targets.
 
 ### Navigation startup boundary
 
-`MaraoDashboard.js` retains its public versioned entry URL. It registers
-`MaraoNavigation.js` and its shared navbar before requesting optional
-`MaraoRuntime.js` content. Navbar state comes from existing view configuration;
-no server card compilation, entity metadata or persisted route cache is required.
-The stable HA-root surface survives view replacement and is released on exit or
-explicit removal. Moved shared helpers retain their exports and popup guards.
+The stable `MaraoFrontend.js` resource selects one coherent versioned graph.
+Critical navigation/bootstrap code reads the ordinary dashboard's single `marao`
+settings block and mounts one HA-root-owned navbar before optional card content.
+Direct links, empty/new views and Panel floor plans do not require a navbar card
+or per-view reference. The surface survives view replacement, responds to settings
+and edit-mode updates, and releases owned layout/theme/listener state on exit or
+opt-out. Native editing restores HA's toolbar. An explicit empty navigation list
+is preserved, with native administrative editing reachable when Marao shortcuts
+are also hidden.
 
 Use the focused navbar startup fixture to hold the optional runtime unresolved
 and verify actual navigation/refresh interaction. Android desktop touch emulation

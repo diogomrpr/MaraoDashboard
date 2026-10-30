@@ -1,0 +1,161 @@
+{
+   "config_version": 2,
+   "name": "Safe migration",
+   "landing_page": "home",
+   "show_cache_reset": false,
+   "show_editor_button": true,
+   "navigation": [
+      {
+         "page": "home",
+         "label": "Main",
+         "icon": "mdi:home",
+         "future": []
+      },
+      {
+         "page": "floor",
+         "label": "Plan"
+      }
+   ],
+   "unknown": {
+      "keep": []
+   },
+   "pages": [
+      {
+         "name": "Plan",
+         "path": "floor",
+         "columns": 1,
+         "entities": [
+            {
+               "id": "plan",
+               "template": "md_floor_plan_card",
+               "name": "Safe room",
+               "variables": {
+                  "image_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "full_page": true,
+                  "lights": [
+                     {
+                        "id": "strip",
+                        "entity_id": "light.safe_strip",
+                        "x": 30,
+                        "y": 40,
+                        "future": [],
+                        "strip": {
+                           "width": 6,
+                           "points": [
+                              {
+                                 "x": 10,
+                                 "y": 10
+                              },
+                              {
+                                 "x": 75,
+                                 "y": 10
+                              }
+                           ]
+                        }
+                     }
+                  ]
+               },
+               "opaque": {
+                  "retain": true
+               }
+            }
+         ]
+      },
+      {
+         "name": "Home",
+         "path": "home",
+         "icon": "mdi:home",
+         "sections": [
+            {
+               "columns": 2,
+               "entities": [
+                  {
+                     "id": "lamp",
+                     "entity_id": "light.safe",
+                     "name": "Lamp",
+                     "variables": {
+                        "future": []
+                     },
+                     "opaque": {
+                        "keep": null
+                     }
+                  },
+                  {
+                     "id": "preset",
+                     "template": "md_number_card",
+                     "entity_id": "input_number.safe",
+                     "name": "Preset",
+                     "variables": {
+                        "shortcuts": [
+                           6,
+                           12,
+                           16
+                        ],
+                        "future": false
+                     }
+                  },
+                  {
+                     "id": "embedded",
+                     "template": "ha_card",
+                     "yaml": "# exact comment\ntype: markdown\ncontent: Safe embedded content\nfuture: []\n"
+                  }
+               ],
+               "cards": [
+                  {
+                     "type": "markdown",
+                     "content": "Raw retained",
+                     "unknown": []
+                  }
+               ]
+            },
+            {
+               "columns": 1,
+               "entities": [
+                  {
+                     "id": "energy",
+                     "template": "md_energy_period_card",
+                     "entity_id": "sensor.safe_energy",
+                     "name": "Energy",
+                     "variables": {
+                        "sub_entities": [
+                           {
+                              "entity_id": "sensor.safe_heating",
+                              "name": "Heating",
+                              "future": []
+                           },
+                           {
+                              "entity_id": "sensor.safe_lighting",
+                              "cost_entity": "sensor.safe_cost"
+                           }
+                        ],
+                        "future": true
+                     }
+                  }
+               ]
+            },
+            {
+               "columns": 1,
+               "entities": [],
+               "cards": []
+            }
+         ]
+      },
+      {
+         "name": "Five",
+         "path": "five",
+         "columns": 5,
+         "entities": [
+            {
+               "id": "one",
+               "entity_id": "light.safe",
+               "name": "One"
+            },
+            {
+               "id": "two",
+               "entity_id": "light.safe",
+               "name": "Two"
+            }
+         ]
+      }
+   ]
+}

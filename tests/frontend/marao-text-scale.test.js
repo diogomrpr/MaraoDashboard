@@ -78,7 +78,7 @@ const cardsSource = (await fs.readFile(new URL('../../custom_components/marao_da
 const instrumentedSource = `
 const MARAO_RESOURCE_QUERY = '';
 const maraoDashboardActive = globalThis.maraoDashboardActive;
-import { cardProblem, problemStyle, problemLabel, showCardDetails, serviceOutcome, serviceConnectionReady, serviceTargetReady, accessOpenerService } from "data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}";
+import { nativeEditing, bindNativeEditing, cardProblem, problemStyle, problemLabel, showCardDetails, serviceOutcome, serviceConnectionReady, serviceTargetReady, accessOpenerService } from "data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}";
 const haptic = (value) => globalThis.__maraoTestHaptics.push(value);
 const callServiceWithNotification = (hass, domain, service, data, onOutcome) => {
   try {

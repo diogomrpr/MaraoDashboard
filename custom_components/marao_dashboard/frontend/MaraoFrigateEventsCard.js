@@ -1,6 +1,6 @@
 const {bindPressFeedback,pressStyles}=await import(new URL(`./MaraoPressFeedback.js${new URL(import.meta.url).search}`,import.meta.url));
 const HTMLElementBase = globalThis.HTMLElement || class {};
-const { cardProblem, problemStyle, problemLabel, showCardDetails } = await import(new URL(`./MaraoCards.js${new URL(import.meta.url).search}`, import.meta.url));
+const { cardProblem, problemStyle, problemLabel, showCardDetails, nativeEditing, bindNativeEditing } = await import(new URL(`./MaraoCards.js${new URL(import.meta.url).search}`, import.meta.url));
 
 const text = (value) => (value == null ? "" : String(value).trim());
 
@@ -286,12 +286,14 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   connectedCallback() {
+    this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, editing => { if (editing) { this._detailRequest += 1; this._selected = undefined; this._detailsPopup?._close(false); this._render(); } });
     this._connected = true;
     this._render();
     this._maybeLoad();
   }
 
   disconnectedCallback() {
+    this._stopNativeEditing?.(); this._stopNativeEditing = null;
     this._press?.destroy();this._press=null;
     this._detailsPopup?._close(false);
     this._connected = false;
@@ -632,6 +634,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   _handleClick(event) {
+    if (this.preview || nativeEditing(this)) return;
     const button = event.target?.closest?.("[data-action]");
     if (!button || button.disabled || this._unavailableState()) return;
     globalThis.window?.MaraoDashboard?.haptic?.("heavy");

@@ -10,9 +10,10 @@ async function waitForHomeAssistantRegistry() {
 }
 await waitForHomeAssistantRegistry();
 const cardsModule = await import(new URL(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
-const { loadHistoryChart, createHistoryPlaceholder, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, fitNativeGrid, updateCardSurface, problemLabel, showCardDetails, layoutState, registerMaraoCards } = cardsModule;
+const { nativeEditing, bindNativeEditing, loadHistoryChart, createHistoryPlaceholder, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, fitNativeGrid, updateCardSurface, problemLabel, showCardDetails, layoutState, registerMaraoCards } = cardsModule;
 registerMaraoCards();
 await import(new URL(`./MaraoFloorPlanCard.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
+await import(new URL(`./MaraoNativeCards.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
 
 const MARAO_FONT_URL = new URL(`./MaraoFonts.css${MARAO_RESOURCE_QUERY}`,import.meta.url).href;
 
@@ -891,7 +892,11 @@ class MaraoSlideToOpen extends HTMLElement {
     if (this._pointerId === null) this._render();
   }
 
+  get preview() { return Boolean(this._preview || this.nativeOwner?.preview || nativeEditing(this)); }
+  set preview(value) { this._preview = Boolean(value); if (this.preview) this._resetGesture(this.shadowRoot?.querySelector('.track')); }
+
   connectedCallback() {
+    this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => { this._detailsPopup?._close(false); this._clearFeedback(); this._resetGesture(this.shadowRoot?.querySelector('.track')); this._render(); });
     // Parent cards may assign hass before this custom element is registered.
     if (Object.hasOwn(this, "hass")) {
       this._hass = this.hass;
@@ -915,6 +920,7 @@ class MaraoSlideToOpen extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this._stopNativeEditing?.(); this._stopNativeEditing = null;
     this._detailsPopup?._close(false);
     this._accessGridItem?.removeAttribute('data-marao-grid-144'); this._accessGridItem = null;
     for (const type of ["location-changed", "popstate"]) globalThis.window?.removeEventListener?.(type, this._cancelHiddenSlide);
@@ -953,7 +959,7 @@ class MaraoSlideToOpen extends HTMLElement {
   }
 
   _disabled() {
-    return this._sending || this._feedback === "accepted" || this._feedback === "fading" || !this._targetReady();
+    return this.preview || this._sending || this._feedback === "accepted" || this._feedback === "fading" || !this._targetReady();
   }
 
   _targetReady() {
@@ -1339,7 +1345,11 @@ class MaraoStateTimelineCard extends HTMLElement {
     this._loadId = 0;
   }
 
+  get preview() { return Boolean(this._preview || this.nativeOwner?.preview || nativeEditing(this)); }
+  set preview(value) { this._preview = Boolean(value); }
+
   connectedCallback() {
+    this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => { this._detailsPopup?._close(false); this._render(); });
     this._resizeObserver ??= new ResizeObserver(() => this._spaceTicks());
     this._resizeObserver.observe(this);
     if (this._config) {
@@ -1355,6 +1365,7 @@ class MaraoStateTimelineCard extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this._stopNativeEditing?.(); this._stopNativeEditing = null;
     this._detailsPopup?._close(false);
     this._resizeObserver?.disconnect();
     // HA can temporarily detach this same card while moving the dashboard shell.
@@ -1730,7 +1741,13 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     this._load();
   }
 
-  connectedCallback() { this._load(); this._scheduleRefresh(); }
+  get preview() { return Boolean(this._preview || this.nativeOwner?.preview || nativeEditing(this)); }
+  set preview(value) { const next = Boolean(value); if (next === Boolean(this._preview)) return; this._preview = next; this._nativeModeChanged(); }
+  _nativeModeChanged() {
+    if (this.preview) { clearTimeout(this._refreshTimer); this._detailsPopup?._close(false); this._detailGeneration = (this._detailGeneration || 0) + 1; this._detailChart?.destroy(); this._detailChart = null; this._detailLoading = false; }
+    this._render(); this._load(); this._scheduleRefresh();
+  }
+  connectedCallback() { this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => this._nativeModeChanged()); this._load(); this._scheduleRefresh(); }
 
   _scheduleRefresh() {
     clearTimeout(this._refreshTimer);
@@ -1751,6 +1768,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
   getCardSize() { return this._config?.popup ? 5 : 2; }
 
   disconnectedCallback() {
+    this._stopNativeEditing?.(); this._stopNativeEditing = null;
     clearTimeout(this._refreshTimer);
     this._detailsPopup?._close(false);
     queueMicrotask(() => { if (!this.isConnected) { this._detailGeneration = (this._detailGeneration || 0) + 1; this._detailChart?.destroy(); this._detailChart = null; this._detailLoading = false; this._loadId++; this._clearPeriodCache(); this._loading = false; this._loadedKey = ''; } });

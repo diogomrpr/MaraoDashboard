@@ -54,13 +54,12 @@ def test_expectation_provenance_and_every_document_hash_are_retained():
         assert f"def {function}(" in (FIXTURES.parents[2] / filename).read_text()
 
 
-def test_documented_canonical_example_matches_the_shared_boundary():
+def test_historical_canonical_fixture_matches_the_shared_boundary():
     from custom_components.marao_dashboard.editor import EDITOR_CATALOG
     from custom_components.marao_dashboard.page_model import validate_pages
-    guide = (FIXTURES.parents[2] / "docs/docs/installation/configuration.md").read_text()
-    example = next(json.loads(block) for block in re.findall(r"```json\n(.*?)\n```", guide, re.S) if '"config_version": 2' in block)
+    example = json.loads((FIXTURES.parents[2] / "tests/frontend/canonical-pages.fixture.json").read_text())
     templates = {card["id"]: card["domains"] for card in EDITOR_CATALOG["cards"]}
-    assert validate_pages(example, templates) == {"home", "office"}
+    assert validate_pages(example, templates) == {"home", "office", "empty", "absent"}
 
 
 def test_parity_expectation_checks_every_starter_role_and_customization_scope():

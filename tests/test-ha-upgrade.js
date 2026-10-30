@@ -47,25 +47,47 @@ function plan(config) {
 function nativePlan(config) {
   const selected=plan(config),modern=JSON.parse(fs.readFileSync(path.join(fixtures,'native-baselines.json'))).records;
   for(const record of modern) selected.rows.push({baseline:record.tag,format:formats[3],source:fs.readFileSync(path.join(fixtures,record.input),'utf8'),expected:JSON.parse(fs.readFileSync(path.join(fixtures,record.expected_source))),expected_compiled:JSON.parse(fs.readFileSync(path.join(fixtures,record.expected_compiled))),replay:'released-source-data',provenance:record});
+  const ordinary=JSON.parse(fs.readFileSync(path.join(fixtures,'ordinary-baseline.json')));
+  for(const [file,digest] of Object.entries(ordinary.files))assert.equal(sha256(fs.readFileSync(path.join(fixtures,file))),digest,file+' frozen provenance');
+  selected.rows.push({baseline:ordinary.tag,format:'strategy-envelope-1',source:fs.readFileSync(path.join(fixtures,'v0.23.4-ordinary-envelope.json'),'utf8'),
+    expected:JSON.parse(fs.readFileSync(path.join(fixtures,'v0.23.4-ordinary-source.json'))),expected_ordinary:JSON.parse(fs.readFileSync(path.join(fixtures,'v0.23.4-ordinary-expected.json'))),provenance:ordinary});
   // This runner replays data only; actual manual cutover/rollback evidence remains separate.
-  for(const row of selected.rows)row.replay=row.baseline==='current-format-2'?'current-format-noop':row.baseline==='v0.2.0'?'historical-storage-data':row.baseline==='predecessor-format-1'?'supported-predecessor-data':'released-source-data';
-  selected.baselines=selected.rows.map(row=>row.baseline);return selected;
+  for(const row of selected.rows)row.replay=row.expected_ordinary?'strategy-to-ordinary-data':row.baseline==='current-format-2'?'current-format-noop':row.baseline==='v0.2.0'?'historical-storage-data':row.baseline==='predecessor-format-1'?'supported-predecessor-data':'released-source-data';
+  selected.baselines=selected.rows.map(row=>row.baseline);selected.targetFormat='ordinary-native-1';return selected;
 }
 
 async function verifyNativeConversions(selected) {
   const {convertDocument}=await import('../frontend_src/convert-document.js');
+  const {convertOrdinaryDocument,validateOrdinaryDocument}=await import('../frontend_src/ordinary-model.js');
   const results=[];
   for(const row of selected.rows) {
     const before=row.source,result=convertDocument(before,{dashboardRoot:'marao-dashboard'});
+    // Keep frozen historical source/compiler evidence separate from the new active target.
     assert.deepEqual(result.source,row.expected,row.baseline+' complete native source');
     if(row.expected_compiled)assert.deepEqual(result.compiled,row.expected_compiled,row.baseline+' complete native output');
-    const customInput=row.format===formats[0]?before.replaceAll('/marao-dashboard/','/marao-custom-root/'):before;
+    let customInput=row.format===formats[0]?before.replaceAll('/marao-dashboard/','/marao-custom-root/'):before;
+    const parsed=JSON.parse(customInput);
+    if(parsed.strategy) {parsed.strategy.dashboard_root='marao-custom-root';customInput=JSON.stringify(parsed);}
     const customExpected=row.format===formats[0]?JSON.parse(JSON.stringify(row.expected).replaceAll('/marao-dashboard/','/marao-custom-root/')):row.expected;
     const renamed=convertDocument(customInput,{dashboardRoot:'marao-custom-root'});
     assert.deepEqual(renamed.source,customExpected);assert.equal(renamed.document.strategy.dashboard_root,'marao-custom-root');
     assert.deepEqual(convertDocument(JSON.stringify(result.document)).source,result.source);
+    const ordinary=convertOrdinaryDocument(before,{dashboardRoot:'marao-dashboard'});
+    validateOrdinaryDocument(ordinary.document);
+    assert.equal(Object.hasOwn(ordinary.document,'strategy'),false);
+    assert.equal(ordinary.originalText,before);
+    assert.deepEqual(ordinary.source,row.expected);
+    if(row.expected_ordinary) {
+      const target=structuredClone(ordinary.document);delete target.marao.migration;
+      assert.deepEqual(target,row.expected_ordinary,row.baseline+' independently specified ordinary target');
+    }
+    const repeated=convertOrdinaryDocument(JSON.stringify(ordinary.document));
+    assert.equal(repeated.changed,false);assert.equal(repeated.kind,'ordinary');
+    assert.deepEqual(repeated.document,ordinary.document,'Native edits/provenance must not be adapted back into builder source');
+    const customOrdinary=convertOrdinaryDocument(customInput,{dashboardRoot:'marao-custom-root'});
+    assert.equal(customOrdinary.root,'marao-custom-root');assert.deepEqual(customOrdinary.source,customExpected);
     assert.equal(row.source,before);
-    results.push({baseline:row.baseline,format:row.format,replay:row.replay,source_sha256:sha256(before),expected_sha256:sha256(JSON.stringify(row.expected)),customRoot:true,repeatConversion:true,passed:true});
+    results.push({baseline:row.baseline,format:row.format,replay:row.replay,source_sha256:sha256(before),expected_sha256:sha256(JSON.stringify(row.expected)),customRoot:true,repeatConversion:true,ordinaryDocument:true,ordinaryNoop:true,passed:true});
   }
   return results;
 }
@@ -349,10 +371,10 @@ async function main() {
   const config = readConfig();
   if(fs.existsSync(path.join(repoRoot,'custom_components/marao_dashboard/frontend/MaraoNativeDashboard.js'))) {
     const selected=nativePlan(config);
-    if(process.argv.includes('--dry-run')) {console.log(JSON.stringify({target:config.url,mode:'native-guided-migration',baselines:selected.rows.map(({baseline,format,replay})=>({baseline,format,replay})),conversionCommand:'npm run test:ha:upgrade -- --conversion-only',manualGuide:'docs/docs/installation/native-migration.md',automaticLegacyReplacement:false},null,2));return;}
+    if(process.argv.includes('--dry-run')) {console.log(JSON.stringify({target:config.url,mode:'native-guided-migration',targetFormat:selected.targetFormat,baselines:selected.rows.map(({baseline,format,replay})=>({baseline,format,replay})),conversionCommand:'npm run test:ha:upgrade -- --conversion-only',manualGuide:'docs/docs/installation/native-migration.md',automaticLegacyReplacement:false,activeBuilderRequired:false},null,2));return;}
     assert.ok(process.argv.includes('--conversion-only'),'Native cutover is guided manual migration. Use --conversion-only for historical data replay; follow the migration guide for preserved-install/rollback and separate HACS update proof. No installation changed.');
     const rows=await verifyNativeConversions(selected),directory=path.join(repoRoot,'ha-test/.artifacts/native-frontend');fs.mkdirSync(directory,{recursive:true,mode:0o700});
-    const reportPath=path.join(directory,'conversion-replay.json');fs.writeFileSync(reportPath,JSON.stringify({kind:'native-conversion-data-replay',installed:false,candidate: fingerprint(path.join(repoRoot,'custom_components/marao_dashboard/frontend')),rows},null,2),{mode:0o600});
+    const reportPath=path.join(directory,'conversion-replay.json');fs.writeFileSync(reportPath,JSON.stringify({kind:'native-conversion-data-replay',targetFormat:selected.targetFormat,installed:false,candidate: fingerprint(path.join(repoRoot,'custom_components/marao_dashboard/frontend')),rows},null,2),{mode:0o600});
     console.log('Native conversion data replay passed for '+rows.length+' baselines. No HA writes, historical package installation or HACS update was performed.');return;
   }
   if (!full && !scope) scope = require('./verification').makePlan({ release: true }).components;

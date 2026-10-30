@@ -22,10 +22,11 @@ export class MaraoFloorPlanCard extends (globalThis.HTMLElement || class {}) {
     this._config=structuredClone(config); this._actionError=''; this._mount();
   }
   set hass(value) { this._hass=value; this._render(); }
-  get preview() { return Boolean(this._preview); }
+  get preview() { return Boolean(this._preview || this.nativeOwner?.preview || actions.nativeEditing(this)); }
   set preview(value) { this._preview=Boolean(value); this._render(); }
   getCardSize() { return this._config?.full_page ? 12 : 6; }
   connectedCallback() {
+    this._stopNativeEditing?.();this._stopNativeEditing=actions.bindNativeEditing(this,()=>this._render());
     this._press ||= bindPressFeedback(this.shadowRoot);
     this._actionLive=true;
     this._resize ||= new ResizeObserver(()=>this._layout());
@@ -33,7 +34,7 @@ export class MaraoFloorPlanCard extends (globalThis.HTMLElement || class {}) {
     this._viewport=()=>this._layout(); window.addEventListener('resize',this._viewport);
     window.visualViewport?.addEventListener('resize',this._viewport); this._layout();
   }
-  disconnectedCallback() { this._press?.destroy();this._press=null;this._actionLive=false; this._resize?.disconnect(); window.removeEventListener('resize',this._viewport); window.visualViewport?.removeEventListener('resize',this._viewport); }
+  disconnectedCallback() { this._stopNativeEditing?.();this._stopNativeEditing=null;this._press?.destroy();this._press=null;this._actionLive=false; this._resize?.disconnect(); window.removeEventListener('resize',this._viewport); window.visualViewport?.removeEventListener('resize',this._viewport); }
   _t(label) { return floorText(this._hass,label); }
   _mount() {
     this._press?.destroy();this._press=null;

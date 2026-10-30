@@ -192,10 +192,14 @@ user's request on 2026-10-29. Its outage check and upstream-version expiry probe
 are retired; it is no longer pending. The [dated context](project-context.md#retired-native-home-assistant-reconnect-verification)
 retains the historical failure without claiming the upstream issue was fixed.
 
-[Standalone native authoring is retired](changes/remove-native-dashboard-authoring/proposal.md).
-The earlier [native editing change](changes/support-native-dashboard-editing/proposal.md)
-is historical and must not restore its superseded authoring requirements. See the
-[retirement notice](../docs/docs/usage/native-dashboard.md) for saved-data implications.
+The [Home Assistant editor change](changes/use-home-assistant-dashboard-editor/proposal.md)
+supersedes the former builder and [native-authoring retirement](changes/remove-native-dashboard-authoring/proposal.md)
+at the ordinary-dashboard authoring boundary. Apply its deltas after the earlier
+[native editing change](changes/support-native-dashboard-editing/proposal.md),
+retirement and builder changes when synchronizing specs. Do not revive strategy
+builder, Monaco or per-view navbar obligations from those historical deltas.
+Existing strategy sources remain read-only until explicit conversion; see
+[current editing](../docs/docs/usage/native-dashboard.md) and the migration guide.
 
 ## Tool installation and ownership
 

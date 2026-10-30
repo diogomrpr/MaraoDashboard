@@ -1,3 +1,4 @@
+// Historical builder helpers retained for reference; the active native package does not ship this editor.
 const { capture: captureScreenshot } = require('./verification-browser');
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -1387,5 +1388,8 @@ async function main() {
   } finally { client.close(); await browser.close(); }
 }
 
-if (require.main === module) main().catch(error => { fs.mkdirSync(output, { recursive: true }); fs.writeFileSync(path.join(output, "failure.txt"), error.stack || error.message); console.error(error.message); process.exitCode = 1; });
+if (require.main === module) {
+  console.error('The Marao dashboard builder and Monaco browser checks are retired. Edit ordinary views and cards with Home Assistant’s dashboard editor. No installation or browser check was started.');
+  process.exitCode = 1;
+}
 module.exports = { scrollHeader };

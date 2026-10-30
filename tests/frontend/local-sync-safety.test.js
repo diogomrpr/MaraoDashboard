@@ -27,6 +27,18 @@ test('current frontend waits for late card imports and rejects stale fingerprint
   await assert.rejects(assertCurrentFrontend({ async waitForFunction() { throw deadline; } }, 'current'), deadline);
 });
 
+test('native readiness requires the current native graph without retired editor or optional camera imports', async () => {
+  const expected='a'.repeat(64),entries=[],window={MaraoFrontendPackage:{identity:expected}};
+  await assertCurrentFrontend({async waitForFunction(predicate,identity){
+    const check=vm.runInNewContext('('+predicate.toString()+')',{URL,window,performance:{getEntriesByType:()=>entries}});
+    for(const file of ['MaraoNativeDashboard.js','MaraoNativeBootstrap.js','MaraoDashboard.js'])entries.push({name:'http://test/'+expected+'--'+file});
+    assert.equal(check(identity),false,'a strategy alone does not register ordinary cards');
+    entries.push({name:'http://test/'+expected+'--MaraoNativeCards.js'});assert.equal(check(identity),true);
+    window.MaraoFrontendPackage.identity='b'.repeat(64);assert.equal(check(identity),false,'the active package must match');
+    return {async dispose(){}};
+  }},expected);
+});
+
 test('canonical Cases composition retains ordinary pages, is idempotent and adds no legacy storage', () => {
   const config = { config_version: 2, name: 'Safe', landing_page: 'home', pages: [{ name: 'Home', path: 'home', entities: [] }] };
   const view = { cards: [{ type: 'markdown', content: 'Safe gallery' }, '/config/dashboard/MaraoDashboard/dashboard/components/navigation/navbar.yaml'] };

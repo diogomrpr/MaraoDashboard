@@ -128,12 +128,14 @@ function setBrowserToken(tokens) {
 }
 
 async function assertCurrentFrontend(page, expected = fingerprint(path.join(repoRoot, "custom_components/marao_dashboard/frontend"))) {
-  // Navbar readiness intentionally precedes optional card/runtime imports.
+  // Native registration/bootstrap readiness does not require opening a card
+  // editor, retired builder/Monaco assets, or a camera-specific runtime.
   const ready = await page.waitForFunction(expected => {
     const urls = performance.getEntriesByType("resource").map(entry => new URL(entry.name));
     const native=/^[a-f0-9]{64}$/.test(expected);
     if(native && window.MaraoFrontendPackage?.identity!==expected) return false;
-    return ["MaraoDashboard.js", "MaraoCards.js", "MaraoFrigateEventsCard.js"].every(file =>
+    const required=native?["MaraoNativeDashboard.js","MaraoNativeBootstrap.js","MaraoNativeCards.js","MaraoDashboard.js"]:["MaraoDashboard.js", "MaraoCards.js", "MaraoFrigateEventsCard.js"];
+    return required.every(file =>
       urls.some(url => native ? url.pathname.endsWith('/'+expected+'--'+file) : url.pathname.endsWith("/" + file) && url.searchParams.get("v") === expected));
   }, expected, { timeout: 15000, polling: 50 });
   await ready.dispose();

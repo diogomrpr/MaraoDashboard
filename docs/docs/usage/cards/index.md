@@ -6,9 +6,13 @@ nav_order: 2.1
 ---
 
 # Usage
+Use [native Home Assistant cards](native-cards.md) to add, configure, duplicate
+and resize Marao cards directly in Home Assistant's dashboard editor. Named
+cards retain specialized options and own their automatic detail sheets.
+
 The [editable page card guide](editable-page-cards.md) covers weather, room,
 scenes, alarm/service actions, period readings, media apps and shared page
-layouts in the visual builder.
+descriptor options retained by the native card editor.
 Use [Entity Group](md_entity_group_card.md) for explicit task summaries and member
 control sheets on Overview, room or custom pages.
 

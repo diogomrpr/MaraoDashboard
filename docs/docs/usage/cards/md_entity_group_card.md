@@ -10,7 +10,7 @@ An Entity Group summarizes selected lights, covers, battery sensors or
 thermostats and opens their existing controls in a sheet. Opening or filtering
 the sheet does not operate any member.
 
-Choose **Entity Group** in Add card, or add a group in Overview. Select its type,
+Choose **Entity Group** in Home Assistant’s native Add card picker. Select its type,
 name, icon and **All entities** or **Active only**, then search members across
 rooms. Edit each member through the usual card options. Changing type retains
 every selection and identifies incompatible members; remove or correct them
@@ -18,6 +18,7 @@ before confirming. Missing or unavailable references remain saved.
 
 ```json
 {
+  "type": "custom:marao-entity-group-card",
   "template": "md_entity_group_card",
   "id": "living-lights",
   "name": "Living room lights",
@@ -31,13 +32,10 @@ before confirming. Missing or unavailable references remain saved.
 }
 ```
 
-Put descriptors in `overview.entity_groups` or room/custom-page `entities`.
-Automatic layouts also accept an `entity_group` bucket; fixed-column lists
-preserve groups between ordinary cards and shortcuts. Each group requires a
-unique stable ID: names and order can change without changing its sheet link.
-Duplicating a room/custom page creates new group IDs. Nested groups and mixed
-types are rejected before writes. Repeated members merge in configured order;
-separate groups and ordinary room cards keep independent selections/options.
+Use this complete configuration in the card's native YAML editor. Native
+Save/Cancel controls manage the draft. Per-member edits retain attached options,
+explicit empty lists and order. New area entities never refill saved membership.
+Nested groups and incompatible member types are rejected.
 
 | Type | Active means | Summary |
 | --- | --- | --- |
@@ -72,19 +70,12 @@ blind position, single/dual thermostat targets and modes retain their existing
 options. Battery rows are read-only. Door/garage/gate covers retain strict slide
 opening and explicit safe closing, including open-only capability.
 
-Groups own their sheets and required member sheets. Ordinary generated hashes
-derive from stable IDs; reserved Overview IDs preserve its released links.
-Conflicting explicit member popup hashes are rejected. Keep groups' IDs distinct
-and retain matching member hashes when editing advanced options.
+Each live card occurrence owns its automatic sheet and required member sheets.
+Native duplication creates independent automatic details even when the saved
+configuration is identical. An explicit external popup hash keeps its authored
+target. Deleting one card releases its own details without changing another card.
 
-When `overview.entity_groups` is absent, released room selections supply editable
-defaults through one shared adapter. Viewing them leaves saved source/history
-untouched and the draft clean. Save & Generate persists the reviewed selections;
-explicit `[]` suppresses defaults. Saved explicit membership never follows later
-registry changes. Downgrading requires the matching prior package and exact
-source/generated/owned-state backup, as described in the update guide.
-
-After removing a member, choose **Update**, then **Save & Generate**. The saved
-dashboard refreshes immediately; no waiting period or browser cache clearing is
-needed. Removed members remain available in search results so they can be added
-again. A changed dashboard registration requires the restart reported by the editor.
+After removing or editing a member, use the native card dialog's **Save**.
+Cancelling leaves the saved card unchanged. Removed members remain available in
+search so they can be added again. Legacy source exports retain their original
+group IDs and options in conversion provenance; see the [migration guide](../../installation/native-migration.md).

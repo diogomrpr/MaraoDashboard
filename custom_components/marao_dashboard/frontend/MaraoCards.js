@@ -1,6 +1,8 @@
-const [dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities, names, sensorThresholds, pressModule] = await Promise.all([
-  'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js', 'MaraoNames.js', 'MaraoSensorThresholds.js', 'MaraoPressFeedback.js',
+const [dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities, names, sensorThresholds, pressModule, nativeContext] = await Promise.all([
+  'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js', 'MaraoNames.js', 'MaraoSensorThresholds.js', 'MaraoPressFeedback.js', 'MaraoNativeContext.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
+const {nativeEditing, bindNativeEditing} = nativeContext;
+export {nativeEditing, bindNativeEditing};
 const { bindDropdown, dropdownStyles } = dropdownModule;
 const {bindPressFeedback,pressStyles,pressTarget} = pressModule;
 const { bindSlider, sliderMarkup, sliderStyles } = sliderModule;
@@ -762,6 +764,7 @@ export function showCardDetails(owner, message, opener) {
   haptic('heavy');
   owner._detailsPopup?._close(false);
   const popup = new MaraoPopupCard();
+  popup.nativeOwner = owner;
   popup._config = { height:'auto', max_height:'100%', title: owner._config?.name || localize('common.details', owner._hass, {}, 'Details'), cards: [] };
   popup._message = message;
   popup.hass = owner._hass;
@@ -1153,10 +1156,10 @@ export class MaraoCard extends BaseElement {
       event.preventDefault(); event.stopImmediatePropagation();
     }, true);
   }
-  get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
+  get preview() { return Boolean(this._preview || this.nativeOwner?.preview || nativeEditing(this)); }
   set preview(value) {
     this._preview = Boolean(value);
-    if (this._preview) { this._cancelSliderGesture(); this._cancelHold(); this._disposeCamera(); }
+    if (this.preview) { this._cancelSliderGesture(); this._cancelHold(); this._disposeCamera(); this._clearAlarmPIN(); this._detailsPopup?._close(false); this._activeHistoryPopup?._close(false); }
     if (this._authoritativeHass) this.hass = this._authoritativeHass;
   }
   setConfig(config) {
@@ -1179,6 +1182,7 @@ export class MaraoCard extends BaseElement {
     this._cancelSliderGesture();
     if (historyIdentity(this._config) !== historyIdentity(config)) { this._graphRequests.clear(); this._graphHistory.clear(); this._graphErrors.clear(); this._graphData = null; this._ownedGraphRecords = null; } this._config = { ...config }; if (previousGraph !== this._graphEntity()) this._activeHistoryPopup?._invalidateHistory(); this._actionError = ""; this._mediaError = ""; this._mediaURL = ""; this._actionRequest = (this._actionRequest || 0) + 1; this._subscribeClimate(); this._observeGraph(); this._render(); }
   connectedCallback() {
+    this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => { this.preview = this._preview; });
     this._ensurePress();
     this._nativeGridItem = fitNativeGrid(this, 76); // 48px control plus the normal 14px side insets.
     this._observeGraph();
@@ -1247,6 +1251,7 @@ export class MaraoCard extends BaseElement {
   }
   get hass() { return this._hass; }
   disconnectedCallback() {
+    this._stopNativeEditing?.(); this._stopNativeEditing = null;
     this._press?.destroy(); this._press = null;
     this._nativeGridItem?.removeAttribute('data-marao-grid-76'); this._nativeGridItem = null;
     this._graphObserver?.disconnect(); this._graphObserver = null; this._graphVisible = undefined;
@@ -2395,12 +2400,12 @@ export class MaraoControlGrid extends BaseElement {
     this._ready = this._mount();
   }
   _native(config, index) { return config.native_cards?.includes(index) || !config.cards[index].type.startsWith('custom:marao-'); }
-  get preview() { return Boolean(this._preview); }
+  get preview() { return Boolean(this._preview || this.nativeOwner?.preview || nativeEditing(this)); }
   set preview(value) { this._preview = Boolean(value); this._forward(); }
   set hass(value) { this._hass = value; this._forward(); }
-  _forward() { for (const child of this._children) { child.preview = this.preview; child.hass = this._hass; } this._layout(); }
-  connectedCallback() { if (globalThis.ResizeObserver && !this._layoutObserver) { this._layoutObserver = new ResizeObserver(() => { this._layoutFrame ||= requestAnimationFrame(() => { this._layoutFrame = 0; this._layout(); }); }); this._layoutObserver.observe(this); } if (this._interrupted) { this._interrupted = false; this._ready = this._mount(); } }
-  disconnectedCallback() { this._layoutObserver?.disconnect(); this._layoutObserver = null; if (this._layoutFrame) cancelAnimationFrame(this._layoutFrame); this._layoutFrame = 0; if (this._loading) { this._request++; this._interrupted = true; this._loading = false; } }
+  _forward() { for (const child of this._children) { child.nativeOwner=this.nativeOwner || this; child.preview = this.preview || Boolean(this.nativeOwner?.preview); child.hass = this._hass; } this._layout(); }
+  connectedCallback() { this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => this._forward()); if (globalThis.ResizeObserver && !this._layoutObserver) { this._layoutObserver = new ResizeObserver(() => { this._layoutFrame ||= requestAnimationFrame(() => { this._layoutFrame = 0; this._layout(); }); }); this._layoutObserver.observe(this); } if (this._interrupted) { this._interrupted = false; this._ready = this._mount(); } }
+  disconnectedCallback() { this._stopNativeEditing?.(); this._stopNativeEditing = null; this._layoutObserver?.disconnect(); this._layoutObserver = null; if (this._layoutFrame) cancelAnimationFrame(this._layoutFrame); this._layoutFrame = 0; if (this._loading) { this._request++; this._interrupted = true; this._loading = false; } }
   _layout() {
     const grid = this.shadowRoot?.querySelector('.control-grid');
     if (!grid || !globalThis.getComputedStyle) return;
@@ -2496,10 +2501,11 @@ export class MaraoControlGrid extends BaseElement {
 export class MaraoPopupCard extends BaseElement {
   constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._hass = null; this._open = false; this._focus = null; this._childrenRenderId = 0; this._backgroundState = []; }
   setConfig(config) { this._config = { height: "auto", max_height: "100%", ...config, ...(config.cards ? { cards: config.cards.map(canonicalCard) } : {}) }; this._renderHost(); this._sync(); if (this._open) this._renderChildren(); }
-  get preview() { return Boolean(this._preview || this.nativeOwner?.preview); }
-  set preview(value) { this._preview = Boolean(value); if (this._preview) this._close(false); }
+  get preview() { return Boolean(this._preview || this.nativeOwner?.preview || nativeEditing(this)); }
+  set preview(value) { this._preview = Boolean(value); if (this.preview) this._close(false); }
   set hass(value) { this._hass = value; this._syncTheme(); this._updateAccessHeader(); this._updateChildrenHass(); this._refreshHistory(); }
   connectedCallback() {
+    this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => this._sync());
     this._viewPath = window.location.pathname;
     this._viewOwner = null;
     let card;
@@ -2519,6 +2525,7 @@ export class MaraoPopupCard extends BaseElement {
     this._disconnectSheet();
   }
   _disconnectSheet() {
+    this._stopNativeEditing?.(); this._stopNativeEditing = null;
     window.removeEventListener("hashchange", this._sync); window.removeEventListener("location-changed", this._sync); window.removeEventListener("popstate", this._sync);
     this._viewOwner = null; this._close(false);
   }
@@ -2526,7 +2533,8 @@ export class MaraoPopupCard extends BaseElement {
   openLightColor(owner, opener) { this.openHistory(owner, opener, 'light-color'); }
   _detailSource(context) { return context.kind === 'light-color' ? context.owner._config.entity : context.owner._graphEntity?.(); }
   openHistory(owner, opener, kind = 'history') {
-    if (this.preview || !owner.isConnected) return;
+    if (this.preview || owner.preview || nativeEditing(owner) || !owner.isConnected) return;
+    this.nativeOwner = owner;
     this._historyContext = { owner, kind, restoreFocus: focusRestorer(opener), id: `${Date.now()}-${++historyEntryId}`, path: window.location.pathname, hash: window.location.hash, source: kind === 'light-color' ? owner._config.entity : owner._graphEntity?.() };
     owner._activeHistoryPopup = this;
     this._openSheet(this._historyContext.restoreFocus);
@@ -2658,6 +2666,7 @@ export class MaraoPopupCard extends BaseElement {
   }
   _renderHost() { if (this.shadowRoot) this.shadowRoot.innerHTML = "<style>:host{display:block;height:0;overflow:visible}</style>"; }
   _sync = () => {
+    if (this.preview) { this._close(false); return; }
     if (this._historyContext) {
       const context = this._historyContext;
       const current = window.history.state?.maraoHistory?.id === context.id;
@@ -2665,7 +2674,6 @@ export class MaraoPopupCard extends BaseElement {
       if (this._historyHost) this._hideHistory();
       if (this._transientHistory) { this._close(false); return; }
     }
-    if (this.preview) { this._close(false); return; }
     const hash = text(this._config.hash);
     if (window.location.pathname !== this._viewPath || !hash || window.location.hash !== hash) {
       const next = this._open && window.location.pathname === this._viewPath && findElements("marao-popup-card", this._viewOwner?.view.shadowRoot || this._viewOwner?.view).find((popup) => popup !== this && popup.isConnected && popup._config.hash === window.location.hash);
@@ -2675,6 +2683,7 @@ export class MaraoPopupCard extends BaseElement {
     else if (this.isConnected) this._openSheet();
   };
   _openSheet(returnFocus) {
+    if (this.preview) return;
     if (this._open) return;
     for (const navbar of fullscreenUsers) { navbar._refreshGesture?.cancel(); navbar._closeOverflow?.(true); }
     const previous = findElements("marao-popup-card", this._viewOwner?.view.shadowRoot || this._viewOwner?.view).find((popup) => popup !== this && popup._open);
@@ -2749,13 +2758,13 @@ export class MaraoPopupCard extends BaseElement {
     }
     for (const config of Array.isArray(this._config.cards) ? this._config.cards : []) {
       if (renderId !== this._childrenRenderId) return;
-      try { const card = helpers?.createCardElement ? helpers.createCardElement(config) : document.createElement("div"); if (card.setConfig) card.setConfig(config); card.hass = this._hass; host.append(card); } catch (error) { const message = document.createElement("p"); message.textContent = error.message; host.append(message); }
+      try { const card = helpers?.createCardElement ? helpers.createCardElement(config) : document.createElement("div"); if (card.setConfig) card.setConfig(config); card.nativeOwner=this.nativeOwner || this;card.preview=this.preview; card.hass = this._hass; host.append(card); } catch (error) { const message = document.createElement("p"); message.textContent = error.message; host.append(message); }
     }
   }
   _updateChildrenHass() {
     if (this._config.entity_group) { this._reconcileGroupChildren(); return; }
     const host = this._overlay?.querySelector(".marao-popup-content");
-    for (const card of host?.children || []) card.hass = this._hass;
+    for (const card of host?.children || []) {card.nativeOwner=this.nativeOwner || this;card.preview=this.preview;card.hass = this._hass;}
   }
   _reconcileGroupChildren() {
     const host = this._overlay?.querySelector('.marao-popup-content');
@@ -2784,7 +2793,7 @@ export class MaraoPopupCard extends BaseElement {
         this._groupChildren.set(config.entity, card);
       }
       card.setAttribute('data-marao-control-cell', '');
-      card.hass = this._hass;
+      card.nativeOwner=this.nativeOwner || this;card.preview=this.preview;card.hass = this._hass;
       if (host.children[index] !== card) host.insertBefore(card, host.children[index] || null);
       index++;
     }
@@ -2903,10 +2912,10 @@ export class MaraoPowerHistoryCard extends BaseElement {
       ids.map(id => value?.states?.[id]), value?.themes]);
     if (marker !== this._marker) { this._marker = marker; this._sync(); }
   }
-  get preview() { return Boolean(this._preview); }
+  get preview() { return Boolean(this._preview || this.nativeOwner?.preview || nativeEditing(this)); }
   set preview(value) { this._preview = Boolean(value); this._sync(); }
-  connectedCallback() { this._sync(); }
-  disconnectedCallback() { this._loadId++; this._starting = false; this._failed = false; this._chart?.destroy(); this._chart = null; this.shadowRoot?.replaceChildren(); }
+  connectedCallback() { this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => this._sync()); this._sync(); }
+  disconnectedCallback() { this._stopNativeEditing?.(); this._stopNativeEditing = null; this._loadId++; this._starting = false; this._failed = false; this._chart?.destroy(); this._chart = null; this.shadowRoot?.replaceChildren(); }
   getCardSize() { return 6; }
   getGridOptions() { return { columns: 12, rows: 'auto' }; }
   _options() {

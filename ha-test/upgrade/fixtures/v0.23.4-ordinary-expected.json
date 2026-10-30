@@ -1,0 +1,204 @@
+{
+  "title": "Safe migration",
+  "extension": {
+    "empty": [],
+    "exact": "untouched"
+  },
+  "views": [
+    {
+      "title": "Home",
+      "path": "home",
+      "type": "sections",
+      "icon": "mdi:home",
+      "sections": [
+        {
+          "type": "grid",
+          "cards": [
+            {
+              "id": "lamp",
+              "entity_id": "light.safe",
+              "name": "Lamp",
+              "variables": {
+                "future": []
+              },
+              "opaque": {
+                "keep": null
+              },
+              "type": "custom:marao-light-card",
+              "template": "md_light_card",
+              "grid_options": {
+                "columns": 6
+              }
+            },
+            {
+              "id": "preset",
+              "template": "md_number_card",
+              "entity_id": "input_number.safe",
+              "name": "Preset",
+              "variables": {
+                "shortcuts": [
+                  6,
+                  12,
+                  16
+                ],
+                "future": false
+              },
+              "type": "custom:marao-number-card",
+              "grid_options": {
+                "columns": 6
+              }
+            },
+            {
+              "type": "markdown",
+              "content": "Safe embedded content",
+              "future": [],
+              "grid_options": {
+                "columns": 6
+              }
+            },
+            {
+              "type": "markdown",
+              "content": "Raw retained",
+              "unknown": []
+            }
+          ]
+        },
+        {
+          "type": "grid",
+          "cards": [
+            {
+              "id": "energy",
+              "template": "md_energy_period_card",
+              "entity_id": "sensor.safe_energy",
+              "name": "Energy",
+              "variables": {
+                "sub_entities": [
+                  {
+                    "entity_id": "sensor.safe_heating",
+                    "name": "Heating",
+                    "future": []
+                  },
+                  {
+                    "entity_id": "sensor.safe_lighting",
+                    "cost_entity": "sensor.safe_cost"
+                  }
+                ],
+                "future": true
+              },
+              "type": "custom:marao-energy-card",
+              "grid_options": {
+                "columns": 12
+              }
+            }
+          ]
+        },
+        {
+          "type": "grid",
+          "cards": []
+        }
+      ]
+    },
+    {
+      "title": "Plan",
+      "path": "floor",
+      "type": "panel",
+      "cards": [
+        {
+          "id": "plan",
+          "template": "md_floor_plan_card",
+          "name": "Safe room",
+          "variables": {
+            "image_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "full_page": true,
+            "lights": [
+              {
+                "id": "strip",
+                "entity_id": "light.safe_strip",
+                "x": 30,
+                "y": 40,
+                "future": [],
+                "strip": {
+                  "width": 6,
+                  "points": [
+                    {
+                      "x": 10,
+                      "y": 10
+                    },
+                    {
+                      "x": 75,
+                      "y": 10
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "opaque": {
+            "retain": true
+          },
+          "type": "custom:marao-floorplan-card",
+          "grid_options": {
+            "columns": 12
+          }
+        }
+      ]
+    },
+    {
+      "title": "Five",
+      "path": "five",
+      "type": "sections",
+      "sections": [
+        {
+          "type": "grid",
+          "cards": [
+            {
+              "type": "grid",
+              "columns": 5,
+              "square": false,
+              "cards": [
+                {
+                  "id": "one",
+                  "entity_id": "light.safe",
+                  "name": "One",
+                  "type": "custom:marao-light-card",
+                  "template": "md_light_card"
+                },
+                {
+                  "id": "two",
+                  "entity_id": "light.safe",
+                  "name": "Two",
+                  "type": "custom:marao-light-card",
+                  "template": "md_light_card"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "marao": {
+    "version": 1,
+    "navbar": {
+      "routes": [
+        {
+          "icon": "mdi:home",
+          "icon_selected": "mdi:home",
+          "label": "Main",
+          "page": "home",
+          "future": [],
+          "path": "/marao-dashboard/home"
+        },
+        {
+          "icon": "mdi:file-outline",
+          "icon_selected": "mdi:file-outline",
+          "label": "Plan",
+          "page": "floor",
+          "path": "/marao-dashboard/floor"
+        }
+      ]
+    },
+    "show_cache_reset": false,
+    "show_editor_button": true
+  }
+}

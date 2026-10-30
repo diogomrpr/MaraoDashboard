@@ -144,15 +144,15 @@ test('symlinked workspace assets are refused without changing the remote install
   assert.deepEqual(f.remoteBytes(), before);
 });
 
-async function nativeFixture(t) {
+async function nativeFixture(t,{ordinary=false}={}) {
   const f=fixture(t), {createEnvelope}=await import('../../custom_components/marao_dashboard/frontend/MaraoSource.js');
   fs.rmSync(f.remote+f.integration,{recursive:true});
-  const document=createEnvelope(JSON.stringify({config_version:2,name:'Safe',landing_page:'card-test',navigation:[],pages:[{name:'Cases',path:'card-test',entities:[]}]}),'marao-dashboard');
+  let document=ordinary?{title:'Saved native edits',marao:{version:1,navbar:{routes:[]},migration:{original_source:'Immutable origin is not active input'}},unknown:{retain:[]},views:[{title:'Home',path:'home',type:'sections',max_columns:8,sections:[{type:'grid',cards:[{type:'markdown',content:'Keep native edits',grid_options:{columns:9},future:[]}]}]},{title:'Cases',path:'card-test',cards:[]}]}:createEnvelope(JSON.stringify({config_version:2,name:'Safe',landing_page:'card-test',navigation:[],pages:[{name:'Cases',path:'card-test',entities:[]}]}),'marao-dashboard');
   const folder='MaraoFrontend', installed=f.remote+'/www/community/'+folder;
   fs.mkdirSync(installed,{recursive:true});fs.writeFileSync(installed+'/old.js','old');
   const candidate=f.root+'/native-stage', dist=candidate+'/dist';fs.mkdirSync(dist,{recursive:true});
   const identity='b'.repeat(64);
-  for(const file of ['MaraoFrontend.js','MaraoFrontend.release.json',identity+'--MaraoNativeDashboard.js',identity+'--MaraoDashboard.js',identity+'--MaraoDashboardJsonWorker.js']) fs.writeFileSync(dist+'/'+file,'native candidate '+file);
+  for(const file of ['MaraoFrontend.js','MaraoFrontend.release.json',...['MaraoNativeDashboard.js','MaraoNativeBootstrap.js','MaraoNativeCards.js','MaraoNativeCardEditor.js','MaraoOrdinaryMigration.js','MaraoDashboard.js'].map(file=>identity+'--'+file)]) fs.writeFileSync(dist+'/'+file,'native candidate '+file);
   f.dependencies.buildFrontend=async()=>({destination:candidate,identity});
   f.dependencies.connect=async()=>({close(){},async call(message) {
     f.calls.push(message.type);
@@ -167,7 +167,7 @@ async function nativeFixture(t) {
     if(method==='GET' && endpoint.startsWith('/hacsfiles/'+folder+'/')) {f.calls.push('GET '+endpoint);return fs.readFileSync(installed+'/'+endpoint.split('/').at(-1),'utf8');}
     return api(config,method,endpoint,...args);
   };
-  return {...f,installed,dist,document};
+  return {...f,installed,dist,get document(){return document;},replaceDocument(value){document=structuredClone(value);}};
 }
 
 test('native sync installs a complete graph without changing source, fixtures or restarting HA; repeat is a no-op',async t=>{
@@ -193,8 +193,33 @@ test('native stale serving retains installed candidate and recovery copy without
   assert.deepEqual(JSON.parse(fs.readFileSync(f.remote+'/.marao-test-deployment.json')),f.receipt);
 });
 
-test('explicit native fixture preparation updates only owned code, restarts once and keeps source and helpers',async t=>{
-  const f=await nativeFixture(t),{syncNativeFixtures}=require('../../ha-test/prepare-native-frontend');
+test('ordinary native sync preserves active views, opaque settings and origin bytes without conversion or retired editor assets',async t=>{
+  const f=await nativeFixture(t,{ordinary:true}),before=structuredClone(f.document);
+  const result=await prepareFrontend(f.config,f.dependencies);
+  assert.equal(result.authoring,'ordinary');assert.equal(result.editorURL,'/marao-dashboard/home');
+  assert.deepEqual(result.dashboard,before);assert.deepEqual(result.previewDashboard,before);
+  assert.equal(result.dashboard.views.filter(view=>view.path==='card-test').length,1);
+  assert.ok(!f.calls.some(call=>/POST|save|restart|generate|reload|Monaco|JsonWorker|DashboardPanel/.test(call)));
+  assert.ok(!Object.keys(result.assets).some(file=>/JsonWorker|DashboardPanel/.test(file)));
+  f.calls.length=0;await prepareFrontend(f.config,f.dependencies);assert.ok(!f.calls.includes('upload'));
+});
+
+test('invalid or concurrently changed ordinary native configuration is never replaced by preparation',async t=>{
+  const f=await nativeFixture(t,{ordinary:true}),original=structuredClone(f.document);
+  f.replaceDocument({...original,marao:{...original.marao,version:2}});
+  await assert.rejects(prepareFrontend(f.config,f.dependencies),/version|supported/i);
+  assert.ok(!f.calls.includes('build'));f.calls.length=0;
+  f.replaceDocument({...original,views:original.views.filter(view=>view.path!=='card-test')});
+  await assert.rejects(prepareFrontend(f.config,f.dependencies),/one Cases view/);assert.ok(!f.calls.includes('build'));
+  f.replaceDocument(original);const api=f.dependencies.api;
+  f.dependencies.api=(...args)=>{if(args[2].includes('/hacsfiles/'))f.replaceDocument({...original,title:'Another client edit'});return api(...args);};
+  await assert.rejects(prepareFrontend(f.config,f.dependencies),/Native source changed during preparation/);
+  assert.equal(f.document.title,'Another client edit');assert.ok(!f.calls.some(call=>/save/.test(call)));
+});
+
+test('explicit ordinary native fixture preparation updates only owned code, restarts once and keeps active configuration and helpers',async t=>{
+  const f=await nativeFixture(t,{ordinary:true}),{syncNativeFixtures}=require('../../ha-test/prepare-native-frontend');
+  const documentBefore=structuredClone(f.document);
   for(const [file,contents] of Object.entries({'manifest.json':'{"domain":"marao_test_camera"}','__init__.py':'# fixture code'})) {
     f.write(f.root,'/ha-test/custom_components/marao_test_camera/'+file,contents);
     f.write(f.remote,'/custom_components/marao_test_camera/'+file,'old '+file);
@@ -205,6 +230,7 @@ test('explicit native fixture preparation updates only owned code, restarts once
   const after=f.remoteBytes();
   for(const [file,contents] of Object.entries(before))if(!['custom_components/marao_test_camera/manifest.json','custom_components/marao_test_camera/__init__.py'].includes(file))assert.equal(after[file],contents);
   assert.equal(after['custom_components/marao_test_camera/__init__.py'],'# fixture code');
+  assert.deepEqual(f.document,documentBefore);
   assert.equal((await syncNativeFixtures(f.config,f.dependencies)).changed,false);assert.equal(restarts,1);
   f.write(f.remote,'/custom_components/marao_test_camera/marao-fixture.json','{"owner":"another-owner"}');
   await assert.rejects(syncNativeFixtures(f.config,f.dependencies),/guard failed/);assert.equal(restarts,1);

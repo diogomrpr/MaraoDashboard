@@ -7,9 +7,18 @@
   <img src="custom_components/marao_dashboard/frontend/brand/logo.svg" alt="Marao Dashboard mountain logo" width="312" height="168" loading="lazy">
 </picture>
 
-Marao Dashboard builds a complete, phone-friendly Home Assistant dashboard from
-a visual/JSON editor. It combines editable pages and sections, reusable cards
-and pop-up controls, and a coordinated light/dark appearance.
+Marao Dashboard provides phone-friendly Home Assistant cards, pop-up controls,
+a shared floating navbar and a coordinated light/dark appearance. Use Home
+Assistant’s native editor for pages, sections, sizing and visibility.
+
+## Dashboard editing changes in v0.24.0
+
+Existing strategy dashboards need an explicit one-time conversion to use Home
+Assistant's editor. Back up the matching package and HA data, update Marao, then
+open the former editor page to prepare conversion and download recovery files.
+Convert at the same dashboard address. Existing sources render read-only until
+conversion; ordinary native dashboards need no conversion. See the
+[migration guide](docs/docs/installation/native-migration.md).
 
 ## Breaking change in v0.22.0
 
@@ -31,12 +40,13 @@ importing, even when the dashboard is hidden or restricted to administrators.
 
 ## Highlights
 
-- Edit ordered pages, sections and cards in the existing Visual/JSON builder.
+- Edit pages, sections, card sizes and visibility in Home Assistant’s native editor.
 - Upload a floor plan and place light buttons and illuminated strip overlays visually.
 - Keep media controls in their popup or show them directly on the dashboard.
 - Keep explicit room membership, Entity Groups, energy units and custom content.
 - Use project-owned cards, floating navigation, popovers and scoped styling.
-- Save through Home Assistant's native dashboard APIs, with no Marao Python backend.
+- Configure navigation once and display it automatically on every dashboard page.
+- Save ordinary Home Assistant dashboard configuration with no Marao Python backend.
 - Convert supported historical JSON through one maintained incremental converter.
 
 ## Installation
@@ -49,10 +59,10 @@ Existing users must complete the [migration guide](docs/docs/installation/native
 2. Verify the JavaScript module resource
    `/hacsfiles/MaraoDashboard/MaraoFrontend.js` is registered once, then refresh HA.
    YAML-managed resources use `lovelace.reload_resources` after editing the list.
-3. Create an editable dashboard in **Settings → Dashboards**, select Marao's
-   dashboard strategy, and open its Marao editor to configure your pages.
-   For a converted installation, paste the complete converter output into HA's
-   native raw configuration editor instead.
+3. Create an editable dashboard in **Settings → Dashboards** and add Marao cards
+   through its native picker. Enable shared navigation using the small settings
+   block in the [configuration guide](docs/docs/installation/configuration.md).
+   Existing strategy dashboards use explicit conversion with recovery exports.
 
 See the [full documentation](https://diogomrpr.github.io/MaraoDashboard/) for setup,
 configuration, camera-provider requirements, updates and troubleshooting.
@@ -106,10 +116,10 @@ Marao does not install, update, replace, or remove unrelated HACS cards.
 - `docs/` — product and development documentation.
 - `.github/` — CI workflows and contribution guidance.
 
-HACS installs only `custom_components/marao_dashboard/`. Tests, synthetic media,
-test dependencies, and local credentials stay outside that directory. Package
-validation checks both the HACS source and staged build. Generated development
-output stays in ignored `ha-test/.cache/` and `tests/.artifacts/` directories.
+HACS installs the flat frontend graph from `dist/`. Tests, synthetic media, test
+dependencies and local credentials are not shipped. Editable runtime sources and
+the frozen legacy integration remain in `custom_components/marao_dashboard/`;
+generated development output stays in ignored cache/artifact directories.
 
 ## Contributing and license
 

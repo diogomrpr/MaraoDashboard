@@ -173,7 +173,9 @@ async function verifyPrepared(config, filename, { ssh, referencedEntities, opera
     const historical = historicalEntities(receipt.historical_baseline, referencedEntities);
     assertHistoricalBindings([...historical], states, referencedEntities);
     assert.ok([...referencedEntities(dashboard)].every(entity => states.has(entity) || entity.includes('_missing') || historical.has(entity)), 'Preserved dashboard references missing fixtures');
-    for (const file of ['MaraoDashboard.js', 'MaraoCards.js', 'MaraoFrigateEventsCard.js', 'MaraoDashboardPanel.js']) {
+    const editorAsset = fs.existsSync(path.join(integration, 'frontend', 'MaraoDashboardPanel.js'))
+      ? 'MaraoDashboardPanel.js' : 'MaraoNativeCardEditor.js';
+    for (const file of ['MaraoDashboard.js', 'MaraoCards.js', 'MaraoFrigateEventsCard.js', editorAsset]) {
       const served = await api(config, 'GET', frontendAssetURL(candidate.frontend_fingerprint, file), undefined, { text: true });
       assert.equal(sha256(served), sha256(fs.readFileSync(path.join(integration, 'frontend', file))), 'Served candidate asset is stale: ' + file);
     }

@@ -146,8 +146,8 @@ test("loading and route/visibility changes cannot dispatch or retain alarm codes
 });
 
 test("strict slide routes every native opener once and rejects incompatible overrides", async () => {
-  const names = ["HTMLElement", "MARAO_SLIDE_INTENT_PX", "MARAO_SLIDE_COMPLETE_AT", "serviceConnectionReady", "serviceTargetReady", "accessOpenerService", "haptic", "callServiceWithNotification", "serviceOutcome", "fitNativeGrid"];
-  const values = [globalThis.HTMLElement, 10, .92, runtime.serviceConnectionReady, runtime.serviceTargetReady, accessOpenerService, () => {}, runtime.callServiceWithNotification, runtime.serviceOutcome, runtime.fitNativeGrid];
+  const names = ["HTMLElement", "MARAO_SLIDE_INTENT_PX", "MARAO_SLIDE_COMPLETE_AT", "serviceConnectionReady", "serviceTargetReady", "accessOpenerService", "haptic", "callServiceWithNotification", "serviceOutcome", "fitNativeGrid", "nativeEditing", "bindNativeEditing"];
+  const values = [globalThis.HTMLElement, 10, .92, runtime.serviceConnectionReady, runtime.serviceTargetReady, accessOpenerService, () => {}, runtime.callServiceWithNotification, runtime.serviceOutcome, runtime.fitNativeGrid, runtime.nativeEditing, runtime.bindNativeEditing];
   const Slide = new Function(...names, dashboard.slice(dashboard.indexOf("class MaraoSlideToOpen"), dashboard.indexOf('if (!customElements.get("marao-slide-to-open"))')) + "; return MaraoSlideToOpen;")(...values);
   for (const [domain, service, state] of [["alarm_control_panel", "alarm_disarm", "armed_away"], ["lock", "unlock", "locked"], ["cover", "open_cover", "closed"], ["button", "press", "2026-01-01"], ["switch", "turn_on", "off"], ["script", "turn_on", "off"]]) {
     const id = domain + ".safe", calls = [];
@@ -320,8 +320,8 @@ test('damper defaults and explicit ventilation selections survive metadata refre
 test('access feedback follows explicit outcomes, preserves state and cannot confirm failed or obsolete requests', async t => {
   t.mock.timers.enable({apis:['setTimeout']});
   const pulses=[];
-  const names=['HTMLElement','MARAO_SLIDE_INTENT_PX','MARAO_SLIDE_COMPLETE_AT','serviceConnectionReady','serviceTargetReady','accessOpenerService','haptic','callServiceWithNotification','serviceOutcome','fitNativeGrid'];
-  const Slide=new Function(...names,dashboard.slice(dashboard.indexOf('class MaraoSlideToOpen'),dashboard.indexOf('if (!customElements.get("marao-slide-to-open"))'))+';return MaraoSlideToOpen;')(globalThis.HTMLElement,10,.92,runtime.serviceConnectionReady,runtime.serviceTargetReady,accessOpenerService,value=>pulses.push(value),runtime.callServiceWithNotification,runtime.serviceOutcome,runtime.fitNativeGrid);
+  const names=['HTMLElement','MARAO_SLIDE_INTENT_PX','MARAO_SLIDE_COMPLETE_AT','serviceConnectionReady','serviceTargetReady','accessOpenerService','haptic','callServiceWithNotification','serviceOutcome','fitNativeGrid','nativeEditing','bindNativeEditing'];
+  const Slide=new Function(...names,dashboard.slice(dashboard.indexOf('class MaraoSlideToOpen'),dashboard.indexOf('if (!customElements.get("marao-slide-to-open"))'))+';return MaraoSlideToOpen;')(globalThis.HTMLElement,10,.92,runtime.serviceConnectionReady,runtime.serviceTargetReady,accessOpenerService,value=>pulses.push(value),runtime.callServiceWithNotification,runtime.serviceOutcome,runtime.fitNativeGrid,runtime.nativeEditing,runtime.bindNativeEditing);
   for(const parent of [false,true]) for(const result of ['success','error','hidden','unavailable','skipped']) {
     let resolve,reject,calls=0;
     const pending=new Promise((yes,no)=>{resolve=yes;reject=no;});

@@ -1695,7 +1695,15 @@ test("popup preserves child cards while forwarding Home Assistant state updates"
   assert.equal(popup._hass, hass);
   assert.equal(updates, 1);
   assert.equal(themes, 1);
-  assert.match(source, /for \(const card of host\?\.children \|\| \[\]\) card\.hass = this\._hass/);
+  const children=[{},{}],host={children};
+  popup._overlay={querySelector:()=>host};
+  MaraoPopupCard.prototype._updateChildrenHass.call(popup);
+  assert.equal(host.children,children);
+  for(const child of children){assert.equal(child.hass,hass);assert.equal(child.nativeOwner,popup);assert.equal(child.preview,false);}
+  popup.nativeOwner={preview:true};
+  MaraoPopupCard.prototype._updateChildrenHass.call(popup);
+  for(const child of children){assert.equal(child.nativeOwner,popup.nativeOwner);assert.equal(child.preview,true);}
+
   assert.doesNotMatch(source, /set hass\(value\) \{ this\._hass = value; this\._renderChildren\(\); \}/);
 });
 

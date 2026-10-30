@@ -20,6 +20,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     else options[flag.slice(2)] = value;
   }
   if (options.help) return options;
+  if (options.components.includes('json-editor')) throw new Error('The Marao JSON builder is retired. Use Home Assistant native card YAML or dashboard raw configuration.');
   if (!options.components.length) throw new Error('Preview requires --component; there is no implicit full-gallery preview.');
   if (options.watch && options.once) throw new Error('--watch and --once cannot be combined.');
   const inspection = inspectionFor(selectComponents([], options.components));
@@ -61,7 +62,7 @@ function previewRoute(dashboard, families) {
       if (card.type === 'conditional' || card.type === 'custom:marao-popup-card' || card.visibility?.length) { count++; return; }
       if (['vertical-stack', 'horizontal-stack', 'grid', 'custom:marao-control-grid'].includes(card.type)) { (card.cards || []).forEach(visit); return; }
       count++;
-      if (card.type === 'custom:marao-card') found.add(card.template);
+      if (card.template) found.add(card.template);
       else if (card.type?.startsWith('custom:marao-')) found.add(card.type.slice('custom:'.length));
     };
     (view.cards || []).forEach(visit);
@@ -78,7 +79,7 @@ function editableFrontendFile(root, filename) {
   if (root === 'frontend_src') return true;
   if (relative === 'marao-owned-assets.json') return false;
   // Generated bundles follow source edits; watching them would rebuild each save twice.
-  return !/^(?:assets\/|.*\.LICENSE\.txt$|Marao(?:Dashboard(?:Panel|EditorLabels|JsonEditor|JsonPreparation|EditorWorker|JsonWorker)|Native(?:Catalog|CardEditor|Cards|Model|Dashboard)|Theme|SourceImport|History(?:Data|Chart))\.(?:js|css)$)/.test(relative);
+  return !/^(?:assets\/|.*\.LICENSE\.txt$|Marao(?:Dashboard(?:Settings|Panel|EditorLabels|JsonEditor|JsonPreparation|EditorWorker|JsonWorker)|Native(?:Bootstrap|Catalog|CardEditor|Cards|Model|Dashboard)|OrdinaryMigration|Theme|SourceImport|History(?:Data|Chart))\.(?:js|css)$)/.test(relative);
 }
 
 function createRefreshQueue(refresh, { delay = 250, onError = () => {} } = {}) {
@@ -127,11 +128,22 @@ function monitorDiagnostics(page, output, report) {
   return { errors, willReload() { reloadRequests = new Set(pending); } };
 }
 
-async function inspect(page, options, version, output) {
+async function inspect(page, options, version, output, prepared) {
   const { readySubtree, visualVariablesForScenario } = require('./test-ha-dashboard-accessibility');
   const { scenario, theme, inspection } = options;
   let targets;
   if (inspection.editor) {
+    if (prepared.mode === 'native') {
+      await page.locator('hui-root').waitFor({state:'attached'});
+      await assertCurrentFrontend(page,version);
+      if (prepared.authoring === 'ordinary') {
+        await page.locator('hui-root').evaluate(root=>root.lovelace.setEditMode(true));
+        targets=[{locator:page.locator('hui-root'),family:'native-editor'}];
+      } else {
+        targets=[{locator:page.locator('marao-migration-card'),family:'conversion'}];
+        await targets[0].locator.waitFor({state:'visible'});
+      }
+    } else {
     const panel = page.locator('marao-dashboard-panel');
     await panel.waitFor({ state: 'visible' });
     await page.waitForFunction(element => element._loaded && element._visualReady && !element._busy, await panel.elementHandle());
@@ -144,6 +156,7 @@ async function inspect(page, options, version, output) {
       assert.ok(urls.some(value => { const url = new URL(value); return /^[a-f0-9]{64}$/.test(version) ? url.pathname.endsWith('/'+version+'--'+file) : url.pathname.endsWith('/' + file) && url.searchParams.get('v') === version; }), 'Editor loaded stale ' + file);
     }
     targets = [{ locator: panel, family: 'editor' }];
+    }
   } else {
     const locator = page.locator(cardSelector);
     await locator.first().waitFor({ state: 'visible' });
@@ -191,7 +204,7 @@ async function main(argv = process.argv.slice(2)) {
     const diagnostics = monitorDiagnostics(page, output, report);
     console.log('Preview route: ' + route);
     await page.goto(prepared.config.url + route, { waitUntil: 'domcontentloaded' });
-    await inspect(page, options, prepared.version, output);
+    await inspect(page, options, prepared.version, output, prepared);
     if (diagnostics.errors.length) throw new Error('Preview has browser diagnostics; inspect ' + output);
     if (options.once) { console.log('Preview captures: ' + output); return; }
     if (options.watch) {
@@ -201,7 +214,7 @@ async function main(argv = process.argv.slice(2)) {
         const current = await prepareFrontend();
         if (page.isClosed() || !browser.isConnected()) return;
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await inspect(page, options, current.version, output);
+        await inspect(page, options, current.version, output, current);
         if (diagnostics.errors.length > errorCount) throw new Error('Refreshed preview has browser diagnostics; inspect ' + output);
       }, { onError: error => report(error.message) });
       for (const root of ['frontend_src', 'custom_components/marao_dashboard/frontend', 'custom_components/marao_dashboard/themes']) {

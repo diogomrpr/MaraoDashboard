@@ -1,0 +1,37 @@
+export const SETTINGS_VERSION = 1;
+const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+export function validateDashboardSettings(value) {
+  if (!object(value) || value.version !== SETTINGS_VERSION) throw new Error('Unsupported Marao dashboard settings version.');
+  if (!object(value.navbar) || !Array.isArray(value.navbar.routes)) throw new Error('Marao navigation requires a route list.');
+  for (const route of value.navbar.routes) {
+    if (!object(route) || typeof (route.url || route.path) !== 'string' || !(route.url || route.path).trim()
+      || typeof route.label !== 'string' || !route.label.trim()) throw new Error('Each navigation destination needs an address and label.');
+    const address = route.url || route.path;
+    if (!address.startsWith('/') && !/^https?:\/\//i.test(address)) throw new Error('Navigation addresses must be dashboard paths or HTTP links.');
+  }
+  for (const key of ['show_cache_reset', 'show_editor_button']) if (Object.hasOwn(value, key) && typeof value[key] !== 'boolean') throw new Error('Marao shortcut settings must be booleans.');
+  return value;
+}
+
+export function readDashboardSettings(document) {
+  if (!Object.hasOwn(document || {}, 'marao')) return undefined;
+  return validateDashboardSettings(document.marao);
+}
+
+export function patchDashboardSettings(document, settings) {
+  if (!object(document) || document.strategy || !Array.isArray(document.views)) throw new Error('Use an ordinary Home Assistant dashboard.');
+  if (Object.hasOwn(document, 'marao')) readDashboardSettings(document);
+  validateDashboardSettings(settings);
+  return {...structuredClone(document), marao: structuredClone(settings)};
+}
+
+export async function saveDashboardSettings(hass, path, baseline, settings, isCurrent) {
+  const permitted = () => hass.user?.is_admin && isCurrent();
+  if (!permitted()) throw new Error('settings_stale');
+  const current = await hass.callWS({type:'lovelace/config',url_path:path,force:true});
+  if (!permitted() || JSON.stringify(current) !== JSON.stringify(baseline)) throw new Error('settings_stale');
+  const config = patchDashboardSettings(current, settings);
+  await hass.callWS({type:'lovelace/config/save',url_path:path,config});
+  return config;
+}

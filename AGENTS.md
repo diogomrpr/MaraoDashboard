@@ -43,9 +43,9 @@ keep future work in changes and archive only completed, verified work.
 
 ## Product and architecture
 
-- Marao is a complete mobile Home Assistant dashboard: integration, visual
-  builder, generator, project-owned cards, popovers, navbar, theme, and test
-  gallery. It is not a camera-only project.
+- Marao is a complete mobile Home Assistant dashboard: frontend package, native
+  card editors, historical conversion, project-owned cards, popovers, navbar,
+  theme, and test gallery. It is not a camera-only project.
 - Keep the frontend self-contained. Prefer Home Assistant or browser-native
   features and do not bundle, install, modify, or depend on third-party cards.
 - Preserve Marao's identity and documentation. Keep the README's single

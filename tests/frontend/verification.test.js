@@ -80,12 +80,14 @@ test('focused components retain shared consumers and exclude unrelated suites', 
   assert.equal(checksFor(selectComponents(['docs/docs/development/local-development.md'])).length, 0);
 });
 
-test('editor browser evidence includes the delegated gesture and JSON checks', () => {
-  const selected=checksFor(selectComponents([], ['editor-drag', 'json-editor'])).filter(check=>check.kind==='browser');
-  assert.ok(selected.length);
-  for (const check of selected) for (const file of ['tests/test-ha-editor.js','tests/editor-drag-checks.js','tests/json-editor-checks.js']) {
-    assert.ok(check.inputs.includes(file), check.id+' is missing '+file);
-  }
+test('retired builder scopes retain offline checks without selecting absent browser editors', () => {
+  const selected=checksFor(selectComponents([], ['editor-ui','editor-preload','editor-rendering','editor-drag','json-editor']));
+  assert.ok(selected.some(check=>check.id==='unit:editor-panel'));
+  assert.ok(selected.every(check=>check.kind==='offline'));
+  assert.ok(!selected.some(check=>check.command.includes('tests/test-ha-editor.js')||check.command.some(arg=>['--editor-rendering','--editor-drag','--json-editor'].includes(arg))));
+  const native=checksFor(selectComponents([], ['native-source']));
+  assert.ok(native.some(check=>check.id==='unit:native-card-editor'));
+  assert.ok(!native.some(check=>check.command.includes('tests/test-ha-editor.js')));
 });
 
 test('slider header scope retains geometry, optional variants and safe gestures without unrelated suites', () => {
@@ -208,17 +210,16 @@ test('navbar overflow scope covers configuration, preservation, native, geometry
   assert.ok(!plan.checks.some(check=>/mobile-matrix|editor-drag|json-editor|preserved-upgrade/.test(check.id)));
 });
 
-test('UI batch selection keeps bounded runtime and editor consumers without historical matrices', () => {
+test('UI batch selection retains runtime consumers and historical editor units without retired browser routes', () => {
   const selection = selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js', 'custom_components/marao_dashboard/frontend/MaraoDashboard.js',
     'frontend_src/MaraoDashboardPanel.js', 'tests/test-ha-dashboard-accessibility.js', 'tests/test-ha-editor.js', 'tests/measure-ha-editor.js', 'tests/editor-rendering-checks.js'], ['battery-groups', 'access-label', 'editor-rendering']);
   assert.deepEqual(selection.components, ['access-label', 'battery-groups', 'editor-rendering']);
   const checks = checksFor(selection);
   assert.ok(checks.some(c => c.command.includes('--battery')));
   assert.ok(checks.some(c => c.command.includes('--access')));
-  assert.ok(checks.some(c => c.command.includes('--rendering')));
-  assert.ok(checks.some(c => c.command.includes('--drag-save')));
+  assert.ok(checks.some(c => c.id==='unit:editor-panel'));
+  assert.ok(!checks.some(c => c.command.includes('--rendering')||c.command.includes('--drag-save')||c.command.includes('tests/test-ha-editor.js')));
   assert.ok(!checks.some(c => /mobile-matrix|preserved-upgrade|native-reconnect|camera/.test(c.id)));
-  for (const c of checks.filter(c => c.command.includes('tests/test-ha-editor.js'))) assert.ok(c.inputs.includes('tests/editor-rendering-checks.js'));
 });
 
 test('camera title forms select the supported builder and exclude retired native authoring', () => {

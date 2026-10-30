@@ -23,6 +23,9 @@ const context = vm.createContext({
   BRAND_MARK: '/brand/mark.svg?v=test', BRAND_MARK_DARK: '/brand/mark-dark.svg?v=test',
   confirm: (message) => { confirmations.push(message); return false; },
 });
+const sharedForms = await fs.readFile(new URL('../../frontend_src/card-form-tools.js', import.meta.url), 'utf8');
+vm.runInContext(sharedForms.slice(sharedForms.indexOf('const formEsc')).replace('export const cardFormMethods =', 'globalThis.cardFormMethods ='), context);
+
 // Execute the actual panel with only browser/Monaco imports omitted.
 vm.runInContext(source.slice(source.indexOf("const TEXT =")).replaceAll("import.meta.url", '"https://example.invalid/MaraoDashboardPanel.js?v=test"'), context);
 
