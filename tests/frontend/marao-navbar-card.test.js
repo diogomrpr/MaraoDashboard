@@ -39,8 +39,8 @@ test("ported sheets copy theme colors while viewport insets keep inheriting live
 test("navbar and sheets share the host-aware inset fallback", () => {
   assert.match(source, /var\(--marao-safe-area-inset-\$\{side\}, var\(--safe-area-inset-\$\{side\}, env\(safe-area-inset-\$\{side\}, 0px\)\)\)/);
   assert.match(source, /max\(24px, calc\(\(\$\{safeArea\("bottom"\)\} - 20px\) \* 2\)\)/);
-  assert.match(cardsSource, /padding:max\(50px, \$\{safeArea\("top"\)\}\) \$\{safeArea\("right"\)\} 0 \$\{safeArea\("left"\)\}/);
-  assert.match(cardsSource, /overflow:auto;padding:0 8px \$\{navbarBottomGap\(\)\};border-radius:22px/);
+  assert.match(cardsSource, /padding:max\(50px, \$\{safeArea\("top"\)\}\) max\(8px, \$\{safeArea\("right"\)\}\) max\(8px, \$\{safeArea\("bottom"\)\}\) max\(8px, \$\{safeArea\("left"\)\}\)/);
+  assert.match(cardsSource, /\.marao-popup-scroll\{[^}]*overflow:auto;padding:0 8px \$\{navbarBottomGap\(\)\}/);
   assert.doesNotMatch(cardsSource, /host\.style\.paddingBottom|padding-bottom:max\(8px/);
   assert.match(cardsSource, /max-height:min\(\$\{esc\(this\._config\.max_height\)\}, 100%\)/);
 });

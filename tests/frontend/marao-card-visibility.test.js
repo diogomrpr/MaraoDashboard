@@ -891,7 +891,7 @@ test("title cards render as text-only section headings", () => {
   assert.match(card.shadowRoot.innerHTML, /class="title">Living Room/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /class="state"|class="icon"/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action/);
-  assert.match(source, /\.body\.title-card \{[^}]*padding:0 0 20px;/);
+  assert.match(source, /\.body\.title-card \{[^}]*padding:0;/);
 });
 
 test("slider headers follow family and preserve optional controls and hidden fields", () => {
@@ -1684,6 +1684,24 @@ test("popup restores its original control or the live replacement after HA reren
   } finally {
     Object.assign(globalThis, previous);
   }
+});
+
+test('popup history restores the content scroller while the header shell stays stationary', () => {
+  const previous={document:globalThis.document,window:globalThis.window};
+  const sheet={scrollTop:17},scroll={scrollTop:240},parent={hidden:false,inert:false,after(){}},close={focus(){}};
+  const node=()=>Object.assign(new EventTarget(),{style:{},remove(){}});
+  globalThis.document={createElement:node};globalThis.window={history:{back(){}}};
+  try{
+    const popup=new MaraoPopupCard();let restored=0;
+    popup._overlay={querySelector:selector=>({'.marao-popup-sheet':sheet,'.marao-popup-scroll':scroll,'.marao-popup-content':parent,'.marao-popup-close':close})[selector]};
+    popup._historyContext={owner:{},kind:'sensor',restoreFocus(){restored++;}};popup._transientHistory=true;popup._refreshHistory=()=>{};
+    popup._showHistory();
+    assert.equal(popup._historyScroll,240);assert.equal(scroll.scrollTop,0);assert.equal(sheet.scrollTop,17);
+    assert.equal(parent.hidden,true);assert.equal(parent.inert,true);
+    scroll.scrollTop=80;popup._hideHistory(true);
+    assert.equal(scroll.scrollTop,240);assert.equal(sheet.scrollTop,17);
+    assert.equal(parent.hidden,false);assert.equal(parent.inert,false);assert.equal(restored,1);
+  }finally{Object.assign(globalThis,previous);}
 });
 
 test("popup preserves child cards while forwarding Home Assistant state updates", () => {
