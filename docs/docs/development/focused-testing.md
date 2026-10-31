@@ -328,7 +328,7 @@ native Visual controls. English startup does not request it. Locale failures
 keep the current draft and require explicit Retry; neither split changes the
 approved eager JS/CSS budgets.
 
-The `frontend-refresh` component covers the shared navbar's three-second hold,
+The `frontend-refresh` component covers the shared navbar's two-second hold,
 client recovery deadlines, platform fallbacks and unchanged auth/settings/page.
 `npm run test:ha:alignment -- --frontend-refresh` runs the selected loopback
 Chromium touch/WebKit pointer and native-wrapper cases, including deliberately

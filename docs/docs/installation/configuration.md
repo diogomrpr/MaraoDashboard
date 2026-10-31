@@ -61,7 +61,7 @@ has content, add only the `marao` block in HA's raw configuration editor and kee
 all existing views and other settings.** Choose one of those existing views for
 the initial destination so the navbar menu is reachable.
 
-Administrators can then hold anywhere on the bottom navbar for three seconds and
+Administrators can then hold anywhere on the bottom navbar for two seconds and
 open **Marao settings** (**Definições Marao**). Add, rename, reorder or remove
 shared destinations there. Destinations can be views in this dashboard or
 explicit HTTP links. A saved destination that no longer matches a current view
@@ -79,7 +79,7 @@ through HA's raw editor if you deliberately empty it.
 
 ## Open native editing and maintenance
 
-Administrators can use the main-page pencil or hold the navbar for three seconds
+Administrators can use the main-page pencil or hold the navbar for two seconds
 and select **Edit dashboard** (**Editar painel**). Both open Home Assistant's
 native editor. Its toolbar and card controls remain available while editing;
 Marao's viewing navbar and fullscreen adjustments return after editing ends.

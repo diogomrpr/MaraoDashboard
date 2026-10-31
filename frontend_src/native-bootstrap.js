@@ -1,4 +1,8 @@
 import {readDashboardSettings} from './dashboard-settings.js';
+// Cached older loaders publish installed metadata before loading this graph.
+if (globalThis.window?.MaraoInstalledFrontendPackage && !window.MaraoFrontendPackage) {
+  window.MaraoFrontendPackage = window.MaraoInstalledFrontendPackage;
+}
 const query = new URL(import.meta.url).search;
 const navigation = await import(new URL(`./MaraoNavigation.js${query}`, import.meta.url));
 const controllers = new Map();

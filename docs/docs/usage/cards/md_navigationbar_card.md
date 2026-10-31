@@ -50,7 +50,7 @@ floating over content. It loads with the navigation before optional dashboard co
 so it also works when a content module fails. The existing navbar hold gesture
 remains available and uses the same recovery action. Save or discard edits first.
 
-For administrators, a completed three-second navbar hold opens Maintenance with
+For administrators, a completed two-second navbar hold opens Maintenance with
 **Edit dashboard** and **Clear cache and refresh**. Editing is available on every
 page, including the main page and full-page floor plans, independently of the
 main-page editor shortcut's visibility. Other users retain direct hold-to-refresh.

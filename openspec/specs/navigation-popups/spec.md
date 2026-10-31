@@ -184,22 +184,22 @@ Numeric history opened from an existing Marao sheet SHALL replace its visible co
 - **THEN** history detail and retained parent content close and their pending work is invalidated
 - **AND** focus/inert state and the normal shell remain correct after leaving Marao
 
-### Requirement: Three-second navbar refresh hold
-The active horizontal Marao navbar SHALL accept a continuous primary-pointer hold of 3000 milliseconds on its surface, route icons or overflow toggle to request one frontend refresh. Generated and native navbar hosts SHALL share this behavior. Ordinary taps SHALL retain existing navigation and overflow semantics. A completed hold SHALL NOT also activate its underlying control.
+### Requirement: Two-second navbar refresh hold
+The active horizontal Marao navbar SHALL accept a continuous primary-pointer hold of 2000 milliseconds on its surface, route icons or overflow toggle to request one frontend refresh. Generated and native navbar hosts SHALL share this behavior. Ordinary taps SHALL retain existing navigation and overflow semantics. A completed hold SHALL NOT also activate its underlying control.
 
 #### Scenario: Holding an inactive destination
-- **WHEN** the user holds a visible destination for three seconds on the current page
+- **WHEN** the user holds a visible destination for two seconds on the current page
 - **THEN** one frontend refresh is requested for the current page
 - **AND** the held destination is not opened by the hold or its subsequent release/click
 
 #### Scenario: Holding the overflow toggle
-- **WHEN** the user completes a three-second hold on More
+- **WHEN** the user completes a two-second hold on More
 - **THEN** one refresh is requested without also toggling the overflow menu
 - **AND** no route selection or entity service call occurs
 
 #### Scenario: Normal navigation remains immediate
 - **WHEN** the user makes an ordinary short tap on a route or the overflow toggle
-- **THEN** the existing action occurs once on activation without a three-second delay
+- **THEN** the existing action occurs once on activation without a two-second delay
 - **AND** no frontend refresh is requested
 
 #### Scenario: Native and generated hosts
@@ -210,12 +210,12 @@ The active horizontal Marao navbar SHALL accept a continuous primary-pointer hol
 A refresh hold SHALL cancel on early release, movement exceeding a 10 CSS pixel tolerance from its start, leaving the navbar, pointer cancellation, another contact, scrolling, loss of visibility/focus, route change, editing/preview, modal ownership or host removal. Cancelled holds SHALL NOT refresh. Gesture handlers SHALL preserve scrolling, pinch zoom and later unrelated taps, and SHALL release timers/listeners/capture on cancellation or removal.
 
 #### Scenario: Early release
-- **WHEN** the pointer is released before 3000 milliseconds
+- **WHEN** the pointer is released before 2000 milliseconds
 - **THEN** progress ends and no refresh occurs
 - **AND** an ordinary short tap retains its existing action
 
 #### Scenario: Releasing an armed incomplete hold
-- **WHEN** hold progress has started and the user releases before three seconds
+- **WHEN** hold progress has started and the user releases before two seconds
 - **THEN** the incomplete hold neither refreshes nor activates its underlying destination or overflow toggle
 - **AND** the next independent short tap works normally
 
@@ -350,10 +350,10 @@ Marao SHALL retain one active navigation/recovery surface through same-dashboard
 - **AND** normal eligible use resumes after the owning protection ends
 
 ### Requirement: Uninterrupted refresh hold across the horizontal navbar
-A continuous eligible primary-pointer hold of 3000 milliseconds SHALL request one frontend refresh anywhere on the visible horizontal pill, including padding, gaps, destinations, icon descendants and More. Browser URL previews, context menus, selection and dragging SHALL NOT interrupt that hold. The vertical overflow menu SHALL retain its ordinary behavior.
+A continuous eligible primary-pointer hold of 2000 milliseconds SHALL request one frontend refresh anywhere on the visible horizontal pill, including padding, gaps, destinations, icon descendants and More. Browser URL previews, context menus, selection and dragging SHALL NOT interrupt that hold. The vertical overflow menu SHALL retain its ordinary behavior.
 
 #### Scenario: Android holds a route icon
-- **WHEN** a user holds the selected or an unselected destination icon or its nested graphic for three seconds in an Android browser or Companion WebView
+- **WHEN** a user holds the selected or an unselected destination icon or its nested graphic for two seconds in an Android browser or Companion WebView
 - **THEN** visible progress continues to one refresh without an intervening URL preview, link menu, selection or drag UI
 - **AND** the hold and its release do not navigate to that destination
 
@@ -364,11 +364,11 @@ A continuous eligible primary-pointer hold of 3000 milliseconds SHALL request on
 
 #### Scenario: Ordinary navigation and overflow remain usable
 - **WHEN** a user makes a short tap or ordinary keyboard activation on a destination or More, or scrolls/selects in the vertical overflow menu
-- **THEN** the corresponding existing action occurs once without a three-second delay
+- **THEN** the corresponding existing action occurs once without a two-second delay
 - **AND** no refresh starts and unrelated browser/page gestures remain unaffected
 
 #### Scenario: An interrupted hold is not completed later
-- **WHEN** a hold releases after arming but before three seconds, moves beyond the existing tolerance, leaves the bar, gains another contact, scrolls, loses focus/visibility, changes route or loses its owner
+- **WHEN** a hold releases after arming but before two seconds, moves beyond the existing tolerance, leaves the bar, gains another contact, scrolls, loses focus/visibility, changes route or loses its owner
 - **THEN** progress and completion timers are cancelled without refreshing or activating the held control
 - **AND** the next independent short tap or eligible hold works normally
 

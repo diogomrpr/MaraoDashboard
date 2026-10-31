@@ -25,24 +25,28 @@ Do not install a single JavaScript file without its accompanying assets.
 ## Refresh an open device after an update
 
 The stable loader reads the installed release manifest. Entry modules, deferred
-editor code, styles, fonts and workers use one content-identified graph. Startup,
+editor code, styles and fonts use one content-identified graph. Startup,
 foreground and reconnect checks discover a changed package. Recovery waits while
 a draft, popup or gesture is active; finish, save/export or discard edits before
 refreshing. An old cached session may require a full refresh/reopen once.
 
-The configured refresh button and three-second navbar hold remain fallbacks.
-They retain sign-in, preferences and the current dashboard route. An incomplete
+The configured refresh button and two-second navbar hold remain fallbacks.
+Browser recovery clears frontend Cache Storage, re-fetches the registered startup
+loader into the HTTP cache (including its HACS query parameters), then reloads.
+If the loader cannot be fetched, recovery reports a failure instead of reloading
+an old cached copy. Companion apps can use their native cache-reset command.
+These actions retain sign-in, preferences and the current dashboard route. An incomplete
 installation produces an error: finish downloading the complete package and
 refresh the client. A restart does not replace missing frontend files.
 
 ## Saved configuration and recovery
 
-The editable JSON lives inside the native strategy document in HA dashboard
-storage. Visual/JSON switches and previews are read-only. Successful explicit
-**Save & Generate** uses HA's native save; invalid/newer source is refused without
-resetting it. Saved selections, explicit emptiness, order, names and unknown/raw
-content are retained. Source-format migrations are adjacent steps, separate from
-package, envelope and compiler versions.
+Ordinary views and cards live in HA dashboard storage and use HA's native editor.
+Existing strategy sources remain read-only until explicit conversion through the
+former editor page. Recovery exports retain the original source and proposed
+document; native edits do not regenerate from migration provenance. Saved
+selections, explicit emptiness, order, names and unknown/raw content are retained.
+Dashboard settings versions remain separate from package and source versions.
 
 Export configuration before replacing it. A pre-save comparison catches an
 already changed baseline and retains conflicting drafts, but simultaneous

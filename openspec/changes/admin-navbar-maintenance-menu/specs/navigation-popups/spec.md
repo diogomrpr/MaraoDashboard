@@ -2,22 +2,22 @@
 
 ## MODIFIED Requirements
 
-### Requirement: Three-second navbar refresh hold
-For non-administrators, the active horizontal Marao navbar SHALL accept a continuous primary-pointer hold of 3000 milliseconds on its surface, route icons or overflow toggle to request one frontend refresh. Generated and native navbar hosts SHALL share this behavior. Ordinary taps SHALL retain existing navigation and overflow semantics. A completed hold SHALL NOT also activate its underlying control.
+### Requirement: Two-second navbar refresh hold
+For non-administrators, the active horizontal Marao navbar SHALL accept a continuous primary-pointer hold of 2000 milliseconds on its surface, route icons or overflow toggle to request one frontend refresh. Generated and native navbar hosts SHALL share this behavior. Ordinary taps SHALL retain existing navigation and overflow semantics. A completed hold SHALL NOT also activate its underlying control.
 
 #### Scenario: Holding an inactive destination
-- **WHEN** a non-administrator holds a visible destination for three seconds on the current page
+- **WHEN** a non-administrator holds a visible destination for two seconds on the current page
 - **THEN** one frontend refresh is requested for the current page
 - **AND** the held destination is not opened by the hold or its subsequent release/click
 
 #### Scenario: Holding the overflow toggle
-- **WHEN** a non-administrator completes a three-second hold on More
+- **WHEN** a non-administrator completes a two-second hold on More
 - **THEN** one refresh is requested without also toggling the overflow menu
 - **AND** no route selection or entity service call occurs
 
 #### Scenario: Normal navigation remains immediate
 - **WHEN** the user makes an ordinary short tap on a route or the overflow toggle
-- **THEN** the existing action occurs once on activation without a three-second delay
+- **THEN** the existing action occurs once on activation without a two-second delay
 - **AND** no frontend refresh is requested
 
 #### Scenario: Native and generated hosts
@@ -25,10 +25,10 @@ For non-administrators, the active horizontal Marao navbar SHALL accept a contin
 - **THEN** each host requests the same local frontend refresh without changing its configured destinations or shell ownership
 
 ### Requirement: Uninterrupted refresh hold across the horizontal navbar
-For non-administrators, a continuous eligible primary-pointer hold of 3000 milliseconds SHALL request one frontend refresh anywhere on the visible horizontal pill, including padding, gaps, destinations, icon descendants and More. Browser URL previews, context menus, selection and dragging SHALL NOT interrupt that hold. The vertical overflow menu SHALL retain its ordinary behavior.
+For non-administrators, a continuous eligible primary-pointer hold of 2000 milliseconds SHALL request one frontend refresh anywhere on the visible horizontal pill, including padding, gaps, destinations, icon descendants and More. Browser URL previews, context menus, selection and dragging SHALL NOT interrupt that hold. The vertical overflow menu SHALL retain its ordinary behavior.
 
 #### Scenario: Android holds a route icon
-- **WHEN** a non-administrator holds the selected or an unselected destination icon or its nested graphic for three seconds in an Android browser or Companion WebView
+- **WHEN** a non-administrator holds the selected or an unselected destination icon or its nested graphic for two seconds in an Android browser or Companion WebView
 - **THEN** visible progress continues to one refresh without an intervening URL preview, link menu, selection or drag UI
 - **AND** the hold and its release do not navigate to that destination
 
@@ -39,11 +39,11 @@ For non-administrators, a continuous eligible primary-pointer hold of 3000 milli
 
 #### Scenario: Ordinary navigation and overflow remain usable
 - **WHEN** a user makes a short tap or ordinary keyboard activation on a destination or More, or scrolls/selects in the vertical overflow menu
-- **THEN** the corresponding existing action occurs once without a three-second delay
+- **THEN** the corresponding existing action occurs once without a two-second delay
 - **AND** no refresh starts and unrelated browser/page gestures remain unaffected
 
 #### Scenario: An interrupted hold is not completed later
-- **WHEN** a hold releases after arming but before three seconds, moves beyond the existing tolerance, leaves the bar, gains another contact, scrolls, loses focus/visibility, changes route or loses its owner
+- **WHEN** a hold releases after arming but before two seconds, moves beyond the existing tolerance, leaves the bar, gains another contact, scrolls, loses focus/visibility, changes route or loses its owner
 - **THEN** progress and completion timers are cancelled without refreshing or activating the held control
 - **AND** the next independent short tap or eligible hold works normally
 
@@ -111,7 +111,7 @@ Once HA supplies a valid nonempty navbar configuration, Marao SHALL make navigat
 ## ADDED Requirements
 
 ### Requirement: Administrator navbar maintenance menu
-A completed eligible three-second navbar hold SHALL open a maintenance menu only for the current administrator. Opening SHALL dispatch no refresh, editor navigation or underlying route/overflow click. Regular users SHALL retain direct refresh and SHALL never receive this menu. Ordinary taps, hold cancellation, strong haptics and browser-menu suppression SHALL retain their existing behavior.
+A completed eligible two-second navbar hold SHALL open a maintenance menu only for the current administrator. Opening SHALL dispatch no refresh, editor navigation or underlying route/overflow click. Regular users SHALL retain direct refresh and SHALL never receive this menu. Ordinary taps, hold cancellation, strong haptics and browser-menu suppression SHALL retain their existing behavior.
 
 #### Scenario: An administrator completes a hold
 - **WHEN** an administrator completes the hold anywhere on the eligible horizontal navbar

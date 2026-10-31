@@ -3,7 +3,7 @@ const { refreshFrontend, frontendRefreshInProgress } = await import(new URL(`./M
 // One document owns the subscription, even when HA replaces its navbar or view.
 export function createFrontendUpdates({ host = window, loadedVersion, context, refresh = refreshFrontend }) {
   let hass, connection, unsubscribe, subscribing = false, stopped = false, busy = false, attempted = false;
-  let current, terminal = '', offline = false, generation = 0, subscriptionFailed = false, connected = false;
+  let current, terminal = '', offline = false, generation = 0, subscriptionFailed = false, connected = false, updateCheckFailed = false;
   const pending = new Map(), pointers = new Set();
   const storageKey = dashboard => `marao:frontend-refresh:${dashboard}`;
   const read = dashboard => JSON.parse(host.sessionStorage.getItem(storageKey(dashboard)) || '{"requests":[]}');
@@ -51,6 +51,8 @@ export function createFrontendUpdates({ host = window, loadedVersion, context, r
     if (stopped) return;
     // Unload is a pause, not a version to load. The same subscription receives setup.
     if (!payload?.dashboard || !payload.fingerprint) { current = undefined; return; }
+    // A successful check resolves its own error; failed reloads retain their loop guard.
+    if (updateCheckFailed) { updateCheckFailed = false; terminal = ''; report(''); }
     const changed = current?.fingerprint !== payload.fingerprint;
     current = payload;
     if (changed) { terminal = ''; offline = false; }
@@ -93,7 +95,7 @@ export function createFrontendUpdates({ host = window, loadedVersion, context, r
           // HA regenerates the strategy after native saves; reload only when the installed graph changes.
           receive({dashboard,fingerprint:info.identity});
         };
-        remove = await connection.subscribeEvents(event => { void installed(event).catch(error => {if (stopped || token !== generation) return;terminal='failed';report(terminal);host.console?.warn('Marao native update check failed',error);}); },'lovelace_updated');
+        remove = await connection.subscribeEvents(event => { void installed(event).catch(error => {if (stopped || token !== generation) return;updateCheckFailed=true;terminal='failed';report(terminal);host.console?.warn('Marao native update check failed',error);}); },'lovelace_updated');
         try { await installed(); } catch (error) {await remove();throw error;}
       } else remove = await connection.subscribeMessage(payload => { if (token === generation) receive(payload); }, { type: 'marao_dashboard/frontend/subscribe' });
       if (stopped || token !== generation) await remove();
@@ -105,7 +107,7 @@ export function createFrontendUpdates({ host = window, loadedVersion, context, r
     } catch (error) {
       if (stopped || token !== generation) return;
       // Older servers can lack this optional endpoint; normal rendering continues.
-      subscriptionFailed = true; terminal = 'failed'; report(terminal);
+      subscriptionFailed = true; updateCheckFailed = true; terminal = 'failed'; report(terminal);
       host.console?.warn('Marao frontend update subscription failed', error);
     } finally {
       subscribing = false;

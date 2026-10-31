@@ -59,7 +59,7 @@ test('frontend refresh gallery and realistic page describe the safe shared-navba
   assert.ok(manifest.frontendRefreshCoverage.includes('android-icon-hold-without-url-preview'));
   const source = require('../../ha-test/marao_dashboard_test_dashboard.json');
   const studio = source.pages.find(page => page.path === 'studio');
-  assert.match(JSON.stringify(studio), /Hold a navbar icon for three seconds/);
+  assert.match(JSON.stringify(studio), /Hold a navbar icon for two seconds/);
   assert.match(JSON.stringify(view), /Releasing early cancels/);
 });
 

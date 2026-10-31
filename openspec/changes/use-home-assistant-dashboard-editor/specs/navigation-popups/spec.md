@@ -41,6 +41,11 @@ Ordinary opted-in dashboards SHALL retain Marao styling and shared single-row ov
 ### Requirement: Dashboard-wide navbar configuration
 An opted-in dashboard SHALL have one persisted navbar definition shared across all its views and devices. Settings SHALL preserve route order, labels/icons, external URLs, unknown options, explicit emptiness and main-page shortcut preferences. Saving navbar settings SHALL preserve unrelated native dashboard content. Native view changes SHALL NOT silently repopulate an explicitly configured route list.
 
+#### Scenario: Reordering destinations with grab handles
+- **WHEN** an administrator drags a destination by its visible grab handle in Marao settings
+- **THEN** Home Assistant's native sortable control updates the draft order while preserving each destination's complete configuration
+- **AND** move up/down actions remain available, Save applies the order and closing without saving leaves the stored navbar unchanged
+
 #### Scenario: Navigation is edited once
 - **WHEN** an administrator changes the shared destination order or label
 - **THEN** every view uses the saved settings after the native update
@@ -79,7 +84,7 @@ Marao SHALL initialize one floating navbar automatically on every view of an opt
 - **AND** unrelated dashboards retain their normal appearance and controls
 
 ### Requirement: Native-authoring maintenance actions
-Every eligible three-second navbar hold SHALL retain the existing role-based maintenance behavior on every view. Administrators SHALL receive Edit dashboard and cache-refresh actions; ordinary users SHALL retain direct cache refresh. Edit dashboard SHALL target HA's editor. Main-page shortcut flags SHALL remain independent, and current modal, preview, gesture and unsaved-edit guards SHALL apply.
+Every eligible two-second navbar hold SHALL retain the existing role-based maintenance behavior on every view. Administrators SHALL receive Edit dashboard and cache-refresh actions; ordinary users SHALL retain direct cache refresh. Edit dashboard SHALL target HA's editor. Main-page shortcut flags SHALL remain independent, and current modal, preview, gesture and unsaved-edit guards SHALL apply.
 
 #### Scenario: An administrator holds a selected main-page destination
 - **WHEN** the administrator completes an eligible hold anywhere on the horizontal navbar

@@ -1,6 +1,35 @@
 export const SETTINGS_VERSION = 1;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 
+export function dashboardViewForAddress(document, dashboardPath, address, origin) {
+  let url;
+  try { url = new URL(address, origin); } catch { return undefined; }
+  if (url.origin !== origin) return undefined;
+  const parts = url.pathname.replace(/\/$/, '').split('/');
+  if (parts[1] !== dashboardPath || parts.length > 3) return undefined;
+  if (!parts[2]) return document.views?.[0];
+  let viewPath;
+  try { viewPath = decodeURIComponent(parts[2]); } catch { return undefined; }
+  return document.views?.find((view, index) => String(view.path ?? index) === viewPath);
+}
+
+// Native forms emit their complete value; patch only deliberate edits to retain opaque route data.
+export function patchNavbarRoute(route, previous, next) {
+  const result = {...route};
+  for (const key of ['label', 'icon', 'destination']) {
+    if (next[key] === previous[key]) continue;
+    result[key === 'destination' ? (route.url ? 'url' : 'path') : key] = next[key] || '';
+  }
+  return result;
+}
+
+export function moveNavbarRoute(routes, oldIndex, newIndex) {
+  if (![oldIndex, newIndex].every(index => Number.isInteger(index) && index >= 0 && index < routes.length) || oldIndex === newIndex) return routes;
+  const next = routes.slice();
+  next.splice(newIndex, 0, next.splice(oldIndex, 1)[0]);
+  return next;
+}
+
 export function validateDashboardSettings(value) {
   if (!object(value) || value.version !== SETTINGS_VERSION) throw new Error('Unsupported Marao dashboard settings version.');
   if (!object(value.navbar) || !Array.isArray(value.navbar.routes)) throw new Error('Marao navigation requires a route list.');

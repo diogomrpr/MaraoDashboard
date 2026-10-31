@@ -1,6 +1,6 @@
 const operations = new WeakMap();
 const recoveryParameter = 'marao_cache_bust';
-export const NAVBAR_HOLD_MS = 3000;
+export const NAVBAR_HOLD_MS = 2000;
 const failure = code => Object.assign(new Error(code), { code });
 
 export function cleanFrontendRefreshURL(href) {
@@ -108,6 +108,20 @@ export function refreshFrontend({ host = window, isDirty = () => host.isDirtySta
       host.console?.warn('Marao frontend cache cleanup failed', error);
     } finally { cleanup.abort(failure('interrupted')); signal.removeEventListener('abort', abortCleanup); }
     active();
+    if (host.MaraoFrontendPackage) {
+      const loader = new URL('./MaraoFrontend.js', new URL(host.MaraoFrontendPackage.manifestURL, host.location.origin));
+      const matches = value => { try { const url = new URL(value); return url.origin === host.location.origin && url.pathname === loader.pathname; } catch { return false; } };
+      const entry = host.MaraoFrontendPackage.entryURL
+        || host.performance?.getEntriesByType?.('resource').find(entry => matches(entry.name))?.name || loader.href;
+      if (!matches(entry)) throw failure('failed');
+      // Refresh the actual HTTP cache key (including HACS query parameters), not just Cache Storage.
+      await bounded(async () => {
+        const fresh = await host.fetch(entry, { method: 'GET', cache: 'reload', credentials: 'same-origin', redirect: 'error', signal });
+        if (!fresh.ok) throw failure('failed');
+        await fresh.text();
+      }, 5000, signal);
+      active();
+    }
     const freshURL = frontendRefreshURL(originalURL);
     // Older Android apps intercept location.replace as an external link. Reload the updated current entry instead.
     if (host.externalApp || host.externalAppV2) {

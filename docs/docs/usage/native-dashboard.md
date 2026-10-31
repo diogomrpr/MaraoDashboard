@@ -25,9 +25,14 @@ views and direct links. Adding a Marao card to an ordinary dashboard does not
 change Home Assistant's shell. See [configuration](../installation/configuration.md)
 for shared settings and initial opt-in.
 
-Administrators can use the pencil or hold the navbar for three seconds and select
+Administrators can use the pencil or hold the navbar for two seconds and select
 **Edit dashboard**. Native editing restores Home Assistant's toolbar. The same
 menu opens **Marao settings** for global destinations and shortcut preferences.
+Destinations start collapsed. Expand a row to choose a page with Home Assistant's
+native navigation picker, change its display name or select an icon with the
+native icon picker. Drag a page by its grab handle to change the order, or use
+Home Assistant's move up/down actions in the page options menu. **Add a page or destination** lists dashboard views;
+custom links remain supported by the same picker. Changes apply only on **Save**.
 An explicit empty navigation list stays empty. If all Marao editing entry points
 are hidden, administrators retain Home Assistant's native header/edit controls.
 

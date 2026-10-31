@@ -9,7 +9,7 @@ const localization = 'const navigationTranslations = ' + navigationTranslations 
 function documentHTML(version) {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="fixture-build" content="${version}"><link rel="icon" href="data:,"><style>
   :root{--ha-card-background:#eaf0f8;--primary-text-color:#142e50;--primary-color:#28629e;--text-primary-color:#fff;--divider-color:#8297b1;--safe-area-inset-bottom:34px;--safe-area-inset-left:0px;--safe-area-inset-right:0px;--safe-area-inset-top:0px}body{margin:0;font-family:Montserrat,system-ui,sans-serif;background:var(--ha-card-background);color:var(--primary-text-color)}main{padding:16px;min-height:180vh}h1{font-size:1.3rem}ha-icon{display:inline-grid;place-items:center;width:26px;height:26px}ha-icon:before{content:'●'}
-  </style></head><body><main><h1>Safe frontend refresh fixture</h1><p>Hold the navbar for three seconds. No entity actions.</p></main><script>${localization}
+  </style></head><body><main><h1>Safe frontend refresh fixture</h1><p>Hold the navbar for two seconds. No entity actions.</p></main><script>${localization}
   window.MaraoDashboard={localize};window.services=0;window.haptics=[];addEventListener('haptic',event=>haptics.push(event.detail));
   // Reproduce HA's recovery cleanup, including its omission of the fragment.
   const haRecovery=new URL(location.href);if(haRecovery.searchParams.has('ha_cache_bust')){haRecovery.searchParams.delete('ha_cache_bust');history.replaceState(null,'',haRecovery.pathname+haRecovery.search);}

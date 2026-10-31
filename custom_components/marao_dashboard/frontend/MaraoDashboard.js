@@ -4,7 +4,7 @@ if (!window.MaraoDashboardRuntime) {
   const state = window.MaraoDashboardRuntime = {};
   const identity = new URL(import.meta.url).pathname.match(/\/([a-f0-9]{64})--MaraoDashboard\.js$/)?.[1];
   const root = new URL('./',import.meta.url);
-  window.MaraoFrontendPackage = identity ? {identity,package_version:window.MaraoInstalledFrontendPackage?.package_version,rootURL:root.href,baseURL:root.href,manifestURL:new URL('MaraoFrontend.release.json',root).href} : undefined;
+  window.MaraoFrontendPackage = identity ? {identity,package_version:window.MaraoInstalledFrontendPackage?.package_version,entryURL:window.MaraoInstalledFrontendPackage?.entryURL,rootURL:root.href,baseURL:root.href,manifestURL:new URL('MaraoFrontend.release.json',root).href} : undefined;
   state.navigation = (async () => {
     while (!globalThis.customElements?.get('home-assistant')) await new Promise(resolve => setTimeout(resolve,16));
     return import(new URL(`./MaraoNavigation.js${query}`,import.meta.url));

@@ -62,6 +62,22 @@ test('native configuration events use HA rendering while graph changes defer and
   e.host.dispatchEvent(new Event('focus'));await flush();assert.equal(e.refreshes.length,1);
 });
 
+test('a successful native check clears a transient check failure without clearing a failed reload guard', async t => {
+  const e=automatic(t,{native:true,version:'a'.repeat(64)});await flush();
+  const fetch=e.host.fetch,warnings=[];e.host.console.warn=(...args)=>warnings.push(args);
+  e.host.fetch=async()=>{throw Error('Temporary manifest failure');};
+  e.nativeEvent({url_path:'marao-dashboard'});await flush();
+  assert.equal(e.statuses.at(-1),'failed');assert.equal(warnings.length,1);
+  e.host.fetch=fetch;e.host.dispatchEvent(new Event('focus'));await flush();
+  assert.equal(e.statuses.at(-1),'');assert.equal(e.refreshes.length,0);
+  e.install('b'.repeat(64));e.nativeEvent({url_path:'marao-dashboard'});await flush();
+  assert.equal(e.refreshes.length,1);
+  e.host.dispatchEvent(new Event('focus'));await flush();
+  assert.equal(e.statuses.at(-1),'failed','An old document must still refuse a repeated reload');
+  e.host.dispatchEvent(new Event('focus'));await flush();
+  assert.equal(e.statuses.at(-1),'failed');assert.equal(e.refreshes.length,1);
+});
+
 test('native cached drafts survive suspension and offline reconnect before one coherent refresh', async t => {
   const e=automatic(t,{native:true,version:'a'.repeat(64)});await flush();
   e.view.blocked=true;e.doc.dispatchEvent(pointer('pointerdown'));
@@ -164,6 +180,27 @@ test('HTTP without web cache APIs reloads once without settings access or extra 
   assert.equal(new URL(requests[0][0]).pathname, '/marao_dashboard_static/MaraoFrontendRefresh.js', 'Dashboard views reject HEAD; use the owned static route');
 });
 
+test('native cache refresh replaces the exact startup loader HTTP cache entry before navigating', async t=>{
+  const e=environment(t),order=[],base=e.host.location.origin+'/hacsfiles/custom-folder/';
+  const registered=base+'MaraoFrontend.js?hacstag=old';
+  e.host.MaraoFrontendPackage={rootURL:base,manifestURL:base+'MaraoFrontend.release.json'};
+  e.host.performance.getEntriesByType=()=>[{name:'https://else.invalid/MaraoFrontend.js'}, {name:registered}];
+  e.host.caches={keys:async()=>{order.push('clear');return [];}};
+  e.host.fetch=async(url,options)=>{e.requests.push([url,options]);return {ok:true,text:async()=>{order.push('loader-consumed');return 'fresh startup';}};};
+  const replace=e.host.location.replace;e.host.location.replace=url=>{order.push('navigate');replace(url);};
+  await e.run();
+  assert.equal(e.requests.length,2);assert.equal(e.requests[1][0],registered);
+  assert.equal(e.requests[1][1].method,'GET');assert.equal(e.requests[1][1].cache,'reload');
+  assert.deepEqual(order,['clear','loader-consumed','navigate']);assert.equal(e.urls.length,1);
+});
+
+test('a missing startup loader reports failure instead of reloading the old cached package',async t=>{
+  const e=environment(t),base=e.host.location.origin+'/hacsfiles/example/';
+  e.host.MaraoFrontendPackage={rootURL:base,manifestURL:base+'MaraoFrontend.release.json',entryURL:base+'MaraoFrontend.js?hacstag=registered'};
+  e.host.fetch=async(url,options)=>{if(options.method==='GET')assert.equal(url,e.host.MaraoFrontendPackage.entryURL);return {ok:options.method==='HEAD',text:async()=>''};};
+  await assert.rejects(e.run(),{code:'failed'});assert.equal(e.urls.length,0);assert.equal(e.statuses.at(-1),'failed');
+});
+
 test('supported native reset unloads without a second web navigation', async t => {
   const e = environment(t); const messages = [];
   e.host.webkit = { messageHandlers: { externalBus: { postMessage(message) { messages.push(message); e.host.dispatchEvent(new Event('pagehide')); } } } };
@@ -241,9 +278,9 @@ function navbar(t) {
   return { ...e, nav, binding, feedback, disable: () => { eligible = false; }, state: () => ({ completed, haptics, progress }) };
 }
 
-test('3000ms gesture completes once, consumes a late release and permits the next ordinary tap', t => {
+test('2000ms gesture completes once, consumes a late release and permits the next ordinary tap', t => {
   const e = navbar(t); e.nav.dispatchEvent(pointer('pointerdown')); t.mock.timers.tick(500);
-  assert.equal(e.state().haptics, 1); t.mock.timers.tick(2499); assert.equal(e.state().completed, 0);
+  assert.equal(e.state().haptics, 1); t.mock.timers.tick(1499); assert.equal(e.state().completed, 0);
   t.mock.timers.tick(1); assert.equal(e.state().completed, 1); assert.equal(e.state().haptics, 2);
   assert.deepEqual(e.feedback,['start','cancel'],'Completed holds retain their own completion feedback');
   t.mock.timers.tick(10000); e.doc.dispatchEvent(pointer('pointerup'));

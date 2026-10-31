@@ -1432,7 +1432,7 @@
               "id": "studio-title",
               "template": "md_title_card",
               "name": "Studio controls",
-              "label": "Hold a navbar icon for three seconds to refresh this device. The same hold works between icons. Sign-in, settings and the current page are kept. Pressed icons and overflow controls stay rounded without a square highlight.",
+              "label": "Hold a navbar icon for two seconds to refresh this device. The same hold works between icons. Sign-in, settings and the current page are kept. Pressed icons and overflow controls stay rounded without a square highlight.",
               "show_icon": false,
               "show_state": false
             }
