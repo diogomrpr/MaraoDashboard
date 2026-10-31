@@ -55,6 +55,39 @@ test('retained raw cards block services, navigation and fullscreen as soon as na
   assert.equal(services, 0); assert.equal(fullscreen, 0);
 });
 
+test('preview keeps authoritative entity state and connection while refreshing controls on mode changes',async()=>{
+  const card=new MaraoCard(),renders=[];let services=0;
+  const hass={connected:true,connection:{connected:true},states:{'switch.safe':{state:'on',attributes:{friendly_name:'Safe switch'}}},callService(){services++;}};
+  card._config={template:'md_switch_card',entity:'switch.safe'};card._stateEntities=['switch.safe'];
+  card._render=()=>renders.push({preview:card.preview,connected:card.hass.connected,state:card.hass.states['switch.safe'].state});
+  card.hass=hass;card.preview=true;
+  assert.equal(card.hass,hass);assert.equal(card.hass.connection,hass.connection);
+  assert.deepEqual(renders.at(-1),{preview:true,connected:true,state:'on'});
+  await card._callService('switch','turn_off',{entity_id:'switch.safe'});
+  card._performAction({action:'toggle'},'switch.safe');assert.equal(services,0);
+  const count=renders.length;card.preview=false;
+  assert.equal(renders.length,count+1,'Leaving preview must update controls even when the entity did not change');
+  assert.deepEqual(renders.at(-1),{preview:false,connected:true,state:'on'});
+  card.preview=true;const offline={...hass,connected:false,connection:{connected:false}};card.hass=offline;
+  assert.equal(card.hass,offline);assert.equal(renders.at(-1).connected,false,'Real disconnection stays authoritative in preview');
+});
+
+test('cards mounted before runtime translations refresh once on readiness and release the listener on removal',()=>{
+  const previous=globalThis.window,host=new EventTarget(),card=new MaraoCard();let renders=0,label;
+  globalThis.window=host;
+  card.isConnected=true;card._ensurePress=()=>{};card._observeGraph=()=>{};card._subscribeClimate=()=>{};
+  card._render=()=>{renders++;label=host.MaraoDashboard?.localize('camera.snapshot')||'camera.snapshot';};
+  try{
+    card.connectedCallback();assert.equal(label,'camera.snapshot');
+    host.MaraoDashboard={localize:()=> 'Imagem estática'};
+    host.dispatchEvent(new Event('marao-runtime-ready'));assert.equal(label,'Imagem estática');
+    const count=renders;host.dispatchEvent(new Event('marao-runtime-ready'));assert.equal(renders,count);
+    card.disconnectedCallback();delete host.MaraoDashboard;card.connectedCallback();
+    card.isConnected=false;card.disconnectedCallback();
+    const removedCount=renders;host.dispatchEvent(new Event('marao-runtime-ready'));assert.equal(renders,removedCount);
+  }finally{globalThis.window=previous;}
+});
+
 test('retained raw sheets close before handling history/hash state in native edit mode', () => {
   const { owner, host } = fixture();
   const popup = new MaraoPopupCard(); popup.parentNode = owner.parentNode;

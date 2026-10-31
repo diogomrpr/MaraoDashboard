@@ -2172,6 +2172,7 @@ window.MaraoDashboard = {
   version: "Marao Dashboard v0.3.1"
 };
 
+window.dispatchEvent(new Event('marao-runtime-ready'));
 console.info("%c Marao Dashboard loaded", "color: #d4b392; font-weight: 700;");
 
 // Optional content must not delay registration of basic dashboard cards.

@@ -130,7 +130,7 @@ test('native preview and live native editing forward inert state before hass and
   owner._forward();
   assert.equal(owner._content.inert, true);
   assert.equal(child.nativeOwner, owner);
-  assert.deepEqual(order, [['preview', true], ['hass', false]]);
+  assert.deepEqual(order, [['preview', true], ['hass', true]]);
   owner._host.lovelace.editMode = false; order.length = 0; owner._forward();
   assert.deepEqual(order, [['preview', false], ['hass', true]]);
   owner.preview = true; assert.equal(owner._content.inert, true);

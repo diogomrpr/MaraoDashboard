@@ -154,11 +154,10 @@ export class MaraoNativeCard extends HTMLElementBase {
     if (this.isConnected) this._theme?.applyTheme(this, this._hass);
     const preview = this.preview;
     this._content.inert = preview;
-    const hass = preview && this._hass ? { ...this._hass, connected: false, connection: { ...this._hass.connection, connected: false } } : this._hass;
     for (const child of this._children) {
       child.nativeOwner = this;
       child.preview = preview;
-      child.hass = hass;
+      child.hass = this._hass;
     }
   }
 

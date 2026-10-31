@@ -1183,6 +1183,8 @@ export class MaraoCard extends BaseElement {
     if (historyIdentity(this._config) !== historyIdentity(config)) { this._graphRequests.clear(); this._graphHistory.clear(); this._graphErrors.clear(); this._graphData = null; this._ownedGraphRecords = null; } this._config = { ...config }; if (previousGraph !== this._graphEntity()) this._activeHistoryPopup?._invalidateHistory(); this._actionError = ""; this._mediaError = ""; this._mediaURL = ""; this._actionRequest = (this._actionRequest || 0) + 1; this._subscribeClimate(); this._observeGraph(); this._render(); }
   connectedCallback() {
     this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => { this.preview = this._preview; });
+    this._runtimeReady ||= () => { if (this.isConnected) this._render(); };
+    if (!globalThis.window?.MaraoDashboard?.localize) globalThis.window?.addEventListener?.('marao-runtime-ready', this._runtimeReady, {once:true});
     this._ensurePress();
     this._nativeGridItem = fitNativeGrid(this, 76); // 48px control plus the normal 14px side insets.
     this._observeGraph();
@@ -1199,7 +1201,8 @@ export class MaraoCard extends BaseElement {
   }
   set hass(value) {
     this._authoritativeHass = value;
-    if (this.preview && value) value = { ...value, connected: false, connection: { ...value.connection, connected: false } };
+    const previewChanged = this._renderedPreview !== this.preview;
+    this._renderedPreview = this.preview;
     const entity = text(this._config.entity);
     const previous = this._hass;
     const previousReferences = this._stateReferences;
@@ -1232,7 +1235,7 @@ export class MaraoCard extends BaseElement {
     this._graphAvailabilityState = graphAvailability;
     const accessSlide = this.shadowRoot?.querySelector('marao-slide-to-open');
     // Keep the elements under a scrolling finger mounted when other entities update.
-    if (previous?.states && value?.states && this._config.template !== 'md_header_card'
+    if (!previewChanged && previous?.states && value?.states && this._config.template !== 'md_header_card'
       && wasServiceReady === this._serviceReady
       && previous.connected === value.connected && previous.connection?.connected === value.connection?.connected
       && ["themes", "locale", "language", "localize", "entities", "services", "config", "callApi"].every(key => previous[key] === value[key])
@@ -1242,7 +1245,7 @@ export class MaraoCard extends BaseElement {
     }
     // Home Assistant updates all cards when unrelated entities change. Keep
     // the pressed control mounted until its own state or connection changes.
-    if (this._holdActive && serviceConnectionReady(value)
+    if (!previewChanged && this._holdActive && serviceConnectionReady(value)
       && (!this._secondaryHistory || !this._graphAvailability(graphEntity, value))
       && [this._config.tap_action, this._config.hold_action].every((action) => !isServiceAction(action) || serviceTargetReady(value, action?.target?.entity_id || action?.data?.entity_id || action?.entity_id || entity))
       && previousState && previousState === value?.states?.[entity]
@@ -1252,6 +1255,7 @@ export class MaraoCard extends BaseElement {
   get hass() { return this._hass; }
   disconnectedCallback() {
     this._stopNativeEditing?.(); this._stopNativeEditing = null;
+    globalThis.window?.removeEventListener?.('marao-runtime-ready', this._runtimeReady);
     this._press?.destroy(); this._press = null;
     this._nativeGridItem?.removeAttribute('data-marao-grid-76'); this._nativeGridItem = null;
     this._graphObserver?.disconnect(); this._graphObserver = null; this._graphVisible = undefined;

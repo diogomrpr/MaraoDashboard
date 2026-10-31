@@ -29,9 +29,14 @@ Object.defineProperty(globalThis, "navigator", {
   configurable: true,
   value: { language: "en", maxTouchPoints: 0 },
 });
+const runtimeEvents = [];
 globalThis.window = {
   location: { pathname: "/", hash: "" },
   addEventListener() {},
+  dispatchEvent(event) {
+    runtimeEvents.push({type:event.type,localized:typeof this.MaraoDashboard?.localize === 'function'});
+    return true;
+  },
   MaraoDashboard: {},
 };
 
@@ -109,6 +114,10 @@ const {
 } = await import(
   `data:text/javascript;base64,${Buffer.from(instrumentedSource).toString("base64")}`
 );
+
+test('runtime readiness is announced after translated labels become available', () => {
+  assert.deepEqual(runtimeEvents.filter(event => event.type === 'marao-runtime-ready'), [{type:'marao-runtime-ready',localized:true}]);
+});
 
 test("loads the bundled Montserrat stylesheet without a runtime font CDN", async () => {
   assert.match(source,/\.\/MaraoFonts\.css/);
