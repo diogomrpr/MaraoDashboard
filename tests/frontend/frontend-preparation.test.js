@@ -239,8 +239,8 @@ test('explicit ordinary native fixture preparation updates only owned code, rest
 
 test('native preparation refuses unsupported HA before building or uploading',async t=>{
   const f=await nativeFixture(t), before=f.remoteBytes(), api=f.dependencies.api;
-  f.dependencies.api=(config,method,endpoint,...args)=>endpoint==='/api/config'?{config_dir:f.remote,version:'2026.9.9'}:api(config,method,endpoint,...args);
-  await assert.rejects(prepareFrontend(f.config,f.dependencies),/2026.10.0/);
+  f.dependencies.api=(config,method,endpoint,...args)=>endpoint==='/api/config'?{config_dir:f.remote,version:'2025.11.9'}:api(config,method,endpoint,...args);
+  await assert.rejects(prepareFrontend(f.config,f.dependencies),/2025\.12\.0/);
   assert.ok(!f.calls.includes('build'));assert.deepEqual(f.remoteBytes(),before);
 });
 

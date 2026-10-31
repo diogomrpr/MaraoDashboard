@@ -65,7 +65,7 @@ SHALL tolerate HA rendering replacing the original invoking element.
 - **THEN** focus returns to the current matching opener and the background is usable again
 
 ### Requirement: Scroll containment and close clearance
-Sheets SHALL scroll their content below a stationary title and close control, with the scrollbar confined to that content area, without background scrolling. All four corners SHALL be rounded, with a device-safe inset at the sides and bottom. The close control SHALL remain unobstructed at enlarged text/zoom and short heights. Containment SHALL recognize native Marao sheets, preserve value-slider touch defaults and leave native sheet movement to the browser, including initial zero-vertical movement and boundary reversals. CSS SHALL contain native-sheet overscroll. The backdrop SHALL remain guarded without cancelling touches inside the sheet.
+Sheets SHALL scroll their content below a stationary title and close control, with the scrollbar confined to that content area, without background scrolling. All four corners SHALL be rounded, with device-safe side insets and an 8px outer bottom gap; bottom safe-area clearance SHALL remain inside the sheet. The close control SHALL remain unobstructed at enlarged text/zoom and short heights. Containment SHALL recognize native Marao sheets, preserve value-slider touch defaults and leave native sheet movement to the browser, including initial zero-vertical movement and boundary reversals. CSS SHALL contain native-sheet overscroll. The backdrop SHALL remain guarded without cancelling touches inside the sheet.
 
 #### Scenario: A fixed-height popup is scrolled at 200% zoom
 - **WHEN** the last cards reach the visible area
@@ -283,6 +283,8 @@ All shared popups SHALL default to content-driven height up to the viewport's
 available safe area, leaving at least 50 CSS pixels above the sheet or the top
 safe inset when larger. Generated popup families SHALL share this behavior.
 Explicit fixed/max height settings SHALL remain supported within these bounds.
+The sheet SHALL use an 8px outer bottom gap, with bottom safe-area clearance inside
+the content scroller so controls remain reachable without lifting the sheet.
 
 #### Scenario: Short and long sheets
 - **WHEN** popup content fits in a short sheet

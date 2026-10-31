@@ -14,7 +14,7 @@ the same URL. A normal Update on the old entry does not perform this migration.
 
 ## New installation
 
-1. Use stable Home Assistant **2026.10.0 or newer** and configured [HACS](https://www.hacs.xyz/docs/use/).
+1. Use stable Home Assistant **2025.12.0 or newer** and configured [HACS](https://www.hacs.xyz/docs/use/).
 2. Open HACS → three-dot menu → **Custom repositories**.
 3. Add `https://github.com/diogomrpr/MaraoDashboard` with category **Dashboard**.
 4. Open Marao Dashboard and select **Download**.

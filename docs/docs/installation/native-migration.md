@@ -16,7 +16,7 @@ Updating the package does not perform this conversion automatically.
 
 Keep the existing HACS **Dashboard** registration and resource. No integration
 removal, dashboard recreation or Home Assistant restart is needed for this step.
-Stable Home Assistant **2026.10.0 or newer** and administrator access are required.
+Stable Home Assistant **2025.12.0 or newer** and administrator access are required.
 The conversion action remains unavailable if the native editor compatibility
 check cannot establish support; the original strategy remains readable.
 
@@ -94,7 +94,7 @@ manual migration. Export drafts and keep a recoverable backup before removal.
 Download the [current converter](https://github.com/diogomrpr/MaraoDashboard/releases/latest/download/marao-converter.html)
 and open the HTML file locally. It needs only a browser: no Home Assistant login,
 dashboard builder, local server, command line or intermediate Marao release.
-Migration needs administrator access, stable HA **2026.10.0 or newer**, and a
+Migration needs administrator access, stable HA **2025.12.0 or newer**, and a
 one-time Home Assistant restart. Later updates use the HACS **Dashboard** package
 and a client refresh. Do not repeat this migration for normal frontend updates.
 
@@ -228,7 +228,7 @@ append only the Marao URL/type to its YAML resource list, then run HA’s built-
 API is intentionally unavailable in YAML mode; do not switch unrelated resource
 settings to work around it. A stable resource URL still loads the installed
 frontend manifest after later package updates. Use HA
-2026.10.0 or later stable; earlier/development versions are not accepted for writes.
+2025.12.0 or later stable; earlier/development versions are not accepted for writes.
 
 In **Settings → Dashboards**, create a normal editable dashboard at the recorded
 original address, with the recorded title/icon/sidebar/admin settings. If that

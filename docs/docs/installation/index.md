@@ -11,7 +11,7 @@ without a Marao Python integration. Existing users must follow the
 [manual migration guide](native-migration.md), keeping the same repository and
 dashboard address. Do not update the old Integration entry in place.
 
-For a new installation on stable Home Assistant **2026.10.0 or newer**:
+For a new installation on stable Home Assistant **2025.12.0 or newer**:
 
 1. [Download through HACS](downloads.md) using category **Dashboard**.
 2. Register the module resource once and refresh Home Assistant.

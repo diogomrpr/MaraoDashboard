@@ -45,6 +45,8 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     for (const [file,hash] of Object.entries(manifest.files)) assert.equal(createHash('sha256').update(fs.readFileSync(path.join(directory,'dist',file))).digest('hex'),hash);
     assert.equal(fs.existsSync(path.join(directory,'MaraoFrontend.js')),false);
     assert.equal(JSON.parse(fs.readFileSync(path.join(directory,'hacs.json'))).content_in_root,undefined);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(directory,'hacs.json'))).homeassistant,'2025.12.0');
+    assert.equal(JSON.parse(fs.readFileSync('hacs.json')).homeassistant,'2025.12.0');
     assert.ok(fs.readdirSync(path.join(directory,'dist'),{withFileTypes:true}).every(entry=>entry.isFile()));
     const {AssetURL}=await import(pathToFileURL(path.join(directory,'dist',first.identity+'--MaraoAssetURL.js')));
     const base=pathToFileURL(fs.realpathSync(asset)).href;

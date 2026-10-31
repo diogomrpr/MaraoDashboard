@@ -8,7 +8,7 @@ const metadata = { entities: [], areas: [] };
 function fixture() {
   let document = createEnvelope(source, 'marao-dashboard', { extension: { keep: [] } });
   const calls = [];
-  const hass = { config: { version: '2026.10.0' }, user: { is_admin: true }, language: 'en', async callWS(message) {
+  const hass = { config: { version: '2025.12.0' }, user: { is_admin: true }, language: 'en', async callWS(message) {
     calls.push(message);
     if (message.type === 'lovelace/config') return structuredClone(document);
     if (message.type === 'lovelace/config/save') { document = structuredClone(message.config); return null; }
@@ -41,7 +41,7 @@ test('future source, unsupported host, lost authority and stale saved state neve
       await f.session.stage(undefined, metadata); await acknowledge(f.session);
       if (failure === 'host') f.session.compatibility = () => false;
       if (failure === 'admin') f.hass.user.is_admin = false;
-      if (failure === 'version') f.hass.config.version = '2026.9.9';
+      if (failure === 'version') f.hass.config.version = '2025.11.9';
       if (failure === 'stale') f.replace({ ...f.document, future: 'changed by another client' });
       const before = structuredClone(f.document);
       await assert.rejects(f.session.save()); assert.deepEqual(f.document, before);

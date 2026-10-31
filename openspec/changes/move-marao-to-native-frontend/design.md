@@ -32,6 +32,14 @@ Current source paths establish the real boundaries:
 
 The stable reference is HA 2026.10.4 with frontend 20260930.5. This supports a [custom strategy and editor](https://github.com/home-assistant/frontend/blob/20260930.5/src/panels/lovelace/strategies/types.ts#L20), [arbitrary strategy options](https://github.com/home-assistant/frontend/blob/20260930.5/src/data/lovelace/config/strategy.ts), and [native dashboard saves](https://github.com/home-assistant/core/blob/2026.10.4/homeassistant/components/lovelace/websocket.py#L149). These facts do not establish migration, cache or HACS handoff success.
 
+On 2026-10-31 the user authorized lowering the declared minimum to stable HA
+2025.12.0 after upstream source inspection. Its frontend 20251203.0 includes
+the native dropdown, sortable, navigation selector and dashboard host APIs used
+by Marao. HACS metadata, package generation and the shared editor/migration guard
+shall agree on this minimum and continue rejecting earlier and prerelease builds.
+This changes no saved dashboard or migration format. Runtime evidence remains
+from HA 2026.10; compatibility on 2025.12 has not been verified end to end.
+
 Important native limitations: dashboard configuration reads are available to authenticated users, including for hidden/admin-only dashboards; only writes are admin-only. Native saves replace the document without an expected-revision/CAS parameter. The current ordinary Marao save also lacks an editor revision parameter; its stronger concurrent-edit protections apply to migration/recovery, not every competing editor save.
 
 ## Goals / Non-Goals

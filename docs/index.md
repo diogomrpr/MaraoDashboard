@@ -28,7 +28,7 @@ Do not update the old Integration entry in place.
 
 ## How it works
 
-Install the HACS **Dashboard** package on stable HA 2026.10.0 or newer. Its
+Install the HACS **Dashboard** package on stable HA 2025.12.0 or newer. Its
 Visual/JSON editor lives under the native dashboard root. Use it to choose rooms
 and entities, configure cards and edit Security, Energy, Wallbox and Media pages.
 **Save & Generate** validates locally and saves through native HA storage. Native

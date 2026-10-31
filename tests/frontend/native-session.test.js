@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NativeSession } from '../../frontend_src/native-session.js';
+import { NativeSession, assertNativeSupport } from '../../frontend_src/native-session.js';
 import { createEnvelope } from '../../custom_components/marao_dashboard/frontend/MaraoSource.js';
 
 const text = '{\n "config_version":2,"name":"Safe","landing_page":"home","navigation":[],"pages":[{"name":"Home","path":"home","entities":[]}],"unknown":{"keep":[]}\n}\n';
 function fixture() {
   let document = createEnvelope(text,'marao-dashboard',{extension:{keep:[]}}), listener;
   const calls = [];
-  const hass = {config:{version:'2026.10.0'},user:{is_admin:true},states:{},entities:{},areas:{},devices:{},connection:{async subscribeEvents(callback,type) {assert.equal(type,'lovelace_updated');listener=callback;return () => {listener=null;};}},async callWS(message) {
+  const hass = {config:{version:'2025.12.0'},user:{is_admin:true},states:{},entities:{},areas:{},devices:{},connection:{async subscribeEvents(callback,type) {assert.equal(type,'lovelace_updated');listener=callback;return () => {listener=null;};}},async callWS(message) {
     calls.push(message);
     if (message.type === 'lovelace/config') return structuredClone(document);
     if (message.type === 'lovelace/config/save') {document=structuredClone(message.config);listener?.({data:{url_path:'marao-dashboard'}});return null;}
@@ -16,6 +16,14 @@ function fixture() {
   }};
   return {hass,calls,get document(){return document;},replace:value => {document=value;},event:data => listener?.({data})};
 }
+test('native support accepts stable HA from 2025.12 and rejects earlier or prerelease versions', () => {
+  for (const version of ['2025.12.0', '2025.12.9', '2026.1.0', '2026.10.0', '2027.1.0']) {
+    assert.doesNotThrow(() => assertNativeSupport({ config: { version } }));
+  }
+  for (const version of ['2025.11.9', '2024.12.0', '2025.12.0b1', '2026.1.0.dev0', '', undefined]) {
+    assert.throws(() => assertNativeSupport({ config: { version } }), /2025\.12\.0/);
+  }
+});
 test('native read, unchanged save and notifications preserve exact source text and opaque envelope data', async () => {
   const f = fixture(), session = new NativeSession(f.hass,'marao-dashboard');
   assert.equal((await session.read()).config,text); let notified=0;
@@ -39,7 +47,7 @@ test('authorization, unsupported HA and reported write errors cannot advance the
     const f=fixture(), session=new NativeSession(f.hass,'marao-dashboard');await session.read();
     const baseline=structuredClone(session.baseline);
     if (failure==='admin') f.hass.user.is_admin=false;
-    if (failure==='version') f.hass.config.version='2026.9.9';
+    if (failure==='version') f.hass.config.version='2025.11.9';
     if (failure==='write') {const original=f.hass.callWS;f.hass.callWS=async message => {if(message.type==='lovelace/config/save') throw new Error('native write error');return original(message);};}
     await assert.rejects(session.save(text));assert.deepEqual(session.baseline,baseline);
   }

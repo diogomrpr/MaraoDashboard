@@ -8,15 +8,15 @@ import { describeCardYaml } from './lovelace-model.js';
 
 export { compileDashboard, convertDocument, metadataSnapshot, readMetadata, pageTemplates, catalog };
 const MESSAGES = {
-  en:{version:'Marao requires stable Home Assistant 2026.10.0 or newer.',admin:'Only a Home Assistant administrator can save this dashboard.',conflict:'This dashboard changed in another session. Your draft is retained. Export it before reloading or reconciling the changes.',notNative:'Complete the native dashboard migration before using this editor.',root:'Choose a valid dashboard address.'},
-  pt:{version:'O Marao requer o Home Assistant estável 2026.10.0 ou posterior.',admin:'Só um administrador do Home Assistant pode guardar este dashboard.',conflict:'Este dashboard foi alterado noutra sessão. O rascunho foi mantido. Exporte antes de recarregar ou conciliar as alterações.',notNative:'Conclua a migração do dashboard nativo antes de usar este editor.',root:'Escolha um endereço válido para o dashboard.'}
+  en:{version:'Marao requires stable Home Assistant 2025.12.0 or newer.',admin:'Only a Home Assistant administrator can save this dashboard.',conflict:'This dashboard changed in another session. Your draft is retained. Export it before reloading or reconciling the changes.',notNative:'Complete the native dashboard migration before using this editor.',root:'Choose a valid dashboard address.'},
+  pt:{version:'O Marao requer o Home Assistant estável 2025.12.0 ou posterior.',admin:'Só um administrador do Home Assistant pode guardar este dashboard.',conflict:'Este dashboard foi alterado noutra sessão. O rascunho foi mantido. Exporte antes de recarregar ou conciliar as alterações.',notNative:'Conclua a migração do dashboard nativo antes de usar este editor.',root:'Escolha um endereço válido para o dashboard.'}
 };
 Object.assign(MESSAGES.en,{invalidSource:'Check this configuration before saving.',newerSource:'This configuration needs a newer Marao version.',incompleteSource:'Some information is missing. Use the standalone converter to complete the translation.',legacyDependency:'Resolve the old file or service reference before importing. The standalone converter can help with file addresses.',invalidEnvelope:'This dashboard document is incomplete or unsupported. Keep your export and use a compatible converter.'});
 Object.assign(MESSAGES.pt,{invalidSource:'Verifique esta configuração antes de guardar.',newerSource:'Esta configuração precisa de uma versão mais recente do Marao.',incompleteSource:'Falta alguma informação. Use o conversor independente para concluir a tradução.',legacyDependency:'Resolva a referência ao ficheiro ou serviço antigo antes de importar. O conversor independente pode ajudar com endereços de ficheiros.',invalidEnvelope:'O documento do dashboard está incompleto ou não é suportado. Guarde a exportação e use um conversor compatível.'});
 const message = (hass,key) => (MESSAGES[String(hass.language || 'en').split('-')[0]] || MESSAGES.en)[key];
 export function assertNativeSupport(hass) {
   const match = /^(\d{4})\.(\d+)\.(\d+)$/.exec(hass.config?.version || '');
-  if (!match || Number(match[1]) < 2026 || Number(match[1]) === 2026 && Number(match[2]) < 10) throw new Error(message(hass,'version'));
+  if (!match || Number(match[1]) < 2025 || Number(match[1]) === 2025 && Number(match[2]) < 12) throw new Error(message(hass,'version'));
 }
 
 export class NativeSession {

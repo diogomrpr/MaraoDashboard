@@ -51,7 +51,7 @@ importing, even when the dashboard is hidden or restricted to administrators.
 
 ## Installation
 
-Requires stable Home Assistant **2026.10.0 or newer** and HACS.
+Requires stable Home Assistant **2025.12.0 or newer** and HACS.
 Existing users must complete the [migration guide](docs/docs/installation/native-migration.md) first.
 
 1. Add `https://github.com/diogomrpr/MaraoDashboard` to HACS as a custom

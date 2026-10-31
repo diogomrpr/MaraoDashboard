@@ -588,8 +588,10 @@ large and readable.
   overlay's own top/side safe bounds. Short sheets retain their bottom placement;
   tall sheets clamp to available height, including while open during rotation.
 - Keep the title and close control outside the content scroller, so the scrollbar
-  starts below the header. Round all four sheet corners to 36px and retain at least
-  an 8px side/bottom inset, increased by the device's safe area when needed.
+  starts below the header. Round all four sheet corners to 36px, use an 8px outer
+  bottom gap and at least 8px at the sides, increased by side safe areas when needed.
+  Apply bottom safe-area clearance inside the content scroller rather than lifting
+  the sheet above the screen edge.
 - On wider layouts, stay centered and use the first dashboard column's width
   rather than stretching across the screen.
 - Keep the background inert, trap focus, close through explicit close/back
