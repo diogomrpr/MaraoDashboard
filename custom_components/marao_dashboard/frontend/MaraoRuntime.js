@@ -13,6 +13,7 @@ const cardsModule = await import(new URL(`./MaraoCards.js${MARAO_RESOURCE_QUERY}
 const { nativeEditing, bindNativeEditing, loadHistoryChart, createHistoryPlaceholder, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, fitNativeGrid, updateCardSurface, problemLabel, showCardDetails, layoutState, registerMaraoCards } = cardsModule;
 registerMaraoCards();
 await import(new URL(`./MaraoFloorPlanCard.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
+await import(new URL(`./MaraoSchedules.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
 await import(new URL(`./MaraoNativeCards.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
 
 const MARAO_FONT_URL = new URL(`./MaraoFonts.css${MARAO_RESOURCE_QUERY}`,import.meta.url).href;

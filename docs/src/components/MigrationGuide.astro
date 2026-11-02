@@ -1,0 +1,5 @@
+---
+import { compiledContent } from '../../docs/installation/native-migration.md';
+const content = (await compiledContent()).replace(/^<h1[^>]*>[\s\S]*?<\/h1>\s*/, '');
+---
+<div set:html={content} />

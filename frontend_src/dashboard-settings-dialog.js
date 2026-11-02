@@ -1,3 +1,4 @@
+import {mountLocationSettings} from './location-settings.js';
 import {saveDashboardSettings, readDashboardSettings, validateDashboardSettings, dashboardViewForAddress, patchNavbarRoute, moveNavbarRoute} from './dashboard-settings.js';
 const navigation=await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`,import.meta.url));
 const words={
@@ -154,6 +155,7 @@ export async function openDashboardSettings(root,opener) {
     });
   };
   render();
+  mountLocationSettings(dialog.querySelector('[data-settings]'),draft,hass,mountForm,schema);
   const add=mountForm(dialog.querySelector('[data-add]'),{},[schema('destination',t.add,{navigation:{}})],value=>{
     if(!value.destination)return;navigation.haptic('heavy');const view=viewFor(value.destination);
     const route={path:value.destination,label:view?.title||value.destination,icon:view?.icon||'mdi:view-dashboard'};
@@ -164,7 +166,11 @@ export async function openDashboardSettings(root,opener) {
   dialog.querySelector('[data-save]').onclick=async()=>{
     if(busy||!valid())return;try{validateDashboardSettings(draft);}catch{dialog.querySelector('.status').textContent=t.invalid;return;}
     navigation.haptic('heavy');busy=true;sortable.disabled=true;dialog.querySelector('[data-save]').disabled=true;dialog.querySelector('[data-save]').textContent=t.saving;
-    try{await saveDashboardSettings(root.hass,path,baseline,draft,valid);busy=false;close();}
+    try{await saveDashboardSettings(root.hass,path,baseline,draft,valid,JSON.stringify(baseline.marao?.navbar?.current_room)!==JSON.stringify(draft.navbar.current_room)?recovery=>{
+      const blob=new Blob([JSON.stringify(recovery,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
+      link.href=url;link.download=`marao-location-recovery-${Date.now()}.json`;link.textContent=String(hass.language).startsWith('pt')?'Descarregar recuperação':'Download recovery';dialog.querySelector('footer').prepend(link);link.click();
+      const revoke=()=>{URL.revokeObjectURL(url);dialog.removeEventListener('close',revoke);};dialog.addEventListener('close',revoke);
+    }:undefined);busy=false;close();}
     catch(error){dialog.querySelector('.status').textContent=error.message==='settings_stale'?t.conflict:(error.message||t.error);busy=false;sortable.disabled=false;dialog.querySelector('[data-save]').disabled=false;dialog.querySelector('[data-save]').textContent=t.save;}
   };
 }

@@ -1,3 +1,6 @@
+const {normalizeEventSources,eventTimestamp,mergeSourceEvents,filterEventRows,customEventRange,eventWord}=await import(new URL(`./MaraoEventModel.js${new URL(import.meta.url).search}`,import.meta.url));
+const {bindDropdown,dropdownStyles}=await import(new URL(`./MaraoDropdown.js${new URL(import.meta.url).search}`,import.meta.url));
+const {periodRange}=await import(new URL(`./MaraoHistoryData.js${new URL(import.meta.url).search}`,import.meta.url));
 const {bindPressFeedback,pressStyles}=await import(new URL(`./MaraoPressFeedback.js${new URL(import.meta.url).search}`,import.meta.url));
 const HTMLElementBase = globalThis.HTMLElement || class {};
 const { cardProblem, problemStyle, problemLabel, showCardDetails, nativeEditing, bindNativeEditing } = await import(new URL(`./MaraoCards.js${new URL(import.meta.url).search}`, import.meta.url));
@@ -204,6 +207,7 @@ export function normalizeProtectEvents(payload, limit = 12) {
       const eventType = heading && (heading[3] ? normalizedName(heading[3]) : heading[4] ? "audio" : heading[2] === "Ring Event" ? "ring" : "motion");
       return {
         id: mediaContentId.slice(mediaContentId.lastIndexOf(":event:") + 7),
+        ...(typeof item.timestamp==='number' && Number.isFinite(item.timestamp) && item.timestamp>0?{timestamp:item.timestamp}:{}),
         provider: "unifi_protect",
         label: heading ? heading[3] || heading[4] || eventType : title || localize("camera_events.event", undefined, {}, "Event"),
         ...(heading ? { eventType, dateLabel: heading[1] } : {}),
@@ -232,14 +236,8 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   setConfig(config) {
-    if (!text(config?.entity)) {
-      throw new Error(localize(
-        "camera_events.error.entity_required",
-        this._hass,
-        {},
-        "marao-frigate-events-card requires an entity",
-      ));
-    }
+    this._sources=normalizeEventSources(config || {});
+    this._sourceResults=[];this._cameraFilter='';this._timeFilter='all';this._timeRange=null;this._filter='';
     this._entityName = undefined;
     const requestedLimit = Number(config.limit ?? 12);
     this._config = {
@@ -259,34 +257,23 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   set hass(hass) {
-    const previous = this._hass;
-    const previousAvailability = this._availabilityState;
-    this._hass = hass;
-    this._availabilityState = this._unavailableState();
-    if (previousAvailability !== this._availabilityState) {
-      this._loadedKey = "";
-      this._events = [];
-      this._selected = undefined;
-      this._request += 1;
-      this._detailRequest += 1;
-      this._resetFeed();
-    }
-    if (previous && previousAvailability === this._availabilityState
-      && previous.states?.[this._config?.entity] === hass?.states?.[this._config?.entity]
-      && ["themes", "locale", "language", "localize", "entities"].every(key => previous[key] === hass?.[key])) {
-      this._maybeLoad();
-      return;
-    }
-    this._render();
-    this._maybeLoad();
+    const previousAvailability=this._availabilityState;this._hass=hass;this._availabilityState=this._unavailableState();
+    if(!this._connectionAvailable()){this._request++;this._detailRequest++;this._selected=undefined;this._events=[];for(const source of this._sourceResults||[]){source.events=[];source.invalid=true;}this._loadedKey=previousAvailability===this._availabilityState?this._loadedKey:'';}
+    else if(this._sources?.length>1){
+      const signature=this._sources.map(source=>this._sourceAvailability(source));
+      for(const result of this._sourceResults||[])if(this._sourceAvailability(result.config)){result.events=[];result.status='unavailable';result.invalid=true;if(this._selected?.event?._source===result){this._detailRequest++;this._selected={event:this._selected.event,status:'error',error:eventWord('unavailable',hass)};}}
+      if((this._sourceResults||[]).some(r=>r.invalid))this._events=mergeSourceEvents(this._sourceResults||[]);
+    }else if(previousAvailability!==this._availabilityState){this._events=[];this._request++;this._detailRequest++;this._selected=undefined;this._loadedKey='';}
+    this._render();this._maybeLoad();
   }
 
-  getCardSize() {
-    return 4;
-  }
+  static getStubConfig(){return {type:'custom:marao-camera-events-card',cameras:[]};}
+  static async getConfigElement(){await import(new URL(`./MaraoNativeCardEditor.js${new URL(import.meta.url).search}`,import.meta.url));return document.createElement('marao-native-card-editor');}
+  getGridOptions(){return {columns:12,rows:8,min_rows:4};}
+  getCardSize() {return 8;}
 
   connectedCallback() {
-    this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, editing => { if (editing) { this._detailRequest += 1; this._selected = undefined; this._detailsPopup?._close(false); this._render(); } });
+    this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, editing => { if (editing) { this._request++;this._loadedKey="";this._detailRequest += 1; this._selected = undefined; this._detailsPopup?._close(false); this._render(); } });
     this._connected = true;
     this._render();
     this._maybeLoad();
@@ -294,6 +281,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
 
   disconnectedCallback() {
     this._stopNativeEditing?.(); this._stopNativeEditing = null;
+    this._dropdowns?.forEach(d=>d.destroy());this._dropdowns=[];
     this._press?.destroy();this._press=null;
     this._detailsPopup?._close(false);
     this._connected = false;
@@ -309,15 +297,18 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       && this._hass.connection?.connected !== false;
   }
 
+  _sourceAvailability(source){const state=this._hass?.states?.[source?.entity]?.state;return !state||state==='unknown'?'unknown':state==='unavailable'?'unavailable':'';}
   _unavailableState() {
-    if (!this._connectionAvailable()) return "unavailable";
-    const state = this._hass.states?.[this._config?.entity]?.state;
-    if (!state || state === "unknown") return "unknown";
-    return state === "unavailable" ? "unavailable" : "";
+    if(!this._connectionAvailable())return 'unavailable';
+    const sources=this._sources || (this._config?.entity?[this._config]:[]);
+    return sources.length && sources.every(source=>this._sourceAvailability(source))?this._sourceAvailability(sources[0]):'';
   }
 
   _maybeLoad() {
-    if (!this._connected || !this._config || this._unavailableState()) return;
+    this._sources ||= normalizeEventSources(this._config || {});
+    if (!this._connected || !this._config || this.preview || nativeEditing(this) || this._unavailableState() || !this._sources?.length) return;
+    if(this._sources.length>1){this._maybeLoadSources();return;}
+    if(this._config.cameras!==undefined){this._maybeLoadSources();return;}
     const state = this._hass.states?.[this._config.entity];
     const provider = cameraEventProvider(this._config, this._hass);
     const identity = frigateIdentity(this._config, state);
@@ -336,6 +327,35 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     ]);
     if (key === this._loadedKey) return;
     this._load(identity, key, provider);
+  }
+
+  async _metadataSlot(){
+    if((this._metadataActive||0)>=2)await new Promise(resolve=>(this._metadataWaiters ||= []).push(resolve));
+    else this._metadataActive=(this._metadataActive||0)+1;
+    return ()=>{const next=this._metadataWaiters?.shift();if(next)next();else this._metadataActive--;};
+  }
+  _maybeLoadSources(){
+    const key=JSON.stringify(this._sources.map(config=>[config,cameraEventProvider(config,this._hass),frigateIdentity(config,this._hass.states?.[config.entity]),this._sourceAvailability(config)]));
+    if(this._loadedKey===key)return;
+    this._loadedKey=key;const request=++this._request;this._detailRequest++;this._selected=undefined;this._resetFeed();
+    const previous=this._sourceResults||[];
+    this._sourceResults=this._sources.map(config=>{const provider=cameraEventProvider(config,this._hass),identity=frigateIdentity(config,this._hass.states?.[config.entity]);
+      const old=previous.find(r=>JSON.stringify(r.config)===JSON.stringify(config)&&r.provider===provider&&!r.invalid&&r.status!=='unavailable');
+      if(old)return old;
+      return {config,provider,identity,name:config.name||this._hass.states?.[config.entity]?.attributes?.friendly_name||config.entity,events:[],status:this._sourceAvailability(config)?'unavailable':'loading'};});
+    const jobs=this._sourceResults.filter(r=>r.status==='loading');let next=0;
+    const update=()=>{if(request!==this._request)return;this._events=mergeSourceEvents(this._sourceResults);this._status=this._events.length||this._sourceResults.every(r=>r.status!=='loading')?'ready':'loading';this._render();};
+    const worker=async()=>{while(next<jobs.length){const source=jobs[next++];
+      if(request!==this._request||this.preview||nativeEditing(this))return;
+      const context=Object.create(this);Object.assign(context,{_config:{...source.config,limit:this._config.limit},_identity:source.identity,_provider:source.provider});source.context=context;
+      const release=await this._metadataSlot();
+      if(request!==this._request||this.preview||nativeEditing(this)){release();return;}
+      try{if(source.provider==='frigate'&&(!source.identity.instanceId||!source.identity.camera))throw new Error('Frigate identity unavailable');
+        const events=source.provider==='frigate'?await context._loadFrigateEvents(source.identity):source.provider==='unifi_protect'?await context._loadProtectEvents():source.provider==='netatmo'?await context._loadNetatmoRecordings():await Promise.reject(new Error('Unsupported provider'));
+        if(request!==this._request)return;source.events=events;source.status='ready';
+      }catch(error){if(request!==this._request)return;source.status='error';source.error=String(error.message||error);}finally{release();}
+      update();
+    }};update();void Promise.all([worker(),worker()]);
   }
 
   async _load(identity, key, provider = "frigate") {
@@ -391,11 +411,12 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
         ? await this._loadProtectEvents()
         : provider === "netatmo" ? await this._loadNetatmoRecordings()
         : await this._loadFrigateEvents(identity);
-      if (request !== this._request) return;
-      this._events = events;
+      if (request !== this._request || this._unavailableState()) return;
+      this._sourceResults=[{config:this._config,provider,identity,name:this._title(),events,status:'ready'}];
+      this._events = mergeSourceEvents(this._sourceResults);
       this._status = "ready";
     } catch {
-      if (request !== this._request) return;
+      if (request !== this._request || this._unavailableState()) return;
       this._events = [];
       this._status = "error";
       this._error = localize(
@@ -445,7 +466,6 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     this._observer?.disconnect();
     this._observer = undefined;
     this._previewQueue = [];
-    this._filter = "";
     this._visibleCount = EVENT_BATCH;
     this._feedScroll = undefined;
   }
@@ -479,21 +499,21 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   _filteredEvents() {
-    return this._events.map((event, index) => ({ event, index }))
-      .filter(({ event }) => !this._filter || this._eventTypes(event).includes(this._filter));
+    return filterEventRows(this._events,{camera:this._cameraFilter,type:this._filter,range:this._timeRange},event=>this._eventTypes(event));
   }
 
   _queuePreview(index) {
     const event = this._events[index];
     if (!event || event.thumbnailUrl || event.thumbnailStatus) return;
     event.thumbnailStatus = "queued";
-    this._previewQueue.push(index);
+    this._previewQueue.push(event.eventKey || index);
     this._drainPreviews();
   }
 
   _drainPreviews() {
-    while (this._connected && !this._selected && !this._unavailableState() && this._previewActive < 2 && this._previewQueue.length) {
-      const index = this._previewQueue.shift();
+    while (this._connected && !this.preview && !nativeEditing(this) && !this._selected && !this._unavailableState() && this._previewActive < 2 && this._previewQueue.length) {
+      const key=this._previewQueue.shift(),index=typeof key==='number'?key:this._events.findIndex(event=>event.eventKey===key);
+      if(index<0)continue;
       this._previewActive += 1;
       this._loadPreview(index).finally(() => {
         this._previewActive -= 1;
@@ -504,28 +524,29 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
 
   async _loadPreview(index) {
     const event = this._events[index];
-    if (!event || !this._connected || this._unavailableState() || event.thumbnailUrl || ["loading", "ready", "error"].includes(event.thumbnailStatus)) return;
+    const source=event?._source,provider=source?.provider || this._provider,identity=source?.identity || this._identity;
+    if (!event || this.preview || nativeEditing(this) || !this._connected || this._unavailableState() || event.thumbnailUrl || ["loading", "ready", "error"].includes(event.thumbnailStatus)) return;
     const request = this._request;
     event.thumbnailStatus = "loading";
     try {
-      if (this._provider === "netatmo" && !event.hasThumbnail) {
+      if (provider === "netatmo" && !event.hasThumbnail) {
         event.thumbnailStatus = "empty";
         this._render();
         return;
       }
-      const url = this._provider === "netatmo"
+      const url = provider === "netatmo"
         ? text((await this._browseMedia(event.mediaContentId))?.thumbnail)
-        : this._provider === "unifi_protect"
+        : provider === "unifi_protect"
         ? await this._resolveMedia(event.thumbnailContentId)
-        : await this._signPath(frigateEventPath(this._identity.instanceId, event.id, "thumbnail"));
+        : await this._signPath(frigateEventPath(identity.instanceId, event.id, "thumbnail"));
       if (!url) throw new Error("Missing preview");
-      if (request !== this._request || !this._connected || this._unavailableState()) return;
+      if (source?.invalid || request !== this._request || !this._connected || this._unavailableState()) return;
       event.thumbnailUrl = url;
       event.thumbnailStatus = "ready";
     } catch {
-      if (request !== this._request || !this._connected || this._unavailableState()) return;
+      if (source?.invalid || request !== this._request || !this._connected || this._unavailableState()) return;
       event.thumbnailStatus = "error";
-      this._thumbnailErrors.add(event.id);
+      this._thumbnailErrors.add(event.eventKey || event.id);
     }
     this._render();
   }
@@ -641,14 +662,15 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     if (button.dataset.action === "details") {
       showCardDetails(this, this._selected?.error || this._error, button);
     } else if (button.dataset.action === "refresh") {
-      this._loadedKey = "";
+      this._loadedKey = "";this._sourceResults=[];this._setTimeRange(this._timeFilter || 'all');
       this._maybeLoad();
     } else if (button.dataset.action === "back") {
       this._detailRequest += 1;
       this._selected = undefined;
       this._render();
       if (this._feedScroll) this._feedScroll.element.scrollTop = this._feedScroll.top;
-      this.shadowRoot.querySelector?.(`.event[data-index="${this._openedIndex}"]`)?.focus({ preventScroll: true });
+      const restoredIndex=this._openedKey?this._events.findIndex(event=>event.eventKey===this._openedKey):this._openedIndex;
+      this.shadowRoot.querySelector?.(`.event[data-index="${restoredIndex}"]`)?.focus({ preventScroll: true });
       this._drainPreviews();
     } else if (button.dataset.action === "filter") {
       this._setFilter(button.dataset.type);
@@ -660,29 +682,30 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   async _openEvent(index) {
-    if (this._unavailableState()) return;
+    if (this.preview || nativeEditing(this) || this._unavailableState()) return;
     const event = this._events[index];
+    const source=event?._source,provider=source?.provider || this._provider,identity=source?.identity || this._identity;
     if (!event) return;
     const scroller = this._scrollRoot() || globalThis.document?.scrollingElement;
     this._feedScroll = scroller ? { element: scroller, top: scroller.scrollTop } : undefined;
-    this._openedIndex = index;
+    this._openedIndex = index;this._openedKey=event.eventKey;
     const detailRequest = ++this._detailRequest;
     this._selected = { event, status: "loading" };
     this._render();
     try {
-      const kind = this._provider === "netatmo" ? "hls" : this._provider === "unifi_protect" || event.has_clip ? "clip" : "snapshot";
-      const url = ["netatmo", "unifi_protect"].includes(this._provider)
+      const kind = provider === "netatmo" ? "hls" : provider === "unifi_protect" || event.has_clip ? "clip" : "snapshot";
+      const url = ["netatmo", "unifi_protect"].includes(provider)
         ? await this._resolveMedia(event.mediaContentId)
-        : await this._signPath(frigateEventPath(this._identity.instanceId, event.id, kind));
+        : await this._signPath(frigateEventPath(identity.instanceId, event.id, kind));
       if (kind === "hls" && !globalThis.customElements?.get("ha-hls-player")) {
         const { loadNativeCamera } = await import(new URL(`./MaraoCamera.js${new URL(import.meta.url).search}`, import.meta.url));
         await loadNativeCamera();
         if (!globalThis.customElements?.get("ha-hls-player")) throw new Error("HLS player unavailable");
       }
-      if (detailRequest !== this._detailRequest) return;
+      if (source?.invalid || detailRequest !== this._detailRequest) return;
       this._selected = { event, kind, status: "ready", url };
     } catch {
-      if (detailRequest !== this._detailRequest) return;
+      if (source?.invalid || detailRequest !== this._detailRequest) return;
       this._selected = {
         event,
         status: "error",
@@ -723,6 +746,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       return new Intl.DateTimeFormat(this._hass?.locale?.language, {
         dateStyle: "medium",
         timeStyle: "short",
+        timeZone:this._hass?.config?.time_zone || 'UTC',
       }).format(new Date(seconds * 1000));
     } catch {
       return new Date(seconds * 1000).toLocaleString();
@@ -800,7 +824,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     });
     const reason = problem && problem.kind !== "loading" && (unavailable || this._status === "error")
       ? `<p class="message" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="${problem.kind === "neutral" ? "mdi:help-circle-outline" : "mdi:alert-circle-outline"}" aria-hidden="true"></ha-icon> ${escapeHtml(problemLabel(problem, this._hass))}<button type="button" data-action="details" aria-label="${escapeHtml(problem.reason)}"><ha-icon icon="mdi:information-outline" aria-hidden="true"></ha-icon></button></p>` : "";
-    const status = !this._hass?.states ? localize("common.loading", this._hass, {}, "Loading…")
+    const status = !this._sources?.length && !this._config.entity ? eventWord('setup',this._hass) : !this._hass?.states ? localize("common.loading", this._hass, {}, "Loading…")
       : unavailable ? localize(`common.${unavailable}`, this._hass, {}, unavailable === "unknown" ? "Unknown" : "Unavailable")
       : this._status === "loading" ? localize("camera_events.loading_events", this._hass, {}, "Loading events…")
       : this._status === "error" ? this._error
@@ -810,15 +834,14 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     const disabled = Boolean(unavailable || (!this._selected && this._status === "loading"));
     const types = [...new Set(this._events.flatMap(event => this._eventTypes(event)))];
     const filters = [{ type: "", label: localize("camera_events.all", this._hass, {}, "All") }, ...types.map(type => ({ type, label: this._typeLabel(type) }))];
-    const filterHtml = filters.map(({ type, label }) => `<button type="button" class="filter" data-action="filter" data-type="${escapeHtml(type)}" aria-pressed="${this._filter === type}"${!ready ? " disabled" : ""}>${escapeHtml(label)}</button>`).join("");
     const rows = this._filteredEvents().slice(0, this._visibleCount);
     const more = rows.length < this._filteredEvents().length;
     const detail = this._selected ? this._renderDetail(this._selected) : "";
     let card = this.shadowRoot.querySelector?.("ha-card");
     if (!card) {
-      this.shadowRoot.innerHTML = `<style>${MaraoFrigateEventsCard.styles}</style><ha-card data-status="${!this._hass?.states ? "loading" : unavailable || this._status}"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}>
+      this.shadowRoot.innerHTML = `<style>${MaraoFrigateEventsCard.styles}${dropdownStyles}.filters{display:flex;flex-wrap:wrap;gap:8px}.filters>div{flex:1 1 140px;min-width:0}.range-editor{display:grid;gap:8px;max-height:50dvh;overflow:auto;overscroll-behavior:contain}.range-editor input,.range-editor button{min-height:48px;min-width:48px;font:inherit;max-width:100%;box-sizing:border-box}.coverage{font-size:var(--font-size-caption,.9375rem);overflow-wrap:anywhere}.coverage,.range-editor{grid-column:1/-1}</style><ha-card data-status="${!this._hass?.states ? "loading" : unavailable || this._status}"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}>
         <header><div class="heading"><h2>${escapeHtml(this._title())}</h2><button type="button" class="icon-button" data-action="${action}" aria-label="${escapeHtml(actionLabel)}" title="${escapeHtml(actionLabel)}"${disabled ? ' disabled aria-disabled="true"' : ""}>${this._selected ? '&#x2190;' : '&#x21bb;'}</button></div>
-          <div class="filters" role="group" aria-label="${escapeHtml(localize("camera_events.filters", this._hass, {}, "Event types"))}"${this._selected ? ' style="visibility:hidden"' : ""}>${filterHtml}</div></header>
+          <div class="filters" role="group" aria-label="${escapeHtml(localize("camera_events.filters", this._hass, {}, "Event types"))}"${this._selected ? ' style="visibility:hidden"' : ""}></div></header>
         <main><div class="problem">${reason}</div><p class="message state" role="status"${this._selected || !status || reason ? " hidden" : ""}>${escapeHtml(status)}</p>
           <div class="feed"${!list || this._selected ? " hidden" : ""}><div class="grid">${list ? rows.map(({ event, index }) => this._renderEvent(event, index)).join("") : ""}</div>
           <button type="button" class="more" data-action="more"${!more ? " hidden" : ""}${!ready ? " disabled" : ""}>${escapeHtml(localize("camera_events.load_more", this._hass, {}, "Load more"))}</button></div>
@@ -849,14 +872,6 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       const toolbar = this.shadowRoot.querySelector(".filters");
       toolbar.hidden = false; toolbar.style.visibility = this._selected ? 'hidden' : '';
       toolbar.setAttribute("aria-label", localize("camera_events.filters", this._hass, {}, "Event types"));
-      // Keep pressed filter controls mounted so touch focus and horizontal scroll survive.
-      const filterKey = JSON.stringify(filters);
-      if (this._filterKey !== filterKey) toolbar.innerHTML = filterHtml;
-      for (const filter of toolbar.children) {
-        filter.setAttribute("aria-pressed", String(filter.dataset.type === this._filter));
-        filter.disabled = !ready;
-      }
-      this._filterKey = filterKey;
       const problemHost = this.shadowRoot.querySelector(".problem");
       if (this._reason !== reason) problemHost.innerHTML = reason;
       this._reason = reason;
@@ -868,7 +883,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       feed.hidden = !list || Boolean(this._selected);
       const grid = feed.querySelector(".grid");
       const indexes = rows.map(({ index }) => String(index));
-      const current = [...grid.children].map(row => row.dataset.index);
+      const current = [...grid.children].filter(row=>row.classList.contains('event-row')).map(row => row.dataset.index);
       let changed = false;
       if (!list || this._renderedEvents !== this._events || !current.every((index, offset) => index === indexes[offset])) {
         grid.replaceChildren();
@@ -908,14 +923,65 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     }
     const player = this.shadowRoot.querySelector?.("ha-hls-player");
     if (player) { player.hass = this._hass; player.autoPlay = false; player.controls = true; player.playsInline = true; }
+    this._renderFilters(ready && !this.preview && !nativeEditing(this));
+    const gridHost=this.shadowRoot.querySelector?.('.grid');if(gridHost)gridHost.style.setProperty('--event-columns',this._config.columns || 1);
     this._renderedEvents = this._events;
     this._filterKey = JSON.stringify(filters);
     this._reason = reason;
     this._detailHtml = detail;
   }
 
+  _setTimeRange(value){
+    if(value==='custom')return;
+    const now=Date.now(),zone=this._hass?.config?.time_zone || 'UTC';
+    this._timeFilter=value;
+    this._timeRange=value==='all'?null:value==='hour'||value==='day'?{start:now-(value==='hour'?1:24)*3600000,end:now}:periodRange(now,value==='yesterday'?-1:0,'day',zone);
+    if(this._timeRange)this._timeRange={start:+this._timeRange.start,end:+this._timeRange.end};
+  }
+  _renderFilters(ready){
+    const host=this.shadowRoot?.querySelector?.('.filters');if(!host?.append)return;
+    const w=key=>eventWord(key,this._hass),sources=this._sources || [],scope=this._events.filter(event=>!this._cameraFilter||event.sourceKey===this._cameraFilter);
+    const types=[...new Set(scope.flatMap(event=>this._eventTypes(event)))],availableTypes=new Set(types);if(this._filter&&!types.includes(this._filter))types.push(this._filter);
+    const definitions=[['camera',sources.length===1?[[sources[0].entity,sources[0].name || this._hass?.states?.[sources[0].entity]?.attributes?.friendly_name || sources[0].entity]]:[['',w('allCameras')],...sources.map(source=>[source.entity,source.name || this._hass?.states?.[source.entity]?.attributes?.friendly_name || source.entity])]],['type',[['',w('allTypes')],...types.map(type=>[type,this._typeLabel(type)+(availableTypes.has(type)?'':` (${w('unavailable')})`)])]],['time',['all','hour','day','today','yesterday','custom'].map(key=>[key,w(key)])]];
+    const values={camera:this._cameraFilter || (sources.length===1?sources[0].entity:''),type:this._filter,time:this._timeFilter||'all'};
+    this._dropdowns ||= [];
+    definitions.forEach(([key,options],i)=>{
+      let picker=host.querySelector(`[data-picker="${key}"]`);
+      const signature=JSON.stringify([options,this._hass?.language]);
+      if(!picker){picker=document.createElement('div');picker.className='marao-dropdown';picker.dataset.picker=key;host.append(picker);}
+      if(picker._signature!==signature || !this._dropdowns[i]){
+        this._dropdowns[i]?.destroy();const focused=picker.contains(this.shadowRoot.activeElement);
+        picker.innerHTML=`<button type="button" aria-haspopup="menu" aria-expanded="false"></button><div class="marao-dropdown-options" role="menu" hidden></div>`;
+        const trigger=picker.querySelector('button'),menu=picker.querySelector('[role=menu]');
+        const choices=options.map(([value,label])=>{const button=document.createElement('button');button.type='button';button.setAttribute('role','menuitemradio');button.textContent=label;menu.append(button);return {value,button};});
+        this._dropdowns[i]=bindDropdown(picker,{trigger,menu,choices,value:()=>({camera:this._cameraFilter || (sources.length===1?sources[0].entity:''),type:this._filter,time:this._timeFilter||'all'})[key],activeElement:()=>this.shadowRoot.activeElement,haptic:()=>globalThis.window?.MaraoDashboard?.haptic?.('heavy'),onSelect:value=>{
+          if(this.preview||nativeEditing(this)||this._unavailableState())return;
+          if(key==='camera')this._cameraFilter=value;else if(key==='type')this._filter=value;else if(value==='custom'){this._showCustomRange();return;}else this._setTimeRange(value);
+          this._visibleCount=EVENT_BATCH;const root=this._scrollRoot();if(root)root.scrollTop=0;this._render();
+        }});picker._signature=signature;if(focused)trigger.focus({preventScroll:true});
+      }
+      const trigger=picker.querySelector('button'),selected=options.find(([value])=>value===values[key]);
+      const summary=key==='time'&&this._timeFilter==='custom'&&this._timeRange?this._formatRange():selected?.[1] || '';
+      trigger.textContent=`${w(key)}: ${summary}`;trigger.setAttribute('aria-label',trigger.textContent);trigger.disabled=!ready||key==='camera'&&sources.length<2;this._dropdowns[i]?.sync();
+    });
+    let coverage=this.shadowRoot.querySelector('.coverage');if(!coverage){coverage=document.createElement('p');coverage.className='coverage';host.after(coverage);}
+    const messages=(this._sourceResults||[]).map(source=>`${source.name}: ${source.events.length}/${this._config.limit} ${w('limit')}${source.status==='ready'?'':` · ${w(source.status)}`}${source.provider==='unifi_protect'?' · '+(String(this._hass?.language).startsWith('pt')?'apenas clips recentes concluídos':'recent completed clips only'):''}`);
+    coverage.textContent=!sources.length?w('setup'):[w('coverage'),...messages,this._events.some(event=>eventTimestamp(event)===null)?w('excluded'):'',this._events.length&&!this._filteredEvents().length?w('empty'):''].filter(Boolean).join(' ');
+    coverage.hidden=Boolean(this._selected);
+  }
+  _formatRange(){const format=new Intl.DateTimeFormat(this._hass?.language,{dateStyle:'short',timeStyle:'short',timeZone:this._hass?.config?.time_zone || 'UTC'});return `${format.format(this._timeRange.start)} – ${format.format(this._timeRange.end)}`;}
+  _showCustomRange(){
+    if(this.shadowRoot.querySelector('.range-editor'))return;
+    const form=document.createElement('section');form.className='range-editor';
+    form.innerHTML=`<label>${escapeHtml(eventWord('start',this._hass))}<input type="datetime-local" data-start></label><label>${escapeHtml(eventWord('end',this._hass))}<input type="datetime-local" data-end></label><p role="alert"></p><button type="button" data-apply>${escapeHtml(eventWord('apply',this._hass))}</button><button type="button" data-cancel>${escapeHtml(eventWord('cancel',this._hass))}</button>`;
+    form.querySelector('[data-cancel]').onclick=()=>form.remove();
+    form.querySelector('[data-apply]').onclick=()=>{if(this.preview||nativeEditing(this)||this._unavailableState())return;try{this._timeRange=customEventRange(form.querySelector('[data-start]').value,form.querySelector('[data-end]').value,this._hass?.config?.time_zone || 'UTC');this._timeFilter='custom';this._visibleCount=EVENT_BATCH;form.remove();this._render();}catch{form.querySelector('[role=alert]').textContent=eventWord('invalid',this._hass);}};
+    this.shadowRoot.querySelector('header').append(form);form.querySelector('input').focus();
+  }
+
   _renderEvent(event, index) {
-    return `<article class="event-row" data-index="${index}">
+    const undated=eventTimestamp(event)===null && this._filteredEvents().find(row=>eventTimestamp(row.event)===null)?.index===index;
+    return `${undated?`<h3 class="undated" style="grid-column:1/-1">${escapeHtml(eventWord('undated',this._hass))}</h3>`:''}<article class="event-row" data-index="${index}">
       <h3 class="meta">${this._eventHeading(event)}</h3>
       <button type="button" class="event" data-action="event" data-index="${index}" aria-label="${escapeHtml(this._openLabel(event))}"${this._unavailableState() ? ' disabled aria-disabled="true"' : ""}>
         <span class="thumbnail">${this._preview(event)}</span>
@@ -924,7 +990,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
 
   _eventHeading(event) {
     const date = this._eventDate(event);
-    return `${date ? `<time>${escapeHtml(date)}</time>` : ""}<span>${escapeHtml(this._eventLabel(event))}</span>`;
+    return `${this._sources?.length>1?`<span>${escapeHtml(event.sourceName)}</span>`:''}${eventTimestamp(event)===null?`<span>${escapeHtml(eventWord('undated',this._hass))}</span>`:''}${date ? `<time>${escapeHtml(date)}</time>` : ""}<span>${escapeHtml(this._eventLabel(event))}</span>`;
   }
 
   _openLabel(event) {
@@ -958,26 +1024,24 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   static styles = `${pressStyles}
-    :host { display: block; color: var(--primary-text-color); font-family: var(--primary-font-family, Montserrat, Roboto, system-ui, sans-serif); }
+    :host { display: block;min-height:0;height:100%; color: var(--primary-text-color); font-family: var(--primary-font-family, Montserrat, Roboto, system-ui, sans-serif); }
     :host([data-marao-control-cell]) { display:grid; min-width:0; }
     :host([data-marao-control-cell]) ha-card { height:100%; box-sizing:border-box; }
-    ha-card { overflow: visible; background: var(--ha-card-background, var(--card-background-color)); }
-    header { position: sticky; top: var(--marao-popup-header-height, 0px); z-index: 1; display: grid; gap: 8px; padding: 8px 12px 12px; background: var(--marao-card-background, var(--ha-card-background, var(--card-background-color))); }
+    ha-card { display:flex;flex-direction:column;box-sizing:border-box;height:100%;overflow: visible; background: var(--ha-card-background, var(--card-background-color)); }
+    header { flex:none;position: sticky; top: var(--marao-popup-header-height, 0px); z-index: 1; display: grid; gap: 8px; padding: 8px 12px 12px; background: var(--marao-card-background, var(--ha-card-background, var(--card-background-color))); }
     .heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .heading h2 { min-width: 0; }
     [hidden] { display: none !important; }
-    .filters { display: flex; min-width: 0; gap: 8px; overflow-x: auto; }
-    .filter, .more { min-width: 48px; min-height: 48px; padding: 10px 16px; border: 0; border-radius: 24px; background: var(--secondary-background-color); cursor: pointer; font-size: var(--font-size-secondary, 1rem); }
-    .filter { flex: 0 0 auto; }
-    .filter[aria-pressed="true"] { color: var(--text-primary-color, #fff); background: var(--primary-color); font-weight: var(--font-weight-primary, 700); }
+    .filters { display:flex;flex-wrap:wrap;min-width:0;gap:8px; }
+    .more { min-width: 48px; min-height: 48px; padding: 10px 16px; border: 0; border-radius: 24px; background: var(--secondary-background-color); cursor: pointer; font-size: var(--font-size-secondary, 1rem); }
     .more { display: block; margin: 16px auto 0; }
     h2 { margin: 0; overflow-wrap: anywhere; font-size: var(--font-size-primary, 1.125rem); font-weight: var(--font-weight-primary, 700); }
-    main { position:relative;box-sizing:border-box;height:clamp(240px,60vh,600px);overflow-y:auto;padding:0 12px 12px; }
+    main { flex:1;min-height:160px;position:relative;box-sizing:border-box;height:clamp(240px,60vh,600px);overflow-y:auto;padding:0 12px 12px; }
     main>.state, main>.problem:not(:empty) { position:absolute;inset:0;display:grid;place-items:center; }
     .message button { display:block;min-width:48px;min-height:48px;margin:8px auto 0;border:0;border-radius:12px;background:var(--secondary-background-color); }
     button { font: inherit; color: inherit; }
     .icon-button { justify-self: end; width: 48px; min-width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; cursor: pointer; font-size: max(1.5rem, var(--font-size-primary, 1.125rem)); transition: transform .12s ease, background-color .12s ease; }
-    .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+    .grid { display: grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,max(120px,calc(var(--font-size-primary,1.125rem) * 6),calc((100% - (var(--event-columns,1) - 1) * 20px) / var(--event-columns,1)))),1fr)); gap: 20px; }
     .event { display: block; width: 100%; min-width: 0; min-height: 48px; padding: 0; overflow: hidden; text-align: left; border: 0; border-radius: var(--ha-card-border-radius, 12px); background: var(--secondary-background-color); cursor: pointer; transition: transform .12s ease; }
     button:focus { outline: none; }
     button:disabled { cursor: default; opacity: .55; transform: none; }

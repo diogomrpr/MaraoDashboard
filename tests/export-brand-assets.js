@@ -45,9 +45,6 @@ const destination = path.join(root, 'custom_components/marao_dashboard/brand');
       }
     }
     assert.deepEqual(requests, [], 'Artwork export must not request external resources');
-    for (const [source, target] of [['logo.svg', 'logo.svg'], ['logo-dark.svg', 'logo-dark.svg'], ['mark.svg', 'favicon.svg'], ['mark-dark.svg', 'favicon-dark.svg']]) {
-      fs.copyFileSync(path.join(sources, source), path.join(root, 'docs/assets/images', target));
-    }
-    console.log('Eight transparent native images and four documentation SVGs exported.');
+    console.log('Eight transparent native images exported. Documentation imports the canonical SVGs.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

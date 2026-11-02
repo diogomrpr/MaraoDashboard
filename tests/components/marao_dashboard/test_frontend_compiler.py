@@ -1,5 +1,7 @@
 """Current Python output is a differential oracle, alongside independent expectations."""
 import json
+from copy import deepcopy
+from unittest.mock import patch
 from pathlib import Path
 import subprocess
 
@@ -24,7 +26,31 @@ process.stdout.write(JSON.stringify(compileDashboard(source, {entities,language,
 
 
 def python_compile(source, entities=None, language='en'):
-    resolved = g.resolve_dashboard_config(source, entities or [])
+    def native_extensions(value):
+        if isinstance(value, list):
+            return [native_extensions(item) for item in value]
+        if not isinstance(value, dict):
+            return value
+        role = value.get('template')
+        # Independent output contracts keep frontend-only families in the full
+        # comparison without adding them to the retired Python integration.
+        if role in ('md_people_card', 'md_schedules_card'):
+            if role == 'md_people_card':
+                expected = {'type': 'custom:marao-card', 'template': role, 'entities': deepcopy(value['entities'])}
+                if 'columns' in value:
+                    expected['columns'] = value['columns']
+            else:
+                expected = {'type': 'custom:marao-schedules-runtime', **{key: deepcopy(value[key]) for key in ('group_id', 'targets') if key in value}}
+            if 'name' in value:
+                expected['name'] = value['name']
+            return {'template': 'ha_card', **({'id': value['id']} if 'id' in value else {}), 'yaml': json.dumps(expected), '_native_expected': expected}
+        return {key: native_extensions(child) for key, child in value.items()}
+
+    original_page_card = g._page_card
+    def reference_card(entity, dashboard_key, language='en'):
+        if '_native_expected' in entity:
+            return deepcopy(entity['_native_expected'])
+        return original_page_card(entity, dashboard_key, language)
     def expand(value):
         if isinstance(value, g.TaggedScalar):
             assert value.value == '/components/navigation/navbar.yaml'
@@ -34,9 +60,11 @@ def python_compile(source, entities=None, language='en'):
         if isinstance(value, list):
             return [expand(child) for child in value]
         return value
-    pages = sorted(resolved['pages'], key=lambda page: page['path'] != resolved['landing_page'])
-    views = [{**g._page_view(page, '', 'marao-dashboard', language), 'theme': resolved['theme']} for page in pages]
-    return {'title': resolved['name'], 'views': expand(views)}
+    with patch.object(g, '_page_card', reference_card):
+        resolved = g.resolve_dashboard_config(native_extensions(source), entities or [])
+        pages = sorted(resolved['pages'], key=lambda page: page['path'] != resolved['landing_page'])
+        views = [{**g._page_view(page, '', 'marao-dashboard', language), 'theme': resolved['theme']} for page in pages]
+        return {'title': resolved['name'], 'views': expand(views)}
 
 
 @pytest.mark.parametrize('record', MANIFEST['records'], ids=lambda record: record['input'])

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
-import {readDashboardSettings,patchDashboardSettings,saveDashboardSettings,dashboardViewForAddress,patchNavbarRoute,moveNavbarRoute} from '../../frontend_src/dashboard-settings.js';
+import {validateDashboardSettings,readDashboardSettings,patchDashboardSettings,saveDashboardSettings,dashboardViewForAddress,patchNavbarRoute,moveNavbarRoute} from '../../frontend_src/dashboard-settings.js';
 
 function loadingDialogFixture() {
   class Node {
@@ -17,9 +17,9 @@ function loadingDialogFixture() {
   const controls=new Promise(resolve=>{resolveControls=resolve;});
   const root={isConnected:true,hass:{language:'en',user:{id:'admin',is_admin:true},callWS(){settingsStarted=true;return settings;}},shadowRoot:new Node()};
   const source=readFileSync(new URL('../../frontend_src/dashboard-settings-dialog.js',import.meta.url),'utf8')
-    .replace(/^import .*\n/,'').replace(/^const navigation=await import.*\n/m,'const navigation=globalThis.navigation;\n').replace('export async function','async function');
+    .replace(/^import .*\n/gm,'').replace(/^const navigation=await import.*\n/m,'const navigation=globalThis.navigation;\n').replace('export async function','async function');
   const context={document:{createElement:()=>new Node()},location:{pathname:'/house/home'},window:{addEventListener(){}},customElements:{get:()=>false},
-    loadCardHelpers(){controlsStarted=true;return controls;},navigation:{focusRestorer:()=>()=>{},haptic(){}},AbortController,structuredClone,readDashboardSettings,moveNavbarRoute,queueMicrotask};
+    loadCardHelpers(){controlsStarted=true;return controls;},navigation:{focusRestorer:()=>()=>{},haptic(){}},mountLocationSettings(){},AbortController,structuredClone,readDashboardSettings,moveNavbarRoute,queueMicrotask};
   vm.runInNewContext(source+';globalThis.openSettings=openDashboardSettings;',context);
   return {root,open:()=>context.openSettings(root,{}),started:()=>settingsStarted&&controlsStarted,resolveSettings,rejectSettings,
     resolveControls:()=>resolveControls({createCardElement:()=>({constructor:{getConfigElement:async()=>{}}})})};
@@ -109,9 +109,22 @@ test('native settings refuse unsupported metadata and unsafe route destinations'
 
 test('documented native opt-in uses supported settings and a real initial destination',async()=>{
   const {readFileSync}=await import('node:fs');const {parse}=await import('yaml');
-  const guide=readFileSync(new URL('../../docs/docs/installation/configuration.md',import.meta.url),'utf8');
-  const example=parse(guide.match(/```yaml\n([\s\S]*?)\n```/)[1]);
+  const example=parse(readFileSync(new URL('../../docs/examples/dashboard.yaml',import.meta.url),'utf8'));
   const settings=readDashboardSettings(example);assert.equal(settings.version,1);
   assert.equal(settings.navbar.routes[0].path,'/marao-dashboard/'+example.views[0].path);
   assert.deepEqual(patchDashboardSettings(example,settings),example);
+});
+
+test('current room mappings validate additively without changing routes or native fields',()=>{
+ const source={views:[{path:'home'}],marao:{version:1,navbar:{routes:[],opaque:true}}};
+ const settings={...source.marao,navbar:{...source.marao.navbar,current_room:{enabled:true,people:{'person.alex':{area_sensor:'sensor.area',opaque:1}},rooms:{kitchen:{path:'/house/kitchen'}},away_path:'/house/away'}}};
+ assert.deepEqual(patchDashboardSettings(source,settings),{...source,marao:settings});assert.equal(source.marao.navbar.current_room,undefined);
+ for(const current_room of [null,{enabled:'yes'},{people:[]},{people:{'person.a':{area_sensor:'light.a'}}},{away_path:'https://outside.test'}])assert.throws(()=>validateDashboardSettings({...settings,navbar:{routes:[],current_room}}));
+});
+
+test('location recovery is retained before a shared write and backup failure prevents saving',async()=>{
+ const baseline={views:[],marao:{version:1,navbar:{routes:[]}}},calls=[];
+ const hass={user:{is_admin:true},async callWS(request){calls.push(request.type);return structuredClone(baseline);}};
+ await saveDashboardSettings(hass,'house',baseline,baseline.marao,()=>true,recovery=>{assert.deepEqual(recovery.before,baseline);assert.deepEqual(recovery.after,baseline);assert.deepEqual(calls,['lovelace/config']);});
+ calls.length=0;await assert.rejects(()=>saveDashboardSettings(hass,'house',baseline,baseline.marao,()=>true,()=>{throw new Error('backup failed');}));assert.deepEqual(calls,['lovelace/config']);
 });

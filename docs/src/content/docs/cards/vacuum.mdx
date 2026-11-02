@@ -1,0 +1,65 @@
+---
+title: "Vacuum"
+description: "Vacuum controls with up to three room or segment actions."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Vacuum controls with up to three room or segment actions.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_vacuum_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-vacuum-card
+entity_id: vacuum.downstairs
+```
+
+Compatible entity domains: `vacuum`.
+
+Start, pause and return controls follow the vacuum’s supported features.
+
+Room actions require explicit segment IDs. Optional service/data overrides must match your integration; Marao does not infer room IDs.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `entity_id` | Entity | entity | Not set | A vacuum entity from your Home Assistant. Searchable suggestions are available. |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `variables.icon` | Vacuum icon | icon | Not set | Vacuum icon for this card. Searchable suggestions are available. |
+| `variables.action_1` | Action 1 | vacuum_action | Not set | Action 1 for this card. |
+| `variables.action_2` | Action 2 | vacuum_action | Not set | Action 2 for this card. |
+| `variables.action_3` | Action 3 | vacuum_action | Not set | Action 3 for this card. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| Cleaning | Pause or return the fictional vacuum. |
+| Paused | Resume a paused run. |
+| Returning | Report the native returning state. |
+| Room segments | Use explicitly named room segments. |
+| Vacuum error | A reported device error is visible. |
+| Loading state | Wait for Home Assistant state before showing controls. |
+| Unknown state | The entity exists but has no known state. Controls remain neutral and disabled. |
+| Unavailable | The entity is unavailable. No device action is dispatched. |
+| Missing entity | A removed entity produces an explicit neutral missing-state result. |
+| Disconnected | Controls refuse actions when Home Assistant is disconnected. |
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

@@ -90,9 +90,14 @@ function makePlan(options = {}, comparison) {
         ...(development ? ['publication validation'] : [])] };
 }
 
+const generatedDocumentation = relative => /^docs\/(?:dist(?:\/|$)|public\/(?:playground|brand|fonts)(?:\/|$)|build-meta\.json$|src\/styles\/marao-theme\.css$)/.test(relative);
+const inferredDocumentationOutput = (relative, inputs) => generatedDocumentation(relative)
+  && !inputs.some(input => generatedDocumentation(input) && (relative === input || relative.startsWith(input + '/')));
+
 function inputHashes(inputs, cwd = root) {
   const result = {};
   const visit = relative => {
+    if(inferredDocumentationOutput(relative,inputs))return;
     const file = path.join(cwd, relative);
     if (!fs.existsSync(file)) { result[relative] = 'missing'; return; }
     const stat = fs.lstatSync(file);
@@ -110,6 +115,7 @@ function inputHashes(inputs, cwd = root) {
 function dependencyInputs(inputs, cwd = root) {
   const result = new Set(inputs), visited = new Set();
   const visit = relative => {
+    if(inferredDocumentationOutput(relative,inputs))return;
     if (visited.has(relative)) return; visited.add(relative);
     const file = path.join(cwd, relative);
     if (!fs.existsSync(file)) return;
@@ -126,6 +132,7 @@ function dependencyInputs(inputs, cwd = root) {
       const dependency = path.relative(cwd, resolved);
       assert.ok(!dependency.startsWith('..') && !path.isAbsolute(dependency), 'Dependency escaped repository');
       if (dependency.split(path.sep).some(part => ['.cache', '.artifacts'].includes(part))) continue;
+      if(inferredDocumentationOutput(dependency,inputs))continue;
       if (dependency === 'tests/verification-map.js' && !inputs.includes(dependency)) continue;
       result.add(dependency); visit(dependency);
     }

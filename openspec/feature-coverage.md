@@ -47,12 +47,12 @@ and affected runtime before changing their shape.
 | `md_graph_card` | Live metric and 24-hour trace; line/fill/icon visibility, graph color/background | [History](specs/camera-history-content/spec.md) |
 | `md_toggle_graph_card` | Metric trace plus independently guarded `toggle_entity`; active/inactive background, content and icon options | [History](specs/camera-history-content/spec.md), [cards](specs/card-behaviors/spec.md) |
 | `md_timeline_card` | Project-owned timeline, optional `timeline_name` | [History](specs/camera-history-content/spec.md) |
-| `md_entity_group_card` | Light, cover, climate and battery summaries with explicit membership, independent popup identity and supported member filters/options | [Cards](specs/card-behaviors/spec.md), [groups](../docs/docs/usage/cards/md_entity_group_card.md) |
+| `md_entity_group_card` | Light, cover, climate and battery summaries with explicit membership, independent popup identity and supported member filters/options | [Cards](specs/card-behaviors/spec.md), [groups](../docs/src/content/docs/cards/entity-group.mdx) |
 | `md_navigation_card` | Entity-free page shortcut, label prefix and icon/card colors | [Generation](specs/dashboard-generation/spec.md), [cards](specs/card-behaviors/spec.md) |
 
 Most cards render through [MaraoCards.js](../custom_components/marao_dashboard/frontend/MaraoCards.js).
 Generation lives in [generator.py](../custom_components/marao_dashboard/generator.py),
-and options are explained in [card documentation](../docs/docs/usage/cards/index.md).
+and options are explained in [card documentation](../docs/src/content/docs/cards/index.mdx).
 The broad existing action/card regression file is
 [marao-climate-card.test.js](../tests/frontend/marao-climate-card.test.js), despite
 its name; camera/history/visibility and focused browser checks cover their own paths.
@@ -98,7 +98,7 @@ Cases entities; runtime card behavior is unchanged.
 | Wallbox starter cards: status, charging power/max current, current input/presets and pause/resume | [Generation](specs/dashboard-generation/spec.md), [values](specs/value-numeric-controls/spec.md) | [Catalog](../custom_components/marao_dashboard/editor.py), [generator checks](../tests/components/marao_dashboard/test_generator.py) |
 | Media starter cards: explicit players, editable generic/Apple TV controls/apps, bounded seek and short/long commands | [Builder](specs/visual-builder/spec.md), [cards](specs/card-behaviors/spec.md) | [Panel](../frontend_src/MaraoDashboardPanel.js), [generator checks](../tests/components/marao_dashboard/test_generator.py), [card checks](../tests/frontend/marao-climate-card.test.js) |
 | JSON/YAML preservation, custom markers, per-file atomic writes, owned manifest cleanup, save recovery, 20-version history/restore | [Generation](specs/dashboard-generation/spec.md), [integration](specs/integration-lifecycle/spec.md) | [History](../custom_components/marao_dashboard/history.py), [history checks](../tests/components/marao_dashboard/test_history.py), [generator checks](../tests/components/marao_dashboard/test_generator.py) |
-| Owned dashboard/theme patches, exact legacy migration, manual Repair, unrelated configuration preservation | [Integration lifecycle](specs/integration-lifecycle/spec.md) | [Patches](../custom_components/marao_dashboard/config_patch.py), [migration](../custom_components/marao_dashboard/legacy_migration.py), [patch checks](../tests/components/marao_dashboard/test_config_patch.py), [update guide](../docs/docs/installation/update.md) |
+| Owned dashboard/theme patches, exact legacy migration, manual Repair, unrelated configuration preservation | [Integration lifecycle](specs/integration-lifecycle/spec.md) | [Patches](../custom_components/marao_dashboard/config_patch.py), [migration](../custom_components/marao_dashboard/legacy_migration.py), [patch checks](../tests/components/marao_dashboard/test_config_patch.py), [update guide](../docs/src/content/docs/help/update.md) |
 
 The realistic unpinned **Studio** fixture combines a title section, a two-column
 energy/light section with duplicate light occurrences, an empty drop section, independently configured Media and Energy popups and a raw
@@ -284,3 +284,21 @@ dropdowns, media shortcuts, floor-plan examples and the shared navbar provide
 manual examples. No new fixtures are needed. Check quick taps, nested actions,
 native scrolling, fixed outer geometry and stationary Reduced Motion feedback;
 camera playback/transport and embedded native controls are outside this change.
+
+
+## People, summary sections and schedules
+
+- People: `MaraoCollections.js`, `MaraoCards.js`, native catalog/composition/editor;
+  `tests/frontend/collections.test.js`, native-card/editor assertions; fictional
+  person fixtures under `ha-test/custom_components/marao_test_climate/people.py`.
+- Summary sections: `MaraoCollections.js`, `MaraoGroupDetails.js`, shared group
+  composition/editor; `collections.test.js` and retained-child runtime assertions.
+- Schedules: `frontend_src/schedule-model.js`, `schedule-api.js`, `schedules-card.js`;
+  `schedules.test.js`, bounded disposable `ha-test/check-schedules.mjs`.
+  These exercise explicit owned fake resources, not real devices or production.
+
+## Pending batch: location, People columns and camera events
+
+- Current room: `MaraoLocation.js`, `MaraoLocationPreferences.js`, `MaraoNavigation.js`, `frontend_src/location-settings.js`; targeted navbar/settings tests.
+- People columns and fan icons: shared `MaraoCards.js` presentation, `MaraoCollections.js` validation and native editor/composition; collection/editor assertions and existing safe examples.
+- Camera events: `MaraoEventModel.js` and the existing `MaraoFrigateEventsCard.js`, native event editor, popup column forwarding in composition/generator; event/editor and scoped page-generation assertions. Examples stay under `ha-test/` and `/marao-dashboard`.

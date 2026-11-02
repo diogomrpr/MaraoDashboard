@@ -12,8 +12,8 @@ const compose = (config, instanceId = 'one') => composeNativeCard(config, { inst
 const config = (template, extra = {}) => ({ type: nativeCardType(template), template, ...extra });
 
 test('all catalog identities expose independent native types, defaults and shared sizing without replacing runtime types', () => {
-  assert.equal(Object.keys(NATIVE_CARD_TYPES).length, 36);
-  assert.equal(new Set(Object.values(NATIVE_CARD_TYPES)).size, 36);
+  assert.equal(Object.keys(NATIVE_CARD_TYPES).length, 38);
+  assert.equal(new Set(Object.values(NATIVE_CARD_TYPES)).size, 38);
   for (const entry of catalog.cards) {
     const stub = nativeCardStub(entry.id, hass);
     if (entry.id === 'md_floor_plan_card') stub.variables.image_id = 'a'.repeat(32);
@@ -38,9 +38,10 @@ test('native registration retains existing generic renderers and hides only cata
   globalThis.customElements = { get: name => registry.get(name), define: (name, value) => registry.set(name, value) };
   globalThis.window = { customCards: [] };
   registerNativeCards(); registerNativeCards();
-  assert.equal(registry.size, 39);
+  assert.equal(registry.size, 41);
   assert.equal(registry.get('marao-card'), runtime);
-  assert.equal(window.customCards.length, catalog.cards.filter(card => !card.hidden).length);
+  assert.equal(window.customCards.length, catalog.cards.filter(card => !card.hidden).length+1);
+  assert.equal(window.customCards.filter(card=>card.type==='marao-camera-events-card').length,1);
   for (const entry of catalog.cards) {
     const element = registry.get(nativeCardType(entry.id).slice(7));
     assert.equal(typeof element.getConfigElement, 'function');
@@ -145,4 +146,13 @@ test('invalid access actions and mismatched native identities fail before compos
   assert.throws(() => validateNativeCardConfig(config('md_access_slide_action_card', { entity_id: 'lock.test', tap_action: { action: 'toggle' } })), /strict slide/);
   assert.throws(() => validateNativeCardConfig({ type: 'custom:marao-light-card', template: 'md_access_card', entity_id: 'lock.test' }), /card type/);
   assert.throws(() => composeNativeCard(config('md_light_card', { entity_id: 'light.test' })), /occurrence identity/);
+});
+
+test('camera popup columns forward explicitly while omission retains released output',async()=>{
+ const {composeNativeCard}=await import('../../frontend_src/card-composition.js');
+ const config={type:'custom:marao-camera-card',entity:'camera.front',variables:{event_provider:'frigate',event_limit:7}};
+ const base=composeNativeCard(config,{instanceId:'columns'});const changed=composeNativeCard({...config,variables:{...config.variables,event_columns:2}},{instanceId:'columns'});
+ const events=base.popups[0].cards.find(card=>card.type==='custom:marao-camera-events-card');
+ assert.equal(Object.hasOwn(events,'columns'),false);
+ assert.deepEqual(changed.popups[0].cards.find(card=>card.type==='custom:marao-camera-events-card'),{...events,columns:2});
 });

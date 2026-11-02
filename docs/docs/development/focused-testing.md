@@ -79,8 +79,8 @@ disposable installation and refreshes the real HA page with native controls/icon
 the smallest representative existing view containing the selected visible runtime
 families, falling back to Cases; the dashboard editor uses its fixed route.
 Generic shared scopes require a representative
-`--family <template IDs>`; inspect editor and runtime scopes separately. Camera form changes use the visual builder editor scope. Standalone native
-authoring is retired.
+`--family <template IDs>`; inspect editor and runtime scopes separately. Camera form changes use the current native card editor scope. Home Assistant
+owns native authoring; historical whole-dashboard builder checks remain offline-only.
 Frontend sync reloads Marao when files changed. It does not reset helpers, explicitly
 generate dashboards or restart HA; normal entry lifecycle may update generated
 output/history. Missing or incompatible setup requires explicit `npm run ha:sync`.
@@ -288,7 +288,11 @@ Use `--component battery-groups --component access-label --component editor-rend
 
 Editor timing uses `node tests/measure-ha-editor.js before --fixture /private/tmp/<fixture>.json --expected-editor-sha256 <installed-hash>` and the matching `after` invocation. It never deploys. Retain the same private format-2 fixture and bind each phase to the served asset hash. Three serial cold and warm samples at normal/4× CPU report native readiness, mounted controls, startup versus interaction long tasks and two-frame interaction delay (not measured paint). First expansion and reopen costs are reported separately. Saved source must remain byte-identical.
 
-### Progressive editor startup
+### Historical progressive editor startup
+
+This section records the retired Integration/Visual builder implementation. It
+is retained for compatibility maintenance; none of its browser measurements or
+backend APIs are a current frontend installation or publication gate.
 
 The administrator `marao_dashboard/config/get` command accepts `scope`:
 `full` is the compatible default (including explicit-source previews), `initial`

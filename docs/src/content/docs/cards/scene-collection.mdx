@@ -1,0 +1,56 @@
+---
+title: "Scene collection"
+description: "Open an ordered collection of native scenes and toggle helpers."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Open an ordered collection of native scenes and toggle helpers.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_scene_collection_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-scene-collection-card
+name: Scenes
+entities:
+  - scene.evening
+  - input_boolean.guest_mode
+```
+
+Open the collection to activate a scene or toggle a helper. A scene activation is an action, not an on/off state.
+
+The configured order and custom member labels are retained.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `variables.popup_hash` | Popup hash | text | Not set | Optional link to an existing external popup hash. Omit it to use this card’s automatic details. |
+| `popup_view` | Custom popup view | text | Not set | Optional existing view path used for a Home Assistant managed popup layout. Omit for automatic details. Searchable suggestions are available. |
+| `entities` | Ordered scene members | json | Not set | Scene and input_boolean IDs, or descriptors with entity_id, name and icon. Searchable suggestions are available. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| Named members | Use labels and icons without changing entity identity. |
+| Empty collection | An explicit empty list stays empty. |
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

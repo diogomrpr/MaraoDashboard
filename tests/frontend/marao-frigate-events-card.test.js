@@ -91,11 +91,11 @@ test("camera event actions keep a visible 48px target and strong feedback", () =
   assert.match(source, /MaraoDashboard\?\.haptic\?\.\("heavy"\)/);
   assert.match(source, /button:disabled \{ cursor: default; opacity: \.55;/);
   assert.doesNotMatch(source, /:focus-visible/);
-  assert.match(MaraoFrigateEventsCard.styles, /grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(MaraoFrigateEventsCard.styles, /grid-template-columns:repeat\(auto-fill/);
   assert.match(MaraoFrigateEventsCard.styles, /\.meta > \* \{ overflow-wrap: anywhere;/);
   assert.match(MaraoFrigateEventsCard.styles, /top: var\(--marao-popup-header-height, 0px\)/);
-  assert.match(MaraoFrigateEventsCard.styles, /\.filters \{[^}]*overflow-x: auto/);
-  assert.match(MaraoFrigateEventsCard.styles, /\.filter, \.more \{ min-width: 48px; min-height: 48px/);
+  assert.match(MaraoFrigateEventsCard.styles, /\.filters \{[^}]*flex-wrap:wrap/);
+  assert.match(MaraoFrigateEventsCard.styles, /\.more \{ min-width: 48px; min-height: 48px/);
   assert.doesNotMatch(MaraoFrigateEventsCard.styles, /@media\s*\([^)]*(?:width|height)/);
 });
 
@@ -443,7 +443,7 @@ test("camera entity availability disables events and invalidates in-flight resul
     assert.equal(calls, 0);
     assert.match(card.shadowRoot.innerHTML, new RegExp(`data-status="${state || "unknown"}"`));
     assert.match(card.shadowRoot.innerHTML, /data-action="refresh"[^>]*disabled/);
-    assert.match(card.shadowRoot.innerHTML, /data-action="filter"[^>]*disabled/);
+    assert.match(card.shadowRoot.innerHTML, /data-action="refresh"[^>]*disabled/);
     assert.match(card.shadowRoot.innerHTML, /data-action="more"[^>]*disabled/);
     assert.doesNotMatch(card.shadowRoot.innerHTML, /<article|<video|class="detail-image"/);
     assert.match(card.shadowRoot.innerHTML, /class="feed" hidden/);
@@ -731,4 +731,63 @@ test('event heading retains its name when camera attributes become unavailable',
   assert.equal(card._title(),'A configured camera name');
   card._hass={states:{'camera.safe':{state:'unavailable'}}};
   assert.equal(card._title(),'A configured camera name');
+});
+
+test('multi-source validation, source identities and filters preserve undated and untyped recordings',async()=>{
+ const {normalizeEventSources,mergeSourceEvents,filterEventRows}=await import('../../custom_components/marao_dashboard/frontend/MaraoEventModel.js');
+ for(const config of [{columns:0},{columns:null},{cameras:['camera.a']},{entity:'camera.a',cameras:[{entity:'camera.b'}]},{cameras:[{entity:'camera.a'},{entity:'camera.a'}]}])assert.throws(()=>normalizeEventSources(config));
+ assert.deepEqual(normalizeEventSources({cameras:[]}),[]);
+ const sources=[{config:{entity:'camera.a'},provider:'frigate',identity:{instanceId:'one'},events:[{id:'same',start_time:100,label:'person'}]}, {config:{entity:'camera.b'},provider:'unifi_protect',events:[{id:'same',provider:'unifi_protect',dateLabel:'yesterday'}]}, {config:{entity:'camera.c'},provider:'netatmo',events:[{id:'recording',provider:'netatmo',start_time:200,eventTypes:[]}]}];
+ const rows=mergeSourceEvents(sources);assert.deepEqual(rows.map(r=>r.sourceKey),['camera.c','camera.a','camera.b']);assert.equal(new Set(rows.map(r=>r.eventKey)).size,3);
+ rows[0].thumbnailUrl='kept';assert.equal(mergeSourceEvents(sources)[0].thumbnailUrl,'kept');
+ assert.deepEqual(filterEventRows(rows,{camera:'camera.a',type:'person',range:{start:100000,end:200000}},e=>[e.label]).map(r=>r.event.id),['same']);
+ assert.equal(filterEventRows(rows,{range:{start:100000,end:200000}}).length,1);
+ assert.equal(filterEventRows(rows,{type:'person'},e=>e.eventTypes||[]).length,0);
+});
+
+test('custom HA-local time bounds reject missing and ambiguous clocks and retain interval edges',async()=>{
+ const {customEventRange}=await import('../../custom_components/marao_dashboard/frontend/MaraoEventModel.js');
+ assert.deepEqual(customEventRange('2026-11-02T10:00','2026-11-02T11:00','Europe/Lisbon'),{start:Date.UTC(2026,10,2,10),end:Date.UTC(2026,10,2,11)});
+ for(const bounds of [['2026-03-29T01:30','2026-03-29T03:00'],['2026-10-25T01:30','2026-10-25T03:00'],['2026-11-02T12:00','2026-11-02T11:00']])assert.throws(()=>customEventRange(...bounds,'Europe/Lisbon'));
+ const {periodRange}=await import('../../frontend_src/history-data.js');
+ for(const [day,hours] of [['2026-03-29T12:00Z',23],['2026-10-25T12:00Z',25]]){const range=periodRange(day,0,'day','Europe/Lisbon');assert.equal((range.end-range.start)/3600000,hours);}
+});
+
+test('multi-camera loading isolates failures with at most two metadata jobs and no preview requests',async()=>{
+ const card=new MaraoFrigateEventsCard();card._render=()=>{};
+ card.setConfig({cameras:[{entity:'camera.a',frigate_instance_id:'one'},{entity:'camera.b',frigate_instance_id:'two'},{entity:'camera.c',frigate_instance_id:'three'}],limit:2});
+ let active=0,max=0,calls=0;
+ card._hass={states:Object.fromEntries(['a','b','c'].map(id=>['camera.'+id,{state:'idle'}])),callWS:async request=>{calls++;active++;max=Math.max(max,active);await new Promise(resolve=>setTimeout(resolve,0));active--;if(request.instance_id==='two')throw new Error('denied');return [{id:'same',start_time:request.instance_id==='one'?10:20}];}};
+ card._connected=true;card._maybeLoad();await new Promise(resolve=>setTimeout(resolve,15));
+ assert.equal(max,2);assert.equal(calls,3);assert.deepEqual(card._events.map(e=>e.sourceKey),['camera.c','camera.a']);assert.equal(card._sourceResults[1].status,'error');
+ card._maybeLoad();assert.equal(calls,3);
+ card.preview=true;card._loadedKey='';card._maybeLoad();assert.equal(calls,3);
+});
+
+test('multi-source disconnection clears detail and events, and obsolete loads share the two-job bound',async()=>{
+ const card=new MaraoFrigateEventsCard();card._render=()=>{};card.setConfig({cameras:[{entity:'camera.a',frigate_instance_id:'one'},{entity:'camera.b',frigate_instance_id:'two'}]});
+ let active=0,max=0;const finish=[];
+ const hass={connected:true,states:{'camera.a':{state:'idle'},'camera.b':{state:'idle'}},callWS:()=>{active++;max=Math.max(active,max);return new Promise(resolve=>finish.push(()=>{active--;resolve([]);}));}};
+ card._connected=true;card.hass=hass;await Promise.resolve();await Promise.resolve();assert.equal(active,2);
+ card._selected={event:{id:'old'},status:'ready',url:'old'};card.hass={...hass,connected:false};assert.equal(card._selected,undefined);assert.deepEqual(card._events,[]);
+ card.hass=hass;await Promise.resolve();assert.equal(active,2);finish.splice(0).forEach(done=>done());await new Promise(resolve=>setTimeout(resolve,0));assert.equal(max,2);finish.splice(0).forEach(done=>done());
+});
+
+test('camera filters rebind after Home Assistant detaches and retains the card DOM',()=>{
+ const before={document:globalThis.document,window:globalThis.window};
+ class Node extends EventTarget{
+  constructor(){super();this.children=[];this.dataset={};this.attributes={};this.style={};this.childNodes=[];}
+  append(node){this.children.push(node);}after(){}focus(){}contains(){return false;}
+  setAttribute(k,v){this.attributes[k]=v;}getAttribute(k){return this.attributes[k];}
+  querySelector(selector){if(selector==='button')return this.trigger;if(selector==='[role=menu]')return this.menu;const key=/data-picker="(.*?)"/.exec(selector)?.[1];return key?this.children.find(c=>c.dataset.picker===key):null;}
+  set innerHTML(value){this.trigger=new Node();this.menu=new Node();}
+ }
+ globalThis.document=Object.assign(new EventTarget(),{createElement:()=>new Node()});globalThis.window=new EventTarget();
+ try{
+  const host=new Node(),coverage=new Node(),card=new MaraoFrigateEventsCard();card.shadowRoot={querySelector:s=>s==='.filters'?host:s==='.coverage'?coverage:null};card._sources=[{entity:'camera.a'},{entity:'camera.b'}];card._config={limit:12};card._hass={states:{},language:'en'};
+  card._renderFilters(true);const picker=host.children[0];picker.trigger.dispatchEvent(new Event('click'));assert.equal(card._dropdowns[0].open,true);
+  card.disconnectedCallback();assert.equal(card._dropdowns.length,0);
+  card._renderFilters(true);assert.equal(host.children[0],picker);picker.trigger.dispatchEvent(new Event('click'));assert.equal(card._dropdowns[0].open,true);
+  card.disconnectedCallback();
+ }finally{Object.assign(globalThis,before);}
 });

@@ -346,13 +346,13 @@ runtime or replace the repository quality contract and application checks.
 2. Identify affected shared consumers and capture a private task snapshot,
    preserving pre-existing dirty work and reviewing concurrent hunk ownership.
 3. Edit the source files described in the
-   [architecture guide]({{ '/docs/development/index.html' | relative_url }}).
+   [architecture guide](index.md).
    Run `npm run build:editor` after editing native editor/composition source;
    the build owns generated frontend files.
 4. When supported behavior changes, add stable state examples, safe helper definitions, popup/action variants,
    and coverage entries in `ha-test/`. Place a representative example on a
    realistic native page as well as Cases when those distinct placements matter. See
-   [gallery coverage]({{ '/docs/development/test-gallery.html' | relative_url }}).
+   [gallery coverage](test-gallery.md).
 5. Preview `npm run test:affected -- --since <snapshot> --tier <tier> --plan`,
    resolving shared-file scope with reviewed components. Visual work needs no
    automatic suite; behavior/focused work runs its required checks after the last

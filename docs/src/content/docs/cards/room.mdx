@@ -1,0 +1,59 @@
+---
+title: "Room shortcut"
+description: "Open a page and switch off its explicitly selected lights."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Open a page and switch off its explicitly selected lights.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_room_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-room-card
+name: Living room
+icon: mdi:sofa
+page: living-room
+variables:
+  light_entities:
+    - light.living_room
+    - light.kitchen
+```
+
+The room background reflects its explicitly selected lights. Normal lighting has no additional visible status row. The accessible name retains lighting status.
+
+The light-off control affects only the listed lights. It does not use automatic area discovery.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `variables.light_entities` | Room lights | json | Not set | Room lights for this card. Searchable suggestions are available. |
+| `page` | Destination page | text | Not set | Path of an existing view in this dashboard. Searchable suggestions are available. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| All lights off | The room retains its navigation target when every selected light is off. |
+| Navigation only | An explicit empty light list keeps a plain room shortcut. |
+| One unavailable light | Usable lights remain represented and unavailable members have a neutral problem cue. |
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

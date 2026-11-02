@@ -60,6 +60,7 @@ function expandGallery(source) {
   const editable = structuredClone(manifest.editablePageCases || []);
   const view = structuredClone(source);
   view.entities = [...editable, ...structuredClone(manifest.entityGroupCases || [])];
+  view.cards.push(...structuredClone(require('./feature-examples.json')));
   view.cards.push(...structuredClone(manifest.cameraLiveCases || []), ...structuredClone(manifest.sectionLayoutCases || []), ...structuredClone(manifest.titleLayoutCases), ...structuredClone(manifest.binaryPresentationCases), ...structuredClone(manifest.problemPresentationCases), ...structuredClone(manifest.energyFormattingCases), ...structuredClone(manifest.roomCompositionCases));
   view.cards.push({type: 'custom:marao-card', template: 'md_base_card', entity: 'sensor.marao_dashboard_test_energy_format_missing_live', name: 'Simulate source unit loss', show_state: false, tap_action: {action: 'call-service', service: 'marao_test_camera.toggle_energy_unit'}});
   for (const example of manifest.energyFormattingCases.filter(card => card.popup_hash)) {

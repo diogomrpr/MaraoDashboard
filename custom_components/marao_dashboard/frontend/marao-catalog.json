@@ -573,6 +573,14 @@
           "advanced": false,
           "description": "",
           "default": 12
+        },
+        {
+          "key": "event_columns",
+          "label": "Event columns",
+          "kind": "number",
+          "selector": "number",
+          "advanced": false,
+          "description": "Preferred event columns inside the popup; reduces when space is limited."
         }
       ]
     },
@@ -1735,6 +1743,26 @@
       "entity_optional": true,
       "description": "Upload a room image and place light controls and illuminated strips.",
       "variables": []
+    },
+    {
+      "id": "md_people_card",
+      "label": "People",
+      "icon": "mdi:account-group",
+      "domains": [],
+      "entity_optional": true,
+      "description": "Display explicitly selected people and their current places.",
+      "variables": [],
+      "people": true
+    },
+    {
+      "id": "md_schedules_card",
+      "label": "Schedules",
+      "icon": "mdi:calendar-clock",
+      "domains": [],
+      "entity_optional": true,
+      "description": "Manage device schedules and seasonal timer groups in Home Assistant.",
+      "variables": [],
+      "schedules": true
     }
   ],
   "pages": {

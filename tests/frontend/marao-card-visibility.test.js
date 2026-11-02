@@ -442,9 +442,9 @@ test("card registration can be retried after the custom-element registry becomes
   };
   try {
     registerMaraoCards();
-    assert.deepEqual([...registered.keys()], ["marao-card", "marao-power-history-card", "marao-control-grid", "marao-navbar-card", "marao-popup-card"]);
+    assert.deepEqual([...registered.keys()], ["marao-summary-actions", "marao-card", "marao-power-history-card", "marao-control-grid", "marao-navbar-card", "marao-popup-card"]);
     registerMaraoCards();
-    assert.equal(registered.size, 5);
+    assert.equal(registered.size, 6);
   } finally {
     globalThis.customElements = previousRegistry;
   }
@@ -1741,6 +1741,7 @@ test('live group filtering retains eligible nodes, cancels removed controls and 
       cards: [{ entity: 'light.first' }, { entity: 'light.second' }] };
     popup._overlay = { querySelector: selector => selector === '.marao-popup-content' ? host : close };
     popup._groupChildren = new Map(); popup._groupHelpers = { createCardElement: node };
+    popup._groupLayout=new Map([['',{cells:host,buttons:[],info:{},entities:['light.first','light.second']}]]);
     popup.hass = { states: { 'light.first': { state: 'on' }, 'light.second': { state: 'on' } } };
     const [first, second] = host.children; const insertions = host.insertions;
     second.control = { getRootNode: () => ({ host: second }) };

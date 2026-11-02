@@ -1,3 +1,7 @@
+const popupLayouts=await import(new URL(`./MaraoPopupView.js${new URL(import.meta.url).search}`,import.meta.url));
+const {popupViewError}=await import(new URL(`./MaraoPopupLayout.js${new URL(import.meta.url).search}`,import.meta.url));
+const {peopleError,peopleRows,collectionLabel,escapeText,sectionsError} = await import(new URL(`./MaraoCollections.js${new URL(import.meta.url).search}`,import.meta.url));
+const {reconcileGroup}=await import(new URL(`./MaraoGroupDetails.js${new URL(import.meta.url).search}`,import.meta.url));
 const [dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities, names, sensorThresholds, pressModule, nativeContext] = await Promise.all([
   'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js', 'MaraoNames.js', 'MaraoSensorThresholds.js', 'MaraoPressFeedback.js', 'MaraoNativeContext.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
@@ -971,6 +975,8 @@ function cardStyles() {
     .control.number-control { grid-area:icon; justify-self:end; }
     .exhaust-actions {grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;pointer-events:auto;}
     .exhaust-actions:empty {display:none;}
+    .exhaust-actions button {display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;overflow-wrap:anywhere;}
+    .exhaust-actions ha-icon {flex:0 0 24px;}
     .wallbox-shortcuts { grid-area:wallbox; z-index:2; display:grid; grid-template-columns:repeat(auto-fit,minmax(48px,1fr)); gap:8px; width:100%; margin-top:8px; pointer-events:auto; }
     .wallbox-shortcuts button, .exhaust-actions button { min-width:48px; min-height:48px; background:var(--opacity-contrast-100,color-mix(in srgb,currentColor 14%,transparent)); color:var(--primary-text-color,#141414); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--color-black,#000) 12%,transparent); font-size:var(--font-size-primary,1.125rem); font-weight:var(--font-weight-primary,700); }
     .wallbox-shortcuts button[aria-pressed="true"]:not(:disabled) { background:var(--color-blue); color:var(--color-black); box-shadow:inset 0 0 0 3px var(--color-black); }
@@ -1164,6 +1170,7 @@ export class MaraoCard extends BaseElement {
   }
   setConfig(config) {
     config = accessCardConfig(config, this._hass);
+    if(config.template==='md_people_card'){const error=peopleError(config);if(error)throw new Error(collectionLabel(error,this._hass));}
     this.shadowRoot?.querySelector("marao-slide-to-open")?._clearFeedback?.();
     this._layoutMetadata = {};
     if (config.template === "md_sensor_card") { const error = sensorThresholdError(config.variables || {}, config.entity); if (error) throw new Error(localize(error, this._hass, {}, error)); }
@@ -1783,6 +1790,11 @@ export class MaraoCard extends BaseElement {
       this._activeHistoryPopup?._refreshHistory();
       return;
     }
+    if(this._config.template==='md_people_card') {
+      const rows=peopleRows(this._config,this._hass),e=escapeText;
+      this._setMarkup(`<style>${cardStyles()}.people{display:grid;gap:16px;padding:16px;min-width:0}.people h2{margin:0;font:inherit;font-weight:700;overflow-wrap:anywhere}${controlGridStyles('.people ul')}.people ul{--marao-control-columns:${this._config.columns ?? 1};--marao-control-gap:16px;list-style:none;margin:0;padding:0}.people li{flex-wrap:wrap}.people li{display:flex;align-items:center;gap:12px;min-width:0}.people .person-icon{flex:0 0 48px;width:48px;height:48px;border-radius:50%;overflow:hidden;background:var(--secondary-background-color);display:grid;place-items:center}.people img{width:48px;height:48px;object-fit:cover}.people .copy{min-width:0;overflow-wrap:anywhere}.people .person-problem{color:var(--secondary-text-color)}</style><ha-card><div class="people"><h2>${e(this._config.name || collectionLabel('People',this._hass))}</h2><ul>${rows.map(row=>`<li${row.problem?' class="person-problem"':''}><span class="person-icon">${row.picture?`<img alt="" src="${e(row.picture)}"><ha-icon hidden icon="${e(row.icon)}"></ha-icon>`:`<ha-icon icon="${e(row.icon)}"></ha-icon>`}</span><div class="copy"><strong>${e(row.name)}</strong><div>${e(row.place)}</div></div></li>`).join('')}</ul>${!rows.length?e(collectionLabel('No people selected',this._hass)):''}</div></ha-card>`,JSON.stringify([rows,this._config.columns]));
+      this.shadowRoot.querySelectorAll('img').forEach(img=>{img.onerror=()=>{img.hidden=true;img.nextElementSibling.hidden=false;};});return;
+    }
     if (this._config.template === "md_alarm_controls_card") { this._renderAlarm(); return; }
     const gesture = this._sliderGesture;
     if (gesture?.input.isConnected) {
@@ -2002,7 +2014,7 @@ export class MaraoCard extends BaseElement {
     const graphPrimaryHistory = graphCard && !action && !config.tap_action;
     if (graphPrimaryHistory) actionControl = `<button class="card-action" type="button" data-card-action aria-label="${esc(localize('history.title', this._hass, {}, 'History'))}"${this.preview || this._graphAvailability(graphEntity) ? ' disabled' : ''}></button>`;
     if (feedback) actionControl += `<button class="card-action problem-details" type="button" data-problem-details aria-label="${esc(problem.reason)}"></button>`;
-    const coverActions = exhaust ? `<div class="exhaust-actions">${[['open_cover',1,'access.open','Open'],['close_cover',2,'common.close','Close']].filter(([,feature]) => Number(state.attributes?.supported_features) & feature).map(([service,,key,fallback]) => `<button type="button" data-exhaust-action="${service}" aria-label="${esc(localize('actions.for_target', this._hass, {action:localize(key,this._hass,{},fallback),name:this._label(entity,config,state)}, `${fallback} ${this._label(entity,config,state)}`))}"${controlsDisabled ? ' disabled' : ''}>${esc(localize(key,this._hass,{},fallback))}</button>`).join('')}</div>` : '';
+    const coverActions = exhaust ? `<div class="exhaust-actions">${[['open_cover',1,'access.open','Open'],['close_cover',2,'common.close','Close']].filter(([,feature]) => Number(state.attributes?.supported_features) & feature).map(([service,,key,fallback]) => `<button type="button" data-exhaust-action="${service}" aria-label="${esc(localize('actions.for_target', this._hass, {action:localize(key,this._hass,{},fallback),name:this._label(entity,config,state)}, `${fallback} ${this._label(entity,config,state)}`))}"${controlsDisabled ? ' disabled' : ''}><ha-icon aria-hidden="true" icon="${service==='open_cover'?'mdi:arrow-expand-vertical':'mdi:arrow-collapse-vertical'}"></ha-icon><span>${esc(localize(key,this._hass,{},fallback))}</span></button>`).join('')}</div>` : '';
     const holdProgress = holdAction || alternateHold ? '<svg class="hold-progress" aria-hidden="true" focusable="false"><rect x="1.5" y="1.5" pathLength="100"></rect></svg>' : "";
     const holdHint = holdAction ? `<div class="climate">${esc(actionLabel)}</div>` : "";
     const graphStatus = showsGraph ? loading ? "loading" : graphData.error ? "format-error" : this._graphStatus(graphEntity) : "";
@@ -2504,7 +2516,7 @@ export class MaraoControlGrid extends BaseElement {
 
 export class MaraoPopupCard extends BaseElement {
   constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._hass = null; this._open = false; this._focus = null; this._childrenRenderId = 0; this._backgroundState = []; }
-  setConfig(config) { this._config = { height: "auto", max_height: "100%", ...config, ...(config.cards ? { cards: config.cards.map(canonicalCard) } : {}) }; this._renderHost(); this._sync(); if (this._open) this._renderChildren(); }
+  setConfig(config) { const layoutError=popupViewError(config);if(layoutError)throw new Error(layoutError);this._sourceConfig=structuredClone(config);if(config.entity_group){const error=sectionsError(config.entity_group);if(error)throw new Error(collectionLabel(error,this._hass));} this._config = { height: "auto", max_height: "100%", ...config, ...(config.cards ? { cards: config.cards.map(canonicalCard) } : {}) }; this._renderHost(); this._sync(); if (this._open) this._renderChildren(); }
   get preview() { return Boolean(this._preview || this.nativeOwner?.preview || nativeEditing(this)); }
   set preview(value) { this._preview = Boolean(value); if (this.preview) this._close(false); }
   set hass(value) { this._hass = value; this._syncTheme(); this._updateAccessHeader(); this._updateChildrenHass(); this._refreshHistory(); }
@@ -2740,7 +2752,10 @@ export class MaraoPopupCard extends BaseElement {
     host.style?.removeProperty('--marao-control-columns');
     if (this._message) { const message = document.createElement('p'); message.style.cssText = 'margin:0;overflow-wrap:anywhere;white-space:pre-line'; message.textContent = this._message; host.replaceChildren(message); return; }
     const renderId = ++this._childrenRenderId;
-    this._groupHelpers = null; this._groupChildren = new Map(); this._groupEmpty = null;
+    this._nativePopupView?.destroy();this._nativePopupView=null;this._layoutControls?.();
+    this._layoutControls=popupLayouts.bindPopupLayoutControls(this,{haptic,navigate});
+    if(this._config.popup_view){this._nativePopupView=popupLayouts.mountPopupView(this,host);return;}
+    this._groupHelpers = null; this._groupChildren = new Map(); this._groupEmpty = null; this._groupLayout = null;
     host.replaceChildren();
     const loading = document.createElement('p'); loading.setAttribute('role', 'status');
     loading.textContent = localize('common.loading', this._hass, {}, 'Loading…'); host.append(loading);
@@ -2766,53 +2781,13 @@ export class MaraoPopupCard extends BaseElement {
     }
   }
   _updateChildrenHass() {
+    this._layoutControls?.update?.();
+    if(this._nativePopupView){this._nativePopupView.update();return;}
     if (this._config.entity_group) { this._reconcileGroupChildren(); return; }
     const host = this._overlay?.querySelector(".marao-popup-content");
     for (const card of host?.children || []) {card.nativeOwner=this.nativeOwner || this;card.preview=this.preview;card.hass = this._hass;}
   }
-  _reconcileGroupChildren() {
-    const host = this._overlay?.querySelector('.marao-popup-content');
-    if (!host || !this._groupHelpers || !this._groupChildren) return;
-    const group = this._config.entity_group;
-    const activity = entityGroupState(group.entity_type, group.entities, this._hass);
-    const eligible = new Set(group.popup_filter === 'active' ? activity.activeEntities : group.entities);
-    const detail = this._historyContext;
-    // Keep the inspected light mounted when it turns off or loses availability.
-    if (this._historyHost && detail?.kind === 'light-color' && group.entities.includes(detail.source)) eligible.add(detail.source);
-    for (const [id, card] of this._groupChildren) {
-      if (eligible.has(id)) continue;
-      let active = deepActiveElement();
-      while (active && active !== card && !card.contains(active)) active = active.getRootNode()?.host;
-      if (active) this._overlay.querySelector('.marao-popup-close')?.focus();
-      card.remove(); this._groupChildren.delete(id);
-    }
-    let index = 0;
-    for (const config of this._config.cards || []) {
-      if (!eligible.has(config.entity)) continue;
-      this._groupEmpty?.remove(); this._groupEmpty = null;
-      let card = this._groupChildren.get(config.entity);
-      if (!card) {
-        try { card = this._groupHelpers.createCardElement(config); if (card.setConfig) card.setConfig(config); }
-        catch (error) { card = document.createElement('p'); card.textContent = error.message; }
-        this._groupChildren.set(config.entity, card);
-      }
-      card.setAttribute('data-marao-control-cell', '');
-      card.nativeOwner=this.nativeOwner || this;card.preview=this.preview;card.hass = this._hass;
-      if (host.children[index] !== card) host.insertBefore(card, host.children[index] || null);
-      index++;
-    }
-    if (!index) {
-      this._groupEmpty ||= document.createElement('p');
-      this._groupEmpty.setAttribute('role', 'status');
-      this._groupEmpty.textContent = !this._hass?.states ? localize('common.loading', this._hass, {}, 'Loading…')
-        : !group.entities.length ? localize('group.empty', this._hass, {}, 'No entities configured')
-        : localize('group.no_active', this._hass, {}, 'No active entities');
-      if (!this._groupEmpty.isConnected) host.append(this._groupEmpty);
-    }
-    const uniform = index > 0;
-    host.classList?.toggle('control-grid', uniform);
-    if (uniform) host.style?.setProperty('--marao-control-columns', '1');
-  }
+  _reconcileGroupChildren() { reconcileGroup(this,{entityGroupState,isAccessCover,deepActiveElement,haptic,controlGridStyles,callService:callServiceWithNotification}); }
   _setBackgroundInert(overlay, root = document.body) {
     const body = document.body;
     if (body?.style) {
@@ -2887,6 +2862,7 @@ export class MaraoPopupCard extends BaseElement {
     this._headerObserver?.disconnect(); this._headerObserver = null;
     this._columnObserver?.disconnect(); this._columnObserver = null;
     this._popupPress?.destroy(); this._popupPress = null;
+    this._nativePopupView?.destroy();this._nativePopupView=null;this._layoutControls?.();this._layoutControls=null;
     this._open = false; this._overlay?.remove(); this._overlay = null; this._restoreBackground();
     this._childrenRenderId++; this._groupChildren?.clear(); this._groupHelpers = null; this._groupEmpty = null;
     if (updateHash && window.location.hash === text(this._config.hash)) {
@@ -2962,6 +2938,7 @@ export class MaraoPowerHistoryCard extends BaseElement {
 }
 
 export function registerMaraoCards() {
+  popupLayouts.registerPopupActions({haptic,isAccessCover,callService:callServiceWithNotification});
   for (const [name, klass] of [["marao-card", MaraoCard], ["marao-power-history-card", MaraoPowerHistoryCard], ["marao-control-grid", MaraoControlGrid], ["marao-navbar-card", MaraoNavbarCard], ["marao-popup-card", MaraoPopupCard]]) {
     if (globalThis.customElements && !globalThis.customElements.get(name)) globalThis.customElements.define(name, klass);
   }

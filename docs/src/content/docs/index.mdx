@@ -1,0 +1,31 @@
+---
+title: Your home, your dashboard
+description: Explore Marao cards, try them live, and build a Home Assistant dashboard that feels like yours.
+template: splash
+hero:
+  title: Your home.\nYour dashboard.
+  tagline: Mobile controls that bring your rooms, devices, and everyday routines together.
+  actions:
+    - text: Explore the cards
+      link: /MaraoDashboard/cards/
+      icon: right-arrow
+    - text: Install Marao
+      link: /MaraoDashboard/start/install/
+      variant: secondary
+---
+
+import {Card, CardGrid} from '@astrojs/starlight/components';
+import Playground from '../../components/Playground.astro';
+
+## Try it before you build it
+
+Try the card below, or select **Open playground** to change settings and device states. These are the same Marao cards you use in Home Assistant, running here with fictional devices.
+
+<Playground cardId="md_light_card" />
+
+<CardGrid>
+  <Card title="Start with one card" icon="add-document">Add Marao to an existing dashboard. Home Assistant owns the pages, layout, sizing, and visibility.</Card>
+  <Card title="Make it yours" icon="setting">Explore the settings and behavior examples for every public card. Copy the YAML into Home Assistant when you are ready.</Card>
+  <Card title="Bring rooms together" icon="home">Use room summaries, shared navigation, and popups to keep everyday controls within reach.</Card>
+  <Card title="Keep control" icon="approve-check">Marao runs inside Home Assistant. The website playground uses fictional data and needs no account connection.</Card>
+</CardGrid>

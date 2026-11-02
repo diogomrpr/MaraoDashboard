@@ -39,6 +39,23 @@ test('inferred generated staging is not a source identity, while source and expl
   write('ha-test/.cache/dist/package.js','explicit input changed');assert.notEqual(checkIdentity(explicit,directory),before,'Explicit check inputs remain binding');
 });
 
+test('generated documentation stays outside source fingerprints while published package inputs remain binding',t=>{
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'marao-docs-inputs-'));
+  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  const write=(file,body)=>{const target=path.join(directory,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,body);};
+  write('docs/src/entry.js',"new URL('../dist/output.js',import.meta.url);");
+  const generated=['docs/dist/output.js','docs/public/playground/frame.html','docs/public/brand/logo.svg','docs/public/fonts/Montserrat.ttf','docs/build-meta.json','docs/src/styles/marao-theme.css'];
+  for(const file of [...generated,'dist/package.js'])write(file,'before');
+  const check={command:['node','docs/src/entry.js'],inputs:['docs','dist']},identity=checkIdentity(check,directory);
+  assert.ok(!dependencyInputs(['docs/src/entry.js'],directory).includes('docs/dist/output.js'));
+  for(const file of generated)write(file,'rebuilt output');
+  assert.equal(checkIdentity(check,directory),identity);
+  write('docs/src/entry.js','changed source');assert.notEqual(checkIdentity(check,directory),identity);
+  const sourceChanged=checkIdentity(check,directory);write('dist/package.js','changed published package');assert.notEqual(checkIdentity(check,directory),sourceChanged);
+  const explicit={...check,inputs:['docs/dist']},before=checkIdentity(explicit,directory);
+  write('docs/dist/output.js','explicit change');assert.notEqual(checkIdentity(explicit,directory),before);
+});
+
 test('camera playback stays manual-only in affected and full plans while code tests remain', () => {
   const selection = selectComponents([], ['camera']);
   for (const options of [{}, { full: true }]) {

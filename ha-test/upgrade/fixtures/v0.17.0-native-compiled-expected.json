@@ -197,6 +197,23 @@
               "light.marao_dashboard_test_light",
               "light.marao_dashboard_test_room_light",
               "light.marao_dashboard_test_onoff_light"
+            ],
+            "members": [
+              {
+                "entity_id": "light.marao_dashboard_test_light",
+                "name": "Living room ceiling lighting",
+                "variables": {
+                  "custom_label": "Reading corner"
+                }
+              },
+              {
+                "entity_id": "light.marao_dashboard_test_room_light",
+                "name": "Accent Lights"
+              },
+              {
+                "entity_id": "light.marao_dashboard_test_onoff_light",
+                "name": "On/off Light"
+              }
             ]
           },
           "cards": [
@@ -248,6 +265,50 @@
               "cover.marao_dashboard_test_case_cover_slider_minimum",
               "cover.marao_dashboard_test_case_cover_slider_middle",
               "cover.marao_dashboard_test_case_cover_slider_maximum"
+            ],
+            "members": [
+              {
+                "entity_id": "cover.marao_dashboard_test_cover",
+                "name": "Blinds"
+              },
+              {
+                "entity_id": "cover.marao_dashboard_test_garage_door",
+                "name": "Garage Door"
+              },
+              {
+                "entity_id": "cover.marao_dashboard_test_open_only_door",
+                "name": "Pedestrian Gate",
+                "device_class": "door",
+                "supported_features": 1
+              },
+              {
+                "entity_id": "cover.marao_dashboard_test_case_cover_closed",
+                "name": "Living room blinds"
+              },
+              {
+                "entity_id": "cover.marao_dashboard_test_case_cover_open",
+                "name": "Kitchen blinds"
+              },
+              {
+                "entity_id": "cover.marao_dashboard_test_case_cover_opening",
+                "name": "Bedroom blinds"
+              },
+              {
+                "entity_id": "cover.marao_dashboard_test_case_cover_closing",
+                "name": "Office blinds"
+              },
+              {
+                "entity_id": "cover.marao_dashboard_test_case_cover_slider_minimum",
+                "name": "Guest room blinds"
+              },
+              {
+                "entity_id": "cover.marao_dashboard_test_case_cover_slider_middle",
+                "name": "Dining room blinds"
+              },
+              {
+                "entity_id": "cover.marao_dashboard_test_case_cover_slider_maximum",
+                "name": "Hallway blinds"
+              }
             ]
           },
           "cards": [
@@ -387,6 +448,20 @@
               "climate.marao_dashboard_test_multi_mode_climate",
               "climate.marao_dashboard_test_dual_target_climate",
               "climate.marao_dashboard_test_feedback_delayed_confirmation"
+            ],
+            "members": [
+              {
+                "entity_id": "climate.marao_dashboard_test_multi_mode_climate",
+                "name": "Thermostat"
+              },
+              {
+                "entity_id": "climate.marao_dashboard_test_dual_target_climate",
+                "name": "Dual target thermostat"
+              },
+              {
+                "entity_id": "climate.marao_dashboard_test_feedback_delayed_confirmation",
+                "name": "Delayed thermostat"
+              }
             ]
           },
           "cards": [
@@ -544,6 +619,137 @@
               "sensor.marao_dashboard_test_maintenance_battery_28",
               "sensor.marao_dashboard_test_maintenance_battery_29",
               "sensor.marao_dashboard_test_maintenance_battery_30"
+            ],
+            "members": [
+              {
+                "entity_id": "sensor.marao_dashboard_test_battery",
+                "name": "Battery",
+                "template": "md_battery_card"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_legacy_battery",
+                "name": "Marao Dashboard Test Legacy Battery"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_1",
+                "name": "Marao Dashboard Test Maintenance Battery 1"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_2",
+                "name": "Marao Dashboard Test Maintenance Battery 2"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_3",
+                "name": "Marao Dashboard Test Maintenance Battery 3"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_4",
+                "name": "Marao Dashboard Test Maintenance Battery 4"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_5",
+                "name": "Marao Dashboard Test Maintenance Battery 5"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_6",
+                "name": "Marao Dashboard Test Maintenance Battery 6"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_7",
+                "name": "Marao Dashboard Test Maintenance Battery 7"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_8",
+                "name": "Marao Dashboard Test Maintenance Battery 8"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_9",
+                "name": "Marao Dashboard Test Maintenance Battery 9"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_10",
+                "name": "Marao Dashboard Test Maintenance Battery 10"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_11",
+                "name": "Marao Dashboard Test Maintenance Battery 11"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_12",
+                "name": "Marao Dashboard Test Maintenance Battery 12"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_13",
+                "name": "Marao Dashboard Test Maintenance Battery 13"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_14",
+                "name": "Marao Dashboard Test Maintenance Battery 14"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_15",
+                "name": "Marao Dashboard Test Maintenance Battery 15"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_16",
+                "name": "Marao Dashboard Test Maintenance Battery 16"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_17",
+                "name": "Marao Dashboard Test Maintenance Battery 17"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_18",
+                "name": "Marao Dashboard Test Maintenance Battery 18"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_19",
+                "name": "Marao Dashboard Test Maintenance Battery 19"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_20",
+                "name": "Marao Dashboard Test Maintenance Battery 20"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_21",
+                "name": "Marao Dashboard Test Maintenance Battery 21"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_22",
+                "name": "Marao Dashboard Test Maintenance Battery 22"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_23",
+                "name": "Marao Dashboard Test Maintenance Battery 23"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_24",
+                "name": "Marao Dashboard Test Maintenance Battery 24"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_25",
+                "name": "Marao Dashboard Test Maintenance Battery 25"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_26",
+                "name": "Marao Dashboard Test Maintenance Battery 26"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_27",
+                "name": "Marao Dashboard Test Maintenance Battery 27"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_28",
+                "name": "Marao Dashboard Test Maintenance Battery 28"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_29",
+                "name": "Marao Dashboard Test Maintenance Battery 29"
+              },
+              {
+                "entity_id": "sensor.marao_dashboard_test_maintenance_battery_30",
+                "name": "Marao Dashboard Test Maintenance Battery 30"
+              }
             ]
           },
           "cards": [
@@ -3877,6 +4083,19 @@
             "entities": [
               "light.marao_dashboard_test_light",
               "light.marao_dashboard_test_onoff_light"
+            ],
+            "members": [
+              {
+                "entity_id": "light.marao_dashboard_test_light",
+                "name": "Task lighting",
+                "variables": {
+                  "enable_slider": true
+                }
+              },
+              {
+                "entity_id": "light.marao_dashboard_test_onoff_light",
+                "name": "Marao Dashboard Test Onoff Light"
+              }
             ]
           },
           "cards": [

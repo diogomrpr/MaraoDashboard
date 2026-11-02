@@ -1,3 +1,4 @@
+const {locationError,locationLabel,locationPreferenceKey,readLocationPreference,writeLocationPreference,resolveLocation}=await import(new URL(`./MaraoLocation.js${new URL(import.meta.url).search}`,import.meta.url));
 const [refreshModule, updatesModule, themeModule, pressModule] = await Promise.all([
   'MaraoFrontendRefresh.js', 'MaraoFrontendUpdates.js', 'MaraoTheme.js', 'MaraoPressFeedback.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
@@ -151,6 +152,7 @@ export class MaraoNavbarCard extends BaseElement {
     if (routes.some(route => !route || typeof route !== 'object' || Array.isArray(route)
       || typeof (route.url || route.path) !== 'string' || !(route.url || route.path).trim()
       || typeof route.label !== 'string' || !route.label.trim())) throw new Error(localize("navigation.invalid_entry", this._hass));
+    const error=locationError(config?.current_room);if(error)throw new Error(error);
     this._closeOverflow(false);
     this._closeMaintenance(false);
     this._config = { ...config, routes }; this._render();
@@ -173,6 +175,7 @@ export class MaraoNavbarCard extends BaseElement {
     applyFullscreen();
   }
   disconnectedCallback() {
+    this._closeLocationPreferences?.();
     this._closeMaintenance(false);
     this._pagePress?.destroy();this._pagePress=null;this._press?.destroy();this._press=null;
     this._pageRefresh?.remove();
@@ -203,8 +206,16 @@ export class MaraoNavbarCard extends BaseElement {
     while (root && root.localName !== 'hui-root') root = root.parentElement || root.getRootNode()?.host;
     return root;
   }
+  _routes() {
+    if(!this._config.current_room?.enabled)return this._config.routes || [];
+    const key=locationPreferenceKey(window.location.origin,this._config.dashboard_root,this._hass?.user?.id);
+    if(this._locationKey!==key){this._locationKey=key;let storage;try{storage=window.localStorage;}catch{}this._locationPreference=readLocationPreference(storage,key);}
+    const document=this._root()?.lovelace?.rawConfig || this._root()?.lovelace?.config;
+    return [resolveLocation(this._config.current_room,this._hass,this._locationPreference?.person,document,this._config.dashboard_root,window.location.origin),...(this._config.routes || [])];
+  }
   _view() { return this._root()?.shadowRoot?.querySelector('#view'); }
   _syncContext() {
+    if(this._locationDialog && (this._root()?.lovelace?.editMode || !this._config.current_room?.enabled || this._locationKey!==locationPreferenceKey(window.location.origin,this._config.dashboard_root,this._hass?.user?.id)))this._closeLocationPreferences?.();
     if (this._maintenance && !this._maintenanceValid(this._maintenance)) this._closeMaintenance(false);
     const editing = Boolean(this._root()?.lovelace?.editMode);
     if (this._isSurface) this.hidden = Boolean(editing || this.preview);
@@ -226,7 +237,7 @@ export class MaraoNavbarCard extends BaseElement {
     const top = Math.max(safe.top, this.preview ? 0 : host?.top || 0, viewport?.offsetTop || 0);
     const style = getComputedStyle(nav), size = nav.querySelector('a,button')?.getBoundingClientRect().width || 48;
     const gap = parseFloat(style.columnGap) || 0, padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-    const { slots } = navbarPartition(this._config.routes || [], right - left, size, gap, padding);
+    const { slots } = navbarPartition(this._routes(), right - left, size, gap, padding);
     const geometry = [left, right, top, safe.bottom, slots].map(value => Math.round(value * 2) / 2).join(':');
     if (this._geometry !== geometry) { this._refreshGesture?.cancel(); this._closeOverflow(false); }
     this._geometry = geometry; this._safeTop = top;
@@ -256,7 +267,7 @@ export class MaraoNavbarCard extends BaseElement {
     this._press?.destroy();this._press=null;this._overflowPress?.destroy();this._overflowPress=null;
     this._refreshGesture?.destroy();
     this._observer?.unobserve(this.shadowRoot.querySelector('.bounds'));
-    const routes = this._config.routes || [];
+    const routes = this._routes();
     this._visibleCount = routes.length > this._slots ? this._slots - 1 : routes.length;
     const overflow = routes.length > this._visibleCount;
     this.toggleAttribute?.('data-empty', !routes.length); this.toggleAttribute?.('data-preview', this.preview);
@@ -299,7 +310,8 @@ export class MaraoNavbarCard extends BaseElement {
   _bindLinks(root) {
     root?.querySelectorAll('[data-route]').forEach(link => link.addEventListener('click', event => {
       event.preventDefault(); if (this.preview || this._editing) return;
-      const route = this._config.routes[Number(link.dataset.route)];
+      const route = this._routes()[Number(link.dataset.route)];
+      if(!route || route.disabled)return;
       const href = route.url || route.path, target = new URL(href, window.location.href);
       this._closeOverflow(target.pathname === window.location.pathname && Boolean(target.hash)); haptic('heavy'); navigate(href);
     }));
@@ -421,11 +433,16 @@ export class MaraoNavbarCard extends BaseElement {
       onStatus: state => this._refreshFeedback(state),
     }).catch(() => { /* The operation already renders its localized error. */ }).finally(() => { this._refreshing = false; this._updateCurrent(); });
   }
+  _openLocationPreferences(opener) {
+    haptic('heavy');
+    import(new URL(`./MaraoLocationPreferences.js${new URL(import.meta.url).search}`,import.meta.url)).then(module=>{if(this.isConnected&&!this._editing)return module.openLocationPreferences(this,opener);}).catch(error=>{this._closeLocationPreferences?.();this._refreshFeedback('failed');console.error('Location preferences failed',error);});
+  }
   _syncPageRefresh() {
     const view = this._view(), lovelace = this._root()?.lovelace;
     const showRefresh = this._config?.show_cache_reset !== false;
+    const showLocation=Boolean(this._config?.current_room?.enabled);
     const editorURL = this._hass?.user?.is_admin && this._config?.show_editor_button !== false ? this._editorURL() : '';
-    if (!this.isConnected || this._surface || this.preview || this._editing || !showRefresh && !editorURL || lovelace?.editMode || !view
+    if (!this.isConnected || this._surface || this.preview || this._editing || !showRefresh && !editorURL && !showLocation || lovelace?.editMode || !view
       || !navbarMainPage(lovelace?.config || lovelace?.rawConfig)) {
       this._pagePress?.destroy();this._pagePress=null;this._pageRefresh?.remove(); return;
     }
@@ -448,6 +465,9 @@ export class MaraoNavbarCard extends BaseElement {
         if (this._editorURL()) { haptic('heavy'); this._openEditor(); }
       });
     }
+    let locationButton=this._pageRefresh.shadowRoot.querySelector('.location-preferences');
+    if(showLocation && !locationButton){locationButton=document.createElement('button');locationButton.type='button';locationButton.className='location-preferences';locationButton.innerHTML='<ha-icon icon="mdi:account-switch" aria-hidden="true"></ha-icon>';locationButton.onclick=()=>{if(this._refreshEligible(undefined,this._pageRefresh)&&this._config.current_room?.enabled)this._openLocationPreferences(locationButton);};this._pageRefresh.shadowRoot.append(locationButton);}
+    if(locationButton){locationButton.hidden=!showLocation;locationButton.setAttribute('aria-label',locationLabel('preferences',this._hass));}
     this._pagePress ||= bindPressFeedback(this._pageRefresh.shadowRoot);
     if (this._pageRefresh.parentNode !== view) view.prepend(this._pageRefresh);
     const editor = this._pageRefresh.shadowRoot.querySelector('.frontend-editor');
@@ -460,13 +480,16 @@ export class MaraoNavbarCard extends BaseElement {
   }
   _updateCurrent() {
     if (!this.shadowRoot) return;
-    const routes = this._config.routes || [], disabled = this.preview || this._editing;
-    const current = route => route && navbarRouteCurrent(route);
+    const routes = this._routes(), disabled = this.preview || this._editing;
+    const current = route => route && !route.disabled && navbarRouteCurrent(route);
     this._syncPageRefresh();
     this.shadowRoot.querySelector('.nav')?.setAttribute('aria-label', localize('navigation.label', this._hass, {}, 'Marao navigation'));
     this.shadowRoot.querySelectorAll('[data-route]').forEach(link => {
-      const route = routes[Number(link.dataset.route)], active = current(route);
-      link.classList.toggle('active', active); link.setAttribute('aria-disabled', String(Boolean(disabled))); link.tabIndex = disabled ? -1 : 0;
+      const route = routes[Number(link.dataset.route)], active = !route?.disabled && current(route);
+      if(!route)return;
+      link.setAttribute('aria-label',route.label);if(link.localName==='a')link.setAttribute('href',route.path || route.url || '#');
+      if(link.localName==='button')link.disabled=Boolean(disabled || route.disabled);
+      link.classList.toggle('active', active); link.setAttribute('aria-disabled', String(Boolean(disabled || route.disabled))); link.tabIndex = disabled || route.disabled ? -1 : 0;
       if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
       link.querySelector('ha-icon').setAttribute('icon', active ? route.icon_selected || route.icon || 'mdi:circle' : route.icon || route.icon_selected || 'mdi:circle-outline');
     });
@@ -484,7 +507,7 @@ export class MaraoNavbarCard extends BaseElement {
     this._open = true;
     const menu = document.createElement('nav'); menu.id = 'marao-overflow'; menu.className = 'overflow surface';
     menu.setAttribute('aria-label', localize('navigation.open', this._hass, {}, 'Additional destinations'));
-    menu.innerHTML = this._config.routes.slice(this._visibleCount).map((route, i) => this._link(route, i + this._visibleCount)).join('');
+    menu.innerHTML = this._routes().slice(this._visibleCount).map((route, i) => this._link(route, i + this._visibleCount)).join('');
     this.shadowRoot.append(menu); this._overflowPress=bindPressFeedback(menu); this._bindLinks(menu); this._updateCurrent();
     const box = toggle.getBoundingClientRect();
     menu.style.left = `${box.left + box.width / 2}px`; menu.style.bottom = `${innerHeight - box.top + 8}px`;
@@ -686,6 +709,7 @@ export function focusRestorer(element) {
 function applyFullscreen() {
   const owned = new Map();
   const editorViews = new Set();
+  const editHeaders = new Set();
   const activeNavbars = new Set();
   for (const navbar of fullscreenUsers) {
     const nativeActive = navbar._config?.dashboard_root === window.location.pathname.split('/')[1];
@@ -699,12 +723,17 @@ function applyFullscreen() {
     if (!active) continue;
     let root = navbar;
     while (root && root.localName !== "hui-root") root = root.parentElement || root.getRootNode()?.host;
-    if (navbar.preview || root?.lovelace?.editMode) continue;
+    if (navbar.preview) continue;
+    const headers = root?.shadowRoot?.querySelectorAll("app-header, ha-app-layout > header, .header") || [];
+    if (root?.lovelace?.editMode) {
+      for (const header of headers) { owned.set(header, ["display"]); editHeaders.add(header); }
+      continue;
+    }
     if (navbar._config?.native_editor && navbar._hass?.user?.is_admin && !navbar._config.routes.length && navbar._config.show_editor_button === false) continue;
     activeNavbars.add(navbar);
     const view = root?.shadowRoot?.querySelector("#view");
     const pageFlow = navbarMainPage(root?.lovelace?.config || root?.lovelace?.rawConfig, window.location) ? ["flex-direction"] : [];
-    for (const header of root?.shadowRoot?.querySelectorAll("app-header, ha-app-layout > header, .header") || []) owned.set(header, ["display"]);
+    for (const header of headers) owned.set(header, ["display"]);
     if (view) {
       owned.set(view, ["padding-top", "padding-right", "padding-left", "padding-bottom", "--marao-floor-plan-clearance", ...pageFlow]);
       if (navbar.localName === 'marao-dashboard-editor-card') editorViews.add(view);
@@ -738,6 +767,12 @@ function applyFullscreen() {
     }
     for (const property of properties) {
       const original = fullscreenOriginals.get(node)[property];
+      // Releasing our hiding alone cannot expose a header already hidden by the viewing theme.
+      if (property === "display") {
+        const visible = original.value && original.value !== "none" ? original.value : "block";
+        setStyle(node, property, editHeaders.has(node) ? visible : "none", "important");
+        continue;
+      }
       // The full-height editor has no navbar; clearance would scroll its toolbar offscreen.
       if (editorViews.has(node) && property === 'padding-bottom') { setStyle(node, property, '0px', 'important'); continue; }
       // Native top padding includes the hidden header and inset; retain only its ordinary spacing token.
@@ -748,7 +783,7 @@ function applyFullscreen() {
         : property === "padding-bottom"
         ? `calc(${coveredBottom ? `${coveredBottom}px` : `calc(60px + ${navbarBottomGap()})`} + 8px)`
         : safeArea(property.slice(8));
-      setStyle(node, property, property === "display" ? "none" : property === "flex-direction" ? "column"
+      setStyle(node, property, property === "flex-direction" ? "column"
         : `max(${normal}, ${clearance})`, "important");
     }
   }

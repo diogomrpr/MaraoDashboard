@@ -1,0 +1,76 @@
+marao-playground{
+  display:block;container-type:inline-size;margin:2rem 0;border:1px solid var(--opacity-contrast-100);
+  border-radius:28px;overflow:hidden;background:var(--ha-card-background);color:var(--primary-text-color);box-shadow:var(--ha-card-box-shadow);
+}
+marao-playground [hidden]{display:none!important}
+marao-playground :is(button,input,select,textarea){box-sizing:border-box;font:inherit;color:inherit}
+marao-playground button{min-height:48px;min-width:48px;padding:12px 20px;border:0;border-radius:24px;background:var(--marao-card-background);cursor:pointer;font-weight:600;font-size:.85rem;line-height:1.4}
+marao-playground button:active{transform:scale(.98)}
+marao-playground button:disabled{opacity:.5;cursor:default}
+marao-playground :is(button,input,select,textarea):focus{outline:none}
+marao-playground :is([data-toggle-playground],[data-copy]){background:var(--primary-color);color:var(--text-primary-color)}
+marao-playground .playground-heading{display:flex;justify-content:flex-end;padding:16px 20px}
+marao-playground .playground-top{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;padding:4px 20px 20px}
+marao-playground .playground-control{display:grid;gap:8px;min-width:0;font-size:.75rem;font-weight:600;color:var(--subtext-color)}
+marao-playground :where(input:not([type=checkbox]),select,textarea){width:100%;min-width:0;min-height:48px;padding:13px 16px;border:1px solid transparent;border-radius:16px;background:var(--marao-card-background);color:var(--primary-text-color);font-size:.85rem;line-height:1.55}
+marao-playground select{appearance:none;padding-right:38px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6' fill='none' stroke='%237D8D91' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+marao-playground .playground-columns{display:grid;grid-template-columns:minmax(0,1fr);border-top:1px solid var(--opacity-contrast-100)}
+marao-playground .playground-edit{min-width:0;padding:24px}
+marao-playground .playground-tabs{display:flex;gap:4px;max-width:max-content;padding:4px;margin-bottom:24px;background:var(--marao-card-background);border-radius:28px}
+marao-playground .playground-tabs button{background:transparent;padding:10px 22px}
+marao-playground .playground-tabs button[aria-selected=true]{background:var(--ha-card-background);box-shadow:0 2px 6px var(--opacity-contrast-100)}
+marao-playground [data-settings]{display:grid;gap:12px}
+marao-playground .setting-field{display:grid;gap:9px;min-width:0;margin:0;padding:16px;border:1px solid var(--opacity-contrast-100);border-radius:20px}
+marao-playground .setting-label{font-size:.85rem;font-weight:600;line-height:1.5}
+marao-playground .setting-description{font-size:.72rem;font-weight:400;line-height:1.65;color:var(--subtext-color);overflow-wrap:anywhere}
+marao-playground .setting-copy{display:grid;gap:4px;min-width:0}
+marao-playground .setting-field[data-kind=boolean]{grid-template-columns:minmax(0,1fr) 56px;align-items:center;gap:16px;background:var(--marao-card-background);border:0}
+marao-playground input[type=checkbox]{position:relative;appearance:none;flex:none;width:56px;height:48px;min-width:56px;margin:0;border:0;background:transparent;cursor:pointer}
+marao-playground input[type=checkbox]::before{content:'';position:absolute;inset:8px 0;border-radius:24px;background:var(--divider-color)}
+marao-playground input[type=checkbox]::after{content:'';position:absolute;top:12px;left:4px;width:24px;height:24px;border-radius:50%;background:var(--ha-card-background);box-shadow:0 1px 4px rgba(0,0,0,.15);transition:transform .15s ease}
+marao-playground input[type=checkbox]:checked::before{background:var(--primary-color)}
+marao-playground input[type=checkbox]:checked::after{transform:translateX(24px);background:var(--text-primary-color)}
+marao-playground .color-input{display:flex;gap:10px;align-items:center;min-width:0}
+marao-playground .color-swatch{flex:0 0 28px;width:28px;height:28px;border-radius:50%;border:1px solid var(--divider-color);background:var(--marao-card-background)}
+marao-setting-picker{display:block;min-width:0}
+marao-playground .setting-picker-trigger{display:flex;align-items:center;gap:12px;width:100%;padding:13px 16px;border-radius:16px;background:var(--marao-card-background);color:var(--primary-text-color);font-size:.85rem;font-weight:500;text-align:left}
+marao-playground .setting-picker-value{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.55}
+marao-playground .setting-picker-trigger svg{width:20px;height:20px;flex:none;fill:currentColor}
+marao-playground .setting-picker-popover{position:fixed;inset:auto;margin:0;box-sizing:border-box;padding:10px;border:1px solid var(--opacity-contrast-100);border-radius:24px;background:var(--ha-card-background);color:var(--primary-text-color);box-shadow:0 12px 40px rgba(0,0,0,.22);font:500 .85rem/1.5 Montserrat,system-ui,sans-serif;overflow:hidden}
+marao-playground .setting-picker-popover:popover-open{display:flex;flex-direction:column;gap:8px}
+marao-playground .setting-picker-search{display:flex;gap:8px;flex:none}
+marao-playground .setting-picker-search input{flex:1;min-width:0}
+marao-playground .setting-picker-close{padding:8px;flex:none;font-size:1.5rem}
+marao-playground .setting-picker-options{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+marao-playground .setting-picker-option{display:flex;align-items:center;gap:12px;width:100%;background:transparent;border-radius:14px;padding:12px;text-align:left;font-size:.8rem;font-weight:500}
+marao-playground .setting-picker-option.is-active{background:var(--marao-card-background)}
+marao-playground .setting-picker-option[aria-selected=true]{background:var(--primary-color);color:var(--text-primary-color)}
+marao-playground .setting-picker-option svg{width:28px;height:28px;flex:none;fill:currentColor}
+marao-playground .setting-picker-option-copy{display:grid;gap:3px;min-width:0;flex:1;overflow-wrap:anywhere}
+marao-playground .setting-picker-option small{font-size:.7rem;font-weight:400;line-height:1.5}
+marao-playground .setting-picker-check{font-size:1rem;flex:none}
+marao-playground .setting-picker-status{margin:0;padding:0 8px;font-size:.72rem;line-height:1.5;color:var(--subtext-color);overflow-wrap:anywhere}
+marao-playground .setting-picker-status:empty{display:none}
+marao-playground :is(.setting-picker-custom,.setting-picker-clear){flex:none;white-space:normal;overflow-wrap:anywhere;font-size:.78rem}
+marao-playground textarea{resize:vertical;min-height:140px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;tab-size:2}
+marao-playground .yaml-label{display:grid;gap:12px;font-size:.8rem;font-weight:600}
+marao-playground [data-yaml]{min-height:360px;background:var(--primary-background-color);border:1px solid var(--opacity-contrast-100);padding:20px;line-height:1.8;font-weight:400}
+marao-playground .playground-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+marao-playground .playground-hint{font-size:.72rem;font-weight:400;line-height:1.65;color:var(--subtext-color);overflow-wrap:anywhere;margin:14px 0 0}
+marao-playground .playground-error{padding:14px 16px;border-radius:16px;background:var(--marao-problem-error-background);color:var(--marao-problem-error-text);font-size:.8rem;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+marao-playground .playground-preview{display:flex;flex-direction:column;align-items:center;min-width:0;padding:24px;background:var(--primary-background-color)}
+marao-playground iframe{display:block;border:0;width:100%;max-width:400px;min-height:280px;height:460px;border-radius:24px;background:var(--primary-background-color)}
+marao-playground .playground-preview .playground-hint{max-width:400px}
+marao-playground[data-editing] .playground-preview{order:-1;border-bottom:1px solid var(--opacity-contrast-100)}
+@container(min-width:760px){
+  marao-playground[data-editing] .playground-columns{grid-template-columns:minmax(0,1fr) minmax(0,1fr);height:min(80dvh,900px,calc(100dvh - var(--sl-nav-height) - 12rem));min-height:320px;overflow:hidden}
+  marao-playground[data-editing] .playground-edit{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0;padding:0}
+  marao-playground[data-editing] .playground-tabs{margin:20px}
+  marao-playground[data-editing] .playground-editor-scroll{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:0 20px 20px}
+  marao-playground[data-editing] .playground-footer{padding:16px 20px;border-top:1px solid var(--opacity-contrast-100)}
+  marao-playground[data-editing] .playground-actions{margin-top:0}
+  marao-playground[data-editing] .playground-preview{order:0;min-height:0;overflow:hidden;border-left:1px solid var(--opacity-contrast-100);border-bottom:0}
+  marao-playground[data-editing] iframe{flex:1;min-height:0;max-height:100%}
+}
+@media(max-width:480px){marao-playground{border-radius:24px}marao-playground .playground-heading{padding:12px}marao-playground .playground-top{padding:4px 12px 16px}marao-playground .playground-edit{padding:16px}marao-playground .playground-preview{padding:12px}}
+@media(prefers-reduced-motion:reduce){marao-playground button:active{transform:none}marao-playground input[type=checkbox]::after{transition:none}}

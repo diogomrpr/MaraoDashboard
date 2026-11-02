@@ -1,0 +1,87 @@
+---
+title: "Navbar"
+description: "Floating dashboard navigation, compact overflow and an optional current-room shortcut powered by Bermuda."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Floating dashboard navigation, compact overflow and an optional current-room shortcut powered by Bermuda.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="navbar" />
+
+## Use in Home Assistant
+
+For an ordinary Home Assistant dashboard, put the `routes` and `current_room` options under `marao.navbar` in dashboard configuration. Do not add a navbar card to every view. The playground previews the standalone runtime and its Copy YAML button exports the dashboard settings block. The runtime example below explains the same options.
+
+```yaml
+type: custom:marao-navbar-card
+dashboard_root: marao-dashboard
+routes:
+  - path: /marao-dashboard/home
+    label: Home
+    icon: mdi:home
+  - path: /marao-dashboard/living-room
+    label: Living room
+    icon: mdi:sofa
+  - path: /marao-dashboard/kitchen
+    label: Kitchen
+    icon: mdi:silverware-fork-knife
+current_room:
+  enabled: true
+  people:
+    person.alex:
+      area_sensor: sensor.alex_area
+    person.sam:
+      area_sensor: sensor.sam_area
+  rooms:
+    living_room:
+      path: /marao-dashboard/living-room
+    kitchen:
+      path: /marao-dashboard/kitchen
+  away_path: /marao-dashboard/away
+```
+
+Ordinary dashboards configure navigation once in the top-level marao.navbar block. The standalone card shown here exposes the same runtime for the demonstration; do not add one per view.
+
+Automatic identity matches the signed-in HA user to a unique person user_id. A browser-local manual person override supports shared devices.
+
+Bermuda room resolution uses the configured area sensor’s area_id. It does not infer rooms from display names or last_seen.
+
+A missing, unknown, unmapped or unavailable room retains a disabled away-style slot so navigation does not move. Away can open the optional configured Away page.
+
+All configured entries remain reachable. A rightmost More control opens vertical overflow when the row is full.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `routes` | Navigation entries | json | Not set | Ordered routes with path, label and icon. |
+| `current_room` | Current room settings | json | Not set | Optional enabled flag, person-to-area-sensor mapping, area-to-view mapping and away_path. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Current room | Alex is home in the Living room. |
+| Another room | The fixed first slot follows a configured area. |
+| Away page | A person outside home uses the Away destination even if an area sensor is stale. |
+| Unknown room | Keep a neutral placeholder when the room is unknown. |
+| Unmapped room | Do not guess a destination for an unmapped area. |
+| Many entries | Keep every entry available through More. |
+| Navigation only | Omit the current-room slot when the feature is disabled. |
+
+## Website preview limits
+
+The signed-in account and browser-local identity choice are fictional in this isolated preview. Copy the routes/current_room fields into marao.navbar in your dashboard settings.
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

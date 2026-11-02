@@ -1,0 +1,6 @@
+---
+import Default from '@astrojs/starlight/components/PageTitle.astro';
+import meta from '../../build-meta.json';
+---
+<div class="release-label">{meta.released ? `Marao ${meta.version}` : `Local preview · ${meta.version} · not published`}</div>
+<Default><slot /></Default>

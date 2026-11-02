@@ -1,0 +1,80 @@
+---
+title: "Camera"
+description: "Automatic camera preview to live video with a generated Frigate, UniFi Protect or Netatmo events popup."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Automatic camera preview to live video with a generated Frigate, UniFi Protect or Netatmo events popup.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_camera_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-camera-card
+entity_id: camera.front_door
+variables:
+  event_provider: frigate
+  frigate_camera: front_door
+  frigate_instance_id: demo
+  event_limit: 12
+  event_columns: 2
+```
+
+Compatible entity domains: `camera`.
+
+The summary uses the bound camera; popup_stream_entity optionally selects a different camera for popup video. Event metadata stays associated with the configured event camera.
+
+The card opens video and recent events. Preloading is optional and uses resources while viewing other pages.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `entity_id` | Entity | entity | Not set | A camera entity from your Home Assistant. Searchable suggestions are available. |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `variables.popup_stream_entity` | Popup stream | entity | Not set | Popup stream for this card. Searchable suggestions are available. |
+| `variables.preload_stream` | Preload stream in background | boolean | `false` | Uses bandwidth and device resources on other dashboard pages. Popup video stays on demand. |
+| `variables.popup_hash` | Popup hash | text | Not set | Optional link to an existing external popup hash. Omit it to use this card’s automatic details. |
+| `variables.event_provider` | Event provider | text | `auto` | Event provider for this card. Choices: `auto`, `frigate`, `unifi_protect`, `netatmo`. |
+| `variables.frigate_camera` | Frigate camera name | text | Not set | Frigate camera name for this card. Searchable suggestions are available. |
+| `variables.frigate_instance_id` | Frigate instance ID | text | Not set | Frigate instance ID for this card. Searchable suggestions are available. |
+| `variables.unifi_protect_media_source` | UniFi Protect media source | text | Not set | UniFi Protect media source for this card. Searchable suggestions are available. |
+| `variables.event_limit` | Event limit | number | `12` | Event limit for this card. |
+| `variables.event_columns` | Event columns | number | Not set | Preferred event columns inside the popup; reduces when space is limited. |
+| `popup_view` | Custom popup view | text | Not set | Optional existing view path used for a Home Assistant managed popup layout. Omit for automatic details. Searchable suggestions are available. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| Separate popup stream | Use another camera entity for popup video. |
+| UniFi Protect events | Choose the native Protect media provider. |
+| Netatmo recordings | Choose native Netatmo recordings without inventing detection labels. |
+| Background preloading option | Enable preloading explicitly; the website does not start a real stream. |
+| Loading state | Wait for Home Assistant state before showing controls. |
+| Unknown state | The entity exists but has no known state. Controls remain neutral and disabled. |
+| Unavailable | The entity is unavailable. No device action is dispatched. |
+| Missing entity | A removed entity produces an explicit neutral missing-state result. |
+| Disconnected | Controls refuse actions when Home Assistant is disconnected. |
+
+## Website preview limits
+
+Camera pictures and event metadata are fictional. Live streams, audio, native fullscreen and transport recovery require Home Assistant and are not simulated as working video.
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

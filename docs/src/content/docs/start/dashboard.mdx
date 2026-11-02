@@ -1,0 +1,36 @@
+---
+title: Set up a dashboard
+description: Enable shared Marao navigation without replacing your existing views.
+---
+
+import dashboardExample from '../../../../examples/dashboard.yaml?raw';
+import { Code } from '@astrojs/starlight/components';
+
+Create an editable dashboard in **Settings → Dashboards**, or use an existing ordinary dashboard. Home Assistant owns its views, sections, card sizes, visibility and saving.
+
+Adding a Marao card alone does not change the surrounding Home Assistant shell. An optional dashboard-level `marao` block enables shared floating navigation and the coordinated dashboard appearance.
+
+## Enable shared navigation
+
+For a new empty dashboard, this complete configuration creates Home and Rooms views with matching destinations:
+
+<Code code={dashboardExample} lang="yaml" />
+
+Use your dashboard's actual address and an existing view path. **If the dashboard already contains cards, add only the `marao` block in its raw configuration editor. Keep all existing views and other settings.**
+
+The same navbar appears on every view, including empty or newly created views and direct links. You do not need to place a navbar card in each view.
+
+## Change destinations
+
+As an administrator, hold the navbar for two seconds and open **Marao settings**. Add, rename, reorder or remove destinations, then **Save**. Adding a view does not automatically add a destination. Renaming a view path requires updating links that use it.
+
+Routes can point to dashboard views or explicit HTTP links. Keep a real initial view reachable. An empty route list removes the navbar and its hold target; restore routes through Home Assistant's raw editor if needed.
+
+The main-page editing and cache shortcuts can be hidden independently. Home Assistant's native editing controls remain the fallback if Marao entry points are hidden.
+
+## Continue
+
+- [Navigation and current room](../../features/navigation/): overflow, automatic person selection and an optional Away page.
+- [Layouts and visibility](../../features/layout/): Home Assistant sections, sizes and native editing.
+- [Popup layouts](../../features/popups/): automatic details and editable layouts.
+- [Theme and interaction](../../features/theme/): appearance, language and state feedback.

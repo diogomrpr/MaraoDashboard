@@ -1,0 +1,39 @@
+---
+import {getExample} from '../../examples/manifest.js';
+const {cardId}=Astro.props;
+const example=getExample(cardId);
+if(!example)throw new Error(`Unknown playground example: ${cardId}`);
+const base=import.meta.env.BASE_URL.replace(/\/$/,'');
+---
+<marao-playground data-card-id={cardId} data-frame-url={`${base}/playground/frame.html`} data-icons-url={`${base}/playground/icons.json`} class="not-content">
+  <div class="playground-heading"><button type="button" data-toggle-playground aria-expanded="false">Open playground</button></div>
+  <div class="playground-top" data-playground-controls hidden>
+    <div class="playground-control"><span>Behavior</span><select data-scenario aria-label="Behavior scenario">{example.scenarios.map(s=><option value={s.id}>{s.label}</option>)}</select></div>
+    <div class="playground-control"><span>Appearance</span><select data-theme aria-label="Preview appearance"><option value="light">Light</option><option value="dark">Dark</option></select></div>
+    <div class="playground-control"><span>Card language</span><select data-language aria-label="Card language"><option value="en">English</option><option value="pt">Português</option></select></div>
+  </div>
+  <div class="playground-columns">
+    <div class="playground-edit" data-playground-controls hidden>
+      <div class="playground-tabs" role="tablist" aria-label="Configuration editor">
+        <button data-tab="settings" type="button" role="tab" aria-selected="true">Settings</button>
+        <button data-tab="yaml" type="button" role="tab" aria-selected="false">YAML</button>
+      </div>
+      <div class="playground-editor-scroll">
+        <div data-settings role="tabpanel" aria-label="Card settings"></div>
+        <div data-yaml-panel role="tabpanel" aria-label="YAML configuration" hidden>
+          <label class="yaml-label">Card configuration<textarea data-yaml aria-label="Card YAML" spellcheck="false" autocomplete="off"></textarea></label>
+        </div>
+        <p data-error role="alert" class="playground-error" hidden></p>
+      </div>
+      <div class="playground-footer">
+        <div class="playground-actions"><button type="button" data-copy>Copy YAML</button><button type="button" data-reset>Reset</button></div>
+        <p data-copy-status role="status" class="playground-hint">{example.id==='navbar'?'Merge the marao block into your dashboard configuration. Keep existing views.':'Paste into Home Assistant’s manual card editor. Replace example entity IDs with yours.'}</p>
+      </div>
+    </div>
+    <div class="playground-preview">
+      <iframe title={`${example.title} live preview`} sandbox="allow-scripts" referrerpolicy="no-referrer" loading="lazy" src={`${base}/playground/frame.html`}></iframe>
+      <p data-preview-status role="status" class="playground-hint">Loading preview…</p>
+    </div>
+  </div>
+</marao-playground>
+<script>import '../scripts/playground.js';</script>

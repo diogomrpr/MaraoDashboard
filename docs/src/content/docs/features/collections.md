@@ -1,0 +1,37 @@
+---
+title: People and entity collections
+description: Keep explicit membership, useful summaries and safe group controls.
+---
+
+Collections retain the entities and order you choose. Adding a new entity to a Home Assistant area does not silently refill a saved collection.
+
+## People
+
+The People card displays selected `person.*` entities using Home Assistant's reported Home, Away or named-place state. Configure tracking in HA first. Marao does not poll for location, store live location data or add a map.
+
+People remain in saved order, left to right and then down. Optional top-level `columns` accepts 1–6; omitting it keeps one column. Narrow widths and enlarged text may reduce the visible column count. Names and places wrap, and an unavailable person does not hide another person's location.
+
+Pictures are used when available unless you select an icon. Failed pictures fall back to an account icon. The card is informational; the room-following navbar is a separate [navigation feature](../navigation/).
+
+## Entity Groups
+
+Entity Groups summarize selected lights, covers, climates or batteries and open their individual controls. Choose **All entities** or **Active only** for the sheet. Lights default to Active only; the other types default to All entities. Filtering changes presentation, not the complete configured action scope.
+
+| Group | Active means |
+| --- | --- |
+| Lights | On |
+| Covers | Open or opening |
+| Climate | An enabled mode, including idle operation |
+| Batteries | A valid percentage below 20 |
+
+Add named sections to organize members by room or floor. Each member belongs to at most one section; unassigned members stay in Other. Deleting a section keeps its members. Without sections, the flat list remains.
+
+Whole-group and section controls act on eligible configured members. Unavailable or unsupported devices are excluded and explained. Tap-based Open all excludes doors, gates and garages; open those with their individual strict slides. Climate bulk actions do not invent a supported mode or change temperatures. Battery groups remain read-only.
+
+Battery severity follows the lowest valid percentage, while the displayed percentage remains the first usable reading. Invalid or missing values do not become zero. A known low battery retains its warning even if another member is unavailable.
+
+## Scene collections
+
+Scene collections keep selected options in order, with local names and icons. Opening, viewing or editing a collection does not activate a scene. Confirm changes through the native card dialog's Save control.
+
+See the individual [card references](../../cards/) for editable examples and complete configuration fields.

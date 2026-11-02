@@ -1,0 +1,65 @@
+---
+title: "Schedules"
+description: "Manage device schedules and seasonal timer groups in Home Assistant."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Manage device schedules and seasonal timer groups in Home Assistant.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_schedules_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-schedules-card
+name: Garden schedules
+group_id: garden
+targets:
+  - switch.garden
+  - valve.garden
+```
+
+An administrator sets up the collection and acknowledges dedicated devices. Home Assistant owns the automations and stop timers; the browser does not need to stay open.
+
+Seasonal groups select which future starts are allowed. Pausing or switching groups does not cancel accepted timed runs.
+
+Timers support selected weekdays/local start times, on-only operation or 1–1440 minute durations. Overlapping timed intervals and duplicate starts within a group are rejected.
+
+Structural external edits and ambiguous ownership are read-only until reconciled. Keep native backups and private recovery exports before resource changes.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `group_id` | Collection ID | text | Not set | Stable collection identity shared by cards referring to the same schedule records. |
+| `targets` | Dedicated devices | json | Not set | Explicit switch, valve or input_boolean entity IDs. Searchable suggestions are available. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| New collection | Set up a new fictional schedule collection. |
+| No target devices | An explicit empty target list never discovers devices automatically. |
+| Reported API failure | Show a readable service error without claiming schedules were saved. |
+
+## Website preview limits
+
+All automation/helper records and device actions are in memory. The demonstration does not create schedules in Home Assistant or simulate elapsed-day execution.
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

@@ -1,7 +1,7 @@
 # Contributing
 
-Contributions are welcome. Keep changes focused and use the existing Home
-Assistant integration layout. Read the root `AGENTS.md` and the
+Keep changes focused and use the existing native frontend architecture.
+Read the root `AGENTS.md` and the
 [dashboard quality contract](../docs/docs/development/dashboard-quality.md) before
 changing dashboard behavior.
 
@@ -20,10 +20,11 @@ changing dashboard behavior.
 
 4. Make the change and add the smallest useful regression test.
 5. Run only the focused test for the code or card you changed.
-6. Configure and prepare a disposable Home Assistant using the
-   [development guide](../docs/docs/development/local-development.md). Inspect
-   affected cards using only safe gallery helpers. Agents may use only
-   `192.168.0.28`.
+6. Install applicable final changes on disposable Home Assistant using the
+   [development guide](../docs/docs/development/local-development.md). Use direct
+   frontend sync for compatible frontend changes; use full preparation only when
+   required. Any selected browser inspection uses safe helpers. Agents may use
+   only `192.168.0.28`. Documentation-only work needs no HA deployment.
 7. Before a push, tag, GitHub release, or HACS release, run
    `npm run verify:publish`.
 8. Open a pull request against `main` explaining the problem and the change.
@@ -43,9 +44,16 @@ Marao's dashboard runtime is self-contained. Reuse Home Assistant or
 browser-native capabilities and the existing Marao components; do not add,
 bundle, fork, or modify third-party Lovelace cards.
 
-When behavior changes, keep the visual builder, validation, generator, card
-runtime, theme, translations, documentation, focused tests, and safe gallery
-fixtures aligned wherever they consume that behavior.
+When behavior changes, keep native card forms, shared validation/composition,
+runtime, theme, translations, documentation examples, focused tests and safe
+gallery fixtures aligned wherever they consume it. Historical conversion remains
+compatible; ordinary native edits must never be regenerated over.
+
+The documentation site uses Astro/Starlight and real card previews backed by
+fictional devices. Add a named scenario for each materially distinct public
+behavior and keep exported YAML free of simulation fields. See
+[documentation maintenance](../docs/src/content/docs/development/documentation.md).
+Public documentation deploys only with its matching stable release.
 
 By contributing, you agree that your work is licensed under the repository's
 existing license.

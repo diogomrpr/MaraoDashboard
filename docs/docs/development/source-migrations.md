@@ -7,8 +7,8 @@ parent: Development
 # JSON format migrations
 
 The shared browser conversion engine is in
-`custom_components/marao_dashboard/frontend/MaraoSource.js`. The dashboard strategy,
-builder and offline converter must use this engine rather than creating separate
+`custom_components/marao_dashboard/frontend/MaraoSource.js`. Read-only historical strategies,
+ordinary-dashboard conversion and the offline converter use this engine rather than creating separate
 conversions. Source-format numbers are independent of Marao release versions,
 Home Assistant storage versions, native-envelope versions and compiler contracts.
 

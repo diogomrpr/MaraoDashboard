@@ -2,6 +2,8 @@
 
 Checked tasks have scoped implementation evidence; unchecked tasks remain pending. Apply this change in dependency order. The host compatibility checks in group 1 must succeed before conversion is enabled. Use existing tools on disposable `192.168.0.28`; camera playback remains manual. Group-local assertions are scoped to changed logic, not an instruction to run every mapped suite.
 
+Groups 1–8 record the earlier implementation. Group 9 is the user's 2026-11-01 edit-header/page-navigation/Done follow-up; its separate evidence is recorded below rather than inferred from those historical checks.
+
 ## 1. Native metadata and automatic-navbar compatibility
 
 - [x] 1.1 Capture the implementation commit/dirty snapshot and reviewed affected consumers; record supported HA/frontend versions and inspect the affected test plan. Verify the scope record identifies card editors, popup composition, navbar/bootstrap and conversion without absorbing unrelated edits.
@@ -57,6 +59,21 @@ Checked tasks have scoped implementation evidence; unchecked tasks remain pendin
 - [x] 8.1 Review the final diff and requested outcomes against completed group-local evidence; run only the remaining essential affected checks serially and resolve relevant failures. Reuse successful host/migration evidence unless final edits invalidate it; do not run full/mobile/theme/camera-transport campaigns.
 - [x] 8.2 Install final applicable assets on disposable HA after final edits using `prepareFrontend()`; use full preparation only for genuinely changed fixtures/setup. Verify current served assets/readiness and retained ordinary source, leaving the converted dashboard/helpers installed at `/marao-dashboard` with no redundant unchanged reinstall.
 - [x] 8.3 Hand off the native test URL/reload guidance and a short manual watch list for native sizing/visibility, floor-plan/energy editing, duplicate popup ownership and all-page navbar behavior. Identify actual checks, manual camera/phone coverage and any remaining limitation honestly.
+
+## 9. Theme-safe edit header, page navigation and Done
+
+- [x] 9.1 Record a fresh implementation commit/dirty snapshot and inspect the shared native host, theme/fullscreen ownership and existing edit-entry path. Fix Marao's hiding at that shared boundary so native page navigation, Done and safe-area spacing remain visible for the entire edit session and view replacement; verify the changed ownership/cleanup behavior with the smallest existing native bootstrap/edit-context/navbar assertion and preserve unrelated shell state.
+- [x] 9.2 Preserve HA's native view-navigation and Done lifecycle: reach every current dashboard page including views absent from Marao routes, remain in edit mode across switches, respect open dialog Save/Cancel and reported save failures, and complete editing once through native Done without a duplicate save. Add only focused assertions needed for changed logic; verify runtime entity actions remain inert during editing and normal viewing returns after completion.
+- [x] 9.3 Update `docs/docs/usage/native-dashboard.md` with the visible native edit header, switching pages, confirming card-dialog edits and Done; review labels/links and distinguish native per-edit saves from a separate whole-dashboard transaction. Reuse the existing safe multi-view example; any agent diagnosis uses at most one targeted edit/page-switch/Done visit on disposable `192.168.0.28`, with temporary safe fixture edits restored and no conversion/full/mobile/camera campaign.
+- [x] 9.4 Build changed frontend assets, run the selected essential assertions serially, review the actual task diff and validate this change. Install final compatible assets once using direct `prepareFrontend()` on disposable `192.168.0.28`, preserve current dashboard/helper state and confirm served-asset/readiness checks. Compare the reported header issue, page switching, Done and restored viewing shell against actual evidence; leave assets installed and hand off a short manual watch list, or report not installed / not ready for test if blocked.
+
+## Edit-header follow-up evidence — 2026-11-01
+
+- Baseline: `cf4662333dd6223c761e698f4131a197d67e19a7`; dirty-state snapshot `/private/tmp/marao-edit-header.json`. Scope is the shared fullscreen/native edit header, native page navigation/Done, guide and existing navbar regression test; unrelated dirty work was preserved.
+- Four selected Node assertions passed: fullscreen ownership/restoration and native edit dispatch in `marao-navbar-card.test.js`; native editing lifetime and inert runtime actions in `native-edit-context.test.js`. The regression includes a pre-hidden header, an unlisted replacement view, native spacing and exact style restoration. Reviewed the behavior selector for the runtime/test/guide subset; no broader suites were run.
+- Strict change validation, task diff/whitespace review and native guide link checks passed. `prepareFrontend()` built and installed the current compatible ordinary-dashboard package on disposable `192.168.0.28`; served-asset/readiness checks passed for identity `b059098cb079785aa90323653fe9e02c2d2a0beaae696d06d1d8357e83c3da08`. The scoped navbar preview reused those installed assets and closed cleanly without reported diagnostics.
+- On the installed dashboard, native editing showed page tabs and localized Done; switching from Home to Empty Room (absent from Marao routes) retained edit mode and Done. Activating Done returned to viewing and restored Marao navigation. No dashboard configuration or helpers were modified; HA's existing save/error paths were retained by code review rather than exercised with writes or injected storage failures.
+- Remaining manual watch list: phone-size tab overflow, Done after real card-dialog Save/Cancel, and header/navbar restoration. No real-phone, layout matrix, migration, camera transport or full-suite testing was performed.
 
 ## Workflow follow-up
 

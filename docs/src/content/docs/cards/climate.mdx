@@ -1,0 +1,71 @@
+---
+title: "Climate"
+description: "Control temperature, modes, and an optional history graph."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Control temperature, modes, and an optional history graph.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_climate_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-climate-card
+entity_id: climate.living_room
+variables:
+  show_mode_buttons: true
+```
+
+Compatible entity domains: `climate`.
+
+Measured temperature, actual activity and availability remain authoritative. Requested mode/targets can show pending feedback until HA confirms or rejects them.
+
+Climate values intentionally omit temperature units. Mode controls reflect only supported HVAC modes.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `entity_id` | Entity | entity | Not set | A climate entity from your Home Assistant. Searchable suggestions are available. |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `variables.show_graph` | Temperature graph | boolean | `false` | Temperature graph for this card. |
+| `variables.graph_entity` | Graph entity | entity | Not set | Graph entity for this card. Searchable suggestions are available. |
+| `variables.show_mode_buttons` | Mode buttons | boolean | `true` | Mode buttons for this card. |
+| `variables.graph_color` | Graph color | color | Not set | Optional graph line/fill color. |
+| `variables.setpoint_label` | Setpoint label | text | Not set | Setpoint label for this card. |
+| `variables.mode_selector_hash` | Mode popup hash | text | Not set | Optional external climate mode popup hash. Omit it for the automatic mode sheet. |
+| `popup_view` | Custom popup view | text | Not set | Optional existing view path used for a Home Assistant managed popup layout. Omit for automatic details. Searchable suggestions are available. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| Heat and off | A single operating mode can be toggled directly. |
+| Temperature range | Heat/cool mode exposes a low and high target. |
+| Off | Keep the last reported temperature while the thermostat is off. |
+| Temperature history | Use an explicit sensor for the inline temperature graph. |
+| Compact modes | Hide inline mode buttons while retaining the mode sheet. |
+| Rejected target | Show a reported target-setting failure without inventing confirmation. |
+| Loading state | Wait for Home Assistant state before showing controls. |
+| Unknown state | The entity exists but has no known state. Controls remain neutral and disabled. |
+| Unavailable | The entity is unavailable. No device action is dispatched. |
+| Missing entity | A removed entity produces an explicit neutral missing-state result. |
+| Disconnected | Controls refuse actions when Home Assistant is disconnected. |
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

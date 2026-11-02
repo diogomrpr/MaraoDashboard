@@ -1,3 +1,8 @@
+// HA custom editors receive the dashboard document directly; runtime roots expose a wrapper.
+export function nativeDashboardConfig(context) {
+  return context?.rawConfig || context?.config || (Array.isArray(context?.views)?context:undefined);
+}
+
 // The only native-edit compatibility boundary used by ordinary runtime cards.
 // No HA classes are imported or patched; the installed host owns notifications.
 export function findNativeHost(owner) {

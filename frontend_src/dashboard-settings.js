@@ -1,3 +1,4 @@
+import {locationError} from '../custom_components/marao_dashboard/frontend/MaraoLocation.js';
 export const SETTINGS_VERSION = 1;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -39,6 +40,7 @@ export function validateDashboardSettings(value) {
     const address = route.url || route.path;
     if (!address.startsWith('/') && !/^https?:\/\//i.test(address)) throw new Error('Navigation addresses must be dashboard paths or HTTP links.');
   }
+  const error=locationError(value.navbar.current_room);if(error)throw new Error(error);
   for (const key of ['show_cache_reset', 'show_editor_button']) if (Object.hasOwn(value, key) && typeof value[key] !== 'boolean') throw new Error('Marao shortcut settings must be booleans.');
   return value;
 }
@@ -55,12 +57,14 @@ export function patchDashboardSettings(document, settings) {
   return {...structuredClone(document), marao: structuredClone(settings)};
 }
 
-export async function saveDashboardSettings(hass, path, baseline, settings, isCurrent) {
+export async function saveDashboardSettings(hass, path, baseline, settings, isCurrent, retainRecovery) {
   const permitted = () => hass.user?.is_admin && isCurrent();
   if (!permitted()) throw new Error('settings_stale');
   const current = await hass.callWS({type:'lovelace/config',url_path:path,force:true});
   if (!permitted() || JSON.stringify(current) !== JSON.stringify(baseline)) throw new Error('settings_stale');
   const config = patchDashboardSettings(current, settings);
+  if(retainRecovery)await retainRecovery({before:structuredClone(current),after:structuredClone(config)});
+  if(!permitted())throw new Error('settings_stale');
   await hass.callWS({type:'lovelace/config/save',url_path:path,config});
   return config;
 }

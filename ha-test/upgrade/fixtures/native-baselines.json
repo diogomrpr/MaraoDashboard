@@ -21,8 +21,8 @@
       "expected_source": "v0.17.0-native-source-expected.json",
       "expected_compiled": "v0.17.0-native-compiled-expected.json",
       "expected_source_sha256": "beda763d60bf20114f6e629f94d6b7cd8481df7cd1cbad44a2c5a29a9f3a17da",
-      "expected_compiled_sha256": "fd61c9953b95d44f59f85fa6675bbe058f25735bb5ad0d56afc5b7697ba8bad5",
-      "expectation_authoring": "Fixed namespace aliases applied to frozen released source/output; v0.17.0 target explicitly adds empty access variables and native raw-section grid/square=false. No candidate converter/compiler imports or output were used. v0.21.1 target equals released output. Original source bytes remain frozen."
+      "expected_compiled_sha256": "a75742000752b2744b5fbb898c1231e6b5831473c007e607e646506ea5169c8e",
+      "expectation_authoring": "Fixed namespace aliases applied to frozen released source/output; v0.17.0 target explicitly adds empty access variables and native raw-section grid/square=false. No candidate converter/compiler imports or output were used. v0.21.1 target equals released output. Original source bytes remain frozen. v0.25.0 target adds entity_group.members copied from the fixed expected source; string members use the existing fixed popup-card titles. No candidate compiler output authored this addition. Released source/output bytes and provenance remain unchanged."
     },
     {
       "tag": "v0.20.0",
@@ -44,8 +44,8 @@
       "expected_source": "v0.20.0-native-source-expected.json",
       "expected_source_sha256": "86d062c2230d7ebb0f8b2279a76c41eb90bfe86327b33ead5ee37d8d68b8f5a7",
       "expected_compiled": "v0.20.0-native-compiled-expected.json",
-      "expected_compiled_sha256": "8e9f738a169201551c8e76eed967047daba5551cbcee14b15521062d5b388a7b",
-      "expectation_authoring": "Reviewed fixed native source and compiled target equal the released source/output for this contract-3 baseline. Opaque hc_bubble_popup_card/hc_slider_card and legacy_page_options remain unchanged. No candidate converter/compiler imports or output were used."
+      "expected_compiled_sha256": "88d0544f2dcf414bcbb9574b2eb9e611d32a8472b26cec229b24405d79d053f6",
+      "expectation_authoring": "Reviewed fixed native source and compiled target equal the released source/output for this contract-3 baseline. Opaque hc_bubble_popup_card/hc_slider_card and legacy_page_options remain unchanged. No candidate converter/compiler imports or output were used. v0.25.0 target adds entity_group.members copied from the fixed expected source; string members use the existing fixed popup-card titles. No candidate compiler output authored this addition. Released source/output bytes and provenance remain unchanged."
     },
     {
       "tag": "v0.21.1",
@@ -67,8 +67,8 @@
       "expected_source": "v0.21.1-native-source-expected.json",
       "expected_compiled": "v0.21.1-native-compiled-expected.json",
       "expected_source_sha256": "087c6103545630acf7d6eee3794dbf64eb00c8c33da02548acd8505d932576eb",
-      "expected_compiled_sha256": "3d8d394af66e8b041c8495661382b5317d70abbc95fd747b907b278664a112cb",
-      "expectation_authoring": "Fixed namespace aliases applied to frozen released source/output; v0.17.0 target explicitly adds empty access variables and native raw-section grid/square=false. No candidate converter/compiler imports or output were used. v0.21.1 target equals released output. Original source bytes remain frozen."
+      "expected_compiled_sha256": "616e77325d8b9286af42ad44716e9aaaaf9984badf609ebeaeeca8e1a2d9ba24",
+      "expectation_authoring": "Fixed namespace aliases applied to frozen released source/output; v0.17.0 target explicitly adds empty access variables and native raw-section grid/square=false. No candidate converter/compiler imports or output were used. v0.21.1 target equals released output. Original source bytes remain frozen. v0.25.0 target adds entity_group.members copied from the fixed expected source; string members use the existing fixed popup-card titles. No candidate compiler output authored this addition. Released source/output bytes and provenance remain unchanged."
     }
   ]
 }

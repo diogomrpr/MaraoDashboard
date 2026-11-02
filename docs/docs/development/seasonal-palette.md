@@ -11,7 +11,7 @@ three spring references, four summer, four autumn and four winter. It keeps the
 mineral base and cleaner forest green, makes yellow and orange distinct, and adds
 river teal, winter blue, rose and lilac to the shared chart sequence.
 
-![Twenty-four representative UI swatches]({{ '/assets/images/marao-seasonal-palette.svg' | relative_url }})
+![Twenty-four representative UI swatches](../../reference/seasonal-palette.svg)
 
 ## Method and skills
 
@@ -31,7 +31,7 @@ palette inspiration. The summer rock accent analysis excludes its letterbox.
 Photos were reviewed by season rather than pooled into a single image-size-weighted
 palette. This is a curated sample, not a statistical survey of the mountain.
 
-The [raw swatches, hue-family samples and provenance]({{ '/assets/data/marao-seasonal-palette.json' | relative_url }})
+The [raw swatches, hue-family samples and provenance](../../reference/seasonal-palette.json)
 are separate from the adjusted UI colors. For example:
 
 | Observed sample | Raw color | UI interpretation |
@@ -81,7 +81,7 @@ redistribution permission in this study.
 
 ## Application
 
-The [theme guide]({{ '/docs/development/theme.html' | relative_url }}) records the
+The [theme guide](theme.md) records the
 final token mappings. Eight domain colors remain compatible with existing cards;
 ten mode-aware chart families are shared by power lines, legends and energy
 breakdowns. Explicit configured chart colors still override the defaults.

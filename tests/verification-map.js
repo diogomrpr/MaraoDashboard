@@ -24,6 +24,13 @@ const families = {
   camera: ['md_camera_card'], history: ['md_graph_card', 'md_timeline_card', 'md_toggle_graph_card'],
 };
 const components = {
+  'documentation-brand': {units:[['brand-assets','canonical artwork']]},
+  'documentation-playground': {browser:[{id:'unit:documentation-playground',kind:'offline',command:['node','--test','--test-concurrency=1',...fs.readdirSync(path.join(__dirname,'docs')).filter(file=>file.endsWith('.test.mjs')).sort().map(file=>'tests/docs/'+file)],inputs:['docs','tests/docs','frontend_src',runtime],exclusive:false}]},
+  'location-shortcut': {units:[['marao-navbar-card'],['dashboard-settings']],editor:true},
+  'popup-layout': {units:[['popup-layout'],['native-cards'],['native-card-editor'],['native-edit-context'],['collections'],['marao-card-visibility','live group filtering']],editor:true},
+  people: {units:[['collections'],['native-cards'],['native-card-editor']],editor:true},
+  'summary-controls': {units:[['collections'],['marao-card-visibility','live group filtering']],editor:true},
+  schedules: {units:[['schedules']],editor:true},
   'press-feedback': { units: [['press-feedback'], ['marao-card-visibility', 'room child activation|dual-action hold|hold completion|active holds|access actions use|touch actions establish|shared dropdown floats|themed scene dropdown'], ['marao-navbar-card'], ['frontend-refresh', 'gesture|short taps|released after'], ['floor-plan'], ['marao-frigate-events-card', 'entity availability disables|type filters|event heading retains']], editor: true, package: true },
   'floor-plan': { units: [['floor-plan'], ['editor-model'], ['editor-panel'], ['native-compiler']], editor: true, package: true },
   'native-source': { units: [['native-source'], ['native-compiler'], ['native-session'], ['native-strategy'], ['native-dependencies'], ['native-package'], ['native-cards'], ['native-card-editor'], ['native-bootstrap'], ['native-edit-context'], ['dashboard-settings'], ['ordinary-conversion'], ['ordinary-session'], ['ordinary-migration-ui'], ['converter']], python: ['test_frontend_compiler'], editor: true, upgrade: true },
@@ -143,6 +150,13 @@ const components = {
 };
 
 const rules = [
+  [/^tests\/export-brand-assets\.js$/, ['documentation-brand']],
+  [/^(docs\/(?:playground|examples|scripts|src\/components|src\/scripts)\/|tests\/docs\/)/, ['documentation-playground']],
+  [/^custom_components\/marao_dashboard\/frontend\/MaraoPopup(?:Layout|View)\.js$|^tests\/frontend\/popup-layout\.test\.js$/, ['popup-layout']],
+  [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoLocation(?:Preferences)?\.js|frontend_src\/location-settings\.js)$/, ['location-shortcut']],
+  [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoEventModel\.js|frontend_src\/event-card-editor\.js)$/, ['camera']],
+  [/^(?:frontend_src\/(?:schedule-model|schedule-api|schedule-text|schedules-card)\.js|custom_components\/marao_dashboard\/frontend\/MaraoSchedules\.js|tests\/frontend\/schedules\.test\.js|ha-test\/check-schedules\.mjs)$/, ['schedules']],
+  [/^(?:custom_components\/marao_dashboard\/frontend\/Marao(?:Collections|GroupDetails)\.js|tests\/frontend\/collections\.test\.js|ha-test\/feature-examples\.json|ha-test\/custom_components\/marao_test_climate\/people\.py)$/, ['people','summary-controls']],
   [/^custom_components\/marao_dashboard\/frontend\/(?:MaraoNative(?:Bootstrap|Cards|CardEditor|Model|Dashboard|Context)\.js|MaraoDashboardSettings\.js|MaraoOrdinaryMigration\.js|MaraoDashboard(?:EditorLabels|EditorWorker|JsonEditor|JsonPreparation|JsonWorker|Panel)\.(?:js|css)|MonacoEditor\.LICENSE\.txt|assets\/codicon-[A-Z0-9]+\.ttf)$/, ['native-source']],
   [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoFloorPlan(?:Card|Text|Editor)?\.js|frontend_src\/floor-plan-editor\.js|tests\/frontend\/floor-plan\.test\.js|ha-test\/floor-plan.*)$/, ['floor-plan']],
   [/^(?:frontend_src\/(?:dashboard-settings(?:-dialog)?|native-bootstrap|native-cards|card-composition|native-card-editor|card-form-tools|ordinary-model|ordinary-session|ordinary-migration-ui|legacy-model)\.js|tests\/frontend\/(?:dashboard-settings|ordinary-[\w-]+|native-cards|native-card-editor|native-bootstrap|card-composition)\.test\.js)$/, ['native-source', 'navbar']],
@@ -244,6 +258,7 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     if (declared.includes('frontend-preview') && file === 'tests/test-ha-dashboard-accessibility.js') ids = ['frontend-preview'];
     if (declared.includes('camera') && declared.includes('editor-ui') && !declared.includes('editor-preload')
       && /^(frontend_src\/(editor-model|editor-labels)\.js|custom_components\/marao_dashboard\/frontend\/MaraoDashboardEditorLabels\.js)$/.test(file)) ids = ['camera-editor', 'editor-ui', ...(file.startsWith('custom_components/') ? ['packaging'] : [])];
+    if(declared.includes('popup-layout')&&/^(frontend_src\/(?:native-cards|native-card-editor|card-composition|card-form-tools)\.js|custom_components\/marao_dashboard\/frontend\/Marao(?:GroupDetails|NativeCards|NativeCardEditor|NativeContext)\.js)$/.test(file))ids=['popup-layout'];
     if (declared.includes('navbar-startup') && /^(frontend_src\/(MaraoNativeCards|MaraoNativeNavbar|build-editor)\.(js|cjs)|custom_components\/marao_dashboard\/frontend\/Marao(Navigation|NativeNavbar|NativeCards|Runtime|Dashboard|Cards|FrontendRefresh)\.js|tests\/(test-ha-(native|navbar-overflow)|test-navbar-startup-local|test-frontend-refresh-local|test-history-chart-local)\.js|ha-test\/(cases\.json|frontend-refresh-fixture\.js|dashboard\/views\/00-card-test\.yaml|marao_dashboard_test_dashboard\.json))$/.test(file)) ids = ['navbar-startup'];
     if (declared.includes('frontend-refresh') && /^(tests\/(test-ha-card-alignment|test-history-chart-local)\.js|ha-test\/(cases\.json|dashboard\/views\/00-card-test\.yaml|marao_dashboard_test_dashboard\.json))$/.test(file)) ids = ['frontend-refresh'];
     if (declared.includes('editor-preload') && file === 'tests/json-editor-checks.js') ids = ['editor-preload'];
@@ -262,7 +277,7 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     if (ids === 'editor-labels') ids = declared.includes('editor-drag') ? ['editor-ui', 'editor-drag'] : ['editor-ui'];
     if (ids === 'shared') {
       if (!declared.length && !conservativeShared) throw new Error(file + ': declare --component after reviewing the shared-component diff.');
-      const consumers = ['press-feedback', 'card-namespace', 'navbar-startup', 'frontend-refresh', 'chart-details', 'control-grid', 'battery-groups', 'access-label', 'slider-headers', 'navbar-overflow', 'security', 'labels', 'slider', 'light', 'light-color', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
+      const consumers = ['popup-layout','people','summary-controls','schedules','press-feedback', 'card-namespace', 'navbar-startup', 'frontend-refresh', 'chart-details', 'control-grid', 'battery-groups', 'access-label', 'slider-headers', 'navbar-overflow', 'security', 'labels', 'slider', 'light', 'light-color', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
       ids = declared.length ? declared.filter(id => consumers.includes(id)) : consumers;
       if (!ids.length) throw new Error(file + ': a runtime component is required; documentation scope cannot omit its checks.');
     }
@@ -281,7 +296,7 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
 
 function inspectionFor(selection) {
   const ids = selection.components;
-  const aliases = {
+  const aliases = {'popup-layout':['md_entity_group_card','md_climate_card'],people:['md_people_card'],'summary-controls':['md_entity_group_card'],schedules:['md_schedules_card'],
     'navbar-startup': ['marao-navbar-card'], 'frontend-refresh': ['marao-navbar-card'], navbar: ['marao-navbar-card'], 'navbar-overflow': ['marao-navbar-card'],
     'battery-groups': ['md_entity_group_card', 'md_battery_card'], 'access-label': ['md_access_slide_action_card'],
     'control-grid': [...families.slider, ...families.climate, 'md_sensor_card'],

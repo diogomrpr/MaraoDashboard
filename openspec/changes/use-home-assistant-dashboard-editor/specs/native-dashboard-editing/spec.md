@@ -67,12 +67,29 @@ The native floor-plan editor SHALL support HA image upload, visual light-button 
 - **AND** the native card editor remains usable with the same placement configuration
 
 ### Requirement: Native editing lifecycle
-Marao SHALL follow HA's card-dialog, dashboard-save and raw-configuration workflows. Native edit mode SHALL retain HA's toolbar, layout/visibility controls and native editor presentation. Marao controls SHALL remain localized and touch-usable; stock HA editor internals SHALL NOT be restyled into the retired builder.
+Marao SHALL follow HA's card-dialog, dashboard-save and raw-configuration workflows. Native edit mode SHALL retain HA's visible page navigation, Done button, toolbar and layout/visibility controls despite viewing-theme header hiding. Page switching SHALL retain edit mode; Done SHALL complete HA's native edit/apply lifecycle. Marao controls SHALL remain localized and touch-usable; stock HA editor internals SHALL NOT be restyled into the retired builder.
 
 #### Scenario: An administrator enters edit mode
 - **WHEN** native editing is opened from Marao navigation
 - **THEN** the HA toolbar and card controls are available without a covering navbar or fullscreen override
 - **AND** leaving edit mode restores the configured viewing appearance
+
+#### Scenario: An administrator edits more than one page
+- **WHEN** dashboard editing is active under the Marao theme and the administrator selects another current dashboard page
+- **THEN** that page opens in the same native edit session with the correct selected-page indication
+- **AND** pages absent from the configured Marao navbar, including new or empty pages, remain reachable through native page navigation
+- **AND** existing card-dialog Save/Cancel guards remain authoritative without implicit discard or a second save
+
+#### Scenario: Done applies confirmed edits and exits editing
+- **WHEN** the administrator has confirmed a native card or layout edit and activates the visible localized Done button
+- **THEN** HA's normal edit/apply completion runs once and its confirmed changes remain in the dashboard
+- **AND** the native workflow returns to viewing with Marao's configured header hiding and floating navigation restored
+- **AND** Done remains reachable after page switching and content scrolling, without a separate Marao Save & Generate action
+
+#### Scenario: A dialog or save has not completed successfully
+- **WHEN** an edit dialog still requires Save/Cancel or HA reports a save failure
+- **THEN** Marao respects the native decision/error state and does not silently discard editable input or report successful application
+- **AND** no duplicate dashboard write or unconditional exit is used to bypass the native workflow
 
 ### Requirement: Retirement of active builder authoring
 Ordinary native configuration SHALL be the sole editable source after conversion. The old Visual/Monaco editor, Save & Generate flow, builder-specific draft guarantees and automatic page-link repair SHALL cease to be authoring features. Read-only historical rendering and conversion SHALL NOT silently write or replace the native dashboard.

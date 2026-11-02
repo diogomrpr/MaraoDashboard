@@ -1,0 +1,61 @@
+---
+title: "Alarm controls"
+description: "Capability-aware alarm controls with transient PIN entry and guarded actions."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Capability-aware alarm controls with transient PIN entry and guarded actions.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_alarm_controls_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-alarm-controls-card
+entity_id: alarm_control_panel.home
+```
+
+Compatible entity domains: `alarm_control_panel`.
+
+This card places alarm controls directly on the page. Use Alarm for a compact summary that opens a sheet.
+
+Supported modes and code requirements come from the alarm entity. Risky disarm/bypass operations retain the 1.2-second hold.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `entity_id` | Entity | entity | Not set | A alarm_control_panel entity from your Home Assistant. Searchable suggestions are available. |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `variables.alarm_layout` | Alarm layout | select | Not set | Unset keeps the existing row and security holds. Choices: `dropdown`, `grid`. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| Grid layout | Show available actions in a grid. |
+| Dropdown layout | Select a supported mode before arming. |
+| Disarm hold | An armed system requires the full disarm hold. |
+| Transient code | Require a temporary numeric code. |
+| Loading state | Wait for Home Assistant state before showing controls. |
+| Unknown state | The entity exists but has no known state. Controls remain neutral and disabled. |
+| Unavailable | The entity is unavailable. No device action is dispatched. |
+| Missing entity | A removed entity produces an explicit neutral missing-state result. |
+| Disconnected | Controls refuse actions when Home Assistant is disconnected. |
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

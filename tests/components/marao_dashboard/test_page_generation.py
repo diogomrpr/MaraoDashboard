@@ -496,3 +496,14 @@ def test_unified_access_page_modes_resolve_without_rewriting_authored_configurat
 def test_explicit_popup_on_open_only_door_offers_only_supported_opening_control():
     entity = {"template": "md_access_card", "entity_id": "cover.safe", "supported_features": 1, "device_class": "door", "variables": {"access_mode": "popup"}}
     assert len(g._access_popup(entity)["cards"][0]["cards"]) == 1
+
+
+def test_optional_event_columns_forward_without_rewriting_omitted_defaults():
+    from custom_components.marao_dashboard.page_model import camera_popup_stream
+    item = {"entity_id": "camera.front", "template": "md_camera_card", "variables": {}}
+    assert "columns" not in g._camera_popup(item)["cards"][1]
+    item["variables"]["event_columns"] = 2
+    assert g._camera_popup(item)["cards"][1]["columns"] == 2
+    for value in (None, True, "2", 0, -1, 1.5):
+        with pytest.raises(ValueError, match="positive integer"):
+            camera_popup_stream("camera.front", {"event_columns": value})

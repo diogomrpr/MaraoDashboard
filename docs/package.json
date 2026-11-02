@@ -1,0 +1,16 @@
+{
+  "name": "marao-documentation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare:site": "node scripts/prepare-site.mjs && node scripts/generate-card-pages.mjs && node scripts/build-preview.mjs",
+    "dev": "npm run prepare:site && node scripts/astro.mjs dev --host 127.0.0.1",
+    "build": "npm run prepare:site && node scripts/astro.mjs build && node scripts/write-redirects.mjs && node scripts/check-site.mjs",
+    "preview": "node scripts/astro.mjs preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.42.8",
+    "@mdi/js": "7.4.47",
+    "astro": "7.4.5"
+  }
+}

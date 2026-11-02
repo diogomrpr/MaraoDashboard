@@ -1,0 +1,79 @@
+---
+title: "Camera Events"
+description: "Browse recent events and recordings from one or several cameras, with combined source, type and time filters."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Browse recent events and recordings from one or several cameras, with combined source, type and time filters.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="camera-events" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-camera-events-card
+title: Recent events
+columns: 2
+limit: 12
+cameras:
+  - entity: camera.front_door
+    name: Entrance
+    event_provider: frigate
+    frigate_instance_id: demo
+    frigate_camera: front_door
+  - entity: camera.garden
+    name: Garden
+    event_provider: netatmo
+```
+
+Compatible entity domains: `camera`.
+
+Camera, event type and date/time filters combine and remain selected after opening a detail and going Back. They filter loaded recent events, not a complete archive.
+
+Use event_provider auto, frigate, unifi_protect or netatmo. Source-specific options include frigate_camera, frigate_instance_id and unifi_protect_media_source.
+
+Multiple sources merge dated events newest first, with stable ties. Undated records appear separately and are excluded from time filters. One source preserves provider order.
+
+One source failing does not remove healthy-source results. Event identity includes its source, preventing duplicate IDs from opening the wrong event.
+
+Legacy single-source entity configuration remains accepted. Do not combine a nonempty cameras list with entity.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `title` | Title | text | Not set | Heading above the recent events. |
+| `cameras` | Camera sources | json | Not set | Ordered unique sources with entity, optional name and provider overrides. |
+| `columns` | Preferred columns | number | Not set | Positive integer; the layout reduces columns when space is limited. |
+| `limit` | Per-source event limit | number | `12` | Maximum recent records requested for each source. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Mixed sources | Combine a detection source with native recordings. |
+| One source | Keep a single camera’s provider order. |
+| No recent events | Show an honest empty feed. |
+| One source fails | Retain events from the healthy camera. |
+| All sources fail | Show source failures clearly. |
+| Loading | Keep visible loading feedback while metadata is pending. |
+| No sources | An empty source list stays empty. |
+
+## Website preview limits
+
+The preview provides fictional event metadata and static images. Native clip/video playback requires Home Assistant.
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

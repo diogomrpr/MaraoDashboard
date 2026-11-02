@@ -29,9 +29,9 @@ at smaller sizes, including 16px favicons, 32px marks and native sidebar icons.
 Preserve each source's aspect ratio and clear space. Select the light or dark
 variant for its actual background. A decorative mark beside a product heading
 has empty alternative text; a standalone logo has the name Marao Dashboard.
-The current documentation theme has a light page background, so its page artwork
-uses the light variant; browser-tab favicons and README pictures also support
-their dark backgrounds.
+The documentation supports light and dark presentation. Select the matching
+source for the actual surface; browser-tab favicons and README pictures also
+support their dark backgrounds.
 
 From the repository root, reproduce the exports with the installed browser tools:
 
@@ -44,9 +44,10 @@ The command renders the canonical SVGs without network resources, checks
 transparency and the wordmark cutout, and replaces the derived files. Native
 integration images live in `custom_components/marao_dashboard/brand/`: `icon.png`
 and `dark_icon.png` are 256×256; `logo.png` and `dark_logo.png` are 520×280. Their
-`@2x.png` counterparts have twice each dimension. Documentation copies live at
-`docs/assets/images/{logo,logo-dark,favicon,favicon-dark}.svg`. Do not edit the
-derived copies independently.
+`@2x.png` counterparts have twice each dimension. Starlight imports its logo from
+the canonical frontend brand source. The documentation build copies those sources
+to ignored `docs/public/brand` for static consumers. Tests and exports use the
+canonical source directly; do not maintain separate editable documentation copies.
 
 Home Assistant's [native brand support](https://developers.home-assistant.io/docs/core/integration/brand_images/)
 serves the packaged PNGs through its authenticated integration branding API.

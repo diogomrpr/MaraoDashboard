@@ -1,0 +1,86 @@
+---
+title: "Floor Plan"
+description: "Upload a room image and place light controls and illuminated strips."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Upload a room image and place light controls and illuminated strips.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_floor_plan_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-floorplan-card
+name: Living room
+variables:
+  image_id: "11111111111111111111111111111111"
+  full_page: false
+  lights:
+    - id: living-room
+      entity_id: light.living_room
+      x: 35
+      y: 45
+      name: Ceiling
+      icon: mdi:ceiling-light
+      strip:
+        width: 10
+        points:
+          - x: 15
+            y: 20
+          - x: 75
+            y: 20
+          - x: 75
+            y: 70
+    - id: desk
+      entity_id: light.desk
+      x: 78
+      y: 72
+      name: Desk
+```
+
+Upload your own image through the native HA card editor before replacing the example image ID. Exported YAML contains an image reference, not its image bytes.
+
+Markers toggle lights; illuminated strips follow reported brightness/color. Image and strip paths themselves do not dispatch actions.
+
+Editing placements, tracing strips and managing image uploads happens in Home Assistant. Coordinates can also be edited in YAML.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `popup_view` | Custom popup view | text | Not set | Optional existing view path used for a Home Assistant managed popup layout. Omit for automatic details. Searchable suggestions are available. |
+| `variables.image_id` | Image ID | text | Not set | Home Assistant image ID from the native Floor Plan editor. |
+| `variables.full_page` | Full-page layout | boolean | `false` | Use with a native Panel view for a full-page floor plan. |
+| `variables.lights` | Light placements | json | Not set | Unique local IDs, light entity_id, x/y percentages, optional name/icon and strip width/points. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| Image only | An explicit empty list keeps the floor-plan image. |
+| Lights off | Strip lighting follows the light state. |
+| Full page | Use the full-page preference with a native Panel view. |
+| Unavailable marker | A missing or unavailable light remains neutral and disabled. |
+
+## Website preview limits
+
+The preview uses a fictional floor-plan drawing. Its image ID must be replaced with one uploaded to your Home Assistant.
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

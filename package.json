@@ -1,6 +1,6 @@
 {
   "name": "marao-dashboard",
-  "version": "0.24.4",
+  "version": "0.25.0",
   "private": true,
   "description": "Marao Dashboard Home Assistant dashboard development tools",
   "scripts": {
@@ -28,7 +28,11 @@
     "test:ha:upgrade": "node tests/test-ha-upgrade.js",
     "test:affected": "node tests/verification.js",
     "test:full": "node tests/verification.js --full",
-    "build:converter": "node frontend_src/build-native.cjs"
+    "build:converter": "node frontend_src/build-native.cjs",
+    "docs:dev": "npm --prefix docs run dev",
+    "docs:build": "npm --prefix docs run build",
+    "docs:preview": "npm --prefix docs run preview",
+    "docs:test": "node --test --test-concurrency=1 tests/docs/*.test.mjs"
   },
   "devDependencies": {
     "chart.js": "4.5.1",

@@ -19,9 +19,9 @@ routes small repairs, substantial changes and project skills.
 ## Product boundary
 
 Marao Dashboard is a complete, mobile Home Assistant dashboard product. It
-includes the integration, administrator builder, generator, project-owned
-cards, floating navbar, popovers, theme, fullscreen shell, documentation, and
-safe card gallery. Camera support is one feature of that product.
+includes the frontend package, native card editors, historical conversion,
+project-owned cards, floating navbar, popovers, theme, scoped shell, documentation
+and safe card gallery. Home Assistant owns ordinary dashboard editing and storage. Camera support is one feature of that product.
 
 Keep the runtime self-contained:
 
@@ -454,12 +454,12 @@ press-and-hold.
   Pair completion with immediate visual feedback and continue reflecting Home
   Assistant's state.
 
-Destructive builder or administrative actions require an explicit
-confirmation that names what will be removed or replaced, except deleting an
-individual card/entity entry from the local editor draft. That removal happens
-immediately and persists only through Save & Generate; Discard changes restores
-the saved entries. Whole-room/page deletion, discarding unsaved work, and history
-restoration retain their confirmations.
+Destructive Marao administrative actions require explicit confirmation naming
+what will be removed or replaced. Changes inside a native card dialog remain a
+draft until Home Assistant Save; Cancel preserves the saved card. Native page,
+section and card editing uses Home Assistant's own controls. Conversion and
+resource-management operations retain their explicit recovery and confirmation
+flows. The retired Save & Generate and History Restore UI is not a current contract.
 
 ## Shared component contracts
 

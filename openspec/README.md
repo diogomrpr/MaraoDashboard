@@ -199,7 +199,7 @@ at the ordinary-dashboard authoring boundary. Apply its deltas after the earlier
 retirement and builder changes when synchronizing specs. Do not revive strategy
 builder, Monaco or per-view navbar obligations from those historical deltas.
 Existing strategy sources remain read-only until explicit conversion; see
-[current editing](../docs/docs/usage/native-dashboard.md) and the migration guide.
+[current editing](../docs/src/content/docs/start/dashboard.mdx) and the migration guide.
 
 ## Tool installation and ownership
 

@@ -1,3 +1,4 @@
+import {peopleError,sectionsError} from '../custom_components/marao_dashboard/frontend/MaraoCollections.js';
 import { floorPlanErrors, floorPageErrors } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlan.js';
 import { canonicalCard, canonicalTemplate, legacyTemplates } from '../custom_components/marao_dashboard/frontend/MaraoNames.js';
 export { canonicalCard, canonicalTemplate };
@@ -530,6 +531,7 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
   const checkGroup = (group, overview = false) => {
     group = canonicalCard(group);
     const id = group?.id, kind = group?.entity_type;
+    const sectionError = sectionsError(group); if(sectionError)errors.push(sectionError);
     if (!group || typeof group !== 'object' || group.template !== 'md_entity_group_card') { errors.push('Entity Group must be an md_entity_group_card object.'); return; }
     if (typeof id !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(id)) errors.push('Entity Group requires a stable safe id.');
     if (groupIds.has(id)) errors.push('Duplicate Entity Group id.');
@@ -643,7 +645,7 @@ export function validatePages(config, catalog) {
   const safePath = value => typeof value === 'string' && /^[a-z0-9][a-z0-9_-]*$/.test(value);
   const safeId = value => typeof value === 'string' && /^[a-z][a-z0-9_-]{0,63}$/.test(value);
   const entityId = value => typeof value === 'string' && /^[a-z0-9_]+\.[a-z0-9_]+$/.test(value);
-  const freeRoles = new Set(['md_title_card', 'md_navigation_card', 'md_room_card', 'md_entity_group_card', 'md_scene_collection_card', 'md_header_card', 'md_glance_card', 'md_floor_plan_card']);
+  const freeRoles = new Set(['md_people_card', 'md_schedules_card', 'md_title_card', 'md_navigation_card', 'md_room_card', 'md_entity_group_card', 'md_scene_collection_card', 'md_header_card', 'md_glance_card', 'md_floor_plan_card']);
   const templates = new Map((catalog?.cards || []).map(card => [card.id, card.domains]));
   if (['overview', 'rooms'].some(key => Object.hasOwn(config, key))) errors.push('Mixed legacy and canonical page configuration.');
   if (!Array.isArray(config.pages) || !config.pages.length) return [...errors, 'Keep at least one page.'];
@@ -685,6 +687,8 @@ export function validatePages(config, catalog) {
           if (!safeId(card.id) || ids.has(card.id)) errors.push('Each local card identity must be safe and unique within its page.');
           ids.add(card.id);
         }
+        if(card.template === 'md_people_card') {const error=peopleError(card);if(error)errors.push(error);}
+        if(card.template === 'md_schedules_card' && (!/^[a-zA-Z0-9_-]{1,64}$/.test(card.group_id || '') || card.targets != null && (!Array.isArray(card.targets) || card.targets.some(id=>! /^(switch|valve|input_boolean)\.[a-z0-9_]+$/.test(id)))))errors.push('Choose a schedule collection and supported targets.');
         if (card.template === 'ha_card') {
           if (typeof card.yaml !== 'string' || !card.yaml.trim()) errors.push('Home Assistant card YAML must be nonempty text.');
           continue;
@@ -721,6 +725,7 @@ export function validatePages(config, catalog) {
         if (card.template === 'md_graph_card') errors.push(...validatePowerDevices(options, options.graph_entity || card.entity_id));
         if (card.template === 'md_wallbox_current_card' && Object.hasOwn(options, 'shortcuts') && (!Array.isArray(options.shortcuts) || options.shortcuts.length > 3 || options.shortcuts.some(value => typeof value !== 'number' || !Number.isFinite(value)))) errors.push('Charging shortcuts require at most three finite numbers.');
         if (card.template === 'md_light_card' && Object.hasOwn(options, 'use_light_color') && typeof options.use_light_color !== 'boolean') errors.push('Use light color as background must be a boolean.');
+        if(card.template==='md_camera_card' && Object.hasOwn(options,'event_columns') && (!Number.isSafeInteger(options.event_columns)||options.event_columns<1))errors.push('Event columns must be a positive integer.');
         if (card.template === 'md_camera_card' && Object.hasOwn(options, 'preload_stream') && typeof options.preload_stream !== 'boolean') errors.push('Preload stream must be a boolean.');
         if (card.template === 'md_camera_card' && options.popup_stream_entity != null && options.popup_stream_entity !== '' && (!entityId(options.popup_stream_entity) || !options.popup_stream_entity.startsWith('camera.'))) errors.push('Choose a camera entity for the popup stream.');
         if (card.template === 'md_room_card' && Object.hasOwn(options, 'light_entities') && (!Array.isArray(options.light_entities) || options.light_entities.some(value => !entityId(value) || !value.startsWith('light.')))) errors.push('Room lights must be an explicit list of light entities.');

@@ -1,0 +1,80 @@
+---
+title: "Toggle graph"
+description: "A live metric graph that also controls a related toggle."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+A live metric graph that also controls a related toggle.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_toggle_graph_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-toggle-graph-card
+entity_id: sensor.desk_power
+variables:
+  toggle_entity: switch.desk
+  show_graph_line: true
+  show_graph_fill: true
+  show_icon: true
+```
+
+Compatible entity domains: `sensor`.
+
+The reading/history sensor and controlled switch are separate. Tapping the ordinary action controls toggle_entity, not the sensor.
+
+Active/inactive color options change presentation without changing action targeting.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `entity_id` | Entity | entity | Not set | A sensor entity from your Home Assistant. Searchable suggestions are available. |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `variables.toggle_entity` | Toggle entity | entity | Not set | Toggle entity for this card. Searchable suggestions are available. |
+| `variables.show_graph_line` | Graph line | boolean | `true` | Graph line for this card. |
+| `variables.show_graph_fill` | Graph fill | boolean | `true` | Graph fill for this card. |
+| `variables.show_icon` | Show icon | boolean | `true` | Show icon for this card. |
+| `variables.graph_color` | Graph color | color | Not set | Optional graph line/fill color. |
+| `variables.active_color` | Active color | color | Not set | Active color for this card. |
+| `variables.active_content_color` | Active content color | color | Not set | Active content color for this card. |
+| `variables.active_icon_background` | Active icon background | color | Not set | Active icon background for this card. |
+| `variables.inactive_background` | Inactive background | color | Not set | Inactive background for this card. |
+| `variables.inactive_name_color` | Inactive name color | color | Not set | Inactive name color for this card. |
+| `variables.inactive_state_color` | Inactive state color | color | Not set | Inactive state color for this card. |
+| `variables.inactive_icon_color` | Inactive icon color | color | Not set | Inactive icon color for this card. |
+| `variables.inactive_icon_background` | Inactive icon background | color | Not set | Inactive icon background for this card. |
+| `variables.display_unit` | Display unit | energy_unit | `Auto` | Auto keeps the source unit. Selecting a compatible unit converts the reading. Choices: `mW`, `W`, `kW`, `MW`, `GW`. |
+| `variables.display_precision` | Decimal places | energy_precision | `Auto` | Auto trims trailing zeros. Choose 0–6 fixed decimal places. Choices: `0`, `1`, `2`, `3`, `4`, `5`, `6`. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| Toggle off | The graph remains a reading while its switch is off. |
+| Line only | Display the history line without fill. |
+| Unavailable toggle target | The graph can remain readable while its separate control is disabled. |
+| Custom state colors | Configure distinct active/inactive backgrounds and readable content. |
+| Loading state | Wait for Home Assistant state before showing controls. |
+| Unknown state | The entity exists but has no known state. Controls remain neutral and disabled. |
+| Unavailable | The entity is unavailable. No device action is dispatched. |
+| Missing entity | A removed entity produces an explicit neutral missing-state result. |
+| Disconnected | Controls refuse actions when Home Assistant is disconnected. |
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

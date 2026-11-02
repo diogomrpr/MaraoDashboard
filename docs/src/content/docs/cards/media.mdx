@@ -1,0 +1,67 @@
+---
+title: "Media player"
+description: "Media controls with artwork and generated popup controls."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Media controls with artwork and generated popup controls.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_media_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-media-card
+entity_id: media_player.living_room
+```
+
+Compatible entity domains: `media_player`.
+
+Popup is the default. Inline places the same owned media controls on the dashboard.
+
+Playback, seek, volume, sources and remote controls depend on the entity’s capabilities; selection lists use the reported sources.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `entity_id` | Entity | entity | Not set | A media_player entity from your Home Assistant. Searchable suggestions are available. |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `variables.media_display` | Display | select | Not set | Popup or On dashboard. Missing keeps Popup. Choices: `popup`, `inline`. |
+| `variables.md_show_background_art` | Background artwork | boolean | `true` | Background artwork for this card. |
+| `variables.md_background_color` | Background color | color | Not set | Background color for this card. |
+| `variables.popup_hash` | Popup hash | text | Not set | Optional link to an existing external popup hash. Omit it to use this card’s automatic details. |
+| `popup_view` | Custom popup view | text | Not set | Optional existing view path used for a Home Assistant managed popup layout. Omit for automatic details. Searchable suggestions are available. |
+| `apple_tv` | Remote and app shortcuts | json | Not set | Optional remote_entity, volume_remote_entity and app shortcut configuration. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| Inline controls | Show media controls directly on the page. |
+| Paused | Play resumes the fictional media session. |
+| Idle | An idle player does not display invented media metadata. |
+| Plain background | Hide background artwork. |
+| Remote and shortcuts | Use configured remote commands and named application sources. |
+| Loading state | Wait for Home Assistant state before showing controls. |
+| Unknown state | The entity exists but has no known state. Controls remain neutral and disabled. |
+| Unavailable | The entity is unavailable. No device action is dispatched. |
+| Missing entity | A removed entity produces an explicit neutral missing-state result. |
+| Disconnected | Controls refuse actions when Home Assistant is disconnected. |
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

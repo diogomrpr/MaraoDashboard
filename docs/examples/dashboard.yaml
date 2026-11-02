@@ -1,0 +1,28 @@
+title: Home
+marao:
+  version: 1
+  navbar:
+    routes:
+      - path: /marao-dashboard/home
+        label: Home
+        icon: mdi:home
+      - path: /marao-dashboard/rooms
+        label: Rooms
+        icon: mdi:sofa
+views:
+  - title: Home
+    path: home
+    type: sections
+    sections:
+      - type: grid
+        cards:
+          - type: custom:marao-title-card
+            name: Welcome home
+          - type: custom:marao-light-card
+            entity_id: light.living_room
+            variables:
+              enable_slider: true
+  - title: Rooms
+    path: rooms
+    type: sections
+    sections: []

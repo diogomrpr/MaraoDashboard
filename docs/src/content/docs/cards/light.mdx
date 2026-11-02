@@ -1,0 +1,68 @@
+---
+title: "Light"
+description: "Control a light and optionally show its brightness slider."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Control a light and optionally show its brightness slider.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_light_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-light-card
+entity_id: light.living_room
+variables:
+  enable_slider: true
+```
+
+Compatible entity domains: `light`.
+
+The brightness slider appears only when the entity supports brightness. A simple on/off light stays a simple control.
+
+Controls use Home Assistant’s reported state. Color background is optional and follows the light’s reported RGB or white temperature.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `entity_id` | Entity | entity | Not set | A light entity from your Home Assistant. Searchable suggestions are available. |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `variables.enable_slider` | Brightness slider | boolean | `true` | Brightness slider for this card. |
+| `variables.use_light_color` | Use light color as background | boolean | `false` | When on, use the reported color or white temperature. Otherwise keep the card color. |
+| `variables.card_color` | Card color | color | Not set | Optional card background color. |
+| `variables.custom_label` | Label prefix | text | Not set | Binary state is shown by the card and icon. Prefix-only labels are omitted; useful labels and readings remain. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| Light off | Tap to turn on the fictional light. |
+| Reported light color | Use the light’s reported color as the background. |
+| White temperature | A color-temperature light uses its reported white tone. |
+| Slider hidden | Explicitly hide brightness without changing capability. |
+| On/off light | No brightness control is invented for an on/off-only entity. |
+| Reported action failure | A rejected command produces a readable error. |
+| Loading state | Wait for Home Assistant state before showing controls. |
+| Unknown state | The entity exists but has no known state. Controls remain neutral and disabled. |
+| Unavailable | The entity is unavailable. No device action is dispatched. |
+| Missing entity | A removed entity produces an explicit neutral missing-state result. |
+| Disconnected | Controls refuse actions when Home Assistant is disconnected. |
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

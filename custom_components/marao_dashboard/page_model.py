@@ -81,6 +81,8 @@ def camera_popup_stream(entity: str, options: dict[str, Any]) -> str:
     """Resolve the optional popup binding consistently for every generation path."""
     if "preload_stream" in options and type(options["preload_stream"]) is not bool:
         raise ValueError("Preload stream must be a boolean.")
+    if "event_columns" in options and (type(options["event_columns"]) is not int or options["event_columns"] < 1 or options["event_columns"] > 9007199254740991):
+        raise ValueError("Event columns must be a positive integer.")
     stream = options.get("popup_stream_entity")
     if stream in (None, ""):
         return entity

@@ -7,6 +7,7 @@ const repoRoot = path.resolve(__dirname, "..");
 const frontendRoot = path.join(repoRoot, "custom_components", "marao_dashboard", "frontend");
 const check = process.argv.includes("--check");
 const entries = {
+  MaraoSchedules: 'schedules-card.js',
   MaraoNativeModel: 'legacy-model.js',
   MaraoNativeDashboard: 'native-strategy.js',
   MaraoNativeBootstrap: 'native-bootstrap.js',

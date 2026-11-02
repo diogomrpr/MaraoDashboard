@@ -15,6 +15,8 @@ from homeassistant.util import slugify
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the local visual-test climate entity."""
+    from .people import setup_people
+    setup_people(hass)
     async_add_entities([MaraoTestClimate(
         config.get("name", "Marao Test Climate"), config.get("initial_state", "heat"), config.get("dual_target", False),
         ack_delay=config.get("ack_delay", 0), confirmation_delay=config.get("confirmation_delay", 0), behavior=config.get("behavior", "normal"),

@@ -145,7 +145,7 @@ export const cardFormMethods = {
       return fitting;
     };
     form.addEventListener("value-changed", (event) => { if (!this._busy) changed(event.detail.value); fit(); });
-    host.replaceChildren(form); fit();
+    host.replaceChildren(form); fit();return form;
   },
 
   async _containForm(element) {
@@ -217,7 +217,8 @@ export const cardFormMethods = {
     if (field.kind === "icon") selector = { icon: {} };
     if (field.kind === "number") selector = { number: {} };
     if (field.kind === "object") selector = { object: {} };
-    if (field.kind === "color") selector = { text: { type: "color" } };
+    // Optional colors can be empty or CSS values; HTML color inputs require #rrggbb.
+    // Keep these values editable without coercing an unset option to black.
     if (field.kind === "energy_precision") selector = { select: { mode: "dropdown", options: [
       { value: "auto", label: this._l("Automatic") }, ...Array.from({length: 7}, (_, value) => ({value: String(value), label: String(value)})),
     ] } };
@@ -274,11 +275,11 @@ export const cardFormMethods = {
 
   _entityIds(values) { if (values == null) return []; return (Array.isArray(values) ? values : [values]).map((value) => this._entityId(value)).filter(Boolean); },
 
-  _renderSceneOrder(host, entries = null, changed = null, edit = null) {
+  _renderSceneOrder(host, entries = null, changed = null, edit = null, heading = 'Scene order') {
     const scenes = entries || (Array.isArray(this._model.overview.scenes)
       ? this._model.overview.scenes
       : (this._model.overview.scenes ? [this._model.overview.scenes] : []));
-    host.innerHTML = scenes.length ? `<div class="advanced"><strong>${this._l("Scene order")}</strong><ha-sortable>${scenes.map((scene, index) => `<div class="load-row"><span>${formEsc(scene.name || entityMeta(this._entities, this._entityId(scene))?.name || this._entityId(scene))}</span>${this._iconButton("mdi:arrow-up", "Move up", "scene-up", index, index === 0)}${this._iconButton("mdi:arrow-down", "Move down", "scene-down", index, index === scenes.length - 1)}${edit ? this._iconButton('mdi:pencil', 'Edit card', 'scene-edit', index) : ''}</div>`).join("")}</ha-sortable></div>` : "";
+    host.innerHTML = scenes.length ? `<div class="advanced"><strong>${this._l(heading)}</strong><ha-sortable>${scenes.map((scene, index) => `<div class="load-row"><span>${formEsc(scene.name || entityMeta(this._entities, this._entityId(scene))?.name || this._entityId(scene))}</span>${this._iconButton("mdi:arrow-up", "Move up", "scene-up", index, index === 0)}${this._iconButton("mdi:arrow-down", "Move down", "scene-down", index, index === scenes.length - 1)}${edit ? this._iconButton('mdi:pencil', 'Edit card', 'scene-edit', index) : ''}</div>`).join("")}</ha-sortable></div>` : "";
     host.querySelectorAll("[data-action^='scene-']").forEach((button) => button.addEventListener("click", () => {
       const index = Number(button.dataset.room);
       if (button.dataset.action === 'scene-edit') { edit(index); return; }

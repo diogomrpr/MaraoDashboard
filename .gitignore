@@ -53,6 +53,13 @@ _site/
 docs/_site/
 docs/.jekyll-cache/
 docs/vendor/bundle/
+docs/dist/
+docs/.astro/
+docs/build-meta.json
+docs/src/styles/marao-theme.css
+docs/public/playground/
+docs/public/brand/
+docs/public/fonts/
 
 # Legacy/generated Home Assistant local test artifacts
 .ha-test/

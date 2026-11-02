@@ -1,0 +1,66 @@
+---
+title: "Sensor"
+description: "Show sensor state, last change, and state-aware colors."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Show sensor state, last change, and state-aware colors.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_sensor_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-sensor-card
+entity_id: sensor.humidity
+```
+
+Compatible entity domains: `sensor`, `binary_sensor`.
+
+Numeric thresholds use source values before display conversion. Bounds must be strictly increasing and colors opaque #RRGGBB values.
+
+Binary sensors use explicit active/inactive icons; unknown/unavailable data remains neutral.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `entity_id` | Entity | entity | Not set | A sensor, binary_sensor entity from your Home Assistant. Searchable suggestions are available. |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `variables.background_thresholds` | Background thresholds | sensor_thresholds | Not set | Background thresholds for this card. |
+| `variables.md_card_color` | Active color | color | Not set | Optional active card color. |
+| `variables.on_icon` | On icon | icon | Not set | On icon for this card. Searchable suggestions are available. |
+| `variables.off_icon` | Off icon | icon | Not set | Off icon for this card. Searchable suggestions are available. |
+| `variables.display_unit` | Display unit | energy_unit | `Auto` | Auto keeps the source unit. Selecting a compatible unit converts the reading. Searchable suggestions are available. |
+| `variables.display_precision` | Decimal places | energy_precision | `Auto` | Auto trims trailing zeros. Choose 0–6 fixed decimal places. Choices: `0`, `1`, `2`, `3`, `4`, `5`, `6`. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| Background thresholds | Humidity at 48 uses the first matching threshold. |
+| Higher threshold | At 70 the higher threshold applies. |
+| Binary sensor icons | Set separate active/inactive icons. |
+| Power conversion | Show a compatible source in kW. |
+| Loading state | Wait for Home Assistant state before showing controls. |
+| Unknown state | The entity exists but has no known state. Controls remain neutral and disabled. |
+| Unavailable | The entity is unavailable. No device action is dispatched. |
+| Missing entity | A removed entity produces an explicit neutral missing-state result. |
+| Disconnected | Controls refuse actions when Home Assistant is disconnected. |
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

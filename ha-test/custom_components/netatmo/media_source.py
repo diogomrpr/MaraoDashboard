@@ -1,6 +1,5 @@
 """Native Netatmo browse/resolve shapes with synthetic local playback."""
 from datetime import timedelta
-from homeassistant.components.camera import async_request_stream
 from homeassistant.components.http.auth import async_sign_path
 from homeassistant.components.media_source import MediaSource, PlayMedia, Unresolvable
 from homeassistant.components.media_source.models import BrowseMediaSource
@@ -25,13 +24,27 @@ class FixtureSource(MediaSource):
         return event
 
     async def async_browse_media(self, item):
+        identifier = item.identifier or ""
+        events = self.hass.data["netatmo"]["netatmo_events"][CAMERA_ID]
+        def folder(path, children):
+            return BrowseMediaSource(domain="netatmo", identifier=path, title="Synthetic recordings",
+                                     media_class="directory", media_content_type="video",
+                                     can_play=False, can_expand=True, children=children)
+        if identifier in ("", "events"):
+            return folder("events", [folder("events/" + CAMERA_ID, None)])
+        if identifier == "events/" + CAMERA_ID:
+            return folder(identifier, [BrowseMediaSource(
+                domain="netatmo", identifier=f"events/{CAMERA_ID}/{key}", title=event["message"],
+                media_class="video", media_content_type="application/x-mpegURL",
+                can_play=True, can_expand=False) for key, event in events.items()])
         event = self.event(item)
         thumbnail = async_sign_path(self.hass, "/api/frigate/marao_test/thumbnail/marao-test-clip", timedelta(minutes=5))
-        return BrowseMediaSource(domain="netatmo", identifier=item.identifier, title=event["message"],
+        return BrowseMediaSource(domain="netatmo", identifier=identifier, title=event["message"],
                                  media_class="video", media_content_type="application/x-mpegURL",
                                  can_play=True, can_expand=False, thumbnail=thumbnail)
 
     async def async_resolve_media(self, item):
+        from homeassistant.components.camera import async_request_stream
         self.event(item)
         url = await async_request_stream(self.hass, "camera.marao_dashboard_test_netatmo", "hls")
         return PlayMedia(url, "application/x-mpegURL")

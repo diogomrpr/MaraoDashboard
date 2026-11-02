@@ -1,3 +1,4 @@
+import {findNativeHost,nativeDashboardConfig} from '../custom_components/marao_dashboard/frontend/MaraoNativeContext.js';
 import { catalog } from './native-model.js';
 import { editorLabel } from './editor-labels.js';
 import { composeNativeCard, nativeCardDescriptor, nativeCardType, validateNativeCardConfig } from './card-composition.js';
@@ -27,7 +28,8 @@ export function nativeCardStub(template, hass = {}, entities = []) {
   if (Object.keys(variables).length) config.variables = variables;
   if (['md_navigation_card', 'md_room_card'].includes(template)) config.tap_action = { action: 'none' };
   if (template === 'md_entity_group_card') Object.assign(config, { id: 'group', entity_type: 'light', entities: [], popup_filter: 'active' });
-  if (template === 'md_scene_collection_card') config.entities = [];
+  if (['md_scene_collection_card','md_people_card'].includes(template)) config.entities = [];
+  if(template==='md_schedules_card')Object.assign(config,{group_id:globalThis.crypto.randomUUID(),targets:[]});
   if (template === 'md_floor_plan_card') config.variables = { lights: [] };
   if (template === 'md_media_app_card') {
     const source = hass.states?.[entity]?.attributes?.source_list?.[0];
@@ -46,6 +48,8 @@ export function nativeCardSetup(config) {
 
 export function nativeCardGridOptions(config) {
   const template = nativeCardDescriptor(config).template;
+  if(template==='md_people_card')return {columns:12,rows:'auto',min_columns:3,min_rows:2};
+  if(template==='md_schedules_card')return {columns:12,rows:'auto',min_columns:6,min_rows:2};
   let rows = compact.has(template) ? 2 : 3;
   if (template === 'md_title_card') rows = 1;
   if (['md_light_card', 'md_fan_card'].includes(template) && config.variables?.enable_slider !== false) rows = 3;
@@ -60,10 +64,7 @@ export function nativeCardGridOptions(config) {
     min_rows: minimum(template === 'md_title_card' ? 1 : template === 'md_floor_plan_card' ? 4 : 2, explicit.rows) };
 }
 
-function nativeHost(element) {
-  for (let node = element; node; node = node.parentNode || node.host) if (node.localName === 'hui-root') return node;
-  return null;
-}
+const nativeHost = findNativeHost;
 
 function metadata(hass) {
   return Object.values(hass?.states || {}).map(state => ({ entity_id: state.entity_id,
@@ -140,7 +141,7 @@ export class MaraoNativeCard extends HTMLElementBase {
     if (this._host === host) return;
     this._unbindHost(); this._host = host;
     if (host?.addController && host?.removeController) {
-      this._controller = { hostUpdated: () => this._forward(), hostDisconnected: () => this._forward() };
+      this._controller = { hostUpdated: () => this._refresh(), hostDisconnected: () => this._forward() };
       host.addController(this._controller);
     }
   }
@@ -169,10 +170,13 @@ export class MaraoNativeCard extends HTMLElementBase {
     const bound = new Set([this._config.entity_id, ...(Array.isArray(this._config.entities) ? this._config.entities : []).map(entity => typeof entity === 'string' ? entity : entity.entity_id)]);
     const dashboardRoot = this._host?.panel?.url_path || globalThis.location?.pathname.split('/')[1] || 'marao-dashboard';
     const language = this._hass?.language || 'en';
-    const key = JSON.stringify([dashboardRoot, language, entities.filter(entity => bound.has(entity.entity_id))]);
+    const dashboard=nativeDashboardConfig(this._host?.lovelace);
+    const source=dashboard?.views?.filter((view,index)=>String(view.path ?? index)===this._config.popup_view);
+    if(this._config.popup_view)for(const entity of entities)bound.add(entity.entity_id);
+    const key = JSON.stringify([dashboardRoot, language, source, entities.filter(entity => bound.has(entity.entity_id))]);
     if (this._compositionKey === key) { this._forward(); return; }
     this._compositionKey = key;
-    this._mount({ entities, dashboardRoot, language });
+    this._mount({ entities, dashboardRoot, language, dashboard });
   }
 
   async _mount(context) {
@@ -229,6 +233,10 @@ export function registerNativeCards() {
       picker.push({ type, name: `Marao ${editorLabel(entry.label, { language: globalThis.navigator?.language })}`, preview: true,
         description: editorLabel(entry.description || entry.label, { language: globalThis.navigator?.language }) });
     }
+  }
+  if(picker&&!picker.some(entry=>entry.type==='marao-camera-events-card')){
+    const language={language:globalThis.navigator?.language};
+    picker.push({type:'marao-camera-events-card',name:`Marao ${editorLabel('Camera Events',language)}`,description:editorLabel('Browse explicitly selected camera events.',language),preview:true});
   }
 }
 

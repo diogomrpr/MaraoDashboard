@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Scoped fullscreen shell
-Home Assistant's native top bar SHALL be hidden only while viewing an opted-in Marao dashboard. Native editing SHALL restore its toolbar and host-managed safe areas. Leaving Marao SHALL restore the normal HA shell and every layout property changed by Marao. Adding an individual Marao card to an ordinary dashboard SHALL NOT enable dashboard-wide shell changes.
+Home Assistant's native top bar SHALL be hidden only while viewing an opted-in Marao dashboard. Native editing SHALL restore a visible native edit header with page navigation, Done and host-managed safe areas despite Marao theme/fullscreen hiding. Leaving Marao SHALL restore the normal HA shell and every layout property changed by Marao. Adding an individual Marao card to an ordinary dashboard SHALL NOT enable dashboard-wide shell changes.
 
 #### Scenario: The user navigates from Marao to native settings
 - **WHEN** the active route stops being a Marao dashboard
@@ -17,8 +17,13 @@ Home Assistant's native top bar SHALL be hidden only while viewing an opted-in M
 
 #### Scenario: Native editing owns the page
 - **WHEN** an administrator enters dashboard or card editing
-- **THEN** HA's editing controls and layout are unobstructed and Marao's navbar cannot activate through the editor
+- **THEN** HA's native page navigation, Done and editing controls/layout are visible and unobstructed, and Marao's navbar cannot activate through the editor
 - **AND** viewing overrides return only after editing ends in the same opted-in dashboard
+
+#### Scenario: The editing view is replaced under the Marao theme
+- **WHEN** HA replaces the active view after a page switch while dashboard edit mode remains active
+- **THEN** the replacement retains its visible native edit header, page navigation, Done and host-managed safe-area spacing
+- **AND** no theme update or delayed fullscreen callback hides those controls or restores the floating viewing navbar early
 
 #### Scenario: All Marao editing entry points are hidden
 - **WHEN** navigation is explicitly empty and both main-page shortcuts are disabled
@@ -26,11 +31,11 @@ Home Assistant's native top bar SHALL be hidden only while viewing an opted-in M
 - **AND** the removed internal editor route is not required to recover editing access
 
 ### Requirement: Native editing with Marao navigation
-Ordinary opted-in dashboards SHALL retain Marao styling and shared single-row overflow navigation without a route-count cap. Administrator edit access SHALL open HA's native editor outside route entries. Native editing SHALL restore its toolbar; leaving Marao SHALL restore the normal shell.
+Ordinary opted-in dashboards SHALL retain Marao styling and shared single-row overflow navigation without a route-count cap. Administrator edit access SHALL open HA's native editor outside route entries. Editing SHALL expose native navigation among current dashboard pages and a visible Done button independently of Marao's viewing navbar destinations. Leaving Marao SHALL restore the normal shell.
 
 #### Scenario: Native editing starts
 - **WHEN** an administrator uses Edit dashboard
-- **THEN** HA's existing native editor opens with its native controls unobstructed
+- **THEN** HA's existing native editor opens with page navigation, Done and its native controls visible and unobstructed
 
 #### Scenario: A Marao card is added to an ordinary dashboard
 - **WHEN** that dashboard has no explicit Marao dashboard opt-in

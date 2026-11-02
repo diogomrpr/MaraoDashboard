@@ -10,7 +10,7 @@ nav_order: 0
 The **Marao Dashboard** theme is part of the card contract. Reuse its semantic
 variables instead of hard-coding a color, font, radius, or surface in an
 individual template. Update light and dark modes together and follow the
-[dashboard quality contract]({{ '/docs/development/dashboard-quality.html' | relative_url }}).
+[dashboard quality contract](dashboard-quality.md).
 
 ## Typography
 
@@ -65,7 +65,7 @@ token that expresses the role:
 Marao takes its name from Serra do Marão in Portugal. The expanded palette draws
 on 15 photographs across spring, summer, autumn and winter: heather and carqueja,
 forest and rivers, autumn copper, snowy ridges and mist. See the
-[seasonal study, swatches and source credits]({{ '/docs/development/seasonal-palette.html' | relative_url }}).
+[seasonal study, swatches and source credits](seasonal-palette.md).
 Raw photo samples are recorded separately from the UI colors, which are adjusted
 for readable light/dark pairings. Photographs are not bundled into the dashboard.
 

@@ -1,0 +1,47 @@
+@import './marao-theme.css';
+@import './playground.css';
+@font-face{font-family:Montserrat;src:url('../../../custom_components/marao_dashboard/frontend/fonts/Montserrat.ttf') format('truetype');font-style:normal;font-weight:100 900;font-display:swap}
+:root{
+  --sl-font:Montserrat,system-ui,sans-serif;
+  --sl-color-white:var(--primary-text-color);
+  --sl-color-black:var(--primary-background-color);
+  --sl-color-gray-1:var(--primary-text-color);
+  --sl-color-gray-2:var(--subtext-color);
+  --sl-color-gray-3:var(--disabled-text-color);
+  --sl-color-gray-4:var(--divider-color);
+  --sl-color-gray-5:var(--opacity-contrast-100);
+  --sl-color-gray-6:var(--marao-card-background);
+  --sl-color-gray-7:var(--primary-background-color);
+  --sl-color-bg:var(--primary-background-color);
+  --sl-color-bg-nav:var(--primary-background-color);
+  --sl-color-bg-sidebar:var(--primary-background-color);
+  --sl-color-bg-inline-code:var(--secondary-background-color);
+  --sl-color-hairline-light:var(--opacity-contrast-100);
+  --sl-color-hairline:var(--opacity-contrast-100);
+  --sl-color-accent-low:var(--secondary-background-color);
+  --sl-color-accent:var(--primary-color);
+  --sl-color-accent-high:var(--primary-text-color);
+  --sl-color-text:var(--primary-text-color);
+  --sl-color-text-accent:var(--primary-color);
+  --sl-content-width:64rem;
+  --sl-text-h1:clamp(2rem,4vw,3.5rem);
+}
+.site-title img{height:2.6rem;width:auto}
+.release-label{font-size:.75rem;font-weight:600;letter-spacing:.04em;color:var(--subtext-color);margin-bottom:.8rem}
+.hero h1{white-space:pre-line;letter-spacing:-.04em}.hero{padding-block:3rem}
+h1,h2,h3{letter-spacing:-.025em}
+.sl-markdown-content a{overflow-wrap:anywhere}
+.sl-markdown-content table{width:100%;background:var(--ha-card-background);border-radius:20px;border-collapse:separate;border-spacing:0;overflow:hidden;font-size:.85rem}
+.sl-markdown-content :is(th,td){padding:14px;border-color:var(--opacity-contrast-100)}
+.sl-markdown-content th{background:var(--marao-card-background);font-weight:600}
+.sl-markdown-content tbody tr:last-child td{border-bottom:0}
+.sl-link-card{border-radius:24px!important;background:var(--ha-card-background)!important;border-color:var(--opacity-contrast-100)!important;box-shadow:var(--ha-card-box-shadow)!important}
+.sidebar-content :is(a,summary){min-height:48px;display:flex;align-items:center;border-radius:14px}
+.sidebar-content a[aria-current=page]{background:var(--primary-color);color:var(--text-primary-color)}
+header :is(button,select){min-height:48px;min-width:48px}
+:is(a,button,input,select,textarea,summary):focus-visible{outline:none}
+@media(min-width:72rem){
+  html:has(marao-playground[data-editing]) .right-sidebar-container{display:none}
+  html:has(marao-playground[data-editing]) .main-pane{width:100%;--sl-content-margin-inline:auto}
+}
+@media(max-width:480px){.hero{padding-block:1.5rem}.sl-markdown-content table{font-size:.8rem}.sl-markdown-content :is(th,td){padding:10px}}

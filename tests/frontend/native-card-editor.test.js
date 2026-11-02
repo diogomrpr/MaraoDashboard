@@ -82,3 +82,37 @@ test('legacy entity spelling survives native form updates and active forms survi
   const hass={language:'en',states:{'light.test':{state:'on',attributes:{friendly_name:'Test'}}}};editor.hass=hass;
   assert.equal(form.hass,hass);
 });
+
+test('People and section drafts retain native placement and unknown member data through complete events',()=>{
+  const original={type:'custom:marao-people-card',name:'Household',entities:[{entity_id:'person.alex',name:'Alex',future:{empty:[],enabled:false}},{entity_id:'person.sam',icon:'mdi:account'}],grid_options:{columns:12},visibility:[{condition:'user',users:['fixture']}],future:{retain:true}};
+  const editor=new MaraoCardEditor(),events=[];editor.dispatchEvent=event=>events.push(event.detail.config);editor.setConfig(original);
+  editor._commitDescriptor({...structuredClone(original),entities:[original.entities[1],{...original.entities[0],name:'Alexandra'}]});
+  assert.deepEqual(events[0],{...original,entities:[original.entities[1],{...original.entities[0],name:'Alexandra'}]});
+  assert.deepEqual(original.entities[0].future,{empty:[],enabled:false});
+  editor._commitDescriptor({...events[0],entities:[]});assert.deepEqual(events[1].entities,[]);assert.deepEqual(events[1].grid_options,{columns:12});
+});
+
+test('optional color fields represent unset and CSS values without HTML color coercion',()=>{
+  const editor=Object.create(MaraoCardEditor.prototype),entry=card('md_light_card');
+  assert.deepEqual(editor._variableSchema({key:'card_color',kind:'color',label:'Card color'}).selector,{text:{}});
+  for(const value of ['', 'var(--primary-color)', '#123456']) {
+    const config={type:'custom:marao-light-card',entity_id:'light.test',variables:{card_color:value}},data=nativeCardFormData(config,entry);
+    assert.deepEqual(patchNativeCard(config,entry,data,{...data,name:'Desk'}),{...config,name:'Desk'});
+  }
+});
+
+test('people column edits retain native data and omission on unrelated edits',()=>{
+ const card={id:'md_people_card',people:true,variables:[]},source={type:'custom:marao-people-card',entities:[],opaque:{keep:true},grid_options:{columns:12}};
+ const previous=nativeCardFormData(source,card);
+ assert.equal(Object.hasOwn(patchNativeCard(source,card,previous,{...previous,name:'People'}),'columns'),false);
+ assert.deepEqual(patchNativeCard(source,card,previous,{...previous,columns:2}),{...source,columns:2});
+});
+
+test('event membership edits preserve legacy shape, opaque fields and per-source identity',async()=>{
+ const {patchEventSources}=await import('../../frontend_src/event-card-editor.js');
+ const legacy={type:'custom:marao-frigate-events-card',entity:'camera.a',frigate_instance_id:'main',opaque:{keep:1},grid_options:{columns:12}};
+ assert.deepEqual(patchEventSources(legacy,[{entity:'camera.a',frigate_instance_id:'main'}]),legacy);
+ const next=patchEventSources(legacy,[{entity:'camera.a',frigate_instance_id:'main',future:true},{entity:'camera.b',name:'B'}]);
+ assert.equal(next.entity,undefined);assert.deepEqual(next.opaque,{keep:1});assert.equal(next.cameras[0].future,true);
+ assert.deepEqual(patchEventSources(next,[]).cameras,[]);assert.equal(legacy.entity,'camera.a');
+});

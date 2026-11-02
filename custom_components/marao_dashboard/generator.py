@@ -2876,6 +2876,8 @@ def _camera_popup(entity: dict[str, Any], language: str = "en") -> dict[str, Any
         value = entity.get(option) or variables.get(option)
         if value:
             events_card[option] = value
+    if "event_columns" in variables:
+        events_card["columns"] = variables["event_columns"]
     event_limit = entity.get("event_limit") or variables.get("event_limit")
     if event_limit:
         events_card["limit"] = event_limit
@@ -3085,6 +3087,8 @@ def _entity_group_popup(group, language="en"):
     name = _entity_group_name(group, language)
     return {**_popup_header(_entity_group_hash(group), None, name, group.get("icon") or "mdi:view-list"),
             "entity_group": {"id": group["id"], "entity_type": group["entity_type"], "popup_filter": group["popup_filter"],
+                             **({"summary_sections": deepcopy(group["summary_sections"])} if "summary_sections" in group else {}),
+                             "members": deepcopy(group["entities"]),
                              "entities": [member["entity_id"] for member in group["entities"]]},
             "cards": [_room_entity_card(member) for member in _entity_group_members(group)]}
 

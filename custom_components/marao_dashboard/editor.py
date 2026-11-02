@@ -149,6 +149,7 @@ EDITOR_CATALOG: dict[str, Any] = {
                     advanced=True,
                 ),
                 _field("event_limit", "Event limit", "number", default=12),
+                _field("event_columns", "Event columns", "number"),
             ],
         },
         {

@@ -1,0 +1,94 @@
+[
+  {
+    "type": "custom:marao-people-card",
+    "entities": [
+      "person.marao_dashboard_test_alex",
+      "person.marao_dashboard_test_sam",
+      "person.marao_dashboard_test_jules",
+      "person.marao_dashboard_test_taylor"
+    ],
+    "name": "People",
+    "columns": 2
+  },
+  {
+    "type": "custom:marao-entity-group-card",
+    "name": "Lights by floor",
+    "id": "floor-lights",
+    "entity_type": "light",
+    "popup_filter": "active",
+    "entities": [
+      "light.marao_dashboard_test_light",
+      "light.marao_dashboard_test_room_light",
+      "light.marao_dashboard_test_onoff_light"
+    ],
+    "summary_sections": [
+      {
+        "id": "ground",
+        "name": "Ground floor",
+        "entities": [
+          "light.marao_dashboard_test_light"
+        ]
+      },
+      {
+        "id": "first",
+        "name": "First floor",
+        "entities": [
+          "light.marao_dashboard_test_room_light"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "custom:marao-entity-group-card",
+    "name": "Covers by floor",
+    "id": "floor-covers",
+    "entity_type": "cover",
+    "entities": [
+      "cover.marao_dashboard_test_cover",
+      "cover.marao_dashboard_test_garage_door",
+      "cover.marao_dashboard_test_open_only_door"
+    ],
+    "summary_sections": [
+      {
+        "id": "ground",
+        "name": "Ground floor",
+        "entities": [
+          "cover.marao_dashboard_test_cover"
+        ]
+      },
+      {
+        "id": "access",
+        "name": "Access",
+        "entities": [
+          "cover.marao_dashboard_test_garage_door",
+          "cover.marao_dashboard_test_open_only_door"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "custom:marao-schedules-card",
+    "name": "Seasonal schedules",
+    "group_id": "marao_dashboard_test_seasonal",
+    "targets": []
+  },
+  {
+    "type": "custom:marao-camera-events-card",
+    "title": "Camera events",
+    "columns": 2,
+    "cameras": [
+      {
+        "entity": "camera.marao_dashboard_test_camera",
+        "name": "Entrance",
+        "event_provider": "frigate",
+        "frigate_instance_id": "marao_test",
+        "frigate_camera": "front"
+      },
+      {
+        "entity": "camera.marao_dashboard_test_netatmo",
+        "name": "Recordings",
+        "event_provider": "netatmo"
+      }
+    ]
+  }
+]

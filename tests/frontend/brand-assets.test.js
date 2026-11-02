@@ -44,7 +44,7 @@ test('the existing iconset exposes the canonical compact mark and functional gly
   assert.equal(icons.fapro, icons.marao_dashboard);
 });
 
-test('canonical artwork renders without fonts and documentation copies stay aligned', () => {
+test('canonical artwork renders without fonts and the site uses its original sources', () => {
   for (const name of ['logo.svg', 'logo-dark.svg', 'mark.svg', 'mark-dark.svg', 'mark-monochrome.svg']) {
     const svg = read(sources + name).toString();
     assert.match(svg, /<svg\b[^>]*viewBox="0 0 (?:520 280|24 24)"/);
@@ -55,9 +55,9 @@ test('canonical artwork renders without fonts and documentation copies stay alig
       assert.match(svg, /mask="url\(#wordmark\)"/);
     }
   }
-  for (const [source, target] of [['logo.svg', 'logo.svg'], ['logo-dark.svg', 'logo-dark.svg'], ['mark.svg', 'favicon.svg'], ['mark-dark.svg', 'favicon-dark.svg']]) {
-    assert.deepEqual(read(sources + source), read('docs/assets/images/' + target));
-  }
+  const site=read('docs/astro.config.mjs').toString();
+  for(const name of ['logo.svg','logo-dark.svg'])assert.ok(site.includes('frontend/brand/'+name));
+
 });
 
 test('native brand images include standard and high-resolution transparent variants', () => {

@@ -1,0 +1,73 @@
+---
+title: "Entity Group"
+description: "Summarize selected lights, covers, batteries or thermostats and open their controls."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Summarize selected lights, covers, batteries or thermostats and open their controls.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_entity_group_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-entity-group-card
+name: Lights
+id: lights
+entity_type: light
+entities:
+  - light.living_room
+  - light.kitchen
+  - light.desk
+popup_filter: active
+summary_sections:
+  - id: ground-floor
+    name: Ground floor
+    entities:
+      - light.living_room
+      - light.kitchen
+```
+
+The summary reflects the selected members, including unavailable members and the worst battery where applicable.
+
+Section actions operate on eligible members once per service batch. Access opening remains an individual deliberate slide; unsafe or unsupported group actions are skipped explicitly.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `popup_view` | Custom popup view | text | Not set | Optional existing view path used for a Home Assistant managed popup layout. Omit for automatic details. Searchable suggestions are available. |
+| `id` | Stable group ID | text | Not set | Unique local identifier for this group. |
+| `entity_type` | Group type | select | Not set | Supported summary family. Choices: `light`, `cover`, `climate`, `battery`. |
+| `entities` | Members | json | Not set | An ordered explicit list of compatible entity IDs or descriptors. Searchable suggestions are available. |
+| `summary_sections` | Summary sections | json | Not set | Named sections with unique IDs and non-overlapping member lists. Unassigned members appear under Other. |
+| `popup_filter` | Popup filter | select | Not set | Choose active members or all members. Choices: `active`, `all`. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| All members | Show inactive members in the detail sheet too. |
+| Empty group | An explicit empty group is retained. |
+| Covers with an access point | Ordinary blinds can open together; the garage requires its own slide. |
+| Climate group | Group supported climate actions by capability. |
+| Battery group | The worst configured battery determines the summary. |
+| Partially unavailable | Available members remain usable. |
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

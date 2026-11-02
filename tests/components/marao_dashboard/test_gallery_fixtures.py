@@ -752,3 +752,18 @@ async def test_quality_fixture_uses_only_its_own_registry_entry(monkeypatch):
     entries.assert_called_once_with("marao_test_camera")
     assert devices.async_get_or_create.call_args.kwargs["config_entry_id"] == "fixture-owner"
     entities.async_update_entity.assert_called_once_with("camera.safe_quality", device_id="safe-device")
+
+
+async def test_netatmo_fixture_browses_native_camera_folders_and_timestamp_keys():
+    package = load_fixture("netatmo/__init__.py")
+    fixture = load_fixture("netatmo/media_source.py")
+    hass = SimpleNamespace(data={})
+    await package.async_setup(hass, {})
+    source = fixture.FixtureSource(hass)
+    root = await source.async_browse_media(SimpleNamespace(identifier=""))
+    folder = root.children[0]
+    assert folder.media_content_id == f"media-source://netatmo/events/{package.CAMERA_ID}"
+    assert folder.can_expand and not folder.can_play
+    rows = await source.async_browse_media(SimpleNamespace(identifier="events/" + package.CAMERA_ID))
+    assert len(rows.children) == 3
+    assert all(row.can_play and row.media_content_id.rsplit("/", 1)[1].isdigit() for row in rows.children)

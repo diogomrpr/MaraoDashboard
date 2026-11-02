@@ -1,5 +1,15 @@
 import { FLOOR_PT_LABELS } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlanText.js';
 export const PT_LABELS = {
+  "Camera Events":"Eventos de câmaras", "Browse explicitly selected camera events.":"Consultar eventos das câmaras selecionadas.",
+  "Event columns":"Colunas de eventos", "Event columns must be a positive integer.":"As colunas de eventos têm de ser um inteiro positivo.", "Preferred event columns inside the popup; reduces when space is limited.":"Número preferido de colunas de eventos na janela; reduz-se quando há pouco espaço.", "Add camera":"Adicionar câmara", "Camera":"Câmara", "Provider":"Fornecedor", "Frigate instance":"Instância Frigate", "Frigate camera":"Câmara Frigate", "Protect media source":"Fonte multimédia Protect", "Remove":"Remover", "People": "Pessoas", "People columns must be an integer from 1 to 6.":"As colunas de pessoas têm de ser um inteiro entre 1 e 6.", "Schedules": "Horários", "Section name": "Nome da secção", "Schedule collection": "Coleção de horários", "New collection": "Nova coleção", "Devices": "Dispositivos",
+  "People requires an explicit list of person entities.": "Pessoas exige uma lista explícita de entidades person.",
+  "Choose unique person entities with textual names and icons.": "Escolha pessoas únicas com nomes e ícones de texto.",
+  "Summary sections must be a list.": "As secções do resumo têm de ser uma lista.",
+  "Sections require unique stable IDs, names and member lists.": "As secções exigem identificadores estáveis únicos, nomes e listas de membros.",
+  "Assign each configured member to at most one section.": "Atribua cada membro configurado a uma única secção.",
+  "Choose a schedule collection and supported targets.": "Escolha uma coleção de horários e dispositivos suportados.",
+  "Display explicitly selected people and their current places.": "Mostrar as pessoas selecionadas e os seus locais atuais.",
+  "Manage device schedules and seasonal timer groups in Home Assistant.": "Gerir horários de dispositivos e grupos sazonais de temporizadores no Home Assistant.",
   "Add": "Adicionar", "Delete": "Eliminar", "Edit": "Editar", "Update": "Atualizar", "Create": "Criar", "Cancel": "Cancelar",
   "Advanced options": "Opções avançadas", "Unknown": "Desconhecida", "Unavailable": "Indisponível",
   ...FLOOR_PT_LABELS,

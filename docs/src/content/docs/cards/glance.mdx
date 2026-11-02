@@ -1,0 +1,67 @@
+---
+title: "Glance"
+description: "Up to three independently configured readings."
+---
+
+import Playground from '../../../components/Playground.astro';
+
+Up to three independently configured readings.
+
+## Try it
+
+Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
+
+<Playground cardId="md_glance_card" />
+
+## Use in Home Assistant
+
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
+
+```yaml
+type: custom:marao-glance-card
+name: At a glance
+variables:
+  entity1: sensor.temperature
+  entity1_name: Temperature
+  entity1_icon: mdi:thermometer
+  entity2: sensor.humidity
+  entity2_name: Humidity
+  entity2_icon: mdi:water-percent
+  entity3: sensor.house_power
+  entity3_name: Power
+  entity3_icon: mdi:flash
+```
+
+Each of the three optional readings has an independent entity, name and icon. One unavailable reading does not erase the other values.
+
+## Settings
+
+The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
+
+| YAML path | Setting | Value type | Catalog default | Behavior |
+| --- | --- | --- | --- | --- |
+| `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
+| `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `variables.entity1` | Reading 1 | entity | Not set | Reading 1 for this card. Searchable suggestions are available. |
+| `variables.entity1_name` | Reading 1 name | text | Not set | Reading 1 name for this card. |
+| `variables.entity1_icon` | Reading 1 icon | icon | Not set | Reading 1 icon for this card. Searchable suggestions are available. |
+| `variables.entity2` | Reading 2 | entity | Not set | Reading 2 for this card. Searchable suggestions are available. |
+| `variables.entity2_name` | Reading 2 name | text | Not set | Reading 2 name for this card. |
+| `variables.entity2_icon` | Reading 2 icon | icon | Not set | Reading 2 icon for this card. Searchable suggestions are available. |
+| `variables.entity3` | Reading 3 | entity | Not set | Reading 3 for this card. Searchable suggestions are available. |
+| `variables.entity3_name` | Reading 3 name | text | Not set | Reading 3 name for this card. |
+| `variables.entity3_icon` | Reading 3 icon | icon | Not set | Reading 3 icon for this card. Searchable suggestions are available. |
+
+## Behavior examples
+
+Select **Open playground**, then choose a scenario to inspect its configuration and reported device state. Similar numeric or color values do not need separate examples.
+
+| Scenario | What it demonstrates |
+| --- | --- |
+| Default | Try the configured card with fictional devices. |
+| One reading | Leave unused positions empty. |
+| One unavailable reading | Keep usable values visible. |
+
+## Layout and shared behavior
+
+Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).

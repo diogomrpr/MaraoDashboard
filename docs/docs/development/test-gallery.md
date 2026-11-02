@@ -9,7 +9,7 @@ nav_order: 5
 
 The disposable Home Assistant exposes one Marao dashboard at
 `/marao-dashboard`. Its normal Home, Rooms, Security, Energy, Wallbox, Media,
-Appliances, and room-detail views exercise realistic generated layouts. The
+Appliances, and room-detail views exercise realistic native layouts. The
 Cards index at `/marao-dashboard/card-test` links to an individual page for each
 card, with each shortcut named after that card. Each page collects its existing
 variations and popup examples and includes a Back to cards shortcut. The combined
@@ -142,7 +142,7 @@ sheets with the same options. These use only safe template sensors; the isolated
 History fixture returns unit-bearing Wh/J and W/kW records without changing
 Recorder data. Missing and incompatible historical units deliberately show a
 readable formatting error while retaining the live reading. The missing-unit example starts with valid Wh metadata; its safe fixture action
-removes/restores that unit after generation. The Visual builder rejects an
+removes/restores that unit in its fixture setup. The shared validator rejects an
 explicit conversion without source metadata before saving. Fixture reset restores
 the unit before generation.
 

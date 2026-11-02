@@ -1,3 +1,4 @@
+import {popupViewError,resolvePopupView,popupGroupFromView} from '../custom_components/marao_dashboard/frontend/MaraoPopupLayout.js';
 import labels from '../custom_components/marao_dashboard/frontend/marao-generator-labels.json' with { type: 'json' };
 import { appleTVOptions, copy, defaultTemplate, domain, entries, friendly, isAccess, object, sections, slug } from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
 import { catalog, validateSource } from './native-model.js';
@@ -22,6 +23,7 @@ export function nativeCardDescriptor(config) {
 
 export function validateNativeCardConfig(config, entities = []) {
   const descriptor = nativeCardDescriptor(config);
+  const error=popupViewError(config);if(error)throw new Error(error);
   // Reuse the source validators on one card, without imposing page ownership on HA.
   const card = { ...descriptor, id: descriptor.id || 'card' };
   const pages = [{ name: 'Native card', path: 'native', entities: [card] }];
@@ -31,9 +33,13 @@ export function validateNativeCardConfig(config, entities = []) {
 }
 
 /** Compose only this occurrence. Saved IDs never identify automatic live sheets. */
-export function composeNativeCard(config, { entities = [], dashboardRoot = 'marao-dashboard', language = 'en', instanceId } = {}) {
+export function composeNativeCard(config, { entities = [], dashboardRoot = 'marao-dashboard', language = 'en', instanceId, dashboard } = {}) {
   if (typeof instanceId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(instanceId)) throw new Error('A live card occurrence identity is required.');
-  const descriptor = nativeCardDescriptor(config), external = new Set();
+  let descriptor = nativeCardDescriptor(config);
+  if(descriptor.popup_view&&descriptor.template==='md_entity_group_card'&&dashboard) {
+    try {const group=popupGroupFromView(descriptor,resolvePopupView(dashboard,descriptor.popup_view).view,entities);descriptor={...descriptor,entities:group.members};delete descriptor.summary_sections;} catch {descriptor={...descriptor,entities:[]};delete descriptor.summary_sections;}
+  }
+  const external = new Set();
   for (const item of [descriptor, ...entries(descriptor.entities)]) {
     for (const key of ['popup_hash', 'mode_selector_hash', 'lights_popup']) if (own(item.variables || {}, key)) external.add(item.variables[key]);
   }
@@ -43,6 +49,7 @@ export function composeNativeCard(config, { entities = [], dashboardRoot = 'mara
   // An external group sheet also owns the nested mode/access sheets it links to.
   const externalGroup = descriptor.template === 'md_entity_group_card' && typeof descriptor.variables?.popup_hash === 'string' && Boolean(descriptor.variables.popup_hash);
   const popups = externalGroup ? [] : composition.popups(item).filter(popup => !external.has(popup.hash));
+  if(descriptor.popup_view&&popups.length)popups[0]={...popups[0],popup_view:descriptor.popup_view};
   return { card: composition.pageCard(item), popups };
 }
 
@@ -158,16 +165,19 @@ export function createCardComposition({ root = 'marao-dashboard', language = 'en
     return { ...member, name: member.name || friendly(member.entity_id), variables };
   });
   const groupCard = entity => ({ type: 'custom:marao-card', template: 'md_entity_group_card', id: entity.id, name: name(entity), icon: entity.icon || ({ light: 'mdi:lightbulb-group-outline', cover: 'mdi:window-shutter', climate: 'mdi:thermostat', battery: 'mdi:battery' })[entity.entity_type], variables: { entity_type: entity.entity_type, summary_entities: entity.entities.map(member => member.entity_id) }, tap_action: navigate(groupHash(entity)) });
-  const groupPopups = entity => [{ ...header(groupHash(entity), null, name(entity), entity.icon || 'mdi:view-list'), entity_group: { id: entity.id, entity_type: entity.entity_type, popup_filter: entity.popup_filter, entities: entity.entities.map(member => member.entity_id) }, cards: groupMembers(entity).map(roomCard) }, ...groupMembers(entity).filter(member => domain(member.entity_id) === 'climate' || isAccess(member) && !openOnly(member)).map(member => domain(member.entity_id) === 'climate' ? climatePopup(member) : accessPopup(member))];
+  const groupPopups = entity => [{ ...header(groupHash(entity), null, name(entity), entity.icon || 'mdi:view-list'), entity_group: { id: entity.id, entity_type: entity.entity_type, popup_filter: entity.popup_filter, ...(own(entity,'summary_sections')?{summary_sections:copy(entity.summary_sections)}:{}), members:copy(entity.entities), entities: entity.entities.map(member => member.entity_id) }, cards: groupMembers(entity).map(roomCard) }, ...groupMembers(entity).filter(member => domain(member.entity_id) === 'climate' || isAccess(member) && !openOnly(member)).map(member => domain(member.entity_id) === 'climate' ? climatePopup(member) : accessPopup(member))];
   const cameraPopup = entity => {
     const options = entity.variables || {}, events = { type: 'custom:marao-camera-events-card', entity: entity.entity_id, title: t('camera.events') };
     for (const key of ['event_provider', 'frigate_camera', 'frigate_instance_id', 'unifi_protect_media_source']) if (entity[key] || options[key]) events[key] = entity[key] || options[key];
+    if(own(options,'event_columns'))events.columns=options.event_columns;
     if (entity.event_limit || options.event_limit) events.limit = entity.event_limit || options.event_limit;
     return { ...header(options.popup_hash || hash('camera', entity.entity_id), entity.entity_id, entity.name || friendly(entity.entity_id), entity.icon || 'mdi:cctv'), cards: [{ type: 'custom:marao-card', template: 'md_camera_card', entity: options.popup_stream_entity || entity.entity_id, name: entity.name || friendly(entity.entity_id), show_name: false, tap_action: { action: 'fullscreen' } }, events] };
   };
   const mediaPopup = entity => createMediaPopup(entity, header, grid);
   const pageCard = entity => {
     const item = { ...entity, name: name(entity) }, role = item.template, variables = item.variables || {};
+    if(role==='md_people_card')return {...(own(entity,'columns')?{columns:entity.columns}:{}),type:'custom:marao-card',template:role,entities:copy(item.entities),...(own(entity,'name')?{name:entity.name}:{})};
+    if(role==='md_schedules_card')return {type:'custom:marao-schedules-runtime',...pick(item,['group_id','targets']),...(own(entity,'name')?{name:entity.name}:{})};
     if (role === 'ha_card') return raw(parseCardYaml(item.yaml));
     if (role === 'md_floor_plan_card') return { type:'custom:marao-floor-plan-card', name:item.name, ...copy(variables), lights_popup:variables.lights_popup ?? `#page-${item._page_instance}-${item.id}-lights` };
     if (role === 'md_media_card' && variables.media_display === 'inline') {

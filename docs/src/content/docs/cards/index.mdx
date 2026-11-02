@@ -1,0 +1,60 @@
+---
+title: Cards
+description: Every public Marao card, with editable configuration and interactive behavior examples.
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Choose a card to try its real Marao controls with fictional devices, edit settings or YAML, and copy its configuration into Home Assistant. Site search finds card names, settings and behavior descriptions.
+
+<CardGrid>
+  <LinkCard title="Title" description="An editable heading inside any page or section." href="./title/" />
+  <LinkCard title="Weather" description="Current weather with an optional native forecast." href="./weather/" />
+  <LinkCard title="Room shortcut" description="Open a page and switch off its explicitly selected lights." href="./room/" />
+  <LinkCard title="Scene collection" description="Open an ordered collection of native scenes and toggle helpers." href="./scene-collection/" />
+  <LinkCard title="Alarm" description="Alarm state and supported controls with transient code entry." href="./security/" />
+  <LinkCard title="Status" description="A compact entity reading or status." href="./base/" />
+  <LinkCard title="Energy period" description="A day or month reading and its independently named history popup." href="./energy-period/" />
+  <LinkCard title="Media app" description="Open a configured source on the selected media player." href="./media-app/" />
+  <LinkCard title="Camera" description="Automatic camera preview to live video with a generated Frigate, UniFi Protect or Netatmo events popup." href="./camera/" />
+  <LinkCard title="Light" description="Control a light and optionally show its brightness slider." href="./light/" />
+  <LinkCard title="Cover" description="Open, close, and position a cover or blind." href="./cover/" />
+  <LinkCard title="Climate" description="Control temperature, modes, and an optional history graph." href="./climate/" />
+  <LinkCard title="Fan / exhaust valve" description="Control fan speed or cover-backed exhaust opening with native commands." href="./fan/" />
+  <LinkCard title="Media player" description="Media controls with artwork and generated popup controls." href="./media/" />
+  <LinkCard title="Access" description="Access controls with configurable popup, slide, close or security hold." href="./access/" />
+  <LinkCard title="Sensor" description="Show sensor state, last change, and state-aware colors." href="./sensor/" />
+  <LinkCard title="Switch" description="Toggle a switch with optional power usage and graph." href="./switch/" />
+  <LinkCard title="Number control" description="Increase or decrease a Home Assistant number entity." href="./number/" />
+  <LinkCard title="Wallbox charging current" description="Large charging-current value with up/down controls and optional shortcuts." href="./wallbox-current/" />
+  <LinkCard title="Vacuum" description="Vacuum controls with up to three room or segment actions." href="./vacuum/" />
+  <LinkCard title="Battery" description="Battery percentage with green, yellow, and red states." href="./battery/" />
+  <LinkCard title="Dishwasher" description="Operation state, progress, remaining time, and refill warnings." href="./dishwasher/" />
+  <LinkCard title="Washing machine" description="A focused running-state card for a washing machine." href="./washing-machine/" />
+  <LinkCard title="Graph" description="A large live metric with a project-owned 24-hour background graph." href="./graph/" />
+  <LinkCard title="Toggle graph" description="A live metric graph that also controls a related toggle." href="./toggle-graph/" />
+  <LinkCard title="Timeline" description="Show recent state transitions for any supported entity." href="./timeline/" />
+  <LinkCard title="Page shortcut" description="Open another generated dashboard page." href="./navigation/" />
+  <LinkCard title="Entity Group" description="Summarize selected lights, covers, batteries or thermostats and open their controls." href="./entity-group/" />
+  <LinkCard title="Alarm controls" description="Capability-aware alarm controls with transient PIN entry and guarded actions." href="./alarm-controls/" />
+  <LinkCard title="Header" description="Date, weather and optional person and air quality." href="./header/" />
+  <LinkCard title="Glance" description="Up to three independently configured readings." href="./glance/" />
+  <LinkCard title="Scene selector" description="Native selector options and authoritative selection." href="./scene/" />
+  <LinkCard title="Floor Plan" description="Upload a room image and place light controls and illuminated strips." href="./floor-plan/" />
+  <LinkCard title="People" description="Display explicitly selected people and their current places." href="./people/" />
+  <LinkCard title="Schedules" description="Manage device schedules and seasonal timer groups in Home Assistant." href="./schedules/" />
+  <LinkCard title="Camera Events" description="Browse recent events and recordings from one or several cameras, with combined source, type and time filters." href="./camera-events/" />
+  <LinkCard title="Navbar" description="Floating dashboard navigation, compact overflow and an optional current-room shortcut powered by Bermuda." href="./navbar/" />
+</CardGrid>
+
+## Which configuration should I copy?
+
+Use the public `custom:marao-…` type shown on each page. The preview keeps fictional entity state separate from the exported configuration. Replace example entity IDs with your own before pasting into Home Assistant. Dashboard-wide navigation belongs in `marao.navbar`; its reference explains that placement.
+
+## Compatibility names
+
+The internal access renderer variants `md_access_slide_action_card`, `md_access_hold_action_card`, `md_access_action_card` support [Access](./access/); they are not separate cards to choose for a new dashboard. Existing legacy `custom:marao-card` configurations with `md_*` templates and the `custom:marao-frigate-events-card` event alias remain compatibility forms. New examples use current public native types.
+
+## Preview boundaries
+
+These examples never connect to a Home Assistant account. Native dashboard editing, arbitrary third-party cards and real camera playback belong to Home Assistant; relevant pages state those limits.

@@ -83,10 +83,11 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
   };
   const view = { style: style({ "padding-top": ["8px", "important"], "padding-bottom": ["13px", ""], "flex-direction": ["row", "important"] }) };
   const header = { style: style({ display: ["flex", "important"] }) };
+  let currentHeader = header;
   const unrelated = { style: style({ display: ["grid", ""] }) };
   let currentView = view;
   const root = { localName: "hui-root", lovelace: { config: { views: [{ path: "overview" }, { path: "energy" }] } }, shadowRoot: {
-    querySelectorAll: () => [header], querySelector: () => currentView,
+    querySelectorAll: () => [currentHeader], querySelector: () => currentView,
   } };
   let navRect, navBottom = 24;
   const navbar = () => ({ isConnected: true, getClientRects: () => [{}], parentElement: root,
@@ -172,6 +173,29 @@ test("fullscreen owns only active Marao roots and restores styles on replacement
   assert.equal(header.style.getPropertyValue('display'),'flex','A preview cannot hide the HA shell');
   functions.unregisterFullscreen(preview);
   assert.equal(currentView.style.values.size, 0);
+
+  const themedHeader = { style: style({ display: ['none', 'important'] }) };
+  currentHeader = themedHeader;
+  root.lovelace.editMode = true;
+  const native = { ...navbar(), _config: { dashboard_root: 'marao-dashboard', routes: [] }, getClientRects: () => [] };
+  functions.registerFullscreen(native);
+  assert.deepEqual(themedHeader.style.values.get('display'), ['block', 'important'], 'Native page tabs and Done must be visible even when the viewing theme already hid the header');
+  assert.equal(currentView.style.values.size, 0, 'HA retains its own editing safe-area spacing');
+  currentHeader = { style: style() };
+  currentView = { style: style({ 'padding-top': ['112px', ''] }) };
+  window.location.pathname = '/marao-dashboard/unlisted-page';
+  functions.applyFullscreen();
+  assert.deepEqual(themedHeader.style.values.get('display'), ['none', 'important'], 'The replaced header regains its exact original style');
+  assert.deepEqual(currentHeader.style.values.get('display'), ['block', 'important'], 'Editing keeps navigation and Done on a replacement page absent from navbar routes');
+  assert.equal(currentView.style.getPropertyValue('padding-top'), '112px', 'Editing leaves native header clearance intact');
+  root.lovelace.editMode = false;
+  functions.applyFullscreen();
+  assert.equal(currentHeader.style.getPropertyValue('display'), 'none', 'Done restores the normal viewing shell');
+  window.location.pathname = '/other-dashboard/0';
+  functions.applyFullscreen();
+  assert.equal(currentHeader.style.values.size, 0, 'Dashboard exit releases the editing override');
+  assert.deepEqual(currentView.style.values.get('padding-top'), ['112px', '']);
+  functions.unregisterFullscreen(native);
   assert.equal(timers, 0);
   assert.equal(events.size, 0);
 });
@@ -376,4 +400,34 @@ test('main-page actions remain eligible without visible navbar routes but retain
     const card={_closeOverflow(){},_closeMaintenance(){},_render(){}};
     assert.throws(()=>MaraoNavbarCard.prototype.setConfig.call(card,{routes:[],show_editor_button:'false'}),/boolean/);
   }finally{globalThis.document=previous;}
+});
+
+ test('location resolves owners, explicit overrides, unknown rooms and confirmed away without writes',async()=>{
+ const {resolveLocation,readLocationPreference,writeLocationPreference}=await import('../../custom_components/marao_dashboard/frontend/MaraoLocation.js');
+ const config={people:{'person.a':{area_sensor:'sensor.area'},'person.b':{area_sensor:'sensor.other'}},rooms:{kitchen:{path:'/house/kitchen'}},away_path:'/house/away'};
+ const hass={user:{id:'a'},states:{'person.a':{state:'home',attributes:{user_id:'a'}},'person.b':{state:'not_home',attributes:{user_id:'b'}},'sensor.area':{state:'Kitchen',attributes:{area_id:'kitchen'}}}};
+ const doc={views:[{path:'kitchen',title:'Kitchen'},{path:'away'}]},r=override=>resolveLocation(config,hass,override,doc,'house','https://example.test');
+ assert.equal(r().path,'/house/kitchen');assert.equal(r('person.b').path,'/house/away');
+ hass.states['sensor.area'].state='unknown';assert.equal(r().disabled,true);
+ hass.states['person.a'].state='unavailable';assert.equal(r().disabled,true);
+ hass.states['person.a'].state='Work';assert.equal(r().path,'/house/away');
+ hass.connected=false;assert.equal(r().disabled,true);
+ const map=new Map(),storage={getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};
+ writeLocationPreference(storage,'a','person.b');assert.equal(readLocationPreference(storage,'b').person,null);assert.equal(readLocationPreference(storage,'a').person,'person.b');
+ writeLocationPreference(storage,'a',null);assert.equal(readLocationPreference(storage,'a').person,null);
+ assert.deepEqual(writeLocationPreference(null,'a','person.a'),{person:'person.a',error:'storage'});
+ });
+
+test('location preferences survive a navbar redraw on the stable dashboard host',async()=>{
+ const previous={document:globalThis.document,window:globalThis.window,location:globalThis.location,customElements:globalThis.customElements};
+ class Node extends EventTarget{
+  constructor(){super();this.nodes=new Map();this.children=[];this.isConnected=true;}
+  querySelector(key){if(!this.nodes.has(key))this.nodes.set(key,new Node());return this.nodes.get(key);}
+  append(node){node.parentNode=this;this.children.push(node);}
+  showModal(){this.open=true;}close(){this.open=false;this.dispatchEvent(new Event('close'));}remove(){this.parentNode.children=this.parentNode.children.filter(n=>n!==this);this.isConnected=false;}
+  focus(){}getAttributeNames(){return [];}getAttribute(){return null;}
+ }
+ const root=new Node(),own=new Node(),owner={isConnected:true,_config:{current_room:{enabled:true}},_hass:{user:{id:'test'},language:'en'},_locationKey:'test',_routes(){},_root:()=>({shadowRoot:root}),shadowRoot:own};
+ globalThis.document={createElement:()=>new Node()};globalThis.window=new EventTarget();globalThis.location={pathname:'/house/home'};globalThis.customElements={get:()=>true};
+ try{const {openLocationPreferences}=await import('../../custom_components/marao_dashboard/frontend/MaraoLocationPreferences.js');await openLocationPreferences(owner,new Node());const dialog=owner._locationDialog;assert.equal(dialog.parentNode,root);own.children=[];assert.equal(dialog.open,true);assert.equal(root.children[0],dialog);owner._closeLocationPreferences();assert.equal(owner._locationDialog,null);assert.equal(root.children.length,0);}finally{Object.assign(globalThis,previous);}
 });
