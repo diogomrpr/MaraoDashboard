@@ -3,6 +3,27 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {validateDashboardSettings,readDashboardSettings,patchDashboardSettings,saveDashboardSettings,dashboardViewForAddress,patchNavbarRoute,moveNavbarRoute} from '../../frontend_src/dashboard-settings.js';
+import {mountLocationSettings} from '../../frontend_src/location-settings.js';
+
+test('location forms reject incomplete or duplicate mappings without silently saving old values',t=>{
+ const previous=globalThis.document;t.after(()=>{globalThis.document=previous;});
+ const node=()=>({children:[],append(...items){this.children.push(...items);},setAttribute(){},remove(){this.removed=true;}});
+ globalThis.document={createElement:node};
+ const draft={version:1,navbar:{routes:[],current_room:{people:{'person.a':{area_sensor:'sensor.a',future:[]},'person.b':{area_sensor:'sensor.b'}},rooms:{}}}},forms=[];
+ const validate=mountLocationSettings(node(),draft,{language:'en'},(host,data,schema,change)=>{const form={host,data,schema,change};forms.push(form);return form;},(name,label,selector)=>({name,label,selector}));
+ const a=forms.find(form=>form.data.person==='person.a'),b=forms.find(form=>form.data.person==='person.b');
+ a.change({...a.data,area_sensor:''});assert.throws(validate,/current room mappings/);
+ assert.equal(draft.navbar.current_room.people['person.a'].area_sensor,'sensor.a');
+ a.change({...a.data,person:'person.b'});assert.throws(validate,/current room mappings/);
+ assert.equal(draft.navbar.current_room.people['person.b'].area_sensor,'sensor.b');
+ a.change({...a.data,person:'person.c',area_sensor:'sensor.c'});assert.doesNotThrow(validate);
+ assert.deepEqual(draft.navbar.current_room.people['person.c'],{area_sensor:'sensor.c',future:[]});
+ assert.equal(Object.hasOwn(draft.navbar.current_room.people,'person.a'),false);
+ b.change({...b.data,person:''});assert.throws(validate,/current room mappings/);
+ b.host.children.at(-1).onclick();assert.doesNotThrow(validate);
+ assert.equal(Object.hasOwn(draft.navbar.current_room.people,'person.b'),false);
+ assert.doesNotThrow(()=>validateDashboardSettings(draft));
+});
 
 function loadingDialogFixture() {
   class Node {
@@ -19,7 +40,7 @@ function loadingDialogFixture() {
   const source=readFileSync(new URL('../../frontend_src/dashboard-settings-dialog.js',import.meta.url),'utf8')
     .replace(/^import .*\n/gm,'').replace(/^const navigation=await import.*\n/m,'const navigation=globalThis.navigation;\n').replace('export async function','async function');
   const context={document:{createElement:()=>new Node()},location:{pathname:'/house/home'},window:{addEventListener(){}},customElements:{get:()=>false},
-    loadCardHelpers(){controlsStarted=true;return controls;},navigation:{focusRestorer:()=>()=>{},haptic(){}},mountLocationSettings(){},AbortController,structuredClone,readDashboardSettings,moveNavbarRoute,queueMicrotask};
+    loadCardHelpers(){controlsStarted=true;return controls;},navigation:{focusRestorer:()=>()=>{},haptic(){}},mountLocationSettings(){return()=>{};},AbortController,structuredClone,readDashboardSettings,moveNavbarRoute,queueMicrotask};
   vm.runInNewContext(source+';globalThis.openSettings=openDashboardSettings;',context);
   return {root,open:()=>context.openSettings(root,{}),started:()=>settingsStarted&&controlsStarted,resolveSettings,rejectSettings,
     resolveControls:()=>resolveControls({createCardElement:()=>({constructor:{getConfigElement:async()=>{}}})})};

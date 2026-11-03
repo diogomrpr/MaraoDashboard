@@ -1,4 +1,6 @@
+import {refreshCardMetadata} from './native-card-metadata.js';
 import {readDashboardSettings} from './dashboard-settings.js';
+import {createPopupCoordinator} from './popup-coordinator.js';
 // Cached older loaders publish installed metadata before loading this graph.
 if (globalThis.window?.MaraoInstalledFrontendPackage && !window.MaraoFrontendPackage) {
   window.MaraoFrontendPackage = window.MaraoInstalledFrontendPackage;
@@ -13,18 +15,27 @@ export function nativeHostCompatible(root) {
   return typeof root?.addController === 'function' && typeof root?.removeController === 'function' && typeof root.lovelace?.setEditMode === 'function';
 }
 
+export function findDashboardHost(path) {
+  const matches=[...controllers.values()].filter(({root,path:ownerPath})=>root.isConnected && (root.panel?.url_path || root.panel?.config?.url_path || ownerPath)===path);
+  return matches.length===1 ? matches[0].root : null;
+}
+
 export function attachDashboardHost(root) {
   if (controllers.has(root)) return controllers.get(root);
   if (!nativeHostCompatible(root)) return undefined;
   const controller = {
     root,
+    popups:createPopupCoordinator(root),
     hostConnected() { this.sync(); },
     hostUpdated() { this.sync(); },
     hostDisconnected() {
+      this.popups.dispose();
       navigation.setDashboardNavigation(root, null);
       controllers.delete(root);root.removeController(this);scheduleDiscovery();
     },
     sync() {
+      refreshCardMetadata(root.hass);
+      this.popups.sync();
       const path = rootPath(), config = root.lovelace?.rawConfig || root.lovelace?.config;
       const ownPath = root.panel?.url_path || root.panel?.config?.url_path || this.path;
       if (!root.isConnected || ownPath && ownPath !== path) {navigation.setDashboardNavigation(root, null);return;}
@@ -70,7 +81,7 @@ export function discoverDashboardHosts() {
 function scheduleDiscovery() {if (!scheduled) {scheduled=true;queueMicrotask(discoverDashboardHosts);}}
 
 if (globalThis.window && globalThis.document && !window.MaraoNativeBootstrap) {
-  window.MaraoNativeBootstrap = {refresh:discoverDashboardHosts,compatible:nativeHostCompatible};
+  window.MaraoNativeBootstrap = {refresh:discoverDashboardHosts,compatible:nativeHostCompatible,findHost:findDashboardHost};
   for (const event of ['location-changed','popstate']) window.addEventListener(event, scheduleDiscovery);
   customElements.whenDefined('hui-root').then(scheduleDiscovery);
   scheduleDiscovery();

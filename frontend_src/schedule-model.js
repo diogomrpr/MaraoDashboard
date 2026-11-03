@@ -1,7 +1,7 @@
 export const MANAGER='marao-schedules';
 export const EVENT='marao_schedule_request';
 export const DAYS=['mon','tue','wed','thu','fri','sat','sun'];
-export const uid=()=>globalThis.crypto.randomUUID().replaceAll('-','');
+export const uid=()=>Array.from(globalThis.crypto.getRandomValues(new Uint32Array(4)),value=>value.toString(16).padStart(8,'0')).join('');
 export const controllerId=id=>'marao_schedules_'+id+'_controller';
 export const timerId=id=>'marao_schedules_'+id;
 const copy=value=>structuredClone(value);

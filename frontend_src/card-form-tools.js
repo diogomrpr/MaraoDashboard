@@ -1,4 +1,5 @@
 import {clone, entityMeta, moveItem, sensorThresholdError} from './editor-model.js';
+import {mediaAppLogoChoices,mediaAppLogoError} from '../custom_components/marao_dashboard/frontend/MaraoMediaApps.js';
 
 const formEsc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
@@ -87,11 +88,14 @@ export const cardFormMethods = {
     content.innerHTML = `<div id="media-form"></div><h3>${this._l('Apps')}</h3><div id="app-list"></div><ha-button data-add-app>${this._l('Add app')}</ha-button><p data-error role="alert"></p><div class="dialog-actions"><ha-button data-close>${this._t('cancel')}</ha-button><ha-button data-save appearance="filled">${this._t('update')}</ha-button></div>`;
     const editApp = index => {
       const existing = index == null ? {} : apps[index];
-      this._openFormDialog(index == null ? 'Add app' : 'Edit app', { name: existing.name || '', source: existing.source || '', icon: existing.icon || '' }, [
+      this._openFormDialog(index == null ? 'Add app' : 'Edit app', { name: existing.name || '', source: existing.source || '', icon: existing.icon || '', logo: existing.logo ?? '' }, [
         this._schema('name', 'Display name', { text: {} }), this._schema('source', 'App source', { text: {} }, true), this._schema('icon', 'Icon', { icon: {} }),
+        {...this._schema('logo','App logo',{select:{mode:'dropdown',options:mediaAppLogoChoices(value=>this._l(value))}}),helper:this._l('Choose artwork independently of the app source.')},
       ], value => {
         if (!String(value.source || '').trim()) throw new Error('Media app requires an explicit source.');
+        const error=mediaAppLogoError(value.logo);if(error)throw new Error(error);
         const next = { ...existing, source: value.source };
+        if(value.logo!== (existing.logo??'')){if(value.logo)next.logo=value.logo;else delete next.logo;}
         for (const key of ['name', 'icon']) if (value[key]) next[key] = value[key]; else delete next[key];
         if (index == null) apps.push(next); else apps[index] = next;
         render();
@@ -144,7 +148,7 @@ export const cardFormMethods = {
       fitting.catch(error => this._setStatus(this._error(error), "error"));
       return fitting;
     };
-    form.addEventListener("value-changed", (event) => { if (!this._busy) changed(event.detail.value); fit(); });
+    form.addEventListener("value-changed", (event) => { if (!this._busy) { form.data = event.detail.value; changed(event.detail.value); } fit(); });
     host.replaceChildren(form); fit();return form;
   },
 
@@ -210,6 +214,7 @@ export const cardFormMethods = {
 
   _variableSchema(field, sourceId) {
     let selector = { text: {} };
+    if(field.kind==='app_logo')selector={select:{mode:'dropdown',options:mediaAppLogoChoices(value=>this._l(value))}};
     if (field.kind === "select") selector = { select: { mode: 'dropdown', options: field.options.map(value => ({ value, label: this._l(({ auto: 'Automatic', popup: 'Popup', inline: 'On dashboard', slide: 'Slide to open', close: 'Close or lock', hold: 'Security hold', dropdown: 'Dropdown', grid: 'Grid' })[value] || value) })) } };
     if (field.kind === "boolean") selector = { boolean: {} };
     if (field.kind === "entity") selector = { entity: { domain: field.domains || [], multiple: Boolean(field.multiple) } };

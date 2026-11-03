@@ -171,7 +171,7 @@ export class MaraoNavbarCard extends BaseElement {
   get preview() { return Boolean(this._preview); }
   set preview(value) {
     this._preview = Boolean(value);
-    if (this._config && this._renderedPreview !== this.preview) { this._closeOverflow(false); this._render(); }
+    if (this._config && this._renderedPreview !== this.preview) { this._closeMaintenance(false); this._closeOverflow(false); this._render(); }
     applyFullscreen();
   }
   disconnectedCallback() {
@@ -254,8 +254,8 @@ export class MaraoNavbarCard extends BaseElement {
   }
   _render() {
     if (!this.shadowRoot) return;
-    this._closeMaintenance(true);
     if (!this._isSurface && this._surface && !this.preview) {
+      this._closeMaintenance(false);
       this._pagePress?.destroy();this._pagePress=null;this._press?.destroy();this._press=null;
       this._pageRefresh?.remove();
       this.setAttribute('data-marao-navbar-placeholder', '');
@@ -273,7 +273,10 @@ export class MaraoNavbarCard extends BaseElement {
     this.toggleAttribute?.('data-empty', !routes.length); this.toggleAttribute?.('data-preview', this.preview);
     this._renderedPreview = this.preview;
     const bottom = navbarBottomGap();
-    this.shadowRoot.innerHTML = `<style>${pressStyles}
+    // Repartitioning must not replace a modal opened before the desktop scrollbar disappears.
+    const content = this._navbarContent ||= document.createElement('div');
+    if (content.parentNode !== this.shadowRoot) this.shadowRoot.append(content);
+    content.innerHTML = `<style>${pressStyles}
       :host{display:block;height:128px;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}
       :host([hidden]),:host([data-empty]){display:none!important}:host([data-preview]){height:auto}
       .bounds{position:fixed;visibility:hidden;pointer-events:none;inset:${safeArea("top")} calc(12px + ${safeArea("right")}) ${safeArea("bottom")} calc(12px + ${safeArea("left")})}

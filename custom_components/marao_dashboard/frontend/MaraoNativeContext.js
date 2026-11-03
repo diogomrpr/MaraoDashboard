@@ -14,8 +14,33 @@ export function findNativeHost(owner) {
   return null;
 }
 
+// HA mounts card dialogs beside the dashboard, outside the runtime root's ancestry.
+export function findNativeEditorContext(owner) {
+  let dialog;
+  for(let node=owner;node;node=node.parentNode || node.host || node.getRootNode?.()?.host) {
+    if(node.localName==='hui-dialog-edit-card'){dialog=node;break;}
+  }
+  const path=globalThis.location?.pathname.split('/')[1];
+  const root=findNativeHost(owner) || globalThis.window?.MaraoNativeBootstrap?.findHost?.(path);
+  if(root && dialog && typeof dialog.closeDialog==='function' && typeof dialog.isEffectiveDirtyState==='boolean')return {root,dialog};
+}
+
 export function nativeEditing(owner) {
   return Boolean(findNativeHost(owner)?.lovelace?.editMode);
+}
+
+// HA dialogs are mounted beside hui-root, across shadow boundaries. Native
+// editMode alone is not dirty; only an effective unsaved dialog draft blocks.
+export function nativeDashboardHasDraft(root) {
+  const visit=tree=>{
+    if(!tree?.querySelectorAll)return false;
+    for(const node of tree.querySelectorAll('*')) {
+      if(node.localName?.startsWith('hui-dialog-edit-')&&node.isEffectiveDirtyState===true)return true;
+      if(node.shadowRoot&&visit(node.shadowRoot))return true;
+    }
+    return false;
+  };
+  return visit(root?.ownerDocument||globalThis.document);
 }
 
 export function bindNativeEditing(owner, onChange) {

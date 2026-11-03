@@ -547,3 +547,15 @@ test('media presentation survives independent editing and rejects unsupported ch
  }
  assert.ok(validateConfig(make('bad'),2,[],{},catalog).some(error=>error.includes('Popup or On dashboard')));
 });
+
+test('standalone and nested app logo IDs validate without inserting defaults or changing old data',()=>{
+  const make=card=>({config_version:2,name:'Safe',landing_page:'home',pages:[{name:'Home',path:'home',entities:[card]}]});
+  for(const value of [undefined,'','netflix','spotify','youtube','disney-plus','prime-video','apple-tv','plex','meo'])for(const nested of [false,true]){
+    const choice=value===undefined?{}:{[nested?'logo':'app_logo']:value};const card=nested?{template:'md_media_card',entity_id:'media_player.safe',apple_tv:{apps:[{source:'Custom',...choice}]}}:{template:'md_media_app_card',entity_id:'media_player.safe',variables:{app_source:'Custom',...choice}};
+    const input=make(card),before=structuredClone(input);assert.deepEqual(validateConfig(input,2,[],{},catalog),[]);assert.deepEqual(serializeConfig(normalizeConfig(input)),before);assert.deepEqual(input,before);
+  }
+  for(const invalid of [null,'NETFLIX','https://invalid/image.png',12]){
+    assert.ok(validateConfig(make({template:'md_media_app_card',entity_id:'media_player.safe',variables:{app_source:'Custom',app_logo:invalid}}),2,[],{},catalog).includes('Choose a supported app logo.'));
+    assert.ok(validateConfig(make({template:'md_media_card',entity_id:'media_player.safe',apple_tv:{apps:[{source:'Custom',logo:invalid}]}}),2,[],{},catalog).includes('Choose a supported app logo.'));
+  }
+});

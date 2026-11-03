@@ -332,7 +332,7 @@ function orderedPages(source, context) {
       const selected = own(options, 'players') ? player : selectedById.get(player.entity_id) || { entity_id: player.entity_id };
       section(target, [card(target, selected, 'md_media_card')]);
       section(target, (appleTVOptions(player)?.apps || []).map((app, index) => {
-        const item = { ...copy(app), id: `card-${count(target) + index + 1}`, template: 'md_media_app_card', entity_id: player.entity_id, name: app.name || app.source, icon: app.icon || 'mdi:play-box-outline', show_state: false, variables: { app_source: app.source } };
+        const item = { ...copy(app), id: `card-${count(target) + index + 1}`, template: 'md_media_app_card', entity_id: player.entity_id, name: app.name || app.source, icon: app.icon || 'mdi:play-box-outline', show_state: false, variables: { app_source: app.source, ...(Object.hasOwn(app,'logo')?{app_logo:app.logo}:{}) } };
         delete item.source; return item;
       }), 2);
     }

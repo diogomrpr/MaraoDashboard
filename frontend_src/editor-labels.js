@@ -1,5 +1,10 @@
 import { FLOOR_PT_LABELS } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlanText.js';
 export const PT_LABELS = {
+  "Choose an entity in the card editor.": "Escolha uma entidade no editor do cartão.",
+  "Choose an app source in the card editor.": "Escolha uma fonte de aplicação no editor do cartão.",
+  'App logo':'Logótipo da aplicação',
+  'Choose artwork independently of the app source.':'Escolha a imagem independentemente da origem da aplicação.',
+  'Choose a supported app logo.':'Escolha um logótipo de aplicação suportado.',
   "Camera Events":"Eventos de câmaras", "Browse explicitly selected camera events.":"Consultar eventos das câmaras selecionadas.",
   "Event columns":"Colunas de eventos", "Event columns must be a positive integer.":"As colunas de eventos têm de ser um inteiro positivo.", "Preferred event columns inside the popup; reduces when space is limited.":"Número preferido de colunas de eventos na janela; reduz-se quando há pouco espaço.", "Add camera":"Adicionar câmara", "Camera":"Câmara", "Provider":"Fornecedor", "Frigate instance":"Instância Frigate", "Frigate camera":"Câmara Frigate", "Protect media source":"Fonte multimédia Protect", "Remove":"Remover", "People": "Pessoas", "People columns must be an integer from 1 to 6.":"As colunas de pessoas têm de ser um inteiro entre 1 e 6.", "Schedules": "Horários", "Section name": "Nome da secção", "Schedule collection": "Coleção de horários", "New collection": "Nova coleção", "Devices": "Dispositivos",
   "People requires an explicit list of person entities.": "Pessoas exige uma lista explícita de entidades person.",
@@ -77,7 +82,6 @@ export const PT_LABELS = {
   "Section": "Secção",
   "Add section": "Adicionar secção",
   "Delete section": "Eliminar secção",
-  "Edit layout": "Editar disposição",
   "copy": "cópia",
   "Replace existing links with": "Substituir ligações existentes por",
   "Confirm the named page deletion.": "Confirme a eliminação da página indicada.",

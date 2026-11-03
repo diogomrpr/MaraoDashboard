@@ -26,9 +26,17 @@ Entity Groups summarize selected lights, covers, climates or batteries and open 
 
 Add named sections to organize members by room or floor. Each member belongs to at most one section; unassigned members stay in Other. Deleting a section keeps its members. Without sections, the flat list remains.
 
-Whole-group and section controls act on eligible configured members. Unavailable or unsupported devices are excluded and explained. Tap-based Open all excludes doors, gates and garages; open those with their individual strict slides. Climate bulk actions do not invent a supported mode or change temperatures. Battery groups remain read-only.
+Whole-group and section controls act on eligible configured members. Unavailable or unsupported devices are excluded; controls with no eligible targets are disabled. Buttons show their action without a repeated eligibility sentence below them, and reported service errors remain visible. Tap-based Open all excludes doors, gates and garages; open those with their individual strict slides. Climate bulk actions do not invent a supported mode or change temperatures. Battery groups remain read-only.
 
 Battery severity follows the lowest valid percentage, while the displayed percentage remains the first usable reading. Invalid or missing values do not become zero. A known low battery retains its warning even if another member is unavailable.
+
+After **Edit popup**, manage the group's type, explicit member selection and filter
+in the parent card; arrange sections in its native source view. A type change
+uses only compatible selected members. Prior managed layout, suppressed controls
+and selections are retained for returning to that type. Independent custom cards
+remain in place. For example, a light group can become a cover group with selected
+fake covers, then return to its light selection and resized controls. Hidden
+members still count for actions; deleted controls do not. See [popup layouts](../popups/).
 
 ## Scene collections
 

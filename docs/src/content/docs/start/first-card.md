@@ -15,6 +15,20 @@ Start with one existing light so you can see how configuration, preview and savi
 
 The card uses capabilities reported by the entity. A dimmable light can expose brightness controls; an on/off light does not gain dimming merely because the slider option is enabled.
 
+The editor's **Help** icon opens that card's reference, including Camera Events. Picker names follow your Home Assistant language after HA loads; reopen the picker after changing language.
+
+New cards prefer available entities that are not already used, then HA's fallback choices. If neither list contains a match, choose an entity in the editable setup card. Marao does not search for another device or invent an app source. By entity recommendations are deliberately conservative: specialized cards such as appliance-status cards remain available through **By card**.
+
+Selecting a person offers **Marao People** with that person alone. For example, the fictional playground person can be written as:
+
+```yaml
+type: custom:marao-people-card
+entities:
+  - person.alex
+```
+
+Replace the example ID with your own existing person. The card does not add other people automatically.
+
 ## Start from a playground
 
 Open a card in the [card catalog](../../cards/), select a behavior example and edit its settings or YAML. The preview uses fictional devices. You can try controls without signing in or operating your home.
@@ -34,5 +48,7 @@ This is a single card. Paste it in a card editor, not over the complete dashboar
 ## Save and revisit
 
 Home Assistant's **Save** confirms the card dialog; **Cancel** discards its draft. Layout and visibility belong to Home Assistant. Marao's visual fields preserve unrelated configuration when you change a field, so you can combine normal fields and YAML.
+
+Light and Fan declare their stable slider/color defaults for hosts that support effective-default comparison. Older hosts, or hosts comparing nested options literally, may still warn after an option returns to its omitted default; normal Save and Cancel remain in control.
 
 If a card reports an unavailable entity, check the ID and the entity's state in Home Assistant. A preview can demonstrate states, but cannot confirm that a particular device supports an action. See [troubleshooting](../../help/troubleshooting/).

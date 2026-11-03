@@ -34,7 +34,33 @@ async function hold(page, locator, milliseconds=3100, padding=false) {
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();
   }else{await page.mouse.move(x,y);await page.mouse.down();await page.waitForTimeout(milliseconds);await page.mouse.up();}
 }
-async function run(){
+async function desktopMaintenance(base, {channel}={}) {
+ const browser=await chromium.launch({channel});
+ const context=await browser.newContext({viewport:{width:1280,height:900},isMobile:false,hasTouch:false});
+ const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ try {
+   await page.goto(base+'/marao-dashboard/overview');await page.waitForFunction(()=>window.ready);
+   const bar=page.locator('[data-marao-navigation-surface]'),nav=bar.locator('.nav');await nav.waitFor({state:'visible'});
+   await bar.evaluate(card=>{hass.user={id:'desktop-admin',is_admin:true};card.hass=hass;window.unintendedRefreshes=0;card._refreshFrontend=()=>unintendedRefreshes++;});
+   const initialSlots=await bar.evaluate(card=>card._slots);
+   const box=await nav.locator('[data-route="0"]').boundingBox();assert.ok(box);
+   await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();
+   const menu=bar.locator('dialog.maintenance');await menu.waitFor({state:'visible'});
+   await menu.evaluate(dialog=>{window.openMaintenance=dialog;});
+   // Classic desktop scrollbars can change the available slots when showModal locks scrolling.
+   await page.setViewportSize({width:1100,height:900});
+   await page.waitForFunction(slots=>document.querySelector('home-assistant').shadowRoot.querySelector('hui-root').shadowRoot.querySelector('[data-marao-navigation-surface]')._slots!==slots,initialSlots);
+   await page.mouse.up();
+   assert.equal(await bar.evaluate(card=>card._maintenance?.dialog===window.openMaintenance && openMaintenance.matches(':modal')),true,'Navbar reflow and the opening release must retain the same maintenance dialog');
+   assert.equal(await menu.evaluate(dialog=>dialog.contains(dialog.getRootNode().activeElement)),true,'Focus stays inside the retained modal');
+   assert.equal(new URL(page.url()).pathname,'/marao-dashboard/overview');assert.equal(await page.evaluate(()=>unintendedRefreshes),0);
+   await menu.locator('.close').click();await menu.waitFor({state:'detached'});
+   await nav.locator('[data-route="1"]').click();assert.equal(new URL(page.url()).pathname,'/marao-dashboard/rooms','The next short mouse click still navigates');
+   assert.equal(await page.evaluate(()=>services),0);assert.deepEqual(errors,[]);
+   return {engine:browser.version(),profile:'desktop-mouse',maintenanceSurvivesReflow:true,releaseDoesNotActivate:true,shortTap:true,errors};
+ } finally {await context.close();await browser.close();}
+}
+async function run({desktopOnly=false,channel}={}){
  const output=artifactDirectory('navbar-startup-local'),results=[];
  const server=http.createServer((req,res)=>{
    const url=new URL(req.url,'http://localhost');
@@ -42,7 +68,8 @@ async function run(){
    res.setHeader('Content-Type','text/html');res.end(html());
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
- try{for(const engine of [chromium,webkit]){
+ const base=`http://127.0.0.1:${server.address().port}`;
+ try{for(const engine of desktopOnly?[]:[chromium,webkit]){
    const browser=await engine.launch();const context=await browser.newContext({viewport:{width:360,height:800},hasTouch:true,isMobile:true});const page=await context.newPage();
    const errors=[],held=[];let refreshes=0;
    page.on('pageerror',error=>errors.push(error.message));
@@ -83,8 +110,8 @@ async function run(){
      assert.equal(await page.evaluate(()=>root.shadowRoot.querySelector('#view').style.getPropertyValue('padding-bottom')),'');
      results.push({engine:engine.name(),holds:targets.length,criticalReadyWithBlockedRuntime:true,tapRefresh:true,generatedNavigation:true,viewContinuity:true,emptyCleanup:true,errors});
    }finally{await context.close();await browser.close();}
- }}finally{await new Promise(resolve=>server.close(resolve));}
+ }results.push(await desktopMaintenance(base,{channel}));}finally{await new Promise(resolve=>server.close(resolve));}
  fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({results},null,2));console.log(JSON.stringify({output,results}));
 }
-if(require.main===module)run().catch(error=>{console.error(error.stack);process.exitCode=1;});
+if(require.main===module)run({desktopOnly:process.argv.includes('--desktop'),channel:process.argv.includes('--chrome')?'chrome':undefined}).catch(error=>{console.error(error.stack);process.exitCode=1;});
 module.exports={run};

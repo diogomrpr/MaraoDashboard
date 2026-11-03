@@ -985,6 +985,17 @@ test("media app branding recognizes sources, ships real icons and preserves cust
   assert.equal(stateAppearance("md_media_app_card", "idle", { variables: { app_source: "Netflix", active_color: "#123456" } }).background, "#123456");
 });
 
+test('media app explicit artwork preserves launch data, semantic names and problem priority',async()=>{
+  const calls=[],config={template:'md_media_app_card',entity:'media_player.test',name:'Custom shortcut',icon:'mdi:television',variables:{app_source:'Custom TV app',app_logo:'netflix'},tap_action:{action:'call-service',service:'media_player.select_source',data:{source:'Custom TV app'}}},before=structuredClone(config);
+  const card=new MaraoCard();card.setConfig(config);const hass={callService:async(...args)=>calls.push(args),states:{'media_player.test':{state:'idle',attributes:{}}}};card.hass=hass;
+  assert.equal(mediaAppBrand(config).id,'netflix');assert.match(card.shadowRoot.innerHTML,/media-apps\/netflix\.svg/);assert.match(card.shadowRoot.innerHTML,/aria-label="Custom shortcut"/);
+  await performAction(hass,card._config.tap_action,config.entity);assert.deepEqual(calls,[['media_player','select_source',{source:'Custom TV app',entity_id:'media_player.test'},undefined,false]]);
+  assert.equal(stateAppearance('md_media_app_card','idle',config).background,'#000');assert.deepEqual(stateAppearance('md_media_app_card','unavailable',config),{unavailable:true});
+  card.hass={...hass,states:{'media_player.test':{state:'unavailable',attributes:{}}}};assert.match(card.shadowRoot.innerHTML,/data-card-action[^>]* disabled/);assert.match(card.shadowRoot.innerHTML,/class="problem"/);
+  assert.equal(mediaAppBrand({...config,variables:{app_source:'MEO Go',app_logo:''}}).id,'meo');assert.equal(mediaAppBrand({...config,name:'Netflix',variables:{app_source:'Custom TV app',app_logo:''}}),undefined);
+  assert.throws(()=>card.setConfig({...config,variables:{...config.variables,app_logo:'https://invalid/logo'}}),/supported app logo/);card._hass={language:'pt'};assert.throws(()=>card.setConfig({...config,variables:{app_logo:'bad'}}),/logótipo/);assert.deepEqual(config,before);
+});
+
 test("wallbox current card uses a large stepper and optional shortcuts", () => {
   const calls = [];
   const card = new MaraoCard();

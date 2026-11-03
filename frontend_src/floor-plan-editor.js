@@ -41,7 +41,8 @@ export function openFloorPlanEditor(panel, roomIndex, cardIndex, kind) {
   let selected=-1,pointIndex=-1,trace=null,placing=false,drag=null,lightDialog=null,suppressClick=false,uploadAttempt=0,uploading=false,lastFile=null,localURL=null,retryUpload=false;
   const general={name:draft.name||'',full_page:options.full_page===true};
   panel._mountForm(q('[data-general]'),general,[panel._schema('name',t('Name'),{text:{}}),panel._schema('full_page',t('Full page'),{boolean:{}})],value=>{
-    draft.name=value.name; if(value.full_page!==general.full_page||Object.hasOwn(options,'full_page'))options.full_page=value.full_page; draw();
+    if(value.name!==(draft.name||'')){if(value.name)draft.name=value.name;else delete draft.name;delete draft.name_key;}
+    if(value.full_page!==general.full_page||Object.hasOwn(options,'full_page'))options.full_page=value.full_page; draw();
   });
   q('[data-help]').textContent=t('Images are stored in Home Assistant immediately. Save applies the arrangement.');
   q('[data-upload-label]').prepend(document.createTextNode(t(existing?'Replace image':'Upload image')+' '));
@@ -81,7 +82,7 @@ export function openFloorPlanEditor(panel, roomIndex, cardIndex, kind) {
     panel._mountForm(content.querySelector('[data-form]'),data,schema,value=>{
       edited.entity_id=value.entity_id;
       for(const key of ['name','icon'])if(value[key]||Object.hasOwn(item,key))edited[key]=value[key]??'';else delete edited[key];
-      if(edited.strip&&(Object.hasOwn(item.strip,'width')||value.width!==data.width))edited.strip.width=value.width;
+      if(edited.strip&&(Object.hasOwn(item.strip,'width')||value.width!==(edited.strip.width??6)))edited.strip.width=value.width;
     });
     const close=()=>panel._closeDialog(child);
     const remove=content.querySelector('[data-remove]');remove.textContent=t('Remove light');remove.hidden=index==null;

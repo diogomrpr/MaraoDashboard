@@ -1,10 +1,12 @@
 import {findNativeHost,nativeEditing,bindNativeEditing,nativeDashboardConfig} from './MaraoNativeContext.js';
-import {resolvePopupView,popupGroupFromView,popupViewError,popupRole,popupLabel as label,canonicalLayout,savePopupLayout} from './MaraoPopupLayout.js';
+import {resolvePopupView,popupGroupFromView,popupViewError,popupLabel as label} from './MaraoPopupLayout.js';
 import {createGroupScope,updateGroupScope,groupActionStyles} from './MaraoGroupDetails.js';
+import {managedPopupIssue} from './MaraoPopupManaged.js';
 const parent=node=>node?.parentNode || node?.host || node?.getRootNode?.()?.host;
 const metadata=hass=>Object.values(hass?.states || {}).map(state=>({entity_id:state.entity_id,device_class:state.attributes?.device_class}));
 export const dashboardConfig=root=>nativeDashboardConfig(root?.lovelace);
 function failure(host,error,hass) {const p=document.createElement('p');p.setAttribute('role','alert');p.textContent=label(error.message,hass);host.replaceChildren(p);}
+function ownsFocus(view){let node=globalThis.document?.activeElement;while(node?.shadowRoot?.activeElement)node=node.shadowRoot.activeElement;for(;node;node=parent(node))if(node===view)return true;return false;}
 
 /** Compatibility boundary: use HA's registered view host; never import or patch HA classes. */
 export function mountPopupView(owner,host) {
@@ -14,6 +16,7 @@ export function mountPopupView(owner,host) {
     try {
       if(!root?.lovelace||!customElements.get('hui-view'))throw new Error('Native popup layouts are unavailable on this Home Assistant host.');
       const config=dashboardConfig(root),source=resolvePopupView(config,owner._config.popup_view);
+      const issue=managedPopupIssue(config,owner._config.popup_view,root._maraoPopupSync?.get(owner._config.popup_view));if(issue)throw new Error(issue);
       if(!view) {
         view=document.createElement('hui-view');view.nativeOwner=owner;view.style.cssText='display:block;min-width:0;width:100%';
         // Live popups never enter an editing surface, even through an emitted native event.
@@ -24,52 +27,12 @@ export function mountPopupView(owner,host) {
         saveConfig:()=>{throw new Error('Edit cards and sections in the linked Home Assistant view.');},
         setEditMode:()=>{throw new Error('Edit cards and sections in the linked Home Assistant view.');}};
       view.index=source.index;view.lovelace=facade;view.narrow=host.clientWidth<768;view.hass=owner._hass;
-    }catch(error){view?.remove();view=null;failure(host,error,owner._hass);}
+    }catch(error){if(view&&ownsFocus(view))owner._overlay?.querySelector('.marao-popup-close')?.focus({preventScroll:true});view?.remove();view=null;failure(host,error,owner._hass);}
   };
   const controller={hostUpdated:update},subscribed=root?.addController&&root?.removeController;
   if(subscribed)root.addController(controller);
   const resize=new ResizeObserver(update);resize.observe(host);update();
   return {update,destroy(){disposed=true;resize.disconnect();if(subscribed)root.removeController(controller);view?.remove();view=null;}};
-}
-
-function openerFor(owner) {
-  const native=owner.nativeOwner;
-  if(native?.constructor?.template&&popupRole({...native._config,template:native.constructor.template})&&native._children?.[1]===owner)return native._config;
-  if(!native&&owner._sourceConfig?.type==='custom:marao-popup-card')return owner._sourceConfig;
-}
-export function bindPopupLayoutControls(owner,api) {
-  const root=findNativeHost(owner),opener=openerFor(owner);let linked=owner._config.popup_view;
-  if(!root||!opener||!owner._hass?.user?.is_admin||owner.preview||owner._message||owner._historyContext)return ()=>{};
-  const head=owner._overlay?.querySelector('.marao-popup-head');if(!head)return ()=>{};
-  const tools=document.createElement('div');tools.className='marao-popup-layout-tools';tools.style.cssText='flex:none;padding:0 20px 8px;display:flex;flex-wrap:wrap;gap:8px;min-width:0';
-  const style=document.createElement('style');style.textContent='.marao-popup-layout-tools button,.marao-popup-layout-tools a{box-sizing:border-box;min-width:48px;min-height:48px;border:0;border-radius:24px;padding:12px;font:inherit;overflow-wrap:anywhere;color:var(--primary-text-color);background:var(--secondary-background-color);cursor:pointer}.marao-popup-layout-tools button:disabled{opacity:.5;cursor:default}.marao-popup-layout-tools button:focus{outline:none}.marao-popup-layout-tools p{margin:0;width:100%;overflow-wrap:anywhere}';tools.append(style);
-  const button=document.createElement('button');button.type='button';button.textContent=label(linked?'Edit layout':'Create editable layout',owner._hass);tools.append(button);
-  const status=document.createElement('p');status.setAttribute('role','alert');tools.append(status);head.after(tools);
-  let disposed=false,busy=false,uncertain=false,recoveryURL;
-  const dashboardPath=location.pathname.split('/')[1],address=location.pathname,currentPath=(()=>{const route=decodeURIComponent(address.split('/')[2] || ''),views=dashboardConfig(root)?.views || [];return String(views.find((view,index)=>String(view.path ?? index)===route)?.path ?? (route&&/^\d+$/.test(route)?views[Number(route)]?.path:undefined) ?? (route || views[0]?.path || '0'));})(),identity=canonicalLayout(opener),user=owner._hass.user.id;
-  const permitted=()=>!disposed&&owner._open&&location.pathname===address&&owner._hass?.user?.id===user&&owner._hass?.user?.is_admin&&!owner.preview&&owner._hass?.connection?.connected!==false&&owner._hass?.connected!==false;
-  const edit=path=>{
-    resolvePopupView(dashboardConfig(root),path);
-    if(!root.hass?.user?.is_admin||root.hass?.connection?.connected===false||root.hass?.connected===false||typeof root.lovelace?.setEditMode!=='function')throw new Error('Layout creation requires an administrator on a connected, editable dashboard.');
-    owner._close(true);api.navigate(`/${dashboardPath}/${path}`);root.lovelace.setEditMode(true);
-  };
-  button.onclick=async()=>{
-    if(busy||uncertain||!permitted())return;api.haptic('heavy');
-    try {
-      if(linked){edit(linked);return;}
-      busy=true;button.disabled=true;status.textContent=label('Creating layout…',owner._hass);
-      const result=await savePopupLayout({hass:owner._hass,root,opener,popup:owner._config,currentPath,path:dashboardPath,backPath:address,isCurrent:()=>permitted()&&canonicalLayout(openerFor(owner))===identity,
-        recovery:document=>{
-          recoveryURL=URL.createObjectURL(new Blob([JSON.stringify(document,null,2)],{type:'application/json'}));
-          const link=window.document.createElement('a');link.href=recoveryURL;link.download=`marao-popup-layout-recovery-${Date.now()}.json`;link.textContent=label('Download layout recovery',owner._hass);tools.append(link);link.click();
-        }});
-      linked=result.path;button.textContent=label('Edit layout',owner._hass);
-      edit(linked);
-    }catch(error){uncertain=error.message.startsWith('Save could not be confirmed.');status.textContent=label(error.message,owner._hass);}
-    finally {busy=false;button.disabled=uncertain||!permitted();}
-  };
-  const release=()=>{disposed=true;tools.remove();if(recoveryURL&&!uncertain){const url=recoveryURL;setTimeout(()=>URL.revokeObjectURL(url),60000);}};
-  release.update=()=>{button.disabled=busy||uncertain||!permitted();};release.update();return release;
 }
 
 export function registerPopupActions(api) {
@@ -82,7 +45,7 @@ export function registerPopupActions(api) {
       this._config=structuredClone(config);this._scope=null;this._render();
     }
     set hass(value){this._hass=value;this._render();}
-    get preview(){return Boolean(!this.isConnected||this._preview||nativeEditing(this));}
+    get preview(){const root=findNativeHost(this);return Boolean(!this.isConnected||this._preview||nativeEditing(this)||this._config&&managedPopupIssue(dashboardConfig(root),this._config.popup_view,root?._maraoPopupSync?.get(this._config.popup_view)));}
     set preview(value){this._preview=Boolean(value);this._render();}
     connectedCallback(){this._release=bindNativeEditing(this,()=>this._render());this._root=findNativeHost(this);this._controller={hostUpdated:()=>this._render()};this._root?.addController?.(this._controller);this._render();}
     disconnectedCallback(){this._release?.();this._root?.removeController?.(this._controller);}
@@ -92,6 +55,7 @@ export function registerPopupActions(api) {
       if(!this._config||!this.shadowRoot)return;
       try {
         const root=findNativeHost(this),source=resolvePopupView(dashboardConfig(root),this._config.popup_view);
+        const issue=managedPopupIssue(dashboardConfig(root),this._config.popup_view,root._maraoPopupSync?.get(this._config.popup_view));if(issue)throw new Error(issue);
         let section;for(let node=this;node;node=parent(node))if(node.localName==='hui-section'){section=node;break;}
         if(!section||section.viewIndex!==source.index||!Number.isInteger(section.index)||!source.view.sections?.[section.index])throw new Error('Section action must belong to its linked Sections view.');
         const group=popupGroupFromView(this._config,source.view,metadata(this._hass)),part=this._config.scope==='all'?{id:'__all',name:source.view.title,entities:group.entities}:group.summary_sections[section.index];

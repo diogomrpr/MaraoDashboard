@@ -21,6 +21,14 @@ Some options require capabilities the device must expose. Slider settings cannot
 
 Check the dashboard address and view path. Native page renaming does not automatically repair explicit navbar links or `popup_view` references. A popup layout must be an unambiguous Sections view in the same dashboard. Choose **Automatic** in the card's Popup layout field to use the retained automatic content.
 
+To edit popup content, use **Edit popup** in its saved card's native editor. Save new or modified cards first and reopen their editor. Save-first guidance retains unresolved drafts; a missing or ambiguous linked source is an error, not a request to regenerate the view.
+
+Popup editing does not download a file. If settings and controls differ, stale
+controls are disabled until a confirmed update or explicit Edit popup succeeds.
+Resolve other unsaved drafts first. Browser storage must be available to stage a
+write. If a save cannot be confirmed, reopen the editor to check the saved state;
+divergent data remains blocked without rollback or repeated writes.
+
 ## The current-room shortcut shows a placeholder
 
 Confirm all of the following:
@@ -51,7 +59,11 @@ Schedule administration requires an administrator, supported UI-managed automati
 
 ## A save or conversion cannot be confirmed
 
-Keep the recovery download and reload before retrying. For conversion, use the recovery copy's saved-state check to distinguish original, converted and divergent data. Never replace an uncertain dashboard with a starter configuration. See [migration and recovery](../migration/).
+For conversion, keep its recovery download and use the recovery copy's saved-state
+check to distinguish original, converted and divergent data. Popup edits instead
+use a temporary internal browser transaction and provide no recovery download.
+Never replace an uncertain dashboard with a starter configuration. See
+[migration and recovery](../migration/).
 
 ## Report a reproducible problem
 

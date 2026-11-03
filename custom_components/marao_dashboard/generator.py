@@ -2034,7 +2034,7 @@ def _media_view(config: dict[str, Any], include_root: str, language: str = "en")
                 "name": app.get("name") or app["source"],
                 "icon": app.get("icon") or "mdi:play-box-outline",
                 "show_state": False,
-                "variables": {"app_source": app["source"]},
+                "variables": {"app_source": app["source"], **({"app_logo": app["logo"]} if "logo" in app else {})},
             }
             for app in apps
             if isinstance(app, dict) and app.get("source")
@@ -2814,7 +2814,7 @@ def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
                         "name": app.get("name") or app["source"],
                         "icon": app.get("icon") or "mdi:play-box-outline",
                         "show_state": False,
-                        "variables": {"app_source": app["source"]},
+                        "variables": {"app_source": app["source"], **({"app_logo": app["logo"]} if "logo" in app else {})},
                     }
                     for app in apps
                 ],

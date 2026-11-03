@@ -268,7 +268,7 @@ def convert_legacy_pages(source, registry=None):
                 item = {**deepcopy(app), "id": f"card-{sum(len(part['entities']) for part in media['sections']) + len(apps) + 1}",
                         "template": "md_media_app_card", "entity_id": player["entity_id"], "name": app.get("name") or app["source"],
                         "icon": app.get("icon") or "mdi:play-box-outline", "show_state": False,
-                        "variables": {"app_source": app["source"]}}
+                        "variables": {"app_source": app["source"], **({"app_logo": app["logo"]} if "logo" in app else {})}}
                 item.pop("source")
                 apps.append(item)
             section(media, apps, 2)

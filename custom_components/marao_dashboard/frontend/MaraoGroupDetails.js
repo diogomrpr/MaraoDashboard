@@ -1,14 +1,28 @@
 import {summarySections,summaryAction,collectionLabel as label} from './MaraoCollections.js';
-export const groupActionStyles='.marao-group-actions{display:flex;gap:8px;flex-wrap:wrap}.marao-group-actions button{min-width:48px;min-height:48px;flex:1;padding:12px;border:0;border-radius:24px;font:inherit;background:var(--secondary-background-color);color:var(--primary-text-color);overflow-wrap:anywhere;cursor:pointer}.marao-group-actions button:disabled{opacity:.5;cursor:default}.marao-group-actions button:focus{outline:none}.marao-group-scope{min-width:0;display:grid;gap:8px}.marao-group-scope h3{margin:8px 0;overflow-wrap:anywhere}.marao-group-info{font:inherit;overflow-wrap:anywhere;margin:0}';
+export const groupActionStyles=`
+.marao-group-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr));gap:12px}
+.marao-group-actions button{box-sizing:border-box;display:flex;align-items:center;gap:10px;min-width:0;min-height:72px;padding:12px;border:0;border-radius:var(--ha-card-border-radius,20px);font:inherit;font-weight:700;line-height:1.35;text-align:start;background:var(--color-green,#39755B);box-shadow:var(--ha-card-box-shadow,none);color:var(--color-white,#F1F3EC);cursor:pointer}
+.marao-group-actions button[data-group-action="off"]{background:var(--color-red,#A34F48)}
+.marao-group-action-icon{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;border-radius:50%;background:var(--opacity-contrast-100,rgba(127,127,127,.16))}
+.marao-group-action-icon ha-icon{--mdc-icon-size:24px;width:24px;height:24px}
+.marao-group-action-label{min-width:0;overflow-wrap:anywhere}
+.marao-group-actions button:disabled{background:var(--ha-card-background,var(--card-background-color));color:var(--disabled-text-color);opacity:.5;cursor:default}
+.marao-group-actions button:focus{outline:none}
+.marao-group-scope{min-width:0;display:grid;gap:8px}
+.marao-group-scope h3{margin:8px 0;overflow-wrap:anywhere}
+.marao-group-info{font:inherit;overflow-wrap:anywhere;margin:0}
+.marao-group-info:empty{display:none}`;
 export function createGroupScope(owner,part,group,api,parent,refresh) {
   const section=document.createElement('section');section.className='marao-group-scope';
   if(part.name){const heading=document.createElement('h3');heading.textContent=part.id==='__other'?label('Other',owner._hass):part.name;section.append(heading);}
   const controls=document.createElement('div');controls.className='marao-group-actions';section.append(controls);
-  const info=document.createElement('p');info.className='marao-group-info';section.append(info);
   const error=document.createElement('p');error.className='marao-group-info';error.setAttribute('role','alert');section.append(error);parent.append(section);
-  const scope={...part,section,controls,info,error,buttons:[],busy:false,group};
+  const scope={...part,section,controls,error,buttons:[],busy:false,group};
   if(group.entity_type!=='battery')for(const on of [true,false]) {
-    const button=document.createElement('button');button.type='button';controls.append(button);scope.buttons.push({button,on});
+    const button=document.createElement('button');button.type='button';button.dataset.groupAction=on?'on':'off';
+    const visual=document.createElement('span');visual.className='marao-group-action-icon';visual.setAttribute('aria-hidden','true');
+    const icon=document.createElement('ha-icon');icon.setAttribute('icon',group.entity_type==='cover'?(on?'mdi:arrow-up':'mdi:arrow-down'):(on?'mdi:power-on':'mdi:power-off'));visual.append(icon);
+    const text=document.createElement('span');text.className='marao-group-action-label';button.append(visual,text);controls.append(button);scope.buttons.push({button,on,text});
     button.onclick=async()=>{
       if(button.disabled||scope.busy||owner.preview)return;
       scope.busy=true;api.haptic('heavy');refresh();const errors=[];
@@ -17,7 +31,7 @@ export function createGroupScope(owner,part,group,api,parent,refresh) {
         for(const batch of plan.batches) {
           const [domain,service]=batch.service.split('.');
           const targets=domain==='climate'?batch.entities.map(id=>[id]):[batch.entities];
-          for(const ids of targets)await api.callService(owner._hass,domain,service,{...batch.data,entity_id:ids.length===1?ids[0]:ids},(status,error)=>{if(status==='error')errors.push(`${ids.join(', ')}: ${error.message}`);});
+          for(const ids of targets){if(owner.preview)return;await api.callService(owner._hass,domain,service,{...batch.data,entity_id:ids.length===1?ids[0]:ids},(status,error)=>{if(status==='error')errors.push(`${ids.join(', ')}: ${error.message}`);});}
         }
         scope.error.textContent=errors.join('\n');
       } catch(error){scope.error.textContent=error.message;} finally {scope.busy=false;refresh();}
@@ -27,14 +41,12 @@ export function createGroupScope(owner,part,group,api,parent,refresh) {
 }
 export function updateGroupScope(owner,scope,group,api) {
   scope.group=group;const hass=owner._hass;
-  for(const {button,on} of scope.buttons) {
+  for(const {button,on,text} of scope.buttons) {
     const plan=summaryAction(group,scope.entities,on,hass,api.isAccessCover);
     const name=label(group.entity_type==='cover'?(on?'Open all':'Close all'):(on?'Turn on all':'Turn off all'),hass);
-    button.textContent=name;button.setAttribute('aria-label',`${name} · ${scope.id==='__other'?label('Other',hass):scope.name || owner._config.title || owner._config.name || ''}`);
+    text.textContent=name;button.setAttribute('aria-label',`${name} · ${scope.id==='__other'?label('Other',hass):scope.name || owner._config.title || owner._config.name || ''}`);
     button.disabled=Boolean(owner.preview||scope.busy||!hass?.callService||!plan.batches.length);button.setAttribute('aria-busy',String(scope.busy));
   }
-  const plans=[true,false].map(on=>summaryAction(group,scope.entities,on,hass,api.isAccessCover));
-  scope.info.textContent=group.entity_type==='battery'?'':plans.map((plan,i)=>`${label(i===0?(group.entity_type==='cover'?'Open all':'Turn on all'):(group.entity_type==='cover'?'Close all':'Turn off all'),hass)}: ${plan.batches.flatMap(b=>b.entities).length} ${label('Eligible',hass)}${plan.skipped.length?' · '+label('Skipped',hass)+': '+plan.skipped.map(([id,reason])=>`${hass?.states?.[id]?.attributes?.friendly_name || id} (${label(reason,hass)})`).join(', '):''}`).join(' · ');
 }
 export function reconcileGroup(owner,api) {
   const root=owner._overlay?.querySelector('.marao-popup-content');

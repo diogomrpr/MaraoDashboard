@@ -5,6 +5,7 @@ export { canonicalCard, canonicalTemplate };
 import { sensorThresholdError } from '../custom_components/marao_dashboard/frontend/MaraoSensorThresholds.js';
 export { sensorThresholdError };
 import { validatePowerDevices } from './history-data.js';
+import {mediaApps,mediaAppLogoError} from '../custom_components/marao_dashboard/frontend/MaraoMediaApps.js';
 export const MAIN_PAGE_BUTTONS = [['show_cache_reset', 'Show cache reset button'], ['show_editor_button', 'Show editor button']];
 export function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -730,6 +731,7 @@ export function validatePages(config, catalog) {
         if (card.template === 'md_camera_card' && options.popup_stream_entity != null && options.popup_stream_entity !== '' && (!entityId(options.popup_stream_entity) || !options.popup_stream_entity.startsWith('camera.'))) errors.push('Choose a camera entity for the popup stream.');
         if (card.template === 'md_room_card' && Object.hasOwn(options, 'light_entities') && (!Array.isArray(options.light_entities) || options.light_entities.some(value => !entityId(value) || !value.startsWith('light.')))) errors.push('Room lights must be an explicit list of light entities.');
         if (card.template === 'md_media_app_card' && (typeof options.app_source !== 'string' || !options.app_source.trim())) errors.push('Media app requires an explicit source.');
+        if(card.template==='md_media_app_card'){const error=mediaAppLogoError(options.app_logo);if(error)errors.push(error);}
         if (accessRole === 'md_access_hold_action_card' && Object.hasOwn(card, 'tap_action')) {
           const action = card.tap_action, button = card.entity_id?.startsWith('button.');
           const valid = object(action) && (button
@@ -746,6 +748,7 @@ export function validatePages(config, catalog) {
             }
             const apps = card.apple_tv.apps ?? [];
             if (!Array.isArray(apps) || apps.some(app => !object(app) || typeof app.source !== 'string' || !app.source.trim())) errors.push('Media apps require an explicit ordered list of sources.');
+            if(Array.isArray(apps)&&apps.some(app=>object(app)&&mediaAppLogoError(app.logo)))errors.push('Choose a supported app logo.');
           }
         }
         if (Object.hasOwn(card, 'page')) references.push(card.page);
@@ -804,6 +807,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
   const fieldSchema = field => {
     let schema;
     if (field.kind === 'entity') schema = binding(field.domains, field.device_classes);
+    else if(field.kind==='app_logo')schema={type:'string',enum:['',...mediaApps.map(app=>app.id)]};
     else if (field.kind === 'boolean') schema = { type: 'boolean' };
     else if (['number', 'energy_precision'].includes(field.kind)) schema = { type: 'number', ...(field.key === 'cost_per_kwh' ? { minimum: 0 } : {}) };
     else if (field.kind === 'sensor_thresholds') return { type: 'array', items: { ...object({ value: { type: 'number' }, color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' } }), required: ['value', 'color'] }, description: field.label };
@@ -827,7 +831,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
     if (card.id === 'md_camera_card') properties.variables.properties.event_provider = suggested(['auto', 'frigate', 'unifi_protect', 'netatmo']);
     if (card.id === 'md_media_card') properties.apple_tv = { anyOf: [{ type: ['boolean', 'null'] }, object({
       remote_entity: binding(['remote']), volume_remote_entity: binding(['remote', 'media_player']),
-      apps: { type: 'array', items: object({ name: { type: 'string' }, source: { type: 'string' }, icon: { type: 'string' } }) },
+      apps: { type: 'array', items: object({ name: { type: 'string' }, source: { type: 'string' }, icon: { type: 'string' }, logo:{type:'string',enum:['',...mediaApps.map(app=>app.id)]} }) },
     })] };
     if (card.id === 'md_media_card') Object.assign(properties, {
       remote_entity: binding(['remote']), volume_remote_entity: binding(['remote', 'media_player']),

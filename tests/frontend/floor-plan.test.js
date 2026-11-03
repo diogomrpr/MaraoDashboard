@@ -74,7 +74,7 @@ test('safe examples are additive, idempotent and retain one dashboard/gallery ro
 });
 
 // Exercise the real editor callbacks with only HA forms/dialogs and DOM geometry stubbed.
-function editorHarness(context) {
+function editorHarness(context,card=source().pages[0].sections[0].entities[0]) {
  class Element extends EventTarget {
   constructor(tag='div'){super();this.tag=tag;this.children=[];this.nodes=new Map();this.style={};this.dataset={};this.isConnected=true;this.open=true;if(tag==='img'){this.naturalWidth=800;this.naturalHeight=800;}}
   set innerHTML(html){
@@ -100,7 +100,7 @@ function editorHarness(context) {
  context.after(()=>{for(const [key,value]of saved)if(value)Object.defineProperty(globalThis,key,value);else delete globalThis[key];});
  globalThis.document={createElement:tag=>new Element(tag),createElementNS:(_ns,tag)=>new Element(tag),createTextNode:text=>({textContent:text})};
  globalThis.ResizeObserver=class{observe(){}disconnect(){}};globalThis.MutationObserver=class{observe(){}disconnect(){}};
- const container={entities:[source().pages[0].sections[0].entities[0]]},before=structuredClone(container.entities[0]),dialogs=[],forms=new Map();
+ const container={entities:[card]},before=structuredClone(container.entities[0]),dialogs=[],forms=new Map();
  const panel={isConnected:true,_model:{},_editableContainer:()=>container,_hass:{language:'en',callService:()=>assert.fail('Editing must never switch lights')},_entities:[],shadowRoot:{},
   _dialog(){const d=new Element('ha-dialog'),host=new Element();d.nodes.set('.dialog-content',host);d.append(host);dialogs.push(d);return d;},
   _closeDialog(dialog){dialog.open=false;dialog.dispatchEvent(new Event('closed'));dialog.isConnected=false;},
@@ -113,6 +113,25 @@ function editorHarness(context) {
  const form=child=>forms.get(child.querySelector('[data-form]'));
  return{panel,parent,q,dialogs,container,before,send,tap,form,forms};
 }
+
+test('floor plan general fields preserve omitted names and change only explicit title edits',context=>{
+ const original={template:'md_floor_plan_card',id:'plan',name_key:'custom.heading',variables:options(),future:[]};
+ const h=editorHarness(context,original),general=h.forms.get(h.q('[data-general]'));
+ general.change({...general.data,full_page:true});h.q('[data-save]').onclick();
+ assert.deepEqual(h.container.entities[0],{...original,variables:{...original.variables,full_page:true}});
+ const named=editorHarness(context,{...original,name:'Plan'}),form=named.forms.get(named.q('[data-general]'));
+ form.change({...form.data,name:'Downstairs'});form.change({...form.data,name:'Plan'});named.q('[data-save]').onclick();
+ assert.equal(named.container.entities[0].name,'Plan');assert.equal(Object.hasOwn(named.container.entities[0],'name_key'),false);
+});
+
+test('strip thickness can return to its implicit default after another draft value',context=>{
+ const card=source().pages[0].sections[0].entities[0];delete card.variables.lights[0].strip.width;
+ const h=editorHarness(context,card);h.tap(h.q('[data-markers]').children[0]);const child=h.dialogs[1],form=h.form(child);
+ form.change({...form.data,width:12});form.change({...form.data,width:6});
+ child.querySelector('[data-save]').onclick();h.q('[data-save]').onclick();
+ assert.equal(h.container.entities[0].variables.lights[0].strip.width,6);
+ assert.equal(Object.hasOwn(card.variables.lights[0].strip,'width'),false);
+});
 
 test('light-square settings are transactional, omit coordinates and preserve unknown fields',context=>{
  for(const accept of [false,true]){

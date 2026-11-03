@@ -885,7 +885,8 @@
       "icon": "mdi:youtube",
       "show_state": false,
       "variables": {
-        "app_source": "YouTube"
+        "app_source": "YouTube",
+        "app_logo": "netflix"
       }
     },
     {
@@ -1827,7 +1828,8 @@
       "icon": "mdi:youtube",
       "show_state": false,
       "variables": {
-        "app_source": "YouTube"
+        "app_source": "YouTube",
+        "app_logo": "netflix"
       }
     },
     {

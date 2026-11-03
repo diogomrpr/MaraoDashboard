@@ -824,7 +824,8 @@
                   {
                     "name": "Netflix",
                     "source": "Netflix",
-                    "icon": "mdi:netflix"
+                    "icon": "mdi:netflix",
+                    "logo": "netflix"
                   },
                   {
                     "name": "Disney+",
@@ -1160,7 +1161,7 @@
             "camera": [
               {
                 "entity_id": "camera.marao_dashboard_test_camera",
-                "name": "Front Door Camera \u00b7 automatic live video",
+                "name": "Front Door Camera · automatic live video",
                 "variables": {
                   "event_provider": "frigate",
                   "frigate_instance_id": "marao_test"
@@ -1523,25 +1524,25 @@
           "entities": [
             {
               "template": "md_light_card",
-              "name": "Studio \u00b7 simple light",
+              "name": "Studio · simple light",
               "entity_id": "light.marao_dashboard_test_onoff_light",
               "id": "studio-grid-0"
             },
             {
               "template": "md_light_card",
-              "name": "Studio \u00b7 brightness",
+              "name": "Studio · brightness",
               "entity_id": "light.marao_dashboard_test_light",
               "id": "studio-grid-1"
             },
             {
               "template": "md_cover_card",
-              "name": "Studio \u00b7 cover",
+              "name": "Studio · cover",
               "entity_id": "cover.marao_dashboard_test_cover",
               "id": "studio-grid-2"
             },
             {
               "template": "md_access_action_card",
-              "name": "Studio \u00b7 lock",
+              "name": "Studio · lock",
               "variables": {
                 "action_service": "lock.lock"
               },
@@ -1550,7 +1551,7 @@
             },
             {
               "template": "md_light_card",
-              "name": "Studio \u00b7 hidden icon",
+              "name": "Studio · hidden icon",
               "show_icon": false,
               "variables": {
                 "enable_slider": false
@@ -1560,7 +1561,7 @@
             },
             {
               "template": "md_light_card",
-              "name": "Studio \u00b7 hidden title",
+              "name": "Studio · hidden title",
               "show_name": false,
               "show_state": false,
               "show_label": false,
@@ -1572,7 +1573,7 @@
             },
             {
               "template": "md_access_slide_action_card",
-              "name": "Studio \u00b7 front entrance opening control with a deliberately long later-row title",
+              "name": "Studio · front entrance opening control with a deliberately long later-row title",
               "entity_id": "lock.marao_dashboard_test_lock",
               "id": "studio-grid-6"
             }

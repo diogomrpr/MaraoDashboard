@@ -12,6 +12,7 @@ const entries = {
   MaraoNativeDashboard: 'native-strategy.js',
   MaraoNativeBootstrap: 'native-bootstrap.js',
   MaraoNativeCards: 'native-cards.js',
+  MaraoNativeCardMetadata: 'native-card-metadata.js',
   MaraoNativeCardEditor: 'native-card-editor.js',
   MaraoDashboardSettings: 'dashboard-settings-dialog.js',
   MaraoOrdinaryMigration: 'ordinary-migration-ui.js',

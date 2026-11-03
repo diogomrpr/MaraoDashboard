@@ -342,4 +342,17 @@ const baseline = [
   ['lock', 'lock', { entity_id: 'lock.marao_dashboard_test_lock' }],
 ];
 
-module.exports = { manifest, concreteCases, popupCases, expandGallery, expandHelpers, validateCoverage, baseline, walkCards };
+// Read-only preparation for the single native popup authoring check. Callers
+// stage/restore its document explicitly; normal fixture sync never saves it.
+async function managedPopupExample(document) {
+  const {planPopupEdit}=await import('../frontend_src/popup-management.js');
+  const next=structuredClone(document),page=next.views.find(view=>view.path==='card-test');
+  if(!page||page.type!=='sections')throw new Error('Managed example needs the existing same-dashboard Cases Sections view.');
+  const owner={type:'custom:marao-entity-group-card',id:'managed-popup-example',name:'Managed popup example',entity_type:'light',entities:['light.marao_dashboard_test_case_light_on','light.marao_dashboard_test_case_light_off'],popup_filter:'all'};
+  page.sections.push({type:'grid',cards:[owner]});
+  const result=planPopupEdit(next,owner,'card-test','/marao-dashboard/card-test',{});
+  result.view.sections[0].cards.find(card=>card.entity_id===owner.entities[0]).grid_options={columns:6,rows:3};
+  result.view.sections[0].cards.push({type:'markdown',content:'Custom layout retained when group settings change.',grid_options:{columns:12,rows:'auto'},future:{keep:[]}});
+  return result;
+}
+module.exports = { manifest, concreteCases, popupCases, expandGallery, expandHelpers, validateCoverage, baseline, walkCards, managedPopupExample };

@@ -51,7 +51,8 @@ test('linked membership follows saved sections independently of visibility and i
 test('native composition uses the saved layout without changing retained automatic settings or external ownership',()=>{
   const config={...opener,popup_view:'popup-test'},before=structuredClone(config),dashboard=source();dashboard.views.push({type:'sections',path:'popup-test',sections:[{cards:[{type:'tile',entity:'light.c'}]}]});
   const result=composeNativeCard(config,{instanceId:'one',dashboard});assert.deepEqual(result.card.variables.summary_entities,['light.c']);assert.equal(result.popups[0].popup_view,'popup-test');assert.deepEqual(config,before);
-  assert.equal(composeNativeCard({...config,variables:{popup_hash:'#external'}},{instanceId:'two',dashboard}).popups.length,0);
+  const linked=composeNativeCard({...config,variables:{popup_hash:'#external'}},{instanceId:'two',dashboard});assert.equal(linked.popups[0].popup_view,'popup-test');assert.notEqual(linked.popups[0].hash,'#external');
+  assert.equal(composeNativeCard({...opener,variables:{popup_hash:'#external'}},{instanceId:'three',dashboard}).popups.length,0);
   assert.throws(()=>validateNativeCardConfig({...config,popup_view:'/bad'}),/Sections/);
   const card=catalog.cards.find(c=>c.id==='md_entity_group_card'),data=nativeCardFormData(config,card);
   assert.deepEqual(patchNativeCard(config,card,data,{...data,name:'Renamed'}),{...config,name:'Renamed'});
@@ -59,22 +60,32 @@ test('native composition uses the saved layout without changing retained automat
 });
 
 function saveFixture() {
-  const baseline=source(),writes=[],exports=[];let reads=0,current=true;
-  const hass={user:{is_admin:true},connection:{connected:true},async callWS(){reads++;return structuredClone(baseline);}};
-  const root={lovelace:{mode:'storage',async saveConfig(next){writes.push(next);}}};
-  const args={hass,root,opener,popup,currentPath:'home',path:'marao-dashboard',backPath:'/marao-dashboard/home',isCurrent:()=>current,recovery:value=>exports.push(value)};
-  return {baseline,writes,exports,args,setCurrent:value=>current=value,get reads(){return reads;}};
+  const baseline=source(),writes=[],preserved=[],records=new Map();let reads=0,current=true,saved=baseline;
+  const hass={user:{id:'admin',is_admin:true},connection:{connected:true},async callWS(){reads++;return structuredClone(saved);}};
+  const root={lovelace:{mode:'storage',config:baseline,async saveConfig(next){writes.push(next);saved=next;this.config=next;}}};
+  const journal={async read(key){return records.get(key);},async stage(key,value){records.set(key,value);preserved.push(structuredClone(value));},async clear(key){records.delete(key);}};
+  const args={hass,root,opener,popup,currentPath:'home',path:'marao-dashboard',backPath:'/marao-dashboard/home',isCurrent:()=>current,journal};
+  return {baseline,writes,preserved,records,args,setCurrent:value=>current=value,get reads(){return reads;}};
 }
-test('layout creation performs one native save after fresh checks and exports exact original/proposed data',async()=>{
-  const f=saveFixture();const result=await savePopupLayout(f.args);assert.equal(f.reads,2);assert.equal(f.writes.length,1);assert.equal(f.exports.length,1);assert.deepEqual(f.exports[0].original,f.baseline);assert.deepEqual(f.exports[0].proposed,result.config);assert.equal(result.config.views.length,f.baseline.views.length+1);
-  for(const setup of [f=>f.setCurrent(false),f=>f.args.hass.user.is_admin=false,f=>f.args.root.lovelace.editMode=true,f=>f.args.hass.connection.connected=false,f=>f.args.root.lovelace.mode='yaml']) {
-    const blocked=saveFixture();setup(blocked);await assert.rejects(savePopupLayout(blocked.args));assert.equal(blocked.writes.length,0);assert.equal(blocked.exports.length,0);
+test('layout creation performs one verified native save with internal preservation and no export contract',async()=>{
+  const f=saveFixture();f.args.root.lovelace.editMode=true;const result=await savePopupLayout(f.args);assert.equal(f.reads,3);assert.equal(f.writes.length,1);assert.equal(f.preserved.length,1);assert.deepEqual(f.preserved[0].original,f.baseline);assert.deepEqual(f.preserved[0].proposed,result.config);assert.equal(f.records.size,0);assert.equal(result.config.views.length,f.baseline.views.length+1);
+  for(const setup of [f=>f.setCurrent(false),f=>f.args.hass.user.is_admin=false,f=>f.args.root.lovelace.config={...source(),title:'Unsaved'},f=>f.args.hass.connection.connected=false,f=>f.args.root.lovelace.mode='yaml']) {
+    const blocked=saveFixture();setup(blocked);await assert.rejects(savePopupLayout(blocked.args));assert.equal(blocked.writes.length,0);assert.equal(blocked.preserved.length,0);
   }
-  const stale=saveFixture();let reads=0;stale.args.hass.callWS=async()=>({...source(),title:++reads===1?'first':'changed'});await assert.rejects(savePopupLayout(stale.args),/Dashboard changed/);assert.equal(stale.writes.length,0);
+  const stale=saveFixture();let reads=0;stale.args.hass.callWS=async()=>++reads===1?source():({...source(),title:'changed'});await assert.rejects(savePopupLayout(stale.args),/Dashboard changed/);assert.equal(stale.writes.length,0);
 });
-test('uncertain saves retain recovery and read back without retrying a write',async()=>{
-  const f=saveFixture();f.args.root.lovelace.saveConfig=async next=>{f.writes.push(next);throw new Error('lost acknowledgement');};await assert.rejects(savePopupLayout(f.args),/Save could not be confirmed/);assert.equal(f.writes.length,1);assert.equal(f.exports.length,1);assert.equal(f.reads,3);
+test('failed saves read back without retrying a write or requiring a recovery download',async()=>{
+  const f=saveFixture();f.args.root.lovelace.saveConfig=async next=>{f.writes.push(next);throw new Error('lost acknowledgement');};await assert.rejects(savePopupLayout(f.args),/not saved/);assert.equal(f.writes.length,1);assert.equal(f.preserved.length,1);assert.equal(f.records.size,0);assert.equal(f.reads,3);
   const acknowledged=saveFixture();acknowledged.args.root.lovelace.saveConfig=async next=>{acknowledged.writes.push(next);acknowledged.args.hass.callWS=async()=>next;throw new Error('lost acknowledgement');};assert.ok((await savePopupLayout(acknowledged.args)).path);assert.equal(acknowledged.writes.length,1);
+});
+
+test('creation rechecks lifecycle after internal staging and verifies acknowledged writes',async()=>{
+  for(const interrupt of [f=>f.setCurrent(false),f=>f.args.root.lovelace.config={...source(),title:'Changed during staging'}]) {
+    const f=saveFixture(),stage=f.args.journal.stage;f.args.journal.stage=async(...args)=>{await stage(...args);interrupt(f);};
+    await assert.rejects(savePopupLayout(f.args),/Dashboard changed/);assert.equal(f.preserved.length,1);assert.equal(f.writes.length,0);assert.equal(f.records.size,0);
+  }
+  const f=saveFixture();f.args.root.lovelace.saveConfig=async next=>{f.writes.push(next);};
+  await assert.rejects(savePopupLayout(f.args),/not saved/);assert.equal(f.writes.length,1);assert.equal(f.preserved.length,1);
 });
 
 test('native popup host forwards state without remounting or writes, handles missing sources and disposes subscriptions',t=>{
@@ -99,7 +110,7 @@ test('native section actions follow their containing section, refresh targets an
   const previous={customElements:globalThis.customElements};t.after(()=>Object.assign(globalThis,previous));let Actions;
   globalThis.customElements={get:()=>undefined,define:(_name,value)=>Actions=value};registerPopupActions({isAccessCover:()=>false});
   const source={type:'sections',path:'popup-test',title:'Lights',sections:[{cards:[{type:'tile',entity:'light.a'}]},{cards:[{type:'tile',entity:'light.b'}]}]},root={localName:'hui-root',lovelace:{config:{views:[source]},editMode:false}};
-  const section={localName:'hui-section',index:0,viewIndex:0,parentNode:root},button={setAttribute(){}},scope={entities:[],buttons:[{button,on:true}],info:{}},owner=Object.assign(Object.create(Actions.prototype),{parentNode:section,isConnected:true,shadowRoot:{},_config:{popup_view:'popup-test',scope:'section',entity_type:'light'},_scope:scope,_hass:{callService(){},states:{'light.a':{state:'off',attributes:{}},'light.b':{state:'off',attributes:{}}}}});
+  const section={localName:'hui-section',index:0,viewIndex:0,parentNode:root},button={setAttribute(){}},scope={entities:[],buttons:[{button,on:true,text:{}}]},owner=Object.assign(Object.create(Actions.prototype),{parentNode:section,isConnected:true,shadowRoot:{},_config:{popup_view:'popup-test',scope:'section',entity_type:'light'},_scope:scope,_hass:{callService(){},states:{'light.a':{state:'off',attributes:{}},'light.b':{state:'off',attributes:{}}}}});
   owner._render();assert.deepEqual(scope.entities,['light.a']);assert.equal(button.disabled,false);
   section.index=1;owner._render();assert.deepEqual(scope.entities,['light.b']);
   source.sections[1].cards=[];owner._render();assert.deepEqual(scope.entities,[]);assert.equal(button.disabled,true);

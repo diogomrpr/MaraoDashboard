@@ -89,6 +89,8 @@ def test_page_model_accepts_empty_page_without_reinsertion():
     ({"template": "md_wallbox_current_card", "entity_id": "number.safe", "variables": {"shortcuts": [float("inf")]}}, "shortcuts"),
     ({"template": "md_wallbox_current_card", "entity_id": "number.safe", "variables": {"shortcuts": [1, 2, 3, 4]}}, "shortcuts"),
     ({"template": "md_media_app_card", "entity_id": "media_player.safe", "variables": {"app_source": " "}}, "source"),
+    ({"template": "md_media_app_card", "entity_id": "media_player.safe", "variables": {"app_source": "Custom", "app_logo": "invalid"}}, "app logo"),
+    ({"template": "md_media_card", "entity_id": "media_player.safe", "apple_tv": {"apps": [{"source": "Custom", "logo": None}]}}, "app logo"),
     ({"template": "md_room_card", "page": "home", "variables": {"light_entities": ["switch.safe"]}}, "Room lights"),
     ({"template": "md_media_card", "entity_id": "media_player.safe", "apple_tv": {"remote_entity": "lock.safe"}}, "remote"),
     ({"template": "md_media_card", "entity_id": "media_player.safe", "apple_tv": {"apps": [{"name": "Missing source"}]}}, "sources"),

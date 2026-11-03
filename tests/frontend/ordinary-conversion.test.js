@@ -38,6 +38,11 @@ test('ordinary native documents are stable and do not inherit retired layout or 
   assert.throws(() => convertOrdinaryDocument(JSON.stringify(ordinary), { ...context, supplements: [{ page: 'home', yaml: '- type: markdown' }] }), /ordinary_conversion_unneeded/);
 });
 
+test('managed popup and unknown newer ownership records survive ordinary conversion without rewriting',()=>{
+  const ordinary={views:[{type:'sections',path:'popup-safe',marao_popup:{version:7,future:{keep:[],enabled:false}},sections:[{cards:[{type:'custom:marao-light-card',entity_id:'light.fake',marao_popup_slot:'member:light.fake',future:null}]}]}],marao:{version:1,navbar:{routes:[]}}};
+  const before=structuredClone(ordinary),result=convert(ordinary);assert.equal(result.changed,false);assert.deepEqual(result.document,before);assert.deepEqual(ordinary,before);
+});
+
 test('each historical source uses the ordered chain once; newer and ambiguous inputs are left untouched', () => {
   for (const record of json('page-model-expectations.json').records) {
     const original = text(record.input), result = convertOrdinaryDocument(original, context);

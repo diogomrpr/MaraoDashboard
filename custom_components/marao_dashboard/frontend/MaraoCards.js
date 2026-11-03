@@ -2,6 +2,8 @@ const popupLayouts=await import(new URL(`./MaraoPopupView.js${new URL(import.met
 const {popupViewError}=await import(new URL(`./MaraoPopupLayout.js${new URL(import.meta.url).search}`,import.meta.url));
 const {peopleError,peopleRows,collectionLabel,escapeText,sectionsError} = await import(new URL(`./MaraoCollections.js${new URL(import.meta.url).search}`,import.meta.url));
 const {reconcileGroup}=await import(new URL(`./MaraoGroupDetails.js${new URL(import.meta.url).search}`,import.meta.url));
+const {mediaAppBrand,mediaAppLogoError}=await import(new URL(`./MaraoMediaApps.js${new URL(import.meta.url).search}`,import.meta.url));
+export {mediaAppBrand};
 const [dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities, names, sensorThresholds, pressModule, nativeContext] = await Promise.all([
   'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js', 'MaraoNames.js', 'MaraoSensorThresholds.js', 'MaraoPressFeedback.js', 'MaraoNativeContext.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
@@ -51,23 +53,6 @@ function referencedEntities(value) {
 }
 export const ACCESS_HOLD_MS = 1200;
 export const LIGHT_COLOR_HOLD_MS = 600;
-
-const mediaApps = [
-  { id: "netflix", file: "netflix.svg", sources: ["Netflix", "com.netflix.Netflix"], color: "#000", text: "#fff" },
-  { id: "spotify", file: "spotify.svg", symbol: true, sources: ["Spotify", "com.spotify.client", "com.spotify.Spotify"], color: "#121212", text: "#fff" },
-  { id: "youtube", sources: ["YouTube", "com.google.ios.youtube"], color: "#d90000", text: "#fff" },
-  { id: "disney-plus", sources: ["Disney+", "Disney Plus", "com.disney.disneyplus"], color: "#006d74", text: "#fff" },
-  { id: "prime-video", sources: ["Prime Video", "Amazon Prime Video", "com.amazon.aiv.AIVApp"], color: "#0064b5", text: "#fff" },
-  { id: "apple-tv", sources: ["TV", "Apple TV", "Apple TV+", "com.apple.tv", "com.apple.TVWatchList"], color: "#151515", text: "#fff" },
-  { id: "plex", file: "plex.svg", sources: ["Plex", "com.plexapp.plex"], color: "#111111", text: "#fff" },
-  { id: "meo", file: "meo.svg", sources: ["MEO", "MEO Go", "pt.sapo.mobile.iphone.tmn.meomobile"], color: "#2e26ff", text: "#fff" },
-];
-
-export function mediaAppBrand(config) {
-  const normalize = value => text(value).toLowerCase().replace(/[^a-z0-9]/g, "");
-  const source = normalize(config.variables?.app_source || config.name);
-  return mediaApps.find(app => app.sources.some(alias => normalize(alias) === source));
-}
 
 export function accessOpenerService(entity, configured) {
   const native = { lock: "lock.unlock", cover: "cover.open_cover", button: "button.press", switch: "switch.turn_on", script: "script.turn_on" }[domainOf(entity)];
@@ -1170,6 +1155,7 @@ export class MaraoCard extends BaseElement {
   }
   setConfig(config) {
     config = accessCardConfig(config, this._hass);
+    if(config.template==='md_media_app_card'){const error=mediaAppLogoError(config.variables?.app_logo,this._hass);if(error)throw new Error(error);}
     if(config.template==='md_people_card'){const error=peopleError(config);if(error)throw new Error(collectionLabel(error,this._hass));}
     this.shadowRoot?.querySelector("marao-slide-to-open")?._clearFeedback?.();
     this._layoutMetadata = {};
@@ -2752,8 +2738,7 @@ export class MaraoPopupCard extends BaseElement {
     host.style?.removeProperty('--marao-control-columns');
     if (this._message) { const message = document.createElement('p'); message.style.cssText = 'margin:0;overflow-wrap:anywhere;white-space:pre-line'; message.textContent = this._message; host.replaceChildren(message); return; }
     const renderId = ++this._childrenRenderId;
-    this._nativePopupView?.destroy();this._nativePopupView=null;this._layoutControls?.();
-    this._layoutControls=popupLayouts.bindPopupLayoutControls(this,{haptic,navigate});
+    this._nativePopupView?.destroy();this._nativePopupView=null;
     if(this._config.popup_view){this._nativePopupView=popupLayouts.mountPopupView(this,host);return;}
     this._groupHelpers = null; this._groupChildren = new Map(); this._groupEmpty = null; this._groupLayout = null;
     host.replaceChildren();
@@ -2781,7 +2766,6 @@ export class MaraoPopupCard extends BaseElement {
     }
   }
   _updateChildrenHass() {
-    this._layoutControls?.update?.();
     if(this._nativePopupView){this._nativePopupView.update();return;}
     if (this._config.entity_group) { this._reconcileGroupChildren(); return; }
     const host = this._overlay?.querySelector(".marao-popup-content");
@@ -2862,7 +2846,7 @@ export class MaraoPopupCard extends BaseElement {
     this._headerObserver?.disconnect(); this._headerObserver = null;
     this._columnObserver?.disconnect(); this._columnObserver = null;
     this._popupPress?.destroy(); this._popupPress = null;
-    this._nativePopupView?.destroy();this._nativePopupView=null;this._layoutControls?.();this._layoutControls=null;
+    this._nativePopupView?.destroy();this._nativePopupView=null;
     this._open = false; this._overlay?.remove(); this._overlay = null; this._restoreBackground();
     this._childrenRenderId++; this._groupChildren?.clear(); this._groupHelpers = null; this._groupEmpty = null;
     if (updateHash && window.location.hash === text(this._config.hash)) {

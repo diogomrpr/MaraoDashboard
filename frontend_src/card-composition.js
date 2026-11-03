@@ -36,6 +36,11 @@ export function validateNativeCardConfig(config, entities = []) {
 export function composeNativeCard(config, { entities = [], dashboardRoot = 'marao-dashboard', language = 'en', instanceId, dashboard } = {}) {
   if (typeof instanceId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(instanceId)) throw new Error('A live card occurrence identity is required.');
   let descriptor = nativeCardDescriptor(config);
+  // A direct view owns this occurrence even when an older shared hash is retained.
+  if(descriptor.popup_view&&descriptor.variables) {
+    const key=descriptor.template==='md_floor_plan_card'?'lights_popup':descriptor.template==='md_climate_card'?'mode_selector_hash':'popup_hash';
+    delete descriptor.variables[key];
+  }
   if(descriptor.popup_view&&descriptor.template==='md_entity_group_card'&&dashboard) {
     try {const group=popupGroupFromView(descriptor,resolvePopupView(dashboard,descriptor.popup_view).view,entities);descriptor={...descriptor,entities:group.members};delete descriptor.summary_sections;} catch {descriptor={...descriptor,entities:[]};delete descriptor.summary_sections;}
   }
@@ -242,7 +247,7 @@ function createMediaContent(entity, grid) {
   if (!options) return [fixedGrid([button('mdi:skip-previous', 'Previous', 'media_player.media_previous_track'), play(), button('mdi:skip-next', 'Next', 'media_player.media_next_track')])];
   const remote = (command, icon, label = '', extra = {}) => button(icon, label, 'remote.send_command', { ...extra, target: options.remote_entity, data: { command }, ...(extra.hold ? { holdData: { command, hold_secs: 1 } } : {}) });
   const cards = [], apps = options.apps.filter(app => object(app) && app.source);
-  if (apps.length) cards.push({ type: 'custom:marao-control-grid', columns: 3, square: false, cards: apps.map(app => ({ type: 'custom:marao-card', template: 'md_media_app_card', entity: entity.entity_id, name: app.name || app.source, icon: app.icon || 'mdi:play-box-outline', show_state: false, variables: { app_source: app.source } })) });
+  if (apps.length) cards.push({ type: 'custom:marao-control-grid', columns: 3, square: false, cards: apps.map(app => ({ type: 'custom:marao-card', template: 'md_media_app_card', entity: entity.entity_id, name: app.name || app.source, icon: app.icon || 'mdi:play-box-outline', show_state: false, variables: { app_source: app.source, ...(Object.hasOwn(app,'logo')?{app_logo:app.logo}:{}) } })) });
   cards.push(fixedGrid([remote('menu', 'mdi:arrow-u-left-top', 'Back'), remote('up', 'mdi:chevron-up', '', { dpad: true, hold: true }), remote('top_menu', 'mdi:home-outline', 'Home')]), fixedGrid([remote('left', 'mdi:chevron-left', '', { dpad: true, hold: true }), remote('select', 'mdi:checkbox-blank-circle', '', { primary: true, dpad: true, hold: true }), remote('right', 'mdi:chevron-right', '', { dpad: true, hold: true })]), fixedGrid([button('mdi:rewind-10', 'Back 10 seconds', 'media_player.media_seek', { seekOffset: -10 }), remote('down', 'mdi:chevron-down', '', { dpad: true, hold: true }), button('mdi:fast-forward-30', 'Forward 30 seconds', 'media_player.media_seek', { seekOffset: 30 })]));
   const volume = (command, icon, label, service) => String(options.volume_remote_entity || '').startsWith('remote.') ? button(icon, label, 'remote.send_command', { target: options.volume_remote_entity, data: { command } }) : button(icon, label, service, { target: options.volume_remote_entity });
   cards.push(fixedGrid([volume('KEY_VOLDOWN', 'mdi:volume-minus', 'Volume down', 'media_player.volume_down'), play(), volume('KEY_VOLUP', 'mdi:volume-plus', 'Volume up', 'media_player.volume_up')]));

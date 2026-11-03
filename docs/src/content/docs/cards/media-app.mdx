@@ -28,7 +28,32 @@ icon: mdi:radio
 
 Compatible entity domains: `media_player`.
 
-app_source must exactly match a source accepted by the selected media player. The card dispatches the native source-selection service.
+Choose App logo independently of the launch source: Automatic, Netflix, Spotify, YouTube, Disney+, Prime Video, Apple TV, Plex or MEO. Artwork ships with Marao. Automatic matches the source (including MEO Go); an unrecognized source keeps your fallback icon. Choosing a logo does not change what the player opens.
+
+For a standalone shortcut, use `variables.app_logo`:
+
+```yaml
+type: custom:marao-media-app-card
+entity_id: media_player.living_room
+name: Custom TV app
+icon: mdi:television
+variables:
+  app_source: Custom TV app
+  app_logo: netflix
+```
+
+In a Media card’s Apple TV options, each app has the same chooser. Its `logo` becomes the shortcut’s artwork in popup and inline layouts:
+
+```yaml
+apple_tv:
+  apps:
+    - name: Custom TV app
+      source: Custom TV app
+      icon: mdi:television
+      logo: netflix
+```
+
+Omit the option or choose Automatic to restore matching. Valid IDs are `netflix`, `spotify`, `youtube`, `disney-plus`, `prime-video`, `apple-tv`, `plex` and `meo`. The source must exactly match an app supported by your player.
 
 ## Settings
 
@@ -40,6 +65,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
 | `variables.app_source` | App source | text | Not set | App source for this card. Searchable suggestions are available. |
+| `variables.app_logo` | App logo | app_logo | Not set | Choose artwork independently of the app source. Choices: `netflix`, `spotify`, `youtube`, `disney-plus`, `prime-video`, `apple-tv`, `plex`, `meo`. |
 | `variables.action_color` | Action color | color | Not set | Optional action background color; does not change the action’s safety rules. |
 | `variables.action_label` | Action label | text | Not set | Optional visible action label. |
 | `variables.action_label_key` | Action translation key | text | Not set | Optional Marao localization key for the action label. Searchable suggestions are available. |
@@ -51,6 +77,7 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 | Scenario | What it demonstrates |
 | --- | --- |
 | Default | Try the configured card with fictional devices. |
+| Selected logo | Use packaged Netflix artwork while retaining the Radio source. |
 | Another source | Choose Music from the player’s advertised source list. |
 | Source unavailable | An offline player cannot accept a source command. |
 | Loading state | Wait for Home Assistant state before showing controls. |

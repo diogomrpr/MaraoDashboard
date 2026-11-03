@@ -126,7 +126,7 @@ EDITOR_CATALOG: dict[str, Any] = {
         {
             "id": "md_media_app_card", "label": "Media app", "icon": "mdi:play-box-outline", "domains": ["media_player"],
             "description": "Open a configured source on the selected media player.",
-            "variables": [_field("app_source", "App source", "text")],
+            "variables": [_field("app_source", "App source", "text"), _field("app_logo", "App logo", "app_logo", description="Choose artwork independently of the app source.")],
         },
         {
             "id": "md_camera_card",
@@ -567,7 +567,7 @@ def page_templates(config: dict[str, Any], entities: list[dict[str, Any]]) -> di
             player["apple_tv"] = {**deepcopy(selected.get("apple_tv") or {}), **deepcopy(options)}
             for app in options["apps"]:
                 players.append({**deepcopy(app), "template": "md_media_app_card", "entity_id": entity["entity_id"],
-                                "name": app.get("name") or app["source"], "variables": {"app_source": app["source"]}})
+                                "name": app.get("name") or app["source"], "variables": {"app_source": app["source"], **({"app_logo": app["logo"]} if "logo" in app else {})}})
                 players[-1].pop("source", None)
     security = [bound("md_security_card", "Alarm", first("alarm_control_panel"), name_key="security.alarm", variables={"alarm_layout": "dropdown"})]
     security.extend(bound("md_access_card", entity.get("name") or _friendly_name(entity["entity_id"]), entity["entity_id"])

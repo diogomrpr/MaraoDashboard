@@ -1,7 +1,10 @@
 import {findNativeHost,nativeDashboardConfig} from '../custom_components/marao_dashboard/frontend/MaraoNativeContext.js';
 import { catalog } from './native-model.js';
 import { editorLabel } from './editor-labels.js';
+import { uid } from './schedule-model.js';
 import { composeNativeCard, nativeCardDescriptor, nativeCardType, validateNativeCardConfig } from './card-composition.js';
+import {nativeCandidates, registerCardMetadata, refreshCardMetadata} from './native-card-metadata.js';
+import {isAccess} from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
 
 const copy = value => structuredClone(value);
 const query = new URL(import.meta.url).search;
@@ -13,14 +16,20 @@ const compact = new Set(['md_base_card', 'md_light_card', 'md_sensor_card', 'md_
 let nextInstance = 0;
 const sessionId = globalThis.crypto?.randomUUID?.().replaceAll('-', '') || Date.now().toString(36);
 
-export function nativeCardStub(template, hass = {}, entities = []) {
+export function nativeCardStub(template, hass = {}, entities = [], entitiesFallback = []) {
   const entry = catalog.cards.find(card => card.id === template);
   if (!entry) throw new Error('Choose a supported Marao card type.');
-  const candidateIds = [...entities.map(entity => typeof entity === 'string' ? entity : entity.entity_id), ...Object.keys(hass.states || {})];
-  const compatible = id => template !== 'md_fan_card' || !String(id).startsWith('cover.')
-    || !['door', 'garage', 'gate'].includes(hass.states?.[id]?.attributes?.device_class)
-      && !/door|garage|gate/i.test(`${id} ${hass.states?.[id]?.attributes?.friendly_name || ''}`);
-  const entity = entry.domains.map(domain => candidateIds.find(id => String(id).split('.')[0] === domain && compatible(id))).find(Boolean);
+  const compatible = id => {
+    const domain = id.split('.')[0], attributes = hass.states[id].attributes || {};
+    if (!entry.domains.includes(domain)) return false;
+    if (domain === 'cover') {
+      const access = isAccess({...attributes, entity_id:id, name:attributes.friendly_name});
+      if (['md_fan_card','md_cover_card'].includes(template) && access) return false;
+      if (template === 'md_access_card') return access;
+    }
+    return !entry.device_classes?.length || domain !== 'sensor' || entry.device_classes.includes(attributes.device_class);
+  };
+  const entity = nativeCandidates(hass, entities, entitiesFallback).find(compatible);
   const config = { type: nativeCardType(template), template };
   if (entity && !entry.entity_optional) config.entity_id = entity;
   if (!entry.domains.length || entry.entity_optional) config.name = editorLabel(entry.label, hass);
@@ -29,21 +38,74 @@ export function nativeCardStub(template, hass = {}, entities = []) {
   if (['md_navigation_card', 'md_room_card'].includes(template)) config.tap_action = { action: 'none' };
   if (template === 'md_entity_group_card') Object.assign(config, { id: 'group', entity_type: 'light', entities: [], popup_filter: 'active' });
   if (['md_scene_collection_card','md_people_card'].includes(template)) config.entities = [];
-  if(template==='md_schedules_card')Object.assign(config,{group_id:globalThis.crypto.randomUUID(),targets:[]});
+  if(template==='md_schedules_card')Object.assign(config,{group_id:uid(),targets:[]});
   if (template === 'md_floor_plan_card') config.variables = { lights: [] };
   if (template === 'md_media_app_card') {
-    const source = hass.states?.[entity]?.attributes?.source_list?.[0];
+    const sources = hass.states?.[entity]?.attributes?.source_list;
+    const source = Array.isArray(sources) ? sources.find(value => typeof value === 'string' && value.trim()) : undefined;
     if (source) config.variables = { ...config.variables, app_source: source };
   }
   return config;
 }
 
 export function nativeCardSetup(config) {
-  const descriptor = nativeCardDescriptor(config);
-  if (descriptor.template !== 'md_floor_plan_card' || descriptor.variables?.image_id !== undefined && descriptor.variables.image_id !== '') return null;
-  // Validate every other option before allowing this one incomplete initial field.
-  validateNativeCardConfig({ ...config, variables: { ...descriptor.variables, image_id: '0'.repeat(32) } });
-  return 'Upload a floor-plan image.';
+  const descriptor = nativeCardDescriptor(config), entry = catalog.cards.find(card => card.id === descriptor.template);
+  const probe = copy(config);
+  let message;
+  // Validate all authored options, supplying only missing setup fields in this private probe.
+  if (entry.domains.length && !entry.entity_optional && !descriptor.entity_id && !descriptor.entity) {
+    probe.entity_id = `${entry.domains[0]}.marao_setup`;
+    message = 'Choose an entity in the card editor.';
+  }
+  if (descriptor.template === 'md_media_app_card' && (descriptor.variables?.app_source === undefined || descriptor.variables.app_source === '')) {
+    probe.variables = {...probe.variables, app_source:'setup'};
+    message ||= 'Choose an app source in the card editor.';
+  }
+  if (descriptor.template === 'md_floor_plan_card' && (descriptor.variables?.image_id === undefined || descriptor.variables.image_id === '')) {
+    probe.variables = {...probe.variables, image_id:'0'.repeat(32)};
+    message = 'Upload a floor-plan image.';
+  }
+  if (message) validateNativeCardConfig(probe);
+  return message || null;
+}
+
+// These booleans alone were audited against MaraoCards' literal runtime branches.
+// Context-derived defaults, targets and actions must never participate here.
+export function nativeCardDefaults(template) {
+  if (template === 'md_light_card') return {variables:{enable_slider:true, use_light_color:false}};
+  if (template === 'md_fan_card') return {variables:{enable_slider:true}};
+  return {};
+}
+
+function roleApplies(template, state) {
+  const a = state.attributes || {}, numeric = String(state.state ?? '').trim() !== '' && Number.isFinite(Number(state.state));
+  const unit = a.unit_of_measurement, deviceClass = a.device_class;
+  if (template === 'md_energy_period_card') return numeric && catalog.energy_units[unit]?.[0] === 'energy' && (!deviceClass || deviceClass === 'energy');
+  if (template === 'md_battery_card') return numeric && deviceClass === 'battery' && unit === '%' && Number(state.state) >= 0 && Number(state.state) <= 100;
+  if (template === 'md_graph_card') return numeric;
+  // No standard HA metadata proves an appliance status or a weather sensor role.
+  if (['md_dishwasher_card','md_washing_machine_card','md_toggle_graph_card'].includes(template)) return false;
+  if (template === 'md_weather_card') return state.entity_id?.startsWith('weather.');
+  if (template === 'md_wallbox_current_card') return numeric && deviceClass === 'current' && unit === 'A' && Number.isFinite(a.min) && Number.isFinite(a.max) && a.max > a.min;
+  return true;
+}
+
+export function nativeEntitySuggestion(template,hass,entityId) {
+  const entry=catalog.cards.find(card=>card.id===template),state=hass?.states?.[entityId],domain=entityId?.split('.')[0];
+  if(!entry||entry.hidden||!nativeCandidates(hass,[entityId]).length)return null;
+  if(template === 'md_people_card') {
+    if(domain !== 'person') return null;
+    const config = {...nativeCardStub(template,hass), entities:[entityId]};
+    validateNativeCardConfig(config);
+    return {config};
+  }
+  if(!entry.domains.includes(domain)||!roleApplies(template,{...state,entity_id:entityId}))return null;
+  const config=nativeCardStub(template,hass,[entityId]);
+  if(entry.entity_optional)config.entity_id=entityId;
+  if(config.entity_id!==entityId)return null;
+  const metadata={...state.attributes,entity_id:entityId,name:state.attributes?.friendly_name};
+  try{validateNativeCardConfig(config,[metadata]);}catch{return null;}
+  return {config};
 }
 
 export function nativeCardGridOptions(config) {
@@ -103,7 +165,7 @@ export class MaraoNativeCard extends HTMLElementBase {
     this._refresh();
   }
 
-  set hass(value) { this._hass = value; this._refresh(); }
+  set hass(value) { this._hass = value; refreshCardMetadata(value); this._refresh(); }
   get hass() { return this._hass; }
   get preview() { return Boolean(!this.isConnected || this._preview || this._host?.lovelace?.editMode || nativeHost(this)?.lovelace?.editMode); }
   set preview(value) { this._preview = Boolean(value); this._forward(); }
@@ -225,18 +287,22 @@ export function registerNativeCards() {
     if (!customElements.get(type)) {
       class CatalogCard extends MaraoNativeCard {
         static template = entry.id;
-        static getStubConfig(hass, entities) { return nativeCardStub(entry.id, hass, entities); }
+        static getStubConfig(hass, entities, entitiesFallback) { refreshCardMetadata(hass); return nativeCardStub(entry.id, hass, entities, entitiesFallback); }
+        static getDefaultConfig() { return nativeCardDefaults(entry.id); }
       }
       customElements.define(type, CatalogCard);
     }
     if (picker && !entry.hidden && !picker.some(card => card.type === type)) {
-      picker.push({ type, name: `Marao ${editorLabel(entry.label, { language: globalThis.navigator?.language })}`, preview: true,
-        description: editorLabel(entry.description || entry.label, { language: globalThis.navigator?.language }) });
+      registerCardMetadata(picker, {type, preview:true,
+        documentationURL:`https://diogomrpr.github.io/MaraoDashboard/cards/${entry.id.slice(3,-5).replaceAll('_','-')}/`,
+        getEntitySuggestion:(hass,entityId)=>nativeEntitySuggestion(entry.id,hass,entityId)}, entry.label, entry.description || entry.label);
     }
   }
   if(picker&&!picker.some(entry=>entry.type==='marao-camera-events-card')){
-    const language={language:globalThis.navigator?.language};
-    picker.push({type:'marao-camera-events-card',name:`Marao ${editorLabel('Camera Events',language)}`,description:editorLabel('Browse explicitly selected camera events.',language),preview:true});
+    registerCardMetadata(picker, {type:'marao-camera-events-card', preview:true,
+      documentationURL:'https://diogomrpr.github.io/MaraoDashboard/cards/camera-events/',
+      getEntitySuggestion:(hass,entityId)=>entityId?.startsWith('camera.')&&nativeCandidates(hass,[entityId]).length?{config:{type:'custom:marao-camera-events-card',cameras:[{entity:entityId}]}}:null},
+      'Camera Events','Browse explicitly selected camera events.');
   }
 }
 

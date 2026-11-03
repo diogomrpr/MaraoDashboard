@@ -29,7 +29,7 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     const manifest=JSON.parse(fs.readFileSync(path.join(directory,'dist','MaraoFrontend.release.json')));
     const stableImage='MaraoAsset--brand--mark.svg';
     assert.ok(fs.readFileSync(path.join(directory,'dist',stableImage)).equals(fs.readFileSync('custom_components/marao_dashboard/frontend/brand/mark.svg')));
-    for(const name of ['MaraoNativeCards.js','MaraoNativeCardEditor.js','MaraoNativeBootstrap.js','MaraoDashboardSettings.js','MaraoOrdinaryMigration.js']) assert.ok(fs.existsSync(path.join(directory,'dist',first.identity+'--'+name)),name+' must ship in the complete native graph');
+    for(const name of ['MaraoNativeCardMetadata.js','MaraoNativeCards.js','MaraoNativeCardEditor.js','MaraoNativeBootstrap.js','MaraoDashboardSettings.js','MaraoOrdinaryMigration.js']) assert.ok(fs.existsSync(path.join(directory,'dist',first.identity+'--'+name)),name+' must ship in the complete native graph');
     for(const name of ['YAML.LICENSE.txt','ChartJS.LICENSE.txt','KurkleColor.LICENSE.txt','MaraoHistoryChart.js']) assert.ok(fs.existsSync(path.join(directory,'dist',first.identity+'--'+name)),name+' must remain available');
     assert.ok(Object.keys(manifest.files).every(file=>!/MaraoDashboardPanel|MaraoDashboardJson|MaraoDashboardEditorWorker|MonacoEditor|codicon-/.test(file)),'Retired builder/Monaco assets must not ship');
     const legacyModel=await import(pathToFileURL(path.join(directory,'dist',first.identity+'--MaraoNativeModel.js')));
@@ -49,6 +49,10 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     assert.equal(JSON.parse(fs.readFileSync('hacs.json')).homeassistant,'2025.12.0');
     assert.ok(fs.readdirSync(path.join(directory,'dist'),{withFileTypes:true}).every(entry=>entry.isFile()));
     const {AssetURL}=await import(pathToFileURL(path.join(directory,'dist',first.identity+'--MaraoAssetURL.js')));
+    const {mediaApps,mediaAppLogoChoices}=await import(pathToFileURL(path.join(directory,'dist',first.identity+'--MaraoMediaApps.js')));
+    assert.deepEqual(mediaAppLogoChoices().slice(1).map(choice=>choice.value),['netflix','spotify','youtube','disney-plus','prime-video','apple-tv','plex','meo']);
+    const mediaBase=pathToFileURL(fs.realpathSync(path.join(directory,'dist',first.identity+'--MaraoCards.js'))).href;
+    for(const app of mediaApps){const image=new AssetURL('./media-apps/'+(app.file||app.id+'.png'),mediaBase);assert.ok(fs.existsSync(image),app.id+' chooser image ships in the flat package');assert.equal(image.protocol,'file:');}
     const base=pathToFileURL(fs.realpathSync(asset)).href;
     for (const file of ['MaraoNativeCardEditor.js','MaraoOrdinaryMigration.js','MaraoNativeBootstrap.js','brand/mark.svg','fonts/Montserrat.ttf','MaraoTheme.js']) {
       const url=new AssetURL('./'+file+'?v=old',base);

@@ -2,8 +2,8 @@ import {mountLocationSettings} from './location-settings.js';
 import {saveDashboardSettings, readDashboardSettings, validateDashboardSettings, dashboardViewForAddress, patchNavbarRoute, moveNavbarRoute} from './dashboard-settings.js';
 const navigation=await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`,import.meta.url));
 const words={
-  en:{title:'Marao settings',loading:'Loading settings…',loadError:'Could not load settings. Try again.',retry:'Retry',close:'Close',save:'Save',saving:'Saving…',add:'Add a page or destination',remove:'Remove',up:'Move up',down:'Move down',menu:'Page options',drag:'Drag to reorder',label:'Display name',destination:'Page or destination',icon:'Icon',navbar:'Navigation bar',hint:'Choose dashboard pages and arrange them in the order you want.',shortcuts:'Dashboard shortcuts',cache:'Show cache reset button',editor:'Show editor button',empty:'No pages in the navigation bar.',missing:'Destination does not match a current view.',conflict:'This dashboard changed. Close and reopen settings to reconcile your changes.',error:'Could not save settings.',invalid:'Check each destination and display name.'},
-  pt:{title:'Definições Marao',loading:'A carregar as definições…',loadError:'Não foi possível carregar as definições. Tente novamente.',retry:'Tentar novamente',close:'Fechar',save:'Guardar',saving:'A guardar…',add:'Adicionar página ou destino',remove:'Remover',up:'Mover para cima',down:'Mover para baixo',menu:'Opções da página',drag:'Arrastar para reordenar',label:'Nome apresentado',destination:'Página ou destino',icon:'Ícone',navbar:'Barra de navegação',hint:'Escolha as páginas do painel e organize a ordem em que aparecem.',shortcuts:'Atalhos do painel',cache:'Mostrar botão de limpeza da cache',editor:'Mostrar botão do editor',empty:'A barra de navegação não tem páginas.',missing:'O destino não corresponde a uma página atual.',conflict:'O painel foi alterado. Feche e reabra as definições para conciliar as alterações.',error:'Não foi possível guardar as definições.',invalid:'Verifique o destino e o nome de cada página.'}
+  en:{title:'Marao settings',loading:'Loading settings…',loadError:'Could not load settings. Try again.',retry:'Retry',close:'Close',save:'Save',saving:'Saving…',add:'Add a page or destination',remove:'Remove',up:'Move up',down:'Move down',menu:'Page options',drag:'Drag to reorder',label:'Display name',destination:'Page or destination',icon:'Icon',navbar:'Navigation bar',hint:'Choose dashboard pages and arrange them in the order you want.',shortcuts:'Dashboard shortcuts',cache:'Show cache reset button',editor:'Show editor button',empty:'No pages in the navigation bar.',missing:'Destination does not match a current view.',conflict:'This dashboard changed. Close and reopen settings to reconcile your changes.',error:'Could not save settings.',invalid:'Check the navigation and current room settings.'},
+  pt:{title:'Definições Marao',loading:'A carregar as definições…',loadError:'Não foi possível carregar as definições. Tente novamente.',retry:'Tentar novamente',close:'Fechar',save:'Guardar',saving:'A guardar…',add:'Adicionar página ou destino',remove:'Remover',up:'Mover para cima',down:'Mover para baixo',menu:'Opções da página',drag:'Arrastar para reordenar',label:'Nome apresentado',destination:'Página ou destino',icon:'Ícone',navbar:'Barra de navegação',hint:'Escolha as páginas do painel e organize a ordem em que aparecem.',shortcuts:'Atalhos do painel',cache:'Mostrar botão de limpeza da cache',editor:'Mostrar botão do editor',empty:'A barra de navegação não tem páginas.',missing:'O destino não corresponde a uma página atual.',conflict:'O painel foi alterado. Feche e reabra as definições para conciliar as alterações.',error:'Não foi possível guardar as definições.',invalid:'Verifique as definições de navegação e da divisão atual.'}
 };
 const menuIcon='M12,16A2,2 0 0,1 14,18A2,2 0 0,1 12,20A2,2 0 0,1 10,18A2,2 0 0,1 12,16M12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12A2,2 0 0,1 12,10M12,4A2,2 0 0,1 14,6A2,2 0 0,1 12,8A2,2 0 0,1 10,6A2,2 0 0,1 12,4Z';
 const CSS=`
@@ -94,7 +94,7 @@ export async function openDashboardSettings(root,opener) {
   const schema=(name,label,selector)=>({name,label,selector});
   const mountForm=(host,data,fields,changed)=>{
     const form=document.createElement('ha-form');form.hass=hass;form.data=data;form.schema=fields;form.computeLabel=item=>item.label;
-    form.addEventListener('value-changed',event=>{event.stopPropagation();if(!busy)changed(event.detail.value);});host.append(form);return form;
+    form.addEventListener('value-changed',event=>{event.stopPropagation();if(!busy){form.data=event.detail.value;changed(event.detail.value);}});host.append(form);return form;
   };
   const sortable=dialog.querySelector('[data-sortable]');sortable.disabled=false;
   const reorder=(oldIndex,newIndex)=>{
@@ -155,7 +155,7 @@ export async function openDashboardSettings(root,opener) {
     });
   };
   render();
-  mountLocationSettings(dialog.querySelector('[data-settings]'),draft,hass,mountForm,schema);
+  const validateLocation=mountLocationSettings(dialog.querySelector('[data-settings]'),draft,hass,mountForm,schema);
   const add=mountForm(dialog.querySelector('[data-add]'),{},[schema('destination',t.add,{navigation:{}})],value=>{
     if(!value.destination)return;navigation.haptic('heavy');const view=viewFor(value.destination);
     const route={path:value.destination,label:view?.title||value.destination,icon:view?.icon||'mdi:view-dashboard'};
@@ -164,7 +164,7 @@ export async function openDashboardSettings(root,opener) {
   });
   mountForm(dialog.querySelector('[data-flags]'),{show_cache_reset:draft.show_cache_reset!==false,show_editor_button:draft.show_editor_button!==false},[schema('show_cache_reset',t.cache,{boolean:{}}),schema('show_editor_button',t.editor,{boolean:{}})],value=>{for(const key of ['show_cache_reset','show_editor_button'])if(value[key]!== (draft[key]!==false))draft[key]=value[key];});
   dialog.querySelector('[data-save]').onclick=async()=>{
-    if(busy||!valid())return;try{validateDashboardSettings(draft);}catch{dialog.querySelector('.status').textContent=t.invalid;return;}
+    if(busy||!valid())return;try{validateLocation();validateDashboardSettings(draft);}catch{dialog.querySelector('.status').textContent=t.invalid;return;}
     navigation.haptic('heavy');busy=true;sortable.disabled=true;dialog.querySelector('[data-save]').disabled=true;dialog.querySelector('[data-save]').textContent=t.saving;
     try{await saveDashboardSettings(root.hass,path,baseline,draft,valid,JSON.stringify(baseline.marao?.navbar?.current_room)!==JSON.stringify(draft.navbar.current_room)?recovery=>{
       const blob=new Blob([JSON.stringify(recovery,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');

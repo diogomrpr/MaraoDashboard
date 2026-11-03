@@ -7,6 +7,15 @@ nav_order: 2
 
 # Local development
 
+For the focused managed-popup authoring check, `ha-test/cases.js` exposes the
+read-only `managedPopupExample(document)` planner. It adds one group to the
+existing Cases view and a Sections source under `/marao-dashboard`, using only
+existing fake light entities, a resized control and custom markdown. Stage the
+returned document only after privately retaining the exact saved source; after
+Save/Cancel and settings synchronization checks, restore it only if the current
+document still matches the task's last accepted result. No helper reset or new
+dashboard is needed. Normal fixture/frontend sync does not apply this example.
+
 Development and browser tests use a disposable Home Assistant instance. Full
 preparation installs the current working tree and safe fixture entities. The single
 ordinary HA dashboard at `/marao-dashboard` retains its saved views and card configuration.
@@ -464,3 +473,12 @@ Use the focused navbar startup fixture to hold the optional runtime unresolved
 and verify actual navigation/refresh interaction. Android desktop touch emulation
 does not prove Companion native-menu behavior; record physical host versions only
 when inspected. The horizontal hold surface contains no link URL target.
+
+The focused desktop regression uses mouse input and changes the available navbar
+width while the administrator maintenance dialog is open. The same dialog and its
+focus must survive repartitioning and release; desktop scrollbar removal must not
+destroy the newly opened modal. Run only that case with
+`node tests/test-navbar-startup-local.js --desktop`, or add `--chrome` to use the
+installed Google Chrome. Normal fixture runs include this case alongside their
+existing startup checks. Maintenance content stays outside the navbar's redraw
+container; preview, configuration changes and ownership loss still close it safely.

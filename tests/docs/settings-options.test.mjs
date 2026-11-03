@@ -31,6 +31,7 @@ test('context filters entity domains and compatible units and advertises support
   assert.ok(!hints(power,'variables.display_unit').options.some(option=>option.value==='W'));
   assert.deepEqual(hints(context('camera'),'variables.event_provider').options.map(option=>option.value),['auto','frigate','unifi_protect','netatmo']);
   assert.deepEqual(hints(context('media-app'),'variables.app_source').options.map(option=>option.value),['Radio','Music','TV']);
+  const logos=hints(context('media-app'),'variables.app_logo');assert.equal(logos.emptyLabel,'Automatic');assert.deepEqual(logos.options.map(option=>option.value),['netflix','spotify','youtube','disney-plus','prime-video','apple-tv','plex','meo']);
   assert.equal(hints(context('room'),'page').custom,true);
   assert.ok(hints(context('room'),'page').options.some(option=>option.value==='living-room'));
   assert.deepEqual(hints(context('people'),'columns').options.map(option=>option.value),[1,2,3,4,5,6]);

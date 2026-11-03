@@ -1,3 +1,4 @@
+const {cameraEventsStub,refreshCardMetadata}=await import(new URL(`./MaraoNativeCardMetadata.js${new URL(import.meta.url).search}`,import.meta.url));
 const {normalizeEventSources,eventTimestamp,mergeSourceEvents,filterEventRows,customEventRange,eventWord}=await import(new URL(`./MaraoEventModel.js${new URL(import.meta.url).search}`,import.meta.url));
 const {bindDropdown,dropdownStyles}=await import(new URL(`./MaraoDropdown.js${new URL(import.meta.url).search}`,import.meta.url));
 const {periodRange}=await import(new URL(`./MaraoHistoryData.js${new URL(import.meta.url).search}`,import.meta.url));
@@ -257,6 +258,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   set hass(hass) {
+    refreshCardMetadata(hass);
     const previousAvailability=this._availabilityState;this._hass=hass;this._availabilityState=this._unavailableState();
     if(!this._connectionAvailable()){this._request++;this._detailRequest++;this._selected=undefined;this._events=[];for(const source of this._sourceResults||[]){source.events=[];source.invalid=true;}this._loadedKey=previousAvailability===this._availabilityState?this._loadedKey:'';}
     else if(this._sources?.length>1){
@@ -267,7 +269,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     this._render();this._maybeLoad();
   }
 
-  static getStubConfig(){return {type:'custom:marao-camera-events-card',cameras:[]};}
+  static getStubConfig(hass,entities,entitiesFallback){refreshCardMetadata(hass);return cameraEventsStub(hass,entities,entitiesFallback);}
   static async getConfigElement(){await import(new URL(`./MaraoNativeCardEditor.js${new URL(import.meta.url).search}`,import.meta.url));return document.createElement('marao-native-card-editor');}
   getGridOptions(){return {columns:12,rows:8,min_rows:4};}
   getCardSize() {return 8;}

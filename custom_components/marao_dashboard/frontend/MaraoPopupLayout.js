@@ -1,12 +1,14 @@
 import {memberId,summarySections,collectionLabel} from './MaraoCollections.js';
+import {popupCanonical,createManagedView,popupHashFor} from './MaraoPopupManaged.js';
+import {commitPopupDocument,reconcilePopupTransaction,popupAuthoringAllowed,POPUP_UNCERTAIN} from './MaraoPopupTransaction.js';
 export const POPUP_ROLES = ['md_entity_group_card','md_scene_collection_card','md_climate_card','md_media_card','md_camera_card','md_energy_period_card','md_graph_card','md_security_card','md_access_card','md_floor_plan_card'];
+export const popupHash = popupHashFor;
 export const popupRole = config => POPUP_ROLES.includes(config.template)
-  && !['popup_hash','lights_popup','mode_selector_hash'].some(key=>config.variables?.[key])
   && !(config.template==='md_graph_card'&&!config.variables?.history_popup)
   && !(config.template==='md_media_card'&&config.variables?.media_display==='inline')
   && !(config.template==='md_security_card'&&config.tap_action)
   && !(config.template==='md_access_card'&&config.variables?.access_mode&&!['auto','popup'].includes(config.variables.access_mode));
-export const canonicalLayout = value => JSON.stringify(value,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v);
+export const canonicalLayout = popupCanonical;
 export function popupViewError(config) {
   if(Object.hasOwn(config,'popup_view') && (typeof config.popup_view!=='string'||!/^[a-z0-9][a-z0-9_-]*$/.test(config.popup_view)))return 'Choose a same-dashboard Sections view.';
 }
@@ -70,7 +72,7 @@ export function seedPopupView(popup,path,backPath,hass) {
         let template=member.template;
         if(!template)template=group.entity_type==='battery'?'md_battery_card':group.entity_type==='cover'&&(['door','garage','gate'].includes(member.device_class)||/door|garage|gate/.test(id))?'md_access_card':'md_'+group.entity_type+'_card';
         const card=nativePopupCard({...member,type:'custom:marao-card',template});
-        if(group.popup_filter==='active')card.visibility=[...(card.visibility || []),...activeVisibility(group.entity_type,id)];
+        if((group.popup_filter||(group.entity_type==='light'?'active':'all'))==='active')card.visibility=[...(card.visibility || []),...activeVisibility(group.entity_type,id)];
         cards.push(card);
       }
       view.sections.push({type:'grid',cards});
@@ -86,9 +88,8 @@ export function seedPopupView(popup,path,backPath,hass) {
   }
   return view;
 }
-export function appendPopupView(document,opener,currentPath,view) {
+export function popupCardPath(document,opener,currentPath) {
   if(document?.strategy||!Array.isArray(document?.views))throw new Error('Use an ordinary Home Assistant dashboard.');
-  if(document.views.some((v,index)=>String(v.path ?? index)===view.path))throw new Error('Popup layout path already exists.');
   const matches=[];
   const visit=(value,path)=>{
     if(!value||typeof value!=='object')return;
@@ -98,46 +99,87 @@ export function appendPopupView(document,opener,currentPath,view) {
   };
   document.views.forEach((v,index)=>{if(String(v.path ?? index)===currentPath)visit(v,['views',index]);});
   if(matches.length!==1)throw new Error('The invoking card is missing or duplicated. Select an existing layout in its editor.');
-  const next=structuredClone(document),path=matches[0];let parent=next;
+  return matches[0];
+}
+export function popupEditorSource(document,opener,currentPath) {
+  const path=popupCardPath(document,opener,currentPath),hash=popupHash(opener);
+  if(opener.popup_view||!hash)return {opener,external:false};
+  const matches=[];
+  const visit=value=>{
+    if(!value||typeof value!=='object')return;
+    if(Array.isArray(value)){value.forEach(visit);return;}
+    if(value.type==='custom:marao-popup-card'&&value.hash===hash)matches.push(value);
+    for(const key of ['cards','sections'])if(Array.isArray(value[key]))visit(value[key]);
+  };
+  visit(document.views[path[1]]);
+  if(matches.length!==1)throw new Error('Referenced popup is missing or ambiguous.');
+  return {opener:matches[0],popup:matches[0],external:true};
+}
+export function appendPopupView(document,opener,currentPath,view) {
+  if(Array.isArray(document?.views)&&document.views.some((v,index)=>String(v.path ?? index)===view.path))throw new Error('Popup layout path already exists.');
+  const path=popupCardPath(document,opener,currentPath);
+  const next=structuredClone(document);let parent=next;
   for(const key of path.slice(0,-1))parent=parent[key];
   parent[path.at(-1)]={...parent[path.at(-1)],popup_view:view.path};next.views.push(structuredClone(view));
   return next;
 }
 
 const popupPT={
-  'Popup layout':'Disposição do popup','Automatic':'Automática','Create editable layout':'Criar disposição editável','Edit layout':'Editar disposição','Download layout recovery':'Descarregar recuperação da disposição',
+  'Popup layout':'Disposição do popup','Automatic':'Automática','Edit popup':'Editar popup',
+  'Save this card before editing its popup.':'Guarde este cartão antes de editar o seu popup.',
+  'Save this dashboard before editing its popup.':'Guarde este painel antes de editar o seu popup.',
+  'Popup editing is unavailable on this Home Assistant host.':'A edição de popups não está disponível neste Home Assistant.',
+  'This card has no editable popup.':'Este cartão não tem um popup editável.',
+  'Referenced popup is missing or ambiguous.':'O popup associado está em falta ou é ambíguo.',
   'Edit cards and sections in the linked Home Assistant view.':'Edite os cartões e as secções na vista associada do Home Assistant.',
   'Choose a same-dashboard Sections view.':'Escolha uma vista Secções deste painel.',
   'Popup layout view is missing or ambiguous.':'A vista do popup está em falta ou é ambígua.',
   'Popup layout must use a native Sections view.':'O popup exige uma vista Secções nativa.',
   'Native popup layouts are unavailable on this Home Assistant host.':'As disposições nativas de popup não estão disponíveis neste Home Assistant.',
   'Layout creation requires an administrator on a connected, editable dashboard.':'A criação de disposições exige um administrador num painel editável e ligado.',
-  'Dashboard changed. Reopen the popup and try again.':'O painel mudou. Reabra o popup e tente novamente.',
+  'Dashboard changed. Reopen the card editor and try again.':'O painel mudou. Reabra o editor do cartão e tente novamente.',
   'The invoking card is missing or duplicated. Select an existing layout in its editor.':'O cartão de origem está em falta ou duplicado. Escolha uma disposição existente no editor.',
   'Use an ordinary Home Assistant dashboard.':'Utilize um painel normal do Home Assistant.',
   'Popup layout path already exists.':'O endereço da disposição já existe.',
-  'Save could not be confirmed. Keep the recovery download and reload before trying again.':'Não foi possível confirmar a gravação. Guarde a recuperação e recarregue antes de tentar novamente.',
+  [POPUP_UNCERTAIN]:'Não foi possível confirmar a gravação. Reabra o editor para conciliar este popup.',
+  'Popup update was not saved. Your configuration was retained.':'A alteração do popup não foi guardada. A configuração foi mantida.',
+  'Popup changes could not be preserved internally. Try again when browser storage is available.':'Não foi possível preservar as alterações do popup internamente. Tente novamente quando o armazenamento do navegador estiver disponível.',
+  'A popup update is already pending. Reopen the editor to reconcile it.':'Já existe uma alteração do popup pendente. Reabra o editor para a conciliar.',
+  'This popup layout needs a compatible Marao version.':'Esta disposição do popup exige uma versão compatível do Marao.',
+  'Popup management data is invalid.':'Os dados de gestão do popup são inválidos.',
+  'Popup layout has no management provenance.':'A disposição do popup não tem uma origem de gestão reconhecida.',
+  'Updating popup…':'A atualizar o popup…',
+  'Popup settings changed. Use Edit popup to update its controls.':'As definições do popup mudaram. Utilize Editar popup para atualizar os seus controlos.',
+  'This popup is inactive. Change its card settings before using it.':'Este popup está inativo. Altere as definições do seu cartão antes de o utilizar.',
+  'Popup source is missing or ambiguous.':'A origem do popup está em falta ou é ambígua.',
+  'Popup settings could not be reconciled. Check for circular popup references.':'Não foi possível conciliar as definições do popup. Verifique se existem referências circulares entre popups.',
+  'Popup settings changed. Open Edit popup to synchronize.':'As definições do popup mudaram. Abra Editar popup para sincronizar.',
+  'Behavior follows the parent card settings.':'O comportamento segue as definições do cartão de origem.',
+  'Make custom':'Tornar personalizado',
   'Creating layout…':'A criar disposição…','Section action must belong to its linked Sections view.':'A ação da secção tem de pertencer à vista Secções associada.',
 };
 export const popupLabel=(value,hass)=>String(hass?.language || '').startsWith('pt')?popupPT[value] || value:value;
 
+const authoringAllowed=popupAuthoringAllowed;
+export async function readPopupLayout(context) {
+  const {hass,root,opener,currentPath,path,editorDocument}=context;
+  if(!authoringAllowed(context))throw new Error('Layout creation requires an administrator on a connected, editable dashboard.');
+  const baseline=await hass.callWS({type:'lovelace/config',url_path:path,force:true});
+  if(!authoringAllowed(context))throw new Error('Dashboard changed. Reopen the card editor and try again.');
+  if([root.lovelace.rawConfig || root.lovelace.config,editorDocument].some(document=>document && canonicalLayout(document)!==canonicalLayout(baseline)))throw new Error('Save this dashboard before editing its popup.');
+  popupCardPath(baseline,opener,currentPath);
+  await reconcilePopupTransaction(context,baseline);
+  return baseline;
+}
+
 // No writes until both the invoking occurrence and a fresh baseline still match.
 // HA has no compare-and-swap API; use its native single-save operation after preflight.
-export async function savePopupLayout({hass,root,opener,popup,currentPath,path,backPath,isCurrent,recovery}) {
-  const allowed=()=>hass.user?.is_admin&&hass.connected!==false&&hass.connection?.connected!==false&&isCurrent()&&!root.lovelace?.editMode&&typeof root.lovelace?.saveConfig==='function'&&(!root.lovelace.mode||root.lovelace.mode==='storage');
-  if(!allowed())throw new Error('Layout creation requires an administrator on a connected, editable dashboard.');
-  const baseline=await hass.callWS({type:'lovelace/config',url_path:path,force:true});
-  if(!allowed())throw new Error('Dashboard changed. Reopen the popup and try again.');
+export async function savePopupLayout(context) {
+  const {opener,popup,currentPath,backPath}=context;
+  const baseline=await readPopupLayout(context);
+  if(context.plan){const result=context.plan(baseline);await commitPopupDocument(context,baseline,result.config);return result;}
   const suffix=globalThis.crypto?.randomUUID?.().slice(0,8) || (globalThis.crypto?.getRandomValues?Array.from(crypto.getRandomValues(new Uint8Array(4)),byte=>byte.toString(16).padStart(2,'0')).join(''):Date.now().toString(36)+Math.random().toString(36).slice(2,6)),viewPath='popup-'+suffix;
-  const view=seedPopupView(popup,viewPath,backPath,hass),next=appendPopupView(baseline,opener,currentPath,view);
-  const fresh=await hass.callWS({type:'lovelace/config',url_path:path,force:true});
-  if(!allowed()||canonicalLayout(fresh)!==canonicalLayout(baseline))throw new Error('Dashboard changed. Reopen the popup and try again.');
-  recovery({version:1,dashboard:path,created:new Date().toISOString(),original:baseline,proposed:next});
-  try {await root.lovelace.saveConfig(next);}
-  catch(error) {
-    // A rejected response can follow a successful server write. Never blindly retry it.
-    let actual;try{actual=await hass.callWS({type:'lovelace/config',url_path:path,force:true});}catch{}
-    if(!actual||canonicalLayout(actual)!==canonicalLayout(next))throw new Error('Save could not be confirmed. Keep the recovery download and reload before trying again.',{cause:error});
-  }
+  const view=createManagedView(seedPopupView(popup,viewPath,backPath,context.hass),context.behaviorOwner||opener),next=appendPopupView(baseline,opener,currentPath,view);
+  await commitPopupDocument(context,baseline,next);
   return {config:next,view,path:viewPath};
 }

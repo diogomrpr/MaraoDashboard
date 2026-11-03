@@ -107,12 +107,13 @@ test('main-page shortcut flags preserve absence and explicit false through sourc
 });
 
 test('inline media reuses popup controls and preserves independent modes and app targets',()=>{
- const input=structuredClone(source);const card={id:'player',template:'md_media_card',entity_id:'media_player.safe',name:'TV',unknown:{keep:[]},apple_tv:{remote_entity:'remote.safe',volume_remote_entity:'media_player.volume',apps:[{name:'Two',source:'two'},{name:'One',source:'one'}]}};
+ const input=structuredClone(source);const card={id:'player',template:'md_media_card',entity_id:'media_player.safe',name:'TV',unknown:{keep:[]},apple_tv:{remote_entity:'remote.safe',volume_remote_entity:'media_player.volume',apps:[{name:'Two',source:'two',icon:'mdi:television',logo:'netflix'},{name:'One',source:'one',logo:''}]}};
  input.pages[0].sections=[{columns:1,entities:[card]}];
  const popup=compileDashboard(input).views[0].cards.find(c=>c.type==='custom:marao-popup-card');
  const before=structuredClone(input);card.variables={media_display:'inline'};
  const view=compileDashboard(input).views[0];const inline=view.cards[0];assert.equal(inline.type,'vertical-stack');assert.equal(inline.cards[0].variables.now_playing,true);assert.equal(inline.cards[0].tap_action.action,'none');
  assert.deepEqual(inline.cards.slice(1),popup.cards);assert.ok(!view.cards.some(c=>c.type==='custom:marao-popup-card'));
+ const apps=inline.cards[1].cards;assert.deepEqual(apps.map(app=>({name:app.name,entity:app.entity,icon:app.icon,variables:app.variables})),[{name:'Two',entity:'media_player.safe',icon:'mdi:television',variables:{app_source:'two',app_logo:'netflix'}},{name:'One',entity:'media_player.safe',icon:'mdi:play-box-outline',variables:{app_source:'one',app_logo:''}}]);
  assert.deepEqual(card.apple_tv,before.pages[0].sections[0].entities[0].apple_tv);
  input.pages[0].sections[0].entities.push({...structuredClone(card),id:'other',variables:{media_display:'popup'}});
  const mixed=compileDashboard(input).views[0];assert.equal(mixed.cards.filter(c=>c.type==='custom:marao-popup-card').length,1);
@@ -120,6 +121,20 @@ test('inline media reuses popup controls and preserves independent modes and app
  assert.ok(actions.some(a=>a.perform_action==='remote.send_command'&&a.target.entity_id==='remote.safe'));
  assert.ok(actions.some(a=>a.perform_action==='media_player.volume_up'&&a.target.entity_id==='media_player.volume'));
  assert.ok(actions.some(a=>a.perform_action==='media_player.media_seek'&&a.seek_offset===30));
+});
+test('media creation templates preserve nested logo selection and explicit empty app lists',async()=>{
+ const {pageTemplates}=await import('../../frontend_src/native-metadata.js');
+ const card={template:'md_media_card',entity_id:'media_player.safe',apple_tv:{apps:[{source:'Custom TV app',name:'Custom',icon:'mdi:television',logo:'netflix',future:[]},{source:'MEO Go'}]}};
+ const input={pages:[{path:'media',entities:[card]}]},before=structuredClone(input),entities=[{entity_id:'media_player.safe',has_state:true}];
+ const result=pageTemplates(input,entities).media.entities;assert.deepEqual(result.slice(1).map(app=>app.variables),[{app_source:'Custom TV app',app_logo:'netflix'},{app_source:'MEO Go'}]);assert.equal(result[1].name,'Custom');assert.equal(result[1].icon,'mdi:television');assert.deepEqual(result[1].future,[]);assert.deepEqual(input,before);
+ input.pages[0].entities[0].apple_tv.apps=[];assert.equal(pageTemplates(input,entities).media.entities.length,1);
+});
+test('legacy media conversion keeps opt-in logos without changing its source or unselected apps',async()=>{
+ const {convertDocument}=await import('../../frontend_src/convert-document.js');
+ const legacy={config_version:1,name:'Safe',rooms:[],pages:{media:{players:[{entity_id:'media_player.safe',apple_tv:{apps:[{source:'Custom TV app',logo:'netflix',future:[]},{source:'MEO Go'}]}}]}}},before=structuredClone(legacy);
+ const converted=convertDocument(JSON.stringify(legacy),{dashboardRoot:'marao-dashboard'}).source;
+ const media=converted.pages.find(page=>page.path==='media'),apps=media.sections.flatMap(section=>section.entities).filter(card=>card.template==='md_media_app_card');
+ assert.deepEqual(apps.map(app=>app.variables),[{app_source:'Custom TV app',app_logo:'netflix'},{app_source:'MEO Go'}]);assert.deepEqual(apps[0].future,[]);assert.deepEqual(legacy,before);
 });
 test('inline generic media and removed popup links fail preflight without source changes',()=>{
  const input=structuredClone(source);input.pages[0].sections=[{columns:1,entities:[{template:'md_media_card',id:'audio',entity_id:'media_player.safe',variables:{media_display:'inline'}}]}];

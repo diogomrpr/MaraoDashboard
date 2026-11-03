@@ -16,11 +16,11 @@
     ],
     "MW": [
       "power",
-      1000000.0
+      1000000
     ],
     "GW": [
       "power",
-      1000000000.0
+      1000000000
     ],
     "Wh": [
       "energy",
@@ -32,11 +32,11 @@
     ],
     "MWh": [
       "energy",
-      1000000.0
+      1000000
     ],
     "GWh": [
       "energy",
-      1000000000.0
+      1000000000
     ],
     "J": [
       "energy",
@@ -468,6 +468,14 @@
           "selector": "text",
           "advanced": false,
           "description": ""
+        },
+        {
+          "key": "app_logo",
+          "label": "App logo",
+          "kind": "app_logo",
+          "selector": "app_logo",
+          "advanced": false,
+          "description": "Choose artwork independently of the app source."
         },
         {
           "key": "action_color",
@@ -1520,6 +1528,7 @@
       "label": "Entity Group",
       "icon": "mdi:view-list",
       "domains": [],
+      "entity_optional": true,
       "entity_group": true,
       "description": "Summarize selected lights, covers, batteries or thermostats and open their controls.",
       "variables": []

@@ -2,6 +2,7 @@ import catalog from '../../custom_components/marao_dashboard/frontend/marao-cata
 import labels from '../../custom_components/marao_dashboard/frontend/marao-generator-labels.json' with {type:'json'};
 import {getPath} from './editor-model.js';
 import {simulatedServices} from './simulation.js';
+import {mediaAppLogoChoices} from '../../custom_components/marao_dashboard/frontend/MaraoMediaApps.js';
 
 const named=value=>({value,label:String(value)});
 export const choiceValue=value=>value && typeof value==='object'?value.entity_id:value;
@@ -16,6 +17,7 @@ const domainsFor=(field,example,config)=>{
 /** Choice hints never change configuration or discover a real HA installation. */
 export function settingsChoices(field,{config={},states={},dashboard={},example={}}={}){
   const key=field.path.split('.').at(-1);
+  if(field.kind==='app_logo'){const [automatic,...options]=mediaAppLogoChoices();return {emptyLabel:automatic.label,options};}
   if(field.kind==='icon'||key==='icon')return {icons:true,custom:true,options:[]};
   const entityList=field.multiple || field.path==='targets' || field.path==='entities'&&['md_people_card','md_scene_collection_card','md_entity_group_card'].includes(example.id);
   if(field.kind==='entity'||field.selector==='entity'||entityList){

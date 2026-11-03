@@ -9,7 +9,7 @@ from custom_components.marao_dashboard.page_model import page_entries, page_sect
 
 def test_media_creation_preserves_selected_remotes_apps_and_unknown_options_without_mutation():
     options = {"remote_entity": "remote.safe", "volume_remote_entity": "media_player.volume", "future": {"keep": True},
-               "apps": [{"name": "Saved app", "source": "App; exact", "icon": "mdi:play", "future": [2, 1]}]}
+               "apps": [{"name": "Saved app", "source": "App; exact", "icon": "mdi:play", "logo": "netflix", "future": [2, 1]}]}
     source = {"config_version": 2, "pages": [{"name": "Media", "path": "media", "entities": [
         {"id": "tv", "entity_id": "media_player.safe", "template": "md_media_card", "name": "My TV", "apple_tv": options, "future": True},
     ]}]}
@@ -18,9 +18,45 @@ def test_media_creation_preserves_selected_remotes_apps_and_unknown_options_with
     player, app = snapshot["entities"]
     assert player["name"] == "My TV" and player["apple_tv"] == options and player["future"] is True
     assert app["template"] == "md_media_app_card" and app["variables"]["app_source"] == "App; exact"
+    assert app["variables"]["app_logo"] == "netflix"
     assert app["future"] == [2, 1] and source == before
     options["apps"].clear()
     assert len(snapshot["entities"]) == 2
+
+
+def test_media_logo_retained_view_popup_and_catalog_preserve_optional_choices():
+    import json
+    from pathlib import Path
+    from custom_components.marao_dashboard.generator import _media_view, _media_popup
+
+    catalog = json.loads((Path(__file__).parents[3] / "custom_components/marao_dashboard/frontend/marao-catalog.json").read_text())
+    expected = next(card for card in EDITOR_CATALOG["cards"] if card["id"] == "md_media_app_card")
+    assert next(card for card in catalog["cards"] if card["id"] == expected["id"]) == expected
+    for extra, variables in [({}, {"app_source": "Custom TV app"}), ({"logo": "netflix"}, {"app_source": "Custom TV app", "app_logo": "netflix"}), ({"logo": ""}, {"app_source": "Custom TV app", "app_logo": ""})]:
+        player = {"entity_id": "media_player.safe", "name": "TV", "apple_tv": {"apps": [{"name": "Custom", "source": "Custom TV app", "icon": "mdi:television", **extra}]}}
+        before = deepcopy(player)
+        popup = _media_popup(player)
+        view = _media_view({"rooms": [], "pages": {"media": {"players": [player]}}}, "/marao-dashboard")
+        def apps(value):
+            if isinstance(value, dict):
+                return ([value] if value.get("template") == "md_media_app_card" else []) + [item for child in value.values() for item in apps(child)]
+            return [item for child in value for item in apps(child)] if isinstance(value, list) else []
+        for result in [popup, view]:
+            app = apps(result)[0]
+            assert app["variables"] == variables
+            assert (app["entity"], app["name"], app["icon"]) == ("media_player.safe", "Custom", "mdi:television")
+        assert player == before
+
+
+def test_media_logo_legacy_conversion_keeps_opt_in_without_inserting_defaults():
+    from custom_components.marao_dashboard.page_migration import convert_legacy_pages
+    legacy = {"config_version": 1, "name": "Safe", "rooms": [], "pages": {"media": {"players": [{"entity_id": "media_player.safe", "apple_tv": {"apps": [{"source": "Custom TV app", "logo": "netflix", "future": []}, {"source": "MEO Go"}]}}]}}}
+    before = deepcopy(legacy)
+    result = convert_legacy_pages(legacy)
+    media = next(page for page in result["pages"] if page["path"] == "media")
+    apps = [card for section in media["sections"] for card in section["entities"] if card.get("template") == "md_media_app_card"]
+    assert [app["variables"] for app in apps] == [{"app_source": "Custom TV app", "app_logo": "netflix"}, {"app_source": "MEO Go"}]
+    assert apps[0]["future"] == [] and legacy == before
 
 
 def test_security_creation_uses_real_strict_access_and_hold_actions():

@@ -10,6 +10,7 @@ from .card_yaml import parse_card_yaml
 from .card_names import canonical_card
 
 PAGE_FORMAT_VERSION = 2
+MEDIA_APP_LOGOS = ("", "netflix", "spotify", "youtube", "disney-plus", "prime-video", "apple-tv", "plex", "meo")
 FREE_CARD_ROLES = {
     "md_title_card", "md_navigation_card", "md_room_card",
     "md_entity_group_card", "md_scene_collection_card",
@@ -272,6 +273,8 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                         raise ValueError("Room lights must be an explicit list of light entities")
                 if role == "md_media_app_card" and (not isinstance(options.get("app_source"), str) or not options["app_source"].strip()):
                     raise ValueError("Media app requires an explicit source")
+                if role == "md_media_app_card" and "app_logo" in options and options["app_logo"] not in MEDIA_APP_LOGOS:
+                    raise ValueError("Choose a supported app logo.")
                 if role == "md_access_hold_action_card" and "tap_action" in card:
                     action = card["tap_action"]
                     button = entity and entity.startswith("button.")
@@ -294,6 +297,8 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                     apps = apple_tv.get("apps", [])
                     if not isinstance(apps, list) or any(not isinstance(app, dict) or not isinstance(app.get("source"), str) or not app["source"].strip() for app in apps):
                         raise ValueError("Media apps require an explicit ordered list of sources")
+                    if any("logo" in app and app["logo"] not in MEDIA_APP_LOGOS for app in apps):
+                        raise ValueError("Choose a supported app logo.")
                 if "page" in card:
                     references.append(card["page"])
                 elif role in ("md_navigation_card", "md_room_card"):
