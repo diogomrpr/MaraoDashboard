@@ -24,11 +24,8 @@ function contentFor(surface) {
   const visual = surface.querySelector?.('ha-icon,ha-state-icon,svg,img,span');
   const owner = visual?.closest?.('button,a');
   if (owner && owner !== surface) return null;
-  if (visual) return visual;
-  const texts = [...(surface.childNodes || [])].filter(node => node.nodeType === 3 && node.textContent.trim());
-  if (!texts.length) return null;
-  const span = surface.ownerDocument.createElement('span'); texts[0].before(span); span.append(...texts);
-  return span;
+  // Keep the hit-tested DOM stable until Safari completes the click.
+  return visual || null;
 }
 
 export function bindPressFeedback(root, { resolve = event => pressTarget(root,event), pointer = true } = {}) {
@@ -105,7 +102,8 @@ export function bindPressFeedback(root, { resolve = event => pressTarget(root,ev
     }
     if(keyboard){start(entry);release();}
   },true);
-  for(const type of ['scroll','blur','pagehide','location-changed','popstate','hashchange'])listen(host,type,cancel,true);
+  for(const type of ['scroll','pagehide','location-changed','popstate','hashchange'])listen(host,type,cancel,true);
+  listen(host,'blur',event=>{if(event.target===host)cancel();},true);
   listen(doc,'visibilitychange',()=>{if(doc.visibilityState==='hidden')cancel();});
   const observer = globalThis.MutationObserver && root ? new MutationObserver(sync) : null;
   return {start,release,cancel,sync,destroy(){disposed=true;clear();observer?.disconnect();for(const remove of listeners)remove();}};

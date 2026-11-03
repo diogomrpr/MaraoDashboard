@@ -66,3 +66,19 @@ test('manual gesture owners use the same feedback without acquiring pointer hand
  e.binding.release();e.binding.destroy();t.mock.timers.tick(1000);assert.equal(e.card.hasAttribute('data-marao-pressed'),false);
  e.send('click',{detail:0});assert.equal(e.card.hasAttribute('data-marao-pressed'),false);
 });
+
+
+test('plain-text buttons keep their hit-tested children intact through the first click',t=>{
+ const e=environment(t),text={nodeType:3,textContent:'×',before(){throw Error('Reparenting a pressed label cancels Safari clicks');}};
+ e.nested.childNodes=[text];e.nested.ownerDocument={createElement(){throw Error('Pointer feedback must not insert children');}};
+ let actions=0;e.root.addEventListener('click',()=>actions++);
+ e.send('pointerdown',{target:e.nested});assert.ok(e.nested.hasAttribute('data-marao-pressed'));
+ assert.deepEqual(e.nested.childNodes,[text]);e.send('pointerup',{target:e.nested});e.send('click',{target:e.nested});assert.equal(actions,1);
+});
+
+test('focus moving between page elements does not cancel a completed tap; window blur still does',t=>{
+ const e=environment(t);let actions=0;e.root.addEventListener('click',()=>actions++);
+ e.send('pointerdown');const blur=new Event('blur');Object.defineProperty(blur,'target',{value:e.button});e.host.dispatchEvent(blur);
+ assert.ok(e.card.hasAttribute('data-marao-pressed'));e.send('pointerup');assert.equal(e.send('click').defaultPrevented,false);assert.equal(actions,1);
+ e.send('pointerdown');e.host.dispatchEvent(new Event('blur'));assert.equal(e.send('click').defaultPrevented,true);assert.equal(actions,1);
+});

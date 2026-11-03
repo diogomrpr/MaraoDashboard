@@ -18,6 +18,7 @@ export function nativeCardDescriptor(config) {
   if (config.variables != null && !object(config.variables)) throw new Error('Card options must be an object.');
   const descriptor = copy(config);
   delete descriptor.type;
+  if (!descriptor.entity_id && descriptor.entity) descriptor.entity_id = descriptor.entity;
   return { ...descriptor, template };
 }
 

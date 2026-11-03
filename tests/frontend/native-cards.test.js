@@ -247,3 +247,17 @@ test('HA language refresh changes only owned labels and preserves callbacks, hel
   refreshCardMetadata({language:'pt'});refreshCardMetadata({language:'en'});
   assert.equal(light.name,'Marao Light');assert.equal(light.getEntitySuggestion,callback);assert.equal(light.documentationURL,url);assert.deepEqual(draft,before);
 });
+
+
+test('native runtime accepts released entity aliases in popup members without rewriting saved cards',()=>{
+  for(const [template,entity] of [['md_cover_card','cover.blind'],['md_light_card','light.room'],['md_access_card','lock.entry'],['md_access_slide_action_card','cover.garage']]) {
+    const saved=config(template,{entity,grid_options:{columns:6},future:{empty:[],enabled:false}}),before=structuredClone(saved);
+    assert.equal(nativeCardDescriptor(saved).entity_id,entity);
+    assert.doesNotThrow(()=>validateNativeCardConfig(saved));assert.equal(nativeCardSetup(saved),null);
+    const result=compose(saved);assert.equal(result.card.entity,entity);
+    if(template==='md_access_slide_action_card')assert.equal(result.card.template,'md_access_slide_action_card');
+    assert.deepEqual(saved,before);assert.equal(Object.hasOwn(saved,'entity_id'),false);
+  }
+  const explicit=config('md_light_card',{entity:'light.old',entity_id:'light.selected'});
+  assert.equal(nativeCardDescriptor(explicit).entity_id,'light.selected');
+});
