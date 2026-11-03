@@ -22,4 +22,13 @@ No direct ha-mcp connection, production instance, device actions, browser/layout
 
 The final v0.27.0 candidate is installed on disposable `192.168.0.28` through direct `prepareFrontend()`; native served-asset/readiness checks passed with identity `3e02b909a0ab4a1a9cb3a976416955b792b53a7bdc57bd005a8fe02c9ce7929f`. This supersedes the initial metadata build. Test URL: `http://192.168.0.28:8123/marao-dashboard/overview`. The flat graph contains 92 files, including the stable release manifest and authoring index. Preparation preserved the existing ordinary dashboard and safe helper state without an HA restart or browser inspection.
 
-Publication evidence will be recorded after the unit-only gate and external publication complete. Archiving remains a separate explicit request.
+## Publication
+
+- Published [v0.27.0](https://github.com/diogomrpr/MaraoDashboard/releases/tag/v0.27.0), release ID `433318188`, from immutable tag commit `f16bd16b3b29e438aabbd2d5ebb98cb740203f29`. The release is public, stable and marked latest.
+- Whole-candidate `verify:publish --base v0.26.1` passed all 30 selected unit-only groups serially on that clean commit. Final private report: `tests/.artifacts/verification/run-8DUYn0/report.json`; earlier successful report: `run-RS5j6D/report.json`. A redundant evidence read stalled on an ignored cloud-synced documentation output; the output was preserved outside the tree. An overlapping early retry correctly rejected changed generated inputs; the final serial gate passed after cleanup. No failed functional check was waived or suppressed.
+- Exact-commit GitHub checks passed on main and tag. Tag Tests: `41736937572`; HACS: `41736937593`; hassfest: `41736937614`. Main Tests: `41736112297`; HACS: `41736112908`; hassfest: `41736111993`; documentation build: `41736112512`.
+- Uploaded the complete 92-file flat distribution plus offline converter. All 93 remote asset names, sizes and SHA-256 digests match the final local candidate; the remote tag resolves to the recorded commit. Private asset receipt: `/private/tmp/marao-0270-release-verification.json`.
+- Matching documentation build and Pages deployment succeeded through the approved main-branch publisher [41737277706](https://github.com/diogomrpr/MaraoDashboard/actions/runs/41737277706). The automatic tag-triggered build succeeded, but its duplicate deploy (`41737276710`) failed under the existing main-only Pages environment policy. No protection rules were changed, and that tag deployment is not claimed as passing.
+- Generated cloud-sync duplicate files were preserved privately outside the release graph. Canonical distribution hashes remain unchanged. The final installed runtime identity remains the one above; this completion record changes documentation/tracking only and requires no reinstall.
+
+All tracked work is complete. Archiving remains a separate explicit request.

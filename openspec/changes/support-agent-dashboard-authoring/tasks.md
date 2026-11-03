@@ -11,7 +11,7 @@
 - [x] 2.1 Link matching authoring assets through the release manifest and stable index, keep them outside startup, and verify package hashes/version and generated-asset checks.
 - [x] 2.2 Review actual diff and acceptance against scoped evidence, validate OpenSpec and run selected serial checks; record compatibility preservation and unchecked MCP connectivity.
 - [x] 2.3 Build v0.27.0 and install the exact candidate on disposable 192.168.0.28 using served-asset/readiness verification while preserving configuration and helpers.
-- [ ] 2.4 Run whole-candidate unit-only verify:publish and applicable exact-commit HACS/hassfest checks, publish tag/release with the complete graph and converter, and publish matching documentation through the approved workflow; verify public release/assets.
+- [x] 2.4 Run whole-candidate unit-only verify:publish and applicable exact-commit HACS/hassfest checks, publish tag/release with the complete graph and converter, and publish matching documentation through the approved workflow; verify public release/assets.
 
 ## Workflow follow-up
 
