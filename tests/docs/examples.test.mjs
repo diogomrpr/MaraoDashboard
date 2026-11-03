@@ -40,6 +40,8 @@ test('examples protect recently added public behavior and distinct capability sh
   assert.ok(getExample('climate').scenarios.some(s=>s.id==='range' && s.states['climate.living_room'].state==='heat_cool'));
   assert.ok(getExample('schedules').config.group_id);
   assert.ok(getExample('entity-group').config.summary_sections.length);
+  assert.ok(getExample('entity-group').notes.some(note=>note.includes('Edit popup')));
+  assert.ok(getExample('entity-group').notes.some(note=>note.includes('Make custom')));
   assert.deepEqual(getExample('people').scenarios.find(s=>s.id==='empty').config.entities,[]);
 });
 

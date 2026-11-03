@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {applyTheme,releaseTheme} from '../../custom_components/marao_dashboard/frontend/MaraoTheme.js';
 const {buildFrontend} = createRequire(import.meta.url)('../../frontend_src/build-native.cjs');
@@ -27,6 +28,18 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     const asset=path.join(directory,'dist',first.identity+'--MaraoNativeDashboard.js');
     assert.ok(fs.existsSync(asset));assert.ok(fs.existsSync(path.join(directory,'dist','MaraoFrontend.js')));
     const manifest=JSON.parse(fs.readFileSync(path.join(directory,'dist','MaraoFrontend.release.json')));
+    assert.equal(manifest.authoring,'MaraoAuthoring.json');
+    const authoring=JSON.parse(fs.readFileSync(path.join(directory,'dist',manifest.authoring)));
+    assert.equal(authoring.package_version,manifest.package_version);assert.equal(authoring.identity,manifest.identity);assert.equal(authoring.authoring_contract,1);
+    for(const filename of Object.values(authoring.assets))assert.ok(manifest.files[filename],'Authoring payload must be hashed: '+filename);
+    const descriptions=JSON.parse(fs.readFileSync(path.join(directory,'dist',authoring.assets.metadata)));
+    assert.equal(descriptions.package_version,manifest.package_version);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(directory,'dist',authoring.assets.schema))),descriptions.schema);
+    const module=await import(pathToFileURL(path.join(directory,'dist',authoring.assets.module)));
+    assert.equal(module.describeAuthoring().package_version,manifest.package_version);
+    const cli=spawnSync(process.execPath,[path.join(directory,'dist',authoring.assets.cli),'describe'],{input:'',encoding:'utf8'});
+    assert.equal(cli.status,0,cli.stderr);assert.equal(JSON.parse(cli.stdout).package_version,manifest.package_version);
+    assert.doesNotMatch(fs.readFileSync(path.join(directory,'dist','MaraoFrontend.js'),'utf8'),/import\([^)]*Authoring/);
     const stableImage='MaraoAsset--brand--mark.svg';
     assert.ok(fs.readFileSync(path.join(directory,'dist',stableImage)).equals(fs.readFileSync('custom_components/marao_dashboard/frontend/brand/mark.svg')));
     for(const name of ['MaraoNativeCardMetadata.js','MaraoNativeCards.js','MaraoNativeCardEditor.js','MaraoNativeBootstrap.js','MaraoDashboardSettings.js','MaraoOrdinaryMigration.js']) assert.ok(fs.existsSync(path.join(directory,'dist',first.identity+'--'+name)),name+' must ship in the complete native graph');
@@ -68,6 +81,9 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     const next=await buildFrontend(directory,'0.22.0-beta.2');assert.notEqual(next.identity,first.identity);
     assert.ok(fs.existsSync(path.join(directory,'dist',stableImage)),'Persisted ordinary image addresses survive a package identity change');
     assert.equal(JSON.parse(fs.readFileSync(path.join(directory,'dist','MaraoFrontend.release.json'))).package_version,'0.22.0-beta.2');
+    const nextIndex=JSON.parse(fs.readFileSync(path.join(directory,'dist','MaraoAuthoring.json')));
+    const nextCli=spawnSync(process.execPath,[path.join(directory,'dist',nextIndex.assets.cli),'describe'],{input:'',encoding:'utf8'});
+    assert.equal(nextCli.status,0,nextCli.stderr);assert.equal(JSON.parse(nextCli.stdout).package_version,'0.22.0-beta.2');
   } finally {fs.rmSync(directory,{recursive:true,force:true});}
 });
 test('Duplicate frontend entry points share one document runtime without mixing graph ownership', async () => {

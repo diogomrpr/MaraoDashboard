@@ -24,6 +24,7 @@ const families = {
   camera: ['md_camera_card'], history: ['md_graph_card', 'md_timeline_card', 'md_toggle_graph_card'],
 };
 const components = {
+  'agent-authoring': {units:[['agent-authoring'],['native-package']],editor:true},
   'documentation-brand': {units:[['brand-assets','canonical artwork']]},
   'documentation-playground': {browser:[{id:'unit:documentation-playground',kind:'offline',command:['node','--test','--test-concurrency=1',...fs.readdirSync(path.join(__dirname,'docs')).filter(file=>file.endsWith('.test.mjs')).sort().map(file=>'tests/docs/'+file)],inputs:['docs','tests/docs','frontend_src',runtime],exclusive:false}]},
   'location-shortcut': {units:[['marao-navbar-card'],['dashboard-settings']],editor:true},
@@ -150,6 +151,7 @@ const components = {
 };
 
 const rules = [
+  [/^(?:frontend_src\/(?:authoring(?:-schema|-cli)?\.js|build-authoring\.cjs)|custom_components\/marao_dashboard\/frontend\/MaraoAuthoring.*|tests\/frontend\/agent-authoring\.test\.js|docs\/docs\/development\/agent-authoring\.md)$/, ['agent-authoring']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoMediaApps\.js$/, ['labels','native-source','packaging']],
   [/^tests\/export-brand-assets\.js$/, ['documentation-brand']],
   [/^(docs\/(?:playground|examples|scripts|src\/components|src\/scripts)\/|tests\/docs\/)/, ['documentation-playground']],

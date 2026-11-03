@@ -93,6 +93,11 @@ Native save acknowledgement and update events do not independently prove disk pe
 
 ## Build and package ownership
 
+External agent clients can discover the installed version's authoring schema,
+metadata, guide and read-only Node planner through the release manifest's
+`authoring` index. See [agent authoring](agent-authoring.md). These assets remain
+outside normal dashboard startup and do not add a writer or backend.
+
 `npm run build:editor` regenerates source-owned frontend bundles. `npm run build:hacs` stages the Dashboard package and replaces root `dist/` and `hacs.json`. `npm run build:converter` creates the standalone offline HTML converter. Do not edit generated distribution files.
 
 The flat graph contains the stable loader, release manifest and content-identified modules/assets. An injected graph-local URL resolver preserves relative assets without changing the browser's global URL constructor. Manifest hashes support readiness checks. A document-level gate prevents competing registrations from duplicate entry loads.

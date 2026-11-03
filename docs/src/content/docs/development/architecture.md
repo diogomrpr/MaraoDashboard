@@ -32,3 +32,5 @@ Old strategies stay read-only until explicit conversion. Complete source and rec
 Frequent `hass` updates change affected presentation without replacing focused inputs or active gesture targets. Device state remains authoritative. Shared dispatch checks availability, capabilities and connection state, acknowledges interaction and reports failures. Each element owns cleanup for listeners, timers, requests and subscriptions.
 
 The public playground uses these same cards with a fictional HA boundary. Its isolated services, metadata and assets do not become dependencies of the installed product.
+
+External agents can use [installed-version metadata and a local read-only planner](../agent-editing/) to prepare coherent edits through ha-mcp. Authoring assets are discovered from the release manifest and remain outside normal dashboard startup.

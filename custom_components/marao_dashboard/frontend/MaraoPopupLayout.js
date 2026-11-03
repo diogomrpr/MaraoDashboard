@@ -1,5 +1,5 @@
 import {memberId,summarySections,collectionLabel} from './MaraoCollections.js';
-import {popupCanonical,createManagedView,popupHashFor} from './MaraoPopupManaged.js';
+import {popupCanonical,createManagedView,popupHashFor,popupDashboardCards} from './MaraoPopupManaged.js';
 import {commitPopupDocument,reconcilePopupTransaction,popupAuthoringAllowed,POPUP_UNCERTAIN} from './MaraoPopupTransaction.js';
 export const POPUP_ROLES = ['md_entity_group_card','md_scene_collection_card','md_climate_card','md_media_card','md_camera_card','md_energy_period_card','md_graph_card','md_security_card','md_access_card','md_floor_plan_card'];
 export const popupHash = popupHashFor;
@@ -90,28 +90,14 @@ export function seedPopupView(popup,path,backPath,hass) {
 }
 export function popupCardPath(document,opener,currentPath) {
   if(document?.strategy||!Array.isArray(document?.views))throw new Error('Use an ordinary Home Assistant dashboard.');
-  const matches=[];
-  const visit=(value,path)=>{
-    if(!value||typeof value!=='object')return;
-    if(Array.isArray(value)){value.forEach((child,index)=>visit(child,[...path,index]));return;}
-    if(value.type&&canonicalLayout(value)===canonicalLayout(opener))matches.push(path);
-    for(const key of ['cards','sections'])if(Array.isArray(value[key]))visit(value[key],[...path,key]);
-  };
-  document.views.forEach((v,index)=>{if(String(v.path ?? index)===currentPath)visit(v,['views',index]);});
+  const matches=popupDashboardCards(document).filter(card=>card.currentPath===currentPath&&canonicalLayout(card.config)===canonicalLayout(opener)).map(card=>card.address);
   if(matches.length!==1)throw new Error('The invoking card is missing or duplicated. Select an existing layout in its editor.');
   return matches[0];
 }
 export function popupEditorSource(document,opener,currentPath) {
   const path=popupCardPath(document,opener,currentPath),hash=popupHash(opener);
   if(opener.popup_view||!hash)return {opener,external:false};
-  const matches=[];
-  const visit=value=>{
-    if(!value||typeof value!=='object')return;
-    if(Array.isArray(value)){value.forEach(visit);return;}
-    if(value.type==='custom:marao-popup-card'&&value.hash===hash)matches.push(value);
-    for(const key of ['cards','sections'])if(Array.isArray(value[key]))visit(value[key]);
-  };
-  visit(document.views[path[1]]);
+  const matches=popupDashboardCards(document).filter(card=>card.address[1]===path[1]&&card.config.type==='custom:marao-popup-card'&&card.config.hash===hash).map(card=>card.config);
   if(matches.length!==1)throw new Error('Referenced popup is missing or ambiguous.');
   return {opener:matches[0],popup:matches[0],external:true};
 }

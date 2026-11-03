@@ -6,6 +6,7 @@ const path = require("path");
 const repoRoot = path.resolve(__dirname, "..");
 const frontendRoot = path.join(repoRoot, "custom_components", "marao_dashboard", "frontend");
 const check = process.argv.includes("--check");
+const {buildAuthoring,authoringFiles}=require('./build-authoring.cjs');
 const entries = {
   MaraoSchedules: 'schedules-card.js',
   MaraoNativeModel: 'legacy-model.js',
@@ -20,7 +21,7 @@ const entries = {
   MaraoHistoryData: 'history-data.js',
   MaraoHistoryChart: 'history-chart.js',
 };
-const generatedFiles = [...Object.keys(entries).map(name => name + '.js'),
+const generatedFiles = [...Object.keys(entries).map(name => name + '.js'), ...authoringFiles,
   'marao-owned-assets.json', 'YAML.LICENSE.txt', 'ChartJS.LICENSE.txt', 'KurkleColor.LICENSE.txt'];
 // These are generated outputs of the retired builder, never user-owned assets.
 const retiredFiles = ['MaraoDashboardPanel.js', 'MaraoDashboardPanel.css', 'MaraoLovelaceEditor.js',
@@ -42,6 +43,7 @@ function listFiles(root, prefix = "") {
 async function build() {
   const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'marao-native-editor-'));
   try {
+    await buildAuthoring(outputRoot);
     const sourceFiles = listFiles(frontendRoot).filter(file => !retiredFiles.includes(file) && !managedFont(file)
       && !/(?:^|\/)(?:\.DS_Store|__pycache__)(?:\/|$)|\.py[co]$/.test(file));
     const ownedAssets = [...new Set([...sourceFiles, ...generatedFiles])].sort();

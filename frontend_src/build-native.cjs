@@ -21,7 +21,12 @@ async function buildConverter(destination = path.join(root,'ha-test/.cache/nativ
 
 async function buildFrontend(destination = path.join(root,'ha-test/.cache/native-frontend'), version = JSON.parse(fs.readFileSync(path.join(root,'package.json'))).version) {
   const {assertPackageBoundary} = require('./build-hacs-dist.cjs');
+  const {buildAuthoring,authoringFiles}=require('./build-authoring.cjs');
+  const authoringRoot=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'marao-authoring-'));
+  try {
+  await buildAuthoring(authoringRoot,version);
   const frontend = path.join(root,'custom_components/marao_dashboard/frontend');
+  const sourceFile=file=>path.join(authoringFiles.includes(file)?authoringRoot:frontend,file);
   assertPackageBoundary(frontend,{allowLocalCache:true});
   const files = [];
   const visit = (directory,prefix = '') => {for (const item of fs.readdirSync(directory,{withFileTypes:true}).sort((a,b) => a.name.localeCompare(b.name))) {
@@ -34,7 +39,7 @@ async function buildFrontend(destination = path.join(root,'ha-test/.cache/native
   const digest = crypto.createHash('sha256');
   digest.update('package_version\0'+version+'\0');
   digest.update(fs.readFileSync(__filename));
-  for (const file of files) digest.update(file+'\0').update(fs.readFileSync(path.join(frontend,file)));
+  for (const file of files) digest.update(file+'\0').update(fs.readFileSync(sourceFile(file)));
   const identity = digest.digest('hex');
   fs.rmSync(destination,{recursive:true,force:true});
   // Any attached release asset makes HACS prefer assets: upload the entire flat graph together.
@@ -48,17 +53,17 @@ async function buildFrontend(destination = path.join(root,'ha-test/.cache/native
   try {
     const inject = path.join(temporary,'url.js');
     fs.writeFileSync(inject,`export {AssetURL as URL} from './${resolver}';`);
-    const compiled = await esbuild.build({entryPoints:Object.fromEntries(files.filter(file=>file.endsWith('.js')).map(file=>[names[file].slice(0,-3),path.join(frontend,file)])),outdir:dist,bundle:true,write:false,format:'esm',platform:'browser',target:'es2022',minify:true,legalComments:'eof',inject:[inject],external:[`./${resolver}`],logLevel:'silent'});
+    const compiled = await esbuild.build({entryPoints:Object.fromEntries(files.filter(file=>file.endsWith('.js')).map(file=>[names[file].slice(0,-3),sourceFile(file)])),outdir:dist,bundle:true,write:false,format:'esm',platform:'browser',target:'es2022',minify:true,legalComments:'eof',inject:[inject],external:[`./${resolver}`],logLevel:'silent'});
     for (const output of compiled.outputFiles) fs.writeFileSync(output.path,output.contents);
   } finally {fs.rmSync(temporary,{recursive:true,force:true});}
   for (const file of files.filter(file=>!file.endsWith('.js'))) {
     if (file.endsWith('.css')) {
-      const css=fs.readFileSync(path.join(frontend,file),'utf8').replace(/url\((['"]?)([^)'"\s]+)\1\)/g,(whole,quote,relative)=>{
+      const css=fs.readFileSync(sourceFile(file),'utf8').replace(/url\((['"]?)([^)'"\s]+)\1\)/g,(whole,quote,relative)=>{
         const target=path.posix.normalize(path.posix.join(path.posix.dirname(file),relative));
         return names[target] ? `url('${names[target]}')` : whole;
       });
       fs.writeFileSync(path.join(dist,names[file]),css);
-    } else fs.copyFileSync(path.join(frontend,file),path.join(dist,names[file]));
+    } else fs.copyFileSync(sourceFile(file),path.join(dist,names[file]));
   }
   // Persisted ordinary HA picture cards cannot follow our graph URL resolver.
   // Give owned images/fonts a stable flat address across package identities.
@@ -67,8 +72,9 @@ async function buildFrontend(destination = path.join(root,'ha-test/.cache/native
   }
   const loader = `const root=new URL('./',import.meta.url);const manifestURL=new URL('MaraoFrontend.release.json',root);const response=await fetch(manifestURL,{cache:'no-store',credentials:'same-origin'});if(!response.ok)throw new Error('Marao frontend installation is incomplete.');const meta=await response.json();if(meta.compiler_contract!==1||!/^[a-f0-9]{64}$/.test(meta.identity||''))throw new Error('Invalid Marao frontend identity.');window.MaraoInstalledFrontendPackage={identity:meta.identity,package_version:meta.package_version,entryURL:import.meta.url,rootURL:root.href,baseURL:root.href,manifestURL:manifestURL.href};window.MaraoFrontendPackage ||= window.MaraoInstalledFrontendPackage;await import(new URL(meta.identity+'--MaraoNativeDashboard.js',root));await import(new URL(meta.identity+'--MaraoDashboard.js',root));\n`;
   fs.writeFileSync(path.join(dist,'MaraoFrontend.js'),loader);
+  fs.writeFileSync(path.join(dist,'MaraoAuthoring.json'),JSON.stringify({authoring_contract:1,package_version:version,identity,assets:{metadata:names['MaraoAuthoring.metadata.json'],schema:names['MaraoAuthoring.schema.json'],guide:names['MaraoAuthoring.md'],module:names['MaraoAuthoring.js'],cli:names['MaraoAuthoringCLI.mjs']}})+'\n');
   const hashes = Object.fromEntries(fs.readdirSync(dist).sort().map(file=>[file,crypto.createHash('sha256').update(fs.readFileSync(path.join(dist,file))).digest('hex')]));
-  fs.writeFileSync(path.join(dist,'MaraoFrontend.release.json'),JSON.stringify({identity,package_version:version,compiler_contract:1,files:hashes})+'\n');
+  fs.writeFileSync(path.join(dist,'MaraoFrontend.release.json'),JSON.stringify({identity,package_version:version,compiler_contract:1,authoring:'MaraoAuthoring.json',files:hashes})+'\n');
   fs.writeFileSync(path.join(destination,'hacs.json'),JSON.stringify({name:'Marao Dashboard',filename:'MaraoFrontend.js',render_readme:true,homeassistant:'2025.12.0'})+'\n');
   fs.copyFileSync(path.join(root,'LICENSE'),path.join(destination,'LICENSE'));
   fs.writeFileSync(path.join(destination,'README.md'),'# Marao Dashboard\n\n**BREAKING v0.22.0:** existing Integration installations must follow [MIGRATION.md](MIGRATION.md) before changing packages. Do not update the old Integration in place. Keep the same repository and original dashboard address. Download the offline converter from the release assets.\n\nInstall this repository as a HACS Dashboard repository. The resource is `MaraoFrontend.js`. Requires Home Assistant 2025.12.0 or newer.\n\nAll runtime assets are in `dist/`. Commit this graph under the release tag. If attaching any release asset (including the converter), attach every dist file too: HACS prefers release assets over tagged files. Do not attach only the entry JavaScript or use an integration ZIP.\n\nExisting integration installations require the guided [migration procedure](MIGRATION.md) before removal. Export drafts, back up exact package/data, convert offline and retain the original dashboard address. No new legacy Integration release is required.\n');
@@ -77,6 +83,7 @@ async function buildFrontend(destination = path.join(root,'ha-test/.cache/native
   if(attribution) fs.appendFileSync(path.join(destination,'README.md'),'\n'+attribution+'\n');
   assertPackageBoundary(destination);
   return {destination,identity,files:files.length};
+  } finally {fs.rmSync(authoringRoot,{recursive:true,force:true});}
 }
 if (require.main === module) (async () => {
   if (!process.argv.includes('--frontend')) return buildConverter();

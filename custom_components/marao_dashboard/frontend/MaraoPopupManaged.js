@@ -204,12 +204,20 @@ export const managedPopupCurrent=(view,owner)=>{assertManaged(view);return !view
 export const detachManagedPopupCard=config=>{const next=copy(config);delete next.marao_popup_slot;return next;};
 
 // Walk only native card containers, never opaque command data or provenance.
+export function popupDashboardCards(document) {
+  const cards=[];
+  for(const [index,view]of (document.views||[]).entries()) {
+    const currentPath=String(view.path??index);
+    const visit=(value,address)=>{if(!object(value))return;if(value.type)cards.push({config:value,address,currentPath});for(const key of ['cards','sections'])for(const [i,child]of (Array.isArray(value[key])?value[key]:[]).entries())visit(child,[...address,key,i]);if(object(value.card))visit(value.card,[...address,'card']);};
+    visit(view,['views',index]);
+    for(const [i,badge]of (view.badges||[]).entries())visit(badge,['views',index,'badges',i]);
+  }
+  return cards;
+}
 export function popupOwners(document) {
-  const result=[];
+  const result=[],all=popupDashboardCards(document);
   for(const [viewIndex,view]of (document.views||[]).entries()) {
-    const path=String(view.path??viewIndex),cards=[];
-    const visit=(value,address)=>{if(!object(value))return;if(value.type)cards.push({config:value,address});for(const key of ['cards','sections'])for(const [index,child]of (Array.isArray(value[key])?value[key]:[]).entries())visit(child,[...address,key,index]);};
-    visit(view,['views',viewIndex]);
+    const path=String(view.path??viewIndex),cards=all.filter(card=>card.currentPath===path);
     for(const card of cards) {
       if(!POPUP_TEMPLATES.includes(popupTemplate(card.config)))continue;
       let source=card,external=false,error;

@@ -43,6 +43,7 @@ package/data recovery copies. Follow [migration and recovery](docs/docs/installa
 - Automatic details or editable popup layouts backed by native Sections views.
 - Floor plans with visual light placement and illuminated strip overlays.
 - Public card examples with editable configuration and safe interactive scenarios.
+- Installed-version metadata and a [read-only agent planner](docs/docs/development/agent-authoring.md) for editing through ha-mcp.
 
 Native dashboard configuration is readable through Home Assistant's authenticated
 configuration APIs. Hidden dashboards and administrator-only editors do not make
