@@ -32,7 +32,7 @@ export async function buildPreview(){
         throw new Error('Unrecognized runtime import in '+path.basename(args.path)+': '+expression);
       });
       if(path.basename(args.path)==='MaraoCards.js'){
-        source=source.replace('lightColorModule ||= import(url.href)','lightColorModule ||= import("./MaraoLightColor.js")').replace('historyChartModule ||= import(url.href)','historyChartModule ||= import("./MaraoHistoryChart.js")');
+        source=source.replace('lightColorModule ||= import(url.href)','lightColorModule ||= import("./MaraoLightColor.js")').replace('historyChartModule ||= import(url.href)','historyChartModule ||= import("./MaraoHistoryChart.js")').replace('activityModule ||= import(url.href)','activityModule ||= import("./MaraoActivity.js")');
         const files=await fs.readdir(path.join(frontend,'media-apps')),images={};
         for(const file of files)if(/\.(png|svg)$/.test(file))images[file]=await dataURL(path.join(frontend,'media-apps',file));
         source=source.replace('new URL(`./media-apps/${app.file || `${app.id}.png`}${new URL(import.meta.url).search}`, import.meta.url).href',`(${JSON.stringify(images)})[app.file || app.id+'.png']`);
