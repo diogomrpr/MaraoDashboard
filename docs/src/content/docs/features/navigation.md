@@ -1,6 +1,6 @@
 ---
 title: Navigation and current room
-description: Configure destinations, follow the room you are in and keep an optional Away page.
+description: Configure destinations and follow this browser's selected room sensor.
 ---
 
 Marao's floating navbar stays in one row and leaves room for the phone's safe area. When destinations do not fit, **More destinations** opens a vertical menu. Saved destinations remain reachable in their configured order.
@@ -9,47 +9,44 @@ Configure navigation once in [dashboard settings](../../start/dashboard/). Admin
 
 ## Follow the current room
 
-Enable **Current room** in Marao settings. For each person, select the Bermuda **Area** sensor for the device they carry. Map Home Assistant area IDs to existing pages in the same dashboard.
+Enable **Current room** in Marao settings and Save. Under **Current room → This browser**, select **Area sensor for this browser**, such as `sensor.iphonix_area`. Under **Rooms and pages**, map the sensor's current Home Assistant `area_id` to an existing page in this dashboard. A person or person-to-sensor mapping is unnecessary for this mode.
 
-Marao automatically selects the unique `person.*` linked to the signed-in Home Assistant user. This works when each phone uses its owner's own HA account. The selected person's current Area sensor `area_id` determines the room; an entity's registered area or last-seen value is not a current location.
+The chain is **this browser/WebView → selected Area sensor → current `area_id` → mapped page**. The selected sensor is authoritative, even if an account-linked person is Away or unavailable. Marao uses the sensor's current `attributes.area_id`; registry assignment, display names and last-seen history are not current location.
 
-Automatic also checks Home Assistant's person records when the live entity state omits its account link. It matches stable person IDs, so renaming a person entity does not break the lookup. No manual selection is needed for a uniquely linked account; explicit browser choices still take precedence.
-
-The example below belongs inside `marao.navbar`:
+The shared example below belongs inside `marao.navbar`. The sensor selection stays local and is not added to this YAML:
 
 ```yaml
 current_room:
   enabled: true
-  people:
-    person.alex:
-      area_sensor: sensor.alex_phone_area
   rooms:
     living_room:
       path: /marao-dashboard/living-room
     kitchen:
       path: /marao-dashboard/kitchen
-  away_path: /marao-dashboard/away
 ```
 
-Use the sensor's exact area IDs and your existing view paths. Configure the person's Home/Away tracking in Home Assistant as well as Bermuda's room tracking.
+Use the sensor's exact area IDs and your existing view paths. Settings show the saved resolution chain and a labelled, read-only draft preview. Editing shared mappings affects live navigation only after Save. Selecting a local sensor applies immediately using saved mappings, independently of Save/Cancel or closing settings.
+
+Room mappings use the same icon, two-line summary, disclosure and options-menu rows as navigation pages. **Add room** opens the new row's page configuration. Complete it before Save or remove the unfinished row through its options menu. Saved mappings remain collapsed until opened.
 
 ## A stable shortcut
 
-The first navbar slot remains reserved while location changes. In a known room, it uses the mapped page's name and icon; tapping it opens that room. Moving between rooms changes the shortcut without redirecting the page you are reading.
+The first navbar slot remains reserved while location changes. In a known room, it uses the mapped page's name and icon; tapping it opens that room. Moving between rooms updates the shortcut without redirecting the page being read. Extremely narrow hosts put the location entry inside More with the other destinations.
 
-If the person is confirmed outside home, the slot can open the optional **Away** page. Create that page in Home Assistant and select it in Marao settings. Choose whatever content is useful away from home; Marao does not create or populate it automatically.
+A missing, unknown, unavailable or unmapped sensor, unusable area ID or deleted destination keeps a disabled neutral placeholder. Direct sensor mode does not substitute a previous room, another sensor or an Away page. Correct the indicated stage in settings. Regular users can follow their existing readable source and should ask an administrator to change it.
 
-Unknown, unavailable, unlinked or unmapped location keeps a disabled neutral away-style placeholder. A stale room sensor cannot override confirmed away presence. Without an Away destination, the slot remains a placeholder. Extremely narrow hosts put the location entry inside More with the other destinations.
+## Browser storage and shared accounts
 
-## Shared devices
+The selection belongs to this browser/WebView's storage, scoped to the HA origin, dashboard and signed-in account. The account separates private preferences; it does not identify location or physical hardware. For example, an iPhone using `sensor.alex_phone_area` and a tablet using `sensor.hall_tablet_area` can share one HA account and retain different choices in their separate storage contexts. Tabs sharing the same browser storage and scope share the latest saved choice.
 
-On the main page, **Marao settings → Current room → This browser** lets administrators choose a person explicitly or return to **Automatic**. The override is local to this browser or WebView, dashboard and account. It does not change other devices or the shared person-to-sensor configuration.
+Reloads and normal browser, Companion app or HA restarts retain the choice while that storage survives. Another browser/profile, Companion installation, scheme/host/port or cleared site/app data needs separate setup. Private browsing and copied/restored profiles do not provide a stable physical-device identity. No cross-device synchronization or hardware detection occurs.
 
-Clearing browser storage removes the override. If storage cannot be written, the choice applies to the current session with a visible message. Bermuda follows the carried device; leaving a phone or watch behind changes the accuracy of the room shortcut.
+**Clear / Reset this selection** writes an explicitly unconfigured choice, leaving a neutral shortcut after reload. It does not reactivate an old person override. When storage fails, the selected source can apply until reload with **Not saved** feedback; it is not copied into dashboard configuration. Unreadable storage stays neutral until a deliberate choice. Unsupported newer records remain preserved and read-only; upgrade Marao before editing them. Deliberate supported replacements retain the exact previous local record in a scoped recovery entry without touching authentication or other clients' data.
 
+## Legacy person tracking and Away
 
-Current room settings are administrator-only. Shared configuration groups General, People and location sources, and expandable Rooms and pages mappings. Choose the person’s current Bermuda **Area** sensor explicitly; Home/Away presence is a separate source. The resolution chain is HA account → unique linked person → presence → Area sensor `area_id` → existing mapped page. Settings show the saved chain and a labelled draft preview; editing the shared draft does not change live navigation. Confirmed Away takes precedence over a lingering room value.
+Existing person mappings and raw local person preferences remain unchanged. Without a new client preference, a readable existing setup retains its released behavior and is labelled **Legacy person tracking**. The direct sensor selector stays empty; Marao does not infer which carried device is viewing the dashboard.
 
-People and room mappings use the same icon, two-line summary, disclosure and options-menu rows as navigation pages. Choose **Add person** or **Add room** from its single selector; the new row opens with its sensor or page configuration. Complete that configuration before Save, or remove the unfinished row through its options menu. Existing mappings stay collapsed until opened, and their menu also provides Remove.
+After selecting or clearing a direct source, choose **Use legacy person tracking** deliberately to restore this compatibility mode. Its shared **Legacy people and location sources** mappings and local **Person / Automatic** controls remain available. Automatic matches a unique linked HA account/person, using HA person records and stable IDs when the live entity omits the link. A manual person choice overrides that association.
 
-Under **This browser**, administrators can choose a person or Automatic. This choice applies immediately to this browser, dashboard and account, independently of Save or closing the popup. Enable Current room and Save first if it is currently disabled. Automatic also retries a failed identity lookup; unavailable links, sources, area IDs and deleted pages need correction at their indicated stage. Regular users can still follow an existing preference and should contact an administrator to change it.
+Only legacy mode uses person Home/Away presence and the optional `away_path`. Confirmed Away takes precedence over a lingering room reading; unknown/unavailable presence remains neutral. Create the Away page yourself and choose it in settings. These legacy shared fields and their unknown options remain intact; direct browser choices do not rewrite them.

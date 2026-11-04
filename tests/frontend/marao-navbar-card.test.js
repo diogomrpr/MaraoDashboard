@@ -462,17 +462,80 @@ test('automatic location loads missing links once and rejects a previous account
   assert.equal(owner._routes()[0].status,'lookup');assert.equal(owner._routes()[0].disabled,true);assert.equal(requests.length,3);
   owner._locationPreference={person:'person.renamed'};
   assert.equal(owner._routes()[0].path,'/house/kitchen','Manual selection remains usable after a lookup failure');
+  owner._locationPreference={mode:'legacy',person:null};owner._locationIdentity=null;owner._routes();await Promise.resolve();const obsolete=owner._locationIdentity.request;
+  owner._locationPreference={mode:'sensor',area_sensor:'sensor.area'};assert.equal(owner._routes()[0].path,'/house/kitchen');requests[3].resolve({storage:[],config:[]});await obsolete;assert.equal(owner._routes()[0].path,'/house/kitchen');assert.equal(owner._locationIdentity.records,undefined,'Late legacy records cannot override direct sensor mode');
+
  }finally{if(previous===undefined)delete globalThis.window;else globalThis.window=previous;}
 });
 
-test('browser person preferences are embedded and reject regular users and stale owners',async t=>{
+test('browser sensor preferences apply without people and reject regular users and stale owners',async t=>{
  const previous={document:globalThis.document,window:globalThis.window};t.after(()=>Object.assign(globalThis,previous));
  class Node extends EventTarget {constructor(){super();this.children=[];this.attributes={};}append(...nodes){this.children.push(...nodes);}setAttribute(key,value){this.attributes[key]=value;}}
- globalThis.document={createElement:()=>new Node()};const values=new Map();globalThis.window={localStorage:{setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)}};
- const owner={isConnected:true,_config:{current_room:{enabled:true}},_hass:{states:{},user:{id:'admin',is_admin:true}},_root:()=>({}),_locationKey:'browser',_routes:()=>[{location:true,label:'Room unknown'}],_updateCurrent(){this.updates=(this.updates||0)+1;}};
+ globalThis.document={createElement:()=>new Node()};const values=new Map();globalThis.window={location:{origin:'https://settings.test'},localStorage:{getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)}};
+ const {MaraoNavbarCard}=await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
+ const owner={isConnected:true,_config:{dashboard_root:'house',current_room:{enabled:true,rooms:{kitchen:{path:'/house/kitchen'}}}},_hass:{states:{'sensor.iphonix_area':{state:'Kitchen',attributes:{area_id:'kitchen'}}},user:{id:'admin',is_admin:true}},_root:()=>({lovelace:{rawConfig:{views:[{path:'kitchen',title:'Kitchen'},{path:'draft',title:'Draft'}]}}}),_updateCurrent(){this.updates=(this.updates||0)+1;this._routes();}};
+ owner._routes=MaraoNavbarCard.prototype._routes.bind(owner);
  const {mountLocationPreferences}=await import('../../custom_components/marao_dashboard/frontend/MaraoLocationPreferences.js');const host=new Node();let valid=true;
- mountLocationPreferences(host,owner,()=>valid);const automatic=host.children[1],form=host.children[2];
- const choose=person=>form.dispatchEvent(Object.assign(new Event('value-changed'),{detail:{value:{person}}}));
- choose('person.test');assert.equal(values.get('browser'),'person.test');assert.equal(owner.updates,1);
- owner._hass.user.is_admin=false;choose('person.other');assert.equal(values.get('browser'),'person.test');owner._hass.user.is_admin=true;valid=false;automatic.onclick();assert.equal(values.get('browser'),'person.test');valid=true;automatic.onclick();assert.equal(values.has('browser'),false);
+ const draft={navbar:{current_room:{rooms:{kitchen:{path:'/house/draft'}}}}};const refresh=mountLocationPreferences(host,owner,()=>valid,draft);
+ const [hint,form,clear,legacy]=host.children,choose=area_sensor=>form.dispatchEvent(Object.assign(new Event('value-changed'),{detail:{value:{area_sensor}}}));
+ assert.equal(form.schema[0].selector.entity.domain[0],'sensor');assert.equal(form.data.area_sensor,'');
+ choose('sensor.iphonix_area');assert.equal(JSON.parse(values.get(owner._locationKey)).area_sensor,'sensor.iphonix_area');assert.equal(owner.updates,1);assert.equal(owner._routes()[0].path,'/house/kitchen');assert.match(host.children.at(-1).textContent,/Draft/);
+ const inputData=form.data;refresh();assert.equal(form.data,inputData,'Routine updates retain the active form');
+ owner._hass.user.is_admin=false;choose('sensor.other');assert.equal(JSON.parse(values.get(owner._locationKey)).area_sensor,'sensor.iphonix_area');owner._hass.user.is_admin=true;
+ valid=false;clear.onclick();assert.equal(JSON.parse(values.get(owner._locationKey)).mode,'sensor');valid=true;
+ owner._config.dashboard_root='other';choose('sensor.other');assert.equal(JSON.parse(values.get(owner._locationKey)).mode,'sensor');owner._config.dashboard_root='house';
+ clear.onclick();assert.equal(JSON.parse(values.get(owner._locationKey)).mode,'none');assert.equal(owner._routes()[0].disabled,true);legacy.onclick();assert.equal(JSON.parse(values.get(owner._locationKey)).mode,'legacy');
+ const key=owner._locationKey;values.set(key,'{"version":9,"mode":"sensor","area_sensor":"sensor.future"}');owner._locationPreference=null;refresh();assert.equal(form.disabled,true);choose('sensor.other');assert.equal(JSON.parse(values.get(key)).version,9);
+ owner.isConnected=false;clear.onclick();assert.equal(JSON.parse(values.get(key)).version,9);assert.match(hint.textContent,/browser\/WebView/);
+});
+
+const roomStorage=()=>{const values=new Map();return {values,getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};};
+test('device room preferences isolate scopes, preserve legacy data and restore independent clients without read writes',async()=>{
+ const {deviceRoomPreferenceKey:key,readRoomPreference:read,writeDeviceRoomPreference:write,locationPreferenceKey}=await import('../../custom_components/marao_dashboard/frontend/MaraoLocation.js');
+ const a=roomStorage(),b=roomStorage(),scope=key('https://clients.test','house','same'),old=locationPreferenceKey('https://clients.test','house','same');
+ a.setItem(old,'person.old');assert.equal(read(a,scope,old).mode,'absent');assert.equal(a.values.size,1);
+ write(a,scope,{mode:'sensor',area_sensor:'sensor.phone'});write(b,scope,{mode:'sensor',area_sensor:'sensor.tablet'});
+ for(const storage of [a,b])assert.equal(read(storage,scope,old).area_sensor,JSON.parse(storage.getItem(scope)).area_sensor);
+ assert.equal(a.getItem(old),'person.old');assert.equal(read(a,scope,old).person,undefined);
+ for(const other of [key('https://elsewhere.test','house','same'),key('https://clients.test','other','same'),key('https://clients.test','house','other')])assert.equal(read(a,other,old).mode,'absent');
+ assert.equal(key('https://clients.test','house',undefined),null);assert.equal(read(a,null,old).mode,'loading');
+ for(const [raw,mode,error] of [['{"version":1,"mode":"none"}','none',undefined],['{"version":1,"mode":"legacy"}','legacy',undefined],['{"version":1,"mode":"sensor","area_sensor":"light.bad"}','invalid','invalid'],['broken','invalid','invalid'],['{"version":7,"mode":"sensor"}','invalid','newer']]){
+  a.setItem(scope,raw);const count=a.values.size,result=read(a,scope,old);assert.equal(result.mode,mode);assert.equal(result.error,error);assert.equal(a.getItem(scope),raw);assert.equal(a.values.size,count);
+ }
+});
+
+test('device preference replacements retain exact recovery, preserve unknown fields and never restore over newer choices',async()=>{
+ const {deviceRoomPreferenceKey:key,deviceRoomRecoveryKey:backup,writeDeviceRoomPreference:write,restoreDeviceRoomPreference:restore,readDeviceRoomPreference:read,forgetDeviceRoomPreference:forget}=await import('../../custom_components/marao_dashboard/frontend/MaraoLocation.js');
+ const scope=key('https://recovery.test','house','admin'),storage=roomStorage(),raw=' {"version":1,"mode":"sensor","area_sensor":"sensor.old","opaque":{"keep":true}} ';
+ storage.setItem(scope,raw);write(storage,scope,{mode:'sensor',area_sensor:'sensor.new'});assert.equal(JSON.parse(storage.getItem(backup(scope))).previous,raw);assert.deepEqual(JSON.parse(storage.getItem(scope)).opaque,{keep:true});
+ assert.equal(restore(storage,scope),true);assert.equal(storage.getItem(scope),raw);
+ write(storage,scope,{mode:'none'});const cleared=storage.getItem(scope);assert.equal(read(storage,scope).mode,'none');storage.setItem(scope,'{"version":5,"mode":"none"}');assert.equal(restore(storage,scope),false);assert.equal(write(storage,scope,{mode:'sensor',area_sensor:'sensor.new'}).error,'newer');assert.equal(JSON.parse(storage.getItem(scope)).version,5);
+ storage.setItem(scope,'malformed');write(storage,scope,{mode:'none'});assert.equal(JSON.parse(storage.getItem(backup(scope))).previous,'malformed');
+ const events=[],prior=storage.getItem(scope),set=storage.setItem;storage.setItem=(name,value)=>{events.push(name);if(name===scope)throw Error('quota');set(name,value);};
+ assert.equal(write(storage,scope,{mode:'sensor',area_sensor:'sensor.memory'}).persisted,false);assert.equal(storage.getItem(scope),prior);assert.equal(events[0],backup(scope));assert.equal(read(storage,scope).area_sensor,'sensor.memory','Recreated owners share the document-lifetime choice');forget(scope);assert.equal(read(storage,scope).mode,'none','Reload uses the unchanged durable choice');
+ storage.setItem=()=>{throw Error('backup denied');};write(storage,scope,{mode:'sensor',area_sensor:'sensor.temporary'});assert.equal(storage.getItem(scope),prior);forget(scope);
+ const unreadable={getItem(){throw Error('denied');}};assert.equal(read(unreadable,scope).mode,'invalid');write(unreadable,scope,{mode:'sensor',area_sensor:'sensor.session'});assert.equal(read(unreadable,scope).area_sensor,'sensor.session');forget(scope);
+ storage.setItem=(name,value)=>{set(name,value);if(name===backup(scope))set(scope,cleared+' ');};write(storage,scope,{mode:'legacy'});assert.equal(storage.getItem(scope),cleared+' ','A changed current value is not overwritten after backup');
+});
+
+test('direct room resolution bypasses person presence and requires the selected sensor and current same-dashboard page',async()=>{
+ const {resolveLocation}=await import('../../custom_components/marao_dashboard/frontend/MaraoLocation.js');
+ const config={people:{'person.a':{area_sensor:'sensor.other'}},rooms:{kitchen:{path:'/house/kitchen'}},away_path:'/house/away'},doc={views:[{path:'kitchen',title:'Kitchen'},{path:'away'}]},preference={mode:'sensor',area_sensor:'sensor.iphonix_area'};
+ const hass={user:{id:'shared'},states:{'sensor.iphonix_area':{state:'Kitchen',attributes:{area_id:'kitchen'}}}},resolve=()=>resolveLocation(config,hass,preference,doc,'house','https://direct.test');
+ for(const presence of ['not_home','unknown','unavailable']){hass.states['person.a']={state:presence,attributes:{user_id:'shared'}};assert.equal(resolve().path,'/house/kitchen');}
+ delete hass.states['person.a'];delete config.people;assert.equal(resolve().path,'/house/kitchen');
+ const sensor=hass.states['sensor.iphonix_area'];for(const state of ['unknown','unavailable','']){sensor.state=state;assert.equal(resolve().disabled,true);assert.notEqual(resolve().path,'/house/away');}sensor.state='Kitchen';
+ for(const area of [null,'',[], 'missing']){sensor.attributes.area_id=area;assert.equal(resolve().disabled,true);}sensor.attributes.area_id='kitchen';
+ for(const path of ['/other/kitchen','https://elsewhere.test/house/kitchen','/house/deleted','/house/kitchen?token=no']){config.rooms.kitchen.path=path;assert.equal(resolve().disabled,true);}config.rooms.kitchen.path='/house/kitchen';
+ delete hass.states['sensor.iphonix_area'];assert.equal(resolve().disabled,true);hass.states['sensor.iphonix_area']=sensor;hass.connected=false;assert.equal(resolve().disabled,true);
+});
+
+test('direct navbar source starts no identity lookup and reconciles only matching client storage events',async t=>{
+ const previous=globalThis.window;t.after(()=>{globalThis.window=previous;});const storage=roomStorage();globalThis.window={location:{origin:'https://navbar-direct.test'},localStorage:storage};
+ const {MaraoNavbarCard}=await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');const {deviceRoomPreferenceKey:key}=await import('../../custom_components/marao_dashboard/frontend/MaraoLocation.js');
+ const scope=key(window.location.origin,'house','shared');storage.setItem(scope,'{"version":1,"mode":"sensor","area_sensor":"sensor.phone"}');
+ const owner=Object.assign(new MaraoNavbarCard(),{isConnected:true,_config:{dashboard_root:'house',current_room:{enabled:true,rooms:{kitchen:{path:'/house/kitchen'}}}},_hass:{user:{id:'shared'},states:{'sensor.phone':{state:'Kitchen',attributes:{area_id:'kitchen'}}},callWS(){assert.fail('Direct mode must not query people');}},_root:()=>({lovelace:{config:{views:[{path:'kitchen'}]}}}),_updateCurrent(){this.route=this._routes()[0];}});
+ owner._routes=MaraoNavbarCard.prototype._routes.bind(owner);assert.equal(owner._routes()[0].path,'/house/kitchen');
+ storage.setItem(scope,'{"version":1,"mode":"none"}');owner._roomStorageChanged({key:'another-scope'});assert.equal(owner._routes()[0].path,'/house/kitchen');owner._roomStorageChanged({key:scope,storageArea:storage});assert.equal(owner.route.disabled,true);
+ owner._hass.user={};assert.equal(owner._routes()[0].status,'loading');owner._hass.user={id:'other'};assert.equal(owner._routes()[0].status,'unconfigured');
 });

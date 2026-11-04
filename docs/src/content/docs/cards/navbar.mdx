@@ -47,11 +47,11 @@ current_room:
 
 Ordinary dashboards configure navigation once in the top-level marao.navbar block. The standalone card shown here exposes the same runtime for the demonstration; do not add one per view.
 
-Automatic identity matches the signed-in HA user to a unique person user_id. A browser-local manual person override supports shared devices.
+Choose **Marao settings → Current room → This browser → Area sensor for this browser** to follow a sensor directly without a person. Different browsers/devices sharing one HA account can select different sensors. The choice is browser-local, separate from the YAML below; see [navigation setup](../../features/navigation/) for persistence and reset behavior. Existing person mappings and Automatic remain available as explicitly labelled legacy tracking.
 
 Bermuda room resolution uses the configured area sensor’s area_id. It does not infer rooms from display names or last_seen.
 
-A missing, unknown, unmapped or unavailable room retains a disabled away-style slot so navigation does not move. Away can open the optional configured Away page.
+A missing, unknown, unmapped or unavailable room retains a disabled away-style slot so navigation does not move. Only legacy person tracking uses presence and the optional configured Away page; direct sensor mode stays neutral when its own reading is missing.
 
 All configured entries remain reachable. A rightmost More control opens vertical overflow when the row is full.
 
@@ -70,9 +70,9 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 
 | Scenario | What it demonstrates |
 | --- | --- |
-| Current room | Alex is home in the Living room. |
+| Current room | Legacy preview: Alex is home in the Living room. |
 | Another room | The fixed first slot follows a configured area. |
-| Away page | A person outside home uses the Away destination even if an area sensor is stale. |
+| Away page | Legacy person tracking uses Away even if its room sensor is stale. |
 | Unknown room | Keep a neutral placeholder when the room is unknown. |
 | Unmapped room | Do not guess a destination for an unmapped area. |
 | Many entries | Keep every entry available through More. |
@@ -80,7 +80,7 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 
 ## Website preview limits
 
-The signed-in account and browser-local identity choice are fictional in this isolated preview. Copy the routes/current_room fields into marao.navbar in your dashboard settings.
+The signed-in account and legacy person association are fictional in this isolated preview. Configure direct per-browser sensors in Home Assistant settings; the preview does not detect your device. Copy the routes/current_room fields into marao.navbar in your dashboard settings.
 
 ## Layout and shared behavior
 

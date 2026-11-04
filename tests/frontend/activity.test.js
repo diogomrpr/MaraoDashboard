@@ -30,3 +30,36 @@ test('activity reads bounded days, reports partial failure and discards late acc
  let current=true,release;hass.callApi=()=>new Promise(resolve=>{release=resolve;});const pending=loadActivity(hass,['lock.gate'],range,()=>current);current=false;release([]);assert.equal(await pending,null);
  const rows=Array.from({length:80},(_,index)=>({kind:index===70?'request':'state',source:'lock.gate',origin:'unknown'}));assert.equal(filterActivity(rows,{kind:'request'}).length,1);
 });
+
+test('timeline dropdowns synchronize selection/reset and dispose replaced or closed controls',async t=>{
+ const previous={document:globalThis.document,window:globalThis.window};t.after(()=>Object.assign(globalThis,previous));
+ class Node extends EventTarget {
+  constructor(tag='div'){super();this.tag=tag;this.children=[];this.attributes={};this.style={};this.className='';}
+  append(...nodes){for(const node of nodes){node.remove();node.parentElement=this;this.children.push(node);}}
+  prepend(node){this.append(node);this.children.unshift(this.children.pop());}
+  before(node){node.remove();node.parentElement=this.parentElement;this.parentElement.children.splice(this.parentElement.children.indexOf(this),0,node);}
+  remove(){if(this.parentElement)this.parentElement.children=this.parentElement.children.filter(node=>node!==this);this.parentElement=null;}
+  replaceChildren(){for(const node of [...this.children])node.remove();}
+  setAttribute(key,value){this.attributes[key]=value;}getAttribute(key){return this.attributes[key];}removeAttribute(key){delete this.attributes[key];}
+  getRootNode(){return globalThis.document;}focus(){globalThis.document.activeElement=this;}
+  querySelector(selector){return this.querySelectorAll(selector)[0]||null;}
+  querySelectorAll(selector){const match=node=>selector.startsWith('.')?node.className.split(' ').includes(selector.slice(1)):selector==='[role=status]'?node.attributes.role==='status':node.tag===selector;return this.children.flatMap(node=>[...(match(node)?[node]:[]),...node.querySelectorAll(selector)]);}
+  set innerHTML(value){this.replaceChildren();if(value.startsWith('<ha-icon')){this.append(new Node('ha-icon'),new Node('span'));return;}const section=new Node('section'),header=new Node('header'),scroll=new Node(),panel=new Node(),status=new Node('p'),list=new Node();section.className='marao-activity';scroll.className='marao-activity-scroll';panel.className='marao-activity-filters';panel.hidden=true;status.setAttribute('role','status');list.className='marao-activity-list';scroll.append(panel,status,list);section.append(header,scroll);this.append(section);}
+ }
+ globalThis.document=Object.assign(new EventTarget(),{createElement:tag=>new Node(tag)});globalThis.window=new EventTarget();
+ const {readFile}=await import('node:fs/promises'),{bindDropdown,dropdownStyles}=await import('../../custom_components/marao_dashboard/frontend/MaraoDropdown.js');
+ const {dateKey}=await import('../../custom_components/marao_dashboard/frontend/MaraoActivityModel.js');
+ const source=(await readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoActivity.js',import.meta.url),'utf8')).replace(/^const \{.*?\}=await import.*\n/gm,'').replace('export function','function');
+ let records=[{time:Date.now()-1000,source:'light.a',kind:'state',origin:'user',initiator:'alex',before:'off',after:'on'}],queries=0,haptics=0;
+ const create=new Function('activityRange','dateKey','filterActivity','loadActivity','bindDropdown','dropdownStyles',source+';return createActivity;')(activityRange,dateKey,filterActivity,async()=>{queries++;return {records,errors:[]};},bindDropdown,dropdownStyles);
+ const host=new Node(),activity=create(host,{hass:{language:'en',config:{time_zone:'UTC'},states:{}},sources:['light.a'],haptic(){haptics++;}}),flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();
+ const field=label=>host.querySelectorAll('.marao-activity-field').find(node=>node.children[0].textContent===label),trigger=field=>field.children[1].children[0],menu=field=>field.children[1].children[1],selected=field=>trigger(field).children[0].textContent,choose=(field,label)=>menu(field).children.find(node=>node.children[0].textContent===label).dispatchEvent(new Event('click'));
+ const date=field('Date');assert.equal(selected(date),'Today');assert.equal(queries,1);choose(date,'Today');assert.equal(queries,1);
+ trigger(date).dispatchEvent(new Event('click'));assert.equal(menu(date).hidden,false);date.children[1].dispatchEvent(Object.assign(new Event('keydown'),{key:'Escape'}));assert.equal(menu(date).hidden,true);assert.equal(document.activeElement,trigger(date));assert.equal(queries,1);
+ const oldOrigin=field('Origin'),oldTrigger=trigger(oldOrigin);choose(date,'Custom range');assert.equal(host.querySelector('.marao-activity-custom-dates').hidden,false);assert.equal(queries,2);await flush();
+ oldTrigger.dispatchEvent(new Event('click'));assert.equal(menu(oldOrigin).hidden,true,'Replaced controls have no live dropdown binding');
+ choose(field('Origin'),'User');assert.equal(selected(field('Origin')),'User');records=[];choose(date,'Yesterday');await flush();assert.equal(field('Origin'),undefined);assert.equal(selected(date),'Yesterday');
+ const reset=host.querySelector('.marao-activity-filters').children.find(node=>node.tag==='button');const before=queries;reset.onclick();await flush();assert.equal(queries,before+1);assert.equal(selected(date),'Today');assert.equal(host.querySelector('.marao-activity-custom-dates').hidden,true);
+ const type=field('Event type');trigger(type).dispatchEvent(new Event('click'));host.querySelector('.marao-activity-filter-toggle').onclick();assert.equal(menu(type).hidden,true,'Hiding the panel closes its menus');
+ trigger(date).dispatchEvent(new Event('click'));const pressed=haptics;activity.destroy();assert.equal(menu(date).hidden,true);trigger(date).dispatchEvent(new Event('click'));assert.equal(haptics,pressed);assert.equal(host.children.length,0);
+});

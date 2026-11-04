@@ -144,5 +144,18 @@ def test_additive_room_and_activity_catalog_fields_match_native_metadata():
     cards = {card["id"]: card for card in native["cards"]}
     for card in EDITOR_CATALOG["cards"]:
         for field in card["variables"]:
-            if field["key"] in ("climate_entity", "activity_entities"):
+            if field["key"] in ("climate_entity", "activity_entities", "show_reading_names"):
                 assert next(item for item in cards[card["id"]]["variables"] if item["key"] == field["key"]) == field
+
+
+def test_optional_glance_labels_preserve_names_and_reject_nonboolean_values():
+    for value in (True, False):
+        card = {"template": "md_glance_card", "variables": {"entity1": "sensor.a", "entity1_name": "Temperature", "show_reading_names": value, "future": []}}
+        source = {"config_version": 2, "name": "Test", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [card]}]}
+        before = deepcopy(source)
+        validate_pages(source, {"md_glance_card": []})
+        assert source == before
+    for value in ("false", 0, None):
+        card["variables"]["show_reading_names"] = value
+        with pytest.raises(ValueError, match="Show reading labels must be a boolean"):
+            validate_pages(source, {"md_glance_card": []})

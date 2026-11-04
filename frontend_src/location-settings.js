@@ -13,12 +13,12 @@ export function mountLocationSettings(host,draft,hass,mountForm,schema,pageFor,h
  mountForm(enabled,{enabled:current?.enabled===true},[schema('enabled',t('Show current room','Mostrar divisão atual'),{boolean:{}})],value=>{ensure().enabled=value.enabled;});
  const away=document.createElement('div');section.append(away);
  let previousAway=current?.away_path||'';
- mountForm(away,{away_path:previousAway},[schema('away_path',t('Optional Away page','Página Ausente opcional'),{navigation:{}})],value=>{if(value.away_path!==previousAway){ensure().away_path=value.away_path||'';previousAway=value.away_path;}});
+ mountForm(away,{away_path:previousAway},[schema('away_path',t('Optional Away page (legacy person tracking)','Página Ausente opcional (localização antiga por pessoa)'),{navigation:{}})],value=>{if(value.away_path!==previousAway){ensure().away_path=value.away_path||'';previousAway=value.away_path;}});
  for(const [key,idField,label,selector,field,fieldLabel,fieldSelector] of [
   ['people','person',t('Person','Pessoa'),{entity:{domain:['person']}},'area_sensor',t('Bermuda Area sensor','Sensor de divisão Bermuda'),{entity:{domain:['sensor']}}],
   ['rooms','area',t('Room','Divisão'),{area:{}},'path',t('Room page','Página da divisão'),{navigation:{}}]
  ]){
-  const heading=document.createElement('h4');heading.textContent=key==='people'?t('People and location sources','Pessoas e fontes de localização'):t('Rooms and pages','Divisões e páginas');section.append(heading);
+  const heading=document.createElement('h4');heading.textContent=key==='people'?t('Legacy people and location sources','Pessoas e fontes de localização antigas'):t('Rooms and pages','Divisões e páginas');section.append(heading);
   const list=document.createElement('div');list.setAttribute('data-mappings',key);section.append(list);
   const rows=new Set();let expanded;
   const expand=item=>{expanded=item;for(const saved of rows)saved.item.setExpanded(saved.item===expanded);};

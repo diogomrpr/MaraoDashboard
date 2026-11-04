@@ -701,6 +701,7 @@ export function validatePages(config, catalog) {
         if (['name', 'icon'].some(key => card[key] != null && typeof card[key] !== 'string')) errors.push('Card name and icon must be strings.');
         if (card.variables != null && !object(card.variables)) errors.push('Card options must be an object.');
         const options = object(card.variables) ? card.variables : {};
+        if(card.template==='md_glance_card' && Object.hasOwn(options,'show_reading_names') && typeof options.show_reading_names!=='boolean')errors.push('Show reading labels must be a boolean.');
         if (card.template === 'md_floor_plan_card') errors.push(...floorPlanErrors(options));
         if (card.template === 'md_media_card' && Object.hasOwn(options, 'media_display') && !['popup', 'inline'].includes(options.media_display)) errors.push('Choose Popup or On dashboard.');
         if (["md_security_card", "md_alarm_controls_card"].includes(card.template) && Object.hasOwn(options, "alarm_layout") && !["dropdown", "grid"].includes(options.alarm_layout)) errors.push("Alarm layout must be dropdown or grid.");
