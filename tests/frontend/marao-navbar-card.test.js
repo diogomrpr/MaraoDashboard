@@ -418,6 +418,53 @@ test('main-page actions remain eligible without visible navbar routes but retain
  assert.deepEqual(writeLocationPreference(null,'a','person.a'),{person:'person.a',error:'storage'});
  });
 
+test('automatic location uses the HA person record when its live state omits the account link',async()=>{
+ const {resolveLocation}=await import('../../custom_components/marao_dashboard/frontend/MaraoLocation.js');
+ const config={people:{'person.renamed':{area_sensor:'sensor.area'}},rooms:{kitchen:{path:'/house/kitchen'}}};
+ const hass={user:{id:'a'},states:{'person.renamed':{state:'home',attributes:{id:'stable-person'}},'sensor.area':{state:'Kitchen',attributes:{area_id:'kitchen'}}}};
+ const records={storage:[{id:'stable-person',user_id:'a'}],config:[]};
+ const resolve=(override,people=records)=>resolveLocation(config,hass,override,{views:[{path:'kitchen'}]},'house','https://example.test',people);
+ assert.equal(resolve().path,'/house/kitchen');
+ hass.user={id:'b'};assert.equal(resolve().disabled,true);
+ assert.equal(resolve('person.renamed').path,'/house/kitchen','An explicit browser choice still takes precedence');
+ hass.user={id:'a'};
+ assert.equal(resolve(undefined,{storage:[...records.storage,{id:'other-person',user_id:'a'}],config:[]}).disabled,true,'Ambiguous account links cannot select a person');
+ hass.states['person.renamed'].attributes.user_id='b';assert.equal(resolve().disabled,true,'A stale record cannot override a different visible account link');
+ delete hass.states['person.renamed'].attributes.user_id;
+ delete hass.states['person.renamed'];assert.equal(resolve().disabled,true,'A record cannot grant access to an absent person entity');
+});
+
+test('automatic location loads missing links once and rejects a previous account response',async()=>{
+ const {MaraoNavbarCard}=await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
+ const previous=globalThis.window,requests=[],storage=new Map();
+ globalThis.window={location:{origin:'https://example.test'},localStorage:{getItem:key=>storage.get(key)??null}};
+ const owner={isConnected:true,_config:{dashboard_root:'house',current_room:{enabled:true,people:{'person.renamed':{area_sensor:'sensor.area'}},rooms:{kitchen:{path:'/house/kitchen'}}}},
+  _hass:{user:{id:'a'},connection:{},states:{'person.renamed':{state:'home',attributes:{id:'stable-person'}},'sensor.area':{state:'Kitchen',attributes:{area_id:'kitchen'}}},callWS:message=>new Promise((resolve,reject)=>requests.push({message,resolve,reject}))},
+  _root:()=>({lovelace:{rawConfig:{views:[{path:'kitchen'}]}}}),_updateCurrent(){this._routes();}};
+ owner._routes=MaraoNavbarCard.prototype._routes.bind(owner);
+ try{
+  assert.equal(owner._routes()[0].status,'loading');owner._routes();
+  await Promise.resolve();assert.equal(requests.length,1);assert.deepEqual(requests[0].message,{type:'person/list'});
+  const first=owner._locationIdentity.request;
+  owner._hass={...owner._hass,user:{id:'b'}};
+  assert.equal(owner._routes()[0].status,'loading');await Promise.resolve();
+  requests[0].resolve({storage:[{id:'stable-person',user_id:'a'}],config:[]});await first;
+  assert.equal(owner._locationIdentity.records,undefined,'The preceding account response is ignored');
+  const second=owner._locationIdentity.request;
+  requests[1].resolve({storage:[],config:[{id:'stable-person',user_id:'b'}]});await second;
+  assert.equal(owner._routes()[0].path,'/house/kitchen');assert.equal(requests.length,2);
+  owner._hass.states['person.renamed'].attributes.user_id='b';owner._locationIdentity=null;
+  assert.equal(owner._routes()[0].path,'/house/kitchen');assert.equal(requests.length,2,'An exposed account link needs no lookup');
+  delete owner._hass.states['person.renamed'].attributes.user_id;
+  owner._hass={...owner._hass,connection:{}};
+  assert.equal(owner._routes()[0].status,'loading');await Promise.resolve();
+  const failed=owner._locationIdentity.request;requests[2].reject(new Error('Person lookup failed'));await failed;
+  assert.equal(owner._routes()[0].status,'lookup');assert.equal(owner._routes()[0].disabled,true);assert.equal(requests.length,3);
+  owner._locationPreference={person:'person.renamed'};
+  assert.equal(owner._routes()[0].path,'/house/kitchen','Manual selection remains usable after a lookup failure');
+ }finally{if(previous===undefined)delete globalThis.window;else globalThis.window=previous;}
+});
+
 test('location preferences survive a navbar redraw on the stable dashboard host',async()=>{
  const previous={document:globalThis.document,window:globalThis.window,location:globalThis.location,customElements:globalThis.customElements};
  class Node extends EventTarget{

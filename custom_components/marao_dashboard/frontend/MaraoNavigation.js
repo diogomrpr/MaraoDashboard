@@ -175,6 +175,7 @@ export class MaraoNavbarCard extends BaseElement {
     applyFullscreen();
   }
   disconnectedCallback() {
+    this._locationIdentity=null;
     this._closeLocationPreferences?.();
     this._closeMaintenance(false);
     this._pagePress?.destroy();this._pagePress=null;this._press?.destroy();this._press=null;
@@ -211,7 +212,22 @@ export class MaraoNavbarCard extends BaseElement {
     const key=locationPreferenceKey(window.location.origin,this._config.dashboard_root,this._hass?.user?.id);
     if(this._locationKey!==key){this._locationKey=key;let storage;try{storage=window.localStorage;}catch{}this._locationPreference=readLocationPreference(storage,key);}
     const document=this._root()?.lovelace?.rawConfig || this._root()?.lovelace?.config;
-    return [resolveLocation(this._config.current_room,this._hass,this._locationPreference?.person,document,this._config.dashboard_root,window.location.origin),...(this._config.routes || [])];
+    const hass=this._hass,connection=hass?.connection,user=hass?.user?.id;
+    if(this._locationIdentity?.key!==key||this._locationIdentity?.connection!==connection)this._locationIdentity={key,connection};
+    const identity=this._locationIdentity;
+    let route=resolveLocation(this._config.current_room,hass,this._locationPreference?.person,document,this._config.dashboard_root,window.location.origin,identity.records);
+    if(!this._locationPreference?.person&&route.status==='identity'&&hass?.user?.id&&typeof hass.callWS==='function'&&this.isConnected&&!this.preview){
+      if(!identity.request){
+        const current=()=>this.isConnected&&this._locationIdentity===identity&&this._locationKey===key&&this._hass?.connection===connection&&this._hass?.user?.id===user;
+        identity.pending=true;
+        identity.request=Promise.resolve().then(()=>hass.callWS({type:'person/list'})).then(records=>{
+          if(!Array.isArray(records?.storage)||!Array.isArray(records?.config))throw new Error('Invalid Home Assistant person records.');
+          if(current())identity.records=records;
+        }).catch(()=>{if(current())identity.error='lookup';}).then(()=>{if(current()){identity.pending=false;this._updateCurrent();}});
+      }
+      if(identity.pending||identity.error){const status=identity.pending?'loading':identity.error;route={...route,status,label:locationLabel(status,hass)};}
+    }
+    return [route,...(this._config.routes || [])];
   }
   _view() { return this._root()?.shadowRoot?.querySelector('#view'); }
   _syncContext() {

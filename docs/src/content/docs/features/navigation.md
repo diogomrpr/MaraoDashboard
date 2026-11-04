@@ -13,6 +13,8 @@ Enable **Current room** in Marao settings. For each person, select the Bermuda *
 
 Marao automatically selects the unique `person.*` linked to the signed-in Home Assistant user. This works when each phone uses its owner's own HA account. The selected person's current Area sensor `area_id` determines the room; an entity's registered area or last-seen value is not a current location.
 
+Automatic also checks Home Assistant's person records when the live entity state omits its account link. It matches stable person IDs, so renaming a person entity does not break the lookup. No manual selection is needed for a uniquely linked account; explicit browser choices still take precedence.
+
 The example below belongs inside `marao.navbar`:
 
 ```yaml

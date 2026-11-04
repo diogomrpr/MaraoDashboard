@@ -10,17 +10,28 @@ export function locationError(value) {
   }
   if(value.away_path!==undefined && (typeof value.away_path!=='string'||value.away_path && !value.away_path.startsWith('/')))return 'Invalid Away page.';
 }
-const labels={en:{room:'Current room',away:'Away',loading:'Loading location',identity:'Choose a person in Location preferences',unavailable:'Location unavailable',unknown:'Room unknown',unmapped:'No room page configured',preferences:'Location preferences',automatic:'Automatic',person:'Person',close:'Close',storage:'This choice applies for this session; browser storage is unavailable.',invalid:'Saved location preference is invalid. Choose Automatic or a person.'},pt:{room:'Divisão atual',away:'Ausente',loading:'A carregar a localização',identity:'Escolha uma pessoa nas preferências de localização',unavailable:'Localização indisponível',unknown:'Divisão desconhecida',unmapped:'Nenhuma página de divisão configurada',preferences:'Preferências de localização',automatic:'Automático',person:'Pessoa',close:'Fechar',storage:'A escolha aplica-se a esta sessão; o armazenamento do navegador não está disponível.',invalid:'A preferência guardada é inválida. Escolha Automático ou uma pessoa.'}};
+const labels={en:{room:'Current room',away:'Away',loading:'Loading location',identity:'Choose a person in Location preferences',lookup:'Could not load person links. Choose Automatic in Location preferences to retry.',unavailable:'Location unavailable',unknown:'Room unknown',unmapped:'No room page configured',preferences:'Location preferences',automatic:'Automatic',person:'Person',close:'Close',storage:'This choice applies for this session; browser storage is unavailable.',invalid:'Saved location preference is invalid. Choose Automatic or a person.'},pt:{room:'Divisão atual',away:'Ausente',loading:'A carregar a localização',identity:'Escolha uma pessoa nas preferências de localização',lookup:'Não foi possível carregar as associações de pessoas. Escolha Automático nas preferências de localização para tentar novamente.',unavailable:'Localização indisponível',unknown:'Divisão desconhecida',unmapped:'Nenhuma página de divisão configurada',preferences:'Preferências de localização',automatic:'Automático',person:'Pessoa',close:'Fechar',storage:'A escolha aplica-se a esta sessão; o armazenamento do navegador não está disponível.',invalid:'A preferência guardada é inválida. Escolha Automático ou uma pessoa.'}};
 export const locationLabel=(key,hass)=>labels[String(hass?.language||'').startsWith('pt')?'pt':'en'][key]||key;
 export const locationPreferenceKey=(origin,root,user)=>JSON.stringify(['marao-location',origin,root,user]);
 export function readLocationPreference(storage,key){try{const value=storage.getItem(key);if(value===null)return {person:null};if(!/^person\.[a-z0-9_]+$/.test(value))return {person:'invalid',error:'invalid'};return {person:value};}catch{return {person:null,error:'storage'};}}
 export function writeLocationPreference(storage,key,person){try{if(person===null)storage.removeItem(key);else storage.setItem(key,person);return {person};}catch{return {person,error:'storage'};}}
-export function resolveLocation(config,hass,override,document,root,origin){
+function automaticPerson(hass,records){
+  const user=hass?.user?.id;if(!user)return null;
+  const visible=Object.entries(hass.states).filter(([id])=>id.startsWith('person.'));
+  const linked=visible.filter(([,state])=>state.attributes?.user_id===user);
+  if(linked.length)return linked.length===1?linked[0][0]:null;
+  const people=[...(records?.storage||[]),...(records?.config||[])].filter(person=>person?.user_id===user);
+  if(people.length!==1||typeof people[0].id!=='string'||!people[0].id)return null;
+  // Person IDs survive entity renames; names and entity slugs are not account links.
+  const matches=visible.filter(([,state])=>state.attributes?.id===people[0].id&&!state.attributes?.user_id);
+  return matches.length===1?matches[0][0]:null;
+}
+export function resolveLocation(config,hass,override,document,root,origin,records){
   const neutral=status=>({location:true,status,label:locationLabel(status,hass),icon:'mdi:home-export-outline',disabled:true,path:''});
   if(!hass?.states)return neutral('loading');
   if(hass.connected===false||hass.connection?.connected===false)return neutral('unavailable');
-  const people=Object.entries(hass.states).filter(([id,s])=>id.startsWith('person.')&&hass.user?.id&&s.attributes?.user_id===hass.user.id);
-  const person=override || (people.length===1?people[0][0]:null), state=hass.states[person];
+  if(!override&&!hass.user?.id)return neutral('loading');
+  const person=override || automaticPerson(hass,records), state=hass.states[person];
   if(!state)return neutral('identity');
   if(['unknown','unavailable',''].includes(state.state))return neutral('unavailable');
   const away=state.state!=='home';
