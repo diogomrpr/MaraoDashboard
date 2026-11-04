@@ -26,9 +26,12 @@ variables:
   light_entities:
     - light.living_room
     - light.kitchen
+  climate_entity: climate.living_room
 ```
 
-The room background reflects its explicitly selected lights. Normal lighting has no additional visible status row. The accessible name retains lighting status.
+Optional climate_entity associates one climate with a separate off-only control. Reported HVAC mode sets its hue; idle keeps the mode tint, while actual activity determines the active icon. Lighting and climate form a diagonal gradient, with either active source filling the whole surface when alone.
+
+The room background reflects its explicitly selected lights and optional climate. Normal lighting has no additional visible status row. The accessible name retains lighting status.
 
 The light-off control affects only the listed lights. It does not use automatic area discovery.
 
@@ -41,6 +44,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
 | `variables.light_entities` | Room lights | json | Not set | Room lights for this card. Searchable suggestions are available. |
+| `variables.climate_entity` | Room climate | entity | Not set | Room climate for this card. Searchable suggestions are available. |
 | `page` | Destination page | text | Not set | Path of an existing view in this dashboard. Searchable suggestions are available. |
 
 ## Behavior examples
@@ -50,8 +54,10 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 | Scenario | What it demonstrates |
 | --- | --- |
 | Default | Try the configured card with fictional devices. |
+| Climate only | An enabled climate fills the whole card when lights are off. |
+| Lighting only | Off climate contributes no lingering corner. |
 | All lights off | The room retains its navigation target when every selected light is off. |
-| Navigation only | An explicit empty light list keeps a plain room shortcut. |
+| Navigation only | Explicit empty lights and climate keep a plain room shortcut. |
 | One unavailable light | Usable lights remain represented and unavailable members have a neutral problem cue. |
 
 ## Layout and shared behavior

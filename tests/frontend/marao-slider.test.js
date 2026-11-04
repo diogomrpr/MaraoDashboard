@@ -71,3 +71,20 @@ test('keyboard adjustments work after pointer completion, while disabled and des
   assert.deepEqual(commits, [80, 81, 82]);
   assert.equal(input.value, '30');
 });
+
+test('confirmed cover interpolation retargets from the drawn value, keeps targets independent and never dispatches passively',t=>{
+ const old={requestAnimationFrame:globalThis.requestAnimationFrame,cancelAnimationFrame:globalThis.cancelAnimationFrame,performance:globalThis.performance,matchMedia:globalThis.matchMedia,document:globalThis.document};t.after(()=>Object.assign(globalThis,old));
+ let time=0,id=0;const frames=new Map(),motion=new EventTarget(),document=new EventTarget();motion.matches=false;document.hidden=false;
+ Object.assign(globalThis,{performance:{now:()=>time},requestAnimationFrame:callback=>{frames.set(++id,callback);return id;},cancelAnimationFrame:id=>frames.delete(id),matchMedia:()=>motion,document});
+ const step=at=>{time=at;const pending=[...frames.values()];frames.clear();pending.forEach(callback=>callback(time));};
+ const {input,properties,fire}=slider(),commits=[],pulses=[];const control=bindSlider(input,{smooth:true,onCommit:value=>commits.push(value),haptic:value=>pulses.push(value)});
+ assert.equal(properties.get('--marao-slider-fraction'),'0.3');assert.equal(frames.size,0);
+ time=1000;control.update(80,80,{follow:true});assert.equal(input.value,'80');assert.equal(input.dataset.sliderCurrent,'80');step(1100);
+ const drawn=Number(properties.get('--marao-slider-fraction'));assert.ok(drawn>.3&&drawn<.8);
+ control.update(20,20,{follow:true});assert.equal(Number(properties.get('--marao-slider-fraction')),drawn);step(1600);assert.equal(properties.get('--marao-slider-fraction'),'0.2');assert.equal(frames.size,0);
+ control.update(20,20,{follow:true});assert.equal(frames.size,0);
+ time=2000;control.update(60,90);step(2250);assert.equal(properties.get('--marao-slider-target-fraction'),'0.9');assert.deepEqual(commits,[]);assert.deepEqual(pulses,[]);
+ fire('pointerdown');input.value='75';fire('input');assert.equal(properties.get('--marao-slider-target-fraction'),'0.75');assert.equal(frames.size,0);fire('pointerup');fire('change');assert.deepEqual(commits,[75]);assert.deepEqual(pulses,['heavy']);
+ control.update(80,80,{follow:true});motion.matches=true;motion.dispatchEvent(new Event('change'));assert.equal(frames.size,0);assert.equal(properties.get('--marao-slider-fraction'),'0.8');
+ motion.matches=false;time=3000;control.update(90,90,{follow:true});document.hidden=true;document.dispatchEvent(new Event('visibilitychange'));assert.equal(frames.size,0);assert.equal(properties.get('--marao-slider-fraction'),'0.9');control.destroy();assert.equal(frames.size,0);
+});

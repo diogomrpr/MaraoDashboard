@@ -43,6 +43,11 @@ Unknown, unavailable, unlinked or unmapped location keeps a disabled neutral awa
 
 ## Shared devices
 
-On the main page, **Location preferences** lets any signed-in user choose a person explicitly or return to **Automatic**. The override is local to this browser or WebView, dashboard and account. It does not change other devices or the shared person-to-sensor configuration.
+On the main page, **Marao settings → Current room → This browser** lets any signed-in user choose a person explicitly or return to **Automatic**. The override is local to this browser or WebView, dashboard and account. It does not change other devices or the shared person-to-sensor configuration.
 
 Clearing browser storage removes the override. If storage cannot be written, the choice applies to the current session with a visible message. Bermuda follows the carried device; leaving a phone or watch behind changes the accuracy of the room shortcut.
+
+
+Current room settings are administrator-only. Shared configuration groups General, People and location sources, and expandable Rooms and pages mappings. Choose the person’s current Bermuda **Area** sensor explicitly; Home/Away presence is a separate source. The resolution chain is HA account → unique linked person → presence → Area sensor `area_id` → existing mapped page. Settings show the saved chain and a labelled draft preview; editing the shared draft does not change live navigation. Confirmed Away takes precedence over a lingering room value.
+
+Under **This browser**, administrators can choose a person or Automatic. This choice applies immediately to this browser, dashboard and account, independently of Save or closing the popup. Enable Current room and Save first if it is currently disabled. Automatic also retries a failed identity lookup; unavailable links, sources, area IDs and deleted pages need correction at their indicated stage. Regular users can still follow an existing preference and should contact an administrator to change it.

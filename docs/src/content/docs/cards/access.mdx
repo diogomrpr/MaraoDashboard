@@ -24,6 +24,8 @@ entity_id: lock.front_door
 
 Compatible entity domains: `lock`, `cover`, `button`, `switch`, `script`, `input_boolean`, `alarm_control_panel`.
 
+Tap an Activity icon to inspect recorded events with date and type filters. Optional variables.activity_entities adds explicitly related sources. Automatic Updated and last-activation timestamps move into Activity; timestamp-sensor readings remain data.
+
 Opening/unlocking always uses the strict slide control. Incomplete or vertical gestures cancel; closing/locking is an explicit safe tap.
 
 Risky button/switch/helper actions use a 1.2-second hold. Changing presentation must not bypass these interaction rules.
@@ -43,6 +45,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `variables.action_color` | Action color | color | Not set | Optional action background color; does not change the action’s safety rules. |
 | `variables.action_label` | Action label | text | Not set | Optional visible action label. |
 | `variables.action_label_key` | Action translation key | text | Not set | Optional Marao localization key for the action label. Searchable suggestions are available. |
+| `variables.activity_entities` | Related activity entities | json | Not set | Related activity entities for this card. Searchable suggestions are available. |
 | `popup_view` | Custom popup view | text | Not set | Optional existing view path used for a Home Assistant managed popup layout. Omit for automatic details. Searchable suggestions are available. |
 
 ## Behavior examples

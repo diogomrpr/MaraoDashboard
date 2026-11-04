@@ -10,7 +10,7 @@ from .card_yaml import parse_card_yaml
 from .card_names import canonical_card
 
 PAGE_FORMAT_VERSION = 2
-MEDIA_APP_LOGOS = ("", "netflix", "spotify", "youtube", "disney-plus", "prime-video", "apple-tv", "plex", "meo")
+MEDIA_APP_LOGOS = ("", "netflix", "spotify", "youtube", "disney-plus", "prime-video", "apple-tv", "plex", "meo", "hbo-max", "f1-tv")
 FREE_CARD_ROLES = {
     "md_title_card", "md_navigation_card", "md_room_card",
     "md_entity_group_card", "md_scene_collection_card",
@@ -267,6 +267,14 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                     validate_light_options(options)
                 if role == "md_camera_card":
                     camera_popup_stream(entity, options)
+                if "activity_entities" in options:
+                    activity = options["activity_entities"]
+                    if not isinstance(activity, list) or any(not isinstance(item, str) or not ENTITY_ID.fullmatch(item) for item in activity):
+                        raise ValueError("Related activity entities must be an explicit list of entity IDs")
+                if role == "md_room_card" and options.get("climate_entity") not in (None, ""):
+                    climate = options["climate_entity"]
+                    if not isinstance(climate, str) or not ENTITY_ID.fullmatch(climate) or not climate.startswith("climate."):
+                        raise ValueError("Room climate must be a climate entity")
                 if role == "md_room_card" and "light_entities" in options:
                     lights = options["light_entities"]
                     if not isinstance(lights, list) or any(not isinstance(light, str) or not ENTITY_ID.fullmatch(light) or not light.startswith("light.") for light in lights):

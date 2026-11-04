@@ -26,6 +26,8 @@ variables:
 
 Compatible entity domains: `switch`, `input_boolean`, `scene`.
 
+Tap an Activity icon to inspect recorded events with date and type filters. Optional variables.activity_entities adds explicitly related sources. Automatic Updated and last-activation timestamps move into Activity; timestamp-sensor readings remain data.
+
 A native switch/helper toggles; a scene runs scene.turn_on rather than being treated as a persistent switch.
 
 An optional power entity supplies the reading and history independently from the controlled entity.
@@ -48,6 +50,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `variables.show_graph_fill` | Graph fill | boolean | `false` | Graph fill for this card. |
 | `variables.display_unit` | Display unit | energy_unit | `Auto` | Auto keeps the source unit. Selecting a compatible unit converts the reading. Searchable suggestions are available. |
 | `variables.display_precision` | Decimal places | energy_precision | `Auto` | Auto trims trailing zeros. Choose 0–6 fixed decimal places. Choices: `0`, `1`, `2`, `3`, `4`, `5`, `6`. |
+| `variables.activity_entities` | Related activity entities | json | Not set | Related activity entities for this card. Searchable suggestions are available. |
 
 ## Behavior examples
 

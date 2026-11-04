@@ -38,7 +38,7 @@ function loadingDialogFixture() {
   const controls=new Promise(resolve=>{resolveControls=resolve;});
   const root={isConnected:true,hass:{language:'en',user:{id:'admin',is_admin:true},callWS(){settingsStarted=true;return settings;}},shadowRoot:new Node()};
   const source=readFileSync(new URL('../../frontend_src/dashboard-settings-dialog.js',import.meta.url),'utf8')
-    .replace(/^import .*\n/gm,'').replace(/^const navigation=await import.*\n/m,'const navigation=globalThis.navigation;\n').replace('export async function','async function');
+    .replace(/^const \{mountLocationPreferences\}=await import.*\n/m,'').replace(/^import .*\n/gm,'').replace(/^const navigation=await import.*\n/m,'const navigation=globalThis.navigation;\n').replace('export async function','async function');
   const context={document:{createElement:()=>new Node()},location:{pathname:'/house/home'},window:{addEventListener(){}},customElements:{get:()=>false},
     loadCardHelpers(){controlsStarted=true;return controls;},navigation:{focusRestorer:()=>()=>{},haptic(){}},mountLocationSettings(){return()=>{};},AbortController,structuredClone,readDashboardSettings,moveNavbarRoute,queueMicrotask};
   vm.runInNewContext(source+';globalThis.openSettings=openDashboardSettings;',context);
@@ -148,4 +148,13 @@ test('location recovery is retained before a shared write and backup failure pre
  const hass={user:{is_admin:true},async callWS(request){calls.push(request.type);return structuredClone(baseline);}};
  await saveDashboardSettings(hass,'house',baseline,baseline.marao,()=>true,recovery=>{assert.deepEqual(recovery.before,baseline);assert.deepEqual(recovery.after,baseline);assert.deepEqual(calls,['lovelace/config']);});
  calls.length=0;await assert.rejects(()=>saveDashboardSettings(hass,'house',baseline,baseline.marao,()=>true,()=>{throw new Error('backup failed');}));assert.deepEqual(calls,['lovelace/config']);
+});
+
+test('attempted new mappings require explicit Add and reject incomplete or duplicate drafts before saving',t=>{
+ const previous=globalThis.document;t.after(()=>globalThis.document=previous);const node=()=>({children:[],append(...items){this.children.push(...items);},setAttribute(){},remove(){}});globalThis.document={createElement:node};
+ const draft={navbar:{routes:[],current_room:{people:{},rooms:{},opaque:[]}}},forms=[];
+ const validate=mountLocationSettings(node(),draft,{language:'en'},(host,data,schema,change)=>{const form={host,data,schema,change};forms.push(form);return form;},(name,label,selector)=>({name,label,selector}));
+ assert.doesNotThrow(validate);const add=forms.find(form=>form.schema[0].name==='area');add.change({area:'kitchen'});assert.throws(validate,/current room mappings/);assert.deepEqual(draft.navbar.current_room.rooms,{});
+ add.change({area:'kitchen',path:'/house/kitchen'});assert.throws(validate,/current room mappings/);add.host.children.at(-1).onclick();assert.doesNotThrow(validate);assert.deepEqual(draft.navbar.current_room.rooms,{kitchen:{path:'/house/kitchen'}});
+ add.change({area:'kitchen',path:'/house/other'});add.host.children.at(-1).onclick();assert.throws(validate,/current room mappings/);add.change({});assert.doesNotThrow(validate);assert.deepEqual(draft.navbar.current_room.opaque,[]);
 });

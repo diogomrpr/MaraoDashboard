@@ -550,7 +550,7 @@ test('media presentation survives independent editing and rejects unsupported ch
 
 test('standalone and nested app logo IDs validate without inserting defaults or changing old data',()=>{
   const make=card=>({config_version:2,name:'Safe',landing_page:'home',pages:[{name:'Home',path:'home',entities:[card]}]});
-  for(const value of [undefined,'','netflix','spotify','youtube','disney-plus','prime-video','apple-tv','plex','meo'])for(const nested of [false,true]){
+  for(const value of [undefined,'','netflix','spotify','youtube','disney-plus','prime-video','apple-tv','plex','meo','hbo-max','f1-tv'])for(const nested of [false,true]){
     const choice=value===undefined?{}:{[nested?'logo':'app_logo']:value};const card=nested?{template:'md_media_card',entity_id:'media_player.safe',apple_tv:{apps:[{source:'Custom',...choice}]}}:{template:'md_media_app_card',entity_id:'media_player.safe',variables:{app_source:'Custom',...choice}};
     const input=make(card),before=structuredClone(input);assert.deepEqual(validateConfig(input,2,[],{},catalog),[]);assert.deepEqual(serializeConfig(normalizeConfig(input)),before);assert.deepEqual(input,before);
   }

@@ -36,7 +36,7 @@ and affected runtime before changing their shape.
 | `md_fan_card` | Toggle and supported percentage, `enable_slider`, `card_color`, `custom_label` | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
 | `md_media_card` | State/title/artist, generic/Apple TV popup; artwork, background color, `popup_hash` | [Cards](specs/card-behaviors/spec.md) |
 | `md_access_card` | Locks and door/garage/gate covers, `popup_hash`; strict opening/unlocking and explicit safe closing/locking | [Actions](specs/entity-state-actions/spec.md), [cards](specs/card-behaviors/spec.md) |
-| `md_sensor_card` | Numeric/binary states, updated date, `md_card_color`, `on_icon`, `off_icon` | [Cards](specs/card-behaviors/spec.md) |
+| `md_sensor_card` | Numeric/binary states, filtered Activity icon, `md_card_color`, `on_icon`, `off_icon` | [Cards](specs/card-behaviors/spec.md) |
 | `md_switch_card` | Toggle, `power_entity`, `power_unit`, power graph, active/graph colors and line/fill visibility | [Cards](specs/card-behaviors/spec.md), [history](specs/camera-history-content/spec.md) |
 | `md_number_card` | Native number/input-number min/max/step up/down input | [Values](specs/value-numeric-controls/spec.md) |
 | `md_wallbox_current_card` | Shared current input, up to three `shortcuts` | [Values](specs/value-numeric-controls/spec.md), [cards](specs/card-behaviors/spec.md) |
@@ -302,3 +302,9 @@ camera playback/transport and embedded native controls are outside this change.
 - Current room: `MaraoLocation.js`, `MaraoLocationPreferences.js`, `MaraoNavigation.js`, `frontend_src/location-settings.js`; targeted navbar/settings tests.
 - People columns and fan icons: shared `MaraoCards.js` presentation, `MaraoCollections.js` validation and native editor/composition; collection/editor assertions and existing safe examples.
 - Camera events: `MaraoEventModel.js` and the existing `MaraoFrigateEventsCard.js`, native event editor, popup column forwarding in composition/generator; event/editor and scoped page-generation assertions. Examples stay under `ha-test/` and `/marao-dashboard`.
+
+## Combined November card and settings implementation
+
+Activity is owned by `MaraoActivityModel.js`, `MaraoActivity.js` and shared card/detail-shell paths. The full 38-role audit in [the activity design](changes/add-filterable-card-activity/design.md) separates metadata from substantive dates. Focused [activity checks](../tests/frontend/activity.test.js) cover calendar ranges, meaningful events, evidence/metadata limits, partial failures and stale requests; card/native checks cover icons and propagation.
+
+Room climate association and direct off are covered by room cases in `marao-card-visibility.test.js`, native composition and Python page-model checks. Retained color endpoints/artwork and glance wrapping use shared runtime CSS; appearance remains a manual watch item. `marao-slider.test.js` covers confirmed-only interpolation, reversal, independent targets, passive silence and cancellation. Current-room settings share resolver diagnostics and administrator-only browser choices, covered by navbar/settings tests. HBO Max/F1 TV extend the original ordered logo choices and flat package assertions. All additions preserve saved formats and historical fixtures.

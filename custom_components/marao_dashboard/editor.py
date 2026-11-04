@@ -86,7 +86,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             "id": "md_room_card", "label": "Room shortcut", "icon": "mdi:sofa", "domains": [],
             "entity_optional": True, "page_shortcut": True,
             "description": "Open a page and switch off its explicitly selected lights.",
-            "variables": [_field("light_entities", "Room lights", "entity", domains=["light"], multiple=True)],
+            "variables": [_field("light_entities", "Room lights", "entity", domains=["light"], multiple=True), _field("climate_entity", "Room climate", "entity", domains=["climate"])],
         },
         {
             "id": "md_scene_collection_card", "label": "Scene collection", "icon": "mdi:palette-outline", "domains": [],
@@ -466,6 +466,10 @@ EDITOR_CATALOG["cards"].extend([
      "description": "An explicit safe close or lock action.",
      "variables": [_field("action_service", "Action service", "text")]},
 ])
+
+for _activity_card in EDITOR_CATALOG["cards"]:
+    if _activity_card["id"] in {"md_sensor_card", "md_access_card", "md_access_action_card", "md_access_slide_action_card", "md_access_hold_action_card", "md_base_card", "md_switch_card", "md_scene_card", "md_navigation_card", "md_glance_card", "md_header_card"}:
+        _activity_card.setdefault("variables", []).append(_field("activity_entities", "Related activity entities", "entity", multiple=True, advanced=True))
 
 for _card in EDITOR_CATALOG["cards"]:
     if _card["id"] in ("md_security_card", "md_alarm_controls_card"):

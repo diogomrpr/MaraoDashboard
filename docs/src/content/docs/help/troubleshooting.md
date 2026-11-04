@@ -34,7 +34,7 @@ divergent data remains blocked without rollback or repeated writes.
 Confirm all of the following:
 
 1. Current room is enabled in Marao settings.
-2. The signed-in user has a uniquely linked Home Assistant person, or you selected a person in Location preferences.
+2. The signed-in user has a uniquely linked Home Assistant person, or you selected a person in Marao settings → Current room → This browser.
 3. That person has a configured Bermuda Area sensor.
 4. The sensor exposes the current room's `area_id` and that ID maps to an existing page.
 5. The person is currently home. Confirmed away presence takes priority over a stale room reading.
@@ -68,3 +68,8 @@ Never replace an uncertain dashboard with a starter configuration. See
 ## Report a reproducible problem
 
 Include the Marao release, Home Assistant version, browser/app, expected result, observed result and a minimal sanitized card configuration. Remove tokens, alarm codes, camera media, household data and private URLs. Name the affected scenario or option so the issue can be reproduced with fictional devices.
+
+
+Current room settings are administrator-only. Shared configuration groups General, People and location sources, and expandable Rooms and pages mappings. Choose the person’s current Bermuda **Area** sensor explicitly; Home/Away presence is a separate source. The resolution chain is HA account → unique linked person → presence → Area sensor `area_id` → existing mapped page. Settings show the saved chain and a labelled draft preview; editing the shared draft does not change live navigation. Confirmed Away takes precedence over a lingering room value.
+
+Under **This browser**, administrators can choose a person or Automatic. This choice applies immediately to this browser, dashboard and account, independently of Save or closing the popup. Enable Current room and Save first if it is currently disabled. Automatic also retries a failed identity lookup; unavailable links, sources, area IDs and deleted pages need correction at their indicated stage. Regular users can still follow an existing preference and should contact an administrator to change it.

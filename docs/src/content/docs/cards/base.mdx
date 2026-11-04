@@ -24,6 +24,8 @@ entity_id: sensor.house_power
 
 Compatible entity domains: `sensor`, `binary_sensor`, `number`, `input_number`, `switch`, `input_boolean`.
 
+Tap an Activity icon to inspect recorded events with date and type filters. Optional variables.activity_entities adds explicitly related sources. Automatic Updated and last-activation timestamps move into Activity; timestamp-sensor readings remain data.
+
 Use Status for a compact reading or simple entity state. Choose a specialized card when you need dedicated controls.
 
 Power and energy units convert compatible values; display precision does not change stored sensor data.
@@ -44,6 +46,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `variables.action_label_key` | Action translation key | text | Not set | Optional Marao localization key for the action label. Searchable suggestions are available. |
 | `variables.display_unit` | Display unit | energy_unit | `Auto` | Auto keeps the source unit. Selecting a compatible unit converts the reading. Choices: `mW`, `W`, `kW`, `MW`, `GW`. |
 | `variables.display_precision` | Decimal places | energy_precision | `Auto` | Auto trims trailing zeros. Choose 0–6 fixed decimal places. Choices: `0`, `1`, `2`, `3`, `4`, `5`, `6`. |
+| `variables.activity_entities` | Related activity entities | json | Not set | Related activity entities for this card. Searchable suggestions are available. |
 
 ## Behavior examples
 

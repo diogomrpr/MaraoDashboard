@@ -23,22 +23,52 @@ export function sliderMarkup({ key, current, value = current, min = 0, max = 100
   return `<div class="slider"><svg class="slider-track" aria-hidden="true" focusable="false"><rect class="slider-background"></rect><rect class="slider-fill"></rect><circle class="slider-thumb"></circle></svg><input data-slider-key="${esc(key)}" data-slider-current="${Number.isFinite(current) ? current : min}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${esc(label)}" title="${esc(label)}"${disabled ? ' disabled' : ''}></div>`;
 }
 
-export function bindSlider(input, { haptic, onInput, onStart, onCommit, onEnd, onCancel } = {}) {
+export function bindSlider(input, { haptic, onInput, onStart, onCommit, onEnd, onCancel, smooth = false } = {}) {
   let gesture;
   let destroyed = false;
   const fraction = value => {
     const min = Number(input.min), max = Number(input.max);
     return max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0;
   };
-  const update = (current = Number(input.dataset.sliderCurrent ?? input.value), target = Number(input.value)) => {
-    input.dataset.sliderCurrent = String(current);
-    input.value = String(target);
+  let frame, drawn, endpoint, lastReport, segment;
+  const motion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const stop = () => { if (frame != null) globalThis.cancelAnimationFrame?.(frame); frame = null; segment = null; };
+  const paint = (current, target) => {
+    drawn = current;
     const progress = Math.min(fraction(current), fraction(target));
     input.style.setProperty('--marao-slider-progress', `${progress * 100}%`);
     input.parentElement?.style.setProperty('--marao-slider-progress', `${progress * 100}%`);
     input.parentElement?.style.setProperty('--marao-slider-fraction', String(progress));
     input.parentElement?.style.setProperty('--marao-slider-target-fraction', String(fraction(target)));
   };
+  const now = () => globalThis.performance?.now() ?? Date.now();
+  const tick = time => {
+    frame = null;
+    if (destroyed || !segment) return;
+    if(input.isConnected === false || input.checkVisibility?.() === false){settle();return;}
+    const progress = Math.max(0, Math.min(1, (time - segment.start) / segment.duration));
+    const current = segment.from + (endpoint - segment.from) * progress;
+    paint(current, segment.follow ? current : Number(input.value));
+    if (progress < 1) frame = requestAnimationFrame(tick); else segment = null;
+  };
+  const update = (current = Number(input.dataset.sliderCurrent ?? input.value), target = Number(input.value), options = {}) => {
+    const previous = endpoint;
+    const time = now();
+    input.dataset.sliderCurrent = String(current);
+    input.value = String(target);
+    endpoint = current;
+    const immediate = !smooth || gesture && !gesture.completed || options.immediate || motion?.matches || globalThis.document?.hidden || input.disabled || !Number.isFinite(current) || drawn == null || !globalThis.requestAnimationFrame;
+    if (immediate) { stop(); paint(current, target); if(previous != null && previous !== current)lastReport=time; return; }
+    if (previous === current) { if (segment) {segment.follow = options.follow === true;paint(drawn,segment.follow?drawn:target);} else paint(current, target); return; }
+    const duration = lastReport == null ? 300 : Math.max(200, Math.min(500, (time - lastReport) * .8));
+    lastReport = time;
+    stop();
+    segment = {from: drawn, start: time, duration, follow: options.follow === true};
+    frame = requestAnimationFrame(tick);
+  };
+  const settle = () => { stop(); if (endpoint != null) paint(endpoint, Number(input.value)); };
+  motion?.addEventListener?.('change', settle);
+  globalThis.document?.addEventListener?.('visibilitychange', settle);
   const cancel = () => {
     if (!gesture || gesture.cancelled || gesture.completed) return;
     gesture.cancelled = true;
@@ -55,11 +85,12 @@ export function bindSlider(input, { haptic, onInput, onStart, onCommit, onEnd, o
     input: () => {
       if (destroyed || input.disabled || gesture?.cancelled) return;
       if (gesture) gesture.changed = true;
-      update();
+      update(undefined, Number(input.value), {immediate:true});
       onInput?.(Number(input.value));
     },
     pointerdown: event => {
       if (destroyed || input.disabled || event.button != null && event.button !== 0) return;
+      settle();
       gesture = { input, key: input.dataset.sliderKey, completed: false, cancelled: false, dispatched: false, startValue: Number(input.value) };
       haptic?.('heavy');
       onStart?.(gesture);
@@ -82,8 +113,12 @@ export function bindSlider(input, { haptic, onInput, onStart, onCommit, onEnd, o
   update();
   return {
     update,
+    settle,
     cancel,
     destroy() {
+      stop();
+      motion?.removeEventListener?.('change', settle);
+      globalThis.document?.removeEventListener?.('visibilitychange', settle);
       destroyed = true;
       cancel();
       for (const [type, listener] of Object.entries(listeners)) input.removeEventListener(type, listener);

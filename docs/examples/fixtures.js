@@ -29,7 +29,7 @@ const entries = [
   state('climate.living_room','heat','Living room thermostat',{hvac_modes:['off','heat','cool','heat_cool','auto','dry','fan_only'],hvac_action:'heating',current_temperature:20,temperature:22,target_temp_low:19,target_temp_high:24,min_temp:7,max_temp:30,target_temp_step:0.5,supported_features:387}),
   state('number.level','40','Target level',{min:0,max:100,step:5,unit_of_measurement:'%'}),
   state('number.charging_current','12','Charging current',{min:6,max:32,step:1,unit_of_measurement:'A'}),
-  state('media_player.living_room','playing','Living room speaker',{media_title:'A morning at home',media_artist:'Marao demo',media_album_name:'Example recordings',media_duration:240,media_position:48,media_position_updated_at:stamp,volume_level:0.35,is_volume_muted:false,source:'Radio',source_list:['Radio','Music','TV'],supported_features:2097087}),
+  state('media_player.living_room','playing','Living room speaker',{media_title:'A morning at home',media_artist:'Marao demo',media_album_name:'Example recordings',media_duration:240,media_position:48,media_position_updated_at:stamp,volume_level:0.35,is_volume_muted:false,source:'Radio',source_list:['Radio','Music','TV','HBO Max','F1 TV'],supported_features:2097087}),
   state('remote.living_room','on','Living room remote'),
   state('vacuum.downstairs','docked','Downstairs vacuum',{battery_level:84,supported_features:13311,fan_speed:'standard',fan_speed_list:['quiet','standard','turbo']}),
   state('sensor.dishwasher','running','Dishwasher'),state('sensor.dishwasher_progress','42','Dishwasher progress',{unit_of_measurement:'%'}),

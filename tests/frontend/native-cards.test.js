@@ -261,3 +261,14 @@ test('native runtime accepts released entity aliases in popup members without re
   const explicit=config('md_light_card',{entity:'light.old',entity_id:'light.selected'});
   assert.equal(nativeCardDescriptor(explicit).entity_id,'light.selected');
 });
+
+test('room climate and related activity fields survive native composition, clearing and opaque options',()=>{
+ const room=config('md_room_card',{name:'Room',page:'native',variables:{light_entities:[],climate_entity:'climate.unresolved',future:{keep:[]}},grid_options:{columns:6}}),before=structuredClone(room);
+ assert.doesNotThrow(()=>validateNativeCardConfig(room));const result=compose(room);assert.deepEqual(result.card.variables,{light_entities:[],climate_entity:'climate.unresolved',future:{keep:[]}});assert.deepEqual(room,before);
+ for(const climate_entity of [undefined,null,'','climate.renamed'])assert.doesNotThrow(()=>validateNativeCardConfig({...room,variables:{...room.variables,climate_entity}}));
+ for(const climate_entity of ['light.room',false,12,[]])assert.throws(()=>validateNativeCardConfig({...room,variables:{climate_entity}}),/climate entity/);
+ const scene=config('md_switch_card',{entity:'scene.evening',variables:{activity_entities:['binary_sensor.gate','sensor.power'],opaque:[]},hold_action:{action:'none'}});assert.deepEqual(compose(scene).card.variables,scene.variables);assert.deepEqual(compose(scene).card.hold_action,{action:'none'});
+ const access=config('md_access_card',{entity:'lock.gate',variables:{activity_entities:['binary_sensor.gate'],opaque:[]}});const popup=compose(access).popups[0];assert.match(JSON.stringify(popup),/"activity_entities":\["binary_sensor.gate"\]/);
+ const operating=popup.cards[0].cards;for(const child of operating){assert.equal(Object.hasOwn(child.variables,'popup_hash'),false);assert.deepEqual(child.variables.opaque,[]);assert.deepEqual(child.variables.activity_entities,['binary_sensor.gate']);}
+ for(const activity_entities of [null,'sensor.power',[12],['invalid']])assert.throws(()=>validateNativeCardConfig({...scene,variables:{activity_entities}}),/activity entities/);
+});
