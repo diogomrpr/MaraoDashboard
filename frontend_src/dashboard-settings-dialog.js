@@ -1,3 +1,4 @@
+const {mountLocationPreferences}=await import(new URL(`./MaraoLocationPreferences.js${new URL(import.meta.url).search}`,import.meta.url));
 import {mountLocationSettings} from './location-settings.js';
 import {saveDashboardSettings, readDashboardSettings, validateDashboardSettings, dashboardViewForAddress, patchNavbarRoute, moveNavbarRoute} from './dashboard-settings.js';
 const navigation=await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`,import.meta.url));
@@ -31,6 +32,7 @@ const CSS=`
 .marao-settings button{min-height:48px;min-width:48px;border:0;border-radius:16px;font:inherit;color:inherit;cursor:pointer;padding:12px 16px;background:var(--secondary-background-color)}
 .marao-settings button:focus{outline:none}
 .marao-settings button:disabled{opacity:.55;cursor:default}
+.marao-settings [data-close]{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;padding:0;font-size:2rem;line-height:1}
 .marao-settings .route-toggle{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:8px;text-align:start;background:transparent}
 .marao-settings .route-icon{display:grid;place-items:center;background:var(--ha-card-background);border-radius:50%;width:48px;height:48px;flex:0 0 48px;color:var(--primary-color)}
 .marao-settings .route-label{flex:1;min-width:0;overflow-wrap:anywhere}
@@ -58,7 +60,7 @@ async function loadControls() {
   await card.constructor.getConfigElement();
 }
 
-export async function openDashboardSettings(root,opener) {
+export async function openDashboardSettings(root,opener,owner) {
   if(!root?.hass?.user?.is_admin || root.lovelace?.editMode || root._maraoSettingsDialog)return;
   const hass=root.hass,path=location.pathname.split('/')[1],user=hass.user.id;
   const valid=()=>root.isConnected&&location.pathname.split('/')[1]===path&&root.hass?.user?.id===user&&root.hass?.user?.is_admin&&!root.lovelace?.editMode&&root._maraoSettingsDialog===dialog;
@@ -67,7 +69,7 @@ export async function openDashboardSettings(root,opener) {
   dialog.innerHTML=`<style>${CSS}</style><header><h2 id="marao-settings-title"></h2><button type="button" data-close>×</button></header><div class="body"><p data-loading role="status"></p><button type="button" data-retry hidden></button><div data-settings hidden><h3 data-navbar></h3><p class="hint"></p><ha-sortable data-sortable handle-selector=".drag-handle" draggable-selector=".route" no-style disabled><div data-routes></div></ha-sortable><div data-add></div><section class="shortcuts"><h3 data-shortcuts></h3><div data-flags></div></section></div></div><footer><p class="status" role="alert"></p><button type="button" class="save" data-save disabled></button></footer>`;
   dialog.setAttribute('aria-labelledby','marao-settings-title');
   const restore=navigation.focusRestorer(opener),listeners=new AbortController();let busy=false,expandedRoute;
-  const close=()=>{if(busy||root._maraoSettingsDialog!==dialog)return;dialog.close();dialog.remove();delete root._maraoSettingsDialog;listeners.abort();restore();};
+  const close=()=>{if(busy||root._maraoSettingsDialog!==dialog)return;dialog.close();dialog.remove();delete root._maraoSettingsDialog;listeners.abort();delete root._maraoRefreshSettings;restore();};
   for(const [selector,text]of [['h2',t.title],['[data-loading]',t.loading],['[data-retry]',t.retry],['[data-navbar]',t.navbar],['.hint',t.hint],['[data-shortcuts]',t.shortcuts],['[data-save]',t.save]])dialog.querySelector(selector).textContent=text;
   dialog.querySelector('[data-close]').setAttribute('aria-label',t.close);dialog.querySelector('[data-close]').onclick=close;
   dialog.addEventListener('cancel',event=>{event.preventDefault();close();});dialog.addEventListener('close',()=>{if(root._maraoSettingsDialog===dialog)close();});
@@ -85,7 +87,7 @@ export async function openDashboardSettings(root,opener) {
     dialog.querySelector('[data-loading]').textContent=t.loadError;
     dialog.querySelector('[data-loading]').setAttribute('role','alert');
     const retry=dialog.querySelector('[data-retry]');retry.hidden=false;
-    retry.onclick=()=>{close();openDashboardSettings(root,opener);};
+    retry.onclick=()=>{close();openDashboardSettings(root,opener,owner);};
     return;
   }
   dialog.querySelector('[data-loading]').hidden=true;
@@ -94,7 +96,7 @@ export async function openDashboardSettings(root,opener) {
   const schema=(name,label,selector)=>({name,label,selector});
   const mountForm=(host,data,fields,changed)=>{
     const form=document.createElement('ha-form');form.hass=hass;form.data=data;form.schema=fields;form.computeLabel=item=>item.label;
-    form.addEventListener('value-changed',event=>{event.stopPropagation();if(!busy){form.data=event.detail.value;changed(event.detail.value);}});host.append(form);return form;
+    form.addEventListener('value-changed',event=>{event.stopPropagation();if(!busy){form.data=event.detail.value;changed(event.detail.value);root._maraoRefreshSettings?.();}});host.append(form);return form;
   };
   const sortable=dialog.querySelector('[data-sortable]');sortable.disabled=false;
   const reorder=(oldIndex,newIndex)=>{
@@ -155,7 +157,13 @@ export async function openDashboardSettings(root,opener) {
     });
   };
   render();
-  const validateLocation=mountLocationSettings(dialog.querySelector('[data-settings]'),draft,hass,mountForm,schema);
+  const validateLocation=mountLocationSettings(dialog.querySelector('[data-settings]'),draft,hass,mountForm,schema,viewFor);
+  const browser=document.createElement('section');browser.className='shortcuts';
+  const heading=document.createElement('h4');heading.textContent=String(hass.language).startsWith('pt')?'Este navegador':'This browser';browser.append(heading);(validateLocation.section||dialog.querySelector('[data-settings]')).append(browser);
+  root._maraoRefreshSettings=()=>{if(!valid()){busy=false;close();return;}refresh();};
+  const refresh=owner?._config.current_room?.enabled?mountLocationPreferences(browser,owner,valid,draft):()=>{};
+  if(!owner?._config.current_room?.enabled){const hint=document.createElement('p');hint.textContent=String(hass.language).startsWith('pt')?'Ative a divisão atual e guarde para escolher a pessoa neste navegador.':'Enable Current room and Save before choosing the person for this browser.';browser.append(hint);}
+
   const add=mountForm(dialog.querySelector('[data-add]'),{},[schema('destination',t.add,{navigation:{}})],value=>{
     if(!value.destination)return;navigation.haptic('heavy');const view=viewFor(value.destination);
     const route={path:value.destination,label:view?.title||value.destination,icon:view?.icon||'mdi:view-dashboard'};

@@ -1,3 +1,4 @@
+const {activityTimestamp,activitySources,hasActivity}=await import(new URL(`./MaraoActivityModel.js${new URL(import.meta.url).search}`,import.meta.url));
 const popupLayouts=await import(new URL(`./MaraoPopupView.js${new URL(import.meta.url).search}`,import.meta.url));
 const {popupViewError}=await import(new URL(`./MaraoPopupLayout.js${new URL(import.meta.url).search}`,import.meta.url));
 const {peopleError,peopleRows,collectionLabel,escapeText,sectionsError} = await import(new URL(`./MaraoCollections.js${new URL(import.meta.url).search}`,import.meta.url));
@@ -29,6 +30,12 @@ export function loadLightColorPicker() {
   const url = new URL(`./MaraoLightColor.js${new URL(import.meta.url).search}`, import.meta.url);
   if (lightColorAttempt) url.searchParams.set('marao_retry', String(lightColorAttempt));
   return lightColorModule ||= import(url.href).catch(error => { lightColorModule = null; lightColorAttempt++; throw error; });
+}
+let activityModule, activityAttempt=0;
+function loadActivitySheet() {
+  const url=new URL(`./MaraoActivity.js${new URL(import.meta.url).search}`,import.meta.url);
+  if(activityAttempt)url.searchParams.set('marao_retry',String(activityAttempt));
+  return activityModule ||= import(url.href).catch(error=>{activityModule=null;activityAttempt++;throw error;});
 }
 export function loadHistoryChart() {
   const url = new URL(`./MaraoHistoryChart.js${new URL(import.meta.url).search}`, import.meta.url);
@@ -273,6 +280,7 @@ export function binaryState(entity, state, kind = "md_base_card") {
 }
 
 export function entityStateLabel(state, entity, kind, hass) {
+  if (activityTimestamp(entity, state)) return '';
   const value = text(state?.state, hass?.states ? "unknown" : "loading");
   if (["loading", "unknown", "unavailable"].includes(value)) return localize(`common.${value}`, hass, {}, value === "loading" ? "Loading…" : value);
   if (kind === 'md_battery_card' && batteryReading(value) === null) return localize('common.unavailable', hass, {}, 'Unavailable');
@@ -334,12 +342,14 @@ export function entityGroupState(type, entities, hass) {
   return { state, label, activeEntities, unavailableEntities, available: usable.length, reading, minimumReading };
 }
 
-function readingMarkup(entity, name, icon, hass, kind = "md_sensor_card") {
+function readingMarkup(entity, name, icon, hass, kind = "md_sensor_card", showIcon = true) {
   const state = stateOf(hass, entity);
   const label = name || state.attributes?.friendly_name || entity;
   const unavailable = !hass?.states || ["unknown", "unavailable"].includes(text(state.state, "unknown"));
   const symbol = icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : `<ha-state-icon data-reading-entity="${esc(entity)}" aria-hidden="true"></ha-state-icon>`;
-  return `<div class="reading${unavailable ? ' neutral' : ''}">${symbol}<dt>${esc(label)}</dt><dd>${esc(entityStateLabel(state, entity, kind, hass))}</dd></div>`;
+  const activity = activityTimestamp(entity,state);
+  const control = !showIcon ? '' : activity ? `<button type="button" class="reading-activity" data-activity-open="${esc(entity)}" aria-label="${esc(localize('activity.title',hass,{},'Activity'))}: ${esc(label)}"${unavailable?' disabled':''}>${symbol}</button>` : symbol;
+  return `<div class="reading${unavailable ? ' neutral' : ''}">${control}<dt>${esc(label)}</dt><dd>${esc(entityStateLabel(state, entity, kind, hass))}</dd></div>`;
 }
 
 export function climateModeIcon(value) {
@@ -353,7 +363,33 @@ export function climateModeIcon(value) {
     auto: "mdi:autorenew",
     dry: "mdi:water-percent",
     fan_only: "mdi:fan",
+    fan: 'mdi:fan', drying:'mdi:water-percent', preheating:'mdi:radiator', defrosting:'mdi:snowflake-melt', idle:'mdi:thermostat',
   }[text(value).toLowerCase()] || "mdi:thermostat";
+}
+
+export function roomClimate(config, hass) {
+  const entity = config.variables?.climate_entity;
+  const state = hass?.states?.[entity];
+  const mode = state?.state;
+  const available = Boolean(state && !['unknown','unavailable'].includes(mode));
+  const enabled = available && mode !== 'off';
+  const activity = enabled ? state.attributes?.hvac_action || mode : 'off';
+  const appearance = enabled ? stateAppearance('md_climate_card', activity === 'idle' ? mode : activity, {entity}, hass) : {};
+  const nativeOff = Number(state?.attributes?.supported_features) & 128;
+  const offMode = state?.attributes?.hvac_modes?.includes('off');
+  return {entity, state, mode, activity, available, enabled, color: appearance.background,
+    icon: climateModeIcon(activity),
+    service: nativeOff ? 'climate.turn_off' : offMode ? 'climate.set_hvac_mode' : null};
+}
+export function roomColors(config, hass) {
+  const lighting = roomLightEntities(config).some(id => hass?.states?.[id]?.state === 'on') ? 'var(--room-card-active-background,var(--primary-color))' : null;
+  const climate = roomClimate(config, hass).color;
+  const neutral = 'var(--ha-card-background,var(--card-background-color))';
+  const lightCorner = lighting && climate ? `color-mix(in srgb,${lighting} 25%,var(--color-blue))` : lighting;
+  return [lightCorner || climate || neutral, climate || lighting || neutral];
+}
+for (const name of ['--marao-room-light','--marao-room-climate']) {
+  try { globalThis.CSS?.registerProperty?.({name, syntax:'<color>', inherits:false, initialValue:'#ffffff'}); } catch {}
 }
 
 // Keep the state palette local to Marao so cards do not need Button Card's
@@ -419,7 +455,7 @@ export function stateAppearance(kind, state, config, hass) {
   } else if (kind === "md_climate_card") {
     const colors = {
       heat: orange,
-      heating: orange,
+      heating: orange, preheating:orange, defrosting:orange,
       cool: blue,
       cooling: blue,
       cold: blue,
@@ -672,7 +708,7 @@ export function cardProblem(config, hass, { error = "", contentError = "", loadi
   const summary = kind === 'md_entity_group_card' || kind === 'md_room_card' || summaries.length > 0;
   const readings = kind === "md_glance_card" ? Array.from({ length: 3 }, (_, index) => variables[`entity${index + 1}`]).filter(Boolean) : [];
   const roomMembers = kind === "md_room_card" ? roomLightEntities(config) : [];
-  const content = kind === "md_room_card" ? roomMembers : [...new Set(summaries.length ? summaries : [entity, ...readings].filter(Boolean))];
+  const content = kind === "md_room_card" ? [...roomMembers, variables.climate_entity].filter(Boolean) : [...new Set(summaries.length ? summaries : [entity, ...readings].filter(Boolean))];
   const disconnected = hass?.connected === false || hass?.connection?.connected === false;
   if (!content.length && !error && !contentError) return null;
   if (!hass?.states) return { kind: "loading", reason: localize("common.loading", hass, {}, "Loading…") };
@@ -714,7 +750,7 @@ export function cardProblem(config, hass, { error = "", contentError = "", loadi
     targets.push(...(Array.isArray(target) ? target : [target]));
   }
   const partial = [...new Set([...failedContent, ...failed(targets.filter(Boolean))])];
-  if (partial.length && !summary) {
+  if (partial.length && (!summary || kind === 'md_room_card')) {
     severity ||= "warning";
     details.push(...partial.map(id => {
       const state = hass.states[id];
@@ -844,8 +880,9 @@ export function updateCardSurface(root, markup, selector = 'ha-card', updateCont
   try {
     const style = root.querySelector('style'), css = template.content.querySelector('style').textContent;
     if (style.textContent !== css) style.textContent = css;
-    for (const attribute of [...surface.attributes]) if (!next.hasAttribute(attribute.name)) surface.removeAttribute(attribute.name);
+    for (const attribute of [...surface.attributes]) if (!next.hasAttribute(attribute.name) && !(attribute.name === 'style' && next.hasAttribute('data-room') && !next.hasAttribute('data-problem'))) surface.removeAttribute(attribute.name);
     for (const attribute of [...next.attributes]) if (surface.getAttribute(attribute.name) !== attribute.value) surface.setAttribute(attribute.name, attribute.value);
+    if(next.hasAttribute?.('data-room') && !next.hasAttribute('data-problem'))for(let i=(surface.style?.length||0)-1;i>=0;i--){const property=surface.style[i];if(!['--marao-room-light','--marao-room-climate'].includes(property))surface.style.removeProperty(property);}
     if (updateContent) updateContent(surface, next);
     else {
       const previous = [...surface.childNodes];
@@ -943,7 +980,7 @@ function cardStyles() {
     .climate-card .current-temperature { font-size:calc(var(--font-size-primary,1.125rem) * 1.78); font-weight:var(--font-weight-primary,700); line-height:1.25; }
     .icon { position:relative; grid-area:icon; align-self:end; display:grid; place-items:center; width:52px; height:52px; border-radius:50%; background:var(--marao-icon-background,var(--opacity-contrast-100,rgba(0,0,0,.08))); color:var(--marao-icon-color,var(--icon-color)); }
     .icon :is(ha-icon,ha-state-icon) { --mdc-icon-size:28px; }
-    .icon[data-light-color], .icon[data-history-open] { padding:0; border:0; min-width:48px; min-height:48px; }
+    .icon[data-light-color], .icon[data-history-open], .icon[data-activity-open] { padding:0; border:0; min-width:48px; min-height:48px; }
     .icon .palette-indicator { position:absolute; right:2px; bottom:2px; width:16px; height:16px; --mdc-icon-size:16px; border-radius:50%; background:var(--marao-icon-background,var(--secondary-background-color)); pointer-events:none; }
     .readings { grid-column:1/-1; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,max(110px,calc(var(--font-size-caption,.9375rem) * 8))),1fr)); gap:12px; margin:8px 0 0; min-width:0; }
     .reading { display:grid; justify-items:center; align-content:start; gap:4px; min-width:0; text-align:center; overflow-wrap:anywhere; line-height:1.25; }
@@ -951,7 +988,19 @@ function cardStyles() {
     .reading dd { margin:0; font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-primary,700); }
     .reading :is(ha-icon,ha-state-icon) { --mdc-icon-size:28px; }
     .body.glance-card { display:block; }
-    .body.glance-card .readings { margin:0; }
+    .body.glance-card .readings { margin:0; grid-template-columns:minmax(0,1fr);gap:8px; }
+    .body.glance-card {padding:12px;}
+    .glance-card>.title {margin-bottom:12px;}
+    .glance-card .reading {grid-template-columns:minmax(0,1fr) 48px;grid-template-rows:auto auto;gap:4px 12px;text-align:start;justify-items:stretch;align-items:center;}
+    .glance-card .reading dt {grid-column:1;grid-row:1;height:auto;display:block;overflow:visible;color:var(--secondary-text-color);}
+    .glance-card .reading dd {grid-column:1;grid-row:2;height:auto;min-height:0;white-space:normal;overflow:visible;font-size:var(--font-size-primary,1.125rem);overflow-wrap:anywhere;}
+    .glance-card .reading> :is(ha-icon,ha-state-icon,button) {grid-column:2;grid-row:1/3;box-sizing:border-box;width:48px;height:48px;padding:10px;border-radius:50%;background:var(--opacity-contrast-100,rgba(0,0,0,.08));}
+    .reading-activity {border:0;color:inherit;cursor:pointer;min-width:48px;min-height:48px;}
+    .access-action-icon[data-activity-open] {position:relative;z-index:4;pointer-events:auto;min-width:48px;min-height:48px;padding:10px;border:0;border-radius:50%;color:inherit;background:var(--active-overlay-color,var(--secondary-background-color));}
+    .body.glance-card.has-problem:not(.complete-problem)>.readings {visibility:visible;}
+    .body.glance-card.has-problem:not(.complete-problem)>.problem {position:relative;inset:auto;margin-top:8px;}
+    .body.glance-card.has-problem:not(.complete-problem)>.problem span {white-space:normal;}
+    .body.glance-card.has-problem:not(.complete-problem)>.title {visibility:visible;}
     .control { grid-area:control; z-index:2; display:flex; gap:8px; align-items:center; pointer-events:auto; }
     button { min-width:48px; min-height:48px; border:0; border-radius:12px; padding:10px 12px; color:inherit; background:var(--secondary-background-color); font:inherit; cursor:pointer; pointer-events:auto; transition:transform .12s ease,filter .12s ease; }
     button:focus, input:focus { outline:none; }
@@ -1004,10 +1053,14 @@ function cardStyles() {
     .vacuum-actions { grid-column:1/-1; z-index:3; display:grid; grid-template-columns:repeat(auto-fit,minmax(48px,1fr)); gap:8px; pointer-events:auto; }
     .vacuum-actions button { padding:10px 4px; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); }
     .body.room-card { display:flex; flex-direction:column; align-items:stretch; gap:8px; }
-    .room-bottom { position:relative; display:flex; align-items:flex-end; min-height:48px; margin-top:auto; }
-    .room-artwork { --room-artwork-size:clamp(48px,65cqi,128px); position:absolute; right:calc(-1 * var(--room-edge-inset,14px)); bottom:calc(-1 * var(--room-edge-inset,14px)); width:calc(.8 * var(--room-artwork-size)); height:calc(.8 * var(--room-artwork-size)); max-height:calc(100% + var(--room-edge-inset,14px)); overflow:hidden; color:var(--marao-icon-color,var(--icon-color)); opacity:.2; pointer-events:none; }
+    .room-bottom { position:relative; display:flex; align-items:flex-end; min-height:48px; margin-top:auto; gap:8px; }
+    .room-artwork { --room-artwork-size:clamp(48px,65cqi,128px); position:absolute; right:calc(-1 * var(--room-edge-inset,14px)); bottom:0; width:calc(.9 * var(--room-artwork-size)); height:var(--room-artwork-size); max-height:calc(100% + 36px); overflow:hidden; color:var(--marao-icon-color,var(--icon-color)); opacity:.2; pointer-events:none; }
     .room-artwork :is(ha-icon,ha-state-icon) { display:block; width:var(--room-artwork-size); height:var(--room-artwork-size); --mdc-icon-size:var(--room-artwork-size); }
     .room-lights-off { position:relative; z-index:3; box-sizing:border-box; display:flex; align-items:center; justify-content:center; flex:0 0 48px; width:48px; height:48px; padding:0; border:1px solid currentColor; border-radius:50%; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); pointer-events:auto; }
+    ha-card[data-room] { background:linear-gradient(to top right,var(--marao-room-light),var(--marao-room-climate)); transition:--marao-room-light .3s ease,--marao-room-climate .3s ease; }
+    ha-card[data-room][data-problem] { transition:none; background:var(--marao-card-background,var(--ha-card-background,var(--card-background-color))); }
+    @media(prefers-reduced-motion:reduce) { ha-card[data-room] { transition:none; } }
+    .room-climate-off[data-active="true"] { background:var(--marao-room-climate); }
     .room-lights-off:disabled { opacity:.6; cursor:default; }
     .room-lights-off ha-icon { --mdc-icon-size:28px; }
     .climate-mode-picker { grid-area:modes;z-index:3;pointer-events:auto;min-width:0;width:100% }
@@ -1029,7 +1082,7 @@ function cardStyles() {
       .body.wallbox-card { grid-template-areas:'title' 'control' 'wallbox'; }
       .body.binary-card:not(:has(>.state)) { grid-template-columns:minmax(0,1fr); grid-template-areas:'title' 'icon' 'climate' 'control'; }
       .body.room-card { --room-edge-inset:clamp(0px,calc((100cqi - 64px) / 2),4px); }
-      .body.room-card .room-artwork { bottom:-24px; }
+      .body.room-card .room-artwork { bottom:-8px; }
       .control.number-control { grid-area:control; justify-self:start; }
       .number-stepper { min-width:56px; max-width:100%; }
       .wallbox-shortcuts, .climate-modes { grid-template-columns:minmax(0,1fr); }
@@ -1155,6 +1208,8 @@ export class MaraoCard extends BaseElement {
   }
   setConfig(config) {
     config = accessCardConfig(config, this._hass);
+    if (config.variables?.activity_entities !== undefined && (!Array.isArray(config.variables.activity_entities) || config.variables.activity_entities.some(id => typeof id !== 'string' || !/^[a-z_]+\.[a-z0-9_]+$/.test(id)))) throw new Error(localize('activity.invalid_sources',this._hass,{},'Related activity entities must be an explicit list of entity IDs.'));
+    if (config.template === 'md_room_card' && config.variables?.climate_entity != null && config.variables.climate_entity !== '' && !/^climate\.[a-z0-9_]+$/.test(config.variables.climate_entity)) throw new Error(localize('room.invalid_climate',this._hass,{},'Choose a climate entity.'));
     if(config.template==='md_media_app_card'){const error=mediaAppLogoError(config.variables?.app_logo,this._hass);if(error)throw new Error(error);}
     if(config.template==='md_people_card'){const error=peopleError(config);if(error)throw new Error(collectionLabel(error,this._hass));}
     this.shadowRoot?.querySelector("marao-slide-to-open")?._clearFeedback?.();
@@ -1172,7 +1227,7 @@ export class MaraoCard extends BaseElement {
     this._alarmSignature = "";
     this._alarmBusy = false;
     this._cancelHold();
-    this._cancelSliderGesture();
+    this._cancelSliderGesture();this._sliderControl?.settle?.();
     if (historyIdentity(this._config) !== historyIdentity(config)) { this._graphRequests.clear(); this._graphHistory.clear(); this._graphErrors.clear(); this._graphData = null; this._ownedGraphRecords = null; } this._config = { ...config }; if (previousGraph !== this._graphEntity()) this._activeHistoryPopup?._invalidateHistory(); this._actionError = ""; this._mediaError = ""; this._mediaURL = ""; this._actionRequest = (this._actionRequest || 0) + 1; this._subscribeClimate(); this._observeGraph(); this._render(); }
   connectedCallback() {
     this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => { this.preview = this._preview; });
@@ -1204,6 +1259,7 @@ export class MaraoCard extends BaseElement {
     const wasServiceReady = this._serviceReady;
     this._hass = value;
     this._serviceReady = serviceConnectionReady(value);
+    if(previous?.user?.id !== value?.user?.id || wasServiceReady !== this._serviceReady)this._activeHistoryPopup?._refreshHistory();
     this._camera?.update(value, entity, this._label(entity, this._config, stateOf(value, entity)));
     if (this._config.template === "md_alarm_controls_card") {
       if (!this._serviceReady || !serviceTargetReady(value, entity)) { this._clearAlarmPIN(); this._cancelHold(); }
@@ -1334,10 +1390,30 @@ export class MaraoCard extends BaseElement {
     }
     updateCardSurface(this.shadowRoot, markup, 'ha-card', (surface, next) => {
       const previous = [...surface.childNodes];
-      const slide = this._config.template === 'md_access_slide_action_card' ? surface.querySelector('marao-slide-to-open') : null;
-      const nextSlide = slide ? next.querySelector('marao-slide-to-open') : null;
-      if (slide && nextSlide && slide.getAttribute('entity') === nextSlide.getAttribute('entity')) {
+      const coverRange = ['md_cover_card','md_fan_card'].includes(this._config.template) && domainOf(this._config.entity) === 'cover';
+      const oldRange = coverRange ? surface.querySelector('input[type=range]') : null;
+      const newRange = oldRange ? next.querySelector('input[type=range]') : null;
+      const sameRange = oldRange && newRange && ['data-slider-key','min','max','step'].every(key => oldRange.getAttribute(key) === newRange.getAttribute(key));
+      if (sameRange) {
+        const snapRange = oldRange.disabled || newRange.disabled;
+        oldRange.disabled = newRange.disabled;
+        for (const key of ['aria-label','title']) oldRange.setAttribute(key, newRange.getAttribute(key));
+        this._sliderControl?.update(Number(newRange.dataset.sliderCurrent), Number(newRange.value), {follow: !this._sliderTargets.has(oldRange.dataset.sliderKey), immediate: snapRange || this._hass?.connected === false || this._hass?.connection?.connected === false});
+      }
+      const roomBottom = this._config.template === 'md_room_card' && this._renderedConfig === this._config ? surface.querySelector('.room-bottom') : null;
+      const nextRoomBottom = roomBottom ? next.querySelector('.room-bottom') : null;
+      const sameRoom = roomBottom && nextRoomBottom && roomBottom.children.length === nextRoomBottom.children.length;
+      if (sameRoom) for (let i=0;i<roomBottom.children.length;i++) {
+        const current=roomBottom.children[i],fresh=nextRoomBottom.children[i];
+        for(const attr of [...current.attributes]) if(!fresh.hasAttribute(attr.name))current.removeAttribute(attr.name);
+        for(const attr of [...fresh.attributes])current.setAttribute(attr.name,attr.value);
+        current.innerHTML=fresh.innerHTML;
+      }
+      const slide = sameRoom ? roomBottom : sameRange ? oldRange.parentElement : this._config.template === 'md_access_slide_action_card' ? surface.querySelector('marao-slide-to-open') : null;
+      const nextSlide = sameRoom ? nextRoomBottom : sameRange ? newRange.parentElement : slide ? next.querySelector('marao-slide-to-open') : null;
+      if (slide && nextSlide && (sameRoom || sameRange || slide.getAttribute('entity') === nextSlide.getAttribute('entity'))) {
         const retain = (current, fresh) => {
+          if(current === slide && sameRange)return;
           for (const attr of [...current.attributes]) if (!fresh.hasAttribute(attr.name)) current.removeAttribute(attr.name);
           for (const attr of [...fresh.attributes]) if (current.getAttribute(attr.name) !== attr.value) current.setAttribute(attr.name, attr.value);
           if (current === slide) return;
@@ -1722,6 +1798,14 @@ export class MaraoCard extends BaseElement {
       onRetry: () => { this._graphErrors.delete(entity); this._graphHistory.delete(entity); this._loadGraphHistory(entity); },
     };
   }
+  _activityOptions() {
+    return {hass:this._hass,sources:activitySources(this._config,this._activityEntity||this._config.entity),haptic};
+  }
+  _openActivity(opener,entity=this._config.entity) {
+    if(this.preview || !serviceConnectionReady(this._hass))return;
+    haptic('heavy');this._activityEntity=entity;
+    this._detailPopup(localize('activity.title',this._hass,{},'Activity')).openHistory(this,opener,'activity');
+  }
   _openHistory(opener) {
     if (this.preview || this._graphAvailability(this._graphEntity())) return;
     haptic('heavy');
@@ -1870,6 +1954,9 @@ export class MaraoCard extends BaseElement {
     const roomLightsControl = roomLights.length
       ? `<button class="room-lights-off" type="button" data-room-lights-off aria-label="${esc(roomLightsOffLabel)}" title="${esc(roomLightsOffLabel)}"${roomLightsControlDisabled ? " disabled" : ""}><ha-icon icon="mdi:lightbulb-off-outline" aria-hidden="true"></ha-icon></button>`
       : "";
+    const roomHVAC = kind === 'md_room_card' ? roomClimate(config, this._hass) : {};
+    const roomClimateLabel = `${localize('room.turn_off_climate',this._hass,{},'Turn off climate')}: ${this._hass?.states?.[roomHVAC.entity]?.attributes?.friendly_name || roomHVAC.entity} · ${climateModeLabel(roomHVAC.activity, this._hass)}`;
+    const roomClimateControl = roomHVAC.entity ? `<button class="room-lights-off room-climate-off" type="button" data-room-climate-off data-active="${roomHVAC.enabled && roomHVAC.activity !== 'idle'}" aria-label="${esc(roomClimateLabel)}"${!serviceReady || !roomHVAC.enabled || !roomHVAC.service ? ' disabled' : ''}><ha-icon icon="${esc(roomHVAC.icon)}" aria-hidden="true"></ha-icon></button>` : '';
     const sceneOptions = kind === "md_scene_card" && ["input_select", "select"].includes(domainOf(entity)) && Array.isArray(state.attributes?.options)
       ? state.attributes.options.filter((option) => typeof option === "string")
       : [];
@@ -1886,13 +1973,9 @@ export class MaraoCard extends BaseElement {
     const artwork = !problem && kind === "md_media_card" && (!variables.now_playing || !["idle", "off", "standby"].includes(value)) && mediaAvailable && variables.md_show_background_art !== false && state.attributes?.entity_picture
       ? `<div class="media-artwork" aria-hidden="true"><img src="${esc(state.attributes.entity_picture)}" alt=""></div>` : "";
     const glance = kind === "md_glance_card";
-    let readings = glance ? [1,2,3].filter((index) => variables[`entity${index}`]).map((index) => readingMarkup(variables[`entity${index}`], variables[`entity${index}_name`], variables[`entity${index}_icon`], this._hass)).join("") : "";
+    let readings = glance ? [1,2,3].filter((index) => variables[`entity${index}`]).map((index) => readingMarkup(variables[`entity${index}`], variables[`entity${index}_name`], variables[`entity${index}_icon`], this._hass, "md_sensor_card", config.show_icon !== false && variables.show_icon !== false)).join("") : "";
     const locale = this._hass?.locale?.language || this._hass?.language || "en";
-    let details = kind === "md_sensor_card" ? '<div class="climate placeholder">—</div>' : "";
-    if (kind === "md_sensor_card" && !appearance.unavailable && state.last_updated) {
-      const updated = new Date(state.last_updated);
-      if (Number.isFinite(updated.getTime())) details = `<div class="climate">${esc(localize("sensor.updated", this._hass, { time: new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(updated) }, "Updated " + new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(updated)))}</div>`;
-    }
+    let details = "";
     if (kind === "md_switch_card" && variables.power_entity) {
       const reading = formattedPower ? energyLabel(formattedPower, variables, this._hass) : Number.isFinite(Number(power.state)) && power.state !== "" && power.state != null
         ? `${power.state} ${variables.power_unit || power.attributes?.unit_of_measurement || "W"}` : entityStateLabel(power, variables.power_entity, "md_sensor_card", this._hass);
@@ -1968,19 +2051,20 @@ export class MaraoCard extends BaseElement {
     const usesNumberStepper = ["md_climate_card", "md_number_card", "md_wallbox_current_card"].includes(kind);
     const binaryLabel = binary === null ? "" : `${this._label(toggleEntity || entity, toggleEntity && toggleEntity !== entity ? {} : config, interactionState)}: ${entityStateLabel(interactionState, toggleEntity || entity, kind, this._hass)}`;
     const hiddenBinaryState = binaryLabel && kind !== "md_room_card" && !showIcon ? `<span class="binary-state" role="img" aria-label="${esc(binaryLabel)}"></span>` : "";
+    const activityEntry = !lightColor && hasActivity(config,state);
     const app = kind === "md_media_app_card" ? mediaAppBrand(config) : null;
-    const iconElement = usesNumberStepper && !historyEntry ? "" : kind === "md_room_card" || !showIcon ? hiddenBinaryState : app
+    const iconElement = usesNumberStepper && !historyEntry && !activityEntry ? "" : kind === "md_room_card" || !showIcon ? hiddenBinaryState : app
       ? `<img class="app-icon${app.symbol ? " app-symbol" : ""}" src="${esc(new URL(`./media-apps/${app.file || `${app.id}.png`}${new URL(import.meta.url).search}`, import.meta.url).href)}" width="64" height="64" alt="" aria-hidden="true">`
-      : `<${lightColor || historyEntry ? `button type="button" ${lightColor ? 'data-light-color' : 'data-history-open'}` : 'div'} class="icon"${lightColor || historyEntry ? ` aria-label="${esc(lightColor ? localize('light.picker', this._hass, { name: this._label(entity, config, state) }, `Change color for ${this._label(entity, config, state)}`) : localize('actions.for_target', this._hass, {action:localize('history.title',this._hass,{},'History'),name:this._label(entity,config,state)}, `History ${this._label(entity,config,state)}`))}"${binaryLabel ? ` aria-description="${esc(binaryLabel)}"` : ''}${(historyEntry ? this.preview || this._graphAvailability(graphEntity) : controlsDisabled) ? ' disabled' : ''}` : binaryLabel ? ` role="img" aria-label="${esc(binaryLabel)}"` : ' aria-hidden="true"'}>${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : `<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>`}${lightColor || historyEntry ? `<ha-icon class="palette-indicator" icon="${lightColor ? 'mdi:palette' : 'mdi:chart-line'}" aria-hidden="true"></ha-icon>` : ''}</${lightColor || historyEntry ? 'button' : 'div'}>`;
+      : `<${lightColor || historyEntry || activityEntry ? `button type="button" ${lightColor ? 'data-light-color' : activityEntry ? `data-activity-open="${esc(entity)}"` : 'data-history-open'}` : 'div'} class="icon"${lightColor || historyEntry || activityEntry ? ` aria-label="${esc(activityEntry ? `${localize('activity.title',this._hass,{},'Activity')}: ${this._label(entity,config,state)}` : lightColor ? localize('light.picker', this._hass, { name: this._label(entity, config, state) }, `Change color for ${this._label(entity, config, state)}`) : localize('actions.for_target', this._hass, {action:localize('history.title',this._hass,{},'History'),name:this._label(entity,config,state)}, `History ${this._label(entity,config,state)}`))}"${binaryLabel ? ` aria-description="${esc(binaryLabel)}"` : ''}${(activityEntry ? this.preview || !serviceReady || stateDisabled : historyEntry ? this.preview || this._graphAvailability(graphEntity) : controlsDisabled) ? ' disabled' : ''}` : binaryLabel ? ` role="img" aria-label="${esc(binaryLabel)}"` : ' aria-hidden="true"'}>${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : `<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>`}${lightColor || historyEntry || activityEntry ? `<ha-icon class="palette-indicator" icon="${lightColor ? 'mdi:palette' : activityEntry ? 'mdi:history' : 'mdi:chart-line'}" aria-hidden="true"></ha-icon>` : ''}</${lightColor || historyEntry || activityEntry ? 'button' : 'div'}>`;
     const accessActionIcon = config.icon || (domainOf(entity) === 'lock'
       ? kind === 'md_access_slide_action_card' ? 'mdi:lock-open-variant' : 'mdi:lock'
       : state.attributes?.device_class === 'garage'
         ? kind === 'md_access_slide_action_card' ? 'mdi:garage-open' : 'mdi:garage'
         : kind === 'md_access_slide_action_card' ? 'mdi:door-open' : 'mdi:door-closed');
     const accessIcon = accessPopup && config.show_icon !== false && variables.show_icon !== false
-      ? `<span class="access-action-icon" aria-hidden="true"><ha-icon icon="${esc(accessActionIcon)}"></ha-icon></span>` : '';
+      ? `<button type="button" class="access-action-icon" data-activity-open="${esc(entity)}" aria-label="${esc(localize('activity.title',this._hass,{},'Activity'))}: ${esc(this._label(entity,config,state))}"${this.preview || !serviceReady || stateDisabled ? ' disabled' : ''}><ha-icon icon="${esc(accessActionIcon)}" aria-hidden="true"></ha-icon></button>` : '';
     const roomArtwork = kind === "md_room_card" && showIcon ? `<div class="room-artwork" aria-hidden="true">${icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : '<ha-state-icon data-state-icon aria-hidden="true"></ha-state-icon>'}</div>` : "";
-    const roomBottom = roomLightsControl || roomArtwork ? `<div class="room-bottom">${roomLightsControl}${roomArtwork}</div>` : "";
+    const roomBottom = roomLightsControl || roomClimateControl || roomArtwork ? `<div class="room-bottom">${roomLightsControl}${roomClimateControl}${roomArtwork}</div>` : "";
     const controlClass = kind === "md_climate_card" ? "control number-control climate-number-control" : kind === "md_wallbox_current_card" ? "control number-control wallbox-current-control" : usesNumberStepper ? "control number-control" : "control";
     const serviceTarget = action?.target?.entity_id || action?.data?.entity_id || action?.entity_id || entity;
     const roomNavigation = kind === "md_room_card" && action?.action === "navigate";
@@ -2018,9 +2102,9 @@ export class MaraoCard extends BaseElement {
     }).join("")}</div>` : "";
     const problemMessage = !camera && problem && (problem.kind !== "loading" || !showState) ? `<div class="problem" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="${problem.kind === "loading" ? "mdi:progress-clock" : problem.kind === "neutral" ? "mdi:help-circle-outline" : "mdi:alert-circle-outline"}" aria-hidden="true"></ha-icon><span>${esc(problemLabel(problem, this._hass))}</span></div>` : "";
     const formattedReading = !iconOnly && formatting && (['md_graph_card','md_toggle_graph_card','md_sensor_card','md_base_card'].includes(kind) || kind === 'md_switch_card' && variables.power_entity);
-    const stateMarkup = showState && kind !== "md_wallbox_current_card" ? `<div class="state${!displayValue ? " placeholder" : ""}">${esc(displayValue || "—")}</div>` : "";
+    const stateMarkup = showState && (!activityTimestamp(entity,state) || customLabel || variables.md_label_prefix) && kind !== "md_wallbox_current_card" ? `<div class="state${!displayValue ? " placeholder" : ""}">${esc(displayValue || "—")}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}${accessPopup ? " access-popup-action" : ""}${accessPopup && kind === "md_access_action_card" ? " access-close-action" : ""}">${accessPopup ? `${accessIcon}${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${details}` : uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${coverActions}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${historyControl}${historyEntry && graphStatus === 'error' ? `<button type="button" data-graph-retry aria-label="${esc(localize('common.retry',this._hass,{},'Retry'))}"><ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon></button>` : ''}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
+    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${kind === "md_room_card" ? " data-room" : ""}${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}${accessPopup ? " access-popup-action" : ""}${accessPopup && kind === "md_access_action_card" ? " access-close-action" : ""}">${accessPopup ? `${accessIcon}${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${details}` : uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${coverActions}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${historyControl}${historyEntry && graphStatus === 'error' ? `<button type="button" data-graph-retry aria-label="${esc(localize('common.retry',this._hass,{},'Retry'))}"><ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon></button>` : ''}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
     for (const button of this.shadowRoot.querySelectorAll('[data-exhaust-action]')) button.addEventListener('click', event => {
       event.stopPropagation(); haptic('heavy'); this._coverAction(entity, button.dataset.exhaustAction);
     });
@@ -2032,6 +2116,11 @@ export class MaraoCard extends BaseElement {
       symbol.stateObj = readingEntity ? presentationState(stateOf(this._hass, readingEntity), readingEntity, "md_sensor_card") : presentationState(state, entity, kind);
     }
     const card = this.shadowRoot.querySelector("ha-card");
+    if (card && kind === 'md_room_card') {
+      const [light, climate] = roomColors(config, this._hass);
+      card.style.setProperty('--marao-room-light',light); card.style.setProperty('--marao-room-climate',climate);
+
+    }
     if (card && !problem) {
       if (appearance.background) card.style.setProperty("--marao-card-background", appearance.background);
       if (appearance.text) card.style.setProperty("--marao-card-text-color", appearance.text);
@@ -2048,11 +2137,15 @@ export class MaraoCard extends BaseElement {
       if (text(variables.graph_background).trim()) card.style.setProperty("--marao-graph-background", text(variables.graph_background).trim());
       if (showsGraph) this._syncGraphColor(card, variables);
     }
+    if(card && kind === 'md_room_card' && roomHVAC.enabled && !problem)for(const property of ['--marao-card-text-color','--marao-state-color','--marao-icon-color'])card.style.setProperty(property,'var(--color-black)');
     this._syncSceneDropdown(entity, controlsDisabled);
     if (contentChanged === false) {
       if (showsGraph) this._loadGraphHistory(graphEntity);
       return;
     }
+    this.shadowRoot.querySelectorAll('[data-activity-open]').forEach(button => button.addEventListener('click',event => {
+      event.preventDefault();event.stopPropagation();if(!button.disabled)this._openActivity(button,button.getAttribute('data-activity-open'));
+    }));
     this.shadowRoot.querySelector('[data-problem-details]')?.addEventListener('click', event => { event.stopPropagation(); showCardDetails(this, problem.reason, event.currentTarget); });
     this.shadowRoot.querySelectorAll('[data-history-open]').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); if (!button.disabled) this._openHistory(button); }));
     this.shadowRoot.querySelector('[data-light-color]')?.addEventListener('click', event => { event.stopPropagation(); this._openLightColor(event.currentTarget); });
@@ -2072,13 +2165,21 @@ export class MaraoCard extends BaseElement {
         this._performAction({ action: "call-service", service: entry.service, data: { ...entry.data, entity_id: entity }, haptic: "heavy" }, entity);
       });
     }
+    const climateOffButton = this.shadowRoot.querySelector('[data-room-climate-off]');
+    if (roomClimateControl && climateOffButton) climateOffButton.onclick = event => {
+      event.preventDefault(); event.stopPropagation();
+      const current = roomClimate(this._config, this._hass);
+      if (event.currentTarget.disabled || current.entity !== roomHVAC.entity || !serviceConnectionReady(this._hass) || !current.enabled || !current.service) return;
+      this._performAction({action:'call-service', service:current.service, data:{entity_id:current.entity, ...(current.service === 'climate.set_hvac_mode' ? {hvac_mode:'off'} : {})}, haptic:'heavy'}, current.entity);
+    };
     if (roomLightsControl) {
-      this.shadowRoot.querySelector("[data-room-lights-off]")?.addEventListener("click", (event) => {
+      const button = this.shadowRoot.querySelector("[data-room-lights-off]");
+      if(button) button.onclick = (event) => {
         event.preventDefault();
         event.stopPropagation();
         if (event.currentTarget?.disabled || !this._hass?.states || !serviceConnectionReady(this._hass) || !serviceTargetReady(this._hass, roomLights)) return;
         this._performAction({ action: "call-service", service: "light.turn_off", data: { entity_id: roomLights }, haptic: "heavy" }, entity);
-      });
+      };
     }
     for (const image of this.shadowRoot.querySelectorAll('img.camera,.media-artwork img')) image.addEventListener('error', () => {
       if (!image.isConnected || this._config !== config || this._mediaURL !== pictureURL) return;
@@ -2102,10 +2203,12 @@ export class MaraoCard extends BaseElement {
     });
     if (showsGraph) this._loadGraphHistory(graphEntity);
     const input = this.shadowRoot.querySelector("input[type=range]");
-    this._sliderControl?.destroy(); this._sliderControl = null;
-    if (input) {
+    const retainedRange = input && input === this._sliderInput && this._sliderControl;
+    if (!retainedRange) { this._sliderControl?.destroy(); this._sliderControl = null; }
+    this._sliderInput = input;
+    if (input && !retainedRange) {
       this._sliderControl = bindSlider(input, {
-        haptic,
+        haptic, smooth: domainOf(entity) === 'cover' && ['md_cover_card','md_fan_card'].includes(kind),
         onInput: value => this._sliderTargets.set(`${kind}:${entity}`, value),
         onStart: gesture => {
           this._sliderGesture = gesture;
@@ -2533,11 +2636,12 @@ export class MaraoPopupCard extends BaseElement {
   }
   _invalidateHistory() { this._close(false); this._historyContext = null; }
   openLightColor(owner, opener) { this.openHistory(owner, opener, 'light-color'); }
-  _detailSource(context) { return context.kind === 'light-color' ? context.owner._config.entity : context.owner._graphEntity?.(); }
+  _detailSource(context) { if(context.kind === 'activity')return JSON.stringify(context.owner._activityOptions().sources);return context.kind === 'light-color' ? context.owner._config.entity : context.owner._graphEntity?.(); }
   openHistory(owner, opener, kind = 'history') {
     if (this.preview || owner.preview || nativeEditing(owner) || !owner.isConnected) return;
+    this._hideHistory(false);
     this.nativeOwner = owner;
-    this._historyContext = { owner, kind, restoreFocus: focusRestorer(opener), id: `${Date.now()}-${++historyEntryId}`, path: window.location.pathname, hash: window.location.hash, source: kind === 'light-color' ? owner._config.entity : owner._graphEntity?.() };
+    this._historyContext = { owner, kind, restoreFocus: focusRestorer(opener), id: `${Date.now()}-${++historyEntryId}`, path: window.location.pathname, hash: window.location.hash, account: owner._hass?.user?.id, config: owner._config, source: kind === 'activity' ? JSON.stringify(owner._activityOptions().sources) : kind === 'light-color' ? owner._config.entity : owner._graphEntity?.() };
     owner._activeHistoryPopup = this;
     this._openSheet(this._historyContext.restoreFocus);
     window.history.pushState({ ...window.history.state, maraoHistory: { id: this._historyContext.id } }, '', window.location.href);
@@ -2551,10 +2655,10 @@ export class MaraoPopupCard extends BaseElement {
     this._historyScroll = this._overlay.querySelector('.marao-popup-scroll').scrollTop;
     parent.hidden = true; parent.inert = true;
     const host = document.createElement('div'); host.className = context.kind === 'light-color' ? 'marao-light-color-content' : 'marao-history-content';
-    if (context.kind === 'light-color') {
+    if (['light-color','activity'].includes(context.kind)) {
       const title = this._overlay.querySelector('.marao-popup-head h2');
       this._detailTitle = title.textContent;
-      title.textContent = context.owner._label(context.source, context.owner._config, stateOf(context.owner.hass, context.source));
+      title.textContent = context.kind === 'activity' ? `${context.owner._label(context.owner._activityEntity || context.owner._config.entity,context.owner._config,stateOf(context.owner.hass,context.owner._activityEntity || context.owner._config.entity))} · ${localize('activity.title',this._hass,{},'Activity')}` : context.owner._label(context.source, context.owner._config, stateOf(context.owner.hass, context.source));
       this._overlay.querySelector('.marao-popup-sheet').setAttribute('aria-label', title.textContent);
     }
     parent.after(host); this._historyHost = host;
@@ -2571,7 +2675,30 @@ export class MaraoPopupCard extends BaseElement {
   async _refreshHistory() {
     const context = this._historyContext, host = this._historyHost;
     if (!context || !host) return;
-    if (!context.owner.isConnected || context.path !== window.location.pathname || context.source !== this._detailSource(context)) { this._close(false); return; }
+    if (!context.owner.isConnected || context.path !== window.location.pathname || context.source !== this._detailSource(context) || context.account !== context.owner._hass?.user?.id || context.kind === 'activity' && (context.config !== context.owner._config || context.owner.preview || !serviceConnectionReady(context.owner._hass))) { this._close(false); return; }
+    if(context.kind === 'activity') {
+      const options=context.owner._activityOptions();
+      if(this._historyChart){this._historyChart.update(options);return;}
+      if(this._historyLoading||this._historyFailed)return;
+      this._historyLoading=true;
+      host.textContent=localize('common.loading',this._hass,{},'Loading…');
+      try {
+        const module=await loadActivitySheet();
+        if(host!==this._historyHost||context!==this._historyContext)return;
+        this._historyChart=module.createActivity(host,options);
+        const scroll=this._overlay.querySelector('.marao-popup-scroll');scroll.style.overflow='hidden';scroll.style.display='flex';scroll.style.flexDirection='column';host.style.cssText='display:flex;flex-direction:column;min-height:0;flex:1';
+        if(context.owner._graphEntity?.()&&['md_sensor_card','md_switch_card'].includes(context.owner._config.template)) {
+          const chart=document.createElement('button');chart.type='button';chart.textContent=localize('activity.chart',this._hass,{},'Chart');chart.style.cssText='min-height:48px;min-width:48px';
+          const activity=this._historyChart;let graph,graphHost;
+          chart.onclick=async()=>{haptic('heavy');if(graphHost){graph.destroy();graphHost.remove();graphHost=null;graph=null;host.querySelector('.marao-activity').hidden=false;return;}
+            chart.disabled=true;try{const module=await loadHistoryChart();if(host!==this._historyHost)return;graphHost=document.createElement('div');const back=document.createElement('button');back.type='button';back.textContent=localize('activity.title',this._hass,{},'Activity');back.style.cssText='min-width:48px;min-height:48px';back.onclick=()=>chart.onclick();const canvas=document.createElement('div');graphHost.append(back,canvas);host.append(graphHost);host.querySelector('.marao-activity').hidden=true;graph=module.createHistoryChart(canvas,context.owner._historyOptions());}catch{if(host!==this._historyHost)return;let error=host.querySelector('[data-chart-error]');if(!error){error=document.createElement('p');error.setAttribute('data-chart-error','');error.setAttribute('role','alert');host.append(error);}error.textContent=localize('timeline.history_unavailable',this._hass,{},'History unavailable');}finally{chart.disabled=false;}};
+          this._historyChart={update:next=>{activity.update(next);graph?.update(context.owner._historyOptions());},destroy:()=>{graph?.destroy();graphHost?.remove();activity.destroy();}};
+          host.querySelector('header')?.append(chart);
+        }
+      }catch {if(context!==this._historyContext)return;this._historyFailed=true;host.textContent=localize('timeline.history_unavailable',this._hass,{},'History unavailable');const retry=document.createElement('button');retry.type='button';retry.textContent=localize('common.retry',this._hass,{},'Retry');retry.style.cssText='min-height:48px;min-width:48px';retry.onclick=()=>{this._historyFailed=false;this._refreshHistory();};host.append(retry);}
+      finally{if(host===this._historyHost)this._historyLoading=false;}
+      return;
+    }
     const color = context.kind === 'light-color';
     const options = color ? context.owner._lightColorOptions() : context.owner._historyOptions();
     if (this._historyChart) { this._historyChart.update(options); return; }
@@ -2613,6 +2740,7 @@ export class MaraoPopupCard extends BaseElement {
   }
   _hideHistory(restore = true) {
     if (!this._historyHost && !this._historyChart && !this._historyBack) return;
+    if(this._historyContext?.kind === 'activity')for(const property of ['overflow','display','flex-direction'])this._overlay?.querySelector('.marao-popup-scroll')?.style?.removeProperty(property);
     this._historyChart?.destroy(); this._historyChart = null;
     this._historyHost?.remove(); this._historyHost = null;
     this._historyBack?.remove(); this._historyBack = null;

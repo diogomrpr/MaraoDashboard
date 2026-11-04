@@ -465,16 +465,14 @@ test('automatic location loads missing links once and rejects a previous account
  }finally{if(previous===undefined)delete globalThis.window;else globalThis.window=previous;}
 });
 
-test('location preferences survive a navbar redraw on the stable dashboard host',async()=>{
- const previous={document:globalThis.document,window:globalThis.window,location:globalThis.location,customElements:globalThis.customElements};
- class Node extends EventTarget{
-  constructor(){super();this.nodes=new Map();this.children=[];this.isConnected=true;}
-  querySelector(key){if(!this.nodes.has(key))this.nodes.set(key,new Node());return this.nodes.get(key);}
-  append(node){node.parentNode=this;this.children.push(node);}
-  showModal(){this.open=true;}close(){this.open=false;this.dispatchEvent(new Event('close'));}remove(){this.parentNode.children=this.parentNode.children.filter(n=>n!==this);this.isConnected=false;}
-  focus(){}getAttributeNames(){return [];}getAttribute(){return null;}
- }
- const root=new Node(),own=new Node(),owner={isConnected:true,_config:{current_room:{enabled:true}},_hass:{user:{id:'test'},language:'en'},_locationKey:'test',_routes(){},_root:()=>({shadowRoot:root}),shadowRoot:own};
- globalThis.document={createElement:()=>new Node()};globalThis.window=new EventTarget();globalThis.location={pathname:'/house/home'};globalThis.customElements={get:()=>true};
- try{const {openLocationPreferences}=await import('../../custom_components/marao_dashboard/frontend/MaraoLocationPreferences.js');await openLocationPreferences(owner,new Node());const dialog=owner._locationDialog;assert.equal(dialog.parentNode,root);own.children=[];assert.equal(dialog.open,true);assert.equal(root.children[0],dialog);owner._closeLocationPreferences();assert.equal(owner._locationDialog,null);assert.equal(root.children.length,0);}finally{Object.assign(globalThis,previous);}
+test('browser person preferences are embedded and reject regular users and stale owners',async t=>{
+ const previous={document:globalThis.document,window:globalThis.window};t.after(()=>Object.assign(globalThis,previous));
+ class Node extends EventTarget {constructor(){super();this.children=[];this.attributes={};}append(...nodes){this.children.push(...nodes);}setAttribute(key,value){this.attributes[key]=value;}}
+ globalThis.document={createElement:()=>new Node()};const values=new Map();globalThis.window={localStorage:{setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)}};
+ const owner={isConnected:true,_config:{current_room:{enabled:true}},_hass:{states:{},user:{id:'admin',is_admin:true}},_root:()=>({}),_locationKey:'browser',_routes:()=>[{location:true,label:'Room unknown'}],_updateCurrent(){this.updates=(this.updates||0)+1;}};
+ const {mountLocationPreferences}=await import('../../custom_components/marao_dashboard/frontend/MaraoLocationPreferences.js');const host=new Node();let valid=true;
+ mountLocationPreferences(host,owner,()=>valid);const automatic=host.children[1],form=host.children[2];
+ const choose=person=>form.dispatchEvent(Object.assign(new Event('value-changed'),{detail:{value:{person}}}));
+ choose('person.test');assert.equal(values.get('browser'),'person.test');assert.equal(owner.updates,1);
+ owner._hass.user.is_admin=false;choose('person.other');assert.equal(values.get('browser'),'person.test');owner._hass.user.is_admin=true;valid=false;automatic.onclick();assert.equal(values.get('browser'),'person.test');valid=true;automatic.onclick();assert.equal(values.has('browser'),false);
 });

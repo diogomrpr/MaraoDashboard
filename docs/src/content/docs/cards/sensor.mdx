@@ -24,6 +24,8 @@ entity_id: sensor.humidity
 
 Compatible entity domains: `sensor`, `binary_sensor`.
 
+Tap an Activity icon to inspect recorded events with date and type filters. Optional variables.activity_entities adds explicitly related sources. Automatic Updated and last-activation timestamps move into Activity; timestamp-sensor readings remain data.
+
 Numeric thresholds use source values before display conversion. Bounds must be strictly increasing and colors opaque #RRGGBB values.
 
 Binary sensors use explicit active/inactive icons; unknown/unavailable data remains neutral.
@@ -43,6 +45,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `variables.off_icon` | Off icon | icon | Not set | Off icon for this card. Searchable suggestions are available. |
 | `variables.display_unit` | Display unit | energy_unit | `Auto` | Auto keeps the source unit. Selecting a compatible unit converts the reading. Searchable suggestions are available. |
 | `variables.display_precision` | Decimal places | energy_precision | `Auto` | Auto trims trailing zeros. Choose 0–6 fixed decimal places. Choices: `0`, `1`, `2`, `3`, `4`, `5`, `6`. |
+| `variables.activity_entities` | Related activity entities | json | Not set | Related activity entities for this card. Searchable suggestions are available. |
 
 ## Behavior examples
 

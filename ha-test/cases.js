@@ -151,7 +151,7 @@ function expandGallery(source) {
   view.cards.push({ type: 'custom:marao-popup-card', name: delayedClimate.name, hash: climateHash, entity: delayedClimate.entity, cards: [
     { type: 'custom:marao-card', template: 'md_climate_card', name: delayedClimate.name, entity: delayedClimate.entity, variables: { show_mode_buttons: true } },
   ] });
-  view.cards.push({ type: 'custom:marao-card', template: 'md_room_card', name: manifest.groupCase.name, entity: manifest.groupCase.entity, variables: { light_entities: manifest.groupCase.entities }, tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/rooms' } });
+  view.cards.push({ type: 'custom:marao-card', template: 'md_room_card', name: manifest.groupCase.name, entity: manifest.groupCase.entity, variables: { light_entities: manifest.groupCase.entities, climate_entity: manifest.dualClimateCase.entity }, tap_action: { action: 'navigate', navigation_path: '/marao-dashboard/rooms' } });
   view.cards.push({ type: 'custom:marao-card', template: 'md_base_card', name: manifest.actionErrorCase.name, entity: manifest.actionErrorCase.entity, tap_action: { action: 'call-service', service: manifest.actionErrorCase.service } });
   view.cards.push({ type: 'custom:marao-card', template: 'md_switch_card', name: 'Simulate safe action failure', entity: 'input_boolean.marao_dashboard_test_action_failure' });
   for (const example of manifest.historyCases) {

@@ -1,5 +1,7 @@
 import { FLOOR_PT_LABELS } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlanText.js';
 export const PT_LABELS = {
+  'Room climate':'Climatização da divisão', 'Related activity entities':'Entidades de atividade relacionadas', 'Related activity entities must be an explicit list of entity IDs.':'As entidades de atividade relacionadas têm de ser uma lista explícita de IDs de entidades.', 'Room climate must be a climate entity.':'A climatização da divisão tem de ser uma entidade de climatização.',
+
   "Choose an entity in the card editor.": "Escolha uma entidade no editor do cartão.",
   "Choose an app source in the card editor.": "Escolha uma fonte de aplicação no editor do cartão.",
   'App logo':'Logótipo da aplicação',

@@ -114,7 +114,7 @@ test('popup authoring has no file-download or recovery-link lifecycle',()=>{
 test('native app logo chooser patches only artwork and Automatic removes the override',t=>{
   const original={type:'custom:marao-media-app-card',entity_id:'media_player.safe',name:'Custom',icon:'mdi:television',variables:{app_source:'Custom TV app',future:false},grid_options:{columns:3},visibility:[],future:{keep:[]}};
   const {forms,events,editor}=nativeFormHarness(t,original,{language:'pt',states:{}}),form=forms.find(form=>form.schema.some(field=>field.name==='var__app_logo'));
-  const field=form.schema.find(field=>field.name==='var__app_logo');assert.equal(field.label,'Logótipo da aplicação');assert.deepEqual(field.selector.select.options.map(option=>option.value),['','netflix','spotify','youtube','disney-plus','prime-video','apple-tv','plex','meo']);
+  const field=form.schema.find(field=>field.name==='var__app_logo');assert.equal(field.label,'Logótipo da aplicação');assert.deepEqual(field.selector.select.options.map(option=>option.value),['','netflix','spotify','youtube','disney-plus','prime-video','apple-tv','plex','meo','hbo-max','f1-tv']);
   assert.equal(events.length,0);form.change({...form.data,var__app_logo:'netflix'});assert.deepEqual(events.at(-1),{...original,variables:{...original.variables,app_logo:'netflix'}});
   form.change({...form.data,var__app_logo:''});assert.deepEqual(events.at(-1),original);
   form.change({...form.data,var__app_logo:'invalid'});assert.equal(events.length,2);assert.match(editor.shadowRoot.querySelector('[data-status]').textContent,/logótipo/);
@@ -127,7 +127,7 @@ test('nested app logo edits and cancellation preserve source, app order and unkn
   content.querySelector('#app-list').querySelectorAll=()=>{editButton=globalThis.document.createElement('button');editButton.dataset={room:'0',action:'app-edit'};return [editButton];};
   editor._dialog=()=>dialog;editor._closeDialog=()=>{};editor._openFormDialog=(title,data,schema,save)=>{appForm={data,schema,save};};
   editor._openMediaOptions({entity_id:'media_player.safe',apple_tv:options},value=>saves.push(value));editButton.dispatchEvent(new Event('click'));
-  assert.deepEqual(appForm.schema.find(field=>field.name==='logo').selector.select.options.map(option=>option.value),['','netflix','spotify','youtube','disney-plus','prime-video','apple-tv','plex','meo']);
+  assert.deepEqual(appForm.schema.find(field=>field.name==='logo').selector.select.options.map(option=>option.value),['','netflix','spotify','youtube','disney-plus','prime-video','apple-tv','plex','meo','hbo-max','f1-tv']);
   content.querySelector('[data-close]').dispatchEvent(new Event('click'));assert.equal(saves.length,0);assert.equal(options.apps[0].logo,undefined);
   appForm.save({...appForm.data,logo:'netflix'});assert.equal(saves.length,0);content.querySelector('[data-save]').dispatchEvent(new Event('click'));
   assert.deepEqual(saves[0],{...options,apps:[{...options.apps[0],logo:'netflix'},options.apps[1]]});assert.equal(options.apps[0].logo,undefined);
@@ -451,4 +451,12 @@ test('returning an omitted slider default preserves the literal draft and every 
   assert.deepEqual(away,{...original,variables:{future:null,enable_slider:false}});
   assert.deepEqual(back,{...original,variables:{future:null,enable_slider:true}});
   assert.deepEqual(original,before);
+});
+
+test('room climate and related activity native fields retain unresolved choices and clear only their own option',t=>{
+ const room={type:'custom:marao-room-card',name:'Room',page:'home',variables:{light_entities:[],climate_entity:'climate.unresolved',opaque:[]},grid_options:{columns:6}};
+ const f=nativeFormHarness(t,room,{language:'pt',states:{}}),form=f.forms.find(form=>form.schema.some(field=>field.name==='var__climate_entity')),field=form.schema.find(field=>field.name==='var__climate_entity');assert.equal(field.label,'Climatização da divisão');assert.deepEqual(field.selector.entity.domain,['climate']);assert.equal(form.data.var__climate_entity,'climate.unresolved');
+ form.change({...form.data,var__climate_entity:'climate.new'});assert.deepEqual(f.events.at(-1),{...room,variables:{...room.variables,climate_entity:'climate.new'}});form.change({...form.data,var__climate_entity:''});assert.deepEqual(f.events.at(-1).variables.light_entities,[]);assert.equal(f.events.at(-1).variables.climate_entity,undefined);
+ const sensor={type:'custom:marao-sensor-card',entity_id:'sensor.temperature',variables:{activity_entities:['button.gate','binary_sensor.unresolved'],opaque:[]}};
+ const g=nativeFormHarness(t,sensor),advanced=g.forms.find(form=>form.schema.some(field=>field.name==='var__activity_entities')),sources=advanced.schema.find(field=>field.name==='var__activity_entities');assert.equal(sources.selector.entity.multiple,true);advanced.change({...advanced.data,var__activity_entities:[]});assert.deepEqual(g.events.at(-1),{...sensor,variables:{...sensor.variables,activity_entities:[]}});
 });

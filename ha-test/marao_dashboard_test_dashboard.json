@@ -317,7 +317,8 @@
                   "light.marao_dashboard_test_room_light",
                   "light.marao_dashboard_test_onoff_light"
                 ],
-                "lights_target_entity": "light.marao_dashboard_test_light"
+                "lights_target_entity": "light.marao_dashboard_test_light",
+                "climate_entity": "climate.marao_dashboard_test_multi_mode_climate"
               }
             },
             {
@@ -846,6 +847,15 @@
                     "name": "MEO",
                     "source": "MEO",
                     "icon": "mdi:television"
+                  },
+                  {
+                    "name": "HBO Max",
+                    "source": "HBO Max"
+                  },
+                  {
+                    "name": "F1 TV",
+                    "source": "F1 TV",
+                    "logo": "f1-tv"
                   }
                 ]
               },

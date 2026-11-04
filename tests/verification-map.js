@@ -24,6 +24,7 @@ const families = {
   camera: ['md_camera_card'], history: ['md_graph_card', 'md_timeline_card', 'md_toggle_graph_card'],
 };
 const components = {
+  activity: { units: [['activity'], ['marao-card-visibility','activity|access|glance'], ['native-cards','activity'], ['editor-model','activity']], editor:true },
   'agent-authoring': {units:[['agent-authoring'],['native-package']],editor:true},
   'documentation-brand': {units:[['brand-assets','canonical artwork']]},
   'documentation-playground': {browser:[{id:'unit:documentation-playground',kind:'offline',command:['node','--test','--test-concurrency=1',...fs.readdirSync(path.join(__dirname,'docs')).filter(file=>file.endsWith('.test.mjs')).sort().map(file=>'tests/docs/'+file)],inputs:['docs','tests/docs','frontend_src',runtime],exclusive:false}]},
@@ -121,7 +122,7 @@ const components = {
   actions: { units: [['marao-climate-card', 'action|hold|slide|dispatch|disabled|unavailable']],
     browser: [browser('actions', 'test-ha-dashboard-e2e', ['--actions-only'])] },
   connection: { units: [['marao-climate-card', 'connection|disconnected|unavailable'], ['dashboard-e2e-analysis', 'retired reconnect']] },
-  rooms: { units: [['marao-climate-card', 'room']], browser: [browser('rooms', 'test-ha-room-cards', ['--scenario', 'iphone-normal'])] },
+  rooms: { units: [['marao-card-visibility', 'room']], browser: [browser('rooms', 'test-ha-room-cards', ['--scenario', 'iphone-normal'])] },
   groups: { units: [['marao-climate-card', 'group']], browser: [browser('groups', 'test-ha-dashboard-e2e', ['--groups-only'])] },
   climate: { units: [['marao-climate-card', 'climate|number|stepper|wallbox']], browser: [browser('climate', 'test-ha-dashboard-e2e', ['--climate-only']), browser('numbers', 'test-ha-climate-layout', ['--scenario', 'iphone-normal'])] },
   camera: { units: [['marao-camera-live'], ['camera-request-ledger'], ['marao-card-visibility'], ['marao-frigate-events-card'], ['editor-model'], ['gallery-cases']],
@@ -156,6 +157,7 @@ const rules = [
   [/^tests\/export-brand-assets\.js$/, ['documentation-brand']],
   [/^(docs\/(?:playground|examples|scripts|src\/components|src\/scripts)\/|tests\/docs\/)/, ['documentation-playground']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoPopup(?:Layout|View|Managed|Transaction)\.js$|^frontend_src\/popup-(?:management|coordinator)\.js$|^tests\/frontend\/popup-(?:layout|managed|management|transactions|coordinator)\.test\.js$/, ['popup-layout']],
+  [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoActivity(?:Model)?\.js|tests\/frontend\/activity\.test\.js)$/, ['activity']],
   [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoLocation(?:Preferences)?\.js|frontend_src\/location-settings\.js)$/, ['location-shortcut']],
   [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoEventModel\.js|frontend_src\/event-card-editor\.js)$/, ['camera']],
   [/^(?:frontend_src\/(?:schedule-model|schedule-api|schedule-text|schedules-card)\.js|custom_components\/marao_dashboard\/frontend\/MaraoSchedules\.js|tests\/frontend\/schedules\.test\.js|ha-test\/check-schedules\.mjs)$/, ['schedules']],

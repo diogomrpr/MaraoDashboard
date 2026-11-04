@@ -104,3 +104,45 @@ def test_promoted_card_options_are_validated_at_the_shared_boundary(card, messag
     with pytest.raises(ValueError, match=message):
         validate_pages(config, templates)
     assert config == before
+
+
+@pytest.mark.parametrize("climate", [None, "", "climate.unresolved"])
+def test_room_climate_addition_preserves_explicit_emptiness_and_opaque_options(climate):
+    from custom_components.marao_dashboard.editor import EDITOR_CATALOG
+    templates = {item["id"]: item["domains"] for item in EDITOR_CATALOG["cards"]}
+    config = {"config_version": 2, "name": "Safe", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [{"template": "md_room_card", "page": "home", "variables": {"light_entities": [], "climate_entity": climate, "opaque": []}}]}]}
+    before = deepcopy(config)
+    validate_pages(config, templates)
+    assert config == before
+
+
+@pytest.mark.parametrize("card,message", [
+    ({"template": "md_room_card", "page": "home", "variables": {"climate_entity": "light.room"}}, "Room climate"),
+    ({"template": "md_room_card", "page": "home", "variables": {"climate_entity": False}}, "Room climate"),
+    ({"template": "md_sensor_card", "entity_id": "sensor.safe", "variables": {"activity_entities": "sensor.safe"}}, "activity entities"),
+    ({"template": "md_sensor_card", "entity_id": "sensor.safe", "variables": {"activity_entities": [None]}}, "activity entities"),
+])
+def test_room_and_activity_options_reject_malformed_values(card, message):
+    test_promoted_card_options_are_validated_at_the_shared_boundary(card, message)
+
+
+@pytest.mark.parametrize("logo", ["hbo-max", "f1-tv"])
+def test_new_logos_and_activity_sources_remain_additive(logo):
+    from custom_components.marao_dashboard.editor import EDITOR_CATALOG
+    templates = {item["id"]: item["domains"] for item in EDITOR_CATALOG["cards"]}
+    cards = [{"template": "md_media_app_card", "entity_id": "media_player.safe", "variables": {"app_source": "Custom", "app_logo": logo}}, {"template": "md_media_card", "entity_id": "media_player.safe", "apple_tv": {"apps": [{"source": "Custom", "logo": logo, "opaque": []}]}}, {"template": "md_sensor_card", "entity_id": "sensor.safe", "variables": {"activity_entities": ["binary_sensor.unresolved", "button.gate"], "opaque": []}}]
+    config = {"config_version": 2, "name": "Safe", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": cards}]}
+    before = deepcopy(config)
+    validate_pages(config, templates)
+    assert config == before
+
+
+def test_additive_room_and_activity_catalog_fields_match_native_metadata():
+    from custom_components.marao_dashboard.editor import EDITOR_CATALOG
+    native = json.loads((Path(__file__).parents[3] / "custom_components/marao_dashboard/frontend/marao-catalog.json").read_text())
+    assert len(native["cards"]) == 38
+    cards = {card["id"]: card for card in native["cards"]}
+    for card in EDITOR_CATALOG["cards"]:
+        for field in card["variables"]:
+            if field["key"] in ("climate_entity", "activity_entities"):
+                assert next(item for item in cards[card["id"]]["variables"] if item["key"] == field["key"]) == field

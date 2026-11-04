@@ -148,6 +148,17 @@
             "light"
           ],
           "multiple": true
+        },
+        {
+          "key": "climate_entity",
+          "label": "Room climate",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": false,
+          "description": "",
+          "domains": [
+            "climate"
+          ]
         }
       ]
     },
@@ -253,6 +264,15 @@
           "selector": "text",
           "advanced": true,
           "description": ""
+        },
+        {
+          "key": "activity_entities",
+          "label": "Related activity entities",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "multiple": true
         }
       ],
       "hidden": true
@@ -308,6 +328,15 @@
           "selector": "text",
           "advanced": true,
           "description": ""
+        },
+        {
+          "key": "activity_entities",
+          "label": "Related activity entities",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "multiple": true
         }
       ],
       "hidden": true
@@ -381,6 +410,15 @@
           "selector": "energy_precision",
           "advanced": false,
           "description": "Auto trims trailing zeros. Choose 0–6 fixed decimal places."
+        },
+        {
+          "key": "activity_entities",
+          "label": "Related activity entities",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "multiple": true
         }
       ]
     },
@@ -878,6 +916,15 @@
           "selector": "text",
           "advanced": true,
           "description": ""
+        },
+        {
+          "key": "activity_entities",
+          "label": "Related activity entities",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "multiple": true
         }
       ],
       "hidden": false
@@ -939,6 +986,15 @@
           "selector": "energy_precision",
           "advanced": false,
           "description": "Auto trims trailing zeros. Choose 0–6 fixed decimal places."
+        },
+        {
+          "key": "activity_entities",
+          "label": "Related activity entities",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "multiple": true
         }
       ]
     },
@@ -1031,6 +1087,15 @@
           "selector": "energy_precision",
           "advanced": false,
           "description": "Auto trims trailing zeros. Choose 0–6 fixed decimal places."
+        },
+        {
+          "key": "activity_entities",
+          "label": "Related activity entities",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "multiple": true
         }
       ]
     },
@@ -1520,6 +1585,15 @@
           "selector": "color",
           "advanced": true,
           "description": ""
+        },
+        {
+          "key": "activity_entities",
+          "label": "Related activity entities",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "multiple": true
         }
       ]
     },
@@ -1587,6 +1661,15 @@
           "domains": [
             "sensor"
           ]
+        },
+        {
+          "key": "activity_entities",
+          "label": "Related activity entities",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "multiple": true
         }
       ]
     },
@@ -1669,6 +1752,15 @@
           "selector": "icon",
           "advanced": false,
           "description": ""
+        },
+        {
+          "key": "activity_entities",
+          "label": "Related activity entities",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "multiple": true
         }
       ]
     },
@@ -1681,7 +1773,17 @@
         "input_select"
       ],
       "description": "Native selector options and authoritative selection.",
-      "variables": []
+      "variables": [
+        {
+          "key": "activity_entities",
+          "label": "Related activity entities",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "multiple": true
+        }
+      ]
     },
     {
       "id": "md_access_action_card",
@@ -1740,6 +1842,15 @@
           "selector": "text",
           "advanced": true,
           "description": ""
+        },
+        {
+          "key": "activity_entities",
+          "label": "Related activity entities",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "multiple": true
         }
       ],
       "hidden": true

@@ -176,7 +176,6 @@ export class MaraoNavbarCard extends BaseElement {
   }
   disconnectedCallback() {
     this._locationIdentity=null;
-    this._closeLocationPreferences?.();
     this._closeMaintenance(false);
     this._pagePress?.destroy();this._pagePress=null;this._press?.destroy();this._press=null;
     this._pageRefresh?.remove();
@@ -231,7 +230,6 @@ export class MaraoNavbarCard extends BaseElement {
   }
   _view() { return this._root()?.shadowRoot?.querySelector('#view'); }
   _syncContext() {
-    if(this._locationDialog && (this._root()?.lovelace?.editMode || !this._config.current_room?.enabled || this._locationKey!==locationPreferenceKey(window.location.origin,this._config.dashboard_root,this._hass?.user?.id)))this._closeLocationPreferences?.();
     if (this._maintenance && !this._maintenanceValid(this._maintenance)) this._closeMaintenance(false);
     const editing = Boolean(this._root()?.lovelace?.editMode);
     if (this._isSurface) this.hidden = Boolean(editing || this.preview);
@@ -389,7 +387,7 @@ export class MaraoNavbarCard extends BaseElement {
       haptic('heavy');
       if (action === 'edit' && session.editor) this._openEditor();
       else if (action === 'settings' && this._config.native_editor) {
-        import(new URL(`./MaraoDashboardSettings.js${new URL(import.meta.url).search}`,import.meta.url)).then(module=>module.openDashboardSettings(this._root(),target)).catch(error=>{this._refreshFeedback('failed');console.error('Marao settings could not load',error);});
+        import(new URL(`./MaraoDashboardSettings.js${new URL(import.meta.url).search}`,import.meta.url)).then(module=>module.openDashboardSettings(this._root(),target,this)).catch(error=>{this._refreshFeedback('failed');console.error('Marao settings could not load',error);});
       }
       else if (action === 'refresh') this._refreshFrontend();
     };
@@ -452,16 +450,11 @@ export class MaraoNavbarCard extends BaseElement {
       onStatus: state => this._refreshFeedback(state),
     }).catch(() => { /* The operation already renders its localized error. */ }).finally(() => { this._refreshing = false; this._updateCurrent(); });
   }
-  _openLocationPreferences(opener) {
-    haptic('heavy');
-    import(new URL(`./MaraoLocationPreferences.js${new URL(import.meta.url).search}`,import.meta.url)).then(module=>{if(this.isConnected&&!this._editing)return module.openLocationPreferences(this,opener);}).catch(error=>{this._closeLocationPreferences?.();this._refreshFeedback('failed');console.error('Location preferences failed',error);});
-  }
   _syncPageRefresh() {
     const view = this._view(), lovelace = this._root()?.lovelace;
     const showRefresh = this._config?.show_cache_reset !== false;
-    const showLocation=Boolean(this._config?.current_room?.enabled);
     const editorURL = this._hass?.user?.is_admin && this._config?.show_editor_button !== false ? this._editorURL() : '';
-    if (!this.isConnected || this._surface || this.preview || this._editing || !showRefresh && !editorURL && !showLocation || lovelace?.editMode || !view
+    if (!this.isConnected || this._surface || this.preview || this._editing || !showRefresh && !editorURL || lovelace?.editMode || !view
       || !navbarMainPage(lovelace?.config || lovelace?.rawConfig)) {
       this._pagePress?.destroy();this._pagePress=null;this._pageRefresh?.remove(); return;
     }
@@ -484,9 +477,6 @@ export class MaraoNavbarCard extends BaseElement {
         if (this._editorURL()) { haptic('heavy'); this._openEditor(); }
       });
     }
-    let locationButton=this._pageRefresh.shadowRoot.querySelector('.location-preferences');
-    if(showLocation && !locationButton){locationButton=document.createElement('button');locationButton.type='button';locationButton.className='location-preferences';locationButton.innerHTML='<ha-icon icon="mdi:account-switch" aria-hidden="true"></ha-icon>';locationButton.onclick=()=>{if(this._refreshEligible(undefined,this._pageRefresh)&&this._config.current_room?.enabled)this._openLocationPreferences(locationButton);};this._pageRefresh.shadowRoot.append(locationButton);}
-    if(locationButton){locationButton.hidden=!showLocation;locationButton.setAttribute('aria-label',locationLabel('preferences',this._hass));}
     this._pagePress ||= bindPressFeedback(this._pageRefresh.shadowRoot);
     if (this._pageRefresh.parentNode !== view) view.prepend(this._pageRefresh);
     const editor = this._pageRefresh.shadowRoot.querySelector('.frontend-editor');
@@ -498,6 +488,7 @@ export class MaraoNavbarCard extends BaseElement {
     refresh.setAttribute('aria-label', localize(this._refreshing ? 'navigation.refresh.refreshing' : 'navigation.refresh.action', this._hass));
   }
   _updateCurrent() {
+    this._root()?._maraoRefreshSettings?.();
     if (!this.shadowRoot) return;
     const routes = this._routes(), disabled = this.preview || this._editing;
     const current = route => route && !route.disabled && navbarRouteCurrent(route);

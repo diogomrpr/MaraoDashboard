@@ -367,7 +367,7 @@ test("shared builder settings change the rendered labels, icons and power readin
   card.setConfig({ template: "md_sensor_card", entity: "binary_sensor.test", variables: { on_icon: "mdi:check", off_icon: "mdi:close" } });
   card.hass = { callService() {}, states: { "binary_sensor.test": { state: "off", attributes: {}, last_updated: "2026-10-09T12:00:00Z" } } };
   assert.match(card.shadowRoot.innerHTML, /icon="mdi:close"/);
-  assert.match(card.shadowRoot.innerHTML, /Updated /);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /Updated /);assert.match(card.shadowRoot.innerHTML,/data-activity-open/);
 });
 
 test("unknown custom colors remain neutral and toggle graph presentation honors its builder fields", () => {
@@ -755,7 +755,7 @@ test('room lighting uses every unique selected light and ignores an unrelated pr
   for (const value of ['unknown', 'unavailable', null]) {
     const second = value === null ? undefined : { state: value, attributes: {} };
     card.hass = { ...card.hass, states: { ...states, 'light.second': second } };
-    assert.doesNotMatch(card.shadowRoot.innerHTML, /data-problem="|class="problem"/);
+    assert.match(card.shadowRoot.innerHTML, /data-problem="warning"/);
     assert.match(card.shadowRoot.innerHTML, /data-room-lights-off[^>]* disabled/);
     assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
   }
@@ -766,7 +766,7 @@ test('room lighting uses every unique selected light and ignores an unrelated pr
   assert.match(card.shadowRoot.innerHTML, /<div class="state">Reading corner<\/div>/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /class="room-artwork"|data-room-lights-off|aria-description="Lighting:/);
   card.setConfig({ ...card._config, tap_action: { action: 'none' }, variables: { light_entities: ['light.first'], custom_label: 'Reading corner' } });
-  assert.match(card.shadowRoot.innerHTML, /<ha-card role="group" aria-label="Bedroom" aria-description="Lighting: All off"/);
+  assert.match(card.shadowRoot.innerHTML, /<ha-card data-room role="group" aria-label="Bedroom" aria-description="Lighting: All off"/);
   assert.match(card.shadowRoot.innerHTML, /<div class="state">Reading corner<\/div>/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action|class="binary-cue"/);
 });
@@ -778,8 +778,8 @@ test('room child activation dispatches once and rechecks targets without navigat
     location: { pathname: '/marao-dashboard/rooms' }, history: { pushState(_state, _title, route) { routes.push(route); } } };
   try {
     const card = new MaraoCard();
-    let activate;
-    const button = { disabled: false, addEventListener(_type, handler) { activate = handler; } };
+    const button = { disabled: false };
+    const activate = event => button.onclick(event);
     card.shadowRoot.querySelector = selector => selector === '[data-room-lights-off]' ? button : null;
     card.setConfig({ template: 'md_room_card', entity: 'sensor.unrelated', name: 'Bedroom',
       variables: { light_entities: ['light.first', 'light.second', 'light.first'] },
@@ -962,7 +962,7 @@ test("media app shortcuts fill the card with artwork without a visible title", (
 });
 
 test("media app branding recognizes sources, ships real icons and preserves custom shortcuts", async () => {
-  for (const [source, id, extension = "png"] of [["NETFLIX", "netflix", "svg"], ["Spotify", "spotify", "svg"], ["com.google.ios.youtube", "youtube"], ["Disney+", "disney-plus"], ["Amazon Prime Video", "prime-video"], ["com.apple.TVWatchList", "apple-tv"], ["Plex", "plex", "svg"], ["MEO", "meo", "svg"], ["meo go", "meo", "svg"], ["pt.sapo.mobile.iphone.tmn.meomobile", "meo", "svg"]]) {
+  for (const [source, id, extension = "png"] of [["HBO Max", "hbo-max"], ["Max", "hbo-max"], ["HBO Max: Stream Movies & TV", "hbo-max"], ["F1 TV", "f1-tv"], ["F1 TV: Stream F1® Live", "f1-tv"], ["NETFLIX", "netflix", "svg"], ["Spotify", "spotify", "svg"], ["com.google.ios.youtube", "youtube"], ["Disney+", "disney-plus"], ["Amazon Prime Video", "prime-video"], ["com.apple.TVWatchList", "apple-tv"], ["Plex", "plex", "svg"], ["MEO", "meo", "svg"], ["meo go", "meo", "svg"], ["pt.sapo.mobile.iphone.tmn.meomobile", "meo", "svg"]]) {
     const config = { template: "md_media_app_card", entity: "media_player.apple_tv", name: "My app", icon: "mdi:play-box-outline", show_state: false, variables: { app_source: source } };
     const before = structuredClone(config);
     assert.equal(mediaAppBrand(config).id, id);
@@ -2010,7 +2010,7 @@ test('binary state hiding retains configured labels, numeric readings and metada
  assert.match(renderBinary({entity,variables:{custom_label:'Night lighting',power_entity:'sensor.power'}},states),/<div class="state">Night lighting<\/div>/);
  assert.match(renderBinary({template:'md_switch_card',entity,variables:{power_entity:'sensor.power'}},states),/120 W/);
  const sensor=renderBinary({template:'md_sensor_card',entity:'binary_sensor.test',variables:{on_icon:'mdi:check',off_icon:'mdi:close'}},{'binary_sensor.test':{state:'off',last_updated:'2026-10-10T12:00:00Z',attributes:{}}});
- assert.match(sensor,/icon="mdi:close"/);assert.match(sensor,/Updated /);
+ assert.match(sensor,/icon="mdi:close"/);assert.doesNotMatch(sensor,/Updated /);assert.match(sensor,/data-activity-open/);
 });
 test('binary hiding preserves explicit title-hidden and icon-only roles',()=>{
  const entity='switch.test',states={[entity]:{state:'on',attributes:{}}};
@@ -2044,7 +2044,7 @@ test('binary accessible state uses Home Assistant localized device-class meaning
  for(const [deviceClass,on,off] of [['motion','Detected','Clear'],['moisture','Molhado','Seco'],['opening','Aberto','Fechado']]) for(const value of ['on','off']) for(const template of ['md_sensor_card','md_header_card']) {
   const card=new MaraoCard();card.setConfig({template,entity:'binary_sensor.test',name:'Target'});
   card.hass={language:deviceClass==='motion'?'en':'pt',states:{'binary_sensor.test':{state:value,attributes:{device_class:deviceClass}}},formatEntityState:state=>{assert.equal(state.entity_id,'binary_sensor.test');return state.state==='on'?on:off}};
-  assert.match(card.shadowRoot.innerHTML,new RegExp(`aria-label="Target: ${value==='on'?on:off}"`));assert.doesNotMatch(card.shadowRoot.innerHTML,/<div class="state">/);
+  assert.match(card.shadowRoot.innerHTML,new RegExp(`aria-(?:label|description)="Target: ${value==='on'?on:off}"`));assert.doesNotMatch(card.shadowRoot.innerHTML,/<div class="state">/);
  }
 });
 
@@ -2090,7 +2090,7 @@ test('usable summaries omit availability warnings while glance data retains a co
  assert.equal(cardProblem(summary,normal),null);
  assert.equal(cardProblem(summary,{states:{}}).kind,'neutral');
  const glance={template:'md_glance_card',entity:'sensor.missing',variables:{entity1:'sensor.reading'}};assert.equal(cardProblem(glance,normal).kind,'warning');
- assert.equal(cardProblem({template:'md_room_card',entity,variables:{light_entities:[entity,'light.missing']}},normal),null);
+ assert.equal(cardProblem({template:'md_room_card',entity,variables:{light_entities:[entity,'light.missing']}},normal).kind,'warning');
 });
 test('actual toggle, remote and graph failures remain distinct from readable primary content',()=>{
  for(const config of [
@@ -2315,7 +2315,7 @@ test('access popup owns the live state and action cards retain only their action
     card.setConfig({template,entity,name:template === 'md_access_action_card' ? 'Lock' : 'Unlock'});
     card.hass = {states:{[entity]:{state:'locked',attributes:{}}},callService(){}};
     assert.doesNotMatch(card.shadowRoot.innerHTML, /<div class="state|<div class="icon"/);
-    assert.match(card.shadowRoot.innerHTML, /<span class="access-action-icon" aria-hidden="true">/);
+    assert.match(card.shadowRoot.innerHTML, /<button type="button" class="access-action-icon" data-activity-open=/);
     assert.doesNotMatch(card.shadowRoot.innerHTML.match(/class="body([^"]*)"/)[1], /slider-header/);
     if (template === 'md_access_action_card') {
       assert.match(card.shadowRoot.innerHTML, /class="body[^\"]*access-close-action/);
@@ -2344,4 +2344,65 @@ test('inline Now playing follows current media, clears stale items and honors ar
  assert.doesNotMatch(report('unknown'),/First item|media-artwork/);
  assert.doesNotMatch(report('playing',attributes,{connected:false}),/First item|media-artwork/);
  card._config.variables.md_show_background_art=false;assert.doesNotMatch(report('playing'),/class="media-artwork"/);
+});
+
+test('room climate uses reported activity and four color endpoints without mixing light membership',async()=>{
+ const {roomClimate,roomColors}=await import('../../custom_components/marao_dashboard/frontend/MaraoCards.js');
+ const config={template:'md_room_card',variables:{light_entities:['light.first','light.second'],climate_entity:'climate.room'}},hass={states:{'light.first':{state:'off'},'light.second':{state:'off'},'climate.room':{state:'off',attributes:{hvac_action:'heating',supported_features:128,hvac_modes:['off','heat','cool']}}}};
+ assert.equal(roomClimate(config,hass).enabled,false);const neutral=roomColors(config,hass);assert.equal(neutral[0],neutral[1]);
+ hass.states['climate.room'].state='heat';assert.equal(roomClimate(config,hass).activity,'heating');assert.equal(roomClimate(config,hass).icon,'mdi:fire');const heat=roomColors(config,hass);assert.equal(heat[0],heat[1]);assert.notEqual(heat[0],neutral[0]);
+ hass.states['climate.room'].attributes.hvac_action='idle';assert.equal(roomClimate(config,hass).color,'var(--color-orange)');
+ delete hass.states['climate.room'].attributes.hvac_action;assert.equal(roomClimate(config,hass).activity,'heat');hass.states['climate.room'].state='cool';assert.equal(roomClimate(config,hass).icon,'mdi:snowflake');
+ hass.states['light.second'].state='on';const both=roomColors(config,hass);assert.notEqual(both[0],both[1]);assert.match(both[0],/color-mix/);hass.states['climate.room'].state='off';assert.equal(roomColors(config,hass)[0],roomColors(config,hass)[1]);
+ hass.states['climate.room'].state='unavailable';const problem=cardProblem(config,hass);assert.equal(problem.kind,'warning');assert.match(problem.reason,/Unavailable/);
+});
+test('room climate off dispatches one advertised command and rejects changed, unavailable and already-off targets',async t=>{
+ const old=globalThis.window;t.after(()=>{globalThis.window=old;});globalThis.window={dispatchEvent(){}};
+ const button={disabled:false},card=new MaraoCard(),calls=[];card.shadowRoot.querySelector=selector=>selector==='[data-room-climate-off]'?button:null;
+ card.setConfig({template:'md_room_card',variables:{light_entities:[],climate_entity:'climate.room'}});
+ card.hass={connected:true,callService:async(...args)=>calls.push(args),states:{'climate.room':{state:'heat',attributes:{supported_features:128,hvac_modes:['off','heat']}}}};
+ const event={currentTarget:button,preventDefault(){},stopPropagation(){this.stopped=true;}};
+ button.onclick(event);await new Promise(resolve=>setImmediate(resolve));assert.equal(event.stopped,true);assert.deepEqual(calls[0].slice(0,3),['climate','turn_off',{entity_id:'climate.room'}]);assert.equal(card.hass.states['climate.room'].state,'heat','No fabricated off acknowledgement');
+ card._hass.states['climate.room'].attributes.supported_features=0;button.onclick(event);await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(calls[1].slice(0,3),['climate','set_hvac_mode',{entity_id:'climate.room',hvac_mode:'off'}]);
+ for(const state of ['off','unknown','unavailable']){card._hass.states['climate.room'].state=state;button.onclick(event);}card._hass.states['climate.room'].state='heat';card._hass.connected=false;button.onclick(event);card._hass.connected=true;card._config={...card._config,variables:{climate_entity:'climate.other'}};button.onclick(event);assert.equal(calls.length,2);
+});
+test('activity icons replace automatic timestamps across sensor, access, activation and glance without consuming date readings',()=>{
+ const stamp='2026-11-04T12:00:00Z';
+ for(const template of ['md_sensor_card','md_base_card','md_switch_card','md_access_card','md_access_slide_action_card','md_access_hold_action_card','md_access_action_card']){
+  const card=new MaraoCard();card.setConfig({template,entity:'button.gate',variables:{custom_label:'Gate label'}});card.hass={connected:true,callService(){assert.fail('Rendering activity must not actuate');},states:{'button.gate':{state:stamp,attributes:{}}}};
+  const html=card.shadowRoot.innerHTML.split('</style>')[1];assert.match(html,/data-activity-open="button.gate"/);assert.doesNotMatch(html,/>2026-11-04[^<]*<|Updated /);assert.match(html,/Gate label/);
+ }
+ const card=new MaraoCard();card.setConfig({template:'md_glance_card',name:'Overview',variables:{entity1:'sensor.date',entity2:'button.gate',entity3:'sensor.missing'}});card.hass={connected:true,states:{'sensor.date':{state:stamp,attributes:{}},'button.gate':{state:stamp,attributes:{}}}};
+ const html=card.shadowRoot.innerHTML.split('</style>')[1];assert.match(html,/data-activity-open="button.gate"/);assert.match(html,/2026-11-04T12:00:00Z/);assert.match(html,/Entity missing|Unknown/);assert.match(card.shadowRoot.innerHTML,/glance-card.has-problem:not\(.complete-problem\)>\.readings \{visibility:visible/);
+});
+
+test('idle cover reports retain the attached range, SVG and binding while updating confirmed position',t=>{
+ const old={document:globalThis.document,requestAnimationFrame:globalThis.requestAnimationFrame};t.after(()=>Object.assign(globalThis,old));globalThis.requestAnimationFrame=()=>1;
+ class Node extends EventTarget {
+  constructor(tag,attributes={},children=[]){super();this.localName=tag;this._attrs={...attributes};this.childNodes=[];this.style={setProperty(){},removeProperty(){}};this.dataset={sliderKey:attributes['data-slider-key'],sliderCurrent:attributes['data-slider-current']};this.value=attributes.value;this.min='0';this.max='100';this.append(...children);}
+  get attributes(){return Object.entries(this._attrs).map(([name,value])=>({name,value}));}get children(){return this.childNodes;}
+  get parentElement(){return this.parentNode;}getAttribute(name){return this._attrs[name]??null;}hasAttribute(name){return name in this._attrs;}setAttribute(name,value){this._attrs[name]=String(value);}removeAttribute(name){delete this._attrs[name];}
+  append(...nodes){for(const node of nodes){node.remove();node.parentNode=this;this.childNodes.push(node);}}insertBefore(node,before){node.remove();node.parentNode=this;this.childNodes.splice(this.childNodes.indexOf(before),0,node);}remove(){if(this.parentNode)this.parentNode.childNodes=this.parentNode.childNodes.filter(node=>node!==this);this.parentNode=null;}
+  contains(node){return this.childNodes.some(child=>child===node||child.contains(node));}
+  querySelector(selector){if(selector==='ha-card'&&this.localName==='ha-card')return this;if(selector==='input[type=range]'&&this.localName==='input')return this;for(const child of this.childNodes){const found=child.querySelector(selector);if(found)return found;}return null;}
+ }
+ const make=(current=30)=>{const input=new Node('input',{'data-slider-key':'md_cover_card:cover.blind','data-slider-current':String(current),min:'0',max:'100',step:'1',value:String(current),'aria-label':'Position',title:'Position'}),svg=new Node('svg'),slider=new Node('div',{class:'slider'},[svg,input]),surface=new Node('ha-card',{},[new Node('div',{class:'body'},[new Node('div',{class:'control'},[slider])])]);return {surface,input,svg,slider};};
+ const initial=make(),css={textContent:''};let next;
+ globalThis.document={createElement:tag=>{assert.equal(tag,'template');return {set innerHTML(markup){const current=Number(/data-slider-current="([^"]+)"/.exec(markup)?.[1]||0);next=make(current);this.content={querySelector:selector=>selector==='style'?{textContent:markup.match(/<style>([\s\S]*?)<\/style>/)[1]}:next.surface};}};}};
+ const card=new MaraoCard();card._config={template:'md_cover_card',entity:'cover.blind'};card._stateEntities=['cover.blind'];card._ensurePress=()=>{};card._press={cancel(){}};
+ card.shadowRoot={querySelector:selector=>selector==='style'?css:selector==='ha-card'?initial.surface:initial.surface.querySelector(selector),querySelectorAll:()=>[]};
+ card._sliderInput=initial.input;const updates=[],binding={update:(...values)=>updates.push(values),destroy(){assert.fail('Compatible idle reports must retain the binding');}};card._sliderControl=binding;
+ for(const position of [40,60])card.hass={connected:true,callService(){},states:{'cover.blind':{state:'opening',attributes:{current_position:position,supported_features:7}}}};
+ assert.equal(card.shadowRoot.querySelector('input[type=range]'),initial.input);assert.equal(initial.slider.children[0],initial.svg);assert.equal(card._sliderControl,binding);assert.deepEqual(updates.map(args=>args[0]),[40,60]);assert.equal(updates[1][2].follow,true);
+});
+
+test('activating an Activity icon opens one read-only detail and never starts its access action',()=>{
+ let binding=false;const card=new MaraoCard(),button=new EventTarget(),opened=[],calls=[];button.getAttribute=()=> 'button.gate';button.disabled=false;let stopped=0;
+ card.shadowRoot.querySelectorAll=selector=>binding&&selector==='[data-activity-open]'?[button]:[];
+ card._detailPopup=()=>({openHistory:(owner,opener,kind)=>opened.push({owner,opener,kind})});
+ card.setConfig({template:'md_access_slide_action_card',entity:'button.gate',variables:{activity_entities:['binary_sensor.contact']}});
+ binding=true;card.hass={connected:true,callService:(...args)=>calls.push(args),states:{'button.gate':{state:'2026-11-04T12:00:00Z',attributes:{}}}};
+ card._setMarkup=()=>false;card._render();
+ const event=new Event('click',{cancelable:true});event.stopPropagation=()=>{stopped++;};button.dispatchEvent(event);assert.equal(opened.length,1);assert.equal(opened[0].kind,'activity');assert.equal(opened[0].opener,button);assert.equal(stopped,1);assert.equal(event.defaultPrevented,true);assert.deepEqual(calls,[]);
+ card._preview=true;button.dispatchEvent(new Event('click'));assert.equal(opened.length,1);assert.deepEqual(calls,[]);
 });

@@ -63,7 +63,7 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     assert.ok(fs.readdirSync(path.join(directory,'dist'),{withFileTypes:true}).every(entry=>entry.isFile()));
     const {AssetURL}=await import(pathToFileURL(path.join(directory,'dist',first.identity+'--MaraoAssetURL.js')));
     const {mediaApps,mediaAppLogoChoices}=await import(pathToFileURL(path.join(directory,'dist',first.identity+'--MaraoMediaApps.js')));
-    assert.deepEqual(mediaAppLogoChoices().slice(1).map(choice=>choice.value),['netflix','spotify','youtube','disney-plus','prime-video','apple-tv','plex','meo']);
+    assert.deepEqual(mediaAppLogoChoices().slice(1).map(choice=>choice.value),['netflix','spotify','youtube','disney-plus','prime-video','apple-tv','plex','meo','hbo-max','f1-tv']);
     const mediaBase=pathToFileURL(fs.realpathSync(path.join(directory,'dist',first.identity+'--MaraoCards.js'))).href;
     for(const app of mediaApps){const image=new AssetURL('./media-apps/'+(app.file||app.id+'.png'),mediaBase);assert.ok(fs.existsSync(image),app.id+' chooser image ships in the flat package');assert.equal(image.protocol,'file:');}
     const base=pathToFileURL(fs.realpathSync(asset)).href;

@@ -14,6 +14,8 @@ function fieldSchema(field) {
     ['number_list','energy_sub_entities','power_devices','sensor_thresholds'].includes(kind)?{type:'array',items:kind==='number_list'?{type:'number'}:{type:'object',additionalProperties:true}}:
     kind==='vacuum_action'?{anyOf:[text,object]}:kind==='json'?{}:{...text};
   if(kind==='select'&&field.options?.length)value={enum:field.options.map(option=>typeof option==='object'?option.value:option).concat(null)};
+  if(field.key==='activity_entities')return {type:'array',items:{type:'string',pattern:'^[a-z_]+\\.[a-z0-9_]+$'},description:field.label};
+  if(field.key==='climate_entity')value={type:['string','null'],pattern:'^(?:climate\\.[a-z0-9_]+)?$'};
   if(field.multiple)value={type:'array',items:value};
   return {...value,description:field.description||field.label||field.key,...(field.domains?{'x-entity-domains':field.domains}:{})};
 }

@@ -7,6 +7,8 @@ export const mediaApps = [
   { id: 'apple-tv', label: 'Apple TV', sources: ['TV', 'Apple TV', 'Apple TV+', 'com.apple.tv', 'com.apple.TVWatchList'], color: '#151515', text: '#fff' },
   { id: 'plex', label: 'Plex', file: 'plex.svg', sources: ['Plex', 'com.plexapp.plex'], color: '#111111', text: '#fff' },
   { id: 'meo', label: 'MEO', file: 'meo.svg', sources: ['MEO', 'MEO Go', 'pt.sapo.mobile.iphone.tmn.meomobile'], color: '#2e26ff', text: '#fff' },
+  {id:'hbo-max',label:'HBO Max',sources:['HBO Max','Max','HBO Max: Stream Movies & TV'],color:'#10102c',text:'#fff'},
+  {id:'f1-tv',label:'F1 TV',sources:['F1 TV','F1 TV: Stream F1® Live'],color:'#e10600',text:'#fff'},
 ];
 export const mediaAppLogoError = (value,hass) => value !== undefined && value !== '' && !mediaApps.some(app => app.id === value) ? (String(hass?.language||'').startsWith('pt')?'Escolha um logótipo de aplicação suportado.':'Choose a supported app logo.') : undefined;
 export const mediaAppLogoChoices = (localize = value => value) => [{value:'',label:localize('Automatic')},...mediaApps.map(app=>({value:app.id,label:app.label}))];

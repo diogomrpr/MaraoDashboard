@@ -32,6 +32,10 @@ variables:
   entity3_icon: mdi:flash
 ```
 
+Compact rows show the name and wrapping value on the left with a circular icon on the right. Healthy rows stay readable during partial availability.
+
+Tap an Activity icon to inspect recorded events with date and type filters. Optional variables.activity_entities adds explicitly related sources. Automatic Updated and last-activation timestamps move into Activity; timestamp-sensor readings remain data.
+
 Each of the three optional readings has an independent entity, name and icon. One unavailable reading does not erase the other values.
 
 ## Settings
@@ -51,6 +55,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `variables.entity3` | Reading 3 | entity | Not set | Reading 3 for this card. Searchable suggestions are available. |
 | `variables.entity3_name` | Reading 3 name | text | Not set | Reading 3 name for this card. |
 | `variables.entity3_icon` | Reading 3 icon | icon | Not set | Reading 3 icon for this card. Searchable suggestions are available. |
+| `variables.activity_entities` | Related activity entities | json | Not set | Related activity entities for this card. Searchable suggestions are available. |
 
 ## Behavior examples
 
