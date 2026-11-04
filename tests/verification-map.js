@@ -158,7 +158,7 @@ const rules = [
   [/^(docs\/(?:playground|examples|scripts|src\/components|src\/scripts)\/|tests\/docs\/)/, ['documentation-playground']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoPopup(?:Layout|View|Managed|Transaction)\.js$|^frontend_src\/popup-(?:management|coordinator)\.js$|^tests\/frontend\/popup-(?:layout|managed|management|transactions|coordinator)\.test\.js$/, ['popup-layout']],
   [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoActivity(?:Model)?\.js|tests\/frontend\/activity\.test\.js)$/, ['activity']],
-  [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoLocation(?:Preferences)?\.js|frontend_src\/location-settings\.js)$/, ['location-shortcut']],
+  [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoLocation(?:Preferences)?\.js|frontend_src\/(?:location-settings|settings-row)\.js)$/, ['location-shortcut']],
   [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoEventModel\.js|frontend_src\/event-card-editor\.js)$/, ['camera']],
   [/^(?:frontend_src\/(?:schedule-model|schedule-api|schedule-text|schedules-card)\.js|custom_components\/marao_dashboard\/frontend\/MaraoSchedules\.js|tests\/frontend\/schedules\.test\.js|ha-test\/check-schedules\.mjs)$/, ['schedules']],
   [/^(?:custom_components\/marao_dashboard\/frontend\/Marao(?:Collections|GroupDetails)\.js|tests\/frontend\/collections\.test\.js|ha-test\/feature-examples\.json|ha-test\/custom_components\/marao_test_climate\/people\.py)$/, ['people','summary-controls']],

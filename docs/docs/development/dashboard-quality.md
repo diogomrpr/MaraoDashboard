@@ -504,7 +504,7 @@ Except Access summary cards, normal binary cards omit redundant on/off, stable l
 
 ### Card activity
 
-Automatic Updated and activation timestamps move into the shared read-only Activity sheet. Retain primary date measurements. Icons open the themed sheet independently of card operating actions; strict slides and security holds remain unchanged. Use a fixed title/filter header, internally scrolling day groups, circular event symbols and inline details. Query only explicit sources, whitelist metadata, distinguish requests from reported results and incomplete coverage from empty results. Date/type filters apply before progressive display; origin/initiator require evidence. Glance rows keep healthy readings visible during partial warnings.
+Automatic Updated and activation timestamps move into the shared read-only Activity sheet. Retain primary date measurements. Icons open the themed sheet independently of card operating actions; strict slides and security holds remain unchanged. Keep the title, Date and Filters controls above internally scrolling content. Expand additional filters inline below this toolbar without shrinking or clipping controls. Use large date separators for each day, equally prominent time-only labels on the left rail, circular event symbols and inline details. Query only explicit sources, whitelist metadata, distinguish requests from reported results and incomplete coverage from empty results. Date/type filters apply before progressive display; origin/initiator require evidence. Glance rows keep healthy readings visible during partial warnings.
 
 ### Value sliders
 
