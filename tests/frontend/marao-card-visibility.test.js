@@ -1574,6 +1574,12 @@ test("glance readings show names, values and units independently of missing enti
   assert.match(markup, /<dt>Humidity<\/dt><dd>unknown<\/dd>/);
   assert.match(markup, /<dt>Power<\/dt><dd>120 W<\/dd>/);
   assert.doesNotMatch(markup, /md_glance_card|aria-disabled="true"/);
+  assert.match(markup, /<ha-card data-glance/);assert.equal((markup.match(/class="reading(?: neutral)?"/g)||[]).length,3);
+  card.hass={connected:false,states:{'sensor.temperature':{state:'21',attributes:{}}}};
+  const disconnected=card.shadowRoot.innerHTML.split('</style>')[1];assert.match(disconnected,/Disconnected/);assert.doesNotMatch(disconnected,/<dd>21/);
+  card.setConfig({template:'md_glance_card',show_icon:false,variables:{entity1:'sensor.temperature',entity3:'sensor.power'}});card.hass={states:{'sensor.temperature':{state:'21',attributes:{}},'sensor.power':{state:'120',attributes:{}}}};
+  const reduced=card.shadowRoot.innerHTML.split('</style>')[1];assert.equal((reduced.match(/class="reading(?: neutral)?"/g)||[]).length,2);assert.doesNotMatch(reduced,/<ha-(?:state-)?icon/);
+
 });
 
 test("state labels use native domain translations and preserve unitless climate values", () => {
@@ -2373,7 +2379,7 @@ test('activity icons replace automatic timestamps across sensor, access, activat
   const html=card.shadowRoot.innerHTML.split('</style>')[1];assert.match(html,/data-activity-open="button.gate"/);assert.doesNotMatch(html,/>2026-11-04[^<]*<|Updated /);assert.match(html,/Gate label/);
  }
  const card=new MaraoCard();card.setConfig({template:'md_glance_card',name:'Overview',variables:{entity1:'sensor.date',entity2:'button.gate',entity3:'sensor.missing'}});card.hass={connected:true,states:{'sensor.date':{state:stamp,attributes:{}},'button.gate':{state:stamp,attributes:{}}}};
- const html=card.shadowRoot.innerHTML.split('</style>')[1];assert.match(html,/data-activity-open="button.gate"/);assert.match(html,/2026-11-04T12:00:00Z/);assert.match(html,/Entity missing|Unknown/);assert.match(card.shadowRoot.innerHTML,/glance-card.has-problem:not\(.complete-problem\)>\.readings \{visibility:visible/);
+ const html=card.shadowRoot.innerHTML.split('</style>')[1];assert.match(html,/data-activity-open="button.gate"/);assert.match(html,/2026-11-04T12:00:00Z/);assert.match(html,/Entity missing|Unknown/);assert.match(card.shadowRoot.innerHTML,/glance-card.has-problem>\.readings \{visibility:visible/);
 });
 
 test('idle cover reports retain the attached range, SVG and binding while updating confirmed position',t=>{
@@ -2405,4 +2411,14 @@ test('activating an Activity icon opens one read-only detail and never starts it
  card._setMarkup=()=>false;card._render();
  const event=new Event('click',{cancelable:true});event.stopPropagation=()=>{stopped++;};button.dispatchEvent(event);assert.equal(opened.length,1);assert.equal(opened[0].kind,'activity');assert.equal(opened[0].opener,button);assert.equal(stopped,1);assert.equal(event.defaultPrevented,true);assert.deepEqual(calls,[]);
  card._preview=true;button.dispatchEvent(new Event('click'));assert.equal(opened.length,1);assert.deepEqual(calls,[]);
+});
+
+test('glance can hide reading labels independently of its title and accessible Activity names',()=>{
+ const config={template:'md_glance_card',name:'Summary',variables:{entity1:'sensor.temperature',entity1_name:'Temperature',entity2:'button.recall',entity2_name:'Recall scene'}},card=new MaraoCard();
+ const hass={states:{'sensor.temperature':{state:'21',attributes:{unit_of_measurement:'°C'}},'button.recall':{state:'2026-11-04T12:00:00Z',attributes:{}}}};
+ card.setConfig(config);card.hass=hass;assert.doesNotMatch(card.shadowRoot.innerHTML.split('</style>')[1],/reading-name-hidden|<dt class="binary-state"/);
+ card.setConfig({...config,variables:{...config.variables,show_reading_names:false}});card.hass=hass;const hidden=card.shadowRoot.innerHTML.split('</style>')[1];
+ assert.match(hidden,/<div class="title">Summary<\/div>/);assert.match(hidden,/<dt class="binary-state">Temperature<\/dt><dd>21 °C<\/dd>/);assert.match(hidden,/aria-label="Activity: Recall scene"/);assert.equal((hidden.match(/reading-name-hidden/g)||[]).length,2);
+ card.setConfig({...config,variables:{...config.variables,show_reading_names:true}});card.hass=hass;assert.match(card.shadowRoot.innerHTML.split('</style>')[1],/<dt>Temperature<\/dt>/);
+ assert.throws(()=>card.setConfig({...config,variables:{...config.variables,show_reading_names:'false'}}),/boolean/);
 });

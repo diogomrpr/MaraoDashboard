@@ -263,6 +263,8 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                         raise ValueError("Charging shortcuts require at most three finite numbers")
                 if role == "md_sensor_card":
                     validate_sensor_thresholds(options, entity or "")
+                if role == "md_glance_card" and "show_reading_names" in options and not isinstance(options["show_reading_names"], bool):
+                    raise ValueError("Show reading labels must be a boolean.")
                 if role == "md_light_card":
                     validate_light_options(options)
                 if role == "md_camera_card":

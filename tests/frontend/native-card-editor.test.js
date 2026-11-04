@@ -460,3 +460,12 @@ test('room climate and related activity native fields retain unresolved choices 
  const sensor={type:'custom:marao-sensor-card',entity_id:'sensor.temperature',variables:{activity_entities:['button.gate','binary_sensor.unresolved'],opaque:[]}};
  const g=nativeFormHarness(t,sensor),advanced=g.forms.find(form=>form.schema.some(field=>field.name==='var__activity_entities')),sources=advanced.schema.find(field=>field.name==='var__activity_entities');assert.equal(sources.selector.entity.multiple,true);advanced.change({...advanced.data,var__activity_entities:[]});assert.deepEqual(g.events.at(-1),{...sensor,variables:{...sensor.variables,activity_entities:[]}});
 });
+
+test('glance label visibility defaults on and preserves names and native options across edits',t=>{
+ const original={type:'custom:marao-glance-card',name:'Summary',variables:{entity1:'sensor.a',entity1_name:'Temperature',entity3:'sensor.b',future:{keep:[]}},grid_options:{columns:12},future:false};
+ const {forms,events,editor}=nativeFormHarness(t,original,{language:'pt',states:{}}),form=forms.find(form=>form.schema.some(field=>field.name==='var__show_reading_names'));
+ const field=form.schema.find(field=>field.name==='var__show_reading_names');assert.equal(field.label,'Mostrar nomes das leituras');assert.deepEqual(field.selector,{boolean:{}});assert.equal(form.data.var__show_reading_names,true);assert.equal(events.length,0);
+ form.change({...form.data,var__show_reading_names:false});assert.deepEqual(events.at(-1),{...original,variables:{...original.variables,show_reading_names:false}});
+ form.change({...form.data,var__show_reading_names:true});assert.equal(events.at(-1).variables.entity1_name,'Temperature');assert.equal(events.at(-1).variables.show_reading_names,true);
+ const count=events.length;form.change({...form.data,var__show_reading_names:'false'});assert.equal(events.length,count);assert.match(editor.shadowRoot.querySelector('[data-status]').textContent,/booleano/);
+});

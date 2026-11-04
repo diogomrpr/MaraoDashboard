@@ -456,7 +456,7 @@ EDITOR_CATALOG["cards"].extend([
                    _field("air_quality_sensor", "Air quality", "entity", domains=["sensor"])]},
     {"id": "md_glance_card", "label": "Glance", "icon": "mdi:view-dashboard", "domains": [],
      "entity_optional": True, "description": "Up to three independently configured readings.",
-     "variables": [field for index in range(1, 4) for field in (
+     "variables": [_field("show_reading_names", "Show reading labels", "boolean", default=True)] + [field for index in range(1, 4) for field in (
          _field(f"entity{index}", f"Reading {index}", "entity"),
          _field(f"entity{index}_name", f"Reading {index} name", "text"),
          _field(f"entity{index}_icon", f"Reading {index} icon", "icon"))]},

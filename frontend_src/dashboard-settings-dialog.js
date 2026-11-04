@@ -150,7 +150,7 @@ export async function openDashboardSettings(root,opener,owner) {
   const heading=document.createElement('h4');heading.textContent=String(hass.language).startsWith('pt')?'Este navegador':'This browser';browser.append(heading);(validateLocation.section||dialog.querySelector('[data-settings]')).append(browser);
   root._maraoRefreshSettings=()=>{if(!valid()){busy=false;close();return;}refresh();};
   const refresh=owner?._config.current_room?.enabled?mountLocationPreferences(browser,owner,valid,draft):()=>{};
-  if(!owner?._config.current_room?.enabled){const hint=document.createElement('p');hint.textContent=String(hass.language).startsWith('pt')?'Ative a divisão atual e guarde para escolher a pessoa neste navegador.':'Enable Current room and Save before choosing the person for this browser.';browser.append(hint);}
+  if(!owner?._config.current_room?.enabled){const hint=document.createElement('p');hint.textContent=String(hass.language).startsWith('pt')?'Ative a divisão atual e guarde para escolher o sensor de divisão deste navegador.':'Enable Current room and Save before choosing the Area sensor for this browser.';browser.append(hint);}
 
   const add=mountForm(dialog.querySelector('[data-add]'),{},[schema('destination',t.add,{navigation:{}})],value=>{
     if(!value.destination)return;navigation.haptic('heavy');const view=viewFor(value.destination);

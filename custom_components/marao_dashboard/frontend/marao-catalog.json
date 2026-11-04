@@ -1682,6 +1682,15 @@
       "description": "Up to three independently configured readings.",
       "variables": [
         {
+          "key": "show_reading_names",
+          "label": "Show reading labels",
+          "kind": "boolean",
+          "selector": "boolean",
+          "advanced": false,
+          "description": "",
+          "default": true
+        },
+        {
           "key": "entity1",
           "label": "Reading 1",
           "kind": "entity",

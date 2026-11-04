@@ -65,7 +65,7 @@ page roles through ordinary section/card descriptors; raw cards remain preserved
 | Public name/component | Existing role | Contract and source/check |
 | --- | --- | --- |
 | `md_base_card`, `md_title_card` | Generic presentation and noninteractive section headings | [Cards](specs/card-behaviors/spec.md); [visibility checks](../tests/frontend/marao-card-visibility.test.js) |
-| `md_header_card`, `md_weather_card`, `md_glance_card` | Date/person/air-quality header; condition/temperature/available forecasts; one–three independent named/icon readings | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
+| `md_header_card`, `md_weather_card`, `md_glance_card` | Date/person/air-quality header; condition/temperature/available forecasts; one–three independent responsive reading tiles with optional visible labels | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
 | `md_room_card` | Room navigation, explicit readings and lighting membership; guarded multi-light All off action; approved room-only background state | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
 | `md_scene_card` | Native input-select/select options and authoritative selected state; separate from overview `scene.turn_on` buttons | [Cards](specs/card-behaviors/spec.md); [card checks](../tests/frontend/marao-climate-card.test.js) |
 | `md_security_card`, internal `md_alarm_controls_card` | Authoritative alarm state, generated capability-aware sheet, transient masked numeric/text code, tap arming and held disarm/bypass | [Alarm change](changes/add-alarm-controls-and-service-access-openers/specs/card-behaviors/spec.md); [security checks](../tests/frontend/marao-security.test.js), [native safe checks](../tests/test-ha-security.js) |
@@ -299,7 +299,7 @@ camera playback/transport and embedded native controls are outside this change.
 
 ## Pending batch: location, People columns and camera events
 
-- Current room: `MaraoLocation.js`, `MaraoLocationPreferences.js`, `MaraoNavigation.js`, `frontend_src/location-settings.js`; targeted navbar/settings tests.
+- Current room: direct browser-local sensor choice (origin/dashboard/account scope), explicit clear and legacy person compatibility; `MaraoLocation.js`, `MaraoLocationPreferences.js`, `MaraoNavigation.js`, `frontend_src/location-settings.js`; targeted navbar/settings tests.
 - People columns and fan icons: shared `MaraoCards.js` presentation, `MaraoCollections.js` validation and native editor/composition; collection/editor assertions and existing safe examples.
 - Camera events: `MaraoEventModel.js` and the existing `MaraoFrigateEventsCard.js`, native event editor, popup column forwarding in composition/generator; event/editor and scoped page-generation assertions. Examples stay under `ha-test/` and `/marao-dashboard`.
 

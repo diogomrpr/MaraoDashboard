@@ -342,14 +342,15 @@ export function entityGroupState(type, entities, hass) {
   return { state, label, activeEntities, unavailableEntities, available: usable.length, reading, minimumReading };
 }
 
-function readingMarkup(entity, name, icon, hass, kind = "md_sensor_card", showIcon = true) {
+function readingMarkup(entity, name, icon, hass, kind = "md_sensor_card", showIcon = true, showName = true) {
   const state = stateOf(hass, entity);
   const label = name || state.attributes?.friendly_name || entity;
-  const unavailable = !hass?.states || ["unknown", "unavailable"].includes(text(state.state, "unknown"));
+  const disconnected = hass?.connected === false || hass?.connection?.connected === false;
+  const unavailable = disconnected || !hass?.states || ["unknown", "unavailable"].includes(text(state.state, "unknown"));
   const symbol = icon ? `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>` : `<ha-state-icon data-reading-entity="${esc(entity)}" aria-hidden="true"></ha-state-icon>`;
   const activity = activityTimestamp(entity,state);
   const control = !showIcon ? '' : activity ? `<button type="button" class="reading-activity" data-activity-open="${esc(entity)}" aria-label="${esc(localize('activity.title',hass,{},'Activity'))}: ${esc(label)}"${unavailable?' disabled':''}>${symbol}</button>` : symbol;
-  return `<div class="reading${unavailable ? ' neutral' : ''}">${control}<dt>${esc(label)}</dt><dd>${esc(entityStateLabel(state, entity, kind, hass))}</dd></div>`;
+  return `<div class="reading${unavailable ? ' neutral' : ''}${showName ? '' : ' reading-name-hidden'}">${control}<dt${showName ? '' : ' class="binary-state"'}>${esc(label)}</dt><dd>${esc(disconnected ? localize("common.disconnected",hass,{},"Disconnected") : entityStateLabel(state, entity, kind, hass))}</dd></div>`;
 }
 
 export function climateModeIcon(value) {
@@ -762,11 +763,11 @@ export function cardProblem(config, hass, { error = "", contentError = "", loadi
   return severity ? { kind: severity, reason: [...new Set(details)].join(" · "), complete: Boolean(complete) } : null;
 }
 
-export function problemStyle(problem, appearance = null) {
+export function problemStyle(problem, appearance = null, surface = true) {
   if (!problem || problem.kind === "loading") return "";
   const background = appearance?.background || `var(--marao-problem-${problem.kind}-background,var(--secondary-background-color))`;
   const color = appearance?.text || `var(--marao-problem-${problem.kind}-text,var(--primary-text-color))`;
-  return `background:${background};color:${color};--marao-card-background:${background};--marao-card-text-color:${color};--marao-state-color:${color};--marao-icon-color:${color};--marao-icon-background:transparent;--marao-accent-color:${color};--primary-text-color:${color};--secondary-text-color:${color};--subtext-color:${color};--error-color:${color};opacity:1`;
+  return `${surface ? `background:${background};` : ""}color:${color};--marao-card-background:${background};--marao-card-text-color:${color};--marao-state-color:${color};--marao-icon-color:${color};--marao-icon-background:transparent;--marao-accent-color:${color};--primary-text-color:${color};--secondary-text-color:${color};--subtext-color:${color};--error-color:${color};opacity:1`;
 }
 
 // Only presentation metadata survives loss of availability; readings never do.
@@ -987,20 +988,29 @@ function cardStyles() {
     .reading dt { font-size:var(--font-size-caption,.9375rem); }
     .reading dd { margin:0; font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-primary,700); }
     .reading :is(ha-icon,ha-state-icon) { --mdc-icon-size:28px; }
-    .body.glance-card { display:block; }
-    .body.glance-card .readings { margin:0; grid-template-columns:minmax(0,1fr);gap:8px; }
-    .body.glance-card {padding:12px;}
+    ha-card[data-glance] { background:transparent; border:0; box-shadow:none; overflow:visible; }
+    .body.glance-card { display:block; padding:0; min-height:0; }
+    .body.glance-card .readings { margin:0; grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--font-size-primary,1.125rem) * 4.5)),1fr));grid-auto-rows:1fr;gap:8px; }
     .glance-card>.title {margin-bottom:12px;}
-    .glance-card .reading {grid-template-columns:minmax(0,1fr) 48px;grid-template-rows:auto auto;gap:4px 12px;text-align:start;justify-items:stretch;align-items:center;}
-    .glance-card .reading dt {grid-column:1;grid-row:1;height:auto;display:block;overflow:visible;color:var(--secondary-text-color);}
-    .glance-card .reading dd {grid-column:1;grid-row:2;height:auto;min-height:0;white-space:normal;overflow:visible;font-size:var(--font-size-primary,1.125rem);overflow-wrap:anywhere;}
-    .glance-card .reading> :is(ha-icon,ha-state-icon,button) {grid-column:2;grid-row:1/3;box-sizing:border-box;width:48px;height:48px;padding:10px;border-radius:50%;background:var(--opacity-contrast-100,rgba(0,0,0,.08));}
+    .glance-card .reading {position:relative;box-sizing:border-box;padding:8px;gap:4px;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr;text-align:center;justify-items:center;align-content:start;border-radius:var(--ha-card-border-radius,20px);background:var(--marao-card-background,var(--ha-card-background,var(--card-background-color)));color:var(--marao-card-text-color,inherit);}
+    .glance-card .reading dt {grid-column:1;grid-row:3;height:auto;display:block;overflow:visible;color:var(--secondary-text-color);}
+    .glance-card .reading dd {grid-column:1;grid-row:2;height:auto;min-height:2.5em;white-space:normal;overflow:visible;font-size:var(--font-size-primary,1.125rem);overflow-wrap:anywhere;}
+    .glance-card .reading> :is(ha-icon,ha-state-icon,button) {grid-column:1;grid-row:1;box-sizing:border-box;width:48px;height:48px;padding:10px;border-radius:50%;background:var(--opacity-contrast-100,rgba(0,0,0,.08));}
+    .glance-card .reading:not(:has(>ha-icon,>ha-state-icon,>button)) {grid-template-rows:auto 1fr;}
+    .glance-card .reading:not(:has(>ha-icon,>ha-state-icon,>button)) dd {grid-row:1;}
+    .glance-card .reading:not(:has(>ha-icon,>ha-state-icon,>button)) dt {grid-row:2;}
+    .glance-card .reading.reading-name-hidden {grid-template-rows:auto auto;}
+    .glance-card .reading.reading-name-hidden dt {height:1px;grid-area:auto;}
+    .glance-card .reading.reading-name-hidden:not(:has(>ha-icon,>ha-state-icon,>button)) {grid-template-rows:auto;}
+    ha-card[data-glance].marao-press-surface::after {display:none;}
+    ha-card[data-glance][data-marao-pressed] .reading::after {content:'';position:absolute;inset:0;border-radius:inherit;background:var(--primary-text-color);opacity:.08;pointer-events:none;}
     .reading-activity {border:0;color:inherit;cursor:pointer;min-width:48px;min-height:48px;}
     .access-action-icon[data-activity-open] {position:relative;z-index:4;pointer-events:auto;min-width:48px;min-height:48px;padding:10px;border:0;border-radius:50%;color:inherit;background:var(--active-overlay-color,var(--secondary-background-color));}
-    .body.glance-card.has-problem:not(.complete-problem)>.readings {visibility:visible;}
-    .body.glance-card.has-problem:not(.complete-problem)>.problem {position:relative;inset:auto;margin-top:8px;}
-    .body.glance-card.has-problem:not(.complete-problem)>.problem span {white-space:normal;}
-    .body.glance-card.has-problem:not(.complete-problem)>.title {visibility:visible;}
+    .body.glance-card.has-problem>.readings {visibility:visible;}
+    ha-card[data-glance]>.problem-details {inset:auto 0 0 auto;}
+    .body.glance-card.has-problem>.problem {position:relative;inset:auto;margin-top:8px;min-height:48px;align-items:center;}
+    .body.glance-card.has-problem>.problem span {white-space:normal;}
+    .body.glance-card.has-problem>.title {visibility:visible;}
     .control { grid-area:control; z-index:2; display:flex; gap:8px; align-items:center; pointer-events:auto; }
     button { min-width:48px; min-height:48px; border:0; border-radius:12px; padding:10px 12px; color:inherit; background:var(--secondary-background-color); font:inherit; cursor:pointer; pointer-events:auto; transition:transform .12s ease,filter .12s ease; }
     button:focus, input:focus { outline:none; }
@@ -1211,6 +1221,7 @@ export class MaraoCard extends BaseElement {
     if (config.variables?.activity_entities !== undefined && (!Array.isArray(config.variables.activity_entities) || config.variables.activity_entities.some(id => typeof id !== 'string' || !/^[a-z_]+\.[a-z0-9_]+$/.test(id)))) throw new Error(localize('activity.invalid_sources',this._hass,{},'Related activity entities must be an explicit list of entity IDs.'));
     if (config.template === 'md_room_card' && config.variables?.climate_entity != null && config.variables.climate_entity !== '' && !/^climate\.[a-z0-9_]+$/.test(config.variables.climate_entity)) throw new Error(localize('room.invalid_climate',this._hass,{},'Choose a climate entity.'));
     if(config.template==='md_media_app_card'){const error=mediaAppLogoError(config.variables?.app_logo,this._hass);if(error)throw new Error(error);}
+    if(config.template==='md_glance_card' && Object.hasOwn(config.variables || {},'show_reading_names') && typeof config.variables.show_reading_names!=='boolean')throw new Error(String(this._hass?.language||'').startsWith('pt')?'Mostrar nomes das leituras tem de ser um valor booleano.':'Show reading labels must be a boolean.');
     if(config.template==='md_people_card'){const error=peopleError(config);if(error)throw new Error(collectionLabel(error,this._hass));}
     this.shadowRoot?.querySelector("marao-slide-to-open")?._clearFeedback?.();
     this._layoutMetadata = {};
@@ -1973,7 +1984,7 @@ export class MaraoCard extends BaseElement {
     const artwork = !problem && kind === "md_media_card" && (!variables.now_playing || !["idle", "off", "standby"].includes(value)) && mediaAvailable && variables.md_show_background_art !== false && state.attributes?.entity_picture
       ? `<div class="media-artwork" aria-hidden="true"><img src="${esc(state.attributes.entity_picture)}" alt=""></div>` : "";
     const glance = kind === "md_glance_card";
-    let readings = glance ? [1,2,3].filter((index) => variables[`entity${index}`]).map((index) => readingMarkup(variables[`entity${index}`], variables[`entity${index}_name`], variables[`entity${index}_icon`], this._hass, "md_sensor_card", config.show_icon !== false && variables.show_icon !== false)).join("") : "";
+    let readings = glance ? [1,2,3].filter((index) => variables[`entity${index}`]).map((index) => readingMarkup(variables[`entity${index}`], variables[`entity${index}_name`], variables[`entity${index}_icon`], this._hass, "md_sensor_card", config.show_icon !== false && variables.show_icon !== false, variables.show_reading_names !== false)).join("") : "";
     const locale = this._hass?.locale?.language || this._hass?.language || "en";
     let details = "";
     if (kind === "md_switch_card" && variables.power_entity) {
@@ -2104,7 +2115,7 @@ export class MaraoCard extends BaseElement {
     const formattedReading = !iconOnly && formatting && (['md_graph_card','md_toggle_graph_card','md_sensor_card','md_base_card'].includes(kind) || kind === 'md_switch_card' && variables.power_entity);
     const stateMarkup = showState && (!activityTimestamp(entity,state) || customLabel || variables.md_label_prefix) && kind !== "md_wallbox_current_card" ? `<div class="state${!displayValue ? " placeholder" : ""}">${esc(displayValue || "—")}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${kind === "md_room_card" ? " data-room" : ""}${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}${accessPopup ? " access-popup-action" : ""}${accessPopup && kind === "md_access_action_card" ? " access-close-action" : ""}">${accessPopup ? `${accessIcon}${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${details}` : uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${coverActions}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${historyControl}${historyEntry && graphStatus === 'error' ? `<button type="button" data-graph-retry aria-label="${esc(localize('common.retry',this._hass,{},'Retry'))}"><ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon></button>` : ''}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
+    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${glance ? " data-glance" : ""}${kind === "md_room_card" ? " data-room" : ""}${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem,null,!glance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}${accessPopup ? " access-popup-action" : ""}${accessPopup && kind === "md_access_action_card" ? " access-close-action" : ""}">${accessPopup ? `${accessIcon}${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${details}` : uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${coverActions}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${historyControl}${historyEntry && graphStatus === 'error' ? `<button type="button" data-graph-retry aria-label="${esc(localize('common.retry',this._hass,{},'Retry'))}"><ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon></button>` : ''}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
     for (const button of this.shadowRoot.querySelectorAll('[data-exhaust-action]')) button.addEventListener('click', event => {
       event.stopPropagation(); haptic('heavy'); this._coverAction(entity, button.dataset.exhaustAction);
     });

@@ -1,4 +1,4 @@
-const {locationError,locationLabel,locationPreferenceKey,readLocationPreference,writeLocationPreference,resolveLocation}=await import(new URL(`./MaraoLocation.js${new URL(import.meta.url).search}`,import.meta.url));
+const {locationError,locationLabel,locationPreferenceKey,deviceRoomPreferenceKey,readRoomPreference,forgetDeviceRoomPreference,resolveLocation}=await import(new URL(`./MaraoLocation.js${new URL(import.meta.url).search}`,import.meta.url));
 const [refreshModule, updatesModule, themeModule, pressModule] = await Promise.all([
   'MaraoFrontendRefresh.js', 'MaraoFrontendUpdates.js', 'MaraoTheme.js', 'MaraoPressFeedback.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
@@ -163,6 +163,7 @@ export class MaraoNavbarCard extends BaseElement {
     this._observer = new ResizeObserver(this._scheduleLayout);
     for (const node of [this, this._view(), this.shadowRoot.querySelector('.bounds'), this.shadowRoot.querySelector('.nav')]) if (node) this._observer.observe(node);
     for (const event of ['location-changed', 'popstate', 'hashchange']) window.addEventListener(event, this._locationChanged);
+    window.addEventListener('storage', this._roomStorageChanged);
     window.addEventListener('resize', this._scheduleLayout);
     window.visualViewport?.addEventListener('resize', this._scheduleLayout);
     window.visualViewport?.addEventListener('scroll', this._scheduleLayout);
@@ -184,6 +185,7 @@ export class MaraoNavbarCard extends BaseElement {
     this._refreshGesture?.destroy();
     this._closeOverflow(false); this._clearDismissGesture(); this._observer?.disconnect(); cancelAnimationFrame(this._frame); this._frame = null;
     for (const event of ['location-changed', 'popstate', 'hashchange']) window.removeEventListener(event, this._locationChanged);
+    window.removeEventListener('storage', this._roomStorageChanged);
     window.removeEventListener('resize', this._scheduleLayout);
     window.visualViewport?.removeEventListener('resize', this._scheduleLayout);
     window.visualViewport?.removeEventListener('scroll', this._scheduleLayout);
@@ -208,18 +210,20 @@ export class MaraoNavbarCard extends BaseElement {
   }
   _routes() {
     if(!this._config.current_room?.enabled)return this._config.routes || [];
-    const key=locationPreferenceKey(window.location.origin,this._config.dashboard_root,this._hass?.user?.id);
-    if(this._locationKey!==key){this._locationKey=key;let storage;try{storage=window.localStorage;}catch{}this._locationPreference=readLocationPreference(storage,key);}
+    const key=deviceRoomPreferenceKey(window.location.origin,this._config.dashboard_root,this._hass?.user?.id);
+    this._legacyLocationKey=locationPreferenceKey(window.location.origin,this._config.dashboard_root,this._hass?.user?.id);
+    if(this._locationKey!==key||!this._locationPreference){this._locationKey=key;let storage;try{storage=window.localStorage;}catch{}this._locationPreference=readRoomPreference(storage,key,this._legacyLocationKey);}
     const document=this._root()?.lovelace?.rawConfig || this._root()?.lovelace?.config;
     const hass=this._hass,connection=hass?.connection,user=hass?.user?.id;
-    if(this._locationIdentity?.key!==key||this._locationIdentity?.connection!==connection)this._locationIdentity={key,connection};
+    if(this._locationIdentity?.key!==key||this._locationIdentity?.connection!==connection||this._locationIdentity?.preference!==this._locationPreference)this._locationIdentity={key,connection,preference:this._locationPreference};
     const identity=this._locationIdentity;
-    let route=resolveLocation(this._config.current_room,hass,this._locationPreference?.person,document,this._config.dashboard_root,window.location.origin,identity.records);
-    if(!this._locationPreference?.person&&route.status==='identity'&&hass?.user?.id&&typeof hass.callWS==='function'&&this.isConnected&&!this.preview){
+    let route=resolveLocation(this._config.current_room,hass,this._locationPreference,document,this._config.dashboard_root,window.location.origin,identity.records);
+    if(route.diagnostics.mode==='legacy'&&!this._locationPreference?.person&&route.status==='identity'&&hass?.user?.id&&typeof hass.callWS==='function'&&this.isConnected&&!this.preview){
       if(!identity.request){
         const current=()=>this.isConnected&&this._locationIdentity===identity&&this._locationKey===key&&this._hass?.connection===connection&&this._hass?.user?.id===user;
         identity.pending=true;
-        identity.request=Promise.resolve().then(()=>hass.callWS({type:'person/list'})).then(records=>{
+        identity.request=Promise.resolve().then(()=>current()?hass.callWS({type:'person/list'}):null).then(records=>{
+          if(!current())return;
           if(!Array.isArray(records?.storage)||!Array.isArray(records?.config))throw new Error('Invalid Home Assistant person records.');
           if(current())identity.records=records;
         }).catch(()=>{if(current())identity.error='lookup';}).then(()=>{if(current()){identity.pending=false;this._updateCurrent();}});
@@ -235,6 +239,12 @@ export class MaraoNavbarCard extends BaseElement {
     if (this._isSurface) this.hidden = Boolean(editing || this.preview);
     if (editing !== this._editing) { this._editing = editing; this._refreshGesture?.cancel(); this._closeOverflow(false); this._updateCurrent(); }
   }
+  _roomStorageChanged = event => {
+    let storage;try{storage=window.localStorage;}catch{}
+    if(event.storageArea&&storage&&event.storageArea!==storage)return;
+    if(event.key!==null&&event.key!==this._locationKey&&event.key!==this._legacyLocationKey)return;
+    forgetDeviceRoomPreference(this._locationKey);this._locationPreference=null;this._locationIdentity=null;this._updateCurrent();
+  };
   _locationChanged = () => { this._closeMaintenance(false); if (this._navigationRecord) syncNavigation(this._navigationRecord); this._refreshGesture?.cancel(); this._closeOverflow(false); this._updateCurrent(); this._scheduleLayout(); };
   _scheduleLayout = () => {
     if (this._frame != null || !this.isConnected) return;

@@ -11,10 +11,63 @@ export function locationError(value) {
   if(value.away_path!==undefined && (typeof value.away_path!=='string'||value.away_path && !value.away_path.startsWith('/')))return 'Invalid Away page.';
 }
 const labels={en:{room:'Current room',away:'Away',loading:'Loading location',identity:'Ask an administrator to choose a person in Marao settings',lookup:'Could not load person links. An administrator can choose Automatic in Marao settings to retry.',unavailable:'Location unavailable',unknown:'Room unknown',unmapped:'No room page configured',preferences:'Location preferences',automatic:'Automatic',person:'Person',close:'Close',storage:'This choice applies for this session; browser storage is unavailable.',invalid:'Saved location preference is invalid. Choose Automatic or a person.'},pt:{room:'Divisão atual',away:'Ausente',loading:'A carregar a localização',identity:'Peça a um administrador para escolher uma pessoa nas definições Marao',lookup:'Não foi possível carregar as associações. Um administrador pode escolher Automático nas definições Marao para tentar novamente.',unavailable:'Localização indisponível',unknown:'Divisão desconhecida',unmapped:'Nenhuma página de divisão configurada',preferences:'Preferências de localização',automatic:'Automático',person:'Pessoa',close:'Fechar',storage:'A escolha aplica-se a esta sessão; o armazenamento do navegador não está disponível.',invalid:'A preferência guardada é inválida. Escolha Automático ou uma pessoa.'}};
+Object.assign(labels.en,{storage_read:'Could not read this browser’s room preference. Select a source to use until reload.',unconfigured:'Choose an Area sensor for this browser in Marao settings',invalid:'Saved room source is invalid. Select or clear this browser’s sensor.',newer:'This room preference needs a newer Marao version. It has been preserved.',storage:'Not saved; applies until reload. Browser storage is unavailable.'});
+Object.assign(labels.pt,{storage_read:'Não foi possível ler a preferência de divisão deste navegador. Escolha uma fonte para usar até recarregar.',unconfigured:'Escolha um sensor de divisão para este navegador nas definições Marao',invalid:'A fonte de divisão guardada é inválida. Escolha ou limpe o sensor deste navegador.',newer:'Esta preferência de divisão requer uma versão mais recente do Marao. Foi preservada.',storage:'Não guardado; aplica-se até recarregar. O armazenamento do navegador não está disponível.'});
 export const locationLabel=(key,hass)=>{const pt=String(hass?.language||'').startsWith('pt');if(hass?.user?.is_admin&&key==='identity')return pt?'Escolha uma pessoa nas definições Marao':'Choose a person in Marao settings';return labels[pt?'pt':'en'][key]||key;};
 export const locationPreferenceKey=(origin,root,user)=>JSON.stringify(['marao-location',origin,root,user]);
 export function readLocationPreference(storage,key){try{const value=storage.getItem(key);if(value===null)return {person:null};if(!/^person\.[a-z0-9_]+$/.test(value))return {person:'invalid',error:'invalid'};return {person:value};}catch{return {person:null,error:'storage'};}}
 export function writeLocationPreference(storage,key,person){try{if(person===null)storage.removeItem(key);else storage.setItem(key,person);return {person};}catch{return {person,error:'storage'};}}
+
+// Separate from released person strings; reads never migrate or infer a device.
+const memoryPreferences=new Map();
+export const deviceRoomPreferenceKey=(origin,root,user)=>[origin,root,user].every(v=>typeof v==='string'&&v)?JSON.stringify(['marao-device-room',origin,root,user]):null;
+export const deviceRoomRecoveryKey=key=>JSON.stringify(['marao-device-room-recovery',...JSON.parse(key).slice(1)]);
+function decodeRoomPreference(raw){
+  if(raw===null)return {mode:'absent',raw};
+  let record;try{record=JSON.parse(raw);}catch{return {mode:'invalid',error:'invalid',raw};}
+  if(object(record)&&Number.isInteger(record.version)&&record.version>1)return {mode:'invalid',error:'newer',raw};
+  if(!object(record)||record.version!==1||!['sensor','none','legacy'].includes(record.mode)||record.mode==='sensor'&&!/^sensor\.[a-z0-9_]+$/.test(record.area_sensor))return {mode:'invalid',error:'invalid',record,raw,area_sensor:typeof record?.area_sensor==='string'?record.area_sensor:''};
+  return {...record,record,raw,persisted:true};
+}
+export function forgetDeviceRoomPreference(key){memoryPreferences.delete(key);}
+export function readDeviceRoomPreference(storage,key){
+  if(!key)return {mode:'loading'};
+  if(memoryPreferences.has(key))return memoryPreferences.get(key);
+  try{return decodeRoomPreference(storage.getItem(key));}catch{return {mode:'invalid',error:'storage_read'};}
+}
+export function readRoomPreference(storage,key,legacyKey){
+  const preference=readDeviceRoomPreference(storage,key);
+  if(!['absent','legacy'].includes(preference.mode))return preference;
+  const legacy=readLocationPreference(storage,legacyKey);
+  return legacy.error?{...preference,mode:'invalid',error:legacy.error==='storage'?'storage_read':legacy.error}:{...preference,person:legacy.person};
+}
+export function writeDeviceRoomPreference(storage,key,choice){
+  if(!key)return {mode:'loading'};
+  if(decodeRoomPreference(JSON.stringify({...choice,version:1})).mode==='invalid')return {mode:'invalid',error:'invalid'};
+  let raw,record={...choice,version:1};
+  const temporary=()=>{const value={...record,record,persisted:false,error:'storage'};memoryPreferences.set(key,value);return value;};
+  try{raw=storage.getItem(key);}catch{return temporary();}
+  const prior=decodeRoomPreference(raw);
+  if(prior.error==='newer')return prior;
+  if(object(prior.record))record={...prior.record,...record};
+  if(record.mode!=='sensor')delete record.area_sensor;
+  const replacement=JSON.stringify(record);
+  try{
+    storage.setItem(deviceRoomRecoveryKey(key),JSON.stringify({version:1,previous:raw,replacement}));
+    // Another tab's deliberate choice must not be replaced by stale recovery.
+    if(storage.getItem(key)!==raw){memoryPreferences.delete(key);return readDeviceRoomPreference(storage,key);}
+    storage.setItem(key,replacement);
+  }catch{return temporary();}
+  memoryPreferences.delete(key);return decodeRoomPreference(replacement);
+}
+export function restoreDeviceRoomPreference(storage,key){
+  try{
+    const backup=JSON.parse(storage.getItem(deviceRoomRecoveryKey(key)));
+    if(backup?.version!==1||!(backup.previous===null||typeof backup.previous==='string')||typeof backup.replacement!=='string'||storage.getItem(key)!==backup.replacement)return false;
+    if(backup.previous===null)storage.removeItem(key);else storage.setItem(key,backup.previous);
+    memoryPreferences.delete(key);return true;
+  }catch{return false;}
+}
 function automaticPerson(hass,records){
   const user=hass?.user?.id;if(!user)return null;
   const visible=Object.entries(hass.states).filter(([id])=>id.startsWith('person.'));
@@ -27,22 +80,37 @@ function automaticPerson(hass,records){
   return matches.length===1?matches[0][0]:null;
 }
 export function resolveLocation(config,hass,override,document,root,origin,records){
-  const diagnostics={account:hass?.user?.id,selection:override?'override':'automatic'};
+  const preference=object(override)?override:{mode:'legacy',person:override};
+  const mode=preference.mode==='absent'?(preference.person||Object.keys(config?.people||{}).length?'legacy':'none'):preference.mode||'legacy';
+  const diagnostics={account:hass?.user?.id,mode,selection:mode==='sensor'?'sensor':preference.person?'override':'automatic'};
   const neutral=status=>({diagnostics:{...diagnostics,stage:status},location:true,status,label:locationLabel(status,hass),icon:'mdi:home-export-outline',disabled:true,path:''});
-  if(!hass?.states)return neutral('loading');
+  if(!hass?.states||mode==='loading')return neutral('loading');
   if(hass.connected===false||hass.connection?.connected===false)return neutral('unavailable');
-  if(!override&&!hass.user?.id)return neutral('loading');
-  const person=override || automaticPerson(hass,records), state=hass.states[person];
-  diagnostics.person=person;diagnostics.presence=state?.state;
-  if(!state)return neutral('identity');
-  if(['unknown','unavailable',''].includes(state.state))return neutral('unavailable');
-  const away=state.state!=='home';
-  diagnostics.source=config?.people?.[person]?.area_sensor;
-  const sensor=hass.states[diagnostics.source];
-  const area=sensor&&!['unknown','unavailable'].includes(sensor.state)?sensor.attributes?.area_id:null;
-  diagnostics.area=area;
-  const path=away?config?.away_path:config?.rooms?.[area]?.path;
-  if(!path)return neutral(away?'away':!sensor?'unavailable':!area?'unknown':'unmapped');
+  if(mode==='invalid')return neutral(preference.error||'invalid');
+  if(!['sensor','legacy','none'].includes(mode))return neutral('invalid');
+  if(mode==='none')return neutral('unconfigured');
+  if(!hass.user?.id&&!preference.person)return neutral('loading');
+  let away=false,path;
+  if(mode==='sensor'){
+    if(!/^sensor\.[a-z0-9_]+$/.test(preference.area_sensor))return neutral('invalid');
+    diagnostics.source=preference.area_sensor;
+    const sensor=hass.states[diagnostics.source];
+    if(!sensor||typeof sensor.state!=='string'||!sensor.state.trim()||['unknown','unavailable'].includes(sensor.state))return neutral('unavailable');
+    const area=sensor.attributes?.area_id;
+    if(typeof area!=='string'||!area.trim()||['unknown','unavailable'].includes(area))return neutral('unknown');
+    diagnostics.area=area;path=config?.rooms?.[area]?.path;
+    if(!path)return neutral('unmapped');
+  }else{
+    const person=preference.person||automaticPerson(hass,records),state=hass.states[person];
+    diagnostics.person=person;diagnostics.presence=state?.state;
+    if(!state)return neutral('identity');
+    if(['unknown','unavailable',''].includes(state.state))return neutral('unavailable');
+    away=state.state!=='home';diagnostics.source=config?.people?.[person]?.area_sensor;
+    const sensor=hass.states[diagnostics.source];
+    const area=sensor&&!['unknown','unavailable'].includes(sensor.state)?sensor.attributes?.area_id:null;
+    diagnostics.area=area;path=away?config?.away_path:config?.rooms?.[area]?.path;
+    if(!path)return neutral(away?'away':!sensor?'unavailable':!area?'unknown':'unmapped');
+  }
   diagnostics.path=path;
   let url;try{url=new URL(path,origin);}catch{return neutral('unmapped');}
   const parts=url.pathname.replace(/\/$/,'').split('/');
