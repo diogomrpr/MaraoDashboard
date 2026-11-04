@@ -79,7 +79,13 @@ Marao settings SHALL distinguish Navigation bar, Current room and Dashboard shor
 - **THEN** essential subsection, room and destination labels wrap, controls retain visible 48px targets, and the popup scrolls internally with its close and Save controls reachable
 
 ### Requirement: Navbar-style room mapping rows
-Rooms and pages SHALL use the navbar configuration's expandable summary-row presentation, with a room name/icon, matching page summary, chevron and explicit row actions. Expanding a row SHALL edit its HA area and dashboard page using native selectors in the same popup. This presentation SHALL preserve the existing keyed mappings without introducing a navigation-order requirement.
+Rooms and pages and People and location sources SHALL use the navbar configuration's expandable summary-row presentation, with a name/icon, matching page or source summary, chevron and explicit row actions. Expanding a row SHALL edit its mapping using native selectors in the same popup. This presentation SHALL preserve the existing keyed mappings without introducing a navigation-order requirement.
+
+#### Scenario: Add a mapping from one selector
+- **WHEN** an administrator chooses an unused person or room from its single Add selector
+- **THEN** a new expanded row appears with the corresponding source or page configuration
+- **AND** no separate Add button or second add-form field is needed
+- **AND** Save rejects the incomplete row until it is completed or removed, while existing mappings remain intact
 
 #### Scenario: Inspect and edit a room destination
 - **WHEN** an administrator expands a configured room row and selects another existing page

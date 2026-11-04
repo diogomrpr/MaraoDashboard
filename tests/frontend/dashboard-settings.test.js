@@ -5,12 +5,24 @@ import vm from 'node:vm';
 import {validateDashboardSettings,readDashboardSettings,patchDashboardSettings,saveDashboardSettings,dashboardViewForAddress,patchNavbarRoute,moveNavbarRoute} from '../../frontend_src/dashboard-settings.js';
 import {mountLocationSettings} from '../../frontend_src/location-settings.js';
 
-test('location forms reject incomplete or duplicate mappings without silently saving old values',t=>{
+function mappingDOM(t){
  const previous=globalThis.document;t.after(()=>{globalThis.document=previous;});
- const node=()=>({children:[],append(...items){this.children.push(...items);},setAttribute(){},remove(){this.removed=true;}});
- globalThis.document={createElement:node};
+ class Node extends EventTarget {
+  constructor(tag){super();this.tag=tag;this.children=[];this.attributes={};}
+  append(...items){this.children.push(...items);for(const item of items)if(typeof item==='object')item.parentElement=this;}
+  prepend(...items){this.children.unshift(...items);for(const item of items)if(typeof item==='object')item.parentElement=this;}
+  setAttribute(name,value){this.attributes[name]=value;}
+  remove(){this.parentElement.children=this.parentElement.children.filter(child=>child!==this);}
+ }
+ const make=tag=>new Node(tag);globalThis.document={createElement:make};return make('host');
+}
+const descendants=node=>[node,...(node.children||[]).filter(child=>typeof child==='object').flatMap(descendants)];
+function removeMapping(form){const menu=descendants(form.host.parentElement).find(node=>node.tag==='ha-dropdown');menu.dispatchEvent(Object.assign(new Event('wa-select'),{detail:{item:{value:'remove'}}}));}
+
+test('location forms reject incomplete or duplicate mappings without silently saving old values',t=>{
+ const host=mappingDOM(t);
  const draft={version:1,navbar:{routes:[],current_room:{people:{'person.a':{area_sensor:'sensor.a',future:[]},'person.b':{area_sensor:'sensor.b'}},rooms:{}}}},forms=[];
- const validate=mountLocationSettings(node(),draft,{language:'en'},(host,data,schema,change)=>{const form={host,data,schema,change};forms.push(form);return form;},(name,label,selector)=>({name,label,selector}));
+ const validate=mountLocationSettings(host,draft,{language:'en'},(host,data,schema,change)=>{const form={host,data,schema,change};forms.push(form);return form;},(name,label,selector)=>({name,label,selector}));
  const a=forms.find(form=>form.data.person==='person.a'),b=forms.find(form=>form.data.person==='person.b');
  a.change({...a.data,area_sensor:''});assert.throws(validate,/current room mappings/);
  assert.equal(draft.navbar.current_room.people['person.a'].area_sensor,'sensor.a');
@@ -20,7 +32,7 @@ test('location forms reject incomplete or duplicate mappings without silently sa
  assert.deepEqual(draft.navbar.current_room.people['person.c'],{area_sensor:'sensor.c',future:[]});
  assert.equal(Object.hasOwn(draft.navbar.current_room.people,'person.a'),false);
  b.change({...b.data,person:''});assert.throws(validate,/current room mappings/);
- b.host.children.at(-1).onclick();assert.doesNotThrow(validate);
+ removeMapping(b);assert.doesNotThrow(validate);
  assert.equal(Object.hasOwn(draft.navbar.current_room.people,'person.b'),false);
  assert.doesNotThrow(()=>validateDashboardSettings(draft));
 });
@@ -150,11 +162,15 @@ test('location recovery is retained before a shared write and backup failure pre
  calls.length=0;await assert.rejects(()=>saveDashboardSettings(hass,'house',baseline,baseline.marao,()=>true,()=>{throw new Error('backup failed');}));assert.deepEqual(calls,['lovelace/config']);
 });
 
-test('attempted new mappings require explicit Add and reject incomplete or duplicate drafts before saving',t=>{
- const previous=globalThis.document;t.after(()=>globalThis.document=previous);const node=()=>({children:[],append(...items){this.children.push(...items);},setAttribute(){},remove(){}});globalThis.document={createElement:node};
+test('one add selector creates an expanded mapping with required configuration and rejects duplicate drafts',t=>{
+ const host=mappingDOM(t);
  const draft={navbar:{routes:[],current_room:{people:{},rooms:{},opaque:[]}}},forms=[];
- const validate=mountLocationSettings(node(),draft,{language:'en'},(host,data,schema,change)=>{const form={host,data,schema,change};forms.push(form);return form;},(name,label,selector)=>({name,label,selector}));
- assert.doesNotThrow(validate);const add=forms.find(form=>form.schema[0].name==='area');add.change({area:'kitchen'});assert.throws(validate,/current room mappings/);assert.deepEqual(draft.navbar.current_room.rooms,{});
- add.change({area:'kitchen',path:'/house/kitchen'});assert.throws(validate,/current room mappings/);add.host.children.at(-1).onclick();assert.doesNotThrow(validate);assert.deepEqual(draft.navbar.current_room.rooms,{kitchen:{path:'/house/kitchen'}});
- add.change({area:'kitchen',path:'/house/other'});add.host.children.at(-1).onclick();assert.throws(validate,/current room mappings/);add.change({});assert.doesNotThrow(validate);assert.deepEqual(draft.navbar.current_room.opaque,[]);
+ const validate=mountLocationSettings(host,draft,{language:'en'},(host,data,schema,change)=>{const form={host,data,schema,change};forms.push(form);return form;},(name,label,selector)=>({name,label,selector}));
+ assert.doesNotThrow(validate);const add=forms.find(form=>form.schema[0].name==='area');assert.equal(add.schema.length,1);add.change({area:'kitchen'});assert.deepEqual(add.data,{});assert.throws(validate,/current room mappings/);assert.deepEqual(draft.navbar.current_room.rooms,{});
+ const kitchen=forms.find(form=>form.data.area==='kitchen');assert.equal(kitchen.host.hidden,false);assert.equal(kitchen.schema[1].name,'path');assert.ok(kitchen.schema.every(field=>field.required));
+ kitchen.change({area:'kitchen',path:'/house/kitchen'});assert.doesNotThrow(validate);assert.deepEqual(draft.navbar.current_room.rooms,{kitchen:{path:'/house/kitchen'}});
+ add.change({area:'kitchen'});assert.throws(validate,/current room mappings/);assert.equal(forms.filter(form=>form.data.area==='kitchen').length,1);add.change({});assert.doesNotThrow(validate);
+ add.change({area:'office'});assert.throws(validate,/current room mappings/);const office=forms.find(form=>form.data.area==='office');removeMapping(office);assert.doesNotThrow(validate);assert.equal(Object.hasOwn(draft.navbar.current_room.rooms,'office'),false);
+ const personAdd=forms.find(form=>form.schema.length===1&&form.schema[0].name==='person');personAdd.change({person:'person.alex'});const person=forms.find(form=>form.data.person==='person.alex');assert.equal(person.host.hidden,false);assert.throws(validate,/current room mappings/);person.change({person:'person.alex',area_sensor:'sensor.area'});assert.doesNotThrow(validate);assert.deepEqual(draft.navbar.current_room.people,{'person.alex':{area_sensor:'sensor.area'}});
+ assert.deepEqual(draft.navbar.current_room.opaque,[]);
 });

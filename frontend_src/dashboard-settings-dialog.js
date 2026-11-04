@@ -1,12 +1,12 @@
 const {mountLocationPreferences}=await import(new URL(`./MaraoLocationPreferences.js${new URL(import.meta.url).search}`,import.meta.url));
 import {mountLocationSettings} from './location-settings.js';
+import {createSettingsRow} from './settings-row.js';
 import {saveDashboardSettings, readDashboardSettings, validateDashboardSettings, dashboardViewForAddress, patchNavbarRoute, moveNavbarRoute} from './dashboard-settings.js';
 const navigation=await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`,import.meta.url));
 const words={
   en:{title:'Marao settings',loading:'Loading settings…',loadError:'Could not load settings. Try again.',retry:'Retry',close:'Close',save:'Save',saving:'Saving…',add:'Add a page or destination',remove:'Remove',up:'Move up',down:'Move down',menu:'Page options',drag:'Drag to reorder',label:'Display name',destination:'Page or destination',icon:'Icon',navbar:'Navigation bar',hint:'Choose dashboard pages and arrange them in the order you want.',shortcuts:'Dashboard shortcuts',cache:'Show cache reset button',editor:'Show editor button',empty:'No pages in the navigation bar.',missing:'Destination does not match a current view.',conflict:'This dashboard changed. Close and reopen settings to reconcile your changes.',error:'Could not save settings.',invalid:'Check the navigation and current room settings.'},
   pt:{title:'Definições Marao',loading:'A carregar as definições…',loadError:'Não foi possível carregar as definições. Tente novamente.',retry:'Tentar novamente',close:'Fechar',save:'Guardar',saving:'A guardar…',add:'Adicionar página ou destino',remove:'Remover',up:'Mover para cima',down:'Mover para baixo',menu:'Opções da página',drag:'Arrastar para reordenar',label:'Nome apresentado',destination:'Página ou destino',icon:'Ícone',navbar:'Barra de navegação',hint:'Escolha as páginas do painel e organize a ordem em que aparecem.',shortcuts:'Atalhos do painel',cache:'Mostrar botão de limpeza da cache',editor:'Mostrar botão do editor',empty:'A barra de navegação não tem páginas.',missing:'O destino não corresponde a uma página atual.',conflict:'O painel foi alterado. Feche e reabra as definições para conciliar as alterações.',error:'Não foi possível guardar as definições.',invalid:'Verifique as definições de navegação e da divisão atual.'}
 };
-const menuIcon='M12,16A2,2 0 0,1 14,18A2,2 0 0,1 12,20A2,2 0 0,1 10,18A2,2 0 0,1 12,16M12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12A2,2 0 0,1 12,10M12,4A2,2 0 0,1 14,6A2,2 0 0,1 12,8A2,2 0 0,1 10,6A2,2 0 0,1 12,4Z';
 const CSS=`
 .marao-settings{position:fixed;inset:auto 0 0;margin:auto;width:min(100%,640px);max-width:100%;max-height:calc(100dvh - 24px);box-sizing:border-box;border:0;border-radius:28px 28px 0 0;padding:0;background:var(--ha-card-background);color:var(--primary-text-color);font:1rem/1.5 var(--primary-font-family,Montserrat,sans-serif);overflow:hidden;box-shadow:0 -8px 40px #0002;animation:marao-settings-up .2s ease-out;--ha-font-family-body:var(--primary-font-family);--ha-font-family-heading:var(--primary-font-family);--ha-font-family-code:monospace;--ha-font-size-m:1rem;--ha-font-size-s:.875rem;--ha-font-weight-normal:400;--ha-font-weight-medium:600;--ha-font-weight-bold:700;--ha-color-fill-primary-normal-resting:var(--primary-color);--ha-color-on-primary-normal:var(--text-primary-color)}
 .marao-settings[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto}
@@ -26,7 +26,7 @@ const CSS=`
 .marao-settings .drag-handle:active{cursor:grabbing}
 .marao-settings .sortable-ghost{opacity:.4}
 .marao-settings .sortable-drag{box-shadow:0 4px 16px #0003}
-.marao-settings [data-routes]{display:grid;gap:8px;margin-bottom:16px}
+.marao-settings [data-routes],.marao-settings [data-mappings]{display:grid;gap:8px;margin-bottom:16px}
 .marao-settings .route{border-radius:20px;background:var(--secondary-background-color);min-width:0;overflow:visible}
 .marao-settings .route-heading{display:flex;align-items:center;padding:4px;gap:0}
 .marao-settings button{min-height:48px;min-width:48px;border:0;border-radius:16px;font:inherit;color:inherit;cursor:pointer;padding:12px 16px;background:var(--secondary-background-color)}
@@ -114,18 +114,21 @@ export async function openDashboardSettings(root,opener,owner) {
     const host=dialog.querySelector('[data-routes]');host.replaceChildren();
     if(!draft.navbar.routes.length){const empty=document.createElement('p');empty.className='hint';empty.textContent=t.empty;host.append(empty);}
     draft.navbar.routes.forEach((route,index)=>{
-      const row=document.createElement('section');row.className='route';
-      row.innerHTML='<div class="route-heading"><button type="button" class="drag-handle"><ha-icon icon="mdi:drag-horizontal-variant" aria-hidden="true"></ha-icon></button><button type="button" class="route-toggle"><span class="route-icon"><ha-icon></ha-icon></span><span class="route-label"><span class="name"></span><br><span class="destination"></span></span><ha-icon class="chevron"></ha-icon></button></div><div class="fields" hidden></div>';
-      const toggle=row.querySelector('.route-toggle'),fields=row.querySelector('.fields'),icon=row.querySelector('.route-icon ha-icon');
-      const handle=row.querySelector('.drag-handle');handle.setAttribute('aria-label',`${t.drag}: ${route.label}`);handle.disabled=draft.navbar.routes.length<2;
+      const item=createSettingsRow(t.menu,[{value:'up',label:t.up,disabled:index===0,icon:'arrow-up'},{value:'down',label:t.down,disabled:index===draft.navbar.routes.length-1,icon:'arrow-down'},{value:'remove',label:t.remove,icon:'delete-outline'}],action=>{
+        const target=index+(action==='up'?-1:1);
+        if(busy||!['up','down','remove'].includes(action)||action!=='remove'&&(target<0||target>=draft.navbar.routes.length))return;
+        navigation.haptic('heavy');
+        if(action!=='remove'){reorder(index,target);return;}
+        draft.navbar.routes.splice(index,1);render();host.children[Math.min(index,host.children.length-1)]?.querySelector('.route-toggle')?.focus({preventScroll:true});
+      });
+      const {row,toggle,fields}=item;
+      const handle=document.createElement('button');handle.type='button';handle.className='drag-handle';handle.innerHTML='<ha-icon icon="mdi:drag-horizontal-variant" aria-hidden="true"></ha-icon>';item.heading.prepend(handle);handle.setAttribute('aria-label',`${t.drag}: ${route.label}`);handle.disabled=draft.navbar.routes.length<2;
       handle.onkeydown=event=>{if(event.key==='ArrowUp'||event.key==='ArrowDown'){event.preventDefault();navigation.haptic('heavy');reorder(index,index+(event.key==='ArrowUp'?-1:1));}};
       const previous={destination:route.url||route.path,label:route.label,icon:route.icon||''};
       const warning=document.createElement('p');warning.className='warning';warning.textContent=t.missing;
       const updateHeading=()=>{
         const address=route.url||route.path,view=viewFor(address);
-        row.querySelector('.name').textContent=route.label;
-        row.querySelector('.destination').textContent=view?.title||address;
-        icon.icon=route.icon||view?.icon||'mdi:view-dashboard';
+        item.update(route.label,view?.title||address,route.icon||view?.icon||'mdi:view-dashboard');
         let destination;
         try{destination=new URL(address,location.origin);}catch{}
         warning.hidden=!!destination&&(destination.origin!==location.origin||!destination.pathname.startsWith(`/${path}/`)||!!view);
@@ -133,31 +136,16 @@ export async function openDashboardSettings(root,opener,owner) {
       };
       let mounted=false;
       const expand=()=>{
-        const open=expandedRoute===route;toggle.setAttribute('aria-expanded',String(open));fields.hidden=!open;
-        row.querySelector('.chevron').icon=open?'mdi:chevron-up':'mdi:chevron-down';
+        const open=expandedRoute===route;item.setExpanded(open);
         if(open&&!mounted){mounted=true;mountForm(fields,previous,[schema('destination',t.destination,{navigation:{}}),schema('label',t.label,{text:{}}),schema('icon',t.icon,{icon:{}})],value=>{Object.assign(route,patchNavbarRoute(route,previous,value));Object.assign(previous,value);updateHeading();});fields.append(warning);}
       };
       toggle.onclick=()=>{navigation.haptic('heavy');expandedRoute=expandedRoute===route?undefined:route;host.querySelectorAll('.route').forEach(item=>item.expandSettings());};
       row.expandSettings=expand;
-      const menu=document.createElement('ha-dropdown');menu.placement='bottom-end';
-      const trigger=document.createElement('ha-icon-button');trigger.slot='trigger';trigger.path=menuIcon;trigger.label=`${t.menu}: ${route.label}`;menu.append(trigger);
-      for(const [value,label,disabled,iconName]of [['up',t.up,index===0,'arrow-up'],['down',t.down,index===draft.navbar.routes.length-1,'arrow-down'],['remove',t.remove,false,'delete-outline']]){
-        const item=document.createElement('ha-dropdown-item');item.value=value;item.disabled=disabled;item.textContent=label;
-        const glyph=document.createElement('ha-icon');glyph.icon=`mdi:${iconName}`;glyph.slot='icon';item.prepend(glyph);menu.append(item);
-      }
-      menu.addEventListener('wa-select',event=>{
-        const action=event.detail.item.value,target=index+(action==='up'?-1:1);
-        if(busy||!['up','down','remove'].includes(action)||action!=='remove'&&(target<0||target>=draft.navbar.routes.length))return;
-        navigation.haptic('heavy');
-        if(action!=='remove'){reorder(index,target);return;}
-        draft.navbar.routes.splice(index,1);
-        render();host.children[Math.min(action==='remove'?index:target,host.children.length-1)]?.querySelector('.route-toggle')?.focus({preventScroll:true});
-      });
-      row.querySelector('.route-heading').append(menu);host.append(row);updateHeading();expand();
+      host.append(row);updateHeading();expand();
     });
   };
   render();
-  const validateLocation=mountLocationSettings(dialog.querySelector('[data-settings]'),draft,hass,mountForm,schema,viewFor);
+  const validateLocation=mountLocationSettings(dialog.querySelector('[data-settings]'),draft,hass,mountForm,schema,viewFor,navigation.haptic);
   const browser=document.createElement('section');browser.className='shortcuts';
   const heading=document.createElement('h4');heading.textContent=String(hass.language).startsWith('pt')?'Este navegador':'This browser';browser.append(heading);(validateLocation.section||dialog.querySelector('[data-settings]')).append(browser);
   root._maraoRefreshSettings=()=>{if(!valid()){busy=false;close();return;}refresh();};
