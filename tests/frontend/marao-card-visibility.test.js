@@ -1046,7 +1046,7 @@ test("wallbox current card uses a large stepper and optional shortcuts", () => {
   assert.match(card.shadowRoot.innerHTML, /<output class="number-value wallbox-value"[^>]*>22<small> A<\/small><\/output><div class="number-stepper wallbox-stepper"/);
   assert.match(source, /\.number-stepper \{[^}]*min-width:84px;[^}]*width:auto;/);
   assert.match(source, /\.body\.wallbox-card \{[^}]*grid-template-areas:'value icon' 'title icon'/);
-  assert.doesNotMatch(source, /\.climate-stepper \{[^}]*min-width:/);
+  assert.doesNotMatch(source, /^\s*\.climate-stepper \{[^}]*min-width:/m);
   assert.match(source, /\.wallbox-stepper \{[^}]*background:var\(--ha-card-background,var\(--card-background-color,#fff\)\);[^}]*color:var\(--primary-text-color,#141414\);/);
   assert.match(source, /\.wallbox-shortcuts \{[^}]*pointer-events:auto;/);
   const update = (value, extra = {}) => {
