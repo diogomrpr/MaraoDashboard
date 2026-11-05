@@ -223,7 +223,8 @@ the action it affects.
   Unselected shortcuts stay neutral, with the selected outline and semantic
   pressed state retained as additional cues.
 - Give other visible Marao card titles the full content width in their first row.
-  Put icons, readings and controls below them, including climate steppers, Wallbox
+  Compact climate titles/readings instead sit beside their right-hand target selector.
+  Put other icons, readings and controls below full-width titles, including Wallbox
   shortcuts and separate history, energy and camera-event headers.
   Media app shortcuts use full-card square logos without a visible title; keep
   the configured app name as the button’s semantic label and show problem reasons.
@@ -504,7 +505,7 @@ Except Access summary cards, normal binary cards omit redundant on/off, stable l
 
 ### Glance readings
 
-Glance uses one transparent owner with an optional title and one rounded surface per configured reading. Place the circular icon above the value/unit and wrapping name, separated by 8px gaps. Three equal tiles fit 282px usable width at normal/bold 18px primary text; local responsive sizing reduces columns for narrower hosts or enlarged text. Omitted readings and hidden icons leave no empty slots. Reading labels default to visible; `variables.show_reading_names: false` hides them visually without a label row while retaining semantic names and the independent group title. Keep per-reading statuses, Activity targets and aggregate diagnostics visible on the individual surfaces, including neutral disconnected content, without covering healthy readings with a group overlay.
+Glance uses one transparent owner with an optional title and one rounded surface per configured reading. Place the centered wrapping name above the 48px circular icon and primary value/unit. Use scalable secondary names (about 12px at normal scale), 10px/8px tile padding, 6px internal gaps and 8px tile gaps; share intrinsic rows to align icons and values across wrapped names. Hidden name/icon rows consume no space. Three equal tiles fit 282px usable width at normal/bold 18px primary text; local responsive sizing reduces columns for narrower hosts or enlarged text. Omitted readings and hidden icons leave no empty slots. Reading labels default to visible; `variables.show_reading_names: false` hides them visually without a label row while retaining semantic names and the independent group title. Keep per-reading statuses, Activity targets and aggregate diagnostics visible on the individual surfaces, including neutral disconnected content, without covering healthy readings with a group overlay.
 
 ### Card activity
 
@@ -513,6 +514,8 @@ Automatic Updated and activation timestamps move into the shared read-only Activ
 ### Value sliders
 
 Ordinary covers and cover-backed ventilation interpolate only confirmed position geometry over bounded 200–500ms segments, retargeting from the drawn value without prediction. Targets and input values update immediately; passive frames dispatch nothing and emit no haptics. Retain the connected range, SVG and binding; snap/cancel on unavailable state, removal, hidden document or reduced motion. Sparse reports pause at the last endpoint. Light brightness, fan speed and color-picker sliders remain immediate.
+
+Ordinary cover cards use a larger wrapping name and place their bold localized state inside the position bar, floating left while it fits before the target thumb and switching right when only that side fits. Measure the actual label including its padding, re-evaluate on text/font/width changes, and wrap in the roomier side if neither fits (prefer left on a tie). Keep the state authoritative while dragging, preserve custom labels and explicit state hiding, and omit the duplicate under the name. Let the bar grow for wrapping text. Covers without a supported position bar retain state below the name; other slider families retain their presentation.
 
 - The track is tall enough to keep the thumb visibly centered and contained.
 - Track and card backgrounds must differ. Track, fill, and thumb boundaries
@@ -562,10 +565,9 @@ large and readable.
   input while pending. No configuration setting or persisted request is needed.
 - Omit degree symbols and units from all visual and accessible climate values.
 - A single supported mode turns on directly to that mode.
-- Multiple supported modes open the Marao popup.
-- The climate card and its popup use the shared themed mode dropdown. Its menu
-  does not change the card footprint; requested-mode feedback replaces the state
-  line. Missing measured/target values keep disabled placeholder slots.
+- Multiple supported modes open enabled Marao details. `enable_popup: false` suppresses built-in details while preserving authored actions, references and layouts; supported modes appear inline unless `show_mode_buttons: false`.
+- Climate uses intrinsic compact sizing (about 150px for a normal scalar target), a large unitless measured reading, actual activity and optional `humidity_entity` percentage beside the shared vertical target selector, with 8px above and below it. Invalid humidity is neutral and never disables usable climate controls. Authored grid sizes, ranges, graphs and enlarged typography may grow.
+- Details place readings first, icon modes second and the identical selector at the lower right, with no lower-left placeholder. Modes use 48px named buttons with 28px icons, a non-color selection cue and a localized selected/pending-mode heading. Wrap choices without shrinking. Missing measured/target values retain guarded placeholders.
 - Mode and setpoint controls use a readable theme surface and state-colored
   selection treatment.
 - Climate card background follows heat, cool, heat/cool, auto, dry, fan, off,
@@ -584,6 +586,9 @@ large and readable.
 - Derive iPhone positioning from the shared host-aware bottom inset and preserve
   twice the lowered safe-area offset, with a minimum 24px bottom gap. Use the shared bottom-gap helper for navbar positioning, page clearance and popup padding.
 - The navbar stays below open popups in the stacking order.
+- An invisible full-width touch barrier extends from the navbar's top edge to
+  the viewport bottom. It blocks underlying card taps and touch scrolling while
+  retaining navbar controls and higher popup interactions; previews omit it.
 - The fullscreen shell hides Home Assistant's native top bar only while a
   Marao dashboard is active and restores the normal Home Assistant chrome when
   the user leaves it.
@@ -619,6 +624,12 @@ large and readable.
   the surface or emptying it during an update can reset WebKit's page/sheet scroll.
 
 ### Cameras, graphs, and media
+
+Plex home uses exactly three shared shelves: Continue Watching, Movies and TV Series. Group first-level library children by returned media classes; preserve order/identity and readable partial errors. Use 176px title tiles with approximately 160×240 covers, native horizontal rails, 48px named arrows, reduced-motion-aware scrolling and trailing bounded Load more batches. Browsing/arrows never dispatch services; preserve independent offsets across unrelated updates and Back, with owner-cleaned listeners/observers. Series open in the existing sheet with the selected TV mapping. Plex Watch belongs to its existing Apple TV media card. Reuse the parent TV and its selected Plex/Rivulet playback mapping; browsing and target selection are read-only. Plex playback keeps its explicit client mapping. Rivulet uses a validated movie/episode `rivulet://play/<ratingKey>` link sent to the Apple TV, without Plex source/scan/client-play actions. Its optional browse entity or automatic same-server registered Plex entity supplies metadata only; missing session discovery is explained without fictional fallback. Rivulet must use HA's same Plex server/profile; links do not switch that context. One profile uses HA's connected Plex account. Keep returned item/resume IDs exact, and bound wake/open/discovery readiness to 30 seconds with cancellation on owner/TV/account/connection loss. Never send playback to an unavailable Plex client or claim service acknowledgement means Playing. Keep private library responses in owner-scoped memory; render posters only through HA's authenticated Plex image proxy, never a raw token-bearing Plex URL. Failed reads do not trigger automatic retries. Test device actions with the fictional media fixtures and preserve real Plex server configuration and history.
+
+App shortcuts provide a default source-launch action and one strong haptic per enabled tap. When their target player is off, await its Turn on request before selecting the app; stop after failure, owner/context loss or unavailability. Already-on players select the app directly.
+
+Built-in media playback, volume, app and Apple TV remote buttons are tap controls. Do not generate hold actions, progress rings or long remote commands for directions or Select. Preserve authored custom hold actions through the existing shared action owner.
 
 - Camera cards use Home Assistant feeds and Marao-owned Frigate/UniFi Protect
   event presentation. Activating a camera card opens live popup video above events.

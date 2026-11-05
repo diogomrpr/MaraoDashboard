@@ -272,3 +272,27 @@ test('room climate and related activity fields survive native composition, clear
  const operating=popup.cards[0].cards;for(const child of operating){assert.equal(Object.hasOwn(child.variables,'popup_hash'),false);assert.deepEqual(child.variables.opaque,[]);assert.deepEqual(child.variables.activity_entities,['binary_sensor.gate']);}
  for(const activity_entities of [null,'sensor.power',[12],['invalid']])assert.throws(()=>validateNativeCardConfig({...scene,variables:{activity_entities}}),/activity entities/);
 });
+
+test('built-in media remote controls are tap-only in popup and inline compositions',()=>{
+ const walk=value=>Array.isArray(value)?value.flatMap(walk):value&&typeof value==='object'?[value,...Object.values(value).flatMap(walk)]:[];
+ for(const media_display of ['popup','inline']){
+  const media=config('md_media_card',{entity_id:'media_player.test',variables:{media_display},apple_tv:{remote_entity:'remote.test',apps:[]}}),before=structuredClone(media),result=compose(media);
+  const controls=walk(result).filter(card=>card.tap_action?.perform_action==='remote.send_command');
+  assert.deepEqual(controls.map(card=>card.tap_action.data.command),['menu','up','top_menu','left','select','right','down']);
+  assert.ok(controls.every(card=>card.hold_action===undefined&&card.tap_action.data.hold_secs===undefined));
+  assert.ok(controls.every(card=>card.tap_action.target.entity_id==='remote.test'));assert.deepEqual(media,before);
+ }
+});
+
+test('compact climate settings preserve authored data and suppress only built-in details',()=>{
+  const base={type:'custom:marao-climate-card',entity:'climate.test',name:'Authored',popup_view:'saved-details',grid_options:{columns:9,rows:7},variables:{humidity_entity:'sensor.unresolved',show_mode_buttons:false,unknown:[]},future:{keep:false}};
+  const before=structuredClone(base);validateNativeCardConfig(base);
+  const disabled={...base,variables:{...base.variables,enable_popup:false}};
+  assert.deepEqual(compose(disabled).popups,[]);assert.deepEqual(disabled.popup_view,'saved-details');
+  assert.equal(compose(base).popups.length,1);assert.deepEqual(base,before);
+  assert.equal(nativeCardGridOptions(base).rows,'auto');assert.deepEqual(base.grid_options,{columns:9,rows:7});
+  for(const variables of [{enable_popup:'false'},{humidity_entity:'light.bad'},{humidity_entity:[]},{humidity_entity:42}])assert.throws(()=>validateNativeCardConfig({...base,variables}));
+  for(const humidity_entity of [undefined,null,'','sensor.missing'])assert.doesNotThrow(()=>validateNativeCardConfig({...base,variables:{humidity_entity,enable_popup:false}}));
+  const explicit={...disabled,tap_action:{action:'navigate',navigation_path:'#authored'}};assert.deepEqual(compose(explicit).card.tap_action,explicit.tap_action);
+  const group=compose({type:'custom:marao-entity-group-card',id:'climate',name:'Climate',entity_type:'climate',entities:[{entity_id:'climate.test',variables:{enable_popup:false}}]});assert.equal(group.popups.length,1);
+});

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import base64
+import re
 
 from homeassistant.components.media_player import (
+    BrowseMedia,
     MediaPlayerDeviceClass,
     MediaPlayerEntity,
 )
@@ -16,8 +18,9 @@ from homeassistant.components.media_player.const import (
 from homeassistant.util import slugify
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.discovery import async_load_platform
 
-SOURCES = ["YouTube", "Plex", "Netflix", "Disney+", "Prime Video", "Spotify", "MEO", "HBO Max", "F1 TV"]
+SOURCES = ["YouTube", "Plex", "Netflix", "Disney+", "Prime Video", "Spotify", "MEO", "HBO Max", "F1 TV", "Rivulet"]
 ARTWORK = "data:image/svg+xml;base64," + base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270"><rect width="480" height="270" fill="#805a81"/><circle cx="360" cy="80" r="150" fill="#fff"/><circle cx="90" cy="230" r="170" fill="#e7c278"/></svg>').decode()
 
 
@@ -26,6 +29,14 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     async_add_entities(
         [MaraoTestAppleTV(config.get("name", "Marao Dashboard Test Apple TV"), config.get("initial_state", "idle"), config.get("picture_error", False))]
     )
+    if config.get("name") == "Marao Dashboard Test Apple TV" and not hass.data.get("marao_test_plex_added"):
+        hass.data["marao_test_plex_added"] = True
+        async_add_entities([
+            MaraoTestPlexPlayer("Marao Dashboard Test Plex Player"),
+            MaraoTestAppleTV("Marao Dashboard Test Plex Bedroom"),
+            MaraoTestPlexPlayer("Marao Dashboard Test Plex Player Bedroom"),
+        ])
+        await async_load_platform(hass, "button", "marao_test_media", {}, config)
 
 
 class MaraoTestAppleTV(MediaPlayerEntity):
@@ -42,6 +53,7 @@ class MaraoTestAppleTV(MediaPlayerEntity):
     _attr_volume_level = 0.4
     _attr_supported_features = (
         MediaPlayerEntityFeature.PLAY
+        | MediaPlayerEntityFeature.PLAY_MEDIA
         | MediaPlayerEntityFeature.PAUSE
         | MediaPlayerEntityFeature.PREVIOUS_TRACK
         | MediaPlayerEntityFeature.NEXT_TRACK
@@ -92,6 +104,22 @@ class MaraoTestAppleTV(MediaPlayerEntity):
         self._attr_state = MediaPlayerState.PLAYING
         self.async_write_ha_state()
 
+    async def async_play_media(self, media_type, media_id, **kwargs) -> None:
+        """Receive only fictional Rivulet title links without network access."""
+        from .plex_library import BASE, playback
+
+        match = re.fullmatch(r"rivulet://play/(102|201)", media_id)
+        if media_type != "url" or not match:
+            raise ValueError("The simulated TV accepts only fictional Rivulet title links.")
+        key = match[1]
+        title, offset = playback("episode" if key == "102" else "movie", BASE + key + "?resume=1")
+        self._attr_source = self._attr_app_name = "Rivulet"
+        self._attr_media_title = title
+        self._attr_media_content_id = media_id
+        self._attr_media_position = offset
+        self._attr_state = MediaPlayerState.PLAYING
+        self.async_write_ha_state()
+
     async def async_media_pause(self) -> None:
         """Pause simulated media."""
         self._attr_state = MediaPlayerState.PAUSED
@@ -129,4 +157,23 @@ class MaraoTestAppleTV(MediaPlayerEntity):
     async def async_set_volume_level(self, volume: float) -> None:
         """Set the simulated volume."""
         self._attr_volume_level = max(0, min(volume, 1))
+        self.async_write_ha_state()
+
+
+class MaraoTestPlexPlayer(MaraoTestAppleTV):
+    """Serve fictional library data and playback entirely in memory."""
+
+    _attr_supported_features = MediaPlayerEntityFeature.BROWSE_MEDIA | MediaPlayerEntityFeature.PLAY_MEDIA | MediaPlayerEntityFeature.PLAY | MediaPlayerEntityFeature.PAUSE
+
+    async def async_browse_media(self, media_content_type=None, media_content_id=None):
+        from .plex_library import browse
+        return BrowseMedia(**browse(media_content_type, media_content_id))
+
+    async def async_play_media(self, media_type, media_id, **kwargs):
+        from .plex_library import playback
+        title, offset = playback(media_type, media_id)
+        self._attr_media_title = title
+        self._attr_media_content_id = media_id
+        self._attr_media_position = offset
+        self._attr_state = MediaPlayerState.PLAYING
         self.async_write_ha_state()

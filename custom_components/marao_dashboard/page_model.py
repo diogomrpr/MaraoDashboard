@@ -139,6 +139,14 @@ def validate_power_devices(options: dict[str, Any], main: str | None = None) -> 
             raise ValueError("Power device names must be text.")
 
 
+def validate_climate_options(options):
+    if "enable_popup" in options and not isinstance(options["enable_popup"], bool):
+        raise ValueError("Enable climate popup must be a boolean.")
+    humidity = options.get("humidity_entity")
+    if humidity not in (None, "") and (not isinstance(humidity, str) or not re.fullmatch(r"sensor\.[a-z0-9_]+", humidity)):
+        raise ValueError("Choose a humidity sensor.")
+
+
 def page_entries(spec: Any) -> list[dict[str, Any]]:
     """Retain mixed order and whole descriptors, including entity-free cards."""
     if spec is None:
@@ -265,6 +273,8 @@ def validate_pages(config: dict[str, Any], templates: dict[str, list[str]]) -> s
                     validate_sensor_thresholds(options, entity or "")
                 if role == "md_glance_card" and "show_reading_names" in options and not isinstance(options["show_reading_names"], bool):
                     raise ValueError("Show reading labels must be a boolean.")
+                if role == "md_climate_card":
+                    validate_climate_options(options)
                 if role == "md_light_card":
                     validate_light_options(options)
                 if role == "md_camera_card":

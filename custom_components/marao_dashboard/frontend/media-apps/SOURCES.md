@@ -28,4 +28,15 @@ property of their respective owners.
 
 - f1-tv: publisher artwork from Apple App Store ID 1315007279, retrieved 2026-11-04. Publisher image, converted to PNG without resizing: https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/c5/bb/2e/c5bb2e3d-c18a-f0ce-c93d-f44ddf7b4136/AppIcon-0-0-1x_U007epad-0-9-0-85-220.png/512x512bb.jpg
 
-The two 2026-11-04 additions were converted from the publisher-delivered image encoding to PNG using macOS `sips`, without resizing or redrawing. Both decode at 512 × 512.
+The two 2026-11-04 downloads were originally converted from the publisher-delivered image encoding to PNG using macOS `sips`, without resizing or redrawing. Both shipped assets decode at 512 × 512.
+
+## HBO Max border correction
+
+On 2026-11-04, the built-in image-editing tool removed the HBO Max icon's outer
+silver bevel, extending the dark background to the square edges. The result was
+resampled to the existing 512 × 512 PNG size with `sips`. The shared asset path
+and source/app matching remain unchanged; the card provides its rounded corners.
+
+Edit prompt:
+
+> Use case: precise-object-edit. Edit target: the attached/local HBO Max app icon. This is a minimal correction of an existing app asset, not a redesign. Remove ONLY the white/silver/gray beveled frame and rim around the outer edge of the rounded black tile, including the bright border at the top-left and bottom-right. Extend the existing inner dark black/navy background smoothly all the way to all four square image edges. There must be no frame, border, bevel, outline, white edge, exterior margin, rounded-corner rim or drop shadow in the image. Preserve the HBO max wordmark exactly: identical text, letter shapes, proportions, positioning, scale, silver/white letter fills and shading. Do not change, replace, retype or add any letters or symbols. Preserve the subtle existing interior dark background appearance, but make it fill the full square. Output a clean square opaque PNG suitable for an 80px media shortcut; 512 by 512 pixels preferred. The application's card supplies its own rounded corners. Change only the unwanted outside frame; keep everything else intact.

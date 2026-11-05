@@ -214,7 +214,7 @@ export function appleTVOptions(entity) {
   const options = object(entity.apple_tv) ? entity.apple_tv : {};
   const identity = ['entity_id', 'name', 'model', 'device_model', 'manufacturer'].map(key => entity[key] || '').join(' ').toLowerCase();
   if (!entity.apple_tv && entity.media_type !== 'apple_tv' && !/apple tv|apple_tv|appletv/.test(identity)) return null;
-  return { remote_entity: options.remote_entity || entity.remote_entity || `remote.${entity.entity_id.split('.')[1]}`, volume_remote_entity: options.volume_remote_entity || entity.volume_remote_entity || null, apps: own(options, 'apps') ? options.apps : entity.apple_tv_apps || [] };
+  return { remote_entity: options.remote_entity || entity.remote_entity || `remote.${entity.entity_id.split('.')[1]}`, volume_remote_entity: options.volume_remote_entity || entity.volume_remote_entity || null, apps: own(options, 'apps') ? options.apps : entity.apple_tv_apps || [], ...(own(options,'plex') ? {plex:copy(options.plex)} : {}) };
 }
 
 function orderedPages(source, context) {

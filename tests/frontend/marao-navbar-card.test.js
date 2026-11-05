@@ -65,6 +65,18 @@ test("navbar retains full-size controls in one row and a separately bounded vert
   assert.doesNotMatch(source, /padding-bottom:calc\(192px/);
 });
 
+test("navbar barrier dismisses overflow while navigation controls retain their interaction", async () => {
+  const { MaraoNavbarCard } = await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
+  const navbar = new MaraoNavbarCard(), barrier = {};
+  navbar.shadowRoot = { querySelector: () => barrier };
+  const closed = [];
+  navbar._closeOverflow = restore => closed.push(restore);
+  navbar._outside({ composedPath: () => [{}, navbar] });
+  assert.deepEqual(closed, []);
+  navbar._outside({ composedPath: () => [barrier, navbar] });
+  assert.deepEqual(closed, [true]);
+});
+
 test("fullscreen behavior starts only after the navbar is connected", () => {
   assert.match(source, /connectedCallback\(\) \{[^]*?registerFullscreen\(this\);/);
   assert.doesNotMatch(source, /this\._render\(\); registerFullscreen\(this\);/);

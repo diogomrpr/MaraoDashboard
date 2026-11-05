@@ -703,6 +703,9 @@ def _resolve_entity_group(group, registry, used_ids, *, legacy_overview=False, c
             raise ValueError(f"Entity Group has an invalid member: {group_id}")
         if source.get("variables") is not None and not isinstance(source["variables"], dict):
             raise ValueError(f"Entity Group member options must be an object: {group_id}")
+        if kind == "climate":
+            from .page_model import validate_climate_options
+            validate_climate_options(source.get("variables") or {})
         if any(source.get(key) is not None and not isinstance(source[key], str) for key in ("name", "icon")):
             raise ValueError(f"Entity Group member name and icon must be strings: {group_id}")
         domain = entity_id.split(".", 1)[0]
@@ -2204,7 +2207,7 @@ def _resolve_pages(config, registry=None, *, validate_source_units=True):
         def check_links(value):
             if isinstance(value, dict):
                 links = [value.get("navigation_path")]
-                if value.get("template") in ("md_media_card", "md_camera_card", "md_access_card", "md_entity_group_card", "md_climate_card"):
+                if not (value.get("template") == "md_climate_card" and value.get("variables", {}).get("enable_popup") is False) and value.get("template") in ("md_media_card", "md_camera_card", "md_access_card", "md_entity_group_card", "md_climate_card"):
                     links.extend(value.get("variables", {}).get(key) for key in ("popup_hash", "mode_selector_hash"))
                 for link in links:
                     if isinstance(link, str) and link.startswith(("#page-", "#entity-group-", "#overview-", "#energy-", "#climate-mode-", "#access-", "#media-", "#camera-")) and link not in hashes:
@@ -2291,7 +2294,7 @@ def _page_card_popups(entity, language="en"):
             card = _energy_graph_card(item, item["name"], item.get("icon") or "mdi:flash", None)
         return [{**_popup_header(variables["popup_hash"], item["entity_id"], item["name"], item.get("icon") or "mdi:flash"), "cards": [card]}]
     if role == "md_climate_card":
-        return [_climate_mode_popup(item, language)]
+        return [] if variables.get("enable_popup") is False else [_climate_mode_popup(item, language)]
     if role == "md_media_card":
         return [_media_popup(item)]
     if role == "md_camera_card":
@@ -2484,6 +2487,7 @@ def _entity_container_cards(
     cards.extend(
         _climate_mode_popup(entity, language)
         for entity in container["entities_by_domain"].get("climate", [])
+        if (entity.get("variables") or {}).get("enable_popup") is not False
     )
     cards.extend(
         _access_popup(entity, language)
@@ -2697,7 +2701,6 @@ def _media_button(
     seek_offset: int | None = None,
     primary: bool = False,
     dpad: bool = False,
-    hold_data: dict[str, Any] | None = None,
     target_entity_id: str | None = None,
 ) -> dict[str, Any]:
     target_entity_id = target_entity_id or entity_id
@@ -2746,14 +2749,6 @@ def _media_button(
         card["tap_action"]["data"] = data
     if seek_offset is not None:
         card["tap_action"]["seek_offset"] = seek_offset
-    if hold_data is not None:
-        card["hold_action"] = {
-            "action": "perform-action",
-            "perform_action": service,
-            "target": {"entity_id": target_entity_id},
-            "data": hold_data,
-            "haptic": "heavy",
-        }
     return card
 
 
@@ -2766,9 +2761,7 @@ def _remote_button(
     name: str = "",
     primary: bool = False,
     dpad: bool = False,
-    hold: bool = False,
 ) -> dict[str, Any]:
-    hold_data = {"command": command, "hold_secs": 1} if hold else None
     return _media_button(
         media_entity,
         icon=icon,
@@ -2777,7 +2770,6 @@ def _remote_button(
         data={"command": command},
         primary=primary,
         dpad=dpad,
-        hold_data=hold_data,
         target_entity_id=remote_entity,
     )
 
@@ -2826,17 +2818,17 @@ def _media_popup(entity: dict[str, Any]) -> dict[str, Any]:
         [
             {"type": "grid", "columns": 3, "square": False, "cards": [
                 _remote_button(entity_id, remote_entity, "menu", icon="mdi:arrow-u-left-top", name="Back"),
-                _remote_button(entity_id, remote_entity, "up", icon="mdi:chevron-up", dpad=True, hold=True),
+                _remote_button(entity_id, remote_entity, "up", icon="mdi:chevron-up", dpad=True),
                 _remote_button(entity_id, remote_entity, "top_menu", icon="mdi:home-outline", name="Home"),
             ]},
             {"type": "grid", "columns": 3, "square": False, "cards": [
-                _remote_button(entity_id, remote_entity, "left", icon="mdi:chevron-left", dpad=True, hold=True),
-                _remote_button(entity_id, remote_entity, "select", icon="mdi:checkbox-blank-circle", primary=True, dpad=True, hold=True),
-                _remote_button(entity_id, remote_entity, "right", icon="mdi:chevron-right", dpad=True, hold=True),
+                _remote_button(entity_id, remote_entity, "left", icon="mdi:chevron-left", dpad=True),
+                _remote_button(entity_id, remote_entity, "select", icon="mdi:checkbox-blank-circle", primary=True, dpad=True),
+                _remote_button(entity_id, remote_entity, "right", icon="mdi:chevron-right", dpad=True),
             ]},
             {"type": "grid", "columns": 3, "square": False, "cards": [
                 _media_button(entity_id, icon="mdi:rewind-10", name="Back 10 seconds", service="media_player.media_seek", seek_offset=-10),
-                _remote_button(entity_id, remote_entity, "down", icon="mdi:chevron-down", dpad=True, hold=True),
+                _remote_button(entity_id, remote_entity, "down", icon="mdi:chevron-down", dpad=True),
                 _media_button(entity_id, icon="mdi:fast-forward-30", name="Forward 30 seconds", service="media_player.media_seek", seek_offset=30),
             ]},
         ]
@@ -3096,7 +3088,7 @@ def _entity_group_popup(group, language="en"):
 def _entity_group_secondary_popups(group, language="en"):
     return [_climate_mode_popup(member, language) if member["entity_id"].startswith("climate.") else _access_popup(member, language)
             for member in _entity_group_members(group)
-            if member["entity_id"].startswith("climate.") or (_is_access_entity(member) and not _is_open_only_access(member))]
+            if (member["entity_id"].startswith("climate.") and (member.get("variables") or {}).get("enable_popup") is not False) or (_is_access_entity(member) and not _is_open_only_access(member))]
 
 
 def _popup_grid(cards: list[dict[str, Any]]) -> dict[str, Any]:

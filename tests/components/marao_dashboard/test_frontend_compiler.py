@@ -47,6 +47,17 @@ def python_compile(source, entities=None, language='en'):
         return {key: native_extensions(child) for key, child in value.items()}
 
     original_page_card = g._page_card
+    original_media_popup = g._media_popup
+    def reference_media_popup(entity):
+        popup = original_media_popup(entity)
+        mapping = (entity.get('apple_tv') or {}).get('plex')
+        # Plex is frontend-only; specify its additive child independently of the frozen generator.
+        if isinstance(mapping, dict):
+            popup['cards'].insert(0, {'type': 'custom:marao-plex-watch-card', 'parent': {
+                'entity_id': entity['entity_id'], 'name': entity.get('name') or g._friendly_name(entity['entity_id']),
+                'apple_tv': {'plex': deepcopy(mapping)},
+            }})
+        return popup
     def reference_card(entity, dashboard_key, language='en'):
         if '_native_expected' in entity:
             return deepcopy(entity['_native_expected'])
@@ -60,7 +71,7 @@ def python_compile(source, entities=None, language='en'):
         if isinstance(value, list):
             return [expand(child) for child in value]
         return value
-    with patch.object(g, '_page_card', reference_card):
+    with patch.object(g, '_page_card', reference_card), patch.object(g, '_media_popup', reference_media_popup):
         resolved = g.resolve_dashboard_config(native_extensions(source), entities or [])
         pages = sorted(resolved['pages'], key=lambda page: page['path'] != resolved['landing_page'])
         views = [{**g._page_view(page, '', 'marao-dashboard', language), 'theme': resolved['theme']} for page in pages]

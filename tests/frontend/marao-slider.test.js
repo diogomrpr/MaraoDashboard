@@ -49,6 +49,61 @@ test('cancelling a range restores authoritative state and ignores late native ev
   control.destroy();
 });
 
+test('inline state stays left while it fits and switches right for space through resize, reports and cancellation', t => {
+  const { input, properties, fire } = slider();
+  const previousObserver = globalThis.ResizeObserver, previousDocument = globalThis.document;
+  t.after(() => { globalThis.ResizeObserver = previousObserver; globalThis.document = previousDocument; });
+  let resize, disconnected = false, needed = 96;
+  const fonts = new EventTarget();
+  globalThis.document = { fonts };
+  globalThis.ResizeObserver = class {
+    constructor(callback) { resize = callback; }
+    observe() {}
+    disconnect() { disconnected = true; }
+  };
+  const label = { style: { maxWidth: '' }, getBoundingClientRect: () => ({ width: needed }) };
+  input.parentElement.dataset = {};
+  input.parentElement.clientWidth = 248;
+  input.parentElement.querySelector = selector => selector === '.slider-state' ? label : null;
+  const control = bindSlider(input);
+  assert.equal(input.parentElement.dataset.stateSide, 'right');
+  assert.equal(properties.get('--marao-slider-label-fraction'), '0.7');
+  fire('pointerdown'); input.value = '80'; fire('input');
+  assert.equal(input.parentElement.dataset.stateSide, 'left');
+  assert.equal(properties.get('--marao-slider-label-fraction'), '0.8');
+  control.update(10, 80);
+  assert.equal(input.parentElement.dataset.stateSide, 'left', 'Confirmed fill must not choose the label side');
+  fire('pointercancel');
+  assert.equal(input.parentElement.dataset.stateSide, 'right');
+  assert.equal(properties.get('--marao-slider-label-fraction'), '0.9');
+  control.update(49, 49);
+  assert.equal(input.parentElement.dataset.stateSide, 'left', 'Prefer left when it fits even if right has more space');
+  assert.equal(properties.get('--marao-slider-label-fraction'), '0.49');
+  control.update(47, 47);
+  assert.equal(input.parentElement.dataset.stateSide, 'right', 'Switch before the text overlaps the thumb');
+  control.update(30, 30);
+  input.parentElement.clientWidth = 448; resize();
+  assert.equal(input.parentElement.dataset.stateSide, 'left', 'Wider tracks can keep the same label on the left');
+  needed = 150; fonts.dispatchEvent(new Event('loadingdone'));
+  assert.equal(input.parentElement.dataset.stateSide, 'right', 'Use current label and font metrics');
+  input.parentElement.clientWidth = 168;
+  control.update(50, 50);
+  assert.equal(input.parentElement.dataset.stateSide, 'left', 'When neither side fits, wrap in the larger region with a left tie-break');
+  assert.equal(properties.get('--marao-slider-label-fraction'), '0.5');
+  input.parentElement.clientWidth = 448; needed = 96;
+  for (const target of [0, 50, 100]) {
+    control.update(target, target);
+    assert.equal(input.parentElement.dataset.stateSide, target >= 50 ? 'left' : 'right');
+    assert.equal(properties.get('--marao-slider-label-fraction'), String(Math.max(target, 100 - target) / 100));
+  }
+  assert.equal(label.style.maxWidth, '', 'Temporary natural-width measurement does not leave a style override');
+  control.destroy();
+  assert.equal(disconnected, true);
+  input.parentElement.clientWidth = 48;
+  fonts.dispatchEvent(new Event('loadingdone')); resize();
+  assert.equal(input.parentElement.dataset.stateSide, 'left', 'Disposed observers cannot move the label');
+});
+
 test('pressing a range without changing its value does not send an update', () => {
   const { input, fire } = slider(), commits = [];
   const control = bindSlider(input, { onCommit: value => commits.push(value) });

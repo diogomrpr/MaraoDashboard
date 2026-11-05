@@ -159,3 +159,24 @@ def test_optional_glance_labels_preserve_names_and_reject_nonboolean_values():
         card["variables"]["show_reading_names"] = value
         with pytest.raises(ValueError, match="Show reading labels must be a boolean"):
             validate_pages(source, {"md_glance_card": []})
+
+
+def test_climate_additive_options_validate_without_rewriting_source():
+    templates = {"md_climate_card": ["climate"]}
+    for options in ({}, {"humidity_entity": None}, {"humidity_entity": ""}, {"humidity_entity": "sensor.unresolved", "enable_popup": False, "future": []}):
+        source = {"config_version": 2, "name": "Climate", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [{"entity_id": "climate.safe", "template": "md_climate_card", "variables": options}]}]}
+        before = deepcopy(source)
+        validate_pages(source, templates)
+        assert source == before
+    for options in ({"humidity_entity": "light.bad"}, {"humidity_entity": []}, {"humidity_entity": 12}, {"enable_popup": "false"}, {"enable_popup": 0}):
+        source = {"config_version": 2, "name": "Climate", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [{"entity_id": "climate.safe", "template": "md_climate_card", "variables": options}]}]}
+        before = deepcopy(source)
+        with pytest.raises(ValueError):
+            validate_pages(source, templates)
+        assert source == before
+    from custom_components.marao_dashboard.editor import EDITOR_CATALOG
+    native = json.loads((Path(__file__).parents[3] / "custom_components/marao_dashboard/frontend/marao-catalog.json").read_text())
+    for catalog in (EDITOR_CATALOG, native):
+        fields = {field["key"]: field for card in catalog["cards"] if card["id"] == "md_climate_card" for field in card["variables"]}
+        assert fields["enable_popup"]["default"] is True
+        assert fields["humidity_entity"]["domains"] == ["sensor"]

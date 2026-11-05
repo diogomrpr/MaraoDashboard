@@ -36,11 +36,11 @@ On dashboard SHALL show player information and the existing applicable media con
 - **AND** its expanded content reflows at the available width with controls at least 48px square
 
 ### Requirement: Media action parity across presentations
-Popup and inline presentations SHALL use the same configured app sources, actual remote and volume targets, bounded seeking and short/long command semantics. A completed interaction SHALL dispatch once, while preview, cancellation and unavailable or disconnected actual targets SHALL not dispatch. Reported failures SHALL remain readable and state SHALL remain authoritative.
+Popup and inline presentations SHALL use the same configured app sources, actual remote and volume targets, bounded seeking and tap-only built-in command semantics; explicitly authored custom holds retain their configured behavior. A completed interaction SHALL dispatch once, while preview, cancellation and unavailable or disconnected actual targets SHALL not dispatch. Reported failures SHALL remain readable and state SHALL remain authoritative.
 
 #### Scenario: The same remote is used in either presentation
-- **WHEN** a configured directional remote control receives a short activation or completed hold
-- **THEN** it sends the same single short or long command to the configured target in either presentation
+- **WHEN** a configured directional remote control receives a tap
+- **THEN** it sends the same single ordinary command to the configured target in either presentation
 - **AND** cancellation sends neither command
 
 #### Scenario: A separate volume target is unavailable
@@ -57,7 +57,7 @@ The inline panel SHALL include a distinct Now playing card or section above its 
 #### Scenario: The current item changes
 - **WHEN** Home Assistant reports a new media title, artist, source or artwork for the inline player
 - **THEN** Now playing updates to the reported item while the apps and remote controls stay mounted
-- **AND** an active remote hold is not cancelled by the metadata update
+- **AND** an explicitly authored remote hold is not cancelled by the metadata update
 
 #### Scenario: Playback is paused
 - **WHEN** Home Assistant reports paused playback with current media information
@@ -80,6 +80,24 @@ The inline panel SHALL include a distinct Now playing card or section above its 
 - **WHEN** the saved artwork option is false or no usable artwork exists
 - **THEN** the section uses the normal themed surface while retaining available current media text and playback state
 
+### Requirement: App shortcut vibration and wake
+An app shortcut without an explicit tap action SHALL launch its configured source through the shared card owner. Enabled shortcut taps SHALL emit one strong haptic. Source selection for an off player SHALL first await a successful Turn on request; an already-on player SHALL skip power-on. Wake failure or owner/context/target loss SHALL stop the continuation, retain readable reported errors and send no app command. Saved app data and explicit custom actions SHALL remain intact.
+
+#### Scenario: Launch an app on an off Apple TV
+- **WHEN** a user taps an enabled configured app shortcut while its target player reports off
+- **THEN** it emits one strong haptic and sends one Turn on request
+- **AND** successful completion followed by a current usable context selects the exact configured source once
+
+#### Scenario: Launch an app on an already-on player
+- **WHEN** the target player is already on and available
+- **THEN** the shortcut emits one strong haptic and selects the source once without a power-on request
+
+#### Scenario: Wake fails or becomes obsolete
+- **WHEN** power-on fails or the request owner/configuration/account/connection/target becomes invalid while awaiting it
+- **THEN** no source-selection continuation is sent
+- **AND** a reported failure uses the existing readable action-error presentation without automatic retries
+
+
 ## MODIFIED Requirements
 
 ### Requirement: Standalone native detail parity
@@ -101,3 +119,16 @@ Native cards SHALL own automatic detail sheets with existing media, climate, ala
 #### Scenario: A removed automatic popup still has an authored link
 - **WHEN** switching to On dashboard would remove an automatic media popup targeted by another authored link
 - **THEN** preflight reports the unresolved link before saving rather than deleting, retargeting or silently breaking the link
+
+
+### Requirement: Remote short and long commands
+Built-in media and Apple TV remote controls SHALL dispatch their ordinary command once per tap, without a generated long action or hold countdown. Explicitly authored remote hold actions SHALL retain short activation and a completed 1.2-second hold: short release dispatches one short command; full hold dispatches one configured longer command; cancellation or pointer departure dispatches neither. Availability SHALL be checked against the actual service target.
+
+#### Scenario: A configured remote hold completes
+- **WHEN** the full hold duration elapses on an available fixture remote with an explicitly authored hold action
+- **THEN** its longer command dispatches once and no short command follows on release
+
+#### Scenario: A built-in media remote button is pressed
+- **WHEN** a user presses a built-in directional or Select button in a popup or inline media panel
+- **THEN** the control uses ordinary tap feedback without a hold progress ring or timer
+- **AND** a completed tap sends one command to the configured remote without `hold_secs`

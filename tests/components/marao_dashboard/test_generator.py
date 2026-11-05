@@ -936,6 +936,9 @@ def test_room_media_card_opens_generated_apple_tv_remote_popup(tmp_path: Path) -
     assert "[[[" not in source
     assert app_grid["type"] == "custom:marao-control-grid"
     assert app_grid["columns"] == 3
+    controls = [card for card in _walk_generated_cards(popup["cards"]) if card.get("tap_action", {}).get("perform_action") == "remote.send_command"]
+    assert {card["tap_action"]["data"]["command"] for card in controls} >= {"up", "down", "left", "right", "select"}
+    assert all("hold_action" not in card and "hold_secs" not in card["tap_action"]["data"] for card in controls)
     assert all(card["show_state"] is False for card in app_grid["cards"])
 
 
@@ -1846,3 +1849,22 @@ def test_sensor_thresholds_validate_and_preserve_released_and_nested_options():
             validate_sensor_thresholds({'background_thresholds': rows}, 'sensor.safe')
     with pytest.raises(ValueError, match='sensor entity'):
         generator._entity_card({'template': 'md_sensor_card', 'entity_id': 'binary_sensor.safe', 'variables': {'background_thresholds': [{'value': 0, 'color': '#ffffff'}]}})
+
+
+def test_climate_popup_toggle_preserves_options_and_suppresses_generated_details(tmp_path):
+    options = {"humidity_entity": "sensor.unresolved", "enable_popup": False, "show_mode_buttons": False, "mode_selector_hash": "#climate-mode-saved", "future": []}
+    source = {"config_version": 2, "name": "Climate", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [{"entity_id": "climate.safe", "template": "md_climate_card", "variables": options}]}]}
+    from copy import deepcopy
+    before = deepcopy(source)
+    result = plan_dashboard(source, tmp_path)
+    assert source == before
+    from custom_components.marao_dashboard.generator import _page_card_popups, _entity_group_secondary_popups, _room_entity_card
+    entity = {"entity_id": "climate.safe", "template": "md_climate_card", "name": "Climate", "variables": options}
+    assert _page_card_popups(entity) == []
+    assert _room_entity_card(entity)["variables"] == options | {"show_graph": False}
+    group = {"id": "group", "entity_type": "climate", "entities": [entity]}
+    assert _entity_group_secondary_popups(group) == []
+    enabled = {**entity, "variables": {**options, "enable_popup": True}}
+    popup = _page_card_popups(enabled)[0]
+    assert popup["cards"][0]["variables"]["humidity_entity"] == "sensor.unresolved"
+    assert popup["cards"][0]["variables"]["future"] == []

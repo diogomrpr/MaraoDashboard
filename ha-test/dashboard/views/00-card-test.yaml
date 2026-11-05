@@ -3,6 +3,34 @@ path: card-test
 icon: mdi:test-tube
 theme: Marao Dashboard
 cards:
+  - type: custom:marao-media-card
+    entity_id: media_player.marao_dashboard_test_apple_tv
+    name: Plex TV (simulated)
+    apple_tv:
+      remote_entity: remote.marao_dashboard_test_apple_tv
+      plex:
+        client_entity: media_player.marao_dashboard_test_plex_player
+        scan_clients_entity: button.marao_dashboard_test_plex_scan
+        app_source: Plex
+        library_root:
+          media_content_type: server
+          media_content_id: plex://marao-fixture/server
+
+  - type: custom:marao-media-card
+    entity_id: media_player.marao_dashboard_test_plex_bedroom
+    name: Rivulet Bedroom (simulated)
+    apple_tv:
+      remote_entity: remote.marao_dashboard_test_plex_bedroom
+      plex:
+        playback_app: rivulet
+        browse_entity: media_player.marao_dashboard_test_plex_player_bedroom
+        client_entity: media_player.marao_dashboard_test_plex_player_bedroom
+        scan_clients_entity: button.marao_dashboard_test_plex_scan
+        app_source: Plex
+        library_root:
+          media_content_type: server
+          media_content_id: plex://marao-fixture/server
+
   - type: custom:marao-card
     template: md_scene_card
     entity: input_select.marao_dashboard_test_scene
@@ -121,6 +149,7 @@ cards:
         template: md_glance_card
         name: Single reading
         variables:
+          show_reading_names: false
           entity1: sensor.marao_dashboard_test_temperature
           entity1_name: Temperature
 
@@ -258,6 +287,7 @@ cards:
         name: Climate
         variables:
           mode_selector_hash: "#climate-mode-test"
+          humidity_entity: sensor.marao_dashboard_test_humidity
 
       - type: custom:marao-card
         template: md_climate_card
@@ -272,6 +302,7 @@ cards:
         name: Multi Mode Climate
         variables:
           mode_selector_hash: "#multi-mode-climate-test"
+          enable_popup: false
 
       - type: custom:marao-card
         template: md_climate_card
@@ -1058,14 +1089,6 @@ cards:
                 entity_id: remote.marao_dashboard_test_apple_tv
               data:
                 command: up
-            hold_action:
-              action: perform-action
-              perform_action: remote.send_command
-              target:
-                entity_id: remote.marao_dashboard_test_apple_tv
-              data:
-                command: up
-                hold_secs: 1
           - type: custom:marao-card
             entity: media_player.marao_dashboard_test_apple_tv
             show_name: false
@@ -1096,14 +1119,6 @@ cards:
                 entity_id: remote.marao_dashboard_test_apple_tv
               data:
                 command: left
-            hold_action:
-              action: perform-action
-              perform_action: remote.send_command
-              target:
-                entity_id: remote.marao_dashboard_test_apple_tv
-              data:
-                command: left
-                hold_secs: 1
           - type: custom:marao-card
             entity: media_player.marao_dashboard_test_apple_tv
             show_name: false
@@ -1135,14 +1150,6 @@ cards:
                 entity_id: remote.marao_dashboard_test_apple_tv
               data:
                 command: select
-            hold_action:
-              action: perform-action
-              perform_action: remote.send_command
-              target:
-                entity_id: remote.marao_dashboard_test_apple_tv
-              data:
-                command: select
-                hold_secs: 1
           - type: custom:marao-card
             entity: media_player.marao_dashboard_test_apple_tv
             show_name: false
@@ -1156,14 +1163,6 @@ cards:
                 entity_id: remote.marao_dashboard_test_apple_tv
               data:
                 command: right
-            hold_action:
-              action: perform-action
-              perform_action: remote.send_command
-              target:
-                entity_id: remote.marao_dashboard_test_apple_tv
-              data:
-                command: right
-                hold_secs: 1
       - type: grid
         columns: 3
         square: false
@@ -1193,14 +1192,6 @@ cards:
                 entity_id: remote.marao_dashboard_test_apple_tv
               data:
                 command: down
-            hold_action:
-              action: perform-action
-              perform_action: remote.send_command
-              target:
-                entity_id: remote.marao_dashboard_test_apple_tv
-              data:
-                command: down
-                hold_secs: 1
           - type: custom:marao-card
             entity: media_player.marao_dashboard_test_apple_tv
             show_name: false

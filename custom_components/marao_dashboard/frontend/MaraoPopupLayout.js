@@ -4,6 +4,7 @@ import {commitPopupDocument,reconcilePopupTransaction,popupAuthoringAllowed,POPU
 export const POPUP_ROLES = ['md_entity_group_card','md_scene_collection_card','md_climate_card','md_media_card','md_camera_card','md_energy_period_card','md_graph_card','md_security_card','md_access_card','md_floor_plan_card'];
 export const popupHash = popupHashFor;
 export const popupRole = config => POPUP_ROLES.includes(config.template)
+  && !(config.template==='md_climate_card'&&config.variables?.enable_popup===false)
   && !(config.template==='md_graph_card'&&!config.variables?.history_popup)
   && !(config.template==='md_media_card'&&config.variables?.media_display==='inline')
   && !(config.template==='md_security_card'&&config.tap_action)
