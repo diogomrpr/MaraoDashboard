@@ -158,12 +158,12 @@ export class MaraoCardEditor extends Base {
         if(this._mediaEdited)next.apple_tv=clone(this._mediaValue);
         const errors=this._validateDescriptor(nativeConfigToDescriptor(next));
         if(errors.length){this._setStatus(errors.map(error=>this._l(error)).join('\n'));return;}
-        this._setStatus('');this._commitDescriptor(next);previousData=clone(data);
+        this._setStatus('');this._commitDescriptor(next);const popupChanged=card.id==='md_climate_card'&&previousData.var__enable_popup!==data.var__enable_popup;previousData=clone(data);if(popupChanged)this._render();
       }catch(error){this._setStatus(this._error(error));}
     };
     this._mediaEdited=false;
     const fields=this._expandedFields(card.variables || []),specialKinds=['energy_sub_entities','power_devices','sensor_thresholds'];
-    const basic=fields.filter(field=>!field.advanced&&!specialKinds.includes(field.kind));
+    const basic=fields.filter(field=>!field.advanced&&!specialKinds.includes(field.kind)&&!(card.id==='md_climate_card'&&field.key==='show_mode_buttons'&&data.var__enable_popup!==false));
     const advanced=fields.filter(field=>field.advanced&&!specialKinds.includes(field.kind));
     const schema=[];
     if(card.page_shortcut) {
@@ -203,7 +203,7 @@ export class MaraoCardEditor extends Base {
     if(card.entity_group)this._renderGroup(special,descriptor);
     if(card.schedules)this._renderSchedules(special,original);
     if(card.id==='md_media_card') {
-      const button=document.createElement('button');button.type='button';button.textContent=this._l('Apple TV options');button.onclick=()=>{this._moveHaptic();this._openMediaOptions({entity_id:data.entity_id,apple_tv:this._mediaEdited?this._mediaValue:original.apple_tv},value=>{this._mediaEdited=true;this._mediaValue=value;commit();});};special.append(button);
+      const button=document.createElement('button');button.type='button';button.textContent=this._l('Apple TV options');button.onclick=()=>{this._moveHaptic();this._openMediaOptions({...original,entity_id:data.entity_id,apple_tv:this._mediaEdited?this._mediaValue:original.apple_tv},value=>{this._mediaEdited=true;this._mediaValue=value;commit();});};special.append(button);
     }
   }
   _renderManagedChild(host,card,managed) {

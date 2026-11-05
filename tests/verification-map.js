@@ -24,6 +24,7 @@ const families = {
   camera: ['md_camera_card'], history: ['md_graph_card', 'md_timeline_card', 'md_toggle_graph_card'],
 };
 const components = {
+  plex: {units:[['marao-plex'],['marao-card-visibility','Plex component|app shortcut'],['native-card-editor','Plex|app logo'],['native-cards','media']],editor:true},
   activity: { units: [['activity'], ['marao-card-visibility','activity|access|glance'], ['native-cards','activity'], ['editor-model','activity']], editor:true },
   'agent-authoring': {units:[['agent-authoring'],['native-package']],editor:true},
   'documentation-brand': {units:[['brand-assets','canonical artwork']]},
@@ -154,6 +155,8 @@ const components = {
 const rules = [
   [/^(?:frontend_src\/(?:authoring(?:-schema|-cli)?\.js|build-authoring\.cjs)|custom_components\/marao_dashboard\/frontend\/MaraoAuthoring.*|tests\/frontend\/agent-authoring\.test\.js|docs\/docs\/development\/agent-authoring\.md)$/, ['agent-authoring']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoMediaApps\.js$/, ['labels','native-source','packaging']],
+  [/^custom_components\/marao_dashboard\/frontend\/MaraoClimate\.js$/, ['climate']],
+  [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoPlex(?:Model)?\.js|frontend_src\/plex-editor\.js|tests\/frontend\/marao-plex\.test\.js)$/, ['plex']],
   [/^tests\/export-brand-assets\.js$/, ['documentation-brand']],
   [/^(docs\/(?:playground|examples|scripts|src\/components|src\/scripts)\/|tests\/docs\/)/, ['documentation-playground']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoPopup(?:Layout|View|Managed|Transaction)\.js$|^frontend_src\/popup-(?:management|coordinator)\.js$|^tests\/frontend\/popup-(?:layout|managed|management|transactions|coordinator)\.test\.js$/, ['popup-layout']],

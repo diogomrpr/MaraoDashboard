@@ -115,10 +115,11 @@ export function nativeCardGridOptions(config) {
   let rows = compact.has(template) ? 2 : 3;
   if (template === 'md_title_card') rows = 1;
   if (['md_light_card', 'md_fan_card'].includes(template) && config.variables?.enable_slider !== false) rows = 3;
-  if (['md_climate_card', 'md_header_card', 'md_weather_card', 'md_wallbox_current_card', 'md_alarm_controls_card'].includes(template)) rows = 4;
+  if (['md_header_card', 'md_weather_card', 'md_wallbox_current_card', 'md_alarm_controls_card'].includes(template)) rows = 4;
+  if (template === 'md_climate_card') rows = 'auto';
   if (template === 'md_camera_card') rows = 5;
   if (template === 'md_floor_plan_card') rows = 8;
-  if (template === 'md_media_card' && config.variables?.media_display === 'inline') rows = config.apple_tv ? 12 : 5;
+  if (template === 'md_media_card' && config.variables?.media_display === 'inline') rows = config.apple_tv?.plex ? 'auto' : config.apple_tv ? 12 : 5;
   const explicit = config.grid_options || {};
   const minimum = (preferred, saved) => Number.isFinite(saved) && saved > 0 ? Math.min(preferred, saved) : preferred;
   return { columns: compact.has(template) ? 6 : 12, rows,
@@ -169,7 +170,7 @@ export class MaraoNativeCard extends HTMLElementBase {
   get hass() { return this._hass; }
   get preview() { return Boolean(!this.isConnected || this._preview || this._host?.lovelace?.editMode || nativeHost(this)?.lovelace?.editMode); }
   set preview(value) { this._preview = Boolean(value); this._forward(); }
-  getCardSize() { return this._children[0]?.getCardSize?.() || (this._config ? nativeCardGridOptions(this._config).rows * 1.28 : 3); }
+  getCardSize() { return this._children[0]?.getCardSize?.() || (this._config && Number.isFinite(nativeCardGridOptions(this._config).rows) ? nativeCardGridOptions(this._config).rows * 1.28 : 3); }
   getGridOptions() { return nativeCardGridOptions(this._config || { type: nativeCardType(this.constructor.template) }); }
 
   connectedCallback() {
@@ -218,6 +219,7 @@ export class MaraoNativeCard extends HTMLElementBase {
     const preview = this.preview;
     this._content.inert = preview;
     for (const child of this._children) {
+      child.climateDetail = this._climateDetail;
       child.nativeOwner = this;
       child.preview = preview;
       child.hass = this._hass;
@@ -233,6 +235,9 @@ export class MaraoNativeCard extends HTMLElementBase {
     const dashboardRoot = this._host?.panel?.url_path || globalThis.location?.pathname.split('/')[1] || 'marao-dashboard';
     const language = this._hass?.language || 'en';
     const dashboard=nativeDashboardConfig(this._host?.lovelace);
+    let viewHost=this;while(viewHost&&viewHost.localName!=='hui-view')viewHost=viewHost.parentNode||viewHost.host||viewHost.getRootNode?.()?.host;
+    const currentView=dashboard?.views?.[viewHost?.index ?? this._host?.lovelace?.current_view];
+    this._climateDetail=currentView?.marao_popup?.family==='md_climate_card' && currentView.marao_popup.settings.entity_id===(this._config.entity_id||this._config.entity);
     const source=dashboard?.views?.filter((view,index)=>String(view.path ?? index)===this._config.popup_view);
     if(this._config.popup_view)for(const entity of entities)bound.add(entity.entity_id);
     const key = JSON.stringify([dashboardRoot, language, source, entities.filter(entity => bound.has(entity.entity_id))]);
@@ -254,6 +259,7 @@ export class MaraoNativeCard extends HTMLElementBase {
         this._content.replaceChildren(surface); this._forward(); return;
       }
       const { card, popups } = composeNativeCard(this._config, { ...context, instanceId: this._instanceId });
+      if (this._config.apple_tv?.plex && typeof this._config.apple_tv.plex === 'object') await import(new URL(`./MaraoPlex.js${query}`,import.meta.url));
       const configs = [card, ...popups];
       const local = configs.every(config => config.type.startsWith('custom:') && customElements.get(config.type.slice(7)));
       const helpers = local ? { createCardElement(config) { const child = document.createElement(config.type.slice(7)); child.setConfig(config); return child; } } : await globalThis.loadCardHelpers?.();

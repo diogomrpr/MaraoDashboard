@@ -2698,18 +2698,6 @@
                         "align-self": "center"
                       }
                     ]
-                  },
-                  "hold_action": {
-                    "action": "perform-action",
-                    "perform_action": "remote.send_command",
-                    "target": {
-                      "entity_id": "remote.marao_dashboard_test_apple_tv"
-                    },
-                    "data": {
-                      "command": "up",
-                      "hold_secs": 1
-                    },
-                    "haptic": "heavy"
                   }
                 },
                 {
@@ -2861,18 +2849,6 @@
                         "align-self": "center"
                       }
                     ]
-                  },
-                  "hold_action": {
-                    "action": "perform-action",
-                    "perform_action": "remote.send_command",
-                    "target": {
-                      "entity_id": "remote.marao_dashboard_test_apple_tv"
-                    },
-                    "data": {
-                      "command": "left",
-                      "hold_secs": 1
-                    },
-                    "haptic": "heavy"
                   }
                 },
                 {
@@ -2945,18 +2921,6 @@
                         "align-self": "center"
                       }
                     ]
-                  },
-                  "hold_action": {
-                    "action": "perform-action",
-                    "perform_action": "remote.send_command",
-                    "target": {
-                      "entity_id": "remote.marao_dashboard_test_apple_tv"
-                    },
-                    "data": {
-                      "command": "select",
-                      "hold_secs": 1
-                    },
-                    "haptic": "heavy"
                   }
                 },
                 {
@@ -3029,18 +2993,6 @@
                         "align-self": "center"
                       }
                     ]
-                  },
-                  "hold_action": {
-                    "action": "perform-action",
-                    "perform_action": "remote.send_command",
-                    "target": {
-                      "entity_id": "remote.marao_dashboard_test_apple_tv"
-                    },
-                    "data": {
-                      "command": "right",
-                      "hold_secs": 1
-                    },
-                    "haptic": "heavy"
                   }
                 }
               ]
@@ -3190,18 +3142,6 @@
                         "align-self": "center"
                       }
                     ]
-                  },
-                  "hold_action": {
-                    "action": "perform-action",
-                    "perform_action": "remote.send_command",
-                    "target": {
-                      "entity_id": "remote.marao_dashboard_test_apple_tv"
-                    },
-                    "data": {
-                      "command": "down",
-                      "hold_secs": 1
-                    },
-                    "haptic": "heavy"
                   }
                 },
                 {
@@ -5283,18 +5223,6 @@
                         "align-self": "center"
                       }
                     ]
-                  },
-                  "hold_action": {
-                    "action": "perform-action",
-                    "perform_action": "remote.send_command",
-                    "target": {
-                      "entity_id": "remote.marao_dashboard_test_apple_tv"
-                    },
-                    "data": {
-                      "command": "up",
-                      "hold_secs": 1
-                    },
-                    "haptic": "heavy"
                   }
                 },
                 {
@@ -5446,18 +5374,6 @@
                         "align-self": "center"
                       }
                     ]
-                  },
-                  "hold_action": {
-                    "action": "perform-action",
-                    "perform_action": "remote.send_command",
-                    "target": {
-                      "entity_id": "remote.marao_dashboard_test_apple_tv"
-                    },
-                    "data": {
-                      "command": "left",
-                      "hold_secs": 1
-                    },
-                    "haptic": "heavy"
                   }
                 },
                 {
@@ -5530,18 +5446,6 @@
                         "align-self": "center"
                       }
                     ]
-                  },
-                  "hold_action": {
-                    "action": "perform-action",
-                    "perform_action": "remote.send_command",
-                    "target": {
-                      "entity_id": "remote.marao_dashboard_test_apple_tv"
-                    },
-                    "data": {
-                      "command": "select",
-                      "hold_secs": 1
-                    },
-                    "haptic": "heavy"
                   }
                 },
                 {
@@ -5614,18 +5518,6 @@
                         "align-self": "center"
                       }
                     ]
-                  },
-                  "hold_action": {
-                    "action": "perform-action",
-                    "perform_action": "remote.send_command",
-                    "target": {
-                      "entity_id": "remote.marao_dashboard_test_apple_tv"
-                    },
-                    "data": {
-                      "command": "right",
-                      "hold_secs": 1
-                    },
-                    "haptic": "heavy"
                   }
                 }
               ]
@@ -5775,18 +5667,6 @@
                         "align-self": "center"
                       }
                     ]
-                  },
-                  "hold_action": {
-                    "action": "perform-action",
-                    "perform_action": "remote.send_command",
-                    "target": {
-                      "entity_id": "remote.marao_dashboard_test_apple_tv"
-                    },
-                    "data": {
-                      "command": "down",
-                      "hold_secs": 1
-                    },
-                    "haptic": "heavy"
                   }
                 },
                 {

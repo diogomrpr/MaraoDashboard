@@ -36,7 +36,7 @@ test("mode feedback is immediate across cards, without changing measurements or 
   const pending = main._setClimateMode(climateEntity, "cool");
   assert.match(main.shadowRoot.innerHTML, /class="state">Cool</);
   assert.match(main.shadowRoot.innerHTML, /role="status"[^>]*>Updating/);
-  const sheet = climateCard(t, hass, { show_mode_buttons: true });
+  const sheet = climateCard(t, hass, { show_mode_buttons: true, enable_popup: false });
   assert.match(sheet.shadowRoot.innerHTML, /climate-mode active[^>]*data-climate-mode="cool"/);
   assert.match(sheet.shadowRoot.innerHTML, /class="climate current-temperature"[^>]*>20</);
   assert.deepEqual(state, reportedClimate("off"));
@@ -408,13 +408,33 @@ test("seasonal backgrounds follow active device state and preserve custom colors
   assert.equal(stateAppearance('md_access_card', 'unlocked', {}, {}).background, 'var(--color-red)');
 });
 
-test("climate modes use the shared dropdown and retain measured/target slots", t => {
-  const card = climateCard(t, { states: { [climateEntity]: reportedClimate("heat") } }, { show_mode_buttons: true });
-  assert.match(card.shadowRoot.innerHTML, /class="climate-mode-picker marao-dropdown"/);
-  assert.match(card.shadowRoot.innerHTML, /data-scene-select[^>]*aria-haspopup="menu"/);
-  assert.match(card.shadowRoot.innerHTML, /role="menuitemradio"[^>]*data-climate-mode="heat"[^>]*aria-checked="true"/);
-  assert.match(card.shadowRoot.innerHTML, /class="climate current-temperature"[^>]*>20</);
+test("climate modes use named icon buttons and retain measured/target slots", t => {
+  const card = climateCard(t, { states: { [climateEntity]: reportedClimate("heat") } }, { enable_popup: false });
+  const html=card.shadowRoot.innerHTML.split('</style>')[1];
+  assert.match(html, /class="climate-mode-heading">Mode - Heat</);
+  assert.match(html, /data-climate-mode="heat"[^>]*aria-label="Heat"[^>]*aria-pressed="true"/);
+  assert.doesNotMatch(html, /data-scene-select|role="menuitemradio"/);
+  assert.equal((html.match(/data-climate-mode=/g)||[]).length,4);
+  assert.match(html, /class="climate current-temperature"[^>]*>20</);
   assert.equal(displayedTarget(card), "21");
+  assert.equal(climateDefaultAction(['heat','cool'],{enable_popup:false,mode_selector_hash:'#saved'}),null);
+  assert.equal(climateDefaultAction(['heat'],{enable_popup:false}).data.hvac_mode,'heat');
+});
+
+test('humidity follows only the selected sensor and retains usable thermostat controls',t=>{
+  const hass={callService:async()=>{},states:{[climateEntity]:reportedClimate(),'sensor.humidity':{state:'48.5'}}};
+  const card=climateCard(t,hass,{humidity_entity:'sensor.humidity'});
+  assert.doesNotThrow(()=>climateCard(t,hass,null));
+  const html=()=>card.shadowRoot.innerHTML.split('</style>')[1];
+  assert.match(html(),/climate-humidity[^>]*>48.5%/);
+  const previous=card.shadowRoot.innerHTML;card.hass={...hass,states:{...hass.states,'sensor.unrelated':{state:'1'}}};assert.equal(card.shadowRoot.innerHTML,previous);
+  for(const state of ['62','unknown','unavailable','101','-1','','bad']) {
+    card.hass={...hass,states:{...hass.states,'sensor.humidity':{state}}};
+    assert.match(html(),new RegExp(`climate-humidity[^>]*>${state==='62'?'62%':'—'}<`));
+    assert.doesNotMatch(html(),/data-number-step="increase"[^>]* disabled/);
+  }
+  card.climateDetail=true;card.hass={...hass,language:'pt'};assert.match(html(),/climate-detail/);assert.match(html(),/climate-humidity[^>]*>48,5/);assert.match(html(),/Modo -/);
+  card.setConfig({template:'md_climate_card',entity:climateEntity,variables:{}});assert.doesNotMatch(html(),/climate-humidity/);
 });
 
 test("light state palette colors share a dark foreground across card families", () => {

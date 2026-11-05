@@ -938,6 +938,28 @@ test("slider headers follow family and preserve optional controls and hidden fie
   }
 });
 
+test('cover state moves into the position bar while unsupported and hidden-state variants remain correct', () => {
+  const card = new MaraoCard();
+  const config = { template: 'md_cover_card', entity: 'cover.test', name: 'Bedroom blind', variables: { custom_label: 'State: ' } };
+  const report = (state, attributes) => { card.hass = { connected: true, states: { 'cover.test': { state, attributes } } }; };
+  const markup = () => card.shadowRoot.innerHTML.split('</style>')[1];
+  card.setConfig(config);
+  for (const state of ['open', 'opening', 'closing', 'closed', 'unknown', 'unavailable']) {
+    report(state, { current_position: 50, supported_features: 4 });
+    assert.match(markup(), /<span class="slider-state"[^>]*>State: [^<]+<\/span>/);
+    assert.match(markup(), /aria-description="State: /);
+    assert.doesNotMatch(markup(), /<div class="state/);
+    if (['unknown', 'unavailable'].includes(state)) assert.match(markup(), /type="range"[^>]* disabled/);
+  }
+  report('closed', { supported_features: 3 });
+  assert.match(markup(), /<div class="state">State: closed<\/div>/);
+  assert.doesNotMatch(markup(), /slider-state|type="range"/);
+  report('open', { current_position: 50, supported_features: 4 });
+  card.setConfig({ ...config, show_state: false });
+  assert.match(markup(), /type="range"/);
+  assert.doesNotMatch(markup(), /slider-state|<div class="state/);
+});
+
 test("media app shortcuts fill the card with artwork without a visible title", () => {
   const card = new MaraoCard();
   card.setConfig({
@@ -2390,16 +2412,16 @@ test('idle cover reports retain the attached range, SVG and binding while updati
   get parentElement(){return this.parentNode;}getAttribute(name){return this._attrs[name]??null;}hasAttribute(name){return name in this._attrs;}setAttribute(name,value){this._attrs[name]=String(value);}removeAttribute(name){delete this._attrs[name];}
   append(...nodes){for(const node of nodes){node.remove();node.parentNode=this;this.childNodes.push(node);}}insertBefore(node,before){node.remove();node.parentNode=this;this.childNodes.splice(this.childNodes.indexOf(before),0,node);}remove(){if(this.parentNode)this.parentNode.childNodes=this.parentNode.childNodes.filter(node=>node!==this);this.parentNode=null;}
   contains(node){return this.childNodes.some(child=>child===node||child.contains(node));}
-  querySelector(selector){if(selector==='ha-card'&&this.localName==='ha-card')return this;if(selector==='input[type=range]'&&this.localName==='input')return this;for(const child of this.childNodes){const found=child.querySelector(selector);if(found)return found;}return null;}
+  querySelector(selector){if(selector==='ha-card'&&this.localName==='ha-card')return this;if(selector==='input[type=range]'&&this.localName==='input')return this;if(selector==='.slider-state'&&this._attrs.class==='slider-state')return this;for(const child of this.childNodes){const found=child.querySelector(selector);if(found)return found;}return null;}
  }
- const make=(current=30)=>{const input=new Node('input',{'data-slider-key':'md_cover_card:cover.blind','data-slider-current':String(current),min:'0',max:'100',step:'1',value:String(current),'aria-label':'Position',title:'Position'}),svg=new Node('svg'),slider=new Node('div',{class:'slider'},[svg,input]),surface=new Node('ha-card',{},[new Node('div',{class:'body'},[new Node('div',{class:'control'},[slider])])]);return {surface,input,svg,slider};};
+ const make=(current=30,state='open')=>{const label=new Node('span',{class:'slider-state'});label.textContent=state;const input=new Node('input',{'data-slider-key':'md_cover_card:cover.blind','data-slider-current':String(current),min:'0',max:'100',step:'1',value:String(current),'aria-label':'Position',title:'Position'}),svg=new Node('svg'),slider=new Node('div',{class:'slider'},[svg,label,input]),surface=new Node('ha-card',{},[new Node('div',{class:'body'},[new Node('div',{class:'control'},[slider])])]);return {surface,input,svg,slider};};
  const initial=make(),css={textContent:''};let next;
- globalThis.document={createElement:tag=>{assert.equal(tag,'template');return {set innerHTML(markup){const current=Number(/data-slider-current="([^"]+)"/.exec(markup)?.[1]||0);next=make(current);this.content={querySelector:selector=>selector==='style'?{textContent:markup.match(/<style>([\s\S]*?)<\/style>/)[1]}:next.surface};}};}};
+ globalThis.document={createElement:tag=>{assert.equal(tag,'template');return {set innerHTML(markup){const current=Number(/data-slider-current="([^"]+)"/.exec(markup)?.[1]||0);next=make(current,/class="slider-state"[^>]*>([^<]*)/.exec(markup)?.[1]);this.content={querySelector:selector=>selector==='style'?{textContent:markup.match(/<style>([\s\S]*?)<\/style>/)[1]}:next.surface};}};}};
  const card=new MaraoCard();card._config={template:'md_cover_card',entity:'cover.blind'};card._stateEntities=['cover.blind'];card._ensurePress=()=>{};card._press={cancel(){}};
  card.shadowRoot={querySelector:selector=>selector==='style'?css:selector==='ha-card'?initial.surface:initial.surface.querySelector(selector),querySelectorAll:()=>[]};
  card._sliderInput=initial.input;const updates=[],binding={update:(...values)=>updates.push(values),destroy(){assert.fail('Compatible idle reports must retain the binding');}};card._sliderControl=binding;
  for(const position of [40,60])card.hass={connected:true,callService(){},states:{'cover.blind':{state:'opening',attributes:{current_position:position,supported_features:7}}}};
- assert.equal(card.shadowRoot.querySelector('input[type=range]'),initial.input);assert.equal(initial.slider.children[0],initial.svg);assert.equal(card._sliderControl,binding);assert.deepEqual(updates.map(args=>args[0]),[40,60]);assert.equal(updates[1][2].follow,true);
+ assert.equal(card.shadowRoot.querySelector('input[type=range]'),initial.input);assert.equal(initial.slider.children[0],initial.svg);assert.equal(card._sliderControl,binding);assert.deepEqual(updates.map(args=>args[0]),[40,60]);assert.equal(updates[1][2].follow,true);assert.equal(initial.slider.querySelector('.slider-state').textContent,'opening');assert.equal(initial.input.getAttribute('aria-description'),'opening');
 });
 
 test('activating an Activity icon opens one read-only detail and never starts its access action',()=>{
@@ -2421,4 +2443,71 @@ test('glance can hide reading labels independently of its title and accessible A
  assert.match(hidden,/<div class="title">Summary<\/div>/);assert.match(hidden,/<dt class="binary-state">Temperature<\/dt><dd>21 °C<\/dd>/);assert.match(hidden,/aria-label="Activity: Recall scene"/);assert.equal((hidden.match(/reading-name-hidden/g)||[]).length,2);
  card.setConfig({...config,variables:{...config.variables,show_reading_names:true}});card.hass=hass;assert.match(card.shadowRoot.innerHTML.split('</style>')[1],/<dt>Temperature<\/dt>/);
  assert.throws(()=>card.setConfig({...config,variables:{...config.variables,show_reading_names:'false'}}),/boolean/);
+});
+
+test('default app shortcut taps vibrate once and power on before selecting the app',async t=>{
+ const previous=globalThis.window,haptics=[],calls=[];globalThis.window={dispatchEvent:event=>{if(event.type==='haptic')haptics.push(event.detail);}};t.after(()=>{globalThis.window=previous;});
+ const entity='media_player.apple_tv',card=new MaraoCard(),config={template:'md_media_app_card',entity,name:'Video',variables:{app_source:'YouTube'}};
+ card.setConfig(config);const button=Object.assign(new EventTarget(),{disabled:false,focus(){}});card.shadowRoot.querySelector=selector=>selector==='[data-card-action]'?button:null;
+ let release,pending;const original=card._performAction.bind(card);card._performAction=(...args)=>(pending=original(...args));
+ card.hass={user:{id:'viewer'},connection:{connected:true},states:{[entity]:{state:'off',attributes:{}}},callService:async(domain,service,data)=>{calls.push([domain,service,data]);if(service==='turn_on')await new Promise(resolve=>{release=resolve;});}};
+ assert.match(card.shadowRoot.innerHTML,/data-card-action aria-label="Video"/);button.dispatchEvent(new Event('click'));
+ assert.deepEqual(haptics,['heavy']);assert.deepEqual(calls,[['media_player','turn_on',{entity_id:entity}]]);
+ release();await pending;assert.deepEqual(calls,[['media_player','turn_on',{entity_id:entity}],['media_player','select_source',{source:'YouTube',entity_id:entity}]]);assert.deepEqual(haptics,['heavy']);assert.deepEqual(card._config,config);
+});
+
+test('app shortcut launch skips redundant wake and stops on failed or stale wake requests',async t=>{
+ const previous=globalThis.window;globalThis.window={dispatchEvent(){}};t.after(()=>{globalThis.window=previous;});
+ const entity='media_player.apple_tv',action={action:'call-service',service:'media_player.select_source',data:{source:'Netflix'}},make=(state,callService)=>{const card=new MaraoCard();card.setConfig({template:'md_media_app_card',entity,variables:{app_source:'Netflix'}});card.hass={user:{id:'viewer'},connection:{connected:true},states:{[entity]:{state,attributes:{}}},callService};return card;};
+ const calls=[],card=make('idle',async(...args)=>calls.push(args));await card._performAction(action,entity);assert.equal(calls.length,1);assert.equal(calls[0][1],'select_source');
+ calls.length=0;card.hass={...card.hass,states:{[entity]:{state:'off',attributes:{}}},callService:async(...args)=>{calls.push(args);throw new Error('Power rejected');}};await card._performAction(action,entity);assert.equal(calls.length,1);assert.match(card._actionError,/Power rejected/);
+ for(const invalidate of [card=>card.setConfig({...card._config,name:'Changed'}),card=>{card._hass={...card._hass,user:{id:'other'}};},card=>{card._actionLive=false;},card=>{card._hass={...card._hass,connected:false};},card=>{card._hass.states[entity].state='unavailable';}]){
+  const requests=[];let release;const current=make('off',async(...args)=>{requests.push(args);await new Promise(resolve=>{release=resolve;});});const pending=current._performAction(action,entity);invalidate(current);release();await pending;assert.equal(requests.length,1,'Stale wake cannot launch an app');
+ }
+ for(const state of ['unknown','unavailable']){const current=make(state,()=>assert.fail('Unavailable shortcut must not send'));await current._performAction(action,entity);}
+ const preview=make('off',()=>assert.fail('Preview must not send'));preview._preview=true;await preview._performAction(action,entity);
+});
+test('Plex component retains browse content on HA updates, navigates within one sheet and switches TV without actions',async t=>{
+  const {MaraoPlexWatchCard}=await import('../../custom_components/marao_dashboard/frontend/MaraoPlex.js');
+  const beforeDocument=globalThis.document,beforeWindow=globalThis.window;
+  t.after(()=>{globalThis.document=beforeDocument;globalThis.window=beforeWindow;});
+  const node=tag=>Object.assign(new EventTarget(),{tagName:tag,children:[],dataset:{},style:{},attributes:new Map(),isConnected:true,
+    append(...items){for(const item of items){item.parentNode=this;this.children.push(item);}},replaceChildren(...items){this.children=[];this.append(...items);},
+    setAttribute(key,value){this.attributes.set(key,value);},getAttribute(key){return this.attributes.get(key);},removeAttribute(key){this.attributes.delete(key);},
+    focus(){},remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(child=>child!==this);},
+    querySelectorAll(selector){return this.children.flatMap(child=>[...(selector==='button'&&child.tagName==='button'||selector==='[data-play]'&&child.dataset.play!==undefined||selector==='[data-navigation]'&&child.dataset.navigation!==undefined?[child]:[]),...child.querySelectorAll(selector)]);},
+    querySelector(selector){return this.querySelectorAll(selector)[0]||null;}});
+  globalThis.document=Object.assign(new EventTarget(),{createElement:node});globalThis.window=Object.assign(new EventTarget(),{innerHeight:800,innerWidth:360});
+  const root={media_content_id:'plex://safe/server',media_content_type:'server'},folder={media_content_id:'plex://safe/1',media_content_type:'library',title:'Movies',can_expand:true};
+  const mapping={client_entity:'media_player.plex_safe',scan_clients_entity:'button.scan',app_source:'Plex',library_root:root};
+  const parent={type:'custom:marao-media-card',entity_id:'media_player.safe',name:'Living',apple_tv:{plex:mapping}};
+  const bedroom={...parent,name:'Bedroom',entity_id:'media_player.bedroom',apple_tv:{plex:{...mapping,client_entity:'media_player.plex_bedroom'}}};
+  const series={media_content_id:'plex://safe/100',media_content_type:'show',media_class:'tv_show',title:'Series',can_expand:true};
+  const calls=[],connection={},hass={connected:true,user:{id:'one'},language:'en',connection,states:{'media_player.safe':{state:'idle',attributes:{}},'media_player.bedroom':{state:'idle',attributes:{}}},callService:()=>assert.fail('browsing must not actuate'),callWS:async command=>{calls.push(command);return command.media_content_id===root.media_content_id?{...root,title:'Library',children:[folder]}:command.media_content_id===folder.media_content_id?{...folder,children:[series]}:{...series,children:[]};}};
+  const card=new MaraoPlexWatchCard();card.setConfig({parent,full:true});card.isConnected=true;
+  card.nativeOwner={localName:'hui-root',lovelace:{config:{views:[{title:'Media',cards:[parent,bedroom]}]}}};
+  card._surface=node('ha-card');card._toolbar=node('div');card._targetHost=node('div');card._body=node('div');card._status=node('p');card.hass=hass;await new Promise(resolve=>setImmediate(resolve));
+  card._inSheet=()=>true;
+  const grid=card._body.children;assert.equal(card._home.libraries[0].title,'Movies');
+  card.hass={...hass,states:{...hass.states,'sensor.other':{state:'2'}}};assert.equal(card._body.children,grid);assert.equal(calls.length,2);
+  const movieButton=card._body.querySelectorAll('button').find(button=>button.textContent==='Series'||button.children.some(child=>child.textContent==='Series'));
+  movieButton.onclick(new Event('click'));await new Promise(resolve=>setImmediate(resolve));assert.equal(card._folder.title,'Series');
+  card._toolbar.querySelectorAll('button').find(button=>button.textContent==='Back').onclick(new Event('click'));assert.equal(card._folder,null);
+  card._inSheet=()=>true;card._openBrowser(node('button'));assert.equal(card._expanded,true);assert.equal(card._popup,undefined);
+  const choice=card._targetHost.querySelectorAll('button').find(button=>button.textContent.includes('Bedroom'));
+  choice.dispatchEvent(new Event('click'));await new Promise(resolve=>setImmediate(resolve));assert.equal(card._selected.entity_id,'media_player.bedroom');assert.ok(calls.every(command=>command.type==='media_player/browse_media'));
+  card.preview=true;assert.equal(card._home,null);assert.equal(card._launch.request,undefined);
+});
+
+test('Plex component does not automatically retry failed reads or accept obsolete account results',async t=>{
+  const {MaraoPlexWatchCard}=await import('../../custom_components/marao_dashboard/frontend/MaraoPlex.js');
+  const parent={entity_id:'media_player.safe',apple_tv:{plex:{client_entity:'media_player.plex_safe',scan_clients_entity:'button.scan',app_source:'Plex',library_root:{media_content_type:'server',media_content_id:'plex://safe/server'}}}};
+  let calls=0,release;const connection={},hass={connected:true,user:{id:'one'},connection,states:{'media_player.safe':{state:'idle',attributes:{}}},callService(){},callWS:async()=>{calls++;throw new Error('Browse rejected');}};
+  const card=new MaraoPlexWatchCard();card.setConfig({parent});card.isConnected=true;card.hass=hass;await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(card._contentError,'Browse rejected');for(let index=0;index<4;index++){card.hass={...hass};card.preview=false;}assert.equal(calls,1);
+  const delayed={...hass,callWS:()=>new Promise(resolve=>{release=resolve;})};card._reset();card.hass=delayed;await new Promise(resolve=>setImmediate(resolve));
+  delayed.user.id='two';
+  const freshReads=[],fresh={...delayed,callWS:async command=>{freshReads.push(command);return{media_content_type:'server',media_content_id:'plex://safe/server',title:'New account',children:[]};}};card.hass=fresh;await new Promise(resolve=>setImmediate(resolve));
+  release({media_content_type:'server',media_content_id:'plex://safe/server',title:'Old account',children:[{media_content_type:'server',media_content_id:'plex://safe/server/Recommended',title:'Old private recommendations'}]});await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(card._home.libraries,[]);assert.equal(freshReads.length,1,'obsolete account work must not start recommendation reads in a new account');assert.doesNotMatch(JSON.stringify(card._home),/Old/);card._launch.cancel();
 });

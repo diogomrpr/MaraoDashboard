@@ -1,3 +1,4 @@
+const {climateConfigError,climateHumidity}=await import(new URL(`./MaraoClimate.js${new URL(import.meta.url).search}`,import.meta.url));
 const {activityTimestamp,activitySources,hasActivity}=await import(new URL(`./MaraoActivityModel.js${new URL(import.meta.url).search}`,import.meta.url));
 const popupLayouts=await import(new URL(`./MaraoPopupView.js${new URL(import.meta.url).search}`,import.meta.url));
 const {popupViewError}=await import(new URL(`./MaraoPopupLayout.js${new URL(import.meta.url).search}`,import.meta.url));
@@ -210,8 +211,9 @@ export function climateTemperatureChange(attributes, mode, direction) {
 }
 
 export function climateDefaultAction(modes, variables = {}) {
+  variables ||= {};
   const availableModes = Array.isArray(modes) ? modes.filter(Boolean).map(text) : [];
-  if (availableModes.length > 1 && variables.mode_selector_hash) {
+  if (availableModes.length > 1 && variables.enable_popup !== false && variables.mode_selector_hash) {
     return { action: "navigate", navigation_path: variables.mode_selector_hash, haptic: "heavy" };
   }
   if (availableModes.length === 1) {
@@ -910,6 +912,7 @@ function cardStyles() {
     .compact-header>.icon { flex:0 0 48px; width:48px; height:48px; align-self:flex-start; }
     .compact-copy:empty { display:none; }
     .compact-copy>.title, .compact-copy>.state, .compact-copy>.climate { grid-area:auto; }
+    .body.cover-card .title { font-size:calc(var(--font-size-primary,1.125rem) * 1.25); }
     .body.standard-control>.control { align-self:stretch; width:100%; margin-top:auto; }
     .body.standard-control.icon-only { justify-content:center; }
     .body.access-popup-action { display:grid; grid-template-columns:48px minmax(0,1fr); grid-template-rows:auto; grid-template-areas:none; gap:8px 12px; align-items:center; min-height:88px; }
@@ -990,18 +993,18 @@ function cardStyles() {
     .reading :is(ha-icon,ha-state-icon) { --mdc-icon-size:28px; }
     ha-card[data-glance] { background:transparent; border:0; box-shadow:none; overflow:visible; }
     .body.glance-card { display:block; padding:0; min-height:0; }
-    .body.glance-card .readings { margin:0; grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--font-size-primary,1.125rem) * 4.5)),1fr));grid-auto-rows:1fr;gap:8px; }
+    .body.glance-card .readings { margin:0; grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--font-size-primary,1.125rem) * 4.5)),1fr));grid-auto-rows:auto;gap:8px; }
     .glance-card>.title {margin-bottom:12px;}
-    .glance-card .reading {position:relative;box-sizing:border-box;padding:8px;gap:4px;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr;text-align:center;justify-items:center;align-content:start;border-radius:var(--ha-card-border-radius,20px);background:var(--marao-card-background,var(--ha-card-background,var(--card-background-color)));color:var(--marao-card-text-color,inherit);}
-    .glance-card .reading dt {grid-column:1;grid-row:3;height:auto;display:block;overflow:visible;color:var(--secondary-text-color);}
-    .glance-card .reading dd {grid-column:1;grid-row:2;height:auto;min-height:2.5em;white-space:normal;overflow:visible;font-size:var(--font-size-primary,1.125rem);overflow-wrap:anywhere;}
-    .glance-card .reading> :is(ha-icon,ha-state-icon,button) {grid-column:1;grid-row:1;box-sizing:border-box;width:48px;height:48px;padding:10px;border-radius:50%;background:var(--opacity-contrast-100,rgba(0,0,0,.08));}
-    .glance-card .reading:not(:has(>ha-icon,>ha-state-icon,>button)) {grid-template-rows:auto 1fr;}
-    .glance-card .reading:not(:has(>ha-icon,>ha-state-icon,>button)) dd {grid-row:1;}
-    .glance-card .reading:not(:has(>ha-icon,>ha-state-icon,>button)) dt {grid-row:2;}
-    .glance-card .reading.reading-name-hidden {grid-template-rows:auto auto;}
+    .glance-card .reading {position:relative;box-sizing:border-box;padding:10px 8px;row-gap:6px;grid-column:auto;grid-row:span 3;grid-template-columns:minmax(0,1fr);grid-template-rows:subgrid;text-align:center;justify-items:center;align-content:start;border-radius:var(--ha-card-border-radius,20px);background:var(--marao-card-background,var(--ha-card-background,var(--card-background-color)));color:var(--marao-card-text-color,inherit);}
+    .glance-card .reading dt {grid-column:1;grid-row:1;font-size:calc(var(--font-size-primary,1.125rem) * 2 / 3);height:auto;display:block;overflow:visible;color:var(--secondary-text-color);}
+    .glance-card .reading dd {grid-column:1;grid-row:3;height:auto;min-height:0;white-space:normal;overflow:visible;font-size:var(--font-size-primary,1.125rem);overflow-wrap:anywhere;}
+    .glance-card .reading> :is(ha-icon,ha-state-icon,button) {grid-column:1;grid-row:2;box-sizing:border-box;width:48px;height:48px;padding:10px;border-radius:50%;background:var(--opacity-contrast-100,rgba(0,0,0,.08));}
+    .glance-card .reading:not(:has(>ha-icon,>ha-state-icon,>button)), .glance-card .reading.reading-name-hidden {grid-row:span 2;}
+    .glance-card .reading:not(:has(>ha-icon,>ha-state-icon,>button)) dd, .glance-card .reading.reading-name-hidden dd {grid-row:2;}
+    .glance-card .reading.reading-name-hidden> :is(ha-icon,ha-state-icon,button) {grid-row:1;}
     .glance-card .reading.reading-name-hidden dt {height:1px;grid-area:auto;}
-    .glance-card .reading.reading-name-hidden:not(:has(>ha-icon,>ha-state-icon,>button)) {grid-template-rows:auto;}
+    .glance-card .reading.reading-name-hidden:not(:has(>ha-icon,>ha-state-icon,>button)) {grid-row:span 1;}
+    .glance-card .reading.reading-name-hidden:not(:has(>ha-icon,>ha-state-icon,>button)) dd {grid-row:1;}
     ha-card[data-glance].marao-press-surface::after {display:none;}
     ha-card[data-glance][data-marao-pressed] .reading::after {content:'';position:absolute;inset:0;border-radius:inherit;background:var(--primary-text-color);opacity:.08;pointer-events:none;}
     .reading-activity {border:0;color:inherit;cursor:pointer;min-width:48px;min-height:48px;}
@@ -1100,6 +1103,30 @@ function cardStyles() {
     .body.slider-header, .body.slider-header.binary-card:not(:has(>.state)) { grid-template-columns:minmax(0,1fr) auto; grid-template-areas:'title icon' 'state state' 'control control'; }
     .body.slider-header:not(:has(>.icon)) .title { grid-column:1/-1; }
     .body.standard-control.slider-header { display:flex; }
+    .body.climate-card {display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto 1fr auto;grid-template-areas:'title target' 'climate target' 'state target' 'modes modes';gap:4px 12px;padding:8px 14px;min-height:0;}
+    .body.climate-card:not(:has(.climate-mode-picker)) {grid-template-rows:auto 1fr auto;grid-template-areas:'title target' 'climate target' 'state target';}
+    .body.climate-card>.title {grid-area:title;font-size:var(--font-size-primary,1.125rem);}
+    .body.climate-card>.climate-readings {grid-area:climate;min-width:0;overflow-wrap:anywhere;}
+    .body.climate-card .current-temperature {font-size:calc(var(--font-size-primary,1.125rem) * 2.56);line-height:1.2;}
+    .climate-humidity,.climate-activity {font-size:var(--font-size-secondary,1rem);line-height:1.25;}
+    .body.climate-card>.state {display:none;}
+    .body.climate-card>.climate-pending {grid-area:state;}
+    .body.climate-card>.climate-number-control {grid-area:target;justify-self:end;align-self:stretch;}
+    .body.climate-card .climate-stepper {box-sizing:border-box;min-width:60px;min-height:134px;height:100%;padding:3px;gap:4px;max-width:100%;}
+    .body.climate-card .number-value {height:auto;white-space:normal!important;overflow:visible;}
+    .body.climate-card .climate-stepper button {width:48px;height:48px;}
+    .body.climate-card>.icon {grid-column:1;grid-row:auto;justify-self:start;}
+    .body.climate-card.climate-detail {grid-template-rows:auto auto auto auto;grid-template-areas:'title title' 'climate climate' 'modes modes' '. target';}
+    .body.climate-card.climate-detail:has(.climate-pending) {grid-template-areas:'title title' 'climate climate' 'state state' 'modes modes' '. target';}
+    .climate-modes {display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;}
+    .climate-modes button {position:relative;flex:0 0 48px;width:48px;height:48px;padding:10px;}
+    .climate-modes ha-icon {--mdc-icon-size:28px;}
+    .climate-modes button.active {background:var(--marao-icon-background,var(--primary-color));color:var(--marao-icon-color,var(--primary-text-color));}
+    .mode-check {position:absolute;right:1px;bottom:0;font-size:12px;line-height:1;}
+    @container marao-card (max-width:190px) {
+      .body.climate-card {grid-template-columns:minmax(0,1fr);grid-template-areas:'title' 'climate' 'state' 'target' 'modes';}
+      .body.climate-card.climate-detail {grid-template-areas:'title' 'climate' 'state' 'modes' 'target';}
+    }
     .body.wallbox-card { grid-template-columns:minmax(0,1fr) 64px; grid-template-areas:'value icon' 'title icon' 'wallbox wallbox'; gap:12px 20px; padding:24px; min-height:160px; }
     .body.wallbox-card .wallbox-current-control { display:contents; }
     .body.wallbox-card .wallbox-value { grid-area:value; min-width:0; align-self:end; text-align:left; white-space:normal; overflow-wrap:anywhere; font-size:calc(3.5 * var(--font-size-primary,1.125rem)); font-weight:800; line-height:1.05; opacity:1; }
@@ -1222,6 +1249,7 @@ export class MaraoCard extends BaseElement {
     if (config.template === 'md_room_card' && config.variables?.climate_entity != null && config.variables.climate_entity !== '' && !/^climate\.[a-z0-9_]+$/.test(config.variables.climate_entity)) throw new Error(localize('room.invalid_climate',this._hass,{},'Choose a climate entity.'));
     if(config.template==='md_media_app_card'){const error=mediaAppLogoError(config.variables?.app_logo,this._hass);if(error)throw new Error(error);}
     if(config.template==='md_glance_card' && Object.hasOwn(config.variables || {},'show_reading_names') && typeof config.variables.show_reading_names!=='boolean')throw new Error(String(this._hass?.language||'').startsWith('pt')?'Mostrar nomes das leituras tem de ser um valor booleano.':'Show reading labels must be a boolean.');
+    if(config.template==='md_climate_card'){const error=climateConfigError(config.variables,this._hass);if(error)throw new Error(error);}
     if(config.template==='md_people_card'){const error=peopleError(config);if(error)throw new Error(collectionLabel(error,this._hass));}
     this.shadowRoot?.querySelector("marao-slide-to-open")?._clearFeedback?.();
     this._layoutMetadata = {};
@@ -1404,11 +1432,15 @@ export class MaraoCard extends BaseElement {
       const coverRange = ['md_cover_card','md_fan_card'].includes(this._config.template) && domainOf(this._config.entity) === 'cover';
       const oldRange = coverRange ? surface.querySelector('input[type=range]') : null;
       const newRange = oldRange ? next.querySelector('input[type=range]') : null;
-      const sameRange = oldRange && newRange && ['data-slider-key','min','max','step'].every(key => oldRange.getAttribute(key) === newRange.getAttribute(key));
+      const sameRange = oldRange && newRange && ['data-slider-key','min','max','step'].every(key => oldRange.getAttribute(key) === newRange.getAttribute(key))
+        && Boolean(oldRange.parentElement.querySelector('.slider-state')) === Boolean(newRange.parentElement.querySelector('.slider-state'));
       if (sameRange) {
         const snapRange = oldRange.disabled || newRange.disabled;
         oldRange.disabled = newRange.disabled;
         for (const key of ['aria-label','title']) oldRange.setAttribute(key, newRange.getAttribute(key));
+        const oldLabel = oldRange.parentElement.querySelector('.slider-state');
+        const newLabel = newRange.parentElement.querySelector('.slider-state');
+        if (oldLabel && newLabel) { oldLabel.textContent = newLabel.textContent; oldRange.setAttribute('aria-description', newLabel.textContent); }
         this._sliderControl?.update(Number(newRange.dataset.sliderCurrent), Number(newRange.value), {follow: !this._sliderTargets.has(oldRange.dataset.sliderKey), immediate: snapRange || this._hass?.connected === false || this._hass?.connection?.connected === false});
       }
       const roomBottom = this._config.template === 'md_room_card' && this._renderedConfig === this._config ? surface.querySelector('.room-bottom') : null;
@@ -1610,7 +1642,7 @@ export class MaraoCard extends BaseElement {
     this._sliderGesture = null;
   }
 
-  _range(entity, state, kind, disabled = false) {
+  _range(entity, state, kind, disabled = false, stateLabel) {
     if (["md_light_card", "md_fan_card"].includes(kind) && this._config.variables?.enable_slider === false) return "";
     const attrs = state.attributes || {};
     if (kind === "md_light_card" && Array.isArray(attrs.supported_color_modes)
@@ -1648,7 +1680,7 @@ export class MaraoCard extends BaseElement {
     const stored = this._sliderTargets.get(key);
     const value = Number.isFinite(stored) && Math.abs(stored - current) > step / 2 ? stored : current;
     if (stored != null && value === current) this._sliderTargets.delete(key);
-    return sliderMarkup({ key, current, value, min, max, step, label: modeLabel, disabled });
+    return sliderMarkup({ key, current, value, min, max, step, label: modeLabel, disabled, stateLabel });
   }
 
   _graphAvailability(entity, hass = this._hass) {
@@ -1952,8 +1984,10 @@ export class MaraoCard extends BaseElement {
     const currentTemperature = climate && climate.current_temperature != null ? text(climate.current_temperature) : "";
     const climateReadingLabel = currentTemperature ? localize("climate.current_temperature", this._hass, { value: currentTemperature }, `Current ${currentTemperature}`) : "";
     const climateModes = Array.isArray(climate?.hvac_modes) ? climate.hvac_modes.filter(Boolean).map(text) : [];
-    const modeButtons = kind === "md_climate_card" && config.variables?.show_mode_buttons
-      ? `<div class="climate-mode-picker marao-dropdown" data-scene-picker data-scene-identity="${esc(JSON.stringify([entity,climateModes]))}"><button type="button" data-scene-select aria-label="${esc(localize('climate.modes', this._hass, {}, 'Climate modes'))}" aria-haspopup="menu" aria-expanded="false"${controlsDisabled || !climateModes.length ? ' disabled' : ''}><span data-scene-label>${esc(climateModeLabel(value, this._hass))}</span><ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon></button><div class="marao-dropdown-options" data-scene-menu role="menu" hidden>${climateModes.map(mode => `<button class="climate-mode${mode === value ? ' active' : ''}" type="button" role="menuitemradio" tabindex="-1" data-climate-mode="${esc(mode)}" data-scene-option="${esc(mode)}" aria-checked="${mode === value}"${controlsDisabled ? ' disabled' : ''}><ha-icon icon="${esc(climateModeIcon(mode))}" aria-hidden="true"></ha-icon><span>${esc(climateModeLabel(mode, this._hass))}</span><ha-icon icon="mdi:check" aria-hidden="true"></ha-icon></button>`).join('')}</div></div>` : '';
+    const climateDetail=Boolean(climate && this.climateDetail);
+    const modeHeading=`${localize('climate.mode',this._hass,{},String(this._hass?.language||'').startsWith('pt')?'Modo':'Mode')} - ${climateModeLabel(value,this._hass)}`;
+    const modeButtons = climate && (climateDetail || variables.enable_popup===false && variables.show_mode_buttons!==false)
+      ? `<div class="climate-mode-picker"><div class="climate-mode-heading">${esc(modeHeading)}</div><div class="climate-modes" role="group" aria-label="${esc(modeHeading)}">${climateModes.map(mode=>`<button class="climate-mode${mode===value?' active':''}" type="button" data-climate-mode="${esc(mode)}" aria-label="${esc(climateModeLabel(mode,this._hass))}" aria-pressed="${mode===value}"${controlsDisabled?' disabled':''}><ha-icon icon="${esc(climateModeIcon(mode))}" aria-hidden="true"></ha-icon>${mode===value?'<span class="mode-check" aria-hidden="true">✓</span>':''}</button>`).join('')}</div></div>` : '';
     const shortcuts = kind === "md_wallbox_current_card"
       ? (Array.isArray(config.variables?.shortcuts) ? config.variables.shortcuts : []).map(Number).filter(Number.isFinite).slice(0, 3)
       : [];
@@ -1974,13 +2008,15 @@ export class MaraoCard extends BaseElement {
     const sceneDropdown = kind === 'md_scene_card' && ['input_select','select'].includes(domainOf(entity))
       ? `<div class="scene-options marao-dropdown" data-scene-picker data-scene-identity="${esc(JSON.stringify([entity,sceneOptions]))}"><button type="button" data-scene-select aria-label="${esc(this._label(entity, config, state))}" aria-haspopup="menu" aria-expanded="false"${controlsDisabled || !sceneOptions.length ? " disabled" : ""}><span data-scene-label>${esc(entityStateLabel(state, entity, kind, this._hass))}</span><ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon></button><div class="marao-dropdown-options" data-scene-menu role="menu" aria-label="${esc(this._label(entity, config, state))}" hidden>${sceneOptions.map(option=>`<button type="button" role="menuitemradio" tabindex="-1" data-scene-option="${esc(option)}" aria-checked="${!controlsDisabled && option === value}"${controlsDisabled ? " disabled" : ""}><span>${esc(option)}</span><ha-icon icon="mdi:check" aria-hidden="true"></ha-icon></button>`).join('')}</div></div>`
       : "";
-    const climateControls = climate ? `<div class="climate current-temperature" aria-label="${esc(climateReadingLabel)}">${esc(currentTemperature || '—')}</div>` : "";
+    const humidity=climate?climateHumidity(variables,this._hass):null;
+    const climateControls = climate ? `<div class="climate-readings"><div class="climate current-temperature" aria-label="${esc(climateReadingLabel)}">${esc(currentTemperature || '—')}</div>${humidity===null?'':`<div class="climate-humidity" aria-label="${esc(localize('climate.humidity',this._hass,{},String(this._hass?.language||'').startsWith('pt')?'Humidade':'Humidity'))}">${esc(humidity)}</div>`}${config.show_state===false?'':`<div class="climate-activity">${esc(interactionUnavailable?'—':climateModeLabel(climate.hvac_action || state.state,this._hass))}</div>`}</div>` : "";
     const previewAvailable = !loading && !interactionUnavailable && this._hass?.connected !== false && this._hass?.connection?.connected !== false;
     const mediaAvailable = previewAvailable && value !== "off";
     let media = "";
     if (camera && this.preview) media = `<div class="camera-preview">${!interactionUnavailable && pictureURL ? `<img src="${esc(pictureURL)}" alt="${esc(this._label(entity, config, state))}">` : ''}<span>${esc(localize(!interactionUnavailable && pictureURL ? 'camera.snapshot' : loading ? 'common.loading' : 'common.unavailable', this._hass))}</span></div>`;
 
-    const range = this._range(entity, state, kind, controlsDisabled);
+    const range = this._range(entity, state, kind, controlsDisabled, kind === 'md_cover_card' && config.show_state !== false ? displayValue : undefined);
+    const stateInSlider = kind === 'md_cover_card' && Boolean(range);
     const artwork = !problem && kind === "md_media_card" && (!variables.now_playing || !["idle", "off", "standby"].includes(value)) && mediaAvailable && variables.md_show_background_art !== false && state.attributes?.entity_picture
       ? `<div class="media-artwork" aria-hidden="true"><img src="${esc(state.attributes.entity_picture)}" alt=""></div>` : "";
     const glance = kind === "md_glance_card";
@@ -2047,6 +2083,7 @@ export class MaraoCard extends BaseElement {
     const isAction = ["md_switch_card", "md_light_card", "md_cover_card", "md_fan_card", "md_access_card"].includes(kind);
     const popupHash = config.variables?.popup_hash;
     let action = config.tap_action || (popupHash ? { action: "navigate", navigation_path: popupHash, haptic: "heavy" } : isAction ? { action: "toggle", haptic: "heavy" } : null);
+    if(kind==='md_media_app_card' && !config.tap_action && typeof variables.app_source==='string' && variables.app_source.trim())action={action:'call-service',service:'media_player.select_source',data:{source:variables.app_source},haptic:'heavy'};
     if (kind === "md_climate_card" && !config.tap_action) {
       action = climateDefaultAction(climateModes, config.variables);
     }
@@ -2113,9 +2150,9 @@ export class MaraoCard extends BaseElement {
     }).join("")}</div>` : "";
     const problemMessage = !camera && problem && (problem.kind !== "loading" || !showState) ? `<div class="problem" role="${problem.kind === "error" ? "alert" : "status"}"><ha-icon icon="${problem.kind === "loading" ? "mdi:progress-clock" : problem.kind === "neutral" ? "mdi:help-circle-outline" : "mdi:alert-circle-outline"}" aria-hidden="true"></ha-icon><span>${esc(problemLabel(problem, this._hass))}</span></div>` : "";
     const formattedReading = !iconOnly && formatting && (['md_graph_card','md_toggle_graph_card','md_sensor_card','md_base_card'].includes(kind) || kind === 'md_switch_card' && variables.power_entity);
-    const stateMarkup = showState && (!activityTimestamp(entity,state) || customLabel || variables.md_label_prefix) && kind !== "md_wallbox_current_card" ? `<div class="state${!displayValue ? " placeholder" : ""}">${esc(displayValue || "—")}</div>` : "";
+    const stateMarkup = showState && !stateInSlider && (!activityTimestamp(entity,state) || customLabel || variables.md_label_prefix) && kind !== "md_wallbox_current_card" ? `<div class="state${!displayValue ? " placeholder" : ""}">${esc(displayValue || "—")}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${glance ? " data-glance" : ""}${kind === "md_room_card" ? " data-room" : ""}${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem,null,!glance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? " climate-card" : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}${accessPopup ? " access-popup-action" : ""}${accessPopup && kind === "md_access_action_card" ? " access-close-action" : ""}">${accessPopup ? `${accessIcon}${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${details}` : uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${coverActions}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${historyControl}${historyEntry && graphStatus === 'error' ? `<button type="button" data-graph-retry aria-label="${esc(localize('common.retry',this._hass,{},'Retry'))}"><ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon></button>` : ''}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
+    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${glance ? " data-glance" : ""}${kind === "md_room_card" ? " data-room" : ""}${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem,null,!glance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? ` climate-card${climateDetail?" climate-detail":""}` : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}${kind === "md_cover_card" ? " cover-card" : ""}${accessPopup ? " access-popup-action" : ""}${accessPopup && kind === "md_access_action_card" ? " access-close-action" : ""}">${accessPopup ? `${accessIcon}${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${details}` : uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${coverActions}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${historyControl}${historyEntry && graphStatus === 'error' ? `<button type="button" data-graph-retry aria-label="${esc(localize('common.retry',this._hass,{},'Retry'))}"><ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon></button>` : ''}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
     for (const button of this.shadowRoot.querySelectorAll('[data-exhaust-action]')) button.addEventListener('click', event => {
       event.stopPropagation(); haptic('heavy'); this._coverAction(entity, button.dataset.exhaustAction);
     });
@@ -2224,10 +2261,13 @@ export class MaraoCard extends BaseElement {
         onStart: gesture => {
           this._sliderGesture = gesture;
           gesture.refresh = state => {
-            this._sliderControl.update(this._sliderCurrent(kind, state.attributes, entity));
-            const label = this.shadowRoot.querySelector('.state');
+            const label = this.shadowRoot.querySelector('.state,.slider-state');
             const binary = binaryState(entity, state, kind);
-            if (label && binary === null) label.textContent = entityStateLabel(state, entity, kind, this._hass);
+            if (label && binary === null) {
+              label.textContent = `${this._config.variables?.custom_label || this._config.variables?.md_label_prefix || ''}${entityStateLabel(state, entity, kind, this._hass)}`;
+              if (label.classList.contains('slider-state')) input.setAttribute('aria-description', label.textContent);
+            }
+            this._sliderControl.update(this._sliderCurrent(kind, state.attributes, entity));
             if (binary !== null) {
               if (card) card.dataset.binaryState = String(binary);
               const accessible = this.shadowRoot.querySelector('[data-light-color],.icon[role="img"],.binary-state[role="img"]');
@@ -2259,6 +2299,7 @@ export class MaraoCard extends BaseElement {
       });
     }
 
+    this.shadowRoot.querySelectorAll('[data-climate-mode]').forEach(button=>button.addEventListener('click',event=>{event.stopPropagation();if(!button.disabled)this._setClimateMode(entity,button.getAttribute('data-climate-mode'));}));
     this.shadowRoot.querySelectorAll("[data-number-step]").forEach((button) => {
       button.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -2379,7 +2420,25 @@ export class MaraoCard extends BaseElement {
   _performAction(action, entity) {
     if (this.preview) return;
     if (this._config.template === 'md_camera_card' && action?.action === 'fullscreen') { haptic('heavy'); return this._camera?.fullscreen(); }
+    if(this._config.template==='md_media_app_card' && isServiceAction(action) && (action.service||action.perform_action)==='media_player.select_source'){
+      const target=action.target?.entity_id||action.entity_id||action.data?.entity_id||action.service_data?.entity_id||entity;
+      if(typeof target==='string' && target.startsWith('media_player.') && !action.target?.area_id && !action.target?.device_id)return this._launchMediaApp(action,target);
+    }
     return performAction(this._hass, action, entity, isServiceAction(action) ? serviceOutcome(this) : undefined);
+  }
+
+  async _launchMediaApp(action, target) {
+    const config=this._config,account=this._hass?.user?.id,connection=this._hass?.connection;
+    if(this.preview||!serviceConnectionReady(this._hass)||!serviceTargetReady(this._hass,target)||this._actionLive===false)return;
+    haptic('heavy');
+    const report=serviceOutcome(this),request=this._actionRequest;
+    const current=()=>!this.preview && this._actionLive!==false && this._config===config && this._actionRequest===request && this._hass?.user?.id===account && this._hass?.connection===connection && serviceConnectionReady(this._hass) && serviceTargetReady(this._hass,target);
+    if(stateOf(this._hass,target).state==='off'){
+      let powered=false;
+      await callServiceWithNotification(this._hass,'media_player','turn_on',{entity_id:target},(status,error)=>{report(status,error);if(status==='success')powered=true;});
+      if(!powered||!current())return;
+    }
+    if(current())return callServiceWithNotification(this._hass,'media_player','select_source',{...(action.data??action.service_data??{}),entity_id:target},report);
   }
 
   _callService(domain, service, data, target, intent, observer) {
@@ -2901,7 +2960,7 @@ export class MaraoPopupCard extends BaseElement {
     }
     for (const config of Array.isArray(this._config.cards) ? this._config.cards : []) {
       if (renderId !== this._childrenRenderId) return;
-      try { const card = helpers?.createCardElement ? helpers.createCardElement(config) : document.createElement("div"); if (card.setConfig) card.setConfig(config); card.nativeOwner=this.nativeOwner || this;card.preview=this.preview; card.hass = this._hass; host.append(card); } catch (error) { const message = document.createElement("p"); message.textContent = error.message; host.append(message); }
+      try { const card = helpers?.createCardElement ? helpers.createCardElement(config) : document.createElement("div"); if (card.setConfig) card.setConfig(config); card.climateDetail=!this._config.entity_group && this._config.cards?.some(child=>child.template==='md_climate_card'&&child.variables?.show_mode_buttons);card.nativeOwner=this.nativeOwner || this;card.preview=this.preview; card.hass = this._hass; host.append(card); } catch (error) { const message = document.createElement("p"); message.textContent = error.message; host.append(message); }
     }
   }
   _updateChildrenHass() {

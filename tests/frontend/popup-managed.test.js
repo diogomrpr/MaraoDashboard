@@ -67,3 +67,11 @@ test('raw functional overrides detach without loss and adoption requires functio
   const raw={type:'sections',path:'raw',sections:[{cards:[{type:'markdown',content:'Never replace',future:[]}]}]};
   const uncertain=adoptManagedView(raw,owner,source());assert.equal(uncertain.view,null);assert.deepEqual(uncertain.custom,raw.sections);
 });
+
+test('disabling and re-enabling climate details retains authored placement, slots and custom content',()=>{
+  const climate={template:'md_climate_card',entity_id:'climate.safe',variables:{humidity_entity:'sensor.safe'}},generated={type:'sections',path:'climate-details',sections:[{type:'grid',cards:[{type:'custom:marao-climate-card',entity_id:'climate.safe',variables:{humidity_entity:'sensor.safe',show_mode_buttons:true}}]}]};
+  const view=createManagedView(generated,climate);view.sections[0].cards[0].name='Custom';view.sections[0].cards[0].grid_options={columns:7,rows:8};view.sections[0].cards.push({type:'markdown',content:'Keep me',unknown:[]});
+  const saved=structuredClone(view),off=reconcileManagedView(view,{...climate,variables:{...climate.variables,enable_popup:false}},null);
+  assert.equal(off.marao_popup.active,false);assert.deepEqual(off.sections,saved.sections);assert.deepEqual(off.marao_popup.slots,saved.marao_popup.slots);
+  const on=reconcileManagedView(off,climate,generated);assert.equal(on.marao_popup.active,true);assert.deepEqual(on.sections,saved.sections);assert.deepEqual(view,saved);
+});

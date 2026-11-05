@@ -857,7 +857,16 @@
                     "source": "F1 TV",
                     "logo": "f1-tv"
                   }
-                ]
+                ],
+                "plex": {
+                  "client_entity": "media_player.marao_dashboard_test_plex_player",
+                  "scan_clients_entity": "button.marao_dashboard_test_plex_scan",
+                  "app_source": "Plex",
+                  "library_root": {
+                    "media_content_type": "server",
+                    "media_content_id": "plex://marao-fixture/server"
+                  }
+                }
               },
               "template": "md_media_card",
               "id": "card-1"
@@ -955,6 +964,31 @@
               "apple_tv": false,
               "template": "md_media_card",
               "id": "card-4"
+            }
+          ]
+        },
+        {
+          "columns": 1,
+          "entities": [
+            {
+              "id": "plex-bedroom",
+              "template": "md_media_card",
+              "entity_id": "media_player.marao_dashboard_test_plex_bedroom",
+              "name": "Rivulet Bedroom (simulated)",
+              "apple_tv": {
+                "plex": {
+                  "client_entity": "media_player.marao_dashboard_test_plex_player_bedroom",
+                  "scan_clients_entity": "button.marao_dashboard_test_plex_scan",
+                  "app_source": "Plex",
+                  "library_root": {
+                    "media_content_type": "server",
+                    "media_content_id": "plex://marao-fixture/server"
+                  },
+                  "playback_app": "rivulet",
+                  "browse_entity": "media_player.marao_dashboard_test_plex_player_bedroom"
+                },
+                "remote_entity": "remote.marao_dashboard_test_plex_bedroom"
+              }
             }
           ]
         }

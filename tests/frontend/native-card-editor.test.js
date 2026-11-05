@@ -11,6 +11,64 @@ import {createManagedView} from '../../custom_components/marao_dashboard/fronten
 const card=id=>catalog.cards.find(item=>item.id===id);
 const harnessContexts=new WeakSet();
 
+const plexOptions=()=>({client_entity:'media_player.plex_safe',scan_clients_entity:'button.plex_scan',app_source:'Plex',library_root:{media_content_type:'server',media_content_id:'plex://safe-server/server'},future:{keep:[]}});
+
+test('Plex setup stays with the existing Apple TV and preserves Save, Cancel and opaque fields',t=>{
+  const options={remote_entity:'remote.safe',apps:[],plex:plexOptions(),future:false};
+  const f=nativeFormHarness(t,{type:'custom:marao-media-card',entity_id:'media_player.safe',apple_tv:options},{language:'pt',states:{}}),saves=[];
+  const dialog=globalThis.document.createElement('div'),content=dialog.querySelector('.dialog-content');
+  f.editor._dialog=()=>dialog;f.editor._closeDialog=()=>{};f.editor._openMediaOptions({entity_id:'media_player.safe',apple_tv:options},value=>saves.push(value));
+  const form=f.forms.find(form=>form.schema.some(field=>field.name==='client_entity'));
+  assert.equal(form.schema.find(field=>field.name==='client_entity').label,'Cliente Plex');
+  form.change({...form.data,app_source:'Custom Plex'});assert.equal(saves.length,0);
+  content.querySelector('[data-close]').dispatchEvent(new Event('click'));assert.equal(saves.length,0);
+  content.querySelector('[data-save]').dispatchEvent(new Event('click'));assert.deepEqual(saves[0],{...options,plex:{...options.plex,app_source:'Custom Plex'}});
+  assert.deepEqual(options.plex,plexOptions());
+  form.change({...form.data,enabled:false});content.querySelector('[data-save]').dispatchEvent(new Event('click'));assert.equal(saves.at(-1).plex,false);
+});
+
+test('Plex setup read failure leaves the draft and saved parent unchanged without device calls',async t=>{
+  const f=nativeFormHarness(t,{type:'custom:marao-media-card',entity_id:'media_player.safe',apple_tv:{plex:plexOptions()}},{language:'en',user:{id:'safe'},connection:{},states:{},callWS:async()=>{throw new Error('Browse rejected');},callService:()=>assert.fail('setup must be read-only')});
+  const create=globalThis.document.createElement;
+  globalThis.document.createElement=()=>{const node=create();node.setAttribute=()=>{};return node;};
+  const dialogs=[],saves=[];f.editor._dialog=()=>{const dialog=globalThis.document.createElement('div');dialog.open=true;dialogs.push(dialog);return dialog;};f.editor._closeDialog=()=>{};f.editor._moveHaptic=()=>{};
+  f.editor._openMediaOptions({entity_id:'media_player.safe',apple_tv:{plex:plexOptions()}},value=>saves.push(value));
+  const section=dialogs[0].querySelector('.dialog-content').querySelector('[data-plex-options]');
+  section.children.at(-1).onclick();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(dialogs.length,2);assert.equal(dialogs[1].querySelector('.dialog-content').children[0].textContent,'Browse rejected');
+  assert.equal(saves.length,0);assert.deepEqual(f.editor._config.apple_tv.plex,plexOptions());
+});
+
+test('Apple TV playback app switches to Rivulet without requiring or replacing Plex client choices',t=>{
+  const options={remote_entity:'remote.safe',apps:[],plex:plexOptions(),future:false};
+  const f=nativeFormHarness(t,{type:'custom:marao-media-card',entity_id:'media_player.safe',apple_tv:options},{language:'en',states:{}}),saves=[];
+  const dialog=globalThis.document.createElement('div'),content=dialog.querySelector('.dialog-content');
+  f.editor._dialog=()=>dialog;f.editor._closeDialog=()=>{};f.editor._openMediaOptions({entity_id:'media_player.safe',apple_tv:options},value=>saves.push(value));
+  const form=f.forms.find(form=>form.schema.some(field=>field.name==='playback_app'));
+  assert.deepEqual(form.schema.find(field=>field.name==='playback_app').selector.select.options.map(option=>option.value),['plex','rivulet']);
+  content.querySelector('[data-save]').dispatchEvent(new Event('click'));assert.deepEqual(saves[0],options);
+  form.change({...form.data,playback_app:'rivulet'});
+  const current=f.forms.at(-1);assert.equal(current.schema.some(field=>field.name==='client_entity'),false);
+  assert.equal(current.schema.some(field=>field.name==='scan_clients_entity'),false);
+  assert.equal(current.schema.some(field=>field.name==='browse_entity'),true);
+  content.querySelector('[data-save]').dispatchEvent(new Event('click'));
+  assert.deepEqual(saves.at(-1),{...options,plex:{...options.plex,playback_app:'rivulet'}});
+  assert.deepEqual(options.plex,plexOptions());
+});
+
+test('Rivulet setup can select the configured server before any session exists, with no device or server writes',async t=>{
+  const options={remote_entity:'remote.safe',apps:[],plex:{playback_app:'rivulet',library_root:plexOptions().library_root,future:[]}},calls=[];
+  const f=nativeFormHarness(t,{type:'custom:marao-media-card',entity_id:'media_player.safe',apple_tv:options},{language:'en',user:{id:'safe'},connection:{},states:{},callService:()=>assert.fail('read-only setup'),callWS:async command=>{calls.push(command);return command.type==='config/device_registry/list'?[{name:'Configured server',identifiers:[['plex','real-safe-server']]}]:[];}});
+  const create=globalThis.document.createElement;globalThis.document.createElement=()=>{const node=create();node.setAttribute=()=>{};return node;};
+  const dialogs=[],saves=[];f.editor._dialog=()=>{const node=globalThis.document.createElement('div');node.open=true;dialogs.push(node);return node;};f.editor._closeDialog=()=>{};f.editor._moveHaptic=()=>{};
+  f.editor._openMediaOptions({entity_id:'media_player.safe',apple_tv:options},value=>saves.push(value));
+  const content=dialogs[0].querySelector('.dialog-content');content.querySelector('[data-plex-options]').children.at(-1).onclick();await new Promise(resolve=>setImmediate(resolve));
+  const choose=dialogs[1].querySelector('.dialog-content').children.find(node=>node.textContent==='Use this server: Configured server');assert.ok(choose);choose.onclick();
+  assert.equal(saves.length,0);content.querySelector('[data-save]').dispatchEvent(new Event('click'));
+  assert.deepEqual(saves[0],{...options,plex:{...options.plex,library_root:{media_content_type:'server',media_content_id:'plex://real-safe-server/server'}}});
+  assert.ok(calls.every(command=>['config/device_registry/list','config/entity_registry/list'].includes(command.type)));
+});
+
 function nativeFormHarness(t,config,hass={language:'en',states:{}}) {
   if(!harnessContexts.has(t)){const previous=globalThis.document;t.after(()=>{globalThis.document=previous;});harnessContexts.add(t);}
   const node=()=>Object.assign(new EventTarget(),{children:[],nodes:new Map(),style:{},dataset:{},append(...items){this.children.push(...items);},replaceChildren(...items){this.children=items;},querySelector(selector){if(!this.nodes.has(selector))this.nodes.set(selector,node());return this.nodes.get(selector);},querySelectorAll(){return [];}});
@@ -468,4 +526,10 @@ test('glance label visibility defaults on and preserves names and native options
  form.change({...form.data,var__show_reading_names:false});assert.deepEqual(events.at(-1),{...original,variables:{...original.variables,show_reading_names:false}});
  form.change({...form.data,var__show_reading_names:true});assert.equal(events.at(-1).variables.entity1_name,'Temperature');assert.equal(events.at(-1).variables.show_reading_names,true);
  const count=events.length;form.change({...form.data,var__show_reading_names:'false'});assert.equal(events.length,count);assert.match(editor.shadowRoot.querySelector('[data-status]').textContent,/booleano/);
+});
+
+test('climate humidity clearing and popup edits preserve authored layout and unknown options',()=>{
+  const entry=card('md_climate_card'),source={type:'custom:marao-climate-card',entity:'climate.safe',popup_view:'details',variables:{humidity_entity:'sensor.missing',enable_popup:false,show_mode_buttons:false,future:[]},grid_options:{columns:9,rows:7},tap_action:{action:'none'},future:{keep:false}};
+  const data=nativeCardFormData(source,entry),next=patchNativeCard(source,entry,data,{...data,var__humidity_entity:'',var__enable_popup:true});
+  const expected=structuredClone(source);delete expected.variables.humidity_entity;expected.variables.enable_popup=true;assert.deepEqual(next,expected);assert.equal(source.variables.humidity_entity,'sensor.missing');
 });

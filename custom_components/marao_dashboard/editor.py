@@ -182,6 +182,8 @@ EDITOR_CATALOG: dict[str, Any] = {
             "variables": [
                 _field("show_graph", "Temperature graph", "boolean", default=False),
                 _field("graph_entity", "Graph entity", "entity", domains=["sensor"]),
+                _field("humidity_entity", "Humidity sensor", "entity", domains=["sensor"]),
+                _field("enable_popup", "Enable climate popup", "boolean", default=True),
                 _field("show_mode_buttons", "Mode buttons", "boolean", default=True),
                 _field("graph_color", "Graph color", "color", advanced=True),
                 _field("setpoint_label", "Setpoint label", "text", advanced=True),

@@ -767,3 +767,30 @@ async def test_netatmo_fixture_browses_native_camera_folders_and_timestamp_keys(
     rows = await source.async_browse_media(SimpleNamespace(identifier="events/" + package.CAMERA_ID))
     assert len(rows.children) == 3
     assert all(row.can_play and row.media_content_id.rsplit("/", 1)[1].isdigit() for row in rows.children)
+async def test_plex_fixture_browses_and_resumes_only_its_fictional_library():
+    fixture = load_fixture("marao_test_media/media_player.py")
+    client = fixture.MaraoTestPlexPlayer("Marao Dashboard Test Plex Player")
+    client.async_write_ha_state = Mock()
+    library = (await client.async_browse_media()).as_dict()
+    assert library["media_content_id"] == "plex://marao-fixture/server"
+    assert len(library["children"]) == 3
+    resume = (await client.async_browse_media("hub", "plex://marao-fixture/server/home.continue")).as_dict()
+    episode = resume["children"][0]
+    await client.async_play_media(episode["media_content_type"], episode["media_content_id"])
+    assert client.media_position == 90
+    assert client.state == "playing"
+    client.async_write_ha_state.assert_called_once()
+    with pytest.raises(ValueError):
+        await client.async_play_media("movie", "plex://real-server/201")
+    with pytest.raises(ValueError):
+        await client.async_browse_media("server", "plex://real-server/server")
+    client.async_write_ha_state.assert_called_once()
+    tv = fixture.MaraoTestAppleTV("Marao Dashboard Test Apple TV")
+    tv.async_write_ha_state = Mock()
+    await tv.async_play_media("url", "rivulet://play/102")
+    assert tv.source == "Rivulet" and tv.state == "playing"
+    assert tv.media_title == "The Observatory · S1 E2" and tv.media_position == 90
+    for url in ("rivulet://play/999", "rivulet://play/102?token=secret", "https://real-server/102"):
+        with pytest.raises(ValueError):
+            await tv.async_play_media("url", url)
+    tv.async_write_ha_state.assert_called_once()

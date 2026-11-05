@@ -1,5 +1,6 @@
 import {clone, entityMeta, moveItem, sensorThresholdError} from './editor-model.js';
 import {mediaAppLogoChoices,mediaAppLogoError} from '../custom_components/marao_dashboard/frontend/MaraoMediaApps.js';
+import {mountPlexOptions} from './plex-editor.js';
 
 const formEsc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
@@ -85,7 +86,8 @@ export const cardFormMethods = {
       remote_entity: original.remote_entity || '', volume_remote_entity: original.volume_remote_entity || '' };
     let apps = clone(original.apps || []);
     const dialog = this._dialog(this._l('Apple TV options')), content = dialog.querySelector('.dialog-content');
-    content.innerHTML = `<div id="media-form"></div><h3>${this._l('Apps')}</h3><div id="app-list"></div><ha-button data-add-app>${this._l('Add app')}</ha-button><p data-error role="alert"></p><div class="dialog-actions"><ha-button data-close>${this._t('cancel')}</ha-button><ha-button data-save appearance="filled">${this._t('update')}</ha-button></div>`;
+    content.innerHTML = `<div id="media-form"></div><h3>${this._l('Apps')}</h3><div id="app-list"></div><ha-button data-add-app>${this._l('Add app')}</ha-button><div data-plex-options></div><p data-error role="alert"></p><div class="dialog-actions"><ha-button data-close>${this._t('cancel')}</ha-button><ha-button data-save appearance="filled">${this._t('update')}</ha-button></div>`;
+    const plex=mountPlexOptions(this,content.querySelector('[data-plex-options]'),player,original.plex);
     const editApp = index => {
       const existing = index == null ? {} : apps[index];
       this._openFormDialog(index == null ? 'Add app' : 'Edit app', { name: existing.name || '', source: existing.source || '', icon: existing.icon || '', logo: existing.logo ?? '' }, [
@@ -118,7 +120,9 @@ export const cardFormMethods = {
     content.querySelector('[data-close]').addEventListener('click', () => this._closeDialog(dialog));
     content.querySelector('[data-save]').addEventListener('click', () => {
       try {
-        const value = { ...original, apps };
+        const value = { ...original };
+        if(Object.hasOwn(original,'apps') || JSON.stringify(apps)!==JSON.stringify(original.apps || []))value.apps=apps;
+        if(data.enabled){const plexValue=plex.value();if(plexValue!==undefined)value.plex=plexValue;}
         for (const key of ['remote_entity', 'volume_remote_entity']) if (data[key]) value[key] = data[key]; else delete value[key];
         save(data.enabled ? value : false); this._closeDialog(dialog);
       } catch (error) { content.querySelector('[data-error]').textContent = this._error(error); }

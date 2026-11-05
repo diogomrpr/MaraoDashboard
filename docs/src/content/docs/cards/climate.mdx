@@ -28,7 +28,11 @@ Compatible entity domains: `climate`.
 
 Measured temperature, actual activity and availability remain authoritative. Requested mode/targets can show pending feedback until HA confirms or rejects them.
 
-Climate values intentionally omit temperature units. Mode controls reflect only supported HVAC modes.
+Climate uses a compact readings-first layout: a large unitless current temperature, reported activity and an optional humidity reading beside the vertical target selector. The normal scalar selector has 8px above and below it; long names, ranges, graphs and enlarged text grow naturally.
+
+Choose **Humidity sensor** to show that sensor's reported percentage on the card and in details. Missing or invalid readings show a neutral dash without disabling the thermostat. Clearing the selection hides humidity.
+
+**Enable climate popup** defaults to enabled. Details show readings first, supported modes next, and the same target selector at the lower right. Disabling it exposes supported modes inline unless **Mode buttons** is explicitly false. Mode choices use named 48px icon buttons and a localized selected-mode heading; narrow layouts wrap them. Custom actions, popup references and authored layouts remain saved when the popup is disabled.
 
 ## Settings
 
@@ -41,7 +45,9 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
 | `variables.show_graph` | Temperature graph | boolean | `false` | Temperature graph for this card. |
 | `variables.graph_entity` | Graph entity | entity | Not set | Graph entity for this card. Searchable suggestions are available. |
-| `variables.show_mode_buttons` | Mode buttons | boolean | `true` | Mode buttons for this card. |
+| `variables.humidity_entity` | Humidity sensor | sensor entity | Not set | Optional reported humidity; unset/null/empty hides the reading. |
+| `variables.enable_popup` | Enable climate popup | boolean | `true` | Enable built-in details. False retains targets and exposes inline modes. |
+| `variables.show_mode_buttons` | Mode buttons | boolean | `true` | Show inline modes when the popup is disabled; details retain supported choices. |
 | `variables.graph_color` | Graph color | color | Not set | Optional graph line/fill color. |
 | `variables.setpoint_label` | Setpoint label | text | Not set | Setpoint label for this card. |
 | `variables.mode_selector_hash` | Mode popup hash | text | Not set | Optional external climate mode popup hash. Omit it for the automatic mode sheet. |
@@ -58,7 +64,9 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 | Temperature range | Heat/cool mode exposes a low and high target. |
 | Off | Keep the last reported temperature while the thermostat is off. |
 | Temperature history | Use an explicit sensor for the inline temperature graph. |
-| Compact modes | Hide inline mode buttons while retaining the mode sheet. |
+| Compact modes | Keep supported modes in details. |
+| Humidity | Show the selected sensor on the card and in details. |
+| Inline modes | Disable built-in details and show supported choices on the card. |
 | Rejected target | Show a reported target-setting failure without inventing confirmation. |
 | Loading state | Wait for Home Assistant state before showing controls. |
 | Unknown state | The entity exists but has no known state. Controls remain neutral and disabled. |

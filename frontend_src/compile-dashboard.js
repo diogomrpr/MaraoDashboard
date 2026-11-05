@@ -98,7 +98,7 @@ function validatePopupLinks(page, cards) {
   });
   visit(cards, card => {
     const links = [card.navigation_path];
-    if (!(card.template === 'md_media_card' && card.variables?.media_display === 'inline') && ['md_media_card', 'md_camera_card', 'md_access_card', 'md_entity_group_card', 'md_climate_card'].includes(card.template)) links.push(card.variables?.popup_hash, card.variables?.mode_selector_hash);
+    if (!(card.template==='md_climate_card'&&card.variables?.enable_popup===false) && !(card.template === 'md_media_card' && card.variables?.media_display === 'inline') && ['md_media_card', 'md_camera_card', 'md_access_card', 'md_entity_group_card', 'md_climate_card'].includes(card.template)) links.push(card.variables?.popup_hash, card.variables?.mode_selector_hash);
     for (const link of links) if (typeof link === 'string' && /^#(?:page-|entity-group-|overview-|energy-|climate-mode-|access-|media-|camera-)/.test(link) && !hashes.has(link)) throw new Error(`Page ${page.name}: retarget or remove missing popup link.`);
   });
 }

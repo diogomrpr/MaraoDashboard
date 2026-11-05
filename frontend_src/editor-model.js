@@ -1,3 +1,4 @@
+import {climateConfigError} from '../custom_components/marao_dashboard/frontend/MaraoClimate.js';
 import {peopleError,sectionsError} from '../custom_components/marao_dashboard/frontend/MaraoCollections.js';
 import { floorPlanErrors, floorPageErrors } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlan.js';
 import { canonicalCard, canonicalTemplate, legacyTemplates } from '../custom_components/marao_dashboard/frontend/MaraoNames.js';
@@ -6,6 +7,7 @@ import { sensorThresholdError } from '../custom_components/marao_dashboard/front
 export { sensorThresholdError };
 import { validatePowerDevices } from './history-data.js';
 import {mediaApps,mediaAppLogoError} from '../custom_components/marao_dashboard/frontend/MaraoMediaApps.js';
+import {plexConfigError} from '../custom_components/marao_dashboard/frontend/MaraoPlexModel.js';
 export const MAIN_PAGE_BUTTONS = [['show_cache_reset', 'Show cache reset button'], ['show_editor_button', 'Show editor button']];
 export function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -509,7 +511,7 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
   if (errors.length) return errors;
   if (!String(config.name || "").trim()) errors.push("Dashboard name is required.");
   for (const [key, label] of MAIN_PAGE_BUTTONS) if (Object.hasOwn(config, key) && typeof config[key] !== 'boolean') errors.push(`${label} must be a boolean.`);
-  if (version === 2) errors.push(...validatePages(config, catalog));
+  if (version === 2) errors.push(...validatePages(config, catalog, entities));
   else if (!Array.isArray(config.rooms)) errors.push("Rooms must be a list.");
   for (const [index, room] of (Array.isArray(config.rooms) ? config.rooms : []).entries()) {
     if (!room || typeof room !== 'object' || Array.isArray(room)) { errors.push('Each room must be an object.'); continue; }
@@ -552,6 +554,7 @@ export function validateConfig(config, configVersion = 1, entities, units = {}, 
       }
       const metadata = entities?.find(entity => entity.entity_id === value.entity_id);
       if (value.variables != null && (typeof value.variables !== 'object' || Array.isArray(value.variables))) errors.push('Entity Group member options must be an object.');
+      if(kind==='climate'&&value.variables&&typeof value.variables==='object'){const error=climateConfigError(value.variables);if(error)errors.push(error);}
       if (['name', 'icon'].some(key => value[key] != null && typeof value[key] !== 'string')) errors.push('Entity Group member name and icon must be strings.');
       const legacyBattery = (overview || version === 2) && id === 'overview-maintenance' && value.entity_id.includes('battery');
       if (!entityGroupMemberCompatible(kind, value, metadata, legacyBattery)) errors.push('Entity Group has an incompatible member.');
@@ -640,7 +643,7 @@ export function validateEnergyOptions(options) {
   return errors;
 }
 
-export function validatePages(config, catalog) {
+export function validatePages(config, catalog, entities = []) {
   const errors = [], paths = new Set(), pageIds = new Set(), outputPaths = new Set(), references = [];
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
   const safePath = value => typeof value === 'string' && /^[a-z0-9][a-z0-9_-]*$/.test(value);
@@ -731,6 +734,7 @@ export function validatePages(config, catalog) {
         if (card.template === 'md_camera_card' && Object.hasOwn(options, 'preload_stream') && typeof options.preload_stream !== 'boolean') errors.push('Preload stream must be a boolean.');
         if (card.template === 'md_camera_card' && options.popup_stream_entity != null && options.popup_stream_entity !== '' && (!entityId(options.popup_stream_entity) || !options.popup_stream_entity.startsWith('camera.'))) errors.push('Choose a camera entity for the popup stream.');
         if (Object.hasOwn(options,'activity_entities') && (!Array.isArray(options.activity_entities) || options.activity_entities.some(value=>!entityId(value)))) errors.push('Related activity entities must be an explicit list of entity IDs.');
+        if (card.template === 'md_climate_card') {const error=climateConfigError(options);if(error)errors.push(error);}
         if (card.template === 'md_room_card' && options.climate_entity != null && options.climate_entity !== '' && (typeof options.climate_entity !== 'string' || !/^climate\.[a-z0-9_]+$/.test(options.climate_entity))) errors.push('Room climate must be a climate entity.');
         if (card.template === 'md_room_card' && Object.hasOwn(options, 'light_entities') && (!Array.isArray(options.light_entities) || options.light_entities.some(value => !entityId(value) || !value.startsWith('light.')))) errors.push('Room lights must be an explicit list of light entities.');
         if (card.template === 'md_media_app_card' && (typeof options.app_source !== 'string' || !options.app_source.trim())) errors.push('Media app requires an explicit source.');
@@ -745,6 +749,8 @@ export function validatePages(config, catalog) {
         if (card.apple_tv != null && card.apple_tv !== false) {
           if (!object(card.apple_tv)) errors.push('Apple TV options must be an object or false.');
           else {
+            const plexError = plexConfigError(card.apple_tv.plex, card, entities);
+            if (plexError) errors.push(plexError);
             for (const key of ['remote_entity', 'volume_remote_entity']) {
               const binding = card.apple_tv[key], domains = key === 'remote_entity' ? ['remote'] : ['remote', 'media_player'];
               if (binding != null && (!entityId(binding) || !domains.includes(binding.split('.')[0]))) errors.push('Choose a compatible media remote entity.');
@@ -834,6 +840,12 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
     if (card.id === 'md_camera_card') properties.variables.properties.event_provider = suggested(['auto', 'frigate', 'unifi_protect', 'netatmo']);
     if (card.id === 'md_media_card') properties.apple_tv = { anyOf: [{ type: ['boolean', 'null'] }, object({
       remote_entity: binding(['remote']), volume_remote_entity: binding(['remote', 'media_player']),
+      plex: {anyOf:[{const:false},{...object({
+        playback_app:{type:'string',enum:['plex','rivulet']},browse_entity:binding(['media_player']),
+        client_entity:binding(['media_player']),scan_clients_entity:binding(['button']),app_source:{type:'string',minLength:1},
+        library_root:{...object({media_content_id:{type:'string',pattern:'^plex://'},media_content_type:{const:'server'}}),required:['media_content_id','media_content_type']},
+        continue_watching:{...object({media_content_id:{type:'string',pattern:'^plex://'},media_content_type:{type:'string'}}),required:['media_content_id','media_content_type']},
+      }),required:['library_root'],allOf:[{if:{properties:{playback_app:{const:'rivulet'}},required:['playback_app']},then:{},else:{required:['client_entity','scan_clients_entity','app_source']}}]}]},
       apps: { type: 'array', items: object({ name: { type: 'string' }, source: { type: 'string' }, icon: { type: 'string' }, logo:{type:'string',enum:['',...mediaApps.map(app=>app.id)]} }) },
     })] };
     if (card.id === 'md_media_card') Object.assign(properties, {

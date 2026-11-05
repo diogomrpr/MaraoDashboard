@@ -24,3 +24,17 @@
 - This proposal authorizes planning only. Implementation starts with a subsequent apply request.
 - If publication is requested later, run unit-only `npm run verify:publish` across the release candidate, install its final version metadata and satisfy applicable package checks. Reuse development evidence; do not add integration/full tests without an explicit request.
 - Archive only after implementation and verification are complete and the user requests it.
+
+## 4. Follow-up: Tap-only built-in media buttons
+
+Evidence: baseline `7b500719b6318261bd33a2bda13ce6a5e09c6341`, snapshot `/private/tmp/marao-media-tap-1793830866093.json`. Four selected native/compiler/Python checks and editor build/check passed. The current expected outputs remove only the ten reviewed generated holds per native baseline; frozen source/released output bytes remain unchanged. Final current assets are installed on disposable `192.168.0.28` with served-asset/readiness checks. Manual watch: directions/Select send once on tap, show ordinary brief feedback and no hold ring in popup/inline panels. No real-device or full/browser campaign was run; no new release was published.
+
+- [x] 4.1 Remove automatic long actions from shared native and Python media factories, update current safe gallery examples and media documentation, and preserve explicit authored holds and frozen released inputs/outputs. Update independently specified current compiled expectations only for the removed generated holds. Verify both compositions expose only ordinary commands with the existing remote targets using the focused native/Python tests.
+- [x] 4.2 Rebuild editor assets, review the actual task diff and scoped plan, validate the delta, and install the final current changes on disposable `192.168.0.28`. Confirm served assets/readiness and hand off a short tap/progress-ring manual watch list.
+
+## 5. Follow-up: App shortcut vibration and wake
+
+Evidence: snapshot `/private/tmp/marao-app-wake-1793831188919.json` captures the prior tap-only media work. Five focused runtime checks passed, including the actual default click binding, one heavy haptic, deferred wake/source order, no redundant wake, wake errors and stale/unavailable/preview guards. Editor build/check, syntax, whitespace and strict delta validation passed. Final frontend assets are installed on disposable `192.168.0.28` with served-asset/readiness checks. Physical vibration and real Apple TV wake/app startup remain manual; no new release was published.
+
+- [x] 5.1 Add default app shortcut source actions and a shared owner wake/source sequence with one heavy haptic, exact targets, readable failures and stale/availability/preview guards. Verify click binding, ordered deferred wake, already-on selection and failed/stale continuation in the existing runtime harness; update app guidance and the capability/design without changing saved configurations.
+- [x] 5.2 Review the actual diff and behavior-tier plan against the new baseline, run the smallest targeted checks and editor build/check, validate the delta and install the final batch on disposable `192.168.0.28`. Confirm served assets/readiness and hand off manual vibration and Apple TV wake/app checks.

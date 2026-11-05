@@ -1,5 +1,9 @@
 import { FLOOR_PT_LABELS } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlanText.js';
+import {PLEX_PT} from '../custom_components/marao_dashboard/frontend/MaraoPlexModel.js';
 export const PT_LABELS = {
+  'Humidity sensor':'Sensor de humidade', 'Enable climate popup':'Ativar popup de climatização',
+  'Choose a humidity sensor.':'Escolha um sensor de humidade.', 'Enable climate popup must be a boolean.':'Ativar popup de climatização tem de ser um valor booleano.',
+  ...PLEX_PT,
   'Show reading labels':'Mostrar nomes das leituras',
   'Show reading labels must be a boolean.':'Mostrar nomes das leituras tem de ser um valor booleano.',
   'Room climate':'Climatização da divisão', 'Related activity entities':'Entidades de atividade relacionadas', 'Related activity entities must be an explicit list of entity IDs.':'As entidades de atividade relacionadas têm de ser uma lista explícita de IDs de entidades.', 'Room climate must be a climate entity.':'A climatização da divisão tem de ser uma entidade de climatização.',

@@ -13,6 +13,8 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     async_add_entities(
         [MaraoTestAppleTVRemote(config.get("name", "Marao Dashboard Test Apple TV"), config.get("initial_state", "on"))]
     )
+    if config.get("name") == "Marao Dashboard Test Apple TV":
+        async_add_entities([MaraoTestAppleTVRemote("Marao Dashboard Test Plex Bedroom")])
 
 
 class MaraoTestAppleTVRemote(RemoteEntity):

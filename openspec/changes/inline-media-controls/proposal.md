@@ -30,3 +30,11 @@ None.
 Affected cards: `md_media_card`, its generated media/Apple TV control composition and embedded `md_media_app_card` instances. Shared controls retain their current contracts.
 
 The active native frontend path is `frontend_src/compile-dashboard.js`, the catalog-backed Visual/JSON editor and shared Marao runtime. Update its configuration validation/schema, English/Portuguese labels, media usage documentation and narrow existing editor/compiler/runtime tests. Existing published configurations with no display field must retain their source and compiled popup behavior. Raw Home Assistant cards, protected custom content, archived history and unrelated HA settings remain unchanged. This change adds an optional field rather than bumping the source format, package version or config-entry version.
+
+## Follow-up: Tap-only built-in media buttons
+
+Remove the automatically generated 1.2-second long commands and progress feedback from Apple TV directions and Select in both popup and inline content. Each built-in media button sends its ordinary command once per tap. Keep explicit authored custom holds and shared security safeguards; no persisted dashboard rewrite or package/config version change is needed. Align the shared native factory, Python generation and existing safe gallery examples without changing historical fixtures.
+
+## Follow-up: App shortcut feedback and wake
+
+App shortcuts need a default launch action when no custom tap action is supplied. Give enabled app taps one strong haptic, turn on an off player before selecting its app, and skip redundant power-on for an already-on player. Stop after a failed wake or a stale/unavailable owner/target, reporting native errors through the shared action owner. Keep custom explicit tap actions, app sources/artwork and saved configuration unchanged.

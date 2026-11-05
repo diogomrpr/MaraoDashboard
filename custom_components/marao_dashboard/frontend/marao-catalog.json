@@ -724,6 +724,26 @@
           ]
         },
         {
+          "key": "humidity_entity",
+          "label": "Humidity sensor",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": false,
+          "description": "",
+          "domains": [
+            "sensor"
+          ]
+        },
+        {
+          "key": "enable_popup",
+          "label": "Enable climate popup",
+          "kind": "boolean",
+          "selector": "boolean",
+          "advanced": false,
+          "description": "",
+          "default": true
+        },
+        {
           "key": "show_mode_buttons",
           "label": "Mode buttons",
           "kind": "boolean",

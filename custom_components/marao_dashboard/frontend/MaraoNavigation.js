@@ -304,6 +304,8 @@ export class MaraoNavbarCard extends BaseElement {
       :host{display:block;height:128px;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif)}
       :host([hidden]),:host([data-empty]){display:none!important}:host([data-preview]){height:auto}
       .bounds{position:fixed;visibility:hidden;pointer-events:none;inset:${safeArea("top")} calc(12px + ${safeArea("right")}) ${safeArea("bottom")} calc(12px + ${safeArea("left")})}
+      .touch-barrier{position:fixed;z-index:1000;inset:auto 0 0;height:calc(60px + ${bottom});pointer-events:auto;touch-action:none}
+      :host([data-preview]) .touch-barrier{display:none}
       .surface{pointer-events:auto;display:flex;gap:clamp(2px,.5vw,4px);box-sizing:border-box;padding:6px 10px;border-radius:999px;background:var(--ha-card-background,var(--card-background-color));box-shadow:0 8px 30px rgba(0,0,0,.22)}
       .nav{position:fixed;z-index:1001;left:var(--marao-navbar-left,50%);bottom:${bottom};transform:translateX(-50%);flex-wrap:nowrap;justify-content:center;width:max-content;max-width:var(--marao-navbar-width,calc(100vw - 24px - ${safeArea("left")} - ${safeArea("right")}));height:60px}
       :host([data-preview]) .nav{position:relative;left:var(--marao-navbar-preview-left,50%);bottom:auto;margin:12px 0}
@@ -317,7 +319,7 @@ export class MaraoNavbarCard extends BaseElement {
       .refresh-feedback{position:fixed;z-index:1002;left:var(--marao-navbar-left,50%);bottom:calc(${bottom} + 72px);transform:translateX(-50%);box-sizing:border-box;width:max-content;max-width:var(--marao-navbar-width,calc(100vw - 24px));padding:12px 16px;border-radius:18px;background:var(--ha-card-background,var(--card-background-color));color:var(--primary-text-color);box-shadow:0 8px 30px rgba(0,0,0,.22);font-size:var(--font-size-primary,1.125rem);font-weight:var(--font-weight-primary,500);line-height:1.35;overflow-wrap:anywhere;pointer-events:none}
       .refresh-feedback[hidden],progress[hidden]{display:none}progress{display:block;box-sizing:border-box;appearance:none;-webkit-appearance:none;width:100%;height:10px;margin-top:8px;border:1px solid var(--primary-text-color);border-radius:8px;overflow:hidden;background:var(--ha-card-background,var(--card-background-color));accent-color:var(--primary-text-color)}progress::-webkit-progress-bar{background:var(--ha-card-background,var(--card-background-color))}progress::-webkit-progress-value{background:var(--primary-text-color)}progress::-moz-progress-bar{background:var(--primary-text-color)}
       @media(prefers-reduced-motion:reduce){a,button{transition:none}}
-    </style><div class="bounds" aria-hidden="true"></div><div class="refresh-feedback" role="status" hidden><span></span><progress max="1" hidden></progress></div><nav class="nav surface">${routes.slice(0, this._visibleCount).map((route, i) => this._link(route, i, true)).join('')}${overflow ? '<button type="button" data-overflow aria-expanded="false" aria-controls="marao-overflow"><ha-icon icon="mdi:dots-horizontal"></ha-icon></button>' : ''}</nav>`;
+    </style><div class="bounds" aria-hidden="true"></div><div class="touch-barrier" aria-hidden="true"></div><div class="refresh-feedback" role="status" hidden><span></span><progress max="1" hidden></progress></div><nav class="nav surface">${routes.slice(0, this._visibleCount).map((route, i) => this._link(route, i, true)).join('')}${overflow ? '<button type="button" data-overflow aria-expanded="false" aria-controls="marao-overflow"><ha-icon icon="mdi:dots-horizontal"></ha-icon></button>' : ''}</nav>`;
     const nav=this.shadowRoot.querySelector('.nav');
     this._press=bindPressFeedback(nav,{pointer:false,resolve:event=>this.preview||this._editing?null:pressTarget(nav,event)});
     this._refreshGesture = bindNavbarRefresh(nav, {
@@ -546,6 +548,7 @@ export class MaraoNavbarCard extends BaseElement {
   _key = event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); this._closeOverflow(true); } };
   _focusOutside = event => { if (!event.composedPath().includes(this)) this._closeOverflow(false); };
   _outside = event => {
+    if (event.composedPath().includes(this.shadowRoot.querySelector('.touch-barrier'))) { this._closeOverflow(true); return; }
     if (event.composedPath().includes(this)) return;
     event.preventDefault(); event.stopImmediatePropagation(); this._closeOverflow(false);
     const target = event.composedPath().find(node => node.matches?.(FOCUSABLE));
