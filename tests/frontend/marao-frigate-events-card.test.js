@@ -91,7 +91,7 @@ test("camera event actions keep a visible 48px target and strong feedback", () =
   assert.match(source, /MaraoDashboard\?\.haptic\?\.\("heavy"\)/);
   assert.match(source, /button:disabled \{ cursor: default; opacity: \.55;/);
   assert.doesNotMatch(source, /:focus-visible/);
-  assert.match(MaraoFrigateEventsCard.styles, /grid-template-columns:repeat\(auto-fill/);
+  assert.match(MaraoFrigateEventsCard.styles, /\.grid \{display:grid;grid-template-columns:minmax\(0,1fr\)/);
   assert.match(MaraoFrigateEventsCard.styles, /\.meta > \* \{ overflow-wrap: anywhere;/);
   assert.match(MaraoFrigateEventsCard.styles, /top: var\(--marao-popup-header-height, 0px\)/);
   assert.match(MaraoFrigateEventsCard.styles, /\.filters \{[^}]*flex-wrap:wrap/);
