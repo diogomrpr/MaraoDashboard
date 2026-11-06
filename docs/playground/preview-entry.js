@@ -8,6 +8,8 @@ const channel='marao-playground';let request,simulation,card,runtimeReady,render
 const send=(type,detail={})=>parent.postMessage({channel,type,token:request?.token,id:request?.id,...detail},'*');
 const status=document.querySelector('#status');
 function showError(message){status.textContent=message;send('error',{message});}
+globalThis.addEventListener('error',event=>showError(event.message||'Preview resource could not load.'));
+globalThis.addEventListener('unhandledrejection',event=>showError(event.reason?.message||String(event.reason)));
 globalThis.__maraoPreview=browserEnvironment(showError);
 globalThis.MaraoFrontendPackage={...globalThis.__maraoPreview.installedPackage,package_version:__MARAO_VERSION__,baseURL:'https://marao.example/',rootURL:'https://marao.example/'};
 
@@ -41,6 +43,11 @@ class App extends HTMLElement {constructor(){super();this.attachShadow({mode:'op
 for(const [name,type] of [['ha-icon',Icon],['ha-state-icon',StateIcon],['ha-svg-icon',SvgIcon],['ha-form',Form],['hui-root',Root],['home-assistant',App]])customElements.define(name,type);
 const app=document.createElement('home-assistant'),root=document.createElement('hui-root');app.setAttribute('role','main');app.shadowRoot.append(root);document.querySelector('#preview').replaceWith(app);
 const holder=root.shadowRoot.querySelector('#view');
+if(__MARAO_DESIGN_PREVIEW__){
+  document.body.style.minHeight='0';app.style.minHeight='0';root.style.minHeight='0';
+  const style=document.createElement('style');style.textContent='#view{padding:12px;min-height:0}';root.shadowRoot.append(style);
+}
+
 
 function createCardElement(config){
   if(config.type?.startsWith('custom:marao-')&&customElements.get(config.type.slice(7))){const element=document.createElement(config.type.slice(7));element.setConfig(config);return element;}
@@ -77,7 +84,9 @@ async function render(message){
   }else{
     const element=document.createElement(message.config.type.slice(7));holder.append(element);card=element;card.hass=simulation.hass;card.setConfig(safePreviewData(message.config));
   }
-  send('rendered');resize();
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  if(revision!==renderRevision)return;
+  if(!status.textContent)send('rendered');resize();
 }
 const clone=value=>structuredClone(value);
 let lastHeight=0;
@@ -85,16 +94,16 @@ function resize(){
   const popup=app.shadowRoot.querySelector('.marao-popup-overlay');
   const content=popup?.querySelector('.marao-popup-scroll'),head=popup?.querySelector('.marao-popup-head');
   const needed=popup?Math.ceil((content?.scrollHeight||0)+(head?.getBoundingClientRect().height||0)+58):document.body.scrollHeight;
-  const height=Math.max(460,Math.min(900,needed));
-  if(height!==lastHeight){lastHeight=height;send('resize',{height});}
+  const height=__MARAO_DESIGN_PREVIEW__?(popup?750:Math.max(100,Math.ceil(holder.getBoundingClientRect().height))):Math.max(460,Math.min(900,needed));
+  if(height!==lastHeight){lastHeight=height;send('resize',__MARAO_DESIGN_PREVIEW__?{height,popup:Boolean(popup)}:{height});}
 }
-new ResizeObserver(resize).observe(document.body);
+new ResizeObserver(resize).observe(__MARAO_DESIGN_PREVIEW__?holder:document.body);
 new MutationObserver(resize).observe(app.shadowRoot,{childList:true,subtree:true,characterData:true});
 globalThis.addEventListener('message',async event=>{
   const message=event.data;
   if(event.source===parent&&message?.channel===channel&&message.type==='hello'){try{await runtimeReady;send('ready');}catch(error){send('error',{message:error.message});}return;}
   if(event.source!==parent||!message||message.channel!==channel||message.type!=='render'||typeof message.token!=='string'||typeof message.id!=='string'&&typeof message.id!=='number')return;
-  try{await runtimeReady;await render(message);}catch(error){status.textContent=error.message;send('error',{message:error.message});}
+  try{await runtimeReady;await render(message);}catch(error){status.textContent=error.message;send('error',{message:error.message,token:message.token,id:message.id});}
 });
 runtimeReady=import('../../custom_components/marao_dashboard/frontend/MaraoRuntime.js');
 try{await runtimeReady;send('ready');}catch(error){status.textContent='Preview could not initialize: '+error.message;send('error',{message:status.textContent});}

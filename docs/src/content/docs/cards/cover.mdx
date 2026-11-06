@@ -4,8 +4,11 @@ description: "Open, close, and position a cover or blind."
 ---
 
 import Playground from '../../../components/Playground.astro';
+import DesignGallery from '../../../design/DesignGallery.astro';
 
 Open, close, and position a cover or blind.
+
+<DesignGallery cardId="md_cover_card" />
 
 ## Try it
 
@@ -29,7 +32,6 @@ Use Cover for ordinary blinds. Doors, garages and gates belong to Access, whose 
 Position, open, close and stop controls follow supported_features and current_position. Confirmed reports glide over 200–500 ms; target changes remain immediate. Sparse reports pause at the last confirmed position. Reduced motion snaps to the report.
 
 The name sits above the position bar, top-aligned with the icon on its right. Longer names wrap naturally. The bold current state floats against the left edge of the position bar while it fits before the target thumb, then moves to the right edge when the left side is too narrow. If neither side fits the full label, it wraps in the roomier space. Covers without position support keep the state below the name.
-
 ## Settings
 
 The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.

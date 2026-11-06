@@ -32,3 +32,11 @@ The preview's `home-assistant` host is a direct child of the frame body, matchin
 Build the site and run the documentation checks for catalog coverage, valid examples, links and export boundaries. Inspect a representative interactive flow when changing the playground. Use the same source revision for prose, catalog and preview assets.
 
 The public site follows stable releases only. Changes can be built and reviewed before release, but do not deploy an unreleased runtime under a released version label. There is no Upcoming edition. Keep project rules and historical records in the repository; the website is a current reference, not a rewritten test-history archive.
+
+## Card design workflow
+
+All public card references show real-runtime behavior galleries above their configuration playground. Wide rows place the description beside a mobile-width card. Visible examples and three offscreen examples preload; reserved heights prevent loading jumps. Published assets are built from the documented stable release, with fictional HA data and explicit simulation limits.
+
+For a design request run `npm run card:context -- climate --intent style`, then `npm run docs:design -- --card climate`. The latter reports an isolated workspace/task ID and loopback URL. Reuse it with `--task ID`; source drift is reported without overwriting proposals. Edit actual scoped runtime sources there; they rebuild automatically while the baseline playground stays frozen.
+
+Use `$marao-card-design` or ask naturally, for example “change the Climate current-temperature font size.” Shared source ownership must be inspected before applying. Confirm all affected consumers, selected family including owned details, or a subset. A visual approval alone does not authorize broader shared effects. Implementation in main requires explicit apply, conflict review, targeted checks and the existing disposable-HA installation rule.

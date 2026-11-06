@@ -6,6 +6,8 @@ license: MIT
 
 # Marao Home Assistant frontend
 
+Card design/change requests default to the preview-first [card design skill](../marao-card-design/SKILL.md). Use this implementation guidance after explicit apply authorization. Shared behavior scope must be confirmed; a shared file alone does not establish shared impact.
+
 Marao uses browser-native custom elements and JavaScript modules. Upstream Home
 Assistant uses Lit/TypeScript internally; that does not make those dependencies or
 its internal imports part of this project. Follow the existing shared components

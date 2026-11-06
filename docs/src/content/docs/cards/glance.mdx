@@ -4,8 +4,11 @@ description: "Up to three independently configured readings."
 ---
 
 import Playground from '../../../components/Playground.astro';
+import DesignGallery from '../../../design/DesignGallery.astro';
 
-Up to three independently configured readings. Each rounded tile shows its centered wrapping name, circular icon, then emphasized value/unit. Compact scalable spacing keeps the group transparent and aligns icons and values across long names. `variables.show_reading_names` defaults to true; false removes the visible name row while retaining semantic names and the separate group title. Hiding icons also removes their row.
+Up to three independently configured readings.
+
+<DesignGallery cardId="md_glance_card" />
 
 ## Try it
 
@@ -39,7 +42,6 @@ Tap an Activity icon to inspect recorded events with date and type filters. Opti
 Turn off **Show reading labels** in the card editor to show only icons and values. In YAML, set `variables.show_reading_names: false`. Labels remain visible by default; the group title has its own visibility setting. Custom reading names are retained when hidden and return when labels are enabled again. Activity buttons keep their entity names for accessibility.
 
 Each of the three optional readings has an independent entity, name and icon. One unavailable reading does not erase the other values.
-
 ## Settings
 
 The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.

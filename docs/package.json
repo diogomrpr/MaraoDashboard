@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prepare:site": "node scripts/prepare-site.mjs && node scripts/generate-card-pages.mjs && node scripts/build-preview.mjs",
+    "prepare:site": "node scripts/prepare-site.mjs && node scripts/generate-card-pages.mjs && node scripts/build-preview.mjs && node scripts/build-gallery.mjs",
     "dev": "npm run prepare:site && node scripts/astro.mjs dev --host 127.0.0.1",
     "build": "npm run prepare:site && node scripts/astro.mjs build && node scripts/write-redirects.mjs && node scripts/check-site.mjs",
     "preview": "node scripts/astro.mjs preview --host 127.0.0.1"

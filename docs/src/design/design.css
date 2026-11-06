@@ -1,0 +1,25 @@
+design-gallery{display:block;container-type:inline-size;font-family:Montserrat,system-ui,sans-serif;margin:2rem 0 3rem;color:var(--primary-text-color)}
+design-gallery *{box-sizing:border-box}
+design-gallery :is(h2,h3,p){margin:0}
+design-gallery .design-heading{display:grid;gap:10px;margin-bottom:20px}
+design-gallery .design-eyebrow{font-size:.7rem;font-weight:700;letter-spacing:.12em;color:var(--subtext-color)}
+design-gallery .design-heading h2{font-size:1.7rem}
+design-gallery p{font-size:.85rem;line-height:1.6;color:var(--subtext-color);overflow-wrap:anywhere}
+design-gallery .design-controls{display:flex;flex-wrap:wrap;align-items:end;gap:16px;padding:16px;border:1px solid var(--divider-color);border-radius:18px;margin-bottom:24px}
+design-gallery label{display:grid;gap:6px;font-size:.8rem;font-weight:600;flex:1;min-width:125px}
+design-gallery select{font:inherit;color:inherit;background:var(--ha-card-background);border:1px solid var(--divider-color);border-radius:12px;min-height:48px;width:100%;padding:8px}
+design-gallery .design-controls p{flex:2;min-width:180px}
+design-gallery .design-scenes{display:grid;gap:24px}
+design-gallery .design-scene{min-width:0;border-bottom:1px solid var(--divider-color);padding-bottom:24px}
+design-gallery .design-scene header{display:flex;gap:12px;align-items:start;margin-bottom:16px}
+design-gallery .design-index{font-size:.75rem;font-weight:700;color:var(--subtext-color);padding-top:4px;min-width:22px}
+design-gallery .design-scene h3{font-size:1rem;margin-bottom:4px}
+design-gallery .design-stage{position:relative;min-height:var(--frame-reserve,172px);padding:6px;background:var(--secondary-background-color);border-radius:20px;min-width:0}
+design-gallery iframe{display:block;margin:auto;width:100%;max-width:var(--design-width);height:160px;border:0;border-radius:16px;background:var(--primary-background-color)}
+design-gallery [data-frame-status]{position:absolute;inset:6px;display:grid;place-items:center;margin:0;font-size:.75rem;text-align:center;padding:8px;border-radius:14px;background:var(--primary-background-color);pointer-events:none}
+design-gallery [data-frame-status]:empty{display:none}
+
+@container(min-width:640px){
+  design-gallery .design-scene{display:grid;grid-template-columns:minmax(160px,1fr) minmax(0,calc(var(--design-width) + 12px));gap:24px;align-items:start}
+  design-gallery .design-scene header{margin-bottom:0;padding-top:12px}
+}
