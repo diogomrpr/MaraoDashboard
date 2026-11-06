@@ -191,7 +191,7 @@
     "anchors": [
       "function numberStepper",
       ".number-stepper button {",
-      ".body.climate-card .climate-stepper button {"
+      ".body:is(.climate-card,.number-card) .climate-stepper button {"
     ],
     "consumers": [
       "md_climate_card",
