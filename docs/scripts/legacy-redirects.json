@@ -9,7 +9,6 @@
   "/docs/development/focused-testing/": "/development/testing/",
   "/docs/development/index.html": "/development/",
   "/docs/development/": "/development/",
-  "/docs/development/": "/development/",
   "/docs/development/local-development.html": "/development/local-development/",
   "/docs/development/local-development/": "/development/local-development/",
   "/docs/development/native-frontend.html": "/development/architecture/",
@@ -59,8 +58,8 @@
   "/docs/usage/cards/hc_glance_card/": "/cards/glance/",
   "/docs/usage/cards/hc_graph_card.html": "/cards/graph/",
   "/docs/usage/cards/hc_graph_card/": "/cards/graph/",
-  "/docs/usage/cards/hc_header_card.html": "/cards/header/",
-  "/docs/usage/cards/hc_header_card/": "/cards/header/",
+  "/docs/usage/cards/hc_header_card.html": "/cards/",
+  "/docs/usage/cards/hc_header_card/": "/cards/",
   "/docs/usage/cards/hc_light_card.html": "/cards/light/",
   "/docs/usage/cards/hc_light_card/": "/cards/light/",
   "/docs/usage/cards/hc_media_card.html": "/cards/media/",
@@ -116,8 +115,8 @@
   "/docs/usage/cards/md_glance_card/": "/cards/glance/",
   "/docs/usage/cards/md_graph_card.html": "/cards/graph/",
   "/docs/usage/cards/md_graph_card/": "/cards/graph/",
-  "/docs/usage/cards/md_header_card.html": "/cards/header/",
-  "/docs/usage/cards/md_header_card/": "/cards/header/",
+  "/docs/usage/cards/md_header_card.html": "/cards/",
+  "/docs/usage/cards/md_header_card/": "/cards/",
   "/docs/usage/cards/md_light_card.html": "/cards/light/",
   "/docs/usage/cards/md_light_card/": "/cards/light/",
   "/docs/usage/cards/md_media_card.html": "/cards/media/",
@@ -162,5 +161,6 @@
   "/docs/usage/native-card-configuration.html": "/start/first-card/",
   "/docs/usage/native-card-configuration/": "/start/first-card/",
   "/docs/usage/native-dashboard.html": "/start/dashboard/",
-  "/docs/usage/native-dashboard/": "/start/dashboard/"
+  "/docs/usage/native-dashboard/": "/start/dashboard/",
+  "/cards/header/": "/cards/"
 }
