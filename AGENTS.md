@@ -22,6 +22,10 @@ quality-guide sections; do not load every guide for every task. Applicable rules
 remain binding. OpenSpec does not override this contract or establish test success;
 keep future work in changes and archive only completed, verified work.
 
+## Card design previews
+
+Use `.agents/skills/marao-card-design/SKILL.md` for card appearance, behavior, configuration and new-card requests. Default to an isolated real-runtime preview. Before applying shared changes, confirm all consumers versus the requested family/subset; reuse an unchanged explicit choice. Preview completion does not authorize main runtime edits or HA deployment. Actual approved runtime implementation retains the installation requirements below.
+
 ## Task routing and completion
 
 - Start with the requested outcome and concrete acceptance cases. Use the short

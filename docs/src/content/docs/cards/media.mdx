@@ -4,8 +4,11 @@ description: "Media controls with artwork and generated popup controls."
 ---
 
 import Playground from '../../../components/Playground.astro';
+import DesignGallery from '../../../design/DesignGallery.astro';
 
 Media controls with artwork and generated popup controls.
+
+<DesignGallery cardId="md_media_card" />
 
 ## Try it
 
@@ -73,7 +76,6 @@ apple_tv:
 ```
 
 These IDs are fictional. Missing `playback_app` retains Plex playback. Missing `plex` or `plex: false` keeps the section disabled; an optional `continue_watching` object uses the same `media_content_type`/`media_content_id` shape. No Plex password or token belongs in this configuration. Credentials and poster authentication stay with HA through its Plex image proxy. This feature does not switch Plex profiles, manage the server/library, edit watch history, manage queues or stream via AirPlay.
-
 ## Settings
 
 The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.

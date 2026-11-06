@@ -1,6 +1,6 @@
 {
   "name": "marao-dashboard",
-  "version": "0.30.0",
+  "version": "0.31.0",
   "private": true,
   "description": "Marao Dashboard Home Assistant dashboard development tools",
   "scripts": {
@@ -32,7 +32,9 @@
     "docs:dev": "npm --prefix docs run dev",
     "docs:build": "npm --prefix docs run build",
     "docs:preview": "npm --prefix docs run preview",
-    "docs:test": "node --test --test-concurrency=1 tests/docs/*.test.mjs"
+    "docs:test": "node --test --test-concurrency=1 tests/docs/*.test.mjs",
+    "card:context": "node docs/scripts/card-context.mjs",
+    "docs:design": "node docs/scripts/design-workspace.mjs"
   },
   "devDependencies": {
     "chart.js": "4.5.1",

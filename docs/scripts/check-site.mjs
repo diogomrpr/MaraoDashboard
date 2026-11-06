@@ -26,3 +26,20 @@ for(const [from,to] of Object.entries(redirects)){
 if(!fs.existsSync(path.join(output,'pagefind/pagefind.js')))errors.add('Search index was not generated.');
 if(errors.size)throw new Error([...errors].join('\n'));
 console.log(`Checked ${files.length} pages, internal links, ${Object.keys(redirects).length} redirects and search index.`);
+
+const {cards}=await import('../examples/manifest.js');
+for(const card of cards){
+ const html=fs.readFileSync(path.join(output,'cards',card.slug,'index.html'),'utf8');
+ const ids=[...html.matchAll(/data-scenario-id="([^"]+)"/g)].map(m=>m[1]);
+ if(JSON.stringify(ids)!==JSON.stringify(card.scenarios.map(s=>s.id)))throw Error(`Scenario order mismatch: ${card.slug}`);
+ if(!html.includes('design-gallery')||!html.includes('marao-playground'))throw Error(`Missing gallery/playground: ${card.slug}`);
+ if(html.includes('/design/frame.html')||html.includes('LOCAL DESIGN'))throw Error(`Local proposal leaked: ${card.slug}`);
+}
+if(!fs.existsSync(path.join(output,'gallery/frame.html')))throw Error('Missing released gallery bundle');
+
+for(const relative of ['gallery/frame.html','playground/frame.html']){
+ const bundle=fs.readFileSync(path.join(output,relative),'utf8');
+ if(/\/Users\/|\/private\/tmp\/|\.card-design\/|marao-design-preview/.test(bundle))throw Error(`Local path or middleware leaked into ${relative}`);
+ if(/<script[^>]+src=|import\(new URL/.test(bundle))throw Error(`Unbundled runtime in ${relative}`);
+}
+console.log(`Checked ${cards.length} ordered public galleries and both self-contained runtime bundles.`);

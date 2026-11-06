@@ -4,8 +4,11 @@ description: "Floating dashboard navigation, compact overflow and an optional cu
 ---
 
 import Playground from '../../../components/Playground.astro';
+import DesignGallery from '../../../design/DesignGallery.astro';
 
 Floating dashboard navigation, compact overflow and an optional current-room shortcut powered by Bermuda.
+
+<DesignGallery cardId="navbar" />
 
 ## Try it
 
@@ -56,7 +59,6 @@ A missing, unknown, unmapped or unavailable room retains a disabled away-style s
 All configured entries remain reachable. A rightmost More control opens vertical overflow when the row is full.
 
 An invisible touch barrier covers the full screen width from the navbar's top edge to the bottom. Only navbar controls respond in that strip; cards behind it cannot be tapped or scrolled. Open popups remain interactive above it.
-
 ## Settings
 
 The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
@@ -82,7 +84,7 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 
 ## Website preview limits
 
-The signed-in account and legacy person association are fictional in this isolated preview. Configure direct per-browser sensors in Home Assistant settings; the preview does not detect your device. Copy the routes/current_room fields into marao.navbar in your dashboard settings.
+The signed-in account and browser-local identity choice are fictional in this isolated preview. Copy the routes/current_room fields into marao.navbar in your dashboard settings.
 
 ## Layout and shared behavior
 

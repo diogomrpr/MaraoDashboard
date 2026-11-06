@@ -1,0 +1,6 @@
+interface:
+  display_name: "Marao Card Design"
+  short_description: "Preview, edit and create cards with shared-scope review"
+  default_prompt: "Use $marao-card-design to preview this card change in an isolated real-runtime gallery and confirm affected shared consumers before applying."
+policy:
+  allow_implicit_invocation: true
