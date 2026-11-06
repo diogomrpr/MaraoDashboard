@@ -74,7 +74,7 @@
       "kind": "energy_precision",
       "selector": "energy_precision",
       "advanced": false,
-      "description": "Auto trims trailing zeros. Choose 0–6 fixed decimal places."
+      "description": "Auto trims trailing zeros. Choose 0\u20136 fixed decimal places."
     }
   ],
   "supported_domains": [
@@ -196,7 +196,8 @@
           "kind": "select",
           "selector": "select",
           "advanced": false,
-          "description": "Unset keeps the existing row and security holds.",
+          "description": "Choose Dropdown or Grid. Dropdown is used when omitted.",
+          "default": "dropdown",
           "options": [
             "dropdown",
             "grid"
@@ -409,7 +410,7 @@
           "kind": "energy_precision",
           "selector": "energy_precision",
           "advanced": false,
-          "description": "Auto trims trailing zeros. Choose 0–6 fixed decimal places."
+          "description": "Auto trims trailing zeros. Choose 0\u20136 fixed decimal places."
         },
         {
           "key": "activity_entities",
@@ -486,7 +487,7 @@
           "kind": "energy_precision",
           "selector": "energy_precision",
           "advanced": false,
-          "description": "Auto trims trailing zeros. Choose 0–6 fixed decimal places."
+          "description": "Auto trims trailing zeros. Choose 0\u20136 fixed decimal places."
         }
       ]
     },
@@ -1005,7 +1006,7 @@
           "kind": "energy_precision",
           "selector": "energy_precision",
           "advanced": false,
-          "description": "Auto trims trailing zeros. Choose 0–6 fixed decimal places."
+          "description": "Auto trims trailing zeros. Choose 0\u20136 fixed decimal places."
         },
         {
           "key": "activity_entities",
@@ -1106,7 +1107,7 @@
           "kind": "energy_precision",
           "selector": "energy_precision",
           "advanced": false,
-          "description": "Auto trims trailing zeros. Choose 0–6 fixed decimal places."
+          "description": "Auto trims trailing zeros. Choose 0\u20136 fixed decimal places."
         },
         {
           "key": "activity_entities",
@@ -1257,6 +1258,15 @@
           ]
         },
         {
+          "key": "show_reading_names",
+          "label": "Show reading labels",
+          "kind": "boolean",
+          "selector": "boolean",
+          "advanced": false,
+          "description": "",
+          "default": true
+        },
+        {
           "key": "salt_entity",
           "label": "Salt warning",
           "kind": "entity",
@@ -1401,7 +1411,7 @@
           "kind": "energy_precision",
           "selector": "energy_precision",
           "advanced": false,
-          "description": "Auto trims trailing zeros. Choose 0–6 fixed decimal places."
+          "description": "Auto trims trailing zeros. Choose 0\u20136 fixed decimal places."
         }
       ]
     },
@@ -1539,7 +1549,7 @@
           "kind": "energy_precision",
           "selector": "energy_precision",
           "advanced": false,
-          "description": "Auto trims trailing zeros. Choose 0–6 fixed decimal places."
+          "description": "Auto trims trailing zeros. Choose 0\u20136 fixed decimal places."
         }
       ]
     },
@@ -1642,7 +1652,8 @@
           "kind": "select",
           "selector": "select",
           "advanced": false,
-          "description": "Unset keeps the existing row and security holds.",
+          "description": "Choose Dropdown or Grid. Dropdown is used when omitted.",
+          "default": "dropdown",
           "options": [
             "dropdown",
             "grid"
@@ -1652,6 +1663,7 @@
     },
     {
       "id": "md_header_card",
+      "hidden": true,
       "label": "Header",
       "icon": "mdi:calendar",
       "domains": [

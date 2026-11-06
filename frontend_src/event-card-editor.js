@@ -17,8 +17,8 @@ export function renderEventEditor(editor,host){
  const commit=next=>{draft=next;try{normalizeEventSources(draft);editor._setStatus('');editor._commitDescriptor(draft);}catch(error){editor._setStatus(editor._error(error));}};
  const schema=(name,label,selector)=>editor._schema(name,label,selector);
  const fields=document.createElement('div');host.append(fields);
- let previous={title:source.title||'',limit:source.limit??12,columns:source.columns??1};
- editor._mountForm(fields,previous,[schema('title','Title',{text:{}}),schema('limit','Event limit',{number:{min:1,max:100,step:1,mode:'box'}}),schema('columns','Event columns',{number:{min:1,step:1,mode:'box'}})],value=>{const next=structuredClone(draft);for(const key of ['title','limit','columns'])if(value[key]!==previous[key])next[key]=value[key];commit(next);previous={...value};});
+ let previous={title:source.title||'',limit:source.limit??12};
+ editor._mountForm(fields,previous,[schema('title','Title',{text:{}}),schema('limit','Event limit',{number:{min:1,max:100,step:1,mode:'box'}})],value=>{const next=structuredClone(draft);for(const key of ['title','limit'])if(value[key]!==previous[key])next[key]=value[key];commit(next);previous={...value};});
  const list=document.createElement('div');host.append(list);
  const draw=()=>{list.replaceChildren();sources.forEach((item,index)=>{
   const row=document.createElement('section');row.style.cssText='display:grid;gap:8px;padding:12px;min-width:0';list.append(row);

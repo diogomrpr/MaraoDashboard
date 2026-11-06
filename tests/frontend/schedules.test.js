@@ -36,3 +36,61 @@ test('partial helper provisioning cannot enable starts and preserves its operati
   assert.equal(enables,0);assert.equal(records.size,1);
   const pending=[...records.values()][0];assert.deepEqual(pending.actions,[]);assert.equal(pending.initial_state,false);assert.equal(pending.variables.marao_schedule.status,'provisioning');assert.equal(session.receipt.records[0].before,null);
 });
+
+test('schedule sections open the active group initially and browse independently of selection',async()=>{
+  const {MaraoSchedulesCard}=await import('../../frontend_src/schedules-card.js');
+  const card=new MaraoSchedulesCard();
+  const controls={};
+  card.shadowRoot={activeElement:null,querySelector:()=>null,querySelectorAll:selector=>{
+    const attr=selector.slice(1,-1),key=attr.slice(5).replace(/-([a-z])/g,(_,c)=>c.toUpperCase());
+    return controls[attr]=[...card.shadowRoot.innerHTML.matchAll(new RegExp(attr+'="([^"]*)"','g'))].map(match=>({dataset:{[key]:match[1]}}));
+  }};
+  card._config={group_id:'garden'};card._hass={user:{is_admin:true},states:{'input_select.season':{state:'winter'}}};
+  card._session={manifest:m,timers:[{...t,enabled:true}],selected:'winter'};card._haptic=()=>{};
+  card._render();assert.equal(card._view,'winter');
+  assert.match(card.shadowRoot.innerHTML,/aria-controls="group-winter"/);
+  assert.match(card.shadowRoot.innerHTML,/id="group-summer" hidden/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML,/Export recovery|data-view|data-picker/);
+  controls['data-group'][0].onclick();assert.equal(card._view,'summer');
+  assert.match(card.shadowRoot.innerHTML,/id="group-winter" hidden/);
+  assert.equal(card._hass.states['input_select.season'].state,'winter');
+  const selections=[];card._run=work=>work();card._session.select=id=>selections.push(id);
+  controls['data-active'][0].onclick();controls['data-active'][1].onclick();
+  assert.deepEqual(selections,['summer','paused']);
+  controls['data-group'][0].onclick();assert.equal(card._view,null);
+});
+
+test('off timers use the recognized schedule gate and off adapter while older controllers stay unchanged',()=>{
+  const off={...t,id:'evening-off',time:'19:00',action:'off'};
+  assert.doesNotThrow(()=>validateTimer(off,m));
+  assert.throws(()=>validateTimer({...off,action:'toggle'},m),/Turn on or Turn off/);
+  const legacy=controllerConfig(m),next=controllerConfig({...m,schedules:[{...off,weekday_numbers:[0]}]});
+  assert.equal(recognized(legacy),true);assert.equal(recognized(next),true);
+  const text=JSON.stringify(next.actions);assert.match(text,/approved.get\('action','on'\) == 'off'/);
+  assert.match(text,/switch.turn_off/);assert.match(text,/input_boolean.turn_off/);
+  assert.match(text,/request.get\('source'\) == approved.get\('automation_entity'\)/);
+  assert.doesNotMatch(JSON.stringify(legacy.actions),/approved.get\('action'/);
+});
+
+test('timer popup edits autosave serially without losing a newer change and retain card devices and group',async ctx=>{
+  ctx.mock.timers.enable({apis:['setTimeout']});
+  const before=globalThis.document,created=[];
+  class Node extends EventTarget{constructor(){super();this.children=[];}append(node){this.children.push(node);}setAttribute(){} }
+  globalThis.document={createElement:()=>{const node=new Node();created.push(node);return node;}};
+  ctx.after(()=>{globalThis.document=before;});
+  const {MaraoSchedulesCard}=await import('../../frontend_src/schedules-card.js');
+  const card=new MaraoSchedulesCard(),host=new Node(),actions=new Node(),error={textContent:''},dialog={open:true,querySelector:s=>s==='[data-form]'?host:s==='[data-error]'?error:actions,close(){this.open=false;}};
+  card._modal=()=>dialog;card._weekdays=()=>{};card.isConnected=true;card._hass={states:{}};card._haptic=()=>{};
+  let release;const calls=[];card._session={manifest:m,timers:[t],timer:async data=>{calls.push(structuredClone(data));if(calls.length===1)await new Promise(r=>release=r);}};
+  card._editTimer({...t,enabled:true});const form=created[0];
+  assert.deepEqual(form.schema.map(f=>f.name),['name','time','action']);
+  const change=value=>form.dispatchEvent(Object.assign(new Event('value-changed'),{detail:{value}}));
+  change({name:'First edit'});ctx.mock.timers.tick(500);assert.equal(calls.length,1);
+  change({name:'Latest edit'});ctx.mock.timers.tick(500);assert.equal(calls.length,1,'Only one resource mutation at a time');
+  release();for(let i=0;i<10;i++)await Promise.resolve();
+  assert.equal(calls.length,2);assert.equal(calls[1].name,'Latest edit');assert.deepEqual(calls[1].targets,t.targets);assert.equal(calls[1].timer_group_id,'summer');
+  card._session.timer=async()=>{throw new Error('Write refused');};change({name:'Rejected edit'});ctx.mock.timers.tick(500);for(let i=0;i<5;i++)await Promise.resolve();
+  await dialog._close();assert.equal(dialog.open,true,'A failed edit stays open for recovery');assert.equal(error.textContent,'Write refused');
+  card._session.timer=async()=>{};
+  await dialog._close();assert.equal(dialog.open,false);
+});

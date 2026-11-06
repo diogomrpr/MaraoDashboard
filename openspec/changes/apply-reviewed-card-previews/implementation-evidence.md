@@ -1,0 +1,11 @@
+# Implementation evidence
+
+Applied the consolidated reviewed preview from `.card-design/e551e952-5b00-4f1b-a5ed-fa6033c526f5` to the main sources using a 39-file baseline-aware merge. Exact before-file backups and the reviewed patch are retained in the private temporary promotion directory. Unrelated dirty work and staging were preserved. Generated editor and native assets were rebuilt from the resulting main sources.
+
+The requested outcomes were audited against the promoted owners: shared history time placement; Access label centering and forgiving completion; Alarm options/icons/colors; Climate mode alignment; Camera Events timeline and filters; Cover target-thumb label motion/inset; Dishwasher readings/progress/icons and label option; Energy preview values; Header retirement with saved-card compatibility; Media App neutral availability; compact Number and Wallbox; People/Scene icons; label-free Glance; Weather scenery, metrics and forecasts; grouped autosaving Schedules; continuous Timeline surfaces. Existing main Activity and Energy simulation fixes were retained. Schedule feature documentation now matches the promoted controls.
+
+Selected checks passed: card visibility/layout contracts, slider gestures, schedules, weather presentation, security controls, camera filter rebinding and timestamps, documentation examples and Energy simulation, and Python label validation. Editor/native builds and diff whitespace checks passed. No full test suite, new browser campaign, real-device actuation or camera playback testing was performed.
+
+`prepareFrontend()` confirmed successful native installation on disposable `192.168.0.28`, with served-asset/readiness verification and preserved native dashboard configuration/helpers. Installed asset fingerprint: `0b1c55ada8f3a1cb853587406c67cb769ea8d7fbe2c4ad44c389d25ea800e3c1`. Test entry: `http://192.168.0.28:8123/marao-dashboard/overview`. Documentation stays at `http://127.0.0.1:49942/MaraoDashboard/`, using the existing single server (PID 28611).
+
+Manual handoff: reload Home Assistant and check Cover label movement, compact layouts, forecast content and schedule popup autosaves against real test entities. No publication or archive was requested.

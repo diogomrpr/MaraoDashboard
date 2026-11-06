@@ -59,3 +59,5 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 ## Layout and shared behavior
 
 Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).
+
+The static sky reflects the reported weather condition; no background is animated. A large temperature appears with available wind, humidity and pressure readings. Open **Forecast** for hourly predictions or up to seven days, according to the weather entity’s capabilities. Missing forecasts stay empty and reported errors remain visible. `variables.show_forecast: false` hides the forecast entry.

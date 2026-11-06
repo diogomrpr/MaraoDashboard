@@ -344,7 +344,7 @@ export const PT_LABELS = {
   "Media": "Multimédia",
   "Alarm": "Alarme",
   "Alarm layout": "Disposição do alarme",
-  "Unset keeps the existing row and security holds.": "Sem seleção, mantém a fila e as ações de segurança premidas.",
+  "Choose Dropdown or Grid. Dropdown is used when omitted.": "Escolha Lista pendente ou Grelha. Sem seleção, é usada a lista pendente.",
   "Dropdown": "Lista pendente",
   "Grid": "Grelha",
   "Alarm layout must be dropdown or grid.": "A disposição do alarme deve ser lista pendente ou grelha.",

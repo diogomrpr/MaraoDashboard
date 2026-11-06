@@ -72,14 +72,14 @@ test("alarm code validation, cleanup, single dispatch and authoritative state su
   const card = alarm(t, { states: { [entity]: state }, callService: (...args) => { calls.push(args); return new Promise(resolve => { finish = resolve; }); } });
   assert.match(card.shadowRoot.innerHTML, /type="password" inputmode="numeric"/);
   card._alarmPIN = "text";
-  await card._sendAlarm("alarm_disarm", "hold");
+  await card._sendAlarm("alarm_disarm", "dropdown");
   assert.equal(calls.length, 0); assert.equal(card._alarmPIN, "");
   card._alarmPIN = "1357";
   await card._sendAlarm("alarm_disarm");
   assert.equal(calls.length, 0);
-  const pending = card._sendAlarm("alarm_disarm", "hold");
+  const pending = card._sendAlarm("alarm_disarm", "dropdown");
   assert.equal(card._alarmPIN, "");
-  await card._sendAlarm("alarm_disarm", "hold");
+  await card._sendAlarm("alarm_disarm", "dropdown");
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].slice(0, 3), ["alarm_control_panel", "alarm_disarm", { entity_id: entity, code: "1357" }]);
   assert.equal(state.state, "armed_away");
@@ -94,18 +94,18 @@ test("text/no-code alarms, failures and loss of availability clear private input
   const card = alarm(t, { states: { [entity]: reported("disarmed", { code_format: "text" }) },
     callService: async (_domain, _service, data) => { calls.push(data); throw new Error("Rejected code " + data.code); } });
   card._alarmPIN = "secret text";
-  await card._sendAlarm("alarm_arm_night");
+  await card._sendAlarm("alarm_arm_night", "dropdown");
   assert.equal(calls.length, 1);
   assert.match(card._actionError, /Rejected code \[redacted\]/);
   assert.doesNotMatch(card._actionError, /secret text/);
   card._alarmPIN = "another";
   card.hass = { ...card.hass, connected: false };
   assert.equal(card._alarmPIN, "");
-  await card._sendAlarm("alarm_arm_away");
+  await card._sendAlarm("alarm_arm_away", "dropdown");
   assert.equal(calls.length, 1);
   card.hass = { states: { [entity]: reported() }, callService: async (...args) => errors.push(args) };
   card._alarmPIN = "unused";
-  await card._sendAlarm("alarm_arm_away");
+  await card._sendAlarm("alarm_arm_away", "dropdown");
   assert.equal(Object.hasOwn(errors[0][2], "code"), false);
   card._alarmPIN = "discard";
   card.setConfig({ template: "md_alarm_controls_card", entity: "alarm_control_panel.other" });
@@ -137,9 +137,9 @@ test("alarm holds cancel on release/outside and complete once with border progre
 test("loading and route/visibility changes cannot dispatch or retain alarm codes", async t => {
   let calls = 0;
   const card = alarm(t, { callService: async () => { calls++; } });
-  await card._sendAlarm("alarm_disarm", "hold");
+  await card._sendAlarm("alarm_disarm", "dropdown");
   assert.equal(calls, 0);
-  assert.match(card.shadowRoot.innerHTML, /data-alarm-action="alarm_disarm"[^>]* disabled/);
+  assert.match(card.shadowRoot.innerHTML, /data-scene-select[^>]* disabled/);
   card._alarmPIN = "discard"; card._holdActive = true;
   card._cancelHiddenControls({ type: "location-changed" });
   assert.equal(card._alarmPIN, ""); assert.equal(card._holdActive, false);
@@ -147,7 +147,7 @@ test("loading and route/visibility changes cannot dispatch or retain alarm codes
 
 test("strict slide routes every native opener once and rejects incompatible overrides", async () => {
   const names = ["HTMLElement", "MARAO_SLIDE_INTENT_PX", "MARAO_SLIDE_COMPLETE_AT", "serviceConnectionReady", "serviceTargetReady", "accessOpenerService", "haptic", "callServiceWithNotification", "serviceOutcome", "fitNativeGrid", "nativeEditing", "bindNativeEditing"];
-  const values = [globalThis.HTMLElement, 10, .92, runtime.serviceConnectionReady, runtime.serviceTargetReady, accessOpenerService, () => {}, runtime.callServiceWithNotification, runtime.serviceOutcome, runtime.fitNativeGrid, runtime.nativeEditing, runtime.bindNativeEditing];
+  const values = [globalThis.HTMLElement, 10, Number(dashboard.match(/const MARAO_SLIDE_COMPLETE_AT = ([\d.]+);/)[1]), runtime.serviceConnectionReady, runtime.serviceTargetReady, accessOpenerService, () => {}, runtime.callServiceWithNotification, runtime.serviceOutcome, runtime.fitNativeGrid, runtime.nativeEditing, runtime.bindNativeEditing];
   const Slide = new Function(...names, dashboard.slice(dashboard.indexOf("class MaraoSlideToOpen"), dashboard.indexOf('if (!customElements.get("marao-slide-to-open"))')) + "; return MaraoSlideToOpen;")(...values);
   for (const [domain, service, state] of [["alarm_control_panel", "alarm_disarm", "armed_away"], ["lock", "unlock", "locked"], ["cover", "open_cover", "closed"], ["button", "press", "2026-01-01"], ["switch", "turn_on", "off"], ["script", "turn_on", "off"]]) {
     const id = domain + ".safe", calls = [];
@@ -174,7 +174,9 @@ test("strict slide routes every native opener once and rejects incompatible over
       slide._start(event, point(24)); slide._move(event, point(x, y)); slide._end(event, point(x, y));
     }
     assert.equal(calls.length, 0);
-    slide._start(event, point(24)); slide._move(event, point(290)); slide._end(event, point(290));
+    const endpoint=24+(track.clientWidth-62)*.95;
+    slide._start(event, point(24)); slide._move(event, point(80)); slide._end(event, point(endpoint));
+    slide._end(event, point(endpoint));
     await Promise.resolve(); await Promise.resolve();
     assert.deepEqual(calls[0].slice(0, 3), [domain, service, { entity_id: id }]);
     assert.equal(calls.length, 1);
@@ -349,4 +351,20 @@ test('access feedback follows explicit outcomes, preserves state and cannot conf
     assert.equal(pulses.length,before+1);assert.equal(calls,1);
     slide._clearFeedback();
   }
+});
+
+
+test('omitted alarm layout uses dropdown without rewriting saved configuration; every mode has its icon', t => {
+  const config = {template:'md_alarm_controls_card',entity,variables:{future:true}};
+  const card = new MaraoCard();card.setConfig(config);
+  card.hass = {states:{[entity]:reported('armed_home')},callService:async()=>{}};
+  card.connectedCallback();t.after(()=>card.disconnectedCallback());
+  assert.match(card.shadowRoot.innerHTML,/data-scene-picker/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML,/class="alarm-actions"/);
+  for(const icon of ['shield-home','shield-lock','shield-moon','shield-key','shield-airplane','shield-off'])assert.match(card.shadowRoot.innerHTML,new RegExp('mdi:'+icon));
+  assert.deepEqual(config,{template:'md_alarm_controls_card',entity,variables:{future:true}});
+  card.setConfig({...config,variables:{...config.variables,alarm_layout:'grid'}});
+  assert.match(card.shadowRoot.innerHTML,/data-alarm-action="alarm_arm_home"[^>]*aria-pressed="true"/);
+  assert.match(card.shadowRoot.innerHTML,/--alarm-selected-background:var\(--color-green\)/);
+  assert.match(card.shadowRoot.innerHTML,/class="alarm-disarm/);
 });

@@ -1,4 +1,5 @@
 import {cameraImage,safePreviewData} from './preview-assets.js';
+import {periodRange} from '../../frontend_src/history-data.js';
 import {controllerConfig,startConfig,controllerId,DAYS} from '../../frontend_src/schedule-model.js';
 
 const clone=value=>structuredClone(value);
@@ -29,8 +30,8 @@ export function createSimulation({states={},config={},scenario={},language='en',
   const emit=()=>{if(disposed)return;hass={...hass,states:flags.loading?undefined:{...store}};onChange(hass);for(const cb of subscriptions)cb({event_type:'state_changed',data:{}});};
   const write=(id,value,attributes={})=>{if(!entityPattern.test(id))throw unsupported('invalid entity');const prior=store[id]||{entity_id:id,attributes:{friendly_name:id.split('.')[1].replaceAll('_',' ')},last_changed:now()};store[id]={...prior,state:String(value),attributes:{...prior.attributes,...attributes},last_updated:now(),...(prior.state!==String(value)?{last_changed:now()}:{}),context:{id:'documentation',parent_id:null,user_id:'demo-user'}};};
   const dataGuard=async(operation)=>{if(flags.loading)return new Promise(()=>{});if(flags.failure)throw new Error('Simulated request failed. Choose another scenario to retry.');if(flags.disconnected)throw new Error('Disconnected');};
-  const connection={connected:!flags.disconnected,subscribeEvents:async(callback)=>{subscriptions.add(callback);return()=>subscriptions.delete(callback);},subscribeMessage:async(callback,message)=>{if(message.type==='weather/subscribe_forecast'){queueMicrotask(()=>callback({forecast:forecast()}));return()=>{};}throw unsupported(message.type);}};
-  const forecast=()=>Array.from({length:7},(_,i)=>({datetime:new Date(Date.now()+i*86400000).toISOString(),condition:['sunny','partlycloudy','cloudy','rainy'][i%4],temperature:20+i%4,templow:12+i%3,precipitation:i%3,wind_speed:8+i}));
+  const connection={connected:!flags.disconnected,subscribeEvents:async(callback)=>{subscriptions.add(callback);return()=>subscriptions.delete(callback);},subscribeMessage:async(callback,message)=>{if(message.type==='weather/subscribe_forecast'){queueMicrotask(()=>callback({forecast:forecast(message.forecast_type)}));return()=>{};}throw unsupported(message.type);}};
+  const forecast=(type='daily')=>Array.from({length:type==='hourly'?24:7},(_,i)=>({datetime:new Date(Date.now()+i*(type==='hourly'?3600000:86400000)).toISOString(),condition:['sunny','partlycloudy','cloudy','rainy'][i%4],temperature:20+i%4,...(type==='hourly'?{}:{templow:12+i%3}),precipitation:i%3,precipitation_probability:(i%4)*20,wind_speed:8+i}));
   let hass={language,locale:{language,number_format:'language',time_format:'24',date_format:'language',first_weekday:'monday'},user:{id:'demo-user',name:'Alex (fictional)',is_admin:true},connected:!flags.disconnected,connection,states:flags.loading?undefined:store,entities:registry,devices:Object.fromEntries(Object.values(registry).map(e=>[e.device_id,{id:e.device_id,name:e.name,manufacturer:'Marao demo'}])),areas:{living_room:{name:'Living room'},kitchen:{name:'Kitchen'}},services:simulatedServices,themes:{darkMode:theme==='dark'},config:{time_zone:'Europe/Lisbon',unit_system:{temperature:'°C',length:'km',mass:'kg',volume:'L'},currency:'EUR',components:['automation','timer','input_select','weather']},localize:()=>undefined,hassUrl:path=>String(path).startsWith('data:image/')?path:cameraImage,formatEntityState:state=>state?.state||'',formatEntityAttributeValue:(state,key)=>String(state?.attributes?.[key]??''),callService,callWS,callApi};
 
   function targets(data){return [...new Set([data.entity_id].flat().filter(id=>typeof id==='string'))];}
@@ -103,8 +104,21 @@ export function createSimulation({states={},config={},scenario={},language='en',
     if(type==='media_source/resolve_media'){if(!String(message.media_content_id).includes('eventthumb'))throw unsupported('recording playback');return {url:cameraImage,mime_type:'image/svg+xml'};}
     if(type==='auth/sign_path'){if(!/^\/api\/frigate\//.test(message.path))throw unsupported('signed path');if(message.path.endsWith('.mp4'))throw unsupported('clip playback');return {path:cameraImage};}
     if(type==='energy/get_prefs')return {energy_sources:[],device_consumption:[]};
-    if(type==='recorder/get_statistics_metadata')return (message.statistic_ids||[]).map(id=>({statistic_id:id,has_sum:true,has_mean:true,unit_of_measurement:store[id]?.attributes.unit_of_measurement||'kWh'}));
-    if(type==='recorder/statistics_during_period'){const end=Date.parse(message.end_time)||Date.now(),start=Date.parse(message.start_time)||end-86400000;return Object.fromEntries((message.statistic_ids||[]).map(id=>[id,flags.empty?[]:Array.from({length:24},(_,i)=>({start:(start+(end-start)*i/24)/1000,end:(start+(end-start)*(i+1)/24)/1000,mean:100+i*5,min:80,max:300,sum:20+i*.4,state:20+i*.4}))]));}
+    if(type==='recorder/get_statistics_metadata')return (message.statistic_ids||[]).map(id=>({statistic_id:id,has_sum:true,has_mean:true,statistics_unit_of_measurement:store[id]?.attributes.unit_of_measurement||'kWh',unit_of_measurement:store[id]?.attributes.unit_of_measurement||'kWh'}));
+    if(type==='recorder/statistics_during_period'){
+      const end=Date.parse(message.end_time)||Date.now(),start=Date.parse(message.start_time)||end-86400000;
+      return Object.fromEntries((message.statistic_ids||[]).map(id=>{
+        const rows=[];let sum=20;
+        for(let time=start;!flags.empty&&time<end;){
+          const next=Math.min(end,message.period==='day'?+periodRange(time,0,'day',hass.config.time_zone).end:time+3600000);
+          const change=message.period==='day'?6.8:.4;
+          sum+=change;
+          rows.push({start:time,end:next,change,mean:100+rows.length*5,min:80,max:300,sum,state:sum});
+          time=next;
+        }
+        return [id,rows];
+      }));
+    }
     const helper=/^(input_select|timer)\/(list|create|update|delete)$/.exec(type);
     if(helper){const [,domain,operation]=helper,list=helpers[domain];if(operation==='list')return clone(list);if(operation==='create'){const id='docs_'+(++helperCount),{type:_,...data}=message,record={id,...data};list.push(record);const entity_id=domain+'.'+id;registry[entity_id]={entity_id,unique_id:id,platform:domain};write(entity_id,domain==='timer'?'idle':record.options[0],{friendly_name:record.name,...(record.options?{options:record.options}:{})});emit();return clone(record);}const id=message[domain+'_id'],index=list.findIndex(item=>item.id===id);if(index<0)throw new Error('Helper missing');if(operation==='delete'){list.splice(index,1);delete store[domain+'.'+id];delete registry[domain+'.'+id];}else{const {type:_,[domain+'_id']:ignored,...data}=message;list[index]={...list[index],...data};write(domain+'.'+id,store[domain+'.'+id]?.state||'paused',{options:list[index].options});}emit();return {};}
     if(type==='fire_event'&&message.event_type==='marao_schedule_request'){const request=message.event_data,record=records.get(controllerId(request.collection_id)),manifest=record?.variables?.marao_schedule;if(!manifest)throw new Error('Demo schedule collection missing');if(request.kind==='select')write(manifest.selection.entity_id,request.group);else if(request.kind==='stop'){const target=manifest.targets.find(t=>t.entity_id===request.target);if(!target)throw unsupported('schedule target');write(target.entity_id,target.entity_id.startsWith('valve.')?'closed':'off');write(target.mode.entity_id,'idle');write(target.timer.entity_id,'idle');}else throw unsupported('schedule request '+request.kind);emit();return {};}
@@ -121,10 +135,10 @@ export function createSimulation({states={},config={},scenario={},language='en',
   function seedSchedules(){
     if(!config.group_id||!config.targets?.length||flags.empty||scenario.id==='setup')return;
     const id=config.group_id,selection={domain:'input_select',storage_id:'docs_selection',entity_id:'input_select.docs_selection',baseline:{id:'docs_selection',name:'Demo selection',options:['paused']}};
-    helpers.input_select.push({...selection.baseline,options:['paused','morning']});write(selection.entity_id,'morning',{options:['paused','morning']});
+    helpers.input_select.push({...selection.baseline,options:['paused','morning','evening']});write(selection.entity_id,'morning',{options:['paused','morning','evening']});
     const bound=(config.targets||[]).map((entity_id,i)=>{const mode={domain:'input_select',storage_id:'docs_mode_'+i,entity_id:'input_select.docs_mode_'+i,baseline:{id:'docs_mode_'+i,name:'Demo mode',options:['idle','timed','on_only','stopping']}},timer={domain:'timer',storage_id:'docs_timer_'+i,entity_id:'timer.docs_timer_'+i,baseline:{id:'docs_timer_'+i,name:'Demo timer',duration:0,restore:true}};helpers.input_select.push(mode.baseline);helpers.timer.push(timer.baseline);write(mode.entity_id,'idle',{options:mode.baseline.options});write(timer.entity_id,'idle');return {entity_id,mode,timer};});
-    const manifest={id,name:config.name||'Garden schedules',status:'ready',selection,targets:bound,groups:[{id:'morning',name:'Morning'}],schedules:[]};
-    if(bound.length){const timer={id:'demo_timer',name:'Morning watering',timer_group_id:'morning',targets:bound.map(t=>t.entity_id),days:DAYS.slice(0,5),time:'07:30',stop_mode:'after_duration',duration_minutes:10},record=startConfig(timer,manifest),entity='automation.'+record.id;records.set(record.id,record);write(entity,'on',{id:record.id,friendly_name:record.alias});manifest.schedules.push({...record.variables.marao_schedule,automation_entity:entity,weekday_numbers:[0,1,2,3,4]});}
+    const manifest={id,name:config.name||'Garden schedules',status:'ready',selection,targets:bound,groups:[{id:'morning',name:'Morning'},{id:'evening',name:'Evening'}],schedules:[]};
+    if(bound.length){const timer={id:'demo_timer',name:'Morning watering',timer_group_id:'morning',targets:bound.map(t=>t.entity_id),days:DAYS.slice(0,5),time:'07:30',stop_mode:'none',action:'on'},record=startConfig(timer,manifest),entity='automation.'+record.id;records.set(record.id,record);write(entity,'on',{id:record.id,friendly_name:record.alias});manifest.schedules.push({...record.variables.marao_schedule,automation_entity:entity,weekday_numbers:[0,1,2,3,4]});}
     const record=controllerConfig(manifest);records.set(record.id,record);write('automation.'+record.id,'on',{id:record.id,friendly_name:record.alias});
   }
   seedSchedules();

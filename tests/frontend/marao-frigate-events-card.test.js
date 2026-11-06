@@ -554,6 +554,10 @@ test("native Protect headings split the supplied timestamp without parsing its l
   assert.equal(card._eventDate(events[4]), "");
   const row = card._renderEvent(events[0], 0);
   assert.match(row, /<time>10\/21\/26 17:01:22<\/time><span>Person<\/span><\/h3>\s*<button/);
+  assert.match(row, /class="event-rail"/);
+  assert.doesNotMatch(row, /class="event-time"/,'Undated provider text must not become a fabricated timestamp');
+  const dated = card._renderEvent({provider:'frigate',id:'timeline',start_time:1760000000,label:'person'},1);
+  assert.match(dated, /class="event-time" datetime="[^"]+"/);
   const preview = row.slice(row.indexOf(">", row.indexOf("<button")) + 1);
   assert.doesNotMatch(preview, /17:01:22|<h3|<time>/);
 });
@@ -780,12 +784,12 @@ test('camera filters rebind after Home Assistant detaches and retains the card D
   append(node){this.children.push(node);}after(){}focus(){}contains(){return false;}
   setAttribute(k,v){this.attributes[k]=v;}getAttribute(k){return this.attributes[k];}
   querySelector(selector){if(selector==='button')return this.trigger;if(selector==='[role=menu]')return this.menu;const key=/data-picker="(.*?)"/.exec(selector)?.[1];return key?this.children.find(c=>c.dataset.picker===key):null;}
-  set innerHTML(value){this.trigger=new Node();this.menu=new Node();}
+  set innerHTML(value){this._html=value;this.trigger=new Node();this.menu=new Node();}get innerHTML(){return this._html;}
  }
  globalThis.document=Object.assign(new EventTarget(),{createElement:()=>new Node()});globalThis.window=new EventTarget();
  try{
   const host=new Node(),coverage=new Node(),card=new MaraoFrigateEventsCard();card.shadowRoot={querySelector:s=>s==='.filters'?host:s==='.coverage'?coverage:null};card._sources=[{entity:'camera.a'},{entity:'camera.b'}];card._config={limit:12};card._hass={states:{},language:'en'};
-  card._renderFilters(true);const picker=host.children[0];picker.trigger.dispatchEvent(new Event('click'));assert.equal(card._dropdowns[0].open,true);
+  card._renderFilters(true);assert.equal(coverage.textContent,'');assert.equal(coverage.hidden,true);assert.match(host.children[0].trigger.innerHTML,/mdi:camera/);assert.match(host.children[1].trigger.innerHTML,/mdi:filter-variant/);assert.match(host.children[2].trigger.innerHTML,/mdi:clock-outline/);assert.match(host.children[0].trigger.attributes['aria-label'],/^Camera:/);const picker=host.children[0];picker.trigger.dispatchEvent(new Event('click'));assert.equal(card._dropdowns[0].open,true);
   card.disconnectedCallback();assert.equal(card._dropdowns.length,0);
   card._renderFilters(true);assert.equal(host.children[0],picker);picker.trigger.dispatchEvent(new Event('click'));assert.equal(card._dropdowns[0].open,true);
   card.disconnectedCallback();

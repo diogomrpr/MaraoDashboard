@@ -33,9 +33,9 @@ An administrator sets up the collection and acknowledges dedicated devices. Home
 
 Seasonal groups select which future starts are allowed. Pausing or switching groups does not cancel accepted timed runs.
 
-Timers support selected weekdays/local start times, on-only operation or 1–1440 minute durations. Overlapping timed intervals and duplicate starts within a group are rejected.
+Timers use weekdays, a local start time and an explicit Turn on or Turn off action. New timers use the card’s configured devices and the section they belong to. Existing duration-based records retain their saved behavior.
 
-Structural external edits and ambiguous ownership are read-only until reconciled. Keep native backups and private recovery exports before resource changes.
+Structural external edits and ambiguous ownership are read-only until reconciled. Keep native Home Assistant backups before resource changes.
 
 ## Settings
 
@@ -66,3 +66,9 @@ All automation/helper records and device actions are in memory. The demonstratio
 ## Layout and shared behavior
 
 Home Assistant owns card sizing, sections and visibility. Marao controls retain their touch targets and capability checks. Unknown, unavailable or disconnected entities use neutral presentation and disable unsafe actions. See [layouts and popups](../../features/layout/) and [shared interactions](../../features/theme/).
+
+Groups appear as collapsible sections with only one open at a time. The active group opens initially; its switch activates or pauses it. Tap a timer to edit or delete it in a popup. Use the plus buttons below timers or groups to add a new item.
+
+Timer switches are beside their list rows. The timer popup saves completed edits automatically and keeps errors visible; closing flushes pending edits. Use the top-right close button or the red trash action. Configuration reloads and automation state changes refresh automatically. The card has no manual Refresh, Delete collection, device-status list, duration editor or per-timer group/device picker.
+
+Group sections expose a red delete icon instead of a management dialog. Timer rows open settings without a redundant arrow. Weekdays use a themed multi-select dropdown with checkmarks and a selected-day summary.

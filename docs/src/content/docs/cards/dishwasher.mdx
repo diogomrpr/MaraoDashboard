@@ -48,6 +48,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
 | `variables.progress_entity` | Progress | entity | Not set | Progress for this card. Searchable suggestions are available. |
 | `variables.remaining_time_entity` | Remaining time | entity | Not set | Remaining time for this card. Searchable suggestions are available. |
+| `variables.show_reading_names` | Show reading labels | boolean | `true` | Show reading labels for this card. |
 | `variables.salt_entity` | Salt warning | entity | Not set | Salt warning for this card. Searchable suggestions are available. |
 | `variables.rinse_aid_entity` | Rinse-aid warning | entity | Not set | Rinse-aid warning for this card. Searchable suggestions are available. |
 | `variables.active_program_entity` | Active program | entity | Not set | Active program for this card. Searchable suggestions are available. |
@@ -59,6 +60,7 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 | Scenario | What it demonstrates |
 | --- | --- |
 | Default | Try the configured card with fictional devices. |
+| Icons and values | Hide indicator captions while keeping their accessible names. |
 | Idle | An inactive appliance has no invented running state. |
 | Finished | The completed cycle follows the reported state. |
 | Salt warning | Only the configured abnormal consumable is prioritized. |
