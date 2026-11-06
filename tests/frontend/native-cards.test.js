@@ -58,9 +58,10 @@ test('native registration retains existing generic renderers and hides only cata
 
 test('entity suggestions bind the exact selection, validate defaults and leave discovery and saved state untouched',()=>{
   const source={...hass,states:{...hass.states,'light.selected':{state:'off',attributes:{}},'cover.damper':{state:'open',attributes:{device_class:'damper'}},'sensor.battery':{state:'80',attributes:{device_class:'battery',unit_of_measurement:'%'}}}},before=structuredClone(source);
-  for(const [role,id]of [['md_light_card','light.selected'],['md_fan_card','cover.damper'],['md_media_card','media_player.test'],['md_header_card','weather.test'],['md_battery_card','sensor.battery']]){
+  for(const [role,id]of [['md_light_card','light.selected'],['md_fan_card','cover.damper'],['md_media_card','media_player.test'],['md_battery_card','sensor.battery']]){
     const result=nativeEntitySuggestion(role,source,id);assert.equal(result.config.entity_id,id);assert.doesNotThrow(()=>validateNativeCardConfig(result.config));
   }
+  assert.equal(nativeEntitySuggestion('md_header_card',source,'weather.test'),null);
   assert.equal(nativeEntitySuggestion('md_light_card',source,'switch.test'),null);assert.equal(nativeEntitySuggestion('md_light_card',source,'light.missing'),null);
   assert.equal(nativeEntitySuggestion('md_battery_card',source,'sensor.test'),null);assert.equal(nativeEntitySuggestion('md_media_app_card',{states:{'media_player.empty':{attributes:{}}}},'media_player.empty'),null);
   for(const role of ['md_title_card','md_room_card','md_entity_group_card','md_floor_plan_card'])assert.equal(nativeEntitySuggestion(role,source,'light.selected'),null);
