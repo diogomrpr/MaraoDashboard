@@ -23,7 +23,6 @@ In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste
 ```yaml
 type: custom:marao-camera-events-card
 title: Recent events
-columns: 2
 limit: 12
 cameras:
   - entity: camera.front_door
@@ -56,7 +55,6 @@ The table lists the shared catalog fields and this card’s structured options. 
 | --- | --- | --- | --- | --- |
 | `title` | Title | text | Not set | Heading above the recent events. |
 | `cameras` | Camera sources | json | Not set | Ordered unique sources with entity, optional name and provider overrides. |
-| `columns` | Preferred columns | number | Not set | Positive integer; the layout reduces columns when space is limited. |
 | `limit` | Per-source event limit | number | `12` | Maximum recent records requested for each source. |
 
 ## Behavior examples

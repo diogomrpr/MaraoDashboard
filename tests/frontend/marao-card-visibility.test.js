@@ -1013,7 +1013,12 @@ test('media app explicit artwork preserves launch data, semantic names and probl
   assert.equal(mediaAppBrand(config).id,'netflix');assert.match(card.shadowRoot.innerHTML,/media-apps\/netflix\.svg/);assert.match(card.shadowRoot.innerHTML,/aria-label="Custom shortcut"/);
   await performAction(hass,card._config.tap_action,config.entity);assert.deepEqual(calls,[['media_player','select_source',{source:'Custom TV app',entity_id:'media_player.test'},undefined,false]]);
   assert.equal(stateAppearance('md_media_app_card','idle',config).background,'#000');assert.deepEqual(stateAppearance('md_media_app_card','unavailable',config),{unavailable:true});
-  card.hass={...hass,states:{'media_player.test':{state:'unavailable',attributes:{}}}};assert.match(card.shadowRoot.innerHTML,/data-card-action[^>]* disabled/);assert.match(card.shadowRoot.innerHTML,/class="problem"/);
+  card.hass={...hass,states:{'media_player.test':{state:'unavailable',attributes:{}}}};assert.match(card.shadowRoot.innerHTML,/data-card-action[^>]* disabled/);assert.match(card.shadowRoot.innerHTML,/class="problem"/);assert.match(card.shadowRoot.innerHTML,/<span class="binary-state">Unavailable<\/span>/);assert.match(card.shadowRoot.innerHTML,/data-problem-details aria-label="Unavailable"/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML.split('</style>')[1],/mdi:help-circle-outline/);
+  card.hass={...hass,states:{'media_player.test':{state:'unknown',attributes:{}}}};
+  assert.doesNotMatch(card.shadowRoot.innerHTML.split('</style>')[1],/mdi:help-circle-outline/);
+  assert.match(card.shadowRoot.innerHTML,/data-problem-details aria-label="Unknown"/);
+
   assert.equal(mediaAppBrand({...config,variables:{app_source:'MEO Go',app_logo:''}}).id,'meo');assert.equal(mediaAppBrand({...config,name:'Netflix',variables:{app_source:'Custom TV app',app_logo:''}}),undefined);
   assert.throws(()=>card.setConfig({...config,variables:{...config.variables,app_logo:'https://invalid/logo'}}),/supported app logo/);card._hass={language:'pt'};assert.throws(()=>card.setConfig({...config,variables:{app_logo:'bad'}}),/logótipo/);assert.deepEqual(config,before);
 });
@@ -1610,7 +1615,7 @@ test("state labels use native domain translations and preserve unitless climate 
   const card = new MaraoCard();
   card.setConfig({ entity: "sensor.weather", template: "md_weather_card" });
   card.hass = { ...hass, states: { "sensor.weather": { state: "sunny", attributes: {} } } };
-  assert.match(card.shadowRoot.innerHTML, /<div class="state">Ensolarado<\/div>/);
+  assert.match(card.shadowRoot.innerHTML, /<p class="weather-condition">Ensolarado<\/p>/);
   assert.deepEqual(formatted, ["weather.weather"]);
   card.setConfig({ entity: "climate.room", template: "md_climate_card" });
   card.hass = { ...hass, states: { "climate.room": { state: "heat", attributes: { temperature: 22, current_temperature: 21, unit_of_measurement: "°C" } } } };
@@ -1628,9 +1633,9 @@ test("configured weather, header, dishwasher and camera details reach the visibl
   const card = new MaraoCard();
   card.hass = { states, language: "en" };
   card.setConfig({ entity: "sensor.weather", template: "md_weather_card" });
-  assert.match(card.shadowRoot.innerHTML, /14 °C–22 °C/);
+  assert.match(card.shadowRoot.innerHTML, /data-weather-forecast/);
   card.setConfig({ entity: "sensor.weather", template: "md_weather_card", variables: { show_forecast: false } });
-  assert.doesNotMatch(card.shadowRoot.innerHTML.split("</style>")[1], /14 °C–22 °C/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML.split("</style>")[1], /data-weather-forecast/);
   card.setConfig({ entity: "sensor.weather", template: "md_header_card", variables: { person_entity: "sensor.person" } });
   assert.match(card.shadowRoot.innerHTML, /<dt>Person<\/dt><dd>home<\/dd>/);
   assert.match(card.shadowRoot.innerHTML, new RegExp(new Date().getFullYear()));
@@ -2510,4 +2515,63 @@ test('Plex component does not automatically retry failed reads or accept obsolet
   const freshReads=[],fresh={...delayed,callWS:async command=>{freshReads.push(command);return{media_content_type:'server',media_content_id:'plex://safe/server',title:'New account',children:[]};}};card.hass=fresh;await new Promise(resolve=>setImmediate(resolve));
   release({media_content_type:'server',media_content_id:'plex://safe/server',title:'Old account',children:[{media_content_type:'server',media_content_id:'plex://safe/server/Recommended',title:'Old private recommendations'}]});await new Promise(resolve=>setImmediate(resolve));
   assert.deepEqual(card._home.libraries,[]);assert.equal(freshReads.length,1,'obsolete account work must not start recommendation reads in a new account');assert.doesNotMatch(JSON.stringify(card._home),/Old/);card._launch.cancel();
+});
+
+test('Number uses shared Climate stepper with a separate large value and preserves bounded native steps',async()=>{
+  const card=new MaraoCard(),calls=[];
+  const state={state:'2.5',attributes:{min:0,max:3,step:.5,unit_of_measurement:'%'}};
+  card.hass={states:{'number.level':state},callService:async(...args)=>calls.push(args)};
+  card.setConfig({template:'md_number_card',entity:'number.level',name:'Target level'});
+  let markup=card.shadowRoot.innerHTML.split('</style>')[1];
+  assert.match(markup,/number-card-value[^>]*>2.5<small> %<\/small><\/output><div class="number-stepper climate-stepper number-card-stepper"/);
+  assert.equal((markup.match(/<output /g)||[]).length,1);
+  assert.doesNotMatch(markup,/<div class="state/);
+  assert.match(markup,/mdi:chevron-up/);assert.match(markup,/mdi:chevron-down/);
+  await card._adjustNumber('number.level','md_number_card',1);
+  assert.deepEqual(calls[0].slice(0,3),['number','set_value',{entity_id:'number.level',value:3}]);
+  assert.equal(state.state,'2.5','The reported value stays authoritative');
+  card.hass={...card.hass,states:{'number.level':{state:'unavailable',attributes:state.attributes}}};
+  markup=card.shadowRoot.innerHTML.split('</style>')[1];
+  assert.match(markup,/number-card-value[^>]*>—/);
+  assert.match(markup,/data-number-step="increase"[^>]* disabled/);
+});
+
+test('dishwasher indicators use reported progress and program-specific icons, keeping missing readings neutral', () => {
+  const card = new MaraoCard();
+  const config = {template:'md_dishwasher_card',entity:'sensor.dishwasher',variables:{progress_entity:'sensor.progress',active_program_entity:'sensor.program'}};
+  const states = {'sensor.dishwasher':{state:'running',attributes:{}},'sensor.progress':{state:'42',attributes:{unit_of_measurement:'%'}},'sensor.program':{state:'Eco',attributes:{}}};
+  card.hass = {states,language:'en'};card.setConfig(config);
+  let markup = card.shadowRoot.innerHTML.split('</style>')[1];
+  assert.match(markup,/role="progressbar"[^>]*aria-valuenow="42"/);
+  assert.match(markup,/stroke-dasharray="42 100"/);
+  assert.match(markup,/mdi:leaf/);
+  for(const [program,icon] of [['Quick 45','timer-fast-outline'],['Intensive 70','pot-steam'],['Glass 40','glass-wine'],['Auto 45–65','autorenew'],['Unrecognized cycle','dishwasher']]) {
+    card.hass={states:{...states,'sensor.program':{state:program,attributes:{}}},language:'en'};
+    assert.match(card.shadowRoot.innerHTML.split('</style>')[1],new RegExp('mdi:'+icon));
+  }
+  for(const value of ['unknown','unavailable','','-1','101']) {
+    card.hass={states:{...states,'sensor.progress':{state:value,attributes:{}}},language:'en'};
+    markup=card.shadowRoot.innerHTML.split('</style>')[1];
+    assert.doesNotMatch(markup,/role="progressbar"/);
+    assert.match(markup,/dishwasher-stat neutral/);
+  }
+  assert.equal(config.variables.active_program_entity,'sensor.program');
+  card.setConfig({...config,variables:{...config.variables,remaining_time_entity:'sensor.remaining',show_reading_names:false}});
+  card.hass={states:{...states,'sensor.progress':{state:'42',attributes:{}},'sensor.remaining':{state:'35',attributes:{unit_of_measurement:'min'}}},language:'en'};
+  markup=card.shadowRoot.innerHTML.split('</style>')[1];
+  assert.match(markup,/dishwasher-stat no-label/);assert.match(markup,/<dt>Remaining<\/dt>/);
+  assert.match(markup,/mdi:timer-sand/);assert.match(markup,/35 min/);
+  assert.throws(()=>card.setConfig({...config,variables:{...config.variables,show_reading_names:'false'}}),/boolean/);
+
+});
+
+test('shared weekday dropdown keeps multiple choices checked until explicitly closed',t=>{
+ const old={document:globalThis.document,window:globalThis.window};t.after(()=>Object.assign(globalThis,old));globalThis.document=new EventTarget();globalThis.window=new EventTarget();
+ let active,selected=['mon'];const node=()=>Object.assign(new EventTarget(),{attributes:{},setAttribute(k,v){this.attributes[k]=v;},focus(){active=this;}});
+ const picker=node(),trigger=node(),menu=node(),choices=['mon','tue','wed'].map(value=>({value,button:node()}));
+ const dropdown=bindDropdown(picker,{trigger,menu,choices,multiple:true,value:()=>selected,activeElement:()=>active,haptic(){},onSelect:value=>{selected=selected.includes(value)?selected.filter(day=>day!==value):[...selected,value];}});
+ trigger.dispatchEvent(new Event('click'));choices[1].button.dispatchEvent(new Event('click'));
+ assert.deepEqual(selected,['mon','tue']);assert.equal(dropdown.open,true);assert.equal(choices[0].button.attributes['aria-checked'],'true');assert.equal(choices[1].button.attributes['aria-checked'],'true');
+ choices[0].button.dispatchEvent(new Event('click'));assert.deepEqual(selected,['tue']);assert.equal(choices[0].button.attributes['aria-checked'],'false');
+ picker.dispatchEvent(Object.assign(new Event('keydown'),{key:'Escape'}));assert.equal(dropdown.open,false);assert.equal(active,trigger);dropdown.destroy();
 });

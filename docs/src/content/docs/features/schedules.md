@@ -9,12 +9,11 @@ Administration requires an HA administrator, UI-managed automations and supporte
 
 ## Groups and timers
 
-Create groups such as Summer and Winter with **Manage groups**. **Active timer group** selects which group may start timers. Viewing or editing a group does not activate it. Paused prevents future starts without erasing settings.
+Create seasonal groups with **Add group**. Groups appear as sections, with one section open at a time and the active group open initially. The group toggle selects which group may start timers; opening a section does not activate it. Paused prevents future starts without erasing settings.
 
-Each timer has a name, group, target devices, weekdays and a local start time:
+Use the plus inside a section to add a timer. Timer rows show their essential settings and an enable toggle. Select a row to edit its name, local time, on/off action and weekdays in a popup. Changes save automatically; close the popup with the top-right close control. The red trash control deletes the timer. **Delete group** appears below the timer-add control. Device selection belongs to card configuration. Changes from Home Assistant refresh automatically.
 
-- **Turn on only** has no inferred stop time. It stays on until explicit Stop or an independent action.
-- **Turn off after** accepts 1–1440 minutes. HA owns each accepted device's elapsed stop deadline, including overnight runs.
+New timers specify an on or off action rather than a duration. An on timer has no inferred stop time; add a separate off timer to stop it. Existing timed records retain their saved duration and Home Assistant-owned stop deadlines for compatibility.
 
 Different devices may start slightly apart, and failures can produce partial results. Device state and native automation traces describe those results. Failed or skipped starts are not automatically retried.
 
@@ -28,10 +27,10 @@ Schedules use Home Assistant's timezone. Missing daylight-saving start times are
 
 ## Ownership and recovery
 
-Export recovery data after resource operations and retain the exact affected-record receipts privately. These API records do not preserve shared YAML comments or file formatting.
+Keep a private Home Assistant backup before setup or recovery. The card has no recovery export control. Internal operation receipts preserve affected-record baselines but do not preserve shared YAML comments or file formatting.
 
 Native automation links open configuration and traces. Alias edits are supported; structural customization or newer metadata can make records read-only to Marao. Resolve changed or partial records before more writes. Never identify an uncertain helper only by its display name.
 
-Deleting a collection requires idle devices and verified ownership. Known external/customized dependencies block cleanup. Deleting a seasonal group keeps stop resources needed by active runs. Restore matching package and saved automation/helper/selection data together for rollback, preserving unrelated changes. Unavailable helpers or targets do not prove that a physical device has turned off.
+The card does not offer collection deletion. Resource cleanup requires idle devices and verified ownership; known external/customized dependencies block it. Deleting a seasonal group keeps stop resources needed by active runs. Restore matching package and saved automation/helper/selection data together for rollback, preserving unrelated changes. Unavailable helpers or targets do not prove that a physical device has turned off.
 
 The card playground uses fictional records and devices. It demonstrates configuration and interaction without creating automations in any Home Assistant instance.

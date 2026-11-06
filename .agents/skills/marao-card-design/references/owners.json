@@ -1,5 +1,29 @@
 [
   {
+    "behavior": "weather-presentation",
+    "file": "custom_components/marao_dashboard/frontend/MaraoWeather.js",
+    "anchors": [
+      "export function weatherMarkup",
+      "export function weatherScene",
+      "export class MaraoWeatherForecast"
+    ],
+    "consumers": [
+      "md_weather_card"
+    ],
+    "hooks": [
+      "Static CSS sky and current metrics; forecast content uses the existing Marao popup shell"
+    ],
+    "indirect": [
+      "Weather forecast popup"
+    ],
+    "verificationComponents": [
+      "control-grid"
+    ],
+    "focusedTests": [
+      "tests/frontend/weather-presentation.test.js"
+    ]
+  },
+  {
     "behavior": "climate-presentation",
     "file": "custom_components/marao_dashboard/frontend/MaraoCards.js",
     "anchors": [
@@ -167,7 +191,7 @@
     "anchors": [
       "function numberStepper",
       ".number-stepper button {",
-      ".body.climate-card .climate-stepper button {"
+      ".body:is(.climate-card,.number-card) .climate-stepper button {"
     ],
     "consumers": [
       "md_climate_card",

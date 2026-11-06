@@ -224,24 +224,21 @@ test('loading schedule collection choices preserves the active form and latest d
   assert.equal(editor.shadowRoot.querySelector('[data-status]').textContent,'');
 });
 
-test('event editor retains rejected values until corrected and preserves unrelated source data',t=>{
+test('event editor retains rejected sources until corrected and preserves unrelated source data',t=>{
   const original={type:'custom:marao-camera-events-card',cameras:[{entity:'camera.a',future:{keep:[]}}],columns:2,future:false};
   const {editor,forms,events}=nativeFormHarness(t,original);
-  const general=forms.find(form=>form.schema.some(field=>field.name==='columns'));
-  general.change({...general.data,columns:0});assert.equal(events.length,0);
-  general.change({...general.data,columns:0,title:'Events'});
-  assert.equal(events.length,0,'Another field must not silently discard the rejected columns');
+  const general=forms.find(form=>form.schema.some(field=>field.name==='limit'));
+  assert.equal(general.schema.some(field=>field.name==='columns'),false);
   const camera=forms.find(form=>form.schema.some(field=>field.name==='event_provider'));
+  camera.change({...camera.data,entity:'light.invalid'});
+  assert.equal(events.length,0);
+  general.change({...general.data,limit:3,title:'Events'});
+  assert.equal(events.length,0,'General edits must retain an invalid source draft');
   camera.change({...camera.data,name:'Front'});
   assert.equal(events.length,0,'Source edits must retain the same invalid draft');
-  assert.match(editor.shadowRoot.querySelector('[data-status]').textContent,/positive integer/);
-  general.change({...general.data,columns:3,title:'Events'});
-  assert.deepEqual(events.at(-1),{...original,cameras:[{...original.cameras[0],name:'Front'}],columns:3,title:'Events'});
-  const accepted=events.length;
-  camera.change({...camera.data,entity:'light.invalid'});general.change({...general.data,title:'Front events'});
-  assert.equal(events.length,accepted,'General edits must retain an invalid source draft');
+  assert.ok(editor.shadowRoot.querySelector('[data-status]').textContent);
   camera.change({...camera.data,entity:'camera.b'});
-  assert.equal(events.at(-1).title,'Front events');assert.equal(events.at(-1).cameras[0].entity,'camera.b');
+  assert.deepEqual(events.at(-1),{...original,cameras:[{...original.cameras[0],entity:'camera.b',name:'Front'}],limit:3,title:'Events'});
 });
 
 test('group sections and schedule cards create safe IDs on HTTP without randomUUID',async t=>{

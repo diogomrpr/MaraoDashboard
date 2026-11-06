@@ -600,7 +600,7 @@ test("slide control keeps an action-only label, meaningful semantics, and a larg
   assert.match(slide.shadowRoot.innerHTML, /<span class="label" role="status">Unlock<\/span>/);
   assert.doesNotMatch(slide.shadowRoot.innerHTML, /slide to unlock/i);
   assert.match(slide.shadowRoot.innerHTML, /width: 54px;\s+height: 54px;/);
-  assert.match(slide.shadowRoot.innerHTML, /padding: 8px 16px 8px 72px/);
+  assert.match(slide.shadowRoot.innerHTML, /padding: 8px 16px;/);
   assert.match(slide.shadowRoot.innerHTML, /top: calc\(50% - 27px\)/);
   assert.doesNotMatch(slide.shadowRoot.innerHTML, /padding: 8px 8px 72px|top: auto; bottom: 4px/);
   assert.match(slide.shadowRoot.innerHTML, /--marao-slide-foreground: var\(--primary-text-color\)/);

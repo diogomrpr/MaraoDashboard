@@ -27,8 +27,7 @@ entity_id: weather.home
 
 Compatible entity domains: `weather`, `sensor`.
 
-Forecast capability comes from the weather integration. A sensor may supply current conditions, but does not provide a weather forecast subscription.
-
+The static sky reflects the reported weather condition; no background is animated. A large temperature appears with available wind, humidity and pressure readings. Open **Forecast** for hourly predictions or up to seven days, according to the weather entity’s capabilities. Missing forecasts stay empty and reported errors remain visible. `variables.show_forecast: false` hides the forecast entry.
 ## Settings
 
 The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.

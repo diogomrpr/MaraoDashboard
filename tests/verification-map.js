@@ -35,6 +35,7 @@ const components = {
   'summary-controls': {units:[['collections'],['marao-card-visibility','live group filtering']],editor:true},
   schedules: {units:[['schedules']],editor:true},
   'press-feedback': { units: [['press-feedback'], ['marao-card-visibility', 'room child activation|dual-action hold|hold completion|active holds|access actions use|touch actions establish|shared dropdown floats|themed scene dropdown'], ['marao-navbar-card'], ['frontend-refresh', 'gesture|short taps|released after'], ['floor-plan'], ['marao-frigate-events-card', 'entity availability disables|type filters|event heading retains']], editor: true, package: true },
+  weather: {units:[['weather-presentation'],['marao-card-visibility','configured weather|state labels use native domain']],editor:true},
   'floor-plan': { units: [['floor-plan'], ['editor-model'], ['editor-panel'], ['native-compiler']], editor: true, package: true },
   'native-source': { units: [['native-source'], ['native-compiler'], ['native-session'], ['native-strategy'], ['native-dependencies'], ['native-package'], ['native-cards'], ['native-card-editor'], ['native-bootstrap'], ['native-edit-context'], ['dashboard-settings'], ['ordinary-conversion'], ['ordinary-session'], ['ordinary-migration-ui'], ['converter']], python: ['test_frontend_compiler'], editor: true, upgrade: true },
   'navbar-startup': { units: [['frontend-refresh'], ['marao-navbar-card'], ['marao-history-cards'], ['marao-text-scale'], ['gallery-cases'], ['package-boundary']],
@@ -181,6 +182,7 @@ const rules = [
   [/^custom_components\/marao_dashboard\/(card_names\.py|frontend\/MaraoNames\.js)$|^tests\/(frontend\/card-names\.test\.js|components\/marao_dashboard\/test_card_names\.py)$/, ['card-namespace']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoLight(?:Color|Capabilities)\.js$|^tests\/test-light-color-local\.js$/, ['light-color']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoSlider\.js$/, ['slider']],
+  [/^(?:custom_components\/marao_dashboard\/frontend\/MaraoWeather\.js|tests\/frontend\/weather-presentation\.test\.js)$/, ['weather']],
   [/^tests\/test-ha-navbar-startup\.js$/, ['navbar-startup']],
   [/^custom_components\/marao_dashboard\/frontend\/Marao(?:Navigation|NativeNavbar)\.js$|^frontend_src\/MaraoNativeNavbar\.js$|^tests\/test-navbar-startup-local\.js$/, ['navbar-startup']],
   [/^custom_components\/marao_dashboard\/frontend\/MaraoRuntime\.js$/, 'shared'],
@@ -304,7 +306,7 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
 
 function inspectionFor(selection) {
   const ids = selection.components;
-  const aliases = {'popup-layout':['md_entity_group_card','md_climate_card'],people:['md_people_card'],'summary-controls':['md_entity_group_card'],schedules:['md_schedules_card'],
+  const aliases = {'popup-layout':['md_entity_group_card','md_climate_card'],people:['md_people_card'],'summary-controls':['md_entity_group_card'],schedules:['md_schedules_card'],weather:['md_weather_card'],
     'navbar-startup': ['marao-navbar-card'], 'frontend-refresh': ['marao-navbar-card'], navbar: ['marao-navbar-card'], 'navbar-overflow': ['marao-navbar-card'],
     'battery-groups': ['md_entity_group_card', 'md_battery_card'], 'access-label': ['md_access_slide_action_card'],
     'control-grid': [...families.slider, ...families.climate, 'md_sensor_card'],

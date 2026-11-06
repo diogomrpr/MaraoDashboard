@@ -18,11 +18,11 @@ export function createActivity(host, options) {
   .marao-activity-scroll{flex:1 1 auto;overflow:auto;overscroll-behavior:contain;min-height:48px}.marao-activity [role=status]:empty{display:none}
   .marao-activity h3{display:flex;align-items:center;gap:12px;font-size:var(--font-size-primary,1.125rem);font-weight:700;line-height:1.4;margin:20px 0 16px;overflow-wrap:anywhere}
   .marao-activity h3::before,.marao-activity h3::after{content:'';height:1px;min-width:12px;flex:1;background:var(--divider-color,var(--secondary-text-color))}.marao-activity h3 time{min-width:0}
-  .marao-activity-day{display:grid;grid-template-columns:max-content 48px minmax(0,1fr);column-gap:8px}.marao-activity article{display:grid;grid-template-columns:subgrid;grid-column:1/-1;position:relative;align-items:start}
-  .marao-activity .event-time{padding-top:12px;font-size:var(--font-size-primary,1.125rem);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
-  .marao-activity .event-rail{position:relative;align-self:stretch;display:flex;justify-content:center}.marao-activity article:not(:last-child) .event-rail::after{content:'';position:absolute;top:48px;bottom:0;width:2px;background:var(--divider-color,var(--secondary-text-color))}
+  .marao-activity-day{display:grid;grid-template-columns:minmax(48px,max-content) minmax(0,1fr);column-gap:12px}.marao-activity article{display:grid;grid-template-columns:subgrid;grid-column:1/-1;position:relative;align-items:start}
+  .marao-activity .event-time{grid-column:1;grid-row:1;align-self:start;text-align:center;margin-top:52px;padding:0 0 12px;font-size:.8125rem;font-weight:400;line-height:1.4;color:var(--secondary-text-color);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .marao-activity .event-rail{grid-column:1;grid-row:1;position:relative;align-self:stretch;display:flex;justify-content:center}.marao-activity article:not(:last-child) .event-rail::after{content:'';position:absolute;top:calc(56px + 1.4 * .8125rem);bottom:0;width:2px;background:var(--divider-color,var(--secondary-text-color))}
   .marao-activity .event-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:var(--secondary-background-color);--mdc-icon-size:24px}
-  .marao-activity .event-body{min-width:0;padding-bottom:20px}.marao-activity article:last-child .event-body{padding-bottom:0}
+  .marao-activity .event-body{grid-column:2;grid-row:1;min-width:0;padding-bottom:20px}.marao-activity article:last-child .event-body{padding-bottom:0}
   .marao-activity article button{width:100%;text-align:start;background:transparent;padding:0}.marao-activity .event-title{font-weight:700}
   .marao-activity p{margin:4px 0;overflow-wrap:anywhere}.marao-activity small{color:var(--secondary-text-color);font-size:var(--font-size-caption,.9375rem)}.marao-activity-coverage{display:block;margin-top:20px}
   ${dropdownStyles}</style><section class="marao-activity"><header></header><div class="marao-activity-scroll"><div class="marao-activity-filters" hidden></div><p role="status"></p><div class="marao-activity-list"></div></div></section>`;

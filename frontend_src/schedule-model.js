@@ -15,6 +15,7 @@ export function validateTimer(timer,manifest,others=[]) {
   if(!Array.isArray(timer.targets)||!timer.targets.length||new Set(timer.targets).size!==timer.targets.length||timer.targets.some(id=>!manifest.targets.some(t=>t.entity_id===id)))throw new Error('Choose registered devices.');
   if(!Array.isArray(timer.days)||!timer.days.length||timer.days.some(d=>!DAYS.includes(d))||!/^([01]\d|2[0-3]):[0-5]\d$/.test(timer.time))throw new Error('Choose weekdays and a start time.');
   if(!['none','after_duration'].includes(timer.stop_mode)||timer.stop_mode==='none'&&Object.hasOwn(timer,'duration_minutes')||timer.stop_mode==='after_duration'&&(!Number.isInteger(timer.duration_minutes)||timer.duration_minutes<1||timer.duration_minutes>1440))throw new Error('Choose Turn on only or a duration of 1–1440 minutes.');
+  if(timer.action!==undefined&&!['on','off'].includes(timer.action))throw new Error('Choose Turn on or Turn off.');
   const spans=t=>t.days.map(day=>{const [h,m]=t.time.split(':').map(Number),start=DAYS.indexOf(day)*1440+h*60+m;return [start,start+(t.stop_mode==='after_duration'?t.duration_minutes:0)];});
   for(const other of others)if(other.id!==timer.id&&other.timer_group_id===timer.timer_group_id&&other.targets.some(id=>timer.targets.includes(id)))for(const a of spans(timer))for(const b of spans(other))for(const offset of [-10080,0,10080]) {
     const [s,e]=[b[0]+offset,b[1]+offset];if(a[0]===s || a[0]<e&&s<a[1] || a[0]===a[1]&&s<=a[0]&&a[0]<e || s===e&&a[0]<=s&&s<a[1])throw new Error('Timers overlap for the same device in this group.');
@@ -35,14 +36,15 @@ export function controllerConfig(manifest) {
   const variables={marao_schedule:{...m,manager:MANAGER,version:1,role:'controller'},request:'{{ trigger.event.data if trigger.platform == "event" else {} }}',approved:'{{ (marao_schedule.schedules | selectattr("id", "eq", request.get("timer_id", "")) | list | first) | default({}) }}'};
   const recent="0 <= as_timestamp(now()) - as_timestamp(trigger.event.time_fired,0) < 10";
   const selectionChange=choose(`trigger.id == 'request' and request.get('kind') == 'select' and ${recent} and request.get('group') in ${JSON.stringify(['paused',...m.groups.map(g=>g.id)])}`,[action('input_select.select_option',{entity_id:selection,option:'{{ request.group }}'})]);
-  const starts=[];
+  const starts=[],hasOff=(m.schedules||[]).some(timer=>timer.action==='off');
   for(const target of m.targets) {
     if(!target.mode||!target.timer)continue;
     const id=target.entity_id,mode=target.mode.entity_id,timer=target.timer.entity_id,adapter=targetAdapter(id);
-    const can=`${JSON.stringify(id)} in approved.get('targets', []) and states(${JSON.stringify(mode)}) == 'idle' and states(${JSON.stringify(id)}) in ['off','closed'] and states(${JSON.stringify(timer)}) == 'idle'`;
+    const can=`${hasOff?"approved.get('action','on') == 'on' and ":''}${JSON.stringify(id)} in approved.get('targets', []) and states(${JSON.stringify(mode)}) == 'idle' and states(${JSON.stringify(id)}) in ['off','closed'] and states(${JSON.stringify(timer)}) == 'idle'`;
     starts.push(choose(can,[action('input_select.select_option',{entity_id:mode,option:"{{ 'timed' if approved.stop_mode == 'after_duration' else 'on_only' }}"}),choose(`states(${JSON.stringify(mode)}) in ['timed','on_only']`,[choose("approved.stop_mode == 'after_duration'",[action('timer.start',{entity_id:timer,duration:'{{ approved.duration_minutes * 60 }}'})]),choose(`approved.stop_mode == 'none' or states(${JSON.stringify(timer)}) == 'active'`,[action(adapter.on,{entity_id:id})])])]));
+    if(hasOff)starts.push(choose(`approved.get('action','on') == 'off' and ${JSON.stringify(id)} in approved.get('targets', []) and ${usable(id)} and ${usable(mode)}`,[action('input_select.select_option',{entity_id:mode,option:'stopping'}),action(adapter.off,{entity_id:id})]));
     // Busy/unknown members produce trace diagnostics, never a delayed retry.
-    starts.push(choose(`${JSON.stringify(id)} in approved.get('targets', []) and not (${can}) and states(${JSON.stringify(mode)}) == 'idle'`,[{action:'logbook.log',data:{name:'Marao',entity_id:id,message:'Schedule skipped: unavailable or busy target.'}}]));
+    starts.push(choose(`${hasOff?"approved.get('action','on') == 'on' and ":''}${JSON.stringify(id)} in approved.get('targets', []) and not (${can}) and states(${JSON.stringify(mode)}) == 'idle'`,[{action:'logbook.log',data:{name:'Marao',entity_id:id,message:'Schedule skipped: unavailable or busy target.'}}]));
   }
   const admit=`trigger.id == 'request' and request.get('kind') == 'start' and ${recent} and approved and is_state(approved.get('automation_entity',''), 'on') and request.get('source') == approved.get('automation_entity') and states(${JSON.stringify(selection)}) == approved.get('timer_group_id') and (request.get('epoch',0) | float(0)) == as_timestamp(states[${JSON.stringify(selection)}].last_changed) and now().strftime('%H:%M') == approved.get('time') and now().weekday() in approved.get('days',[]) | map('replace','mon','0') | list`;
   // Weekday validation uses explicit numeric metadata, independent of phone locale.
