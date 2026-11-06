@@ -227,16 +227,16 @@ test('loading schedule collection choices preserves the active form and latest d
 test('event editor retains rejected values until corrected and preserves unrelated source data',t=>{
   const original={type:'custom:marao-camera-events-card',cameras:[{entity:'camera.a',future:{keep:[]}}],columns:2,future:false};
   const {editor,forms,events}=nativeFormHarness(t,original);
-  const general=forms.find(form=>form.schema.some(field=>field.name==='columns'));
-  general.change({...general.data,columns:0});assert.equal(events.length,0);
-  general.change({...general.data,columns:0,title:'Events'});
-  assert.equal(events.length,0,'Another field must not silently discard the rejected columns');
+  const general=forms.find(form=>form.schema.some(field=>field.name==='limit'));
+  general.change({...general.data,limit:0});assert.equal(events.length,0);
+  general.change({...general.data,limit:0,title:'Events'});
+  assert.equal(events.length,0,'Another field must not silently discard the rejected event limit');
   const camera=forms.find(form=>form.schema.some(field=>field.name==='event_provider'));
   camera.change({...camera.data,name:'Front'});
   assert.equal(events.length,0,'Source edits must retain the same invalid draft');
   assert.match(editor.shadowRoot.querySelector('[data-status]').textContent,/positive integer/);
-  general.change({...general.data,columns:3,title:'Events'});
-  assert.deepEqual(events.at(-1),{...original,cameras:[{...original.cameras[0],name:'Front'}],columns:3,title:'Events'});
+  general.change({...general.data,limit:3,title:'Events'});
+  assert.deepEqual(events.at(-1),{...original,cameras:[{...original.cameras[0],name:'Front'}],limit:3,title:'Events'});
   const accepted=events.length;
   camera.change({...camera.data,entity:'light.invalid'});general.change({...general.data,title:'Front events'});
   assert.equal(events.length,accepted,'General edits must retain an invalid source draft');
