@@ -10,6 +10,7 @@ function editorLoader() {
   const resourceFailure = new Error('Module download failed');
   const calls = [];
   let nativeFailure = false;
+  const registered=new Set(['hui-view']);
   const resources = [{ type: 'module', url: '/good.js' }, { type: 'module', url: 'https://user:secret@example.invalid/broken.js?token=private#secret' }, { type: 'css', url: '/style.css' }];
   class Element {
     constructor(tag) { this.tag = tag; this.dataset = {}; this.children = []; this.listeners = {}; this.attributes = {}; }
@@ -18,11 +19,11 @@ function editorLoader() {
     replaceChildren(...children) { this.children = children; }
     querySelector(tag) { return this.children.find(child => child.tag === tag); }
     async _fetchConfig() {}
-    dispatchEvent() { this.listeners['show-dialog']({ stopPropagation() {}, detail: { dialogImport: () => nativeFailure ? Promise.reject(new Error('Required native editor failed')) : Promise.resolve() } }); }
+    dispatchEvent() { this.listeners['show-dialog']({ stopPropagation() {}, detail: { dialogImport: () => {if(nativeFailure)return Promise.reject(new Error('Required native editor failed'));registered.add('hui-card-picker');registered.add('hui-card-element-editor');return Promise.resolve();} } }); }
   }
   const context = vm.createContext({
     URL, Promise, setTimeout, clearTimeout, location: { origin: 'https://ha.invalid' },
-    customElements: { get: () => true }, CustomEvent: class {},
+    customElements: { get: tag => registered.has(tag) }, CustomEvent: class {},
     document: { createElement: tag => new Element(tag) },
     importResource: async url => { calls.push(url); if (url.includes('broken.js')) throw resourceFailure; },
   });

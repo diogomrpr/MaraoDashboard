@@ -1,12 +1,15 @@
-let ready;
+let ready,readyContext,readyDashboard;
 
 export function loadLovelaceEditor(hass, dashboardUrl = location.pathname, {picker = true} = {}) {
-  if(customElements.get('hui-card-element-editor')&&(!picker||customElements.get('hui-card-picker')))return Promise.resolve({config:{views:[]},resourceErrors:[]});
-  if (!ready) {
+  if(!picker&&customElements.get('hui-card-element-editor'))return Promise.resolve({config:{views:[]},resourceErrors:[]});
+  const context=hass.connection||hass,dashboard=new URL(dashboardUrl,location.origin).pathname;
+  if(ready&&readyContext===context&&readyDashboard===dashboard)return ready;
+  {
     let timer;
-    ready = Promise.race([load(hass, dashboardUrl), new Promise((_, reject) => {
+    const attempt = Promise.race([load(hass, dashboardUrl), new Promise((_, reject) => {
       timer = setTimeout(() => reject(new Error('Home Assistant card editor could not load.')), 20000);
-    })]).catch(error => { ready = null; throw error; }).finally(() => clearTimeout(timer));
+    })]).catch(error => { if(ready===attempt)ready=null; throw error; }).finally(() => clearTimeout(timer));
+    ready=attempt;readyContext=context;readyDashboard=dashboard;
   }
   return ready;
 }

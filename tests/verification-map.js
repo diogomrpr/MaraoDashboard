@@ -30,7 +30,7 @@ const components = {
   'documentation-brand': {units:[['brand-assets','canonical artwork']]},
   'documentation-playground': {browser:[{id:'unit:documentation-playground',kind:'offline',command:['node','--test','--test-concurrency=1',...fs.readdirSync(path.join(__dirname,'docs')).filter(file=>file.endsWith('.test.mjs')).sort().map(file=>'tests/docs/'+file)],inputs:['docs','tests/docs','frontend_src',runtime],exclusive:false}]},
   'location-shortcut': {units:[['marao-navbar-card'],['dashboard-settings']],editor:true},
-  'popup-layout': {units:[['popup-layout'],['popup-managed'],['popup-management'],['popup-transactions'],['popup-coordinator'],['native-bootstrap'],['native-cards'],['native-card-editor'],['native-edit-context'],['collections'],['marao-card-visibility','live group filtering']],editor:true},
+  'popup-layout': {units:[['popup-layout'],['popup-card-catalog'],['popup-managed'],['popup-management'],['popup-transactions'],['popup-coordinator'],['native-bootstrap'],['native-cards'],['native-card-editor'],['native-edit-context'],['collections'],['marao-card-visibility','live group filtering']],editor:true},
   people: {units:[['collections'],['native-cards'],['native-card-editor']],editor:true},
   'summary-controls': {units:[['collections'],['marao-card-visibility','live group filtering']],editor:true},
   schedules: {units:[['schedules']],editor:true},
