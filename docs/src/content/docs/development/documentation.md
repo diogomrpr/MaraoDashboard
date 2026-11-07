@@ -33,6 +33,8 @@ Build the site and run the documentation checks for catalog coverage, valid exam
 
 The public site follows stable releases only. Changes can be built and reviewed before release, but do not deploy an unreleased runtime under a released version label. There is no Upcoming edition. Keep project rules and historical records in the repository; the website is a current reference, not a rewritten test-history archive.
 
+A stable release automatically dispatches the documentation workflow on `main`, which checks out that exact release tag before building and publishing. This keeps deployment on the branch allowed by the `github-pages` environment. Manual publication uses the same workflow with `release_tag` set to the latest stable tag; stale or prerelease targets are rejected.
+
 ## Card design workflow
 
 All public card references show real-runtime behavior galleries above their configuration playground. Wide rows place the description beside a mobile-width card. Visible examples and three offscreen examples preload; reserved heights prevent loading jumps. Published assets are built from the documented stable release, with fictional HA data and explicit simulation limits.
