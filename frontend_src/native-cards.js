@@ -1,4 +1,4 @@
-import {findNativeHost,nativeDashboardConfig} from '../custom_components/marao_dashboard/frontend/MaraoNativeContext.js';
+import {findNativeHost,nativeDashboardConfig,nativeEditing} from '../custom_components/marao_dashboard/frontend/MaraoNativeContext.js';
 import { catalog } from './native-model.js';
 import { editorLabel } from './editor-labels.js';
 import { uid } from './schedule-model.js';
@@ -168,7 +168,7 @@ export class MaraoNativeCard extends HTMLElementBase {
 
   set hass(value) { this._hass = value; refreshCardMetadata(value); this._refresh(); }
   get hass() { return this._hass; }
-  get preview() { return Boolean(!this.isConnected || this._preview || this._host?.lovelace?.editMode || nativeHost(this)?.lovelace?.editMode); }
+  get preview() { return Boolean(!this.isConnected || this._preview || this._host?.lovelace?.editMode || nativeEditing(this)); }
   set preview(value) { this._preview = Boolean(value); this._forward(); }
   getCardSize() { return this._children[0]?.getCardSize?.() || (this._config && Number.isFinite(nativeCardGridOptions(this._config).rows) ? nativeCardGridOptions(this._config).rows * 1.28 : 3); }
   getGridOptions() { return nativeCardGridOptions(this._config || { type: nativeCardType(this.constructor.template) }); }

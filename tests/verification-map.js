@@ -36,6 +36,7 @@ const components = {
   schedules: {units:[['schedules']],editor:true},
   weather: {units:[['weather-presentation'],['marao-card-visibility','configured weather|state labels use native domain']],editor:true},
   'press-feedback': { units: [['press-feedback'], ['marao-card-visibility', 'room child activation|dual-action hold|hold completion|active holds|access actions use|touch actions establish|shared dropdown floats|themed scene dropdown'], ['marao-navbar-card'], ['frontend-refresh', 'gesture|short taps|released after'], ['floor-plan'], ['marao-frigate-events-card', 'entity availability disables|type filters|event heading retains']], editor: true, package: true },
+  weather: {units:[['weather-presentation'],['marao-card-visibility','configured weather|state labels use native domain']],editor:true},
   'floor-plan': { units: [['floor-plan'], ['editor-model'], ['editor-panel'], ['native-compiler']], editor: true, package: true },
   'native-source': { units: [['native-source'], ['native-compiler'], ['native-session'], ['native-strategy'], ['native-dependencies'], ['native-package'], ['native-cards'], ['native-card-editor'], ['native-bootstrap'], ['native-edit-context'], ['dashboard-settings'], ['ordinary-conversion'], ['ordinary-session'], ['ordinary-migration-ui'], ['converter']], python: ['test_frontend_compiler'], editor: true, upgrade: true },
   'navbar-startup': { units: [['frontend-refresh'], ['marao-navbar-card'], ['marao-history-cards'], ['marao-text-scale'], ['gallery-cases'], ['package-boundary']],

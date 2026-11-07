@@ -27,6 +27,11 @@ export function findNativeEditorContext(owner) {
 }
 
 export function nativeEditing(owner) {
+  const visited=new Set();
+  for(let node=owner;node&&!visited.has(node);node=node.nativeOwner||node.parentNode||node.parentElement||node.host||node.getRootNode?.()?.host){
+    visited.add(node);
+    if(node._maraoPopupDraftOwner||['hui-card-picker','hui-card-preview','hui-card-element-editor','hui-dialog-edit-card','hui-dialog-create-card'].includes(node.localName))return true;
+  }
   return Boolean(findNativeHost(owner)?.lovelace?.editMode);
 }
 

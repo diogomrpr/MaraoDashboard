@@ -4,6 +4,12 @@ import {validateTimer,controllerConfig,startConfig,recognized,MANAGER} from '../
 import {ScheduleSession} from '../../frontend_src/schedule-api.js';
 const m={id:'garden',name:'Garden',status:'ready',groups:[{id:'summer',name:'Summer'},{id:'winter',name:'Winter'}],selection:{entity_id:'input_select.season'},targets:[{entity_id:'input_boolean.one',mode:{entity_id:'input_select.one'},timer:{entity_id:'timer.one'}},{entity_id:'switch.two',mode:{entity_id:'input_select.two'},timer:{entity_id:'timer.two'}}],schedules:[]};
 const t={id:'morning',name:'Morning',timer_group_id:'summer',targets:['input_boolean.one','switch.two'],days:['mon'],time:'07:00',stop_mode:'none'};
+test('schedule picker previews do not read live automation configuration',async()=>{
+  const {MaraoSchedulesCard}=await import('../../frontend_src/schedules-card.js'),card=new MaraoSchedulesCard();
+  card.parentNode={localName:'hui-card-picker'};card.isConnected=true;card._config={group_id:'preview'};
+  card._hass={user:{is_admin:true},states:{},callApi(){assert.fail('Preview must not load a controller');},callWS(){assert.fail('Preview must not query live configuration');}};
+  let rendered=0;card._render=()=>rendered++;await card._refresh();assert.equal(rendered,1);assert.equal(card._session,undefined);
+});
 test('on-only needs no duration; seasonal groups may reuse times but same-group target overlaps fail',()=>{
   assert.doesNotThrow(()=>validateTimer(t,m));
   assert.throws(()=>validateTimer({...t,duration_minutes:0},m),/duration/);
