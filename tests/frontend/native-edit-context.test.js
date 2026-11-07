@@ -14,6 +14,14 @@ function fixture() {
   return { host, owner, controllers, listeners, update };
 }
 
+test('native pickers and draft-owned card dialogs remain inert outside hui-root ancestry',()=>{
+  for(const parent of [{localName:'hui-card-picker'},{localName:'hui-card-preview'},{localName:'hui-dialog-edit-card'},{_maraoPopupDraftOwner:{}}]){
+    const owner={parentNode:{host:parent},inert:false,shadowRoot:{addEventListener(){},removeEventListener(){}}};
+    assert.equal(findNativeHost(owner),null);assert.equal(nativeEditing(owner),true);
+    const release=bindNativeEditing(owner);assert.equal(owner.inert,true);release();assert.equal(owner.inert,false);
+  }
+});
+
 test('ordinary native edit context crosses shadow roots and live mode changes are scoped and disposed', () => {
   const { host, owner, controllers, listeners, update } = fixture(), changes = [];
   const release = bindNativeEditing(owner, editing => changes.push(editing));

@@ -1,3 +1,4 @@
+import {validatePopupContent,customPopup} from '../custom_components/marao_dashboard/frontend/MaraoPopupContent.js';
 import {popupViewError,resolvePopupView,popupGroupFromView} from '../custom_components/marao_dashboard/frontend/MaraoPopupLayout.js';
 import labels from '../custom_components/marao_dashboard/frontend/marao-generator-labels.json' with { type: 'json' };
 import { appleTVOptions, copy, defaultTemplate, domain, entries, friendly, isAccess, object, sections, slug } from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
@@ -16,6 +17,7 @@ export function nativeCardDescriptor(config) {
   const template = templateForNativeType(config.type);
   if (!template || config.template != null && config.template !== template) throw new Error('Choose a supported Marao card type.');
   if (config.variables != null && !object(config.variables)) throw new Error('Card options must be an object.');
+  validatePopupContent(config);
   const descriptor = copy(config);
   delete descriptor.type;
   if (!descriptor.entity_id && descriptor.entity) descriptor.entity_id = descriptor.entity;
@@ -37,12 +39,16 @@ export function validateNativeCardConfig(config, entities = []) {
 export function composeNativeCard(config, { entities = [], dashboardRoot = 'marao-dashboard', language = 'en', instanceId, dashboard } = {}) {
   if (typeof instanceId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(instanceId)) throw new Error('A live card occurrence identity is required.');
   let descriptor = nativeCardDescriptor(config);
+  const embedded=customPopup(descriptor);
   // A direct view owns this occurrence even when an older shared hash is retained.
-  if(descriptor.popup_view&&descriptor.variables) {
+  if((embedded||descriptor.popup_view)&&descriptor.variables) {
     const key=descriptor.template==='md_floor_plan_card'?'lights_popup':descriptor.template==='md_climate_card'?'mode_selector_hash':'popup_hash';
     delete descriptor.variables[key];
   }
-  if(descriptor.popup_view&&descriptor.template==='md_entity_group_card'&&dashboard) {
+  if(embedded&&descriptor.template==='md_entity_group_card'){
+    descriptor={...descriptor,entities:popupGroupFromView(descriptor,descriptor.popup_content.layout,entities).members};delete descriptor.summary_sections;
+  }
+  if(!embedded&&descriptor.popup_view&&descriptor.template==='md_entity_group_card'&&dashboard) {
     try {const group=popupGroupFromView(descriptor,resolvePopupView(dashboard,descriptor.popup_view).view,entities);descriptor={...descriptor,entities:group.members};delete descriptor.summary_sections;} catch {descriptor={...descriptor,entities:[]};delete descriptor.summary_sections;}
   }
   const external = new Set();
@@ -53,6 +59,14 @@ export function composeNativeCard(config, { entities = [], dashboardRoot = 'mara
   const item = resolveSource({ name: 'Native card', pages: [page] }, entities).pages[0]._sections[0].ordered_cards[0];
   const composition = createCardComposition({ root: dashboardRoot, language });
   // An external group sheet also owns the nested mode/access sheets it links to.
+  if(embedded){
+    const route=`#native-${instanceId}-embedded`,key=descriptor.template==='md_floor_plan_card'?'lights_popup':descriptor.template==='md_climate_card'?'mode_selector_hash':'popup_hash';
+    item.variables={...item.variables,[key]:route};
+    const card=composition.pageCard(item);
+    card.tap_action=navigate(route);
+    const content=copy(descriptor.popup_content);
+    return {card,popups:[{...copy(content.presentation||{}),type:'custom:marao-popup-card',hash:route,name:content.layout.title ?? descriptor.name ?? '',popup_content:content}]};
+  }
   const externalGroup = descriptor.template === 'md_entity_group_card' && typeof descriptor.variables?.popup_hash === 'string' && Boolean(descriptor.variables.popup_hash);
   const popups = externalGroup ? [] : composition.popups(item).filter(popup => !external.has(popup.hash));
   if(descriptor.popup_view&&popups.length)popups[0]={...popups[0],popup_view:descriptor.popup_view};

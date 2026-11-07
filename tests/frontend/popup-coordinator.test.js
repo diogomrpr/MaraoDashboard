@@ -58,3 +58,11 @@ test('superseded summary actions dispatch zero calls and standalone stale source
   f.coordinator.sync();assert.equal(view.inert,true);assert.match(notice.textContent,/Edit popup/);
   f.root.lovelace.editMode=true;f.coordinator.sync();assert.equal(view.inert,false);assert.equal(notice.removed,true);f.coordinator.dispose();
 });
+
+test('confirmed embedded parent changes do not retarget custom children or write legacy sources',async()=>{
+  const f=fixture(),content={version:1,mode:'custom',layout:{type:'sections',sections:[{cards:[{type:'tile',entity:'camera.independent',name:'Keep',unknown:[]}]}]}};
+  f.root.lovelace.config.views[0].sections[0].cards[0].popup_content=content;f.saved=f.root.lovelace.config;
+  const legacy=structuredClone(f.root.lovelace.config.views[1]);f.coordinator.sync();await f.coordinator.settled();
+  await f.saveParent(doc=>{doc.views[0].sections[0].cards[0].entity_id='camera.changed';doc.views[0].sections[0].cards[0].variables.event_columns=4;});
+  assert.equal(f.writes.length,0);assert.deepEqual(f.root.lovelace.config.views[1],legacy);assert.deepEqual(f.root.lovelace.config.views[0].sections[0].cards[0].popup_content,content);f.coordinator.dispose();
+});

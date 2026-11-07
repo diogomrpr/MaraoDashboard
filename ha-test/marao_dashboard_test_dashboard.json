@@ -87,7 +87,38 @@
                     "light.marao_dashboard_test_room_light"
                   ]
                 }
-              ]
+              ],
+              "popup_content": {
+                "version": 1,
+                "mode": "custom",
+                "template": "group-light",
+                "layout": {
+                  "type": "sections",
+                  "title": "Saved lighting controls",
+                  "max_columns": 1,
+                  "sections": [
+                    {
+                      "type": "grid",
+                      "cards": [
+                        {
+                          "type": "custom:marao-summary-actions",
+                          "popup_scope": "embedded",
+                          "entity_type": "light",
+                          "scope": "all"
+                        },
+                        {
+                          "type": "custom:marao-light-card",
+                          "entity_id": "light.marao_dashboard_test_light",
+                          "name": "Custom lighting control",
+                          "grid_options": {
+                            "columns": 12
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
             },
             {
               "template": "md_entity_group_card",

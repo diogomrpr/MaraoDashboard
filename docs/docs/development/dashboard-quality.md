@@ -511,7 +511,7 @@ Glance uses one transparent owner with an optional title and one rounded surface
 
 ### Card activity
 
-Automatic Updated and activation timestamps move into the shared read-only Activity sheet. Retain primary date measurements. Icons open the themed sheet independently of card operating actions; strict slides and security holds remain unchanged. Keep the title, Date and Filters controls above internally scrolling content. Date and other list filters use the shared Marao dropdown, with synchronized current labels, selection and Reset; custom From/Through fields remain date inputs. Close child menus when hiding filters and dispose dropdown controllers on replacement or sheet close. Expand additional filters inline below this toolbar without shrinking or clipping controls. Use large date separators for each day, equally prominent time-only labels on the left rail, circular event symbols and inline details. Query only explicit sources, whitelist metadata, distinguish requests from reported results and incomplete coverage from empty results. Date/type filters apply before progressive display; origin/initiator require evidence. Glance tiles keep healthy readings visible during partial warnings.
+Automatic Updated and activation timestamps move into the shared read-only Activity sheet. Retain primary date measurements. Icons open the themed sheet independently of card operating actions; strict slides and security holds remain unchanged. Keep the title, Date and Filters controls above internally scrolling content. Date and other list filters use the shared Marao dropdown, with synchronized current labels, selection and Reset; custom From/Through fields remain date inputs. Close child menus when hiding filters and dispose dropdown controllers on replacement or sheet close. Expand additional filters inline below this toolbar without shrinking or clipping controls. Use large date separators for each day, smaller time-only labels centered below their circular event symbols on the left rail, and inline details. Query only explicit sources, whitelist metadata, distinguish requests from reported results and incomplete coverage from empty results. Date/type filters apply before progressive display; origin/initiator require evidence. Glance tiles keep healthy readings visible during partial warnings.
 
 ### Value sliders
 
@@ -586,7 +586,12 @@ large and readable.
 - Pressing navbar controls or their icons must not add a rectangular browser highlight; retain the circular active fill and short press feedback.
 - Keep button gaps compact without violating the visible 48-by-48 control rule.
 - Derive iPhone positioning from the shared host-aware bottom inset and preserve
-  twice the lowered safe-area offset, with a minimum 24px bottom gap. Use the shared bottom-gap helper for navbar positioning, page clearance and popup padding.
+  twice the lowered safe-area offset, with a minimum 24px bottom gap. On other
+  devices, including Android, use 24px plus the resolved bottom safe-area inset.
+  Keep inset resolution live in CSS and honor an explicit host-provided zero when
+  the host already protects the edge. Use the shared bottom-gap helper for navbar
+  positioning, touch-barrier height, refresh feedback, page clearance and popup/
+  maintenance padding; do not add the inset again in individual consumers.
 - The navbar stays below open popups in the stacking order.
 - An invisible full-width touch barrier extends from the navbar's top edge to
   the viewport bottom. It blocks underlying card taps and touch scrolling while
@@ -793,7 +798,7 @@ Close, browser navigation and removal release chart resources and inert state.
 
 Number controls place a large scalable value and its unit on the left, with the shared Climate up/down stepper on the right. Reuse the same stepper renderer, button geometry and native number adjustment handler; retain entity min/max/step, authoritative readings and disabled unavailable controls.
 
-Dishwasher readings use integrated icon-and-value indicators. The optional Show reading labels setting hides captions visually while retaining semantic names and all values; omission preserves visible labels. Remaining time uses an hourglass countdown icon. Show valid reported progress as a circular ring with the percentage inside; missing or invalid progress is neutral. Remaining time retains its reported unit, and the program icon follows the reported active program, with a native or dishwasher fallback for unrecognized programs. Keep configured consumable warnings visible and preserve optional sensor selections.
+Dishwasher keeps its reported operation and name visible without cycle indicators in ready/inactive and other non-cycle states. Running, paused and delayed-start states show configured cycle indicators; unavailable optional readings stay neutral locally and never mark the whole appliance as faulty. Do not display a selected or stale program as active while idle. Native sizing defaults to automatic height so the same card grows and shrinks with cycle content, preserving explicit authored grid sizes. Main-entity availability, disconnection, reported faults/actionrequired and configured consumable warnings retain their normal semantics. Dishwasher readings use integrated icon-and-value indicators. The optional Show reading labels setting hides captions visually while retaining semantic names and all values; omission preserves visible labels. Remaining time uses an hourglass countdown icon. Show valid reported progress as a circular ring with the percentage inside; missing or invalid progress is neutral. Remaining time retains its reported unit, and the program icon follows the reported active program, with a native or dishwasher fallback for unrecognized programs. Keep configured consumable warnings visible and preserve optional sensor selections.
 
 ### State-stable content
 

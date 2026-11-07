@@ -1,8 +1,9 @@
+const {validatePopupContent}=await import(new URL(`./MaraoPopupContent.js${new URL(import.meta.url).search}`,import.meta.url));
 const {weatherMarkup}=await import(new URL(`./MaraoWeather.js${new URL(import.meta.url).search}`,import.meta.url));
 const {climateConfigError,climateHumidity}=await import(new URL(`./MaraoClimate.js${new URL(import.meta.url).search}`,import.meta.url));
 const {activityTimestamp,activitySources,hasActivity}=await import(new URL(`./MaraoActivityModel.js${new URL(import.meta.url).search}`,import.meta.url));
 const popupLayouts=await import(new URL(`./MaraoPopupView.js${new URL(import.meta.url).search}`,import.meta.url));
-const {popupViewError}=await import(new URL(`./MaraoPopupLayout.js${new URL(import.meta.url).search}`,import.meta.url));
+const {popupViewError,popupGroupFromView}=await import(new URL(`./MaraoPopupLayout.js${new URL(import.meta.url).search}`,import.meta.url));
 const {peopleError,peopleRows,collectionLabel,escapeText,sectionsError} = await import(new URL(`./MaraoCollections.js${new URL(import.meta.url).search}`,import.meta.url));
 const {reconcileGroup}=await import(new URL(`./MaraoGroupDetails.js${new URL(import.meta.url).search}`,import.meta.url));
 const {mediaAppBrand,mediaAppLogoError}=await import(new URL(`./MaraoMediaApps.js${new URL(import.meta.url).search}`,import.meta.url));
@@ -121,7 +122,9 @@ export function dishwasherProgramIcon(state) {
   return match?.[1] || state?.attributes?.icon || 'mdi:dishwasher';
 }
 
-function dishwasherReadings(variables, hass) {
+function dishwasherReadings(variables, hass, operation) {
+  // Cycle sensors may be absent or retain their previous cycle while idle.
+  if (!['run', 'running', 'pause', 'paused', 'delayedstart', 'delayed'].includes(text(operation).toLowerCase().replace(/[ _-]/g, ''))) return '';
   const pt = String(hass?.language || hass?.locale?.language).startsWith('pt');
   const fields = [['progress_entity','Progress','Progresso'],['remaining_time_entity','Remaining','Tempo restante'],['active_program_entity','Program','Programa']];
   return fields.filter(([key]) => variables[key]).map(([key,en,ptLabel]) => {
@@ -772,7 +775,7 @@ export function cardProblem(config, hass, { error = "", contentError = "", loadi
     ...roomMembers];
   if (kind === "md_switch_card") targets.push(variables.power_entity);
   if (kind === "md_header_card") targets.push(variables.person_entity, variables.air_quality_sensor);
-  if (kind === "md_dishwasher_card") targets.push(...["progress_entity", "remaining_time_entity", "active_program_entity", "salt_entity", "rinse_aid_entity"].map(key => variables[key]));
+  if (kind === "md_dishwasher_card") targets.push(...["salt_entity", "rinse_aid_entity"].map(key => variables[key]));
   if (variables.graph_entity && (["md_graph_card", "md_toggle_graph_card"].includes(kind) || variables.show_graph === true)) targets.push(variables.graph_entity);
   for (const action of [config.tap_action, config.hold_action]) {
     if (!isServiceAction(action)) continue;
@@ -1276,6 +1279,17 @@ export function fitNativeGrid(card, minimumWidth) {
 }
 
 export class MaraoCard extends BaseElement {
+  static async getConfigElement(){
+    await import(new URL(`./MaraoNativeCardEditor.js${new URL(import.meta.url).search}`,import.meta.url));
+    return document.createElement('marao-native-card-editor');
+  }
+  _syncGenericPopup(){
+    if(!this.isConnected)return;
+    if(!this._genericPopupConfig){this._genericPopup?.remove();this._genericPopup=null;return;}
+    if(!this._genericPopup){this._genericPopup=document.createElement('marao-popup-card');this._genericPopup.nativeOwner=this;this.append(this._genericPopup);}
+    this._genericPopup.setConfig(this._genericPopupConfig);this._genericPopup.hass=this._hass;this._genericPopup.preview=this.preview;
+  }
+
   constructor() {
     super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._hass = null; this._sliderTargets = new Map(); this._sliderGesture = null; this._graphHistory = new Map(); this._graphRequests = new Map(); this._graphErrors = new Set(); this._holdTimer = null; this._holdFrame = null; this._holdActive = false; this._holdCompleted = false;
     // A completed hold can replace its button before the native click arrives.
@@ -1293,6 +1307,25 @@ export class MaraoCard extends BaseElement {
     if (this._authoritativeHass) this.hass = this._authoritativeHass;
   }
   setConfig(config) {
+    validatePopupContent(config);
+    this._genericPopupConfig=null;
+    if(config.popup_content?.mode==='custom'){
+      const error=popupViewError(config);if(error)throw new Error(error);
+      const content=config.popup_content;
+      if(content.version!==1||content.layout?.type!=='sections'||!Array.isArray(content.layout.sections))throw new Error('Popup content must use a native Sections layout.');
+      this._genericPopupHash||='#marao-custom-'+Array.from(crypto.getRandomValues(new Uint8Array(8)),value=>value.toString(16).padStart(2,'0')).join('');
+      const hash=this._genericPopupHash,variables={...config.variables},routes=[variables.popup_hash,variables.mode_selector_hash,variables.lights_popup];
+      const next={...config,variables};
+      if(config.template==='md_climate_card')variables.mode_selector_hash=hash;
+      else if(config.template==='md_floor_plan_card')variables.lights_popup=hash;
+      else variables.popup_hash=hash;
+      if(config.tap_action?.action==='navigate'&&routes.includes(config.tap_action.navigation_path))next.tap_action={...config.tap_action,navigation_path:hash};
+      if(config.template==='md_entity_group_card'){
+        const group=popupGroupFromView({entity_type:variables.entity_type||config.entity_type},content.layout,[]);
+        variables.summary_entities=group.members;variables.summary_sections=group.summary_sections;
+      }
+      this._genericPopupConfig={...content.presentation,type:'custom:marao-popup-card',hash,name:content.layout.title??config.name??'',popup_content:structuredClone(content)};config=next;
+    }
     config = accessCardConfig(config, this._hass);
     if (config.variables?.activity_entities !== undefined && (!Array.isArray(config.variables.activity_entities) || config.variables.activity_entities.some(id => typeof id !== 'string' || !/^[a-z_]+\.[a-z0-9_]+$/.test(id)))) throw new Error(localize('activity.invalid_sources',this._hass,{},'Related activity entities must be an explicit list of entity IDs.'));
     if (config.template === 'md_room_card' && config.variables?.climate_entity != null && config.variables.climate_entity !== '' && !/^climate\.[a-z0-9_]+$/.test(config.variables.climate_entity)) throw new Error(localize('room.invalid_climate',this._hass,{},'Choose a climate entity.'));
@@ -1316,8 +1349,9 @@ export class MaraoCard extends BaseElement {
     this._alarmBusy = false;
     this._cancelHold();
     this._cancelSliderGesture();this._sliderControl?.settle?.();
-    if (historyIdentity(this._config) !== historyIdentity(config)) { this._graphRequests.clear(); this._graphHistory.clear(); this._graphErrors.clear(); this._graphData = null; this._ownedGraphRecords = null; } this._config = { ...config }; if (previousGraph !== this._graphEntity()) this._activeHistoryPopup?._invalidateHistory(); this._actionError = ""; this._mediaError = ""; this._mediaURL = ""; this._actionRequest = (this._actionRequest || 0) + 1; this._subscribeClimate(); this._observeGraph(); this._render(); }
+    if (historyIdentity(this._config) !== historyIdentity(config)) { this._graphRequests.clear(); this._graphHistory.clear(); this._graphErrors.clear(); this._graphData = null; this._ownedGraphRecords = null; } this._config = { ...config }; if (previousGraph !== this._graphEntity()) this._activeHistoryPopup?._invalidateHistory(); this._actionError = ""; this._mediaError = ""; this._mediaURL = ""; this._actionRequest = (this._actionRequest || 0) + 1; this._subscribeClimate(); this._observeGraph(); this._render();this._syncGenericPopup(); }
   connectedCallback() {
+    this._syncGenericPopup();
     this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => { this.preview = this._preview; });
     this._runtimeReady ||= () => { if (this.isConnected) this._render(); };
     if (!globalThis.window?.MaraoDashboard?.localize) globalThis.window?.addEventListener?.('marao-runtime-ready', this._runtimeReady, {once:true});
@@ -1336,6 +1370,7 @@ export class MaraoCard extends BaseElement {
     this._render();
   }
   set hass(value) {
+    if(this._genericPopup)this._genericPopup.hass=value;
     this._authoritativeHass = value;
     const previewChanged = this._renderedPreview !== this.preview;
     this._renderedPreview = this.preview;
@@ -1391,6 +1426,7 @@ export class MaraoCard extends BaseElement {
   }
   get hass() { return this._hass; }
   disconnectedCallback() {
+    this._genericPopup?.remove();this._genericPopup=null;
     this._stopNativeEditing?.(); this._stopNativeEditing = null;
     globalThis.window?.removeEventListener?.('marao-runtime-ready', this._runtimeReady);
     this._press?.destroy(); this._press = null;
@@ -2116,7 +2152,7 @@ export class MaraoCard extends BaseElement {
       if (variables.person_entity) readings += readingMarkup(variables.person_entity, "", "mdi:account", this._hass, "person");
       if (variables.air_quality_sensor) readings += readingMarkup(variables.air_quality_sensor, "", "mdi:air-filter", this._hass);
     }
-    if (kind === "md_dishwasher_card") readings += dishwasherReadings(variables, this._hass);
+    if (kind === "md_dishwasher_card") readings += dishwasherReadings(variables, this._hass, state.state);
     const accessPopup = ['md_access_slide_action_card', 'md_access_action_card'].includes(kind) && this._inAccessPopup();
     const showName = !(accessPopup && kind === "md_access_slide_action_card") && kind !== "md_media_app_card" && config.show_name !== false && (!glance || Boolean(config.name));
     const uniformControl = standardControl(config);
@@ -2997,7 +3033,7 @@ export class MaraoPopupCard extends BaseElement {
     if (this._message) { const message = document.createElement('p'); message.style.cssText = 'margin:0;overflow-wrap:anywhere;white-space:pre-line'; message.textContent = this._message; host.replaceChildren(message); return; }
     const renderId = ++this._childrenRenderId;
     this._nativePopupView?.destroy();this._nativePopupView=null;
-    if(this._config.popup_view){this._nativePopupView=popupLayouts.mountPopupView(this,host);return;}
+    if(this._config.popup_content?.mode==='custom'||this._config.popup_view){this._nativePopupView=popupLayouts.mountPopupView(this,host);return;}
     this._groupHelpers = null; this._groupChildren = new Map(); this._groupEmpty = null; this._groupLayout = null;
     host.replaceChildren();
     const loading = document.createElement('p'); loading.setAttribute('role', 'status');

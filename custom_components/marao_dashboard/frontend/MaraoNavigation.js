@@ -120,7 +120,7 @@ export function navigate(path) {
 
 export const safeArea = (side) => `var(--marao-safe-area-inset-${side}, var(--safe-area-inset-${side}, env(safe-area-inset-${side}, 0px)))`;
 
-export const navbarBottomGap = () => /iPhone|iPod/i.test(navigator.userAgent || '') ? `max(24px, calc((${safeArea("bottom")} - 20px) * 2))` : '24px';
+export const navbarBottomGap = () => /iPhone|iPod/i.test(navigator.userAgent || '') ? `max(24px, calc((${safeArea("bottom")} - 20px) * 2))` : `calc(24px + ${safeArea("bottom")})`;
 
 export function navbarRouteCurrent(route, location = window.location) {
   try {

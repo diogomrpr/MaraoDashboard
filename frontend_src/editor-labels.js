@@ -1,6 +1,16 @@
 import { FLOOR_PT_LABELS } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlanText.js';
 import {PLEX_PT} from '../custom_components/marao_dashboard/frontend/MaraoPlexModel.js';
 export const PT_LABELS = {
+  'Entity options':'Opções da entidade', 'Drag to reorder':'Arrastar para reordenar',
+  'Popup draft changed. Reopen the editor.':'A disposição do popup foi alterada. Volte a abrir o editor.',
+  'Home Assistant editor could not load.':'Não foi possível carregar o editor do Home Assistant.',
+  'Appearance':'Aspeto', 'Visibility':'Visibilidade', 'Loading section settings…':'A carregar as definições da secção…',
+  'Home Assistant section editor could not load.':'Não foi possível carregar o editor de secções do Home Assistant.',
+  'Add card':'Adicionar cartão', 'Duplicate':'Duplicar', 'Column span':'Largura da secção', 'Retry':'Tentar novamente',
+  'Choose a supported Marao card type.':'Escolha um tipo de cartão Marao disponível.',
+  'Changes affect this card only.':'As alterações afetam apenas este cartão.',
+  'Popup settings':'Definições do popup', 'Popup draft is invalid.':'A disposição do popup é inválida.', 'Invalid card settings.':'Definições do cartão inválidas.',
+  'Marao card':'Cartão Marao', 'Customize layout':'Personalizar disposição', 'Discard invalid changes':'Descartar alterações inválidas', 'Correct or discard the invalid child settings first.':'Corrija ou descarte primeiro as definições inválidas do cartão.', 'Use the inline card or section settings.':'Use as definições do cartão ou da secção neste ecrã.',
   'Humidity sensor':'Sensor de humidade', 'Enable climate popup':'Ativar popup de climatização',
   'Choose a humidity sensor.':'Escolha um sensor de humidade.', 'Enable climate popup must be a boolean.':'Ativar popup de climatização tem de ser um valor booleano.',
   ...PLEX_PT,

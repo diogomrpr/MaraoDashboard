@@ -297,3 +297,10 @@ test('compact climate settings preserve authored data and suppress only built-in
   const explicit={...disabled,tap_action:{action:'navigate',navigation_path:'#authored'}};assert.deepEqual(compose(explicit).card.tap_action,explicit.tap_action);
   const group=compose({type:'custom:marao-entity-group-card',id:'climate',name:'Climate',entity_type:'climate',entities:[{entity_id:'climate.test',variables:{enable_popup:false}}]});assert.equal(group.popups.length,1);
 });
+
+test('dishwasher native height follows cycle content without changing explicit authored sizing',()=>{
+  const config={type:'custom:marao-dishwasher-card',entity_id:'sensor.operation',grid_options:{columns:6,rows:7},variables:{progress_entity:'sensor.progress',remaining_time_entity:'sensor.remaining',active_program_entity:'sensor.program'}};
+  const before=structuredClone(config);
+  assert.deepEqual(nativeCardGridOptions(config),{columns:12,rows:'auto',min_columns:6,min_rows:2});
+  assert.deepEqual(config,before);
+});

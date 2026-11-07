@@ -2575,3 +2575,55 @@ test('shared weekday dropdown keeps multiple choices checked until explicitly cl
  choices[0].button.dispatchEvent(new Event('click'));assert.deepEqual(selected,['tue']);assert.equal(choices[0].button.attributes['aria-checked'],'false');
  picker.dispatchEvent(Object.assign(new Event('keydown'),{key:'Escape'}));assert.equal(dropdown.open,false);assert.equal(active,trigger);dropdown.destroy();
 });
+
+test('dishwasher idle and active transitions keep optional cycle data separate from actual machine problems', () => {
+  const config = {template:'md_dishwasher_card',entity:'sensor.operation',name:'Dishwasher',variables:{progress_entity:'sensor.progress',remaining_time_entity:'sensor.remaining',active_program_entity:'sensor.program',salt_entity:'sensor.salt',rinse_aid_entity:'sensor.rinse'}};
+  const before=structuredClone(config),card=new MaraoCard();
+  const state=value=>({state:value,attributes:{}}),consumable=value=>({state:value,attributes:{options:['confirmed','off','present']}});
+  let hass={language:'en',connected:true,states:{'sensor.operation':state('ready'),'sensor.progress':state('unavailable'),'sensor.remaining':state('unavailable'),'sensor.program':state('unknown'),'sensor.salt':consumable('off'),'sensor.rinse':consumable('off')},callService(){assert.fail('Rendering never operates the dishwasher');}};
+  card.hass=hass;card.setConfig(config);
+  const markup=()=>card.shadowRoot.innerHTML.split('</style>')[1];
+  const report=(operation,readings={})=>{hass={...hass,states:{...hass.states,'sensor.operation':state(operation),...readings}};card.hass=hass;return markup();};
+  for(const operation of ['ready','inactive','idle','finish','finished','off','aborting']) {
+    const html=report(operation);
+    assert.equal(cardProblem(config,hass),null,operation);
+    assert.match(html,/<div class="title">Dishwasher<\/div>/);
+    assert.doesNotMatch(html,/data-problem=|dishwasher-readings|role="progressbar"|has-problem/);
+  }
+  // A selected/reported program outside a cycle is not an active program.
+  let html=report('ready',{'sensor.program':state('Eco'),'sensor.progress':state('100'),'sensor.remaining':{state:'35',attributes:{unit_of_measurement:'min'}}});
+  assert.doesNotMatch(html,/dishwasher-readings|Eco|100 %|35 min/);
+  for(const operation of ['run','running','pause','paused','delayedstart']) {
+    html=report(operation,{'sensor.progress':state('42'),'sensor.remaining':state('unavailable'),'sensor.program':state('unknown')});
+    assert.equal(cardProblem(config,hass),null,operation);assert.match(html,/aria-valuenow="42"/);
+    assert.match(html,/<div class="title">Dishwasher<\/div>/);assert.doesNotMatch(html,/has-problem|data-problem=|>0 %</);
+  }
+  html=report('run',{'sensor.progress':state('unavailable'),'sensor.remaining':{state:'35',attributes:{unit_of_measurement:'min'}},'sensor.program':state('Eco')});
+  assert.match(html,/35 min/);assert.match(html,/Eco/);assert.doesNotMatch(html,/role="progressbar"|has-problem/);
+  html=report('inactive');assert.doesNotMatch(html,/dishwasher-readings|35 min|Eco/);assert.match(html,/<div class="state">inactive<\/div>/);
+  for(const [entity,value] of [['sensor.salt','confirmed'],['sensor.rinse','present']]) {
+    report('ready',{[entity]:consumable(value)});assert.equal(cardProblem(config,hass).kind,'warning');assert.match(markup(),/data-problem="warning"/);
+    report('ready',{[entity]:consumable('off')});
+  }
+  for(const operation of ['error','actionrequired','attention']) {report(operation);assert.equal(cardProblem(config,hass).kind,'error');}
+  for(const operation of ['unknown','unavailable']) {report(operation);assert.equal(cardProblem(config,hass).kind,'neutral');assert.equal(cardProblem(config,hass).complete,true);}
+  report('ready');
+  for(const entity of ['sensor.progress','sensor.remaining','sensor.program'])delete hass.states[entity];
+  assert.equal(cardProblem(config,hass),null);assert.equal(cardProblem(config,hass,{error:'Rejected'}).kind,'error');
+  delete hass.states['sensor.operation'];assert.equal(cardProblem(config,hass).complete,true);assert.equal(cardProblem(config,hass).reason,'Entity missing');
+  report('ready');hass={...hass,connected:false};card.hass=hass;assert.equal(cardProblem(config,hass).reason,'Disconnected');
+  assert.deepEqual(config,before);
+});
+
+
+test('generic embedded popup keeps stored config and isolates repeated occurrence routes',()=>{
+  const source={type:'custom:marao-card',template:'md_climate_card',entity:'climate.safe',name:'Keep name',styles:{card:[{padding:'12px'}]},variables:{mode_selector_hash:'#shared',future:[]},tap_action:{action:'navigate',navigation_path:'#shared'},popup_content:{version:1,mode:'custom',layout:{type:'sections',sections:[]}}};
+  const before=structuredClone(source);
+  const first=new MaraoCard(),second=new MaraoCard();
+  for(const card of [first,second]){card._render=()=>{};card.setConfig(source);}
+  assert.deepEqual(source,before);
+  assert.notEqual(first._config.variables.mode_selector_hash,second._config.variables.mode_selector_hash);
+  assert.equal(first._config.tap_action.navigation_path,first._genericPopupConfig.hash);
+  assert.deepEqual(first._config.styles,source.styles);assert.equal(first._genericPopupConfig.name,'Keep name');
+  assert.throws(()=>first.setConfig({...source,popup_content:{...source.popup_content,version:99}}),/compatible/);
+});

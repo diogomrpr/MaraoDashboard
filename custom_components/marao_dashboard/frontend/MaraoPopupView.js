@@ -1,3 +1,4 @@
+import {customPopup,validatePopupContent,embeddedPopupContext} from './MaraoPopupContent.js';
 import {findNativeHost,nativeEditing,bindNativeEditing,nativeDashboardConfig} from './MaraoNativeContext.js';
 import {resolvePopupView,popupGroupFromView,popupViewError,popupLabel as label} from './MaraoPopupLayout.js';
 import {createGroupScope,updateGroupScope,groupActionStyles} from './MaraoGroupDetails.js';
@@ -10,15 +11,17 @@ function ownsFocus(view){let node=globalThis.document?.activeElement;while(node?
 
 /** Compatibility boundary: use HA's registered view host; never import or patch HA classes. */
 export function mountPopupView(owner,host) {
-  const root=findNativeHost(owner);let view,facade,disposed=false;
+  const root=findNativeHost(owner);let view,facade,disposed=false,embeddedConfig;
+  const embedded=customPopup(owner._config);
+  if(embedded){validatePopupContent(owner._config);const original=dashboardConfig(root)||{views:[]};embeddedConfig={...original,views:[...(original.views||[]),structuredClone(owner._config.popup_content.layout)]};}
   const update=()=>{
     if(disposed)return;
     try {
       if(!root?.lovelace||!customElements.get('hui-view'))throw new Error('Native popup layouts are unavailable on this Home Assistant host.');
-      const config=dashboardConfig(root),source=resolvePopupView(config,owner._config.popup_view);
-      const issue=managedPopupIssue(config,owner._config.popup_view,root._maraoPopupSync?.get(owner._config.popup_view));if(issue)throw new Error(issue);
+      const config=embedded?embeddedConfig:dashboardConfig(root),source=embedded?{view:config.views.at(-1),index:config.views.length-1}:resolvePopupView(config,owner._config.popup_view);
+      const issue=!embedded&&managedPopupIssue(config,owner._config.popup_view,root._maraoPopupSync?.get(owner._config.popup_view));if(issue)throw new Error(issue);
       if(!view) {
-        view=document.createElement('hui-view');view.nativeOwner=owner;view.style.cssText='display:block;min-width:0;width:100%';
+        view=document.createElement('hui-view');view.nativeOwner=owner;if(embedded)view._maraoEmbeddedPopup={...source,owner};view.style.cssText='display:block;min-width:0;width:100%';
         // Live popups never enter an editing surface, even through an emitted native event.
         for(const name of ['ll-create-card','ll-edit-card','ll-delete-card','ll-duplicate-card','ll-create-badge','ll-edit-badge','ll-delete-badge'])view.addEventListener(name,event=>event.stopImmediatePropagation(),true);
         host.replaceChildren(view);
@@ -41,7 +44,7 @@ export function registerPopupActions(api) {
     constructor(){super();this.attachShadow({mode:'open'});}
     setConfig(config) {
       const error=popupViewError(config);if(error)throw new Error(error);
-      if(!config.popup_view||!['all','section'].includes(config.scope)||!['light','cover','climate','battery'].includes(config.entity_type))throw new Error('Choose a same-dashboard Sections view.');
+      if((!config.popup_view&&config.popup_scope!=='embedded')||!['all','section'].includes(config.scope)||!['light','cover','climate','battery'].includes(config.entity_type))throw new Error('Choose a same-dashboard Sections view.');
       this._config=structuredClone(config);this._scope=null;this._render();
     }
     set hass(value){this._hass=value;this._render();}
@@ -54,8 +57,10 @@ export function registerPopupActions(api) {
     _render() {
       if(!this._config||!this.shadowRoot)return;
       try {
-        const root=findNativeHost(this),source=resolvePopupView(dashboardConfig(root),this._config.popup_view);
-        const issue=managedPopupIssue(dashboardConfig(root),this._config.popup_view,root._maraoPopupSync?.get(this._config.popup_view));if(issue)throw new Error(issue);
+        const root=findNativeHost(this),embedded=this._config.popup_scope==='embedded'?embeddedPopupContext(this):null;
+        if(this._config.popup_scope==='embedded'&&!embedded)throw new Error('Popup source is missing or ambiguous.');
+        const source=embedded||resolvePopupView(dashboardConfig(root),this._config.popup_view);
+        const issue=!embedded&&managedPopupIssue(dashboardConfig(root),this._config.popup_view,root?._maraoPopupSync?.get(this._config.popup_view));if(issue)throw new Error(issue);
         let section;for(let node=this;node;node=parent(node))if(node.localName==='hui-section'){section=node;break;}
         if(!section||section.viewIndex!==source.index||!Number.isInteger(section.index)||!source.view.sections?.[section.index])throw new Error('Section action must belong to its linked Sections view.');
         const group=popupGroupFromView(this._config,source.view,metadata(this._hass)),part=this._config.scope==='all'?{id:'__all',name:source.view.title,entities:group.entities}:group.summary_sections[section.index];

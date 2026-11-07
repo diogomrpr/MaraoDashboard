@@ -18,6 +18,7 @@ export function findNativeHost(owner) {
 export function findNativeEditorContext(owner) {
   let dialog;
   for(let node=owner;node;node=node.parentNode || node.host || node.getRootNode?.()?.host) {
+    if(node._maraoPopupDraftOwner)return;
     if(node.localName==='hui-dialog-edit-card'){dialog=node;break;}
   }
   const path=globalThis.location?.pathname.split('/')[1];
@@ -26,6 +27,11 @@ export function findNativeEditorContext(owner) {
 }
 
 export function nativeEditing(owner) {
+  const visited=new Set();
+  for(let node=owner;node&&!visited.has(node);node=node.nativeOwner||node.parentNode||node.parentElement||node.host||node.getRootNode?.()?.host){
+    visited.add(node);
+    if(node._maraoPopupDraftOwner||['hui-card-picker','hui-card-preview','hui-card-element-editor','hui-dialog-edit-card','hui-dialog-create-card'].includes(node.localName))return true;
+  }
   return Boolean(findNativeHost(owner)?.lovelace?.editMode);
 }
 

@@ -1,3 +1,4 @@
+import {customPopup} from './MaraoPopupContent.js';
 // Persisted popup ownership is independent of package and dashboard versions.
 export const MANAGED_POPUP_VERSION = 1;
 export const popupCanonical = value => JSON.stringify(value,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v);
@@ -219,7 +220,7 @@ export function popupOwners(document) {
   for(const [viewIndex,view]of (document.views||[]).entries()) {
     const path=String(view.path??viewIndex),cards=all.filter(card=>card.currentPath===path);
     for(const card of cards) {
-      if(!POPUP_TEMPLATES.includes(popupTemplate(card.config)))continue;
+      if(customPopup(card.config)||!POPUP_TEMPLATES.includes(popupTemplate(card.config)))continue;
       let source=card,external=false,error;
       if(!card.config.popup_view&&popupHashFor(card.config)) {
         const matches=cards.filter(item=>item.config.type==='custom:marao-popup-card'&&item.config.hash===popupHashFor(card.config));

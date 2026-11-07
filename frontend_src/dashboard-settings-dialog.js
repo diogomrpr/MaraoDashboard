@@ -1,6 +1,6 @@
 const {mountLocationPreferences}=await import(new URL(`./MaraoLocationPreferences.js${new URL(import.meta.url).search}`,import.meta.url));
 import {mountLocationSettings} from './location-settings.js';
-import {createSettingsRow} from './settings-row.js';
+import {createSettingsRow,SETTINGS_ROW_CSS} from './settings-row.js';
 import {saveDashboardSettings, readDashboardSettings, validateDashboardSettings, dashboardViewForAddress, patchNavbarRoute, moveNavbarRoute} from './dashboard-settings.js';
 const navigation=await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`,import.meta.url));
 const words={
@@ -18,30 +18,15 @@ const CSS=`
 .marao-settings h3{font-size:1rem;margin:0 0 4px;font-weight:700}
 .marao-settings p{margin:0;overflow-wrap:anywhere}
 .marao-settings .body{overflow:auto;overscroll-behavior:contain;padding:4px 20px 20px;min-height:0}
-.marao-settings .hint,.marao-settings .destination{color:var(--secondary-text-color);font-size:.875rem}
+.marao-settings .hint{color:var(--secondary-text-color);font-size:.875rem}
 .marao-settings .hint{margin-bottom:16px}
 .marao-settings ha-sortable{display:block}
-.marao-settings .drag-handle{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;padding:12px;background:transparent;color:var(--secondary-text-color);touch-action:none;cursor:grab}
-.marao-settings .drag-handle>*{pointer-events:none}
-.marao-settings .drag-handle:active{cursor:grabbing}
-.marao-settings .sortable-ghost{opacity:.4}
-.marao-settings .sortable-drag{box-shadow:0 4px 16px #0003}
 .marao-settings [data-routes],.marao-settings [data-mappings]{display:grid;gap:8px;margin-bottom:16px}
-.marao-settings .route{border-radius:20px;background:var(--secondary-background-color);min-width:0;overflow:visible}
-.marao-settings .route-heading{display:flex;align-items:center;padding:4px;gap:0}
 .marao-settings button{min-height:48px;min-width:48px;border:0;border-radius:16px;font:inherit;color:inherit;cursor:pointer;padding:12px 16px;background:var(--secondary-background-color)}
 .marao-settings button:focus{outline:none}
 .marao-settings button:disabled{opacity:.55;cursor:default}
 .marao-settings [data-close]{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;padding:0;font-size:2rem;line-height:1}
-.marao-settings .route-toggle{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:8px;text-align:start;background:transparent}
-.marao-settings .route-icon{display:grid;place-items:center;background:var(--ha-card-background);border-radius:50%;width:48px;height:48px;flex:0 0 48px;color:var(--primary-color)}
-.marao-settings .route-label{flex:1;min-width:0;overflow-wrap:anywhere}
-.marao-settings .name{font-weight:600}
-.marao-settings .chevron{width:18px;flex-shrink:0;color:var(--secondary-text-color)}
-.marao-settings .fields{padding:8px 16px 16px;display:grid;gap:12px}
 .marao-settings ha-form{display:block;min-width:0;max-width:100%;--ha-space-4:12px}
-.marao-settings ha-icon-button{--mdc-icon-button-size:48px;--ha-icon-button-size:48px;width:48px;height:48px;flex-shrink:0}
-.marao-settings ha-dropdown-item{min-height:48px;--wa-form-control-value-font-size:1rem}
 .marao-settings .warning{font-size:.875rem;color:var(--error-color)}
 .marao-settings .shortcuts{margin-top:24px;padding-top:20px;border-top:1px solid var(--divider-color)}
 .marao-settings [data-flags]{margin-top:12px}
@@ -49,6 +34,7 @@ const CSS=`
 .marao-settings .status:empty{display:none}
 .marao-settings .status{color:var(--error-color);margin-bottom:12px}
 .marao-settings .save{width:100%;background:var(--primary-color);color:var(--text-primary-color);font-weight:600}
+${SETTINGS_ROW_CSS}
 @keyframes marao-settings-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @media(max-width:380px){.marao-settings header{padding:16px 12px 8px}.marao-settings .body{padding:4px 12px 16px}.marao-settings footer{padding-inline:12px}.marao-settings .fields{padding-inline:12px}}
 `;
@@ -65,7 +51,7 @@ export async function openDashboardSettings(root,opener,owner) {
   const hass=root.hass,path=location.pathname.split('/')[1],user=hass.user.id;
   const valid=()=>root.isConnected&&location.pathname.split('/')[1]===path&&root.hass?.user?.id===user&&root.hass?.user?.is_admin&&!root.lovelace?.editMode&&root._maraoSettingsDialog===dialog;
   const t=words[String(hass.language).startsWith('pt')?'pt':'en'];
-  const dialog=document.createElement('dialog');dialog.className='marao-settings';root._maraoSettingsDialog=dialog;
+  const dialog=document.createElement('dialog');dialog.className='marao-settings settings-rows';root._maraoSettingsDialog=dialog;
   dialog.innerHTML=`<style>${CSS}</style><header><h2 id="marao-settings-title"></h2><button type="button" data-close>×</button></header><div class="body"><p data-loading role="status"></p><button type="button" data-retry hidden></button><div data-settings hidden><h3 data-navbar></h3><p class="hint"></p><ha-sortable data-sortable handle-selector=".drag-handle" draggable-selector=".route" no-style disabled><div data-routes></div></ha-sortable><div data-add></div><section class="shortcuts"><h3 data-shortcuts></h3><div data-flags></div></section></div></div><footer><p class="status" role="alert"></p><button type="button" class="save" data-save disabled></button></footer>`;
   dialog.setAttribute('aria-labelledby','marao-settings-title');
   const restore=navigation.focusRestorer(opener),listeners=new AbortController();let busy=false,expandedRoute;

@@ -36,7 +36,24 @@ test("ported sheets copy theme colors while viewport insets keep inheriting live
   }
 });
 
-test("navbar and sheets share the host-aware inset fallback", () => {
+test("navbar and sheets share live host-aware bottom spacing on Android and iPhone", async () => {
+  const { navbarBottomGap } = await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js');
+  const userAgent = Object.getOwnPropertyDescriptor(navigator, 'userAgent');
+  const bottom = 'var(--marao-safe-area-inset-bottom, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))';
+  try {
+    for (const [agent, expected] of [
+      ['Mozilla/5.0 (Linux; Android 16)', `calc(24px + ${bottom})`],
+      ['Mozilla/5.0 (X11; Linux x86_64)', `calc(24px + ${bottom})`],
+      ['Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', `max(24px, calc((${bottom} - 20px) * 2))`],
+      ['Mozilla/5.0 (iPod touch; CPU iPhone OS 15_0 like Mac OS X)', `max(24px, calc((${bottom} - 20px) * 2))`],
+    ]) {
+      Object.defineProperty(navigator, 'userAgent', { configurable: true, value: agent });
+      assert.equal(navbarBottomGap(), expected, agent);
+    }
+  } finally {
+    if (userAgent) Object.defineProperty(navigator, 'userAgent', userAgent);
+    else delete navigator.userAgent;
+  }
   assert.match(source, /var\(--marao-safe-area-inset-\$\{side\}, var\(--safe-area-inset-\$\{side\}, env\(safe-area-inset-\$\{side\}, 0px\)\)\)/);
   assert.match(source, /max\(24px, calc\(\(\$\{safeArea\("bottom"\)\} - 20px\) \* 2\)\)/);
   assert.match(cardsSource, /padding:max\(50px, \$\{safeArea\("top"\)\}\) max\(8px, \$\{safeArea\("right"\)\}\) 8px max\(8px, \$\{safeArea\("left"\)\}\)/);
