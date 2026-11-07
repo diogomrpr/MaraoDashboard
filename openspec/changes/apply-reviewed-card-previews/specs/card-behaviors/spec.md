@@ -3,7 +3,7 @@
 Saved Header cards SHALL remain compatible, while Header SHALL be hidden from new-card pickers and documentation. Headers SHALL retain localized date in HA's time zone plus optional person and
 air-quality readings. Glance SHALL support one through three independently named
 and icon-configured readings, preserving usable readings when another is unavailable.
-Weather SHALL show a large current temperature, localized condition and available wind, humidity and pressure directly on static condition scenery, without a top-right weather icon. Its shared popup SHALL show supported hourly and up-to-seven-day daily forecasts through native subscriptions, with localized values, explicit errors and lifecycle cleanup. `show_forecast: false` SHALL suppress forecast entry; missing data SHALL NOT be invented.
+Weather SHALL show a large current temperature, localized condition and available wind, humidity and pressure directly on static condition scenery, without a top-right weather icon. Its shared popup SHALL show supported hourly and up-to-seven-day daily forecasts through native subscriptions, with localized values, explicit errors and lifecycle cleanup. `show_forecast: false` SHALL suppress forecast entry; missing data SHALL NOT be invented. Current and forecast readings SHALL display whole numbers without mutating reported data; optional current metrics SHALL wrap naturally without empty slots. With no explicit custom action, tapping the card SHALL open a forecast popup using matching condition scenery and native subscription capabilities.
 
 #### Scenario: A glance contains an unavailable secondary reading
 - **WHEN** the card renders its configured readings

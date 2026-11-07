@@ -1,5 +1,5 @@
 const {validatePopupContent}=await import(new URL(`./MaraoPopupContent.js${new URL(import.meta.url).search}`,import.meta.url));
-const {weatherMarkup}=await import(new URL(`./MaraoWeather.js${new URL(import.meta.url).search}`,import.meta.url));
+const {weatherMarkup,styleWeatherPopup}=await import(new URL(`./MaraoWeather.js${new URL(import.meta.url).search}`,import.meta.url));
 const {climateConfigError,climateHumidity}=await import(new URL(`./MaraoClimate.js${new URL(import.meta.url).search}`,import.meta.url));
 const {activityTimestamp,activitySources,hasActivity}=await import(new URL(`./MaraoActivityModel.js${new URL(import.meta.url).search}`,import.meta.url));
 const popupLayouts=await import(new URL(`./MaraoPopupView.js${new URL(import.meta.url).search}`,import.meta.url));
@@ -2007,10 +2007,10 @@ export class MaraoCard extends BaseElement {
       const config=this._config,entity=config.entity,state=stateOf(this._hass,entity),attrs=state.attributes||{},unavailable=!state.state||['unknown','unavailable'].includes(state.state)||!serviceConnectionReady(this._hass);
       const condition=entityStateLabel(state,entity,'md_weather_card',this._hass);
       this._setMarkup(weatherMarkup({hass:this._hass,state,name:this._label(entity,config,state),condition,unavailable,showForecast:config.variables?.show_forecast!==false,showName:config.show_name!==false,showState:config.show_state!==false,showIcon:config.show_icon!==false,icon:config.icon,customAction:Boolean(config.tap_action||config.hold_action),actionDisabled:unavailable||this.preview}), 'weather');
-      const actionButton=this.shadowRoot.querySelector('[data-weather-action]');if(actionButton){const primary=()=>this._performAction(config.tap_action,entity);if(config.hold_action)this._bindHoldAction(actionButton,this.shadowRoot.querySelector('ha-card'),()=>this._performAction(config.hold_action,entity),primary);else actionButton.onclick=primary;}
+      const openForecast=()=>{if(unavailable||this.preview||config.variables?.show_forecast===false)return;haptic('heavy');const popup=this._detailPopup(this._label(entity,config,state));popup.setConfig({title:this._label(entity,config,state),cards:[{type:'custom:marao-weather-forecast',entity,features:attrs.supported_features||0,unit:attrs.temperature_unit||this._hass?.config?.unit_system?.temperature||'',legacy:attrs.forecast||[]}]});popup.hass=this._hass;popup._openSheet();};
+      const actionButton=this.shadowRoot.querySelector('[data-weather-action]');if(actionButton){const primary=()=>config.tap_action?this._performAction(config.tap_action,entity):openForecast();if(config.hold_action)this._bindHoldAction(actionButton,this.shadowRoot.querySelector('ha-card'),()=>this._performAction(config.hold_action,entity),primary);else actionButton.onclick=primary;}
       if(this._historyPopup?._open)this._historyPopup.hass=this._hass;
-      const button=this.shadowRoot.querySelector('[data-weather-forecast]');
-      if(button)button.onclick=()=>{if(unavailable||this.preview)return;haptic('heavy');const popup=this._detailPopup(this._label(entity,config,state));popup.setConfig({title:this._label(entity,config,state),cards:[{type:'custom:marao-weather-forecast',entity,features:attrs.supported_features||0,unit:attrs.temperature_unit||this._hass?.config?.unit_system?.temperature||'',legacy:attrs.forecast||[]}]});popup.hass=this._hass;popup._openSheet();};
+      const button=this.shadowRoot.querySelector('[data-weather-forecast]');if(button)button.onclick=openForecast;
       return;
     }
     if(this._config.template==='md_people_card') {
@@ -3008,6 +3008,7 @@ export class MaraoPopupCard extends BaseElement {
     root.append(overlay);
     this._popupPress = bindPressFeedback(overlay);
     this._overlay = overlay;
+    styleWeatherPopup(this);
     this._syncTheme();
     this._updateAccessHeader();
     const header = overlay.querySelector('.marao-popup-head');
@@ -3060,6 +3061,7 @@ export class MaraoPopupCard extends BaseElement {
     }
   }
   _updateChildrenHass() {
+    styleWeatherPopup(this);
     if(this._nativePopupView){this._nativePopupView.update();return;}
     if (this._config.entity_group) { this._reconcileGroupChildren(); return; }
     const host = this._overlay?.querySelector(".marao-popup-content");

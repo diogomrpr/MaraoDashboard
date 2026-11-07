@@ -27,7 +27,7 @@ entity_id: weather.home
 
 Compatible entity domains: `weather`, `sensor`.
 
-The static sky reflects the reported weather condition; no background is animated. A large temperature appears with available wind, humidity and pressure readings. Open **Forecast** for hourly predictions or up to seven days, according to the weather entity’s capabilities. Missing forecasts stay empty and reported errors remain visible. `variables.show_forecast: false` hides the forecast entry.
+The static sky reflects the reported weather condition; no background is animated. A large whole-number temperature appears with available wind, humidity and pressure readings. Metrics wrap naturally without empty slots; displayed current and forecast values are rounded without changing reported data. Tap the card to open hourly predictions or up to seven days on matching condition scenery, according to the entity’s capabilities. Explicit custom tap and hold actions retain their configured behavior. Missing forecasts stay empty and reported errors remain visible. `variables.show_forecast: false` hides the forecast entry.
 ## Settings
 
 The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.

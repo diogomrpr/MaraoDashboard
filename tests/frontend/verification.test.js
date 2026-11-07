@@ -81,6 +81,9 @@ test('frontend refresh scope covers recovery, native/navbar ownership and alignm
 });
 
 test('focused components retain shared consumers and exclude unrelated suites', () => {
+  const weather = selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js'], ['weather']);
+  assert.deepEqual(weather.components, ['weather']);
+  assert.ok(checksFor(weather).some(check => check.id === 'unit:weather-presentation'));
   const slider = selectComponents(['custom_components/marao_dashboard/frontend/MaraoCards.js'], ['slider']);
   assert.deepEqual(slider.components, ['cover', 'fan', 'light', 'slider']);
   const checks = checksFor(slider);

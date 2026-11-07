@@ -288,7 +288,7 @@ function selectComponents(files, declared = [], { conservativeShared = false } =
     if (ids === 'editor-labels') ids = declared.includes('editor-drag') ? ['editor-ui', 'editor-drag'] : ['editor-ui'];
     if (ids === 'shared') {
       if (!declared.length && !conservativeShared) throw new Error(file + ': declare --component after reviewing the shared-component diff.');
-      const consumers = ['popup-layout','people','summary-controls','schedules','press-feedback', 'card-namespace', 'navbar-startup', 'frontend-refresh', 'chart-details', 'control-grid', 'battery-groups', 'access-label', 'slider-headers', 'navbar-overflow', 'security', 'labels', 'slider', 'light', 'light-color', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
+      const consumers = ['popup-layout','people','summary-controls','schedules','weather','press-feedback', 'card-namespace', 'navbar-startup', 'frontend-refresh', 'chart-details', 'control-grid', 'battery-groups', 'access-label', 'slider-headers', 'navbar-overflow', 'security', 'labels', 'slider', 'light', 'light-color', 'fan', 'cover', 'popup', 'scroll', 'navbar', 'actions', 'connection', 'rooms', 'groups', 'climate', 'history', 'energy', 'camera'];
       ids = declared.length ? declared.filter(id => consumers.includes(id)) : consumers;
       if (!ids.length) throw new Error(file + ': a runtime component is required; documentation scope cannot omit its checks.');
     }
