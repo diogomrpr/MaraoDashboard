@@ -712,7 +712,7 @@ export function validatePages(config, catalog, entities = []) {
         let accessRole = card.template;
         if (['md_access_card', 'md_access_slide_action_card', 'md_access_action_card', 'md_access_hold_action_card'].includes(accessRole)) {
           const mode = options.access_mode ?? 'auto', domain = card.entity_id?.split('.')[0];
-          const modes = { popup: ['lock', 'cover'], slide: ['lock', 'cover', 'button', 'switch', 'script'], close: ['lock', 'cover'], hold: ['button', 'switch', 'input_boolean', 'alarm_control_panel'] };
+          const modes = { popup: ['lock', 'cover'], slide: ['lock', 'cover', 'button', 'switch', 'script'], close: ['lock', 'cover'], hold: ['button', 'switch', 'input_boolean', 'alarm_control_panel', 'lock'] };
           if (mode !== 'auto' && (!Object.hasOwn(modes, mode) || !modes[mode].includes(domain))) errors.push('Access behavior is incompatible with the selected entity.');
           accessRole = ({ popup: 'md_access_card', slide: 'md_access_slide_action_card', close: 'md_access_action_card', hold: 'md_access_hold_action_card' })[mode] || accessRole;
           if (mode === 'auto' && accessRole === 'md_access_card' && !['lock', 'cover'].includes(domain)) accessRole = domain === 'script' ? 'md_access_slide_action_card' : 'md_access_hold_action_card';
@@ -739,9 +739,10 @@ export function validatePages(config, catalog, entities = []) {
         if (card.template === 'md_room_card' && Object.hasOwn(options, 'light_entities') && (!Array.isArray(options.light_entities) || options.light_entities.some(value => !entityId(value) || !value.startsWith('light.')))) errors.push('Room lights must be an explicit list of light entities.');
         if (card.template === 'md_media_app_card' && (typeof options.app_source !== 'string' || !options.app_source.trim())) errors.push('Media app requires an explicit source.');
         if(card.template==='md_media_app_card'){const error=mediaAppLogoError(options.app_logo);if(error)errors.push(error);}
+        if(accessRole==='md_access_hold_action_card'&&card.entity_id?.startsWith('lock.')&&(options.action_service&&options.action_service!=='lock.lock'||['hold_action','double_tap_action'].some(key=>card[key]&&card[key].action!=='none')))errors.push('Use an access opener slide for opening or unlocking');
         if (accessRole === 'md_access_hold_action_card' && Object.hasOwn(card, 'tap_action')) {
-          const action = card.tap_action, button = card.entity_id?.startsWith('button.');
-          const valid = object(action) && (button
+          const action = card.tap_action, button = card.entity_id?.startsWith('button.'), lock=card.entity_id?.startsWith('lock.');
+          const valid = object(action) && (lock ? action.action==='none'||['call-service','perform-action'].includes(action.action)&&(action.service||action.perform_action)==='lock.lock'&&(action.target?.entity_id||action.entity_id)===card.entity_id&&(!action.target||Object.keys(action.target).every(key=>key==='entity_id'))&&(!action.entity_id||action.entity_id===card.entity_id)&&Object.keys(action.data||action.service_data||{}).length===0 : button
             ? action.action === 'perform-action' && action.perform_action === 'button.press' && object(action.target) && Object.keys(action.target).length === 1 && action.target.entity_id === card.entity_id
             : action.action === 'toggle');
           if (!valid) errors.push('Security action must control its selected entity with the native service.');

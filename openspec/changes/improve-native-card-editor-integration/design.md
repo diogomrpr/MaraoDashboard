@@ -97,3 +97,13 @@ No data migration, backend installation or generated-dashboard rewrite is planne
 Rebuild the current owned frontend, then batch-install through `prepareFrontend()` on disposable `.28`. Installation verifies served assets and preserves saved views/helpers. Use one targeted native visit only for the concrete Help/default/dirty-state boundary as needed; cancel temporary drafts, dispatch no device actions and compare saved state if a write was exercised. Broad browser/theme/device/camera suites are not implied.
 
 If a deliberate test write is necessary, retain exact before/after state privately and restore it only after a fresh concurrency comparison. Package-only rollback is sufficient when no data was written; otherwise restore the matching package and affected saved data together. Unrelated changes and user customization must remain intact.
+
+## Gallery authoring follow-up
+
+The shared native editor reads private normalized descriptors and patches only changed saved fields. Legacy energy/power options retain their top-level location. Legacy automatic access roles validate against their effective native opening/locking service without rewriting their stored template or relaxing explicit-mode restrictions. Old summary aliases keep their original identity and primary domain privately; new cards use current families.
+
+Timeline, energy, power detail, standalone popup, summary-action and control-grid classes expose the shared editor. Control grids delegate to registered HA card-element editors, representing legacy groups as a session-only stack of native grids. The resulting children/groups are flattened back to the existing saved shape; unknown fields and raw-card ownership are retained or a specific validation error rejects an ambiguous edit. The editor has no dashboard-save callback. Standalone popups reuse the existing independent Sections draft and stale-source check. Existing Header retirement and device safety remain unchanged.
+
+Only effective options are exposed: specialized history primitives do not receive inert generic appearance/action fields. Common colors/labels come from the catalog; public documentation uses that same field source. New shared options have no materialized saved defaults or migration. Frozen released source/output expectations remain unchanged.
+
+The gallery's guarded Lock is a supported Security action source. Only locks join that role's existing helper domains; omitted service resolves to lock.lock. Both runtime and source reject unlocking, alternate targets/data and secondary triggers. Existing hold timing/dispatch ownership is reused. Other door/cover opening remains a strict slider and safe close stays explicit.

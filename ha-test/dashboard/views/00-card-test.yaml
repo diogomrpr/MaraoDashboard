@@ -459,11 +459,11 @@ cards:
         cards:
           - type: custom:marao-card
             template: md_light_card
-            entity: sensor.marao_dashboard_test_unknown
+            entity: light.marao_dashboard_test_case_light_unknown
             name: Unknown control
           - type: custom:marao-card
             template: md_light_card
-            entity: sensor.marao_dashboard_test_unavailable
+            entity: light.marao_dashboard_test_case_light_unavailable
             name: Unavailable control
 
       - type: custom:marao-card

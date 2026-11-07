@@ -86,3 +86,31 @@ Marao-owned picker names and descriptions SHALL use HA's selected language once 
 - **WHEN** HA's language changes and a new picker/editor surface is opened
 - **THEN** Marao's registration text uses the new language without duplicate registrations
 - **AND** suggestion callbacks and Help links remain intact, third-party metadata remains untouched, and existing dialogs are not forcibly remounted
+
+### Requirement: Reproducible gallery authoring
+Every supported current gallery card SHALL have a native-picker creation route and effective visual settings for its authored behavior. Existing legacy runtime details SHALL expose an editor without rewriting their saved identity, field aliases or unrelated options. HA SHALL retain outer Save/Cancel ownership; incompatible configurations SHALL remain correctable without weakening access safeguards.
+
+#### Scenario: A user recreates an access popup
+- **WHEN** the user adds Access for a lock and selects its built-in popup template
+- **THEN** the editable native canvas contains an unlocking slider and safe locking button
+- **AND** the full native child picker exposes independent Marao opener, close/lock and held Security action cards
+
+#### Scenario: Effective gallery options are edited
+- **WHEN** a user changes supported appearance/actions, a graph history source or energy page/detail presentation
+- **THEN** the visual editor emits the complete updated parent configuration and the runtime uses that setting
+- **AND** omitted defaults, aliases, opaque options and unrelated child data are preserved
+
+#### Scenario: Existing detail and container cards are edited
+- **WHEN** a user edits a timeline, energy/power detail, standalone popup, popup group action or legacy grouped grid
+- **THEN** the shared or native visual editor exposes its effective settings and preserves its saved type
+- **AND** grouped grids use HA's native stack/grid controls and popup contents use the existing independent Sections draft
+
+#### Scenario: An incompatible example is corrected
+- **WHEN** a legacy Light example is bound to a generic sensor instead of a Light entity
+- **THEN** its primary entity can be corrected through the native selector
+- **AND** the current gallery uses the existing compatible unknown/unavailable Light helpers instead of relaxing Light validation
+
+#### Scenario: A guarded Lock example is recreated
+- **WHEN** Security action is selected with a lock entity
+- **THEN** its complete security hold dispatches only lock.lock to that selected lock
+- **AND** opening services, alternate targets and secondary opening triggers are rejected in source and runtime validation

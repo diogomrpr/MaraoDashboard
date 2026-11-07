@@ -120,3 +120,17 @@ test('access picker defaults and suggestions skip covers lacking the selected ca
   assert.equal(nativeEntitySuggestion('md_access_action_card',hass,'cover.open_only'),null);
   assert.equal(nativeEntitySuggestion('md_access_slide_action_card',hass,'cover.close_only'),null);
 });
+
+test('legacy standalone popups copy their current cards and grouped controls into an independent native canvas',()=>{
+  const popup={type:'custom:marao-popup-card',hash:'#details',name:'Details',cards:[{type:'custom:marao-card',template:'md_light_card',entity:'light.safe',variables:{enable_slider:false},future:[]},{type:'markdown',content:'Kept'}],future:false};
+  const dashboard={views:[{path:'home',cards:[popup]}]},before=structuredClone(dashboard);
+  const prepared=preparePopupCopy(popup,dashboard,'home');
+  assert.deepEqual(prepared.content.layout,{type:'sections',title:'Details',max_columns:1,sections:[{type:'grid',cards:[{...popup.cards[0],type:'custom:marao-light-card',grid_options:{columns:12}},{...popup.cards[1],grid_options:{columns:12}}]}]});
+  assert.deepEqual(prepared.accept(dashboard),prepared.content);assert.deepEqual(dashboard,before);
+  const changed=structuredClone(dashboard);changed.views[0].cards[0].cards=[];assert.throws(()=>prepared.accept(changed),/missing or duplicated|source changed/);
+  const group={...popup,entity_group:{id:'lights',entity_type:'light',popup_filter:'all',members:[{entity_id:'light.safe',future:[]}],entities:['light.safe']}};
+  const copied=preparePopupCopy(group,{views:[]},'home').content;
+  const cards=copied.layout.sections.flatMap(section=>section.cards);
+  assert.ok(cards.some(card=>card.type==='custom:marao-summary-actions'&&card.popup_scope==='embedded'));
+  assert.ok(cards.some(card=>card.entity_id==='light.safe'&&card.future.length===0));
+});

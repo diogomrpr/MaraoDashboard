@@ -306,3 +306,19 @@ test('dishwasher native height follows cycle content without changing explicit a
   assert.deepEqual(nativeCardGridOptions(config),{columns:12,rows:'auto',min_columns:6,min_rows:2});
   assert.deepEqual(config,before);
 });
+
+test('native authoring forwards summary appearance and supports full energy details on the page',()=>{
+  const group=compose(config('md_entity_group_card',{id:'lights',entity_type:'light',entities:['light.safe'],show_name:false,show_icon:false,variables:{active_color:'#223344'}}));
+  assert.equal(group.card.show_name,false);assert.equal(group.card.show_icon,false);assert.equal(group.card.variables.active_color,'#223344');
+  assert.deepEqual(group.card.variables.summary_entities,['light.safe']);
+  const energy=compose(config('md_energy_period_card',{entity_id:'sensor.safe',popup:true,variables:{period:'month',display_precision:3}}));
+  assert.equal(energy.card.type,'custom:marao-energy-period-card');assert.equal(energy.card.popup,true);assert.equal(energy.card.period,'month');assert.equal(energy.card.display_precision,3);assert.deepEqual(energy.popups,[]);
+});
+
+test('the Security action picker can recreate the gallery held Lock without an unlocking fallback',()=>{
+  const state={language:'en',states:{'lock.safe':{entity_id:'lock.safe',state:'unlocked',attributes:{}}}};
+  const stub=nativeCardStub('md_access_hold_action_card',state,['lock.safe']);
+  assert.equal(stub.entity_id,'lock.safe');assert.doesNotThrow(()=>validateNativeCardConfig(stub));
+  const result=compose(stub);assert.equal(result.card.template,'md_access_hold_action_card');assert.equal(result.card.variables.action_service,'lock.lock');
+  assert.deepEqual(result.card.tap_action,{action:'call-service',service:'lock.lock',entity_id:'lock.safe',haptic:'heavy'});assert.deepEqual(result.popups,[]);
+});

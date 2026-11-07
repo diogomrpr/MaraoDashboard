@@ -368,3 +368,14 @@ test('omitted alarm layout uses dropdown without rewriting saved configuration; 
   assert.match(card.shadowRoot.innerHTML,/--alarm-selected-background:var\(--color-green\)/);
   assert.match(card.shadowRoot.innerHTML,/class="alarm-disarm/);
 });
+
+test('held Lock creation uses only lock.lock and rejects alternate targets or opening triggers in both validators',()=>{
+  const catalog={cards:[{id:'md_access_hold_action_card',domains:['lock']}]};
+  const validate=config=>validateConfig({config_version:2,name:'Safe',landing_page:'home',pages:[{path:'home',name:'Home',entities:[{...config,entity_id:config.entity}]}]},2,undefined,{},catalog);
+  for(const access_mode of ['auto','hold']){
+    const original={template:'md_access_hold_action_card',entity:'lock.safe',variables:{access_mode,future:[]}},before=structuredClone(original);
+    assert.equal(runtime.accessCardConfig(original).variables.action_service,'lock.lock');assert.deepEqual(validate(original),[]);assert.deepEqual(original,before);
+    const bypasses=[{variables:{access_mode,action_service:'lock.unlock'}},{tap_action:{action:'toggle'}},{tap_action:{action:'perform-action',perform_action:'lock.unlock',target:{entity_id:'lock.safe'}}},{tap_action:{action:'call-service',service:'lock.lock',target:{entity_id:'lock.other'}}},{tap_action:{action:'call-service',service:'lock.lock',entity_id:'lock.safe',service_data:{entity_id:'lock.other'}}},{hold_action:{action:'toggle'}},{double_tap_action:{action:'toggle'}}];
+    for(const patch of bypasses){const config={...original,...patch};assert.throws(()=>runtime.accessCardConfig(config),/slide/);assert.ok(validate(config).length,'Source must reject the same unsafe held Lock configuration');}
+  }
+});

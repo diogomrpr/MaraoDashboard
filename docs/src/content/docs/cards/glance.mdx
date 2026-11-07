@@ -50,6 +50,17 @@ The table lists the shared catalog fields and this card’s structured options. 
 | --- | --- | --- | --- | --- |
 | `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `show_name` | Show name | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_icon` | Show icon | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_state` | Show state | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_label` | Show label | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `tap_action` | tap action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `hold_action` | hold action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `double_tap_action` | double tap action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `variables.custom_label` | Custom state label | text | Not set | Custom state label for this card. |
+| `variables.md_label_prefix` | State label prefix | text | Not set | State label prefix for this card. |
+| `variables.card_color` | Card color | color | Not set | Optional card background color. |
+| `variables.active_color` | Active color | color | Not set | Active color for this card. |
 | `variables.show_reading_names` | Show reading labels | boolean | `true` | Show or hide all reading labels without changing the group title or saved names. |
 | `variables.entity1` | Reading 1 | entity | Not set | Reading 1 for this card. Searchable suggestions are available. |
 | `variables.entity1_name` | Reading 1 name | text | Not set | Reading 1 name for this card. |

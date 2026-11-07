@@ -1,4 +1,5 @@
 import {createSettingsRow,SETTINGS_ROW_CSS} from './settings-row.js';
+import {loadLovelaceEditor} from './lovelace-loader.js';
 import {renderPopupContent} from './popup-content-editor.js';
 import {renderEventEditor} from './event-card-editor.js';
 import {nativeDashboardConfig,findNativeEditorContext} from '../custom_components/marao_dashboard/frontend/MaraoNativeContext.js';
@@ -15,19 +16,38 @@ import {managedChildContext,detachManagedPopupCard,popupPresentationVariable,pop
 const Base = globalThis.HTMLElement || class {};
 const own = (value,key) => Object.hasOwn(value || {},key);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const commonAppearance=[['show_name','Show name',true],['show_icon','Show icon',true],['show_state','Show state',true],['show_label','Show label',true]];
+const commonActions=['tap_action','hold_action','double_tap_action'];
+const runtimeAliases={'custom:marao-state-timeline-card':'md_timeline_card','custom:marao-energy-period-card':'md_energy_period_card','custom:marao-power-history-card':'md_graph_card'};
+const legacySummaries=new Set(['md_blinds_popup_card','md_climate_popup_card','md_lights_popup_card','md_maintenance_popup_card','md_bubble_popup_card','hc_bubble_popup_card','hc_slider_card']);
+const energyKeys=['period','display_unit','display_precision','sub_entities','calculate_cost','cost_per_kwh'];
+const primitiveKeys=config=>config.type==='custom:marao-energy-period-card'?energyKeys:config.type==='custom:marao-power-history-card'?['power_devices','display_unit','display_precision','graph_color']:[];
+const simpleAppearance=card=>!['md_energy_period_card','md_timeline_card','md_people_card','md_schedules_card','md_floor_plan_card'].includes(card.id);
+const editorCard=card=>card?{...card,variables:[...(simpleAppearance(card)?catalog.common_variables||[]:[]).filter(field=>!card.variables.some(item=>item.key===field.key)),...card.variables]}:card;
+
 const WORDS = {add:'Add',delete:'Delete',edit:'Edit',update:'Update',create:'Create',cancel:'Cancel',advanced:'Advanced options',searchEntities:'Search by name or entity ID',noResults:'No compatible entities match your search.',unknown:'Unknown',unavailable:'Unavailable'};
 
 export function nativeConfigToDescriptor(config) {
   const result=clone(config || {});
-  result.template=canonicalTemplate(result.template || templateForNativeType(result.type) || '');
+  result.template=canonicalTemplate(result.template || templateForNativeType(result.type) || runtimeAliases[result.type] || (result.type==='custom:marao-card'?'md_base_card':''));
+  if(legacySummaries.has(result.template))result.template='md_base_card';
+  const service=result.variables?.action_service,domain=(result.entity_id||result.entity||'').split('.')[0];
+  if((result.variables?.access_mode??'auto')==='auto'){
+    if(result.template==='md_access_action_card'&&service===({lock:'lock.unlock',cover:'cover.open_cover'})[domain]&&service)result.template='md_access_slide_action_card';
+  }
+  if(primitiveKeys(result).length)result.variables={...result.variables,...Object.fromEntries(primitiveKeys(result).filter(key=>own(result,key)).map(key=>[key,clone(result[key])]))};
   if(!result.entity_id && result.entity)result.entity_id=result.entity;
   return result;
 }
 
 export function nativeCardFormData(config, card) {
+  card=editorCard(card);
+  const normalized=nativeConfigToDescriptor(config);
   const data={entity_id:config.entity_id || config.entity || '',name:config.name || '',icon:config.icon || '',page:config.page || '',popup_view:config.popup_view || ''};
+  for(const [key,,fallback]of commonAppearance)data[key]=config[key]??config.variables?.[key]??fallback;
+  for(const key of [...commonActions,'popup'])data[key]=clone(config[key]);
   if(card.id==='md_camera_card')Object.assign(data,formData(config,cameraTitleFields()));
-  for(const field of cardFormMethods._expandedFields(card.variables || []))data[`var__${field.key}`]=cardFormMethods._readVariable(config.variables,field);
+  for(const field of cardFormMethods._expandedFields(card.variables || []))data[`var__${field.key}`]=cardFormMethods._readVariable(normalized.variables,field);
   if(card.scene_collection || card.people)data.scene_entities=flattenEntities(config.entities || []).map(item=>item.entity_id);
   if(card.people)data.columns=config.columns ?? 1;
   return data;
@@ -35,7 +55,9 @@ export function nativeCardFormData(config, card) {
 
 // Patch only fields that actually changed; native layout, actions and opaque data stay owned by HA.
 export function patchNativeCard(config, card, previous, next) {
+  card=editorCard(card);
   let result=clone(config);
+  for(const key of [...commonAppearance.map(([key])=>key),...commonActions,'popup'])if(!sameFormValue(previous[key],next[key])){if(next[key]===undefined||next[key]===null||next[key]==='')delete result[key];else result[key]=clone(next[key]);}
   if(card.people && !sameFormValue(previous.columns,next.columns))result.columns=next.columns;
   for(const key of ['entity_id','name','icon','page','popup_view']) {
     if(sameFormValue(previous[key],next[key]))continue;
@@ -47,10 +69,40 @@ export function patchNativeCard(config, card, previous, next) {
   const variables=clone(result.variables || {});
   for(const field of cardFormMethods._expandedFields(card.variables || [])) {
     const key=`var__${field.key}`;
-    if(!sameFormValue(previous[key],next[key]))cardFormMethods._writeVariable(variables,field,next[key]);
+    if(!sameFormValue(previous[key],next[key])){
+      if(primitiveKeys(config).includes(field.key)){const staged={};cardFormMethods._writeVariable(staged,field,next[key]);if(own(staged,field.key))result[field.key]=staged[field.key];else delete result[field.key];}
+      else cardFormMethods._writeVariable(variables,field,next[key]);
+    }
   }
+  for(const [key]of commonAppearance)if(!own(config,key)&&own(config.variables,key)&&!sameFormValue(previous[key],next[key])){delete result[key];variables[key]=next[key];}
   if(Object.keys(variables).length || own(config,'variables'))result.variables=variables;
   return result;
+}
+
+export function controlGridEditorValue(config) {
+  if(!config.groups)return {...clone(config),type:'grid',columns:config.columns??2,square:false};
+  let offset=0;
+  return {type:'vertical-stack',cards:config.groups.map(group=>{const cards=clone(config.cards.slice(offset,offset+group.count));offset+=group.count;return {...clone(group),type:'grid',square:false,cards};})};
+}
+export function patchControlGrid(config,value) {
+  // shortcut: legacy control grids keep adaptive geometry; use native Grid for square cells or grid titles.
+  const grids=config.groups?value.cards:[value];
+  if(grids?.some(grid=>grid.square===true||grid.title))throw new Error('Use a native Grid card for square cells or a grid title.');
+  const next=clone(config);
+  if(config.groups) {
+    if(value.type!=='vertical-stack'||!Array.isArray(value.cards)||value.cards.some(group=>group.type!=='grid'||!group.cards?.length))throw new Error('Keep a grid for each control group.');
+    next.cards=value.cards.flatMap(group=>clone(group.cards));
+    next.groups=value.cards.map(({type,square,cards,...group})=>({...clone(group),columns:group.columns||1,count:cards.length}));
+  }else {
+    if(value.type!=='grid'||!Array.isArray(value.cards))throw new Error('Use a native Grid card.');
+    next.cards=clone(value.cards);if(own(config,'columns')||value.columns!==2)next.columns=value.columns||2;
+  }
+  if(config.native_cards?.length){
+    const indices=config.native_cards.map(index=>{const source=canonicalLayout(config.cards[index]),matches=next.cards.flatMap((card,i)=>canonicalLayout(card)===source?[i]:[]);if(matches.length!==1)throw new Error('Edit marked raw cards in YAML to preserve their ownership.');return matches[0];});
+    next.native_cards=indices;
+  }
+  if(!Number.isInteger(next.columns??2)||(next.columns??2)<1||(next.columns??2)>6||next.groups?.some(group=>!Number.isInteger(group.columns)||group.columns<1||group.columns>6))throw new Error('Use content cards and one to six columns.');
+  return next;
 }
 
 export class MaraoCardEditor extends Base {
@@ -69,7 +121,7 @@ export class MaraoCardEditor extends Base {
     const language=this._hass?.language,admin=this._hass?.user?.is_admin;this._hass=value;
     this._entities=Object.entries(value?.states || {}).map(([entity_id,state])=>({entity_id,domain:entity_id.split('.')[0],state:state.state,name:state.attributes?.friendly_name || entity_id,...state.attributes}));
     this.shadowRoot?.querySelectorAll('ha-form').forEach(form=>{form.hass=value;});
-    this.shadowRoot?.querySelectorAll('marao-native-card-editor').forEach(editor=>{editor.hass=value;});
+    this.shadowRoot?.querySelectorAll('marao-native-card-editor, hui-card-element-editor').forEach(editor=>{editor.hass=value;});
     if(this._config && (!this._mounted || language!==value?.language))this._render();
     else if(admin!==value?.user?.is_admin)this._renderPopupSelector();
     this._popupInline?.update();
@@ -97,7 +149,11 @@ export class MaraoCardEditor extends Base {
   }
   _selected() {
     const descriptor=nativeConfigToDescriptor(this._config), metadata=entityMeta(this._entities || [],descriptor.entity_id);
-    return catalog.cards.find(card=>card.id===descriptor.template) || cardForEntity(catalog,metadata || descriptor);
+    let card=editorCard(catalog.cards.find(card=>card.id===descriptor.template) || cardForEntity(catalog,metadata || descriptor));
+    if(card&&legacySummaries.has(this._config.template)&&descriptor.entity_id)card={...card,domains:[...new Set([...card.domains,descriptor.entity_id.split('.')[0]])]};
+    if(card&&this._config.type==='custom:marao-power-history-card')card={...card,variables:card.variables.filter(field=>primitiveKeys(this._config).includes(field.key))};
+    if(card&&this._config.type==='custom:marao-state-timeline-card')card={...card,variables:[]};
+    return card;
   }
   _l(label) {return String(this._hass?.language || '').startsWith('pt')?(MOVE_PT_LABELS[label] || PT_LABELS[label] || PT_LABELS[label+'.']?.replace(/\.$/,'') || popupLabel(label,this._hass)):label;}
   _t(key){return this._l(WORDS[key] || key);}
@@ -127,10 +183,12 @@ export class MaraoCardEditor extends Base {
     // The shared validator checks card semantics; native outer layout stays outside this source view.
     const error=popupViewError(descriptor);if(error)return [error];
     const card=clone(descriptor);delete card.type;if(card.template!=='md_entity_group_card')delete card.id;
+    if(card.template==='md_room_card'&&!card.page&&!card.tap_action)card.tap_action={action:'none'};
     const target=card.page;
     const pages=[{name:'Card',path:'home',entities:[card]}];
     if(target && target!=='home')pages.push({name:'Target',path:target,entities:[]});
-    return validateConfig({config_version:2,name:'Card',landing_page:'home',pages},2,this._entities,catalog.energy_units,catalog);
+    const compatible=legacySummaries.has(this._config.template)?{...catalog,cards:catalog.cards.map(entry=>entry.id==='md_base_card'?{...entry,domains:this._selected().domains}:entry)}:catalog;
+    return validateConfig({config_version:2,name:'Card',landing_page:'home',pages},2,this._entities,catalog.energy_units,compatible);
   }
   _render() {
     if(!this.shadowRoot || !this._config || !this._hass)return;
@@ -144,6 +202,7 @@ export class MaraoCardEditor extends Base {
       if(managed){this._renderManagedChild(this.shadowRoot.querySelector('[data-fields]'),card,managed);this._renderPopupSelector();return;}
     }catch(error){this._setStatus(this._error(error));return;}
     if(['custom:marao-camera-events-card','custom:marao-frigate-events-card'].includes(this._config.type)){renderEventEditor(this,this.shadowRoot.querySelector('[data-fields]'));return;}
+    if(this._renderCompatibilityEditor(this.shadowRoot.querySelector('[data-fields]')))return;
     if(!card){this._setStatus(this._l('Choose a supported page card template.'));return;}
     this._renderPopupSelector();
     if(card.id==='md_floor_plan_card') {
@@ -156,12 +215,12 @@ export class MaraoCardEditor extends Base {
     let collection=clone(original.entities || []),collectionEdited=false;
     const commit=()=>{
       try {
-        const next=patchNativeCard(this._config,card,previousData,data);
+        const previousPopup=popupRole(nativeConfigToDescriptor(this._config)),next=patchNativeCard(this._config,card,previousData,data);
         if((card.scene_collection || card.people) && collectionEdited)next.entities=collection;
-        if(this._mediaEdited)next.apple_tv=clone(this._mediaValue);
+        if(this._mediaEdited){if(own(original.variables,'apple_tv')&&!own(original,'apple_tv'))next.variables={...next.variables,apple_tv:clone(this._mediaValue)};else next.apple_tv=clone(this._mediaValue);}
         const errors=this._validateDescriptor(nativeConfigToDescriptor(next));
         if(errors.length){this._setStatus(errors.map(error=>this._l(error)).join('\n'));return;}
-        this._setStatus('');this._commitDescriptor(next);const popupChanged=card.id==='md_climate_card'&&previousData.var__enable_popup!==data.var__enable_popup;previousData=clone(data);if(popupChanged)this._render();
+        this._setStatus('');this._commitDescriptor(next);const popupChanged=previousPopup!==popupRole(nativeConfigToDescriptor(next));previousData=clone(data);if(popupChanged)this._render();
       }catch(error){this._setStatus(this._error(error));}
     };
     this._mediaEdited=false;
@@ -174,7 +233,7 @@ export class MaraoCardEditor extends Base {
       schema.push(this._schema('page','Target page',{select:{mode:'dropdown',options:pages.map(page=>({value:page.path,label:page.name}))}},true));
     }
     if(card.domains?.length)schema.push(this._schema('entity_id',card.id==='md_header_card'?'Weather':card.id==='md_camera_card'?'Dashboard stream':'Entity',{entity:{domain:card.domains}},!card.entity_optional));
-    schema.push(...(card.id==='md_camera_card'?cameraTitleFields().map(field=>this._schema(field.path,field.label,{[field.kind]:{}})):[this._schema('name','Display name',{text:{}}),this._schema('icon','Icon',{icon:{}})]));
+    schema.push(...(card.id==='md_camera_card'?cameraTitleFields().map(field=>this._schema(field.path,field.label,{[field.kind]:{}})):[this._schema('name','Display name',{text:{}}),...(!['md_timeline_card'].includes(card.id)&&this._config.type!=='custom:marao-power-history-card'?[this._schema('icon','Icon',{icon:{}})]:[])]));
     if(card.scene_collection || card.people)schema.push(this._schema('scene_entities',card.people?'People':'Scenes',{entity:{domain:card.people?['person']:['scene','switch','input_boolean'],multiple:true}}));
     if(card.people)schema.push(this._schema('columns','Columns',{number:{min:1,max:6,step:1,mode:'box'}}));
     schema.push(...basic.map(field=>this._variableSchema(field,card.id==='md_switch_card'?data.var__power_entity:data.entity_id)));
@@ -194,8 +253,13 @@ export class MaraoCardEditor extends Base {
       this._refreshEnergyFields(host,card.id==='md_switch_card'?data.var__power_entity:data.entity_id);commit();
     };
     basicForm=this._mountForm(host.querySelector('[data-basic]'),data,schema,changed);
-    const details=host.querySelector('[data-advanced]');details.hidden=!advanced.length;details.querySelector('summary').textContent=this._t('advanced');
-    if(advanced.length)advancedForm=this._mountForm(host.querySelector('[data-advanced-form]'),data,advanced.map(field=>this._variableSchema(field,data.entity_id)),changed);
+    const details=host.querySelector('[data-advanced]');details.querySelector('summary').textContent=this._t('advanced');
+    const cameraFields=card.id==='md_camera_card'?cameraTitleFields().map(field=>field.path):[];
+    const appearance=(simpleAppearance(card)&&this._config.type!=='custom:marao-power-history-card'?commonAppearance:[]).filter(([key])=>!cameraFields.includes(key)).map(([key,label])=>this._schema(key,label,{boolean:{}}));
+    const strict=card.id==='md_access_slide_action_card'||card.id==='md_access_action_card'||card.id==='md_access_hold_action_card'||['slide','close'].includes(data.var__access_mode);
+    if(simpleAppearance(card)&&this._config.type!=='custom:marao-power-history-card'&&!strict&&!['md_entity_group_card','md_scene_collection_card'].includes(card.id))appearance.push(...commonActions.map(key=>this._schema(key,({'tap_action':'Tap action','hold_action':'Hold action','double_tap_action':'Double-tap action'})[key],{ui_action:{}})));
+    if(card.id==='md_energy_period_card')appearance.push(this._schema('popup','Show energy details on dashboard',{boolean:{}}));
+    advancedForm=this._mountForm(host.querySelector('[data-advanced-form]'),data,[...appearance,...advanced.map(field=>this._variableSchema(field,data.entity_id))],changed);
     const renderLists=()=>{
       const lists=host.querySelector('[data-lists]');lists.replaceChildren();
       const kinds=card.id==='md_sensor_card'?[['background_thresholds',false,data.entity_id]]:card.id==='md_graph_card'?[['power_devices',true,null]]:card.id==='md_energy_period_card'?[['sub_entities',false,null]]:[];
@@ -206,7 +270,7 @@ export class MaraoCardEditor extends Base {
     if(card.entity_group)this._renderGroup(special,descriptor);
     if(card.schedules)this._renderSchedules(special,original);
     if(card.id==='md_media_card') {
-      const button=document.createElement('button');button.type='button';button.textContent=this._l('Apple TV options');button.onclick=()=>{this._moveHaptic();this._openMediaOptions({...original,entity_id:data.entity_id,apple_tv:this._mediaEdited?this._mediaValue:original.apple_tv},value=>{this._mediaEdited=true;this._mediaValue=value;commit();});};special.append(button);
+      const button=document.createElement('button');button.type='button';button.textContent=this._l('Apple TV options');button.onclick=()=>{this._moveHaptic();this._openMediaOptions({...original,entity_id:data.entity_id,apple_tv:this._mediaEdited?this._mediaValue:original.apple_tv??original.variables?.apple_tv},value=>{this._mediaEdited=true;this._mediaValue=value;commit();});};special.append(button);
     }
   }
   _renderManagedChild(host,card,managed) {
@@ -228,9 +292,38 @@ export class MaraoCardEditor extends Base {
   }
   _renderPopupSelector() {
     const host=this.shadowRoot?.querySelector('[data-popup-layout]');if(!host)return;
-    const descriptor=nativeConfigToDescriptor(this._config);if(!popupRole(descriptor)&&!own(this._config,'popup_content'))return;
+    const descriptor=nativeConfigToDescriptor(this._config);if(this._config.type!=='custom:marao-popup-card'&&!popupRole(descriptor)&&!own(this._config,'popup_content'))return;
     renderPopupContent(this,host);return;
     if(this._config.popup_content?.mode==='custom')return;
+  }
+
+  _renderCompatibilityEditor(host) {
+    const original=this._config,type=original.type;
+    if(type==='custom:marao-popup-card') {
+      this._renderPopupSelector();
+      this._mountForm(host,{name:original.name||'',hash:original.hash||''},[this._schema('name','Display name',{text:{}}),this._schema('hash','Popup hash',{text:{}})],value=>{
+        const next=clone(this._config);for(const key of ['name','hash'])if((original[key]||'')!==value[key]){if(value[key])next[key]=value[key];else delete next[key];}const error=popupViewError(next);if(error){this._setStatus(this._l(error));return;}this._setStatus('');this._commitDescriptor(next);
+      });return true;
+    }
+    if(type==='custom:marao-summary-actions') {
+      const fields=[this._schema('entity_type','Group type',{select:{mode:'dropdown',options:[['light','Light'],['cover','Cover'],['climate','Climate'],['battery','Battery']].map(([value,label])=>({value,label:this._l(label)}))}}),this._schema('scope','Scope',{select:{mode:'dropdown',options:[{value:'all',label:this._l('Entire popup')},{value:'section',label:this._l('Current section')}]}})];
+      if(original.popup_scope!=='embedded')fields.push(this._schema('popup_view','Popup view',{text:{}}));
+      this._mountForm(host,clone(original),fields,value=>{const error=popupViewError(value);if(error){this._setStatus(this._l(error));return;}this._setStatus('');this._commitDescriptor({...this._config,...value});});return true;
+    }
+    if(type!=='custom:marao-control-grid')return false;
+    const epoch=this._documentEpoch,lifecycle=this._lifecycle;
+    loadLovelaceEditor(this.hass,globalThis.location?.pathname,{picker:false}).then(()=>{
+      if(epoch!==this._documentEpoch||lifecycle!==this._lifecycle||!host.isConnected)return;
+      const editor=document.createElement('hui-card-element-editor');editor.hass=this.hass;editor.lovelaceConfig=nativeDashboardConfig(this.lovelace);editor.value=controlGridEditorValue(this._config);
+      for(const name of ['GUImode-changed','editor-save'])editor.addEventListener(name,event=>event.stopPropagation());
+      editor.addEventListener('config-changed',event=>{event.stopPropagation();if(epoch!==this._documentEpoch||lifecycle!==this._lifecycle||!host.isConnected)return;try{
+        if(event.detail.error)throw new Error(event.detail.error);
+        const next=patchControlGrid(this._config,event.detail.config);this._setStatus('');
+        if(this._compatibilityInvalid&&sameFormValue(next,this._config))this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:clone(next)},bubbles:true,composed:true}));
+        this._compatibilityInvalid=false;this._commitDescriptor(next);
+      }catch(error){const message=this._error(error);this._compatibilityInvalid=true;this._setStatus(message);this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:clone(this._config),error:message},bubbles:true,composed:true}));}});
+      host.replaceChildren(editor);
+    }).catch(error=>this._setStatus(this._error(error)));return true;
   }
 
   _popupEditorContext(){return findNativeEditorContext(this);}

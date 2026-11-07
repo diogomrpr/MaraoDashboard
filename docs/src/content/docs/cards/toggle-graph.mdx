@@ -30,7 +30,7 @@ variables:
   show_icon: true
 ```
 
-Compatible entity domains: `sensor`.
+Compatible entity domains: `sensor`, `switch`, `input_boolean`, `binary_sensor`.
 
 The reading/history sensor and controlled switch are separate. Tapping the ordinary action controls toggle_entity, not the sensor.
 
@@ -42,9 +42,19 @@ The table lists the shared catalog fields and this card’s structured options. 
 
 | YAML path | Setting | Value type | Catalog default | Behavior |
 | --- | --- | --- | --- | --- |
-| `entity_id` | Entity | entity | Not set | A sensor entity from your Home Assistant. Searchable suggestions are available. |
+| `entity_id` | Entity | entity | Not set | A sensor, switch, input_boolean, binary_sensor entity from your Home Assistant. Searchable suggestions are available. |
 | `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `show_name` | Show name | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_icon` | Show icon | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_state` | Show state | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_label` | Show label | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `tap_action` | tap action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `hold_action` | hold action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `double_tap_action` | double tap action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `variables.custom_label` | Custom state label | text | Not set | Custom state label for this card. |
+| `variables.md_label_prefix` | State label prefix | text | Not set | State label prefix for this card. |
+| `variables.card_color` | Card color | color | Not set | Optional card background color. |
 | `variables.toggle_entity` | Toggle entity | entity | Not set | Toggle entity for this card. Searchable suggestions are available. |
 | `variables.show_graph_line` | Graph line | boolean | `true` | Graph line for this card. |
 | `variables.show_graph_fill` | Graph fill | boolean | `true` | Graph fill for this card. |
@@ -60,6 +70,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `variables.inactive_icon_background` | Inactive icon background | color | Not set | Inactive icon background for this card. |
 | `variables.display_unit` | Display unit | energy_unit | `Auto` | Auto keeps the source unit. Selecting a compatible unit converts the reading. Choices: `mW`, `W`, `kW`, `MW`, `GW`. |
 | `variables.display_precision` | Decimal places | energy_precision | `Auto` | Auto trims trailing zeros. Choose 0–6 fixed decimal places. Choices: `0`, `1`, `2`, `3`, `4`, `5`, `6`. |
+| `variables.graph_entity` | History sensor | entity | Not set | History sensor for this card. Searchable suggestions are available. |
 
 ## Behavior examples
 

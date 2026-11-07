@@ -40,6 +40,17 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `entity_id` | Entity | entity | Not set | A select, input_select entity from your Home Assistant. Searchable suggestions are available. |
 | `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `show_name` | Show name | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_icon` | Show icon | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_state` | Show state | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_label` | Show label | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `tap_action` | tap action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `hold_action` | hold action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `double_tap_action` | double tap action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `variables.custom_label` | Custom state label | text | Not set | Custom state label for this card. |
+| `variables.md_label_prefix` | State label prefix | text | Not set | State label prefix for this card. |
+| `variables.card_color` | Card color | color | Not set | Optional card background color. |
+| `variables.active_color` | Active color | color | Not set | Active color for this card. |
 | `variables.activity_entities` | Related activity entities | json | Not set | Related activity entities for this card. Searchable suggestions are available. |
 
 ## Behavior examples

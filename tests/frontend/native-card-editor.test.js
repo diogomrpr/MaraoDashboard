@@ -310,7 +310,7 @@ test('native energy and current forms retain explicit emptiness and reject inval
   const current={type:'custom:marao-wallbox-current-card',template:'md_wallbox_current_card',entity_id:'input_number.current',variables:{shortcuts:[],future:false}};
   const fields=nativeCardFormData(current,card(current.template));
   assert.deepEqual(patchNativeCard(current,card(current.template),fields,{...fields,name:'Current'}).variables.shortcuts,[]);
-  const key=Object.keys(fields).find(key=>key.startsWith('var__'));
+  const key='var__shortcuts';
   assert.throws(()=>patchNativeCard(current,card(current.template),fields,{...fields,[key]:'6,12,16,20'}),/at most three/);
   assert.deepEqual(current.variables.shortcuts,[]);
 });
@@ -730,4 +730,120 @@ test('draft-owned native child editors cannot start legacy source-view persisten
   globalThis.location={pathname:'/marao-dashboard/home'};globalThis.window={MaraoNativeBootstrap:{findHost:()=>({localName:'hui-root'})}};
   const dialog={localName:'hui-dialog-edit-card',_maraoPopupDraftOwner:{},isEffectiveDirtyState:false,closeDialog(){}};
   assert.equal(findNativeEditorContext({parentNode:dialog}),undefined);
+});
+
+test('native appearance and HA action selectors save complete independent drafts',t=>{
+  const original={type:'custom:marao-switch-card',entity:'switch.safe',show_name:false,variables:{custom_label:'Power ',future:[]},tap_action:{action:'none'},styles:{card:[{padding:'4px'}]},future:{raw:[]}};
+  const f=nativeFormHarness(t,original),advanced=f.forms.find(form=>form.schema.some(field=>field.name==='tap_action'));
+  assert.deepEqual(advanced.schema.find(field=>field.name==='tap_action').selector,{ui_action:{}});
+  const action={action:'perform-action',perform_action:'switch.turn_off',target:{entity_id:'switch.safe'},data:{future:false}};
+  advanced.change({...advanced.data,show_name:true,tap_action:action,var__custom_label:'Desk '});
+  assert.deepEqual(f.events.at(-1),{...original,show_name:true,tap_action:action,variables:{custom_label:'Desk ',future:[]}});
+  assert.equal(original.show_name,false);assert.equal(original.tap_action.action,'none');
+  const alias={type:'custom:marao-card',template:'md_light_card',entity:'light.safe',variables:{show_icon:false,future:[]}};
+  const data=nativeCardFormData(alias,card('md_light_card'));assert.equal(data.show_icon,false);
+  assert.deepEqual(patchNativeCard(alias,card('md_light_card'),data,{...data,show_icon:true}),{...alias,variables:{show_icon:true,future:[]}});
+});
+
+test('legacy detail editors retain the saved field locations and expose only effective controls',t=>{
+  const energy={type:'custom:marao-energy-period-card',entity:'sensor.safe',period:'month',display_precision:2,popup:true,future:[]};
+  const f=nativeFormHarness(t,energy),period=f.forms.find(form=>form.schema.some(field=>field.name==='var__period'));
+  assert.equal(period.data.var__period,'month');period.change({...period.data,var__period:'day'});
+  assert.deepEqual(f.events.at(-1),{...energy,period:'day'});
+  const power={type:'custom:marao-power-history-card',entity:'sensor.safe',power_devices:[],display_unit:'W',future:false};
+  const p=nativeFormHarness(t,power),precision=p.forms.find(form=>form.schema.some(field=>field.name==='var__display_precision'));
+  assert.ok(!p.forms.flatMap(form=>form.schema).some(field=>['tap_action','show_name','var__history_popup'].includes(field.name)));
+  precision.change({...precision.data,var__display_precision:3});assert.deepEqual(p.events.at(-1),{...power,display_precision:3});
+  const timeline=nativeFormHarness(t,{type:'custom:marao-state-timeline-card',entity:'lock.safe',name:'Door'});
+  assert.ok(!timeline.forms.flatMap(form=>form.schema).some(field=>field.name==='var__timeline_name'));
+});
+
+test('legacy access aliases remain editable without relaxing explicit access validation',t=>{
+  for(const [template,service]of [['md_access_action_card','lock.unlock'],['md_access_hold_action_card','lock.lock']]){
+    const original={type:'custom:marao-card',template,entity:'lock.safe',variables:{action_service:service},future:[]};
+    const f=nativeFormHarness(t,original),basic=f.forms.find(form=>form.schema.some(field=>field.name==='name'));
+    basic.change({...basic.data,name:'Door'});assert.deepEqual(f.events.at(-1),{...original,name:'Door'});
+    assert.ok(!f.forms.flatMap(form=>form.schema).some(field=>field.name==='tap_action'));
+  }
+  const f=nativeFormHarness(t,{type:'custom:marao-access-action-card',entity_id:'lock.safe',variables:{access_mode:'close',action_service:'lock.unlock'}});
+  const basic=f.forms.find(form=>form.schema.some(field=>field.name==='name'));basic.change({...basic.data,name:'Unsafe'});
+  assert.equal(f.events.length,0);assert.match(f.editor.shadowRoot.querySelector('[data-status]').textContent,/opener slide/);
+});
+
+test('popup group actions and legacy popup headers use native forms without dropping opaque settings',t=>{
+  const action={type:'custom:marao-summary-actions',popup_scope:'embedded',scope:'all',entity_type:'light',grid_options:{columns:12},future:[]};
+  const f=nativeFormHarness(t,action);f.forms[0].change({...f.forms[0].data,scope:'section'});
+  assert.deepEqual(f.events.at(-1),{...action,scope:'section'});
+  const popup={type:'custom:marao-popup-card',hash:'#safe',cards:[{type:'markdown',content:'Kept'}],future:false};
+  const p=nativeFormHarness(t,popup);p.forms[0].change({...p.forms[0].data,name:'Details'});assert.deepEqual(p.events.at(-1),{...popup,name:'Details'});
+});
+
+test('native grid editing retains group order, content, unknown options and raw-card ownership',async()=>{
+  const {controlGridEditorValue,patchControlGrid}=await import('../../frontend_src/native-card-editor.js');
+  const a={type:'custom:marao-light-card',entity_id:'light.a',future:[]},b={type:'markdown',content:'Kept'},c={type:'custom:marao-card',template:'md_sensor_card',entity:'sensor.safe'};
+  const original={type:'custom:marao-control-grid',columns:2,cards:[a,b,c],groups:[{columns:1,count:1,future:false},{columns:2,count:2,future:[]}],native_cards:[2],future:{keep:[]}};
+  const native=controlGridEditorValue(original);
+  assert.deepEqual(native,{type:'vertical-stack',cards:[{type:'grid',square:false,columns:1,count:1,future:false,cards:[a]},{type:'grid',square:false,columns:2,count:2,future:[],cards:[b,c]}]});
+  assert.deepEqual(patchControlGrid(original,native),original);
+  native.cards.reverse();assert.deepEqual(patchControlGrid(original,native),{...original,cards:[b,c,a],groups:[original.groups[1],original.groups[0]],native_cards:[1]});
+  assert.deepEqual(original.cards,[a,b,c]);
+  const invalid=structuredClone(native);invalid.cards[0].cards.pop();assert.throws(()=>patchControlGrid(original,invalid),/raw cards/);
+});
+
+test('every gallery card is reproducible through its native editor or dedicated visual editor',async t=>{
+  const {createRequire}=await import('node:module'),require=createRequire(import.meta.url),YAML=require('yaml');
+  const {expandGallery,walkCards}=require('../../ha-test/cases.js');
+  const {nativeCardType}=await import('../../frontend_src/card-composition.js');
+  const {controlGridEditorValue,patchControlGrid}=await import('../../frontend_src/native-card-editor.js');
+  const gallery=expandGallery(YAML.parse(fs.readFileSync(new URL('../../ha-test/dashboard/views/00-card-test.yaml',import.meta.url),'utf8')));
+  let checked=0;
+  walkCards(gallery,saved=>{
+    const original=JSON.parse(JSON.stringify(saved));
+    if(!original.type&&nativeCardType(original.template))original.type=nativeCardType(original.template);
+    if(!original.type?.startsWith('custom:marao-'))return;
+    if(original.template==='md_floor_plan_card')return; // The dedicated placement editor is covered in floor-plan.test.js.
+    checked++;
+    if(original.type==='custom:marao-control-grid'){assert.deepEqual(patchControlGrid(original,controlGridEditorValue(original)),original);return;}
+    const {editor,forms,events}=nativeFormHarness(t,original);
+    if(original.type==='custom:marao-summary-actions'){
+      const form=forms.find(form=>form.schema.some(field=>field.name==='scope')),scope=original.scope==='all'?'section':'all';
+      assert.ok(form);form.change({...form.data,scope});assert.deepEqual(events.at(-1),{...original,scope});return;
+    }
+    const form=forms.find(form=>form.schema.some(field=>['name','title'].includes(field.name)));
+    assert.ok(form,original.type+' '+original.template+' has native settings');
+    const key=form.schema.some(field=>field.name==='name')?'name':'title',expected={...original,[key]:'Edited gallery example'};
+    if(key==='name')delete expected.name_key;
+    let data={...form.data,[key]:expected[key]};
+    if(original.template==='md_light_card'&&original.entity?.startsWith('sensor.marao_dashboard_test_')){
+      expected.entity=original.entity.endsWith('_unknown')?'light.marao_dashboard_test_case_light_unknown':'light.marao_dashboard_test_case_light_unavailable';
+      data={...data,entity_id:expected.entity};
+    }
+    form.change(data);
+    assert.equal(editor.shadowRoot.querySelector('[data-status]').textContent,'',original.name||original.template||original.type);
+    assert.deepEqual(events.at(-1),expected,original.name||original.template||original.type);
+  });
+  assert.ok(checked>500,'Exercise the complete gallery, not just picker stubs');
+});
+
+test('native grid child events reach only the outer draft and invalid YAML retains the last valid config',async t=>{
+  const saved=new Map(['customElements','location'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
+  t.after(()=>{for(const [key,value]of saved)if(value)Object.defineProperty(globalThis,key,value);else delete globalThis[key];});
+  globalThis.customElements={get:()=>true};globalThis.location={pathname:'/marao-dashboard/home',origin:'http://192.168.0.28:8123'};
+  const original={type:'custom:marao-control-grid',cards:[{type:'markdown',content:'Kept'}],future:[]};
+  const f=nativeFormHarness(t,original),host=f.editor.shadowRoot.querySelector('[data-fields]'),events=[];host.isConnected=true;
+  f.editor.dispatchEvent=event=>events.push(event.detail);await new Promise(resolve=>setImmediate(resolve));
+  const child=host.children[0];assert.equal(child.value.type,'grid');assert.equal(child.value.columns,2);
+  child.dispatchEvent(new CustomEvent('config-changed',{detail:{config:child.value,error:'Invalid YAML'}}));
+  assert.deepEqual(events.at(-1),{config:original,error:'Invalid YAML'});assert.deepEqual(f.editor._config,original);
+  child.dispatchEvent(new CustomEvent('config-changed',{detail:{config:child.value}}));assert.deepEqual(events.at(-1),{config:original});
+  child.dispatchEvent(new CustomEvent('config-changed',{detail:{config:{...child.value,columns:3}}}));
+  assert.deepEqual(events.at(-1).config,{...original,columns:3});assert.deepEqual(original.cards,[{type:'markdown',content:'Kept'}]);
+});
+
+test('popup settings refresh immediately when native history or energy presentation changes',t=>{
+  for(const [config,key,value]of [[{type:'custom:marao-graph-card',entity_id:'sensor.safe'},'var__history_popup',true],[{type:'custom:marao-energy-card',entity_id:'sensor.safe'},'popup',true]]){
+    const f=nativeFormHarness(t,config);let renders=0;const render=f.editor._render.bind(f.editor);f.editor._render=()=>{renders++;render();};
+    const form=f.forms.find(form=>form.schema.some(field=>field.name===key));form.change({...form.data,[key]:value});
+    assert.equal(renders,1);assert.equal(f.editor._config[key]??f.editor._config.variables?.history_popup,value);
+  }
 });

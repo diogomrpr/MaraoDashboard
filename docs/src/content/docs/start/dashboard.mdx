@@ -28,6 +28,18 @@ Routes can point to dashboard views or explicit HTTP links. Keep a real initial 
 
 The main-page editing and cache shortcuts can be hidden independently. Home Assistant's native editing controls remain the fallback if Marao entry points are hidden.
 
+## Recreate a gallery example
+
+Use Home Assistant's **Edit dashboard → Add card → By card** and select the matching Marao family. Choose your own entity, then use **Advanced options** for the example's name/icon visibility, state label, colors and supported native actions. **Toggle graph** can bind its control and history sensor separately.
+
+For a door lock, add **Access**, choose the lock, expand the initially collapsed **Popup settings**, and select **Unlock slider and lock button**. The canvas is already editable. Its native **Add card** picker also includes **Access opener**, **Access close / lock** and **Security action** alongside the full Home Assistant catalog. Opening/unlocking retains the strict slider; the independent Security action keeps its deliberate hold. Select a lock there to recreate the guarded Lock example; that role only locks and cannot unlock.
+
+For an energy chart directly on the page, enable **Show energy details on dashboard**. Existing timeline, energy/power detail cards, popup group actions and legacy control grids now have visual-editor entry points. Grids reuse Home Assistant's native editor; a grouped grid appears as a native stack of grids. Keep each group's grid when editing that compatibility container. Use a normal Home Assistant Grid for square cells or grid titles. Floor Plan uses its existing image-and-light placement editor; People, Schedules, media/Apple TV and Camera Events retain their dedicated settings.
+
+A gallery's unknown/unavailable/loading example demonstrates a reported entity state, not a state to force from the card editor. Bind a compatible entity and keep its normal availability handling. Retired Header and legacy-only identities stay out of the new-card picker; existing cards remain editable and Manual YAML preserves arbitrary configurations. Existing styles and other opaque YAML are retained; ignored legacy style objects do not become new visual settings.
+
+Card edits and popup edits remain drafts until the outer Home Assistant **Save**. **Cancel** discards them together. Popup child dialogs apply to that draft, without saving another dashboard or changing a shared popup source.
+
 ## Continue
 
 - [Navigation and current room](../../features/navigation/): overflow, a browser-local Area sensor and legacy person/Away tracking.

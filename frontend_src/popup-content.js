@@ -1,6 +1,6 @@
 import {generatedPopupView,managedDescriptor} from './popup-management.js';
 import {nativeCardType,validateNativeCardConfig} from './card-composition.js';
-import {resolvePopupView,popupHash,popupEditorSource,canonicalLayout,nativePopupCard,popupRole} from '../custom_components/marao_dashboard/frontend/MaraoPopupLayout.js';
+import {resolvePopupView,popupHash,popupEditorSource,canonicalLayout,nativePopupCard,popupRole,seedPopupView,popupCardPath} from '../custom_components/marao_dashboard/frontend/MaraoPopupLayout.js';
 import {managedPopupError} from '../custom_components/marao_dashboard/frontend/MaraoPopupManaged.js';
 import {validatePopupContent} from '../custom_components/marao_dashboard/frontend/MaraoPopupContent.js';
 
@@ -75,8 +75,10 @@ export function popupTemplateCandidate(parent,id,bindings={},context={}) {
 /** Prepare an immutable candidate; acceptance rechecks the actual source, never writes it. */
 export function preparePopupCopy(parent,dashboard,currentPath,context={}) {
   const opener=copy(parent);delete opener.popup_content;
-  let source,identity;
+  let source,identity,standalonePath;
+  if(opener.type==='custom:marao-popup-card'&&dashboard?.views)try{standalonePath=popupCardPath(dashboard,context.sourceOpener||parent,currentPath);}catch(error){if(!error.message.startsWith('The invoking card'))throw error;}
   const resolve=document=>{
+    if(opener.type==='custom:marao-popup-card'&&!opener.popup_view)return opener;
     if(opener.popup_view)return resolvePopupView(document,opener.popup_view).view;
     if(popupHash(opener)){
       const identity=context.sourceOpener||parent;
@@ -91,13 +93,14 @@ export function preparePopupCopy(parent,dashboard,currentPath,context={}) {
   let view=source;
   if(source.type==='custom:marao-popup-card') {
     if(source.popup_view)view=resolvePopupView(dashboard,source.popup_view).view;
-    else if(source.entity_group)throw new Error('This popup cannot be copied losslessly. Keep editing its linked layout.');
+    else if(source.entity_group)view=seedPopupView(source,'embedded-copy','',context.hass);
     else view={type:'sections',title:source.name,max_columns:1,sections:[{type:'grid',cards:(source.cards||[]).map(card=>nativePopupCard(card))}]};
   }
   const viewIdentity=canonicalLayout(view),linked=source.popup_view;
   const presentation=Object.fromEntries(['height','max_height','icon','show_icon','show_name','show_state','entity'].filter(key=>Object.hasOwn(source,key)).map(key=>[key,copy(source[key])]));
   const content={version:1,mode:'custom',...(Object.keys(presentation).length?{presentation}:{}),layout:independentPopupLayout(view,opener.popup_view||linked||'embedded-copy')};
   return {content,accept(document){
+    if(standalonePath&&canonicalLayout(popupCardPath(document,context.sourceOpener||parent,currentPath))!==canonicalLayout(standalonePath))throw new Error('Popup source changed. Preview the copy again.');
     const current=resolve(document);
     if(canonicalLayout(current)!==identity||linked&&canonicalLayout(resolvePopupView(document,linked).view)!==viewIdentity)throw new Error('Popup source changed. Preview the copy again.');
     return copy(content);

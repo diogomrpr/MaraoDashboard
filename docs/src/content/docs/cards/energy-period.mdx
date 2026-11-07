@@ -42,6 +42,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `entity_id` | Entity | entity | Not set | A sensor entity from your Home Assistant. Searchable suggestions are available. |
 | `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `popup` | Show energy details on dashboard | boolean | Not set | Display the complete period chart on the dashboard instead of the compact summary. |
 | `variables.period` | Period | energy_period | `day` | Period for this card. Choices: `day`, `month`. |
 | `variables.calculate_cost` | Calculate cost from energy | boolean | Not set | Calculate cost from energy for this card. |
 | `variables.cost_per_kwh` | Price per kWh | number | Not set | Leave empty to use the Home Assistant Energy tariff. Calculated costs are estimates. |

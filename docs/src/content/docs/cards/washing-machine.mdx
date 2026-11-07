@@ -25,7 +25,7 @@ type: custom:marao-washing-machine-card
 entity_id: sensor.washing_machine
 ```
 
-Compatible entity domains: `binary_sensor`, `sensor`.
+Compatible entity domains: `binary_sensor`, `sensor`, `input_select`.
 
 Bind the machine’s status sensor or running binary sensor. The card reports that source; it does not create an appliance control integration.
 
@@ -35,9 +35,20 @@ The table lists the shared catalog fields and this card’s structured options. 
 
 | YAML path | Setting | Value type | Catalog default | Behavior |
 | --- | --- | --- | --- | --- |
-| `entity_id` | Entity | entity | Not set | A binary_sensor, sensor entity from your Home Assistant. Searchable suggestions are available. |
+| `entity_id` | Entity | entity | Not set | A binary_sensor, sensor, input_select entity from your Home Assistant. Searchable suggestions are available. |
 | `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `show_name` | Show name | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_icon` | Show icon | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_state` | Show state | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_label` | Show label | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `tap_action` | tap action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `hold_action` | hold action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `double_tap_action` | double tap action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `variables.custom_label` | Custom state label | text | Not set | Custom state label for this card. |
+| `variables.md_label_prefix` | State label prefix | text | Not set | State label prefix for this card. |
+| `variables.card_color` | Card color | color | Not set | Optional card background color. |
+| `variables.active_color` | Active color | color | Not set | Active color for this card. |
 
 ## Behavior examples
 
