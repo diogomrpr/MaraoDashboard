@@ -101,3 +101,16 @@ The card editor SHALL present popup management in a toggle section closed by def
 - **WHEN** an administrator opens an existing or new card editor
 - **THEN** Popup settings is collapsed and the ordinary card controls remain available
 - **AND** expanding it exposes popup editing on the same screen without saving a source view
+
+### Requirement: Editable Access popup controls
+Access lock/cover popup templates SHALL contain an independently editable strict opening slider and safe close/lock button. Generated children SHALL NOT inherit the parent popup presentation mode. Open-only covers SHALL retain only supported opening controls. The existing Access opener and Access close / lock roles SHALL be public native-picker entries and suggested in customized popup authoring, with their own entity bindings. Existing type names and configurations SHALL remain valid.
+
+#### Scenario: Explicit popup mode on a lock
+- **WHEN** an Access card for a lock uses explicit popup mode and its built-in template
+- **THEN** the canvas contains an unlock slider and lock button rather than two nested popup cards
+- **AND** opening/unlocking still requires a completed strict slide, while the safe button uses only lock.lock
+
+#### Scenario: Build the popup manually
+- **WHEN** an administrator chooses Empty, then native Add card
+- **THEN** Marao Access opener and Marao Access close / lock are available with native visual editors
+- **AND** their changes remain within the outer card Save/Cancel draft

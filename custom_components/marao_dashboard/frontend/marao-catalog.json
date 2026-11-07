@@ -215,7 +215,7 @@
     },
     {
       "id": "md_access_slide_action_card",
-      "label": "Access",
+      "label": "Access opener",
       "icon": "mdi:door-open",
       "domains": [
         "lock",
@@ -276,7 +276,7 @@
           "multiple": true
         }
       ],
-      "hidden": true
+      "hidden": false
     },
     {
       "id": "md_access_hold_action_card",
@@ -1828,7 +1828,7 @@
     },
     {
       "id": "md_access_action_card",
-      "label": "Access",
+      "label": "Access close / lock",
       "icon": "mdi:lock",
       "domains": [
         "lock",
@@ -1894,7 +1894,7 @@
           "multiple": true
         }
       ],
-      "hidden": true
+      "hidden": false
     },
     {
       "id": "md_floor_plan_card",

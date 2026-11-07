@@ -24,6 +24,8 @@ export function nativeCardStub(template, hass = {}, entities = [], entitiesFallb
     if (!entry.domains.includes(domain)) return false;
     if (domain === 'cover') {
       const access = isAccess({...attributes, entity_id:id, name:attributes.friendly_name});
+      const feature=template==='md_access_slide_action_card'?1:template==='md_access_action_card'?2:0;
+      if(feature&&attributes.supported_features!=null&&Number.isFinite(Number(attributes.supported_features))&&!(Number(attributes.supported_features)&feature))return false;
       if (['md_fan_card','md_cover_card'].includes(template) && access) return false;
       if (template === 'md_access_card') return access;
     }

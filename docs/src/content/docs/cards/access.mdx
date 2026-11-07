@@ -23,9 +23,13 @@ In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste
 ```yaml
 type: custom:marao-access-card
 entity_id: lock.front_door
+variables:
+  access_mode: popup
 ```
 
 Compatible entity domains: `lock`, `cover`, `button`, `switch`, `script`, `input_boolean`, `alarm_control_panel`.
+
+In Popup settings, choose Unlock slider and lock button for a lock, or Opening slider and close button for a door/garage cover. From Empty, use native Add card to select Marao Access opener and Marao Access close / lock; both are independently configurable. The outer Save/Cancel controls all popup changes.
 
 Tap an Activity icon to inspect recorded events with date and type filters. Optional variables.activity_entities adds explicitly related sources. Automatic Updated and last-activation timestamps move into Activity; timestamp-sensor readings remain data.
 

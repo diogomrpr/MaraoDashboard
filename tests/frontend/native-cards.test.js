@@ -73,7 +73,9 @@ test('entity suggestions retain strict access roles and omit ordinary cover cont
   for(const role of ['md_fan_card','md_cover_card'])assert.equal(nativeEntitySuggestion(role,source,'cover.garage'),null);
   assert.equal(nativeEntitySuggestion('md_access_card',source,'cover.blind'),null);
   for(const id of ['lock.safe','cover.garage','cover.entry_gate']){const result=nativeEntitySuggestion('md_access_card',source,id);assert.equal(result.config.entity_id,id);assert.equal(result.config.template,'md_access_card');}
-  assert.equal(nativeEntitySuggestion('md_access_slide_action_card',source,'lock.safe'),null);
+  for(const [role,type]of [['md_access_slide_action_card','custom:marao-access-slide-action-card'],['md_access_action_card','custom:marao-access-action-card']]){
+    assert.deepEqual(nativeEntitySuggestion(role,source,'lock.safe'),{config:{type,template:role,entity_id:'lock.safe',variables:{access_mode:'auto'}}});
+  }
 });
 
 test('picker defaults honor ordered pools before domain preferences and keep access covers out of fan defaults', () => {

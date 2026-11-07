@@ -14,7 +14,7 @@ export const POPUP_TEMPLATES=Object.freeze([
 
 export function popupTemplatesFor(parent) {
   const owner=managedDescriptor(parent);
-  return [...POPUP_TEMPLATES.filter(entry=>entry.template&&entry.template===owner.template&&(!entry.kind||entry.kind===(owner.entity_type||'light'))),POPUP_TEMPLATES[0]];
+  return [...POPUP_TEMPLATES.filter(entry=>entry.template&&entry.template===owner.template&&(!entry.kind||entry.kind===(owner.entity_type||'light'))).map(entry=>entry.id==='access'?{...entry,label:(owner.entity_id||'').startsWith('lock.')?'Unlock slider and lock button':'Opening slider and close button'}:entry),POPUP_TEMPLATES[0]];
 }
 
 export function popupContentIdentity(content) {
