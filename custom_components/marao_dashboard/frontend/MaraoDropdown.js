@@ -13,7 +13,7 @@ export const dropdownStyles = `${pressStyles}
 .marao-dropdown-options button[aria-checked=false] ha-icon[icon="mdi:check"]{visibility:hidden}
 `;
 
-export function bindDropdown(picker, { trigger, menu, choices, value, activeElement, haptic, onSelect, onTab }) {
+export function bindDropdown(picker, { trigger, menu, choices, value, activeElement, haptic, onSelect, onTab, multiple = false }) {
   const events = new AbortController(), listen = { signal: events.signal };
   let open = false;
   const feedback=bindPressFeedback(picker);
@@ -38,12 +38,13 @@ export function bindDropdown(picker, { trigger, menu, choices, value, activeElem
     open = false; menu.hidden = true; trigger.setAttribute('aria-expanded', 'false');
     if (focus) trigger.focus({ preventScroll: true });
   }
+  const selectedValue = item => multiple ? (value() || []).includes(item.value) : item.value === value();
   const show = () => {
     if (trigger.disabled || !choices.length) return;
     open = true; menu.hidden = false; trigger.setAttribute('aria-expanded', 'true');
     if (floating) menu.showPopover();
     position();
-    const selected = (choices.find(item => item.value === value() && !item.button.disabled) || choices.find(item => !item.button.disabled))?.button;
+    const selected = (choices.find(item => selectedValue(item) && !item.button.disabled) || choices.find(item => !item.button.disabled))?.button;
     selected?.focus({ preventScroll: true });
     if (selected && Number.isFinite(selected.offsetTop)) menu.scrollTop = Math.max(0, selected.offsetTop - menu.clientHeight / 2 + selected.offsetHeight / 2);
   };
@@ -53,7 +54,9 @@ export function bindDropdown(picker, { trigger, menu, choices, value, activeElem
   }, listen);
   for (const item of choices) item.button.addEventListener('click', event => {
     event.stopPropagation(); if (item.button.disabled) return;
-    close(true); onSelect(item.value);
+    if (!multiple) close(true);
+    onSelect(item.value);
+    if (multiple) sync();
   }, listen);
   picker.addEventListener('keydown', event => {
     if (!open) return;
@@ -75,7 +78,7 @@ export function bindDropdown(picker, { trigger, menu, choices, value, activeElem
   globalThis.window?.addEventListener?.('scroll', position, { ...listen, capture: true });
   globalThis.window?.visualViewport?.addEventListener('resize', position, listen);
   const sync = () => {
-    for (const item of choices) { item.button.disabled = trigger.disabled; item.button.setAttribute('aria-checked', String(!trigger.disabled && item.value === value())); }
+    for (const item of choices) { item.button.disabled = trigger.disabled; item.button.setAttribute('aria-checked', String(!trigger.disabled && selectedValue(item))); }
     if (trigger.disabled) close(); else position();
   };
   close(); sync();

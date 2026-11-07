@@ -18,6 +18,7 @@ export function findNativeHost(owner) {
 export function findNativeEditorContext(owner) {
   let dialog;
   for(let node=owner;node;node=node.parentNode || node.host || node.getRootNode?.()?.host) {
+    if(node._maraoPopupDraftOwner)return;
     if(node.localName==='hui-dialog-edit-card'){dialog=node;break;}
   }
   const path=globalThis.location?.pathname.split('/')[1];

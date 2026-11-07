@@ -3,6 +3,34 @@ path: card-test
 icon: mdi:test-tube
 theme: Marao Dashboard
 cards:
+  - type: custom:marao-entity-group-card
+    id: embedded-popup-example
+    name: Custom popup (simulated)
+    entity_type: light
+    entities: []
+    popup_content:
+      version: 1
+      mode: custom
+      template: group-light
+      layout:
+        type: sections
+        title: Custom popup (simulated)
+        max_columns: 1
+        sections:
+          - type: grid
+            cards:
+              - type: custom:marao-summary-actions
+                popup_scope: embedded
+                entity_type: light
+                scope: all
+              - type: custom:marao-light-card
+                entity_id: light.marao_dashboard_test_light
+                name: Independently configured light
+                grid_options:
+                  columns: 12
+          - type: grid
+            cards: []
+
   - type: custom:marao-media-card
     entity_id: media_player.marao_dashboard_test_apple_tv
     name: Plex TV (simulated)

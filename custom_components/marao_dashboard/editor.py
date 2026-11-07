@@ -304,6 +304,7 @@ EDITOR_CATALOG: dict[str, Any] = {
             "variables": [
                 _field("progress_entity", "Progress", "entity", domains=["sensor"]),
                 _field("remaining_time_entity", "Remaining time", "entity", domains=["sensor"]),
+                _field("show_reading_names", "Show reading labels", "boolean", default=True),
                 _field("salt_entity", "Salt warning", "entity", domains=["binary_sensor", "sensor", "input_boolean"]),
                 _field("rinse_aid_entity", "Rinse-aid warning", "entity", domains=["binary_sensor", "sensor", "input_boolean"]),
                 _field("active_program_entity", "Active program", "entity", domains=["select", "sensor", "input_select"]),
@@ -452,7 +453,7 @@ EDITOR_CATALOG: dict[str, Any] = {
 EDITOR_CATALOG["cards"].extend([
     {"id": "md_alarm_controls_card", "label": "Alarm controls", "icon": "mdi:shield-home", "domains": ["alarm_control_panel"],
      "description": "Capability-aware alarm controls with transient PIN entry and guarded actions.", "variables": []},
-    {"id": "md_header_card", "label": "Header", "icon": "mdi:calendar", "domains": ["weather"],
+    {"id": "md_header_card", "hidden": True, "label": "Header", "icon": "mdi:calendar", "domains": ["weather"],
      "entity_optional": True, "description": "Date, weather and optional person and air quality.",
      "variables": [_field("person_entity", "Person", "entity", domains=["person"]),
                    _field("air_quality_sensor", "Air quality", "entity", domains=["sensor"])]},
@@ -475,7 +476,7 @@ for _activity_card in EDITOR_CATALOG["cards"]:
 
 for _card in EDITOR_CATALOG["cards"]:
     if _card["id"] in ("md_security_card", "md_alarm_controls_card"):
-        _card["variables"].insert(0, {**_field("alarm_layout", "Alarm layout", "select", description="Unset keeps the existing row and security holds."), "options": ["dropdown", "grid"]})
+        _card["variables"].insert(0, {**_field("alarm_layout", "Alarm layout", "select", description="Choose Dropdown or Grid. Dropdown is used when omitted."), "options": ["dropdown", "grid"]})
     if _card["id"] in ("md_access_card", "md_access_slide_action_card", "md_access_hold_action_card", "md_access_action_card"):
         _card["hidden"] = _card["id"] != "md_access_card"
         _card["label"] = "Access"

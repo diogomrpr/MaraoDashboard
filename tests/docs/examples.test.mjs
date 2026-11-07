@@ -53,3 +53,11 @@ test('the shared setup example opts into native dashboard navigation without rew
   assert.deepEqual(patchDashboardSettings(source,settings),source);
   validateNativeCardConfig(source.views[0].sections[0].cards[1],entityMetadata);
 });
+
+
+test('retired Header is absent from the public catalog while saved cards still validate',()=>{
+  assert.equal(getExample('md_header_card'),undefined);
+  assert.equal(catalog.cards.find(card=>card.id==='md_header_card').hidden,true);
+  assert.ok(internalCards.some(card=>card.id==='md_header_card'));
+  assert.doesNotThrow(()=>validateNativeCardConfig({type:'custom:marao-header-card',entity_id:'weather.home'},entityMetadata));
+});

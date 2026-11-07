@@ -841,7 +841,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     const detail = this._selected ? this._renderDetail(this._selected) : "";
     let card = this.shadowRoot.querySelector?.("ha-card");
     if (!card) {
-      this.shadowRoot.innerHTML = `<style>${MaraoFrigateEventsCard.styles}${dropdownStyles}.filters{display:flex;flex-wrap:wrap;gap:8px}.filters>div{flex:1 1 140px;min-width:0}.range-editor{display:grid;gap:8px;max-height:50dvh;overflow:auto;overscroll-behavior:contain}.range-editor input,.range-editor button{min-height:48px;min-width:48px;font:inherit;max-width:100%;box-sizing:border-box}.coverage{font-size:var(--font-size-caption,.9375rem);overflow-wrap:anywhere}.coverage,.range-editor{grid-column:1/-1}</style><ha-card data-status="${!this._hass?.states ? "loading" : unavailable || this._status}"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}>
+      this.shadowRoot.innerHTML = `<style>${MaraoFrigateEventsCard.styles}${dropdownStyles}.filters{display:flex;flex-wrap:wrap;gap:8px}.filters>div{flex:1 1 140px;min-width:0}.filters .marao-dropdown>button{display:flex;align-items:center;gap:8px}.filters .marao-dropdown>button ha-icon{flex:none;--mdc-icon-size:24px}.filters .marao-dropdown>button span{min-width:0;overflow-wrap:anywhere}.range-editor{display:grid;gap:8px;max-height:50dvh;overflow:auto;overscroll-behavior:contain}.range-editor input,.range-editor button{min-height:48px;min-width:48px;font:inherit;max-width:100%;box-sizing:border-box}.coverage{font-size:var(--font-size-caption,.9375rem);overflow-wrap:anywhere}.coverage,.range-editor{grid-column:1/-1}</style><ha-card data-status="${!this._hass?.states ? "loading" : unavailable || this._status}"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}>
         <header><div class="heading"><h2>${escapeHtml(this._title())}</h2><button type="button" class="icon-button" data-action="${action}" aria-label="${escapeHtml(actionLabel)}" title="${escapeHtml(actionLabel)}"${disabled ? ' disabled aria-disabled="true"' : ""}>${this._selected ? '&#x2190;' : '&#x21bb;'}</button></div>
           <div class="filters" role="group" aria-label="${escapeHtml(localize("camera_events.filters", this._hass, {}, "Event types"))}"${this._selected ? ' style="visibility:hidden"' : ""}></div></header>
         <main><div class="problem">${reason}</div><p class="message state" role="status"${this._selected || !status || reason ? " hidden" : ""}>${escapeHtml(status)}</p>
@@ -926,7 +926,6 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     const player = this.shadowRoot.querySelector?.("ha-hls-player");
     if (player) { player.hass = this._hass; player.autoPlay = false; player.controls = true; player.playsInline = true; }
     this._renderFilters(ready && !this.preview && !nativeEditing(this));
-    const gridHost=this.shadowRoot.querySelector?.('.grid');if(gridHost)gridHost.style.setProperty('--event-columns',this._config.columns || 1);
     this._renderedEvents = this._events;
     this._filterKey = JSON.stringify(filters);
     this._reason = reason;
@@ -964,12 +963,13 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
       }
       const trigger=picker.querySelector('button'),selected=options.find(([value])=>value===values[key]);
       const summary=key==='time'&&this._timeFilter==='custom'&&this._timeRange?this._formatRange():selected?.[1] || '';
-      trigger.textContent=`${w(key)}: ${summary}`;trigger.setAttribute('aria-label',trigger.textContent);trigger.disabled=!ready||key==='camera'&&sources.length<2;this._dropdowns[i]?.sync();
+      trigger.innerHTML=`<ha-icon icon="mdi:${({camera:'camera',type:'filter-variant',time:'clock-outline'})[key]}" aria-hidden="true"></ha-icon><span>${escapeHtml(summary)}</span>`;trigger.setAttribute('aria-label',`${w(key)}: ${summary}`);trigger.disabled=!ready||key==='camera'&&sources.length<2;this._dropdowns[i]?.sync();
     });
     let coverage=this.shadowRoot.querySelector('.coverage');if(!coverage){coverage=document.createElement('p');coverage.className='coverage';host.after(coverage);}
-    const messages=(this._sourceResults||[]).map(source=>`${source.name}: ${source.events.length}/${this._config.limit} ${w('limit')}${source.status==='ready'?'':` · ${w(source.status)}`}${source.provider==='unifi_protect'?' · '+(String(this._hass?.language).startsWith('pt')?'apenas clips recentes concluídos':'recent completed clips only'):''}`);
-    coverage.textContent=!sources.length?w('setup'):[w('coverage'),...messages,this._events.some(event=>eventTimestamp(event)===null)?w('excluded'):'',this._events.length&&!this._filteredEvents().length?w('empty'):''].filter(Boolean).join(' ');
-    coverage.hidden=Boolean(this._selected);
+    const messages=(this._sourceResults||[]).filter(source=>source.status!=='ready').map(source=>`${source.name}: ${w(source.status)}`);
+    coverage.textContent=!sources.length?w('setup'):[...messages,this._events.some(event=>eventTimestamp(event)===null)?w('excluded'):'',this._events.length&&!this._filteredEvents().length?w('empty'):''].filter(Boolean).join(' ');
+    coverage.hidden=Boolean(this._selected)||!coverage.textContent;
+
   }
   _formatRange(){const format=new Intl.DateTimeFormat(this._hass?.language,{dateStyle:'short',timeStyle:'short',timeZone:this._hass?.config?.time_zone || 'UTC'});return `${format.format(this._timeRange.start)} – ${format.format(this._timeRange.end)}`;}
   _showCustomRange(){
@@ -983,7 +983,11 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
 
   _renderEvent(event, index) {
     const undated=eventTimestamp(event)===null && this._filteredEvents().find(row=>eventTimestamp(row.event)===null)?.index===index;
+    const timestamp=eventTimestamp(event);
+    const time=timestamp===null?'':new Intl.DateTimeFormat(this._hass?.locale?.language || this._hass?.language,{timeStyle:'short',timeZone:this._hass?.config?.time_zone || 'UTC'}).format(new Date(timestamp*1000));
+    const icon=({person:'mdi:walk',car:'mdi:car',vehicle:'mdi:car',dog:'mdi:dog',cat:'mdi:cat',motion:'mdi:motion-sensor'})[this._eventTypes(event)[0]] || 'mdi:camera';
     return `${undated?`<h3 class="undated" style="grid-column:1/-1">${escapeHtml(eventWord('undated',this._hass))}</h3>`:''}<article class="event-row" data-index="${index}">
+      <div class="event-rail"><span class="event-icon" aria-hidden="true"><ha-icon icon="${icon}"></ha-icon></span>${time?`<time class="event-time" datetime="${new Date(timestamp*1000).toISOString()}">${escapeHtml(time)}</time>`:''}</div>
       <h3 class="meta">${this._eventHeading(event)}</h3>
       <button type="button" class="event" data-action="event" data-index="${index}" aria-label="${escapeHtml(this._openLabel(event))}"${this._unavailableState() ? ' disabled aria-disabled="true"' : ""}>
         <span class="thumbnail">${this._preview(event)}</span>
@@ -1043,7 +1047,14 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     .message button { display:block;min-width:48px;min-height:48px;margin:8px auto 0;border:0;border-radius:12px;background:var(--secondary-background-color); }
     button { font: inherit; color: inherit; }
     .icon-button { justify-self: end; width: 48px; min-width: 48px; height: 48px; border: 0; border-radius: 50%; background: transparent; cursor: pointer; font-size: max(1.5rem, var(--font-size-primary, 1.125rem)); transition: transform .12s ease, background-color .12s ease; }
-    .grid { display: grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,max(120px,calc(var(--font-size-primary,1.125rem) * 6),calc((100% - (var(--event-columns,1) - 1) * 20px) / var(--event-columns,1)))),1fr)); gap: 20px; }
+    .grid {display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+    .event-row {position:relative;display:grid;grid-template-columns:minmax(48px,max-content) minmax(0,1fr);column-gap:12px;padding-bottom:20px}
+    .event-row:last-child {padding-bottom:0}
+    .event-rail {grid-column:1;grid-row:1/3;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;min-width:0}
+    .event-row:not(:last-child) .event-rail::after {content:'';flex:1;width:2px;min-height:12px;background:var(--divider-color,var(--secondary-text-color))}
+    .event-icon {display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:var(--secondary-background-color);--mdc-icon-size:24px}
+    .event-time {font-size:.8125rem;line-height:1.4;color:var(--secondary-text-color);white-space:nowrap;font-variant-numeric:tabular-nums}
+    .event-row>.meta,.event-row>.event {grid-column:2}
     .event { display: block; width: 100%; min-width: 0; min-height: 48px; padding: 0; overflow: hidden; text-align: left; border: 0; border-radius: var(--ha-card-border-radius, 12px); background: var(--secondary-background-color); cursor: pointer; transition: transform .12s ease; }
     button:focus { outline: none; }
     button:disabled { cursor: default; opacity: .55; transform: none; }

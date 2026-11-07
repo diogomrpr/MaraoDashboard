@@ -14,7 +14,7 @@ export function generatedPopupView(config,path,backPath,context={}) {
   const owner=managedDescriptor(config);
   validateNativeCardConfig({...owner,type:nativeCardType(owner.template)},context.entities||[]);
   if(!popupRole(owner))return null;
-  delete owner.popup_view;
+  delete owner.popup_view;delete owner.popup_content;
   const key=owner.template==='md_floor_plan_card'?'lights_popup':owner.template==='md_climate_card'?'mode_selector_hash':'popup_hash';
   if(owner.variables){delete owner.variables[key];if(!Object.keys(owner.variables).length)delete owner.variables;}
   const popup=composeNativeCard({...owner,type:nativeCardType(owner.template)},{...context,instanceId:'managed-'+path}).popups[0];

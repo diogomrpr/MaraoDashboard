@@ -1,6 +1,7 @@
 let ready;
 
-export function loadLovelaceEditor(hass, dashboardUrl) {
+export function loadLovelaceEditor(hass, dashboardUrl = location.pathname, {picker = true} = {}) {
+  if(customElements.get('hui-card-element-editor')&&(!picker||customElements.get('hui-card-picker')))return Promise.resolve({config:{views:[]},resourceErrors:[]});
   if (!ready) {
     let timer;
     ready = Promise.race([load(hass, dashboardUrl), new Promise((_, reject) => {

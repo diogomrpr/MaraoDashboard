@@ -8,6 +8,8 @@ const channel='marao-playground';let request,simulation,card,runtimeReady,render
 const send=(type,detail={})=>parent.postMessage({channel,type,token:request?.token,id:request?.id,...detail},'*');
 const status=document.querySelector('#status');
 function showError(message){status.textContent=message;send('error',{message});}
+globalThis.addEventListener('error',event=>showError(event.message||'Preview resource could not load.'));
+globalThis.addEventListener('unhandledrejection',event=>showError(event.reason?.message||String(event.reason)));
 globalThis.__maraoPreview=browserEnvironment(showError);
 globalThis.MaraoFrontendPackage={...globalThis.__maraoPreview.installedPackage,package_version:__MARAO_VERSION__,baseURL:'https://marao.example/',rootURL:'https://marao.example/'};
 
@@ -30,7 +32,13 @@ class Form extends HTMLElement {
   constructor(){super();this.attachShadow({mode:'open'});}
   set schema(value){this._schema=value;this.render();}set data(value){this._data=value;this.render();}get data(){return this._data;}set hass(value){this._hass=value;this.render();}
   connectedCallback(){this.render();}
-  render(){if(!this._schema||!this._hass)return;this.shadowRoot.replaceChildren();const style=document.createElement('style');style.textContent='label{display:grid;gap:8px;margin:12px 0;font:inherit}select,input{box-sizing:border-box;min-height:48px;max-width:100%;width:100%;font:inherit;color:inherit;padding:8px;border:1px solid var(--divider-color);border-radius:12px;background:var(--ha-card-background)}';this.shadowRoot.append(style);for(const field of this._schema){const label=document.createElement('label');label.textContent=this.computeLabel?.(field)||field.name;const select=document.createElement('select');const empty=document.createElement('option');empty.value='';empty.textContent='Automatic';select.append(empty);const domains=field.selector?.entity?.domain;for(const state of Object.values(this._hass.states||{})){if(domains&&!domains.includes(state.entity_id.split('.')[0]))continue;const option=document.createElement('option');option.value=state.entity_id;option.textContent=state.attributes.friendly_name||state.entity_id;select.append(option);}select.value=this._data?.[field.name]||'';select.onchange=()=>{this._data={...this._data,[field.name]:select.value};this.dispatchEvent(new CustomEvent('value-changed',{detail:{value:this._data},bubbles:true,composed:true}));};label.append(select);this.shadowRoot.append(label);}}
+  render(){if(!this._schema||!this._hass)return;this.shadowRoot.replaceChildren();const style=document.createElement('style');style.textContent='label{display:grid;gap:8px;margin:12px 0;font:inherit}select,input{box-sizing:border-box;min-height:48px;max-width:100%;width:100%;font:inherit;color:inherit;padding:8px;border:1px solid var(--divider-color);border-radius:12px;background:var(--ha-card-background)}';this.shadowRoot.append(style);for(const field of this._schema){const label=document.createElement('label');label.textContent=this.computeLabel?.(field)||field.name;const selector=field.selector||{},typed=selector.text||selector.time||selector.boolean;
+const select=document.createElement(typed?'input':'select');
+if(typed){select.type=selector.boolean?'checkbox':selector.time?'time':'text';if(selector.boolean)select.checked=Boolean(this._data?.[field.name]);else select.value=this._data?.[field.name]||'';}
+else {const options=selector.select?.options;
+if(options){select.multiple=Boolean(selector.select.multiple);for(const item of options){const option=document.createElement('option');option.value=typeof item==='string'?item:item.value;option.textContent=typeof item==='string'?item:item.label;option.selected=Array.isArray(this._data?.[field.name])?this._data[field.name].includes(option.value):this._data?.[field.name]===option.value;select.append(option);}}
+else {const empty=document.createElement('option');empty.value='';empty.textContent='Automatic';select.append(empty);const domains=selector.entity?.domain;for(const state of Object.values(this._hass.states||{})){if(domains&&!domains.includes(state.entity_id.split('.')[0]))continue;const option=document.createElement('option');option.value=state.entity_id;option.textContent=state.attributes.friendly_name||state.entity_id;select.append(option);}select.value=this._data?.[field.name]||'';}}
+select.onchange=()=>{const value=selector.boolean?select.checked:select.multiple?[...select.selectedOptions].map(option=>option.value):select.value;this._data={...this._data,[field.name]:value};this.dispatchEvent(new CustomEvent('value-changed',{detail:{value:this._data},bubbles:true,composed:true}));};if(typed&&!selector.boolean)select.oninput=select.onchange;label.append(select);this.shadowRoot.append(label);}}
 }
 class Root extends HTMLElement {
   constructor(){super();this.attachShadow({mode:'open'});this.shadowRoot.innerHTML='<style>:host{display:block;min-height:420px}#view{padding:16px 12px 100px;min-width:0}</style><div id="view"></div>';this.controllers=new Set();this.panel={url_path:'marao-dashboard'};}
@@ -41,6 +49,11 @@ class App extends HTMLElement {constructor(){super();this.attachShadow({mode:'op
 for(const [name,type] of [['ha-icon',Icon],['ha-state-icon',StateIcon],['ha-svg-icon',SvgIcon],['ha-form',Form],['hui-root',Root],['home-assistant',App]])customElements.define(name,type);
 const app=document.createElement('home-assistant'),root=document.createElement('hui-root');app.setAttribute('role','main');app.shadowRoot.append(root);document.querySelector('#preview').replaceWith(app);
 const holder=root.shadowRoot.querySelector('#view');
+if(__MARAO_DESIGN_PREVIEW__){
+  document.body.style.minHeight='0';app.style.minHeight='0';root.style.minHeight='0';
+  const style=document.createElement('style');style.textContent='#view{padding:12px;min-height:0}';root.shadowRoot.append(style);
+}
+
 
 function createCardElement(config){
   if(config.type?.startsWith('custom:marao-')&&customElements.get(config.type.slice(7))){const element=document.createElement(config.type.slice(7));element.setConfig(config);return element;}
@@ -77,7 +90,9 @@ async function render(message){
   }else{
     const element=document.createElement(message.config.type.slice(7));holder.append(element);card=element;card.hass=simulation.hass;card.setConfig(safePreviewData(message.config));
   }
-  send('rendered');resize();
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  if(revision!==renderRevision)return;
+  if(!status.textContent)send('rendered');resize();
 }
 const clone=value=>structuredClone(value);
 let lastHeight=0;
@@ -85,16 +100,16 @@ function resize(){
   const popup=app.shadowRoot.querySelector('.marao-popup-overlay');
   const content=popup?.querySelector('.marao-popup-scroll'),head=popup?.querySelector('.marao-popup-head');
   const needed=popup?Math.ceil((content?.scrollHeight||0)+(head?.getBoundingClientRect().height||0)+58):document.body.scrollHeight;
-  const height=Math.max(460,Math.min(900,needed));
-  if(height!==lastHeight){lastHeight=height;send('resize',{height});}
+  const height=__MARAO_DESIGN_PREVIEW__?(popup?750:Math.max(100,Math.ceil(holder.getBoundingClientRect().height))):Math.max(460,Math.min(900,needed));
+  if(height!==lastHeight){lastHeight=height;send('resize',__MARAO_DESIGN_PREVIEW__?{height,popup:Boolean(popup)}:{height});}
 }
-new ResizeObserver(resize).observe(document.body);
+new ResizeObserver(resize).observe(__MARAO_DESIGN_PREVIEW__?holder:document.body);
 new MutationObserver(resize).observe(app.shadowRoot,{childList:true,subtree:true,characterData:true});
 globalThis.addEventListener('message',async event=>{
   const message=event.data;
   if(event.source===parent&&message?.channel===channel&&message.type==='hello'){try{await runtimeReady;send('ready');}catch(error){send('error',{message:error.message});}return;}
   if(event.source!==parent||!message||message.channel!==channel||message.type!=='render'||typeof message.token!=='string'||typeof message.id!=='string'&&typeof message.id!=='number')return;
-  try{await runtimeReady;await render(message);}catch(error){status.textContent=error.message;send('error',{message:error.message});}
+  try{await runtimeReady;await render(message);}catch(error){status.textContent=error.message;send('error',{message:error.message,token:message.token,id:message.id});}
 });
 runtimeReady=import('../../custom_components/marao_dashboard/frontend/MaraoRuntime.js');
 try{await runtimeReady;send('ready');}catch(error){status.textContent='Preview could not initialize: '+error.message;send('error',{message:status.textContent});}

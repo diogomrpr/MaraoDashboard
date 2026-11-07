@@ -52,12 +52,12 @@ export class ScheduleSession {
   async exclusive(work){this.guard();if(this.busy)throw new Error('Another schedule operation is in progress.');this.busy=true;try{return await work();}finally{this.busy=false;}}
   async helper(domain,name,settings){
     const existing=await this.ws(domain+'/list');
-    if(existing.some(item=>item.name===name))throw new Error('Provisioning helper already exists. Reconcile using the recovery export.');
+    if(existing.some(item=>item.name===name))throw new Error('Provisioning helper already exists. Reconcile in Home Assistant.');
     const record=await this.ws(domain+'/create',{name,...settings});
     this.receipt.helpers.push({domain,record:clone(record)});
     const registry=await this.ws('config/entity_registry/list');
     const entry=registry.find(item=>item.platform===domain&&item.unique_id===record.id);
-    if(!entry)throw new Error('Helper identity is not ready. Keep the recovery export.');
+    if(!entry)throw new Error('Helper identity is not ready. Reconcile in Home Assistant.');
     await this.wait(states=>states[entry.entity_id]);
     return {domain,storage_id:record.id,entity_id:entry.entity_id,baseline:record};
   }

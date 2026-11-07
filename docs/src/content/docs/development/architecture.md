@@ -34,3 +34,11 @@ Frequent `hass` updates change affected presentation without replacing focused i
 The public playground uses these same cards with a fictional HA boundary. Its isolated services, metadata and assets do not become dependencies of the installed product.
 
 External agents can use [installed-version metadata and a local read-only planner](../agent-editing/) to prepare coherent edits through ha-mcp. Authoring assets are discovered from the release manifest and remain outside normal dashboard startup.
+
+## Embedded popup ownership
+
+`MaraoPopupContent.js` validates additive `popup_content` version 1: `mode` is `custom` or `automatic`, `layout` is a native Sections object with explicit `sections`, and optional `template` records origin only. Unknown fields are preserved. Optional `presentation` carries sheet icon/height settings. Native descriptors, composition and ordinary conversion retain this configuration; absence takes the released path. Invalid or newer data fails visibly without falling back to a legacy action.
+
+`popup-content.js` clones built-in seeds and supported existing sources. `popup-content-editor.js` owns only local template/child drafts and emits the complete parent configuration through native `config-changed`. It never saves a dashboard or creates a source view. Nested HA picker/editor events are isolated; asynchronous results and acceptance are checked against the parent draft. Visual editing uses registered HA elements, with YAML fallback.
+
+Custom mode uses an occurrence-specific sheet route and a read-only in-memory Sections facade in `MaraoPopupView.js`. Its synthetic view is never persisted or navigated to. Embedded collection actions resolve their containing occurrence/section; legacy managed reconciliation excludes active embedded owners. Automatic mode retains the custom snapshot and resumes the existing source chain. Existing saved views, transactions and immutable historical inputs remain unchanged.

@@ -71,7 +71,7 @@ test('Rivulet setup can select the configured server before any session exists, 
 
 function nativeFormHarness(t,config,hass={language:'en',states:{}}) {
   if(!harnessContexts.has(t)){const previous=globalThis.document;t.after(()=>{globalThis.document=previous;});harnessContexts.add(t);}
-  const node=()=>Object.assign(new EventTarget(),{children:[],nodes:new Map(),style:{},dataset:{},append(...items){this.children.push(...items);},replaceChildren(...items){this.children=items;},querySelector(selector){if(!this.nodes.has(selector))this.nodes.set(selector,node());return this.nodes.get(selector);},querySelectorAll(){return [];}});
+  const node=()=>Object.assign(new EventTarget(),{children:[],nodes:new Map(),style:{},dataset:{},setAttribute(name,value){this[name]=value;},prepend(...items){this.children.unshift(...items);},append(...items){this.children.push(...items);},replaceChildren(...items){this.children=items;},querySelector(selector){if(!this.nodes.has(selector))this.nodes.set(selector,node());return this.nodes.get(selector);},querySelectorAll(){return [];}});
   globalThis.document={createElement:node};
   const editor=new MaraoCardEditor(),forms=[],events=[];
   editor.dispatchEvent=event=>events.push(event.detail.config);editor.setConfig(config);
@@ -125,20 +125,44 @@ test('every catalog form saves a label and exposes only the primary source its r
   }
 });
 
-test('group membership picker removes stale section references while preserving section settings',t=>{
+const groupHost=editor=>editor.shadowRoot.querySelector('[data-fields]').querySelector('[data-special]');
+const groupRows=editor=>groupHost(editor).querySelector('[data-members]');
+const groupAction=(row,value)=>row.children[0].children.at(-1).dispatchEvent(new CustomEvent('wa-select',{detail:{item:{value}}}));
+test('group row removal prunes stale section references while preserving section settings',t=>{
   const original={type:'custom:marao-entity-group-card',template:'md_entity_group_card',id:'lights',name:'Lights',entity_type:'light',entities:['light.a','light.b'],summary_sections:[{id:'main',name:'Main',entities:['light.a','light.b'],future:false}],future:[]};
   const {editor,forms,events}=nativeFormHarness(t,original);
-  const picker=forms.find(form=>form.schema.some(field=>field.name==='members'));
-  picker.change({members:['light.b']});
-  assert.equal(editor.shadowRoot.querySelector('[data-status]').textContent,'');
+  assert.ok(!forms.some(form=>form.schema.some(field=>field.name==='members')));
+  groupAction(groupRows(editor).children[0],'delete');
   assert.deepEqual(events.at(-1).summary_sections,[{...original.summary_sections[0],entities:['light.b']}]);
-  picker.change({members:[]});
-  assert.deepEqual(events.at(-1).entities,[]);
-  assert.deepEqual(events.at(-1).summary_sections,[{...original.summary_sections[0],entities:[]}]);
+  groupAction(groupRows(editor).children[0],'delete');
+  assert.deepEqual(events.at(-1).entities,[]);assert.deepEqual(events.at(-1).summary_sections,[{...original.summary_sections[0],entities:[]}]);
   assert.deepEqual(original.summary_sections[0].entities,['light.a','light.b']);
-  const section=forms.find(form=>form.schema.some(field=>field.name==='entities'));
-  section.change({name:'Unassigned'});
+  const section=forms.findLast(form=>form.schema.some(field=>field.name==='entities'));section.change({name:'Unassigned'});
   assert.deepEqual(events.at(-1).summary_sections,[{...original.summary_sections[0],name:'Unassigned',entities:[]}]);
+});
+
+test('single Group rows retain opaque settings through inline edits, native drag callbacks and additions',async t=>{
+  const member={entity_id:'light.a',name:'Desk',variables:{enable_slider:false},future:{keep:[]}},original={type:'custom:marao-entity-group-card',id:'lights',name:'Lights',entity_type:'light',popup_filter:'active',entities:[member,'light.b'],summary_sections:[{id:'main',name:'Main',entities:['light.a'],future:false}],future:[]};
+  const f=nativeFormHarness(t,original);f.editor._moveHaptic=()=>{};const rows=groupRows(f.editor),first=rows.children[0];
+  first.children[0].children[1].onclick();const fields=f.forms.findLast(form=>form.schema.some(field=>field.name==='entity_id'));
+  fields.change({...fields.data,name:'Desk changed'});
+  const expected=structuredClone(original);expected.entities[0].name='Desk changed';assert.deepEqual(f.events.at(-1),expected);assert.equal(rows.children[0],first,'typing retains the active row and form');
+  fields.change({...fields.data,entity_id:'light.c'});expected.entities[0].entity_id='light.c';expected.summary_sections[0].entities=['light.c'];assert.deepEqual(f.events.at(-1),expected);
+  const sortable=groupHost(f.editor).querySelector('[data-member-sortable]');sortable.dispatchEvent(new CustomEvent('item-moved',{detail:{oldIndex:0,newIndex:1}}));
+  expected.entities=['light.b',expected.entities[0]];assert.deepEqual(f.events.at(-1),expected);await Promise.resolve();
+  assert.equal(rows.children[1].children[0].children[1]['aria-expanded'],'true','expanded settings follow the member through reorder');
+  const add=f.forms.findLast(form=>form.schema.some(field=>field.name==='member')),count=f.events.length;
+  add.change({member:'light.b'});assert.equal(f.events.length,count);assert.deepEqual(add.data,{member:''});
+  add.change({member:'light.d'});expected.entities.push('light.d');assert.deepEqual(f.events.at(-1),expected);assert.deepEqual(original.entities,[member,'light.b']);
+  const current=f.events.length;sortable.dispatchEvent(new CustomEvent('item-moved',{detail:{oldIndex:-1,newIndex:1}}));assert.equal(f.events.length,current);
+});
+
+test('Group Add entity uses one compatible single selector for each family',t=>{
+  for(const [kind,domain]of [['light','light'],['cover','cover'],['climate','climate'],['battery','sensor']]){
+    const f=nativeFormHarness(t,{type:'custom:marao-entity-group-card',id:'group',name:'Group',entity_type:kind,entities:[]});
+    const adds=f.forms.filter(form=>form.schema.some(field=>field.name==='member'));assert.equal(adds.length,1);
+    assert.deepEqual(adds[0].schema[0].selector,{entity:{domain:[domain]}});assert.ok(!f.forms.some(form=>form.schema.some(field=>field.name==='members')));
+  }
 });
 
 test('managed child forms expose presentation, retain complete data and explicitly detach behavior',t=>{
@@ -161,7 +185,7 @@ test('managed group forms retain explicit selection across type changes without 
   assert.equal(f.forms.some(form=>form.schema.some(field=>field.name==='entity_id')),false);
   const group=f.forms.find(form=>form.schema.some(field=>field.name==='entity_type'));
   group.change({...group.data,entity_type:'cover'});assert.deepEqual(f.events.at(-1).entities,[]);
-  const members=f.forms.filter(form=>form.schema.some(field=>field.name==='members')).at(-1);members.change({members:['cover.fake']});assert.deepEqual(f.events.at(-1).entities,['cover.fake']);
+  const members=f.forms.filter(form=>form.schema.some(field=>field.name==='member')).at(-1);members.change({member:'cover.fake'});assert.deepEqual(f.events.at(-1).entities,['cover.fake']);
   group.change({...group.data,entity_type:'light'});assert.deepEqual(f.events.at(-1).entities,['light.a']);
 });
 
@@ -224,24 +248,21 @@ test('loading schedule collection choices preserves the active form and latest d
   assert.equal(editor.shadowRoot.querySelector('[data-status]').textContent,'');
 });
 
-test('event editor retains rejected values until corrected and preserves unrelated source data',t=>{
+test('event editor retains rejected sources until corrected and preserves unrelated source data',t=>{
   const original={type:'custom:marao-camera-events-card',cameras:[{entity:'camera.a',future:{keep:[]}}],columns:2,future:false};
   const {editor,forms,events}=nativeFormHarness(t,original);
-  const general=forms.find(form=>form.schema.some(field=>field.name==='columns'));
-  general.change({...general.data,columns:0});assert.equal(events.length,0);
-  general.change({...general.data,columns:0,title:'Events'});
-  assert.equal(events.length,0,'Another field must not silently discard the rejected columns');
+  const general=forms.find(form=>form.schema.some(field=>field.name==='limit'));
+  assert.equal(general.schema.some(field=>field.name==='columns'),false);
   const camera=forms.find(form=>form.schema.some(field=>field.name==='event_provider'));
+  camera.change({...camera.data,entity:'light.invalid'});
+  assert.equal(events.length,0);
+  general.change({...general.data,limit:3,title:'Events'});
+  assert.equal(events.length,0,'General edits must retain an invalid source draft');
   camera.change({...camera.data,name:'Front'});
   assert.equal(events.length,0,'Source edits must retain the same invalid draft');
-  assert.match(editor.shadowRoot.querySelector('[data-status]').textContent,/positive integer/);
-  general.change({...general.data,columns:3,title:'Events'});
-  assert.deepEqual(events.at(-1),{...original,cameras:[{...original.cameras[0],name:'Front'}],columns:3,title:'Events'});
-  const accepted=events.length;
-  camera.change({...camera.data,entity:'light.invalid'});general.change({...general.data,title:'Front events'});
-  assert.equal(events.length,accepted,'General edits must retain an invalid source draft');
+  assert.ok(editor.shadowRoot.querySelector('[data-status]').textContent);
   camera.change({...camera.data,entity:'camera.b'});
-  assert.equal(events.at(-1).title,'Front events');assert.equal(events.at(-1).cameras[0].entity,'camera.b');
+  assert.deepEqual(events.at(-1),{...original,cameras:[{...original.cameras[0],entity:'camera.b',name:'Front'}],limit:3,title:'Events'});
 });
 
 test('group sections and schedule cards create safe IDs on HTTP without randomUUID',async t=>{
@@ -324,19 +345,14 @@ test('native type-only configurations resolve their matching catalog roles',()=>
 });
 
 test('Entity Group native forms edit membership without a primary Entity field',t=>{
-  const previous=globalThis.document;t.after(()=>{globalThis.document=previous;});
-  const node=()=>({children:new Map(),append(){},replaceChildren(){},querySelector(selector){if(!this.children.has(selector))this.children.set(selector,node());return this.children.get(selector);},querySelectorAll(){return [];}});
-  globalThis.document={createElement:node};
   const original={type:'custom:marao-entity-group-card',template:'md_entity_group_card',id:'room-lights',name:'Room lights',entity_type:'light',entities:[{entity_id:'light.a',name:'Desk',variables:{enable_slider:false},future:[]}],summary_sections:[],grid_options:{columns:6},future:{keep:false}};
-  const editor=new MaraoCardEditor(),forms=[],events=[];editor.dispatchEvent=event=>events.push(event.detail.config);editor.setConfig(original);
-  editor.shadowRoot=node();editor._hass={language:'en',states:{}};editor._entities=[];editor._renderPopupSelector=()=>{};
-  editor._mountForm=(host,data,schema,change)=>forms.push({host,data,schema,change});editor._render();
+  const {editor,forms,events}=nativeFormHarness(t,original);
   const basic=forms.find(form=>form.schema.some(field=>field.name==='name'));
   assert.ok(basic);assert.equal(basic.schema.some(field=>field.name==='entity_id'),false,'Groups must not request a primary entity');
   assert.ok(forms.some(form=>form.schema.some(field=>field.name==='entity_type')));
-  const members=forms.find(form=>form.schema.some(field=>field.name==='members'));
-  assert.equal(members.schema[0].selector.entity.multiple,true);
-  members.change({members:['light.a','light.b']});
+  const members=forms.find(form=>form.schema.some(field=>field.name==='member'));
+  assert.equal(members.schema[0].selector.entity.multiple,undefined);
+  members.change({member:'light.b'});
   assert.equal(editor.shadowRoot.querySelector('[data-status]').textContent,'','Membership edits must validate without a primary entity');
   assert.deepEqual(events.at(-1),{...original,popup_filter:'active',entities:[original.entities[0],'light.b']});
   assert.equal(Object.hasOwn(events.at(-1),'entity_id'),false);assert.equal(Object.hasOwn(events.at(-1),'entity'),false);
@@ -416,9 +432,10 @@ test('summary cards with saved popup hashes expose Edit popup and reuse the exis
   const h=nativeFormHarness(t,f.original.views[0].sections[0].cards[0],{...f.hass,language:'pt'});
   h.editor._lovelace=f.original;
   MaraoCardEditor.prototype._renderPopupSelector.call(h.editor);
-  const button=h.editor.shadowRoot.querySelector('[data-popup-layout]').children.find(node=>node.textContent==='Editar popup');
-  assert.ok(button,'An external hash must not hide popup editing');assert.equal(button.disabled,false);
-  assert.equal(h.forms.some(form=>form.schema.some(field=>field.name==='popup_view')),false,'The saved popup owns its layout reference');
+  const section=h.editor.shadowRoot.querySelector('[data-popup-layout]').children[0];
+  assert.equal(section.children[0].textContent,'Definições do popup');
+  assert.equal(section.open,false,'Popup editing starts collapsed');
+  assert.equal(h.forms.some(form=>form.schema.some(field=>field.name==='popup_view')),false);
   await f.editor._editPopup();
   assert.deepEqual(f.routes,['/marao-dashboard/details?edit=1']);assert.equal(f.writes.length,0);assert.deepEqual(f.saved,f.original);
 });
@@ -532,4 +549,185 @@ test('climate humidity clearing and popup edits preserve authored layout and unk
   const entry=card('md_climate_card'),source={type:'custom:marao-climate-card',entity:'climate.safe',popup_view:'details',variables:{humidity_entity:'sensor.missing',enable_popup:false,show_mode_buttons:false,future:[]},grid_options:{columns:9,rows:7},tap_action:{action:'none'},future:{keep:false}};
   const data=nativeCardFormData(source,entry),next=patchNativeCard(source,entry,data,{...data,var__humidity_entity:'',var__enable_popup:true});
   const expected=structuredClone(source);delete expected.variables.humidity_entity;expected.variables.enable_popup=true;assert.deepEqual(next,expected);assert.equal(source.variables.humidity_entity,'sensor.missing');
+});
+
+import {PopupInline} from '../../frontend_src/popup-content-editor.js';
+const customContent=()=>({version:1,mode:'custom',layout:{type:'sections',max_columns:1,sections:[{type:'grid',unknown:false,cards:[{type:'markdown',content:'Original',opaque:{keep:[]}}]},{type:'grid',cards:[]}]}});
+function popupHarness(t){
+  const original={type:'custom:marao-camera-card',entity_id:'camera.safe',opaque:false,popup_content:customContent()},f=nativeFormHarness(t,original),create=globalThis.document.createElement;
+  globalThis.document.createElement=tag=>Object.assign(create(),{localName:tag,setAttribute(){},remove(){this.removed=true;},async showDialog(params){this.params=params;}});
+  const controller=Object.create(PopupInline.prototype);
+  Object.assign(controller,{panel:f.editor,content:structuredClone(original.popup_content),host:document.createElement('div'),error:{textContent:''},disposed:false,editable:true,revision:0,dialogs:new Set(),pickers:new WeakMap(),subscriptions:new Set(),events:new AbortController(),isolate(){},update(){this.content=this.panel._config.popup_content;}});
+  controller.view={lovelace:{config:{views:[structuredClone(original.popup_content.layout)]}},remove(){}};
+  f.editor._popupInline=controller;
+  return {...f,controller,original};
+}
+const nativeRequest=(tag,params,dialogImport=async()=>{})=>({detail:{dialogTag:tag,dialogParams:params,dialogImport},stopImmediatePropagation(){this.stopped=true;}});
+
+test('native popup callbacks update only the complete parent draft and preserve opaque content',t=>{
+  const f=popupHarness(t),layout=structuredClone(f.original.popup_content.layout);
+  layout.sections[1].cards.push(layout.sections[0].cards.pop());f.controller.saveDocument({views:[layout]});
+  const expected={...f.original,popup_content:{...f.original.popup_content,layout}};
+  assert.deepEqual(f.events.at(-1),expected);assert.deepEqual(f.original.popup_content,customContent());
+  assert.throws(()=>f.controller.saveDocument({views:[layout,layout]}),/invalid/);assert.deepEqual(f.editor._config,expected);
+});
+
+test('native section Save is redirected to the popup owner instead of a dashboard save callback',async t=>{
+  const f=popupHarness(t),request=nativeRequest('hui-dialog-edit-section',{viewIndex:0,sectionIndex:0,lovelace:{saveConfig(){assert.fail('real dashboard');}},lovelaceConfig:{views:[]},saveConfig(){assert.fail('original save callback');}});
+  await f.controller.openDialog(request);const dialog=[...f.controller.dialogs][0];
+  assert.equal(request.stopped,true);assert.equal(dialog.localName,'hui-dialog-edit-section');assert.equal(dialog.params.lovelace,f.controller.view.lovelace);
+  const layout=structuredClone(f.original.popup_content.layout);layout.sections[0].column_span=2;layout.sections[0].visibility=[{condition:'state',entity:'input_boolean.safe',state:'on'}];
+  await dialog.params.saveConfig({views:[layout]});
+  assert.deepEqual(f.editor._config,{...f.original,popup_content:{...f.original.popup_content,layout}});
+});
+
+test('native child Save preserves later parent edits and native Cancel discards an unaccepted child',async t=>{
+  const f=popupHarness(t);
+  const saveCardConfig=async card=>{const layout=structuredClone(f.editor._config.popup_content.layout);layout.sections[0].cards[0]=card;f.controller.saveDocument({views:[layout]});};
+  await f.controller.openDialog(nativeRequest('hui-dialog-edit-card',{cardConfig:{type:'markdown',content:'Original'},lovelaceConfig:{views:[]},saveCardConfig}));
+  const first=[...f.controller.dialogs][0];first.dispatchEvent(new CustomEvent('dialog-closed',{detail:{dialog:'hui-dialog-edit-card'}}));
+  assert.equal(first.removed,true);assert.equal(f.controller.dialogs.size,0);assert.deepEqual(f.editor._config,f.original);
+  await f.controller.openDialog(nativeRequest('hui-dialog-edit-card',{saveCardConfig}));const second=[...f.controller.dialogs][0];
+  f.editor._commitDescriptor({...f.editor._config,name:'Latest parent'});
+  await second.params.saveCardConfig({type:'markdown',content:'Native child edit',opaque:{keep:[]}});
+  const expected=structuredClone(f.original);expected.name='Latest parent';expected.popup_content.layout.sections[0].cards[0].content='Native child edit';
+  assert.deepEqual(f.editor._config,expected);
+});
+
+test('nested native lifecycle and configuration events cannot escape into the parent card dialog',async t=>{
+  const f=popupHarness(t);await f.controller.openDialog(nativeRequest('hui-dialog-edit-card',{}));const dialog=[...f.controller.dialogs][0];
+  for(const name of ['closed','config-changed','GUImode-changed','editor-save']){let stopped=0;const event=new Event(name);event.stopPropagation=()=>stopped++;dialog.dispatchEvent(event);assert.equal(stopped,1,name);}
+  assert.deepEqual(f.editor._config,f.original);assert.equal(f.controller.dialogs.size,1);
+});
+
+test('repeated native edit requests open one child dialog during loading and while already open',async t=>{
+  const f=popupHarness(t);let finish,loads=0;const load=()=>{loads++;return new Promise(resolve=>{finish=resolve;});};
+  const first=f.controller.openDialog(nativeRequest('hui-dialog-edit-card',{},load));
+  const second=f.controller.openDialog(nativeRequest('hui-dialog-edit-card',{},load));
+  assert.equal(loads,1);finish();await Promise.all([first,second]);assert.equal(f.controller.dialogs.size,1);
+  await f.controller.openDialog(nativeRequest('hui-dialog-edit-card',{},load));assert.equal(loads,1);assert.equal(f.controller.dialogs.size,1);assert.deepEqual(f.editor._config,f.original);
+});
+
+test('popup selectors keep their native dialogs and canvas close events stay inside the popup boundary',t=>{
+  const f=popupHarness(t),host=document.createElement('div'),controller=new PopupInline(f.editor,host),requests=[];controller.openDialog=event=>requests.push(event.detail);
+  const selector=new CustomEvent('show-dialog',{detail:{dialogTag:'ha-generic-picker-dialog'}});selector.composedPath=()=>[host];host.dispatchEvent(selector);assert.equal(requests.length,0);
+  const canvas=new CustomEvent('show-dialog',{detail:{dialogTag:'hui-dialog-edit-card'}});canvas.composedPath=()=>[controller.canvas,host];host.dispatchEvent(canvas);assert.equal(requests.length,1);
+  let stopped=0;const closed=new Event('closed');closed.stopPropagation=()=>stopped++;host.dispatchEvent(closed);assert.equal(stopped,1);controller.dispose();
+});
+
+function popupCanvasHarness(t){
+  const f=popupHarness(t),previous={MutationObserver:globalThis.MutationObserver,customElements:globalThis.customElements,location:globalThis.location};
+  t.after(()=>Object.assign(globalThis,previous));
+  globalThis.MutationObserver=class{observe(){}disconnect(){}};
+  globalThis.customElements={get:()=>undefined};globalThis.location={pathname:'/marao-dashboard/overview'};
+  const create=document.createElement;document.createElement=tag=>{const node=create(tag);node.style.setProperty=()=>{};return node;};
+  const controller=new PopupInline(f.editor,document.createElement('div'));f.editor._popupInline=controller;
+  f.editor._moveHaptic=()=>{};t.after(()=>controller.dispose());
+  return {...f,controller};
+}
+
+test('popup settings contain one filtered dropdown and an always-editable native canvas',t=>{
+  const f=popupCanvasHarness(t),{controller}=f;const start=f.forms.length;controller.update();
+  const forms=f.forms.slice(start);assert.equal(forms.length,1);assert.deepEqual(forms[0].schema.map(field=>field.name),['template']);
+  assert.deepEqual(forms[0].schema[0].selector.select.options.map(option=>option.value),['camera','empty','custom']);
+  assert.equal(forms[0].data.template,'custom');assert.equal(controller.canvas.inert,false);assert.equal(controller.view.lovelace.editMode,true);
+  assert.equal(controller.controls.children.length,1);assert.equal(controller.tools.children.length,0);assert.deepEqual(f.editor._config,f.original);
+});
+
+test('template selection uses parent entities, and only actual manual changes show Custom',async t=>{
+  const f=popupCanvasHarness(t),{controller}=f;controller.update();controller.templateForm.change({template:'camera'});
+  const expected=structuredClone(f.editor._config),layout=structuredClone(expected.popup_content.layout);
+  assert.equal(controller.templateForm.data.template,'camera');assert.equal(controller.view.lovelace.editMode,true);
+  assert.ok(JSON.stringify(layout).includes('camera.safe'));const count=f.events.length;
+  controller.saveDocument({views:[structuredClone(layout)]});assert.equal(f.events.length,count);assert.equal(controller.templateForm.data.template,'camera');
+  controller.templateForm.change({template:'camera'});assert.equal(f.events.length,count);
+  const edited=structuredClone(layout);edited.sections[0].cards[0].name='Manual name';
+  await controller.view.lovelace.saveConfig({views:[edited]});assert.equal(controller.templateForm.data.template,'custom');
+  assert.equal(f.editor._config.popup_content.template,'camera','origin metadata cannot falsely determine the displayed template');
+  controller.saveDocument({views:[layout]});assert.equal(controller.templateForm.data.template,'camera');assert.deepEqual(f.editor._config,expected);
+  const saved=structuredClone(f.editor._config);controller.templateKey=null;controller.update();assert.equal(controller.templateForm.data.template,'camera');assert.deepEqual(f.editor._config,saved);
+  controller.templateForm.change({template:'empty'});assert.equal(controller.templateForm.data.template,'empty');
+  assert.deepEqual(f.editor._config.popup_content.layout,{type:'sections',max_columns:1,sections:[]});assert.equal(controller.view.lovelace.editMode,true);
+});
+
+test('automatic and shared popups stay unchanged until a real canvas edit creates a private snapshot',t=>{
+  const f=popupCanvasHarness(t),{controller}=f;
+  const source={type:'sections',path:'details',title:'Existing popup',max_columns:1,sections:[{type:'grid',opaque:false,cards:[{type:'markdown',content:'Keep me',visibility:[],opaque:{keep:[]}}]}]};
+  const dashboard={views:[source,{type:'sections',path:'other',sections:[]}]},before=structuredClone(dashboard);
+  const original={type:'custom:marao-camera-card',entity_id:'camera.safe',name:'Latest parent',popup_view:'details',opaque:false};
+  f.editor._lovelace={config:dashboard};f.editor._commitDescriptor(original);f.events.length=0;controller.update();
+  assert.equal(controller.view.lovelace.editMode,true);assert.equal(f.events.length,0);assert.deepEqual(f.editor._config,original);
+  controller.saveDocument({views:[structuredClone(controller.content.layout)]});assert.equal(f.events.length,0);
+  const layout={type:'sections',title:'Existing popup',max_columns:1,sections:[{type:'grid',opaque:false,cards:[{type:'markdown',content:'Manual change',visibility:[],opaque:{keep:[]}}]}]};
+  controller.saveDocument({views:[layout]});
+  assert.deepEqual(f.editor._config,{...original,popup_content:{version:1,mode:'custom',layout}});assert.deepEqual(dashboard,before);
+  assert.equal(controller.templateForm.data.template,'custom');
+});
+
+test('automatic popup child dialogs work before content exists and parent target changes never retarget custom children',async t=>{
+  const f=popupCanvasHarness(t),{controller}=f,original={type:'custom:marao-climate-card',entity_id:'climate.safe',name:'Climate'};
+  f.editor._commitDescriptor(original);f.events.length=0;controller.update();
+  assert.equal(controller.templateForm.data.template,'climate');assert.equal(controller.view.lovelace.editMode,true);assert.equal(f.events.length,0);
+  await controller.openDialog(nativeRequest('hui-dialog-edit-section',{saveConfig(){assert.fail('dashboard writes are forbidden');}}));
+  const dialog=[...controller.dialogs][0],layout=structuredClone(controller.content.layout);layout.sections[0].column_span=2;
+  await dialog.params.saveConfig({views:[layout]});assert.deepEqual(f.editor._config,{...original,popup_content:{version:1,mode:'custom',layout}});
+  assert.equal(controller.templateForm.data.template,'custom');
+  controller.templateForm.change({template:'climate'});const saved=structuredClone(f.editor._config.popup_content);
+  f.editor._commitDescriptor({...f.editor._config,entity_id:'climate.other'});controller.update();
+  assert.deepEqual(f.editor._config.popup_content,saved);assert.equal(controller.templateForm.data.template,'custom');
+  f.editor._commitDescriptor({...f.editor._config,entity_id:'climate.safe'});controller.update();assert.equal(controller.templateForm.data.template,'climate');
+});
+
+test('unsupported sources and unavailable template inputs retain the current draft with readable errors',t=>{
+  const f=popupCanvasHarness(t),{controller}=f,original={type:'custom:marao-camera-card',entity_id:'camera.safe',popup_view:'missing',opaque:false};
+  f.editor._lovelace={config:{views:[]}};f.editor._commitDescriptor(original);f.events.length=0;controller.update();
+  assert.equal(controller.editable,false);assert.deepEqual(f.editor._config,original);assert.ok(controller.error.textContent);
+  controller.templateForm.change({template:'empty'});assert.equal(controller.view.lovelace.editMode,true);assert.equal(controller.templateForm.data.template,'empty');
+  const current=structuredClone(f.editor._config),picker=controller.templateForm;picker.change({template:'climate'});
+  assert.deepEqual(f.editor._config,current);assert.ok(controller.error.textContent);assert.equal(picker.data.template,'empty');
+});
+
+test('removed presentation fields stay absent and manual layout edits preserve saved opaque presentation',t=>{
+  const f=popupCanvasHarness(t),{controller}=f,original={...f.original,popup_content:{...f.original.popup_content,presentation:{height:'82vh',max_height:'90vh',opaque:false}}};
+  f.editor._commitDescriptor(original);const start=f.forms.length;controller.update();
+  assert.deepEqual(f.forms.slice(start).flatMap(form=>form.schema.map(field=>field.name)),['template']);
+  const layout=structuredClone(original.popup_content.layout);layout.sections[1].cards.push({type:'markdown',content:'New'});controller.saveDocument({views:[layout]});
+  assert.deepEqual(f.editor._config,{...original,popup_content:{...original.popup_content,layout}});
+});
+
+test('stale native saves and pending dialog loads cannot replace a newer popup or outlive Cancel',async t=>{
+  const f=popupHarness(t);await f.controller.openDialog(nativeRequest('hui-dialog-edit-section',{saveConfig(){}}));const dialog=[...f.controller.dialogs][0];
+  const current=structuredClone(f.editor._config);current.popup_content.layout.sections=[];f.editor._commitDescriptor(current);
+  await assert.rejects(dialog.params.saveConfig({views:[customContent().layout]}),/changed/);assert.deepEqual(f.editor._config,current);
+  let finish;const pending=f.controller.openDialog(nativeRequest('hui-dialog-edit-card',{},()=>new Promise(resolve=>{finish=resolve;})));
+  f.controller.dispose();finish();await pending;assert.equal(f.controller.dialogs.size,0);assert.equal(dialog.removed,true);assert.deepEqual(f.editor._config,current);
+});
+
+test('native picker keeps every card while suggesting public Marao cards first',()=>{
+  const marao={card:{type:'marao-climate-card',isCustom:true}},core={card:{type:'tile'}},other={card:{type:'other-custom',isCustom:true}};
+  const picker={localName:'hui-card-picker',children:[],_cards:[core,other,marao],_suggestedCards:[core]};
+  const controller=Object.create(PopupInline.prototype);Object.assign(controller,{host:{children:[picker]},pickers:new WeakMap()});
+  PopupInline.prototype.isolate.call(controller);assert.deepEqual(picker._cards,[core,other,marao]);assert.deepEqual(picker._suggestedCards,[marao,core]);
+  PopupInline.prototype.isolate.call(controller);assert.deepEqual(picker._suggestedCards,[marao,core]);
+});
+
+test('native sortable option refreshes retain popup-local groups and native touch options',()=>{
+  const sortable={localName:'ha-sortable',dataset:{},group:'card',options:{group:'card',delay:100,delayOnTouchOnly:true},children:[]};
+  const controller=Object.create(PopupInline.prototype);Object.assign(controller,{group:'private-popup',host:{children:[sortable]},pickers:new WeakMap()});
+  controller.isolate();assert.deepEqual(sortable.options,{group:'private-popup-card',delay:100,delayOnTouchOnly:true});
+  sortable.options={group:{name:'card',pull:true,put:true},delay:100};controller.isolate();assert.deepEqual(sortable.options,{group:{name:'private-popup-card',pull:true,put:true},delay:100});
+});
+
+test('equivalent dashboard context echoes do not remount the parent or close native popup dialogs',t=>{
+  const f=nativeFormHarness(t,{type:'custom:marao-climate-card',entity_id:'climate.safe'});let renders=0,updates=0;
+  f.editor._render=()=>renders++;f.editor._renderPopupSelector=()=>updates++;
+  const context={views:[{path:'home'},{path:'other'}]};f.editor.lovelace=context;renders=0;updates=0;f.editor.lovelace=structuredClone(context);
+  assert.equal(renders,0);assert.equal(updates,1);assert.deepEqual(f.editor._availablePages().map(page=>page.path),['home','other']);
+});
+
+test('draft-owned native child editors cannot start legacy source-view persistence',t=>{
+  const previous={location:globalThis.location,window:globalThis.window};t.after(()=>Object.assign(globalThis,previous));
+  globalThis.location={pathname:'/marao-dashboard/home'};globalThis.window={MaraoNativeBootstrap:{findHost:()=>({localName:'hui-root'})}};
+  const dialog={localName:'hui-dialog-edit-card',_maraoPopupDraftOwner:{},isEffectiveDirtyState:false,closeDialog(){}};
+  assert.equal(findNativeEditorContext({parentNode:dialog}),undefined);
 });

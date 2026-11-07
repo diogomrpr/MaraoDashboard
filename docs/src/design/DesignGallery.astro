@@ -1,0 +1,17 @@
+---
+import {designCard} from './gallery-data.js';
+import './design.css';
+const {cardId}=Astro.props,card=designCard(cardId);
+const base=import.meta.env.BASE_URL.replace(/\/$/,'');
+const payload=JSON.stringify(card.scenarios).replaceAll('<','\u003c');
+---
+<design-gallery class="not-content" data-card-id={cardId} data-frame-url={`${base}/${import.meta.env.DEV?'design':'gallery'}/frame.html`} style="--design-width:390px">
+ <div class="design-heading"><span class="design-eyebrow">REAL MARAO CARDS</span><h2 data-en="Card behaviors" data-pt="Comportamentos do cartão">Card behaviors</h2><p>Scroll through the real card’s behaviors using fictional data. Open its details to inspect the real popup. Offscreen examples reset when reloaded.</p></div>
+ <div class="design-controls"><label><span data-en="Card language" data-pt="Idioma do cartão">Card language</span><select data-design-language aria-label="Card language"><option value="en">English</option><option value="pt">Português</option></select></label><label><span data-en="Card width" data-pt="Largura do cartão">Card width</span><select data-design-width aria-label="Card width"><option value="320">320 px</option><option value="390" selected>390 px</option><option value="430">430 px</option></select></label><p>The documentation theme applies to every example. Use the playground below to edit configuration.</p></div>
+ <div class="design-scenes">{card.scenarios.map((scene,index)=>{
+ const label=scene;
+ return <article class="design-scene" data-scenario-id={scene.id} id={`design-${scene.id}`}><header><span class="design-index">{String(index+1).padStart(2,'0')}</span><div><h3 data-en={label.label} data-pt={label.pt}>{label.label}</h3><p data-en={label.description} data-pt={label.descriptionPt}>{label.description}</p></div></header><div class="design-stage"><iframe title={`${card.title} · ${label.label}`} sandbox="allow-scripts" referrerpolicy="no-referrer" data-design-frame></iframe><p data-frame-status role="status">Scroll to load this example.</p></div></article>;
+ })}</div>
+ <script type="application/json" data-design-scenarios set:html={payload}/>
+</design-gallery>
+<script>import './gallery.js';</script>

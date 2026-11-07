@@ -4,8 +4,11 @@ description: "Operation state, progress, remaining time, and refill warnings."
 ---
 
 import Playground from '../../../components/Playground.astro';
+import DesignGallery from '../../../design/DesignGallery.astro';
 
 Operation state, progress, remaining time, and refill warnings.
+
+<DesignGallery cardId="md_dishwasher_card" />
 
 ## Try it
 
@@ -30,9 +33,9 @@ variables:
 
 Compatible entity domains: `sensor`, `input_select`.
 
-Progress, remaining time and selected program are separate optional entities.
+Progress, remaining time and the actually active program are optional cycle readings, shown only while running, paused or awaiting a delayed start.
 
-Salt/rinse alerts appear only when configured and abnormal; normal consumables do not crowd the card.
+Missing cycle readings stay neutral and do not flag the appliance. Ready/inactive states stay compact; automatic height follows cycle content. Salt/rinse alerts and real machine faults remain visible.
 
 ## Settings
 
@@ -45,6 +48,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
 | `variables.progress_entity` | Progress | entity | Not set | Progress for this card. Searchable suggestions are available. |
 | `variables.remaining_time_entity` | Remaining time | entity | Not set | Remaining time for this card. Searchable suggestions are available. |
+| `variables.show_reading_names` | Show reading labels | boolean | `true` | Show reading labels for this card. |
 | `variables.salt_entity` | Salt warning | entity | Not set | Salt warning for this card. Searchable suggestions are available. |
 | `variables.rinse_aid_entity` | Rinse-aid warning | entity | Not set | Rinse-aid warning for this card. Searchable suggestions are available. |
 | `variables.active_program_entity` | Active program | entity | Not set | Active program for this card. Searchable suggestions are available. |
@@ -56,7 +60,10 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 | Scenario | What it demonstrates |
 | --- | --- |
 | Default | Try the configured card with fictional devices. |
-| Idle | An inactive appliance has no invented running state. |
+| Icons and values | Hide indicator captions while keeping their accessible names. |
+| Ready, no cycle data | Normal missing cycle readings do not create an appliance warning. |
+| Idle | Inactive hides stale cycle values and retains the actual operation state. |
+| Cycle with missing readings | A missing optional reading leaves the operation and other readings visible. |
 | Finished | The completed cycle follows the reported state. |
 | Salt warning | Only the configured abnormal consumable is prioritized. |
 | Rinse-aid warning | A separate warning can be shown. |

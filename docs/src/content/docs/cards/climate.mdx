@@ -4,8 +4,11 @@ description: "Control temperature, modes, and an optional history graph."
 ---
 
 import Playground from '../../../components/Playground.astro';
+import DesignGallery from '../../../design/DesignGallery.astro';
 
 Control temperature, modes, and an optional history graph.
+
+<DesignGallery cardId="md_climate_card" />
 
 ## Try it
 
@@ -33,7 +36,6 @@ Climate uses a compact readings-first layout: a large unitless current temperatu
 Choose **Humidity sensor** to show that sensor's reported percentage on the card and in details. Missing or invalid readings show a neutral dash without disabling the thermostat. Clearing the selection hides humidity.
 
 **Enable climate popup** defaults to enabled. Details show readings first, supported modes next, and the same target selector at the lower right. Disabling it exposes supported modes inline unless **Mode buttons** is explicitly false. Mode choices use named 48px icon buttons and a localized selected-mode heading; narrow layouts wrap them. Custom actions, popup references and authored layouts remain saved when the popup is disabled.
-
 ## Settings
 
 The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
@@ -45,7 +47,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
 | `variables.show_graph` | Temperature graph | boolean | `false` | Temperature graph for this card. |
 | `variables.graph_entity` | Graph entity | entity | Not set | Graph entity for this card. Searchable suggestions are available. |
-| `variables.humidity_entity` | Humidity sensor | sensor entity | Not set | Optional reported humidity; unset/null/empty hides the reading. |
+| `variables.humidity_entity` | Humidity sensor | sensor entity | Not set | Optional reported humidity; unset/null/empty hides the reading. Searchable suggestions are available. |
 | `variables.enable_popup` | Enable climate popup | boolean | `true` | Enable built-in details. False retains targets and exposes inline modes. |
 | `variables.show_mode_buttons` | Mode buttons | boolean | `true` | Show inline modes when the popup is disabled; details retain supported choices. |
 | `variables.graph_color` | Graph color | color | Not set | Optional graph line/fill color. |

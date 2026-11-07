@@ -1055,7 +1055,7 @@ class MaraoSlideToOpen extends HTMLElement {
           display: grid;
           place-items: center;
           min-height: 64px;
-          padding: 8px 16px 8px 72px;
+          padding: 8px 16px;
           box-sizing: border-box;
           color: var(--marao-slide-foreground);
           font-family: var(--primary-font-family);
@@ -1103,7 +1103,7 @@ class MaraoSlideToOpen extends HTMLElement {
       <div${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""}>
       <div class="track${feedback ? ` feedback ${feedback}` : ''}" role="slider" tabindex="${disabled ? -1 : 0}" aria-label="${escapeHtml(semanticLabel)}" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0%" aria-disabled="${disabled}">
         <span class="label" role="status"${problem ? ' style="visibility:hidden"' : ""}>${escapeHtml(label)}</span>${problem ? `<span class="problem" role="status" style="right:52px">${escapeHtml(problemLabel(problem, this._hassInstance()))}</span><button class="slide-details" data-slide-details type="button" aria-label="${escapeHtml(problem.reason)}">ⓘ</button>` : ""}
-        <span class="thumb"><ha-icon icon="${feedback === 'sending' ? 'mdi:progress-clock' : ['accepted','fading'].includes(feedback) ? 'mdi:check' : 'mdi:chevron-right'}" aria-hidden="true"></ha-icon></span>
+        <span class="thumb"><ha-icon icon="${feedback === 'sending' ? 'mdi:progress-clock' : ['accepted','fading'].includes(feedback) ? 'mdi:check' : this._alarmOwner() ? 'mdi:shield-off' : 'mdi:chevron-right'}" aria-hidden="true"></ha-icon></span>
       </div>
 
       </div>
@@ -1556,7 +1556,7 @@ class MaraoStateTimelineCard extends HTMLElement {
         :host { display: block; width: 100%; }
         :host([data-marao-control-cell]) { display:grid; min-width:0; }
         :host([data-marao-control-cell]) ha-card { height:100%; }
-        ha-card { box-sizing: border-box; min-height: 168px; padding: 13px 20px; background: var(--ha-card-background); color: var(--primary-text-color); }
+        ha-card { display:block; width:100%; min-width:0; box-sizing: border-box; min-height: 168px; padding: 13px 20px; border-radius:var(--ha-card-border-radius,20px); background: var(--ha-card-background); color: var(--primary-text-color); }
         header { display: grid; gap: 12px; margin-bottom: 8px; }
         ha-card[data-binary=true] { background: var(--color-blue); color: var(--color-black); --subtext-color: var(--color-black); }
         .binary-state { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }

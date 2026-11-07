@@ -227,7 +227,9 @@ the action it affects.
   Put other icons, readings and controls below full-width titles, including Wallbox
   shortcuts and separate history, energy and camera-event headers.
   Media app shortcuts use full-card square logos without a visible title; keep
-  the configured app name as the button’s semantic label and show problem reasons.
+  the configured app name as the button’s semantic label. Use an icon and the
+  information button for problem states; keep the reason in accessible text and
+  tap-to-read details without a background caption.
   Preserve intentionally hidden titles and centered icon-only controls.
 - Secondary, nonessential metadata may use an ellipsis.
 - Reflow multi-column content before controls become cramped.
@@ -509,7 +511,7 @@ Glance uses one transparent owner with an optional title and one rounded surface
 
 ### Card activity
 
-Automatic Updated and activation timestamps move into the shared read-only Activity sheet. Retain primary date measurements. Icons open the themed sheet independently of card operating actions; strict slides and security holds remain unchanged. Keep the title, Date and Filters controls above internally scrolling content. Date and other list filters use the shared Marao dropdown, with synchronized current labels, selection and Reset; custom From/Through fields remain date inputs. Close child menus when hiding filters and dispose dropdown controllers on replacement or sheet close. Expand additional filters inline below this toolbar without shrinking or clipping controls. Use large date separators for each day, equally prominent time-only labels on the left rail, circular event symbols and inline details. Query only explicit sources, whitelist metadata, distinguish requests from reported results and incomplete coverage from empty results. Date/type filters apply before progressive display; origin/initiator require evidence. Glance tiles keep healthy readings visible during partial warnings.
+Automatic Updated and activation timestamps move into the shared read-only Activity sheet. Retain primary date measurements. Icons open the themed sheet independently of card operating actions; strict slides and security holds remain unchanged. Keep the title, Date and Filters controls above internally scrolling content. Date and other list filters use the shared Marao dropdown, with synchronized current labels, selection and Reset; custom From/Through fields remain date inputs. Close child menus when hiding filters and dispose dropdown controllers on replacement or sheet close. Expand additional filters inline below this toolbar without shrinking or clipping controls. Use large date separators for each day, smaller time-only labels centered below their circular event symbols on the left rail, and inline details. Query only explicit sources, whitelist metadata, distinguish requests from reported results and incomplete coverage from empty results. Date/type filters apply before progressive display; origin/initiator require evidence. Glance tiles keep healthy readings visible during partial warnings.
 
 ### Value sliders
 
@@ -584,7 +586,12 @@ large and readable.
 - Pressing navbar controls or their icons must not add a rectangular browser highlight; retain the circular active fill and short press feedback.
 - Keep button gaps compact without violating the visible 48-by-48 control rule.
 - Derive iPhone positioning from the shared host-aware bottom inset and preserve
-  twice the lowered safe-area offset, with a minimum 24px bottom gap. Use the shared bottom-gap helper for navbar positioning, page clearance and popup padding.
+  twice the lowered safe-area offset, with a minimum 24px bottom gap. On other
+  devices, including Android, use 24px plus the resolved bottom safe-area inset.
+  Keep inset resolution live in CSS and honor an explicit host-provided zero when
+  the host already protects the edge. Use the shared bottom-gap helper for navbar
+  positioning, touch-barrier height, refresh feedback, page clearance and popup/
+  maintenance padding; do not add the inset again in individual consumers.
 - The navbar stays below open popups in the stacking order.
 - An invisible full-width touch barrier extends from the navbar's top edge to
   the viewport bottom. It blocks underlying card taps and touch scrolling while
@@ -789,6 +796,10 @@ Calendar energy ranges follow the HA timezone, including daylight-saving days.
 Parent sheets retain mounted content, scroll and focus through history drill-in;
 Close, browser navigation and removal release chart resources and inert state.
 
+Number controls place a large scalable value and its unit on the left, with the shared Climate up/down stepper on the right. Reuse the same stepper renderer, button geometry and native number adjustment handler; retain entity min/max/step, authoritative readings and disabled unavailable controls.
+
+Dishwasher keeps its reported operation and name visible without cycle indicators in ready/inactive and other non-cycle states. Running, paused and delayed-start states show configured cycle indicators; unavailable optional readings stay neutral locally and never mark the whole appliance as faulty. Do not display a selected or stale program as active while idle. Native sizing defaults to automatic height so the same card grows and shrinks with cycle content, preserving explicit authored grid sizes. Main-entity availability, disconnection, reported faults/actionrequired and configured consumable warnings retain their normal semantics. Dishwasher readings use integrated icon-and-value indicators. The optional Show reading labels setting hides captions visually while retaining semantic names and all values; omission preserves visible labels. Remaining time uses an hourglass countdown icon. Show valid reported progress as a circular ring with the percentage inside; missing or invalid progress is neutral. Remaining time retains its reported unit, and the program icon follows the reported active program, with a native or dishwasher fallback for unrecognized programs. Keep configured consumable warnings visible and preserve optional sensor selections.
+
 ### State-stable content
 
 The same rule applies inside popups. Media metadata, numeric controls, forecast
@@ -796,11 +807,13 @@ items, timelines, chart plots/statistics and configured device rows keep their
 normal slots while data loads or fails. Do not retain stale measurements to fill
 those slots. Only presentation metadata such as names and capability descriptors
 may survive missing attributes; service dispatch still checks the live entity.
-Weather forecasts use one horizontally scrolling strip. Alarm actions retain the
-code-entry slot in all layouts. An omitted alarm layout preserves the horizontal
-row and held Disarm/bypass; configured Dropdown commits actions without a hold,
+Weather uses a static condition-based sky, large temperature and available current metrics. Hourly and daily forecasts open in the shared popup. Alarm actions retain the
+code-entry slot in all layouts. Only Dropdown and Grid are offered; omission renders Dropdown without changing
+saved configuration. Dropdown commits actions without a hold,
 while Grid uses two arming columns, held bypass and a full-width strict Disarm
-slide. These are alarm-specific exceptions to the general security-hold rule. Camera events use a bounded,
+slide. Every mode has a distinct icon; the authoritative selected option has a
+state color plus a check/pressed cue. Unknown, unavailable and disconnected states
+remain neutral. These are alarm-specific exceptions to the general security-hold rule. Camera events use a bounded,
 internally scrolling viewer with fixed-aspect media, so initial loading, filters,
 empty results and playback errors do not move the rest of the popup. Lazy loading
 still adds events to that viewer. Native compilation uses the corresponding card

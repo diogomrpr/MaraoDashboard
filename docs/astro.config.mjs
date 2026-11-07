@@ -1,10 +1,12 @@
 import {defineConfig} from 'astro/config';
 import starlight from '@astrojs/starlight';
+import designPreview from './scripts/design-preview-plugin.mjs';
 
 export default defineConfig({
   site:'https://diogomrpr.github.io',
   base:'/MaraoDashboard',
   trailingSlash:'always',
+  vite:{server:{fs:{allow:['..']}},cacheDir:'.design/vite',plugins:[designPreview()]},
   integrations:[starlight({
     title:'Marao',
     disable404Route:true,

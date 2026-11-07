@@ -1,0 +1,618 @@
+[
+  {
+    "behavior": "weather-presentation",
+    "file": "custom_components/marao_dashboard/frontend/MaraoWeather.js",
+    "anchors": [
+      "export function weatherMarkup",
+      "export function weatherScene",
+      "export class MaraoWeatherForecast"
+    ],
+    "consumers": [
+      "md_weather_card"
+    ],
+    "hooks": [
+      "Static CSS sky and current metrics; forecast content uses the existing Marao popup shell"
+    ],
+    "indirect": [
+      "Weather forecast popup"
+    ],
+    "verificationComponents": [
+      "control-grid"
+    ],
+    "focusedTests": [
+      "tests/frontend/weather-presentation.test.js"
+    ]
+  },
+  {
+    "behavior": "climate-presentation",
+    "file": "custom_components/marao_dashboard/frontend/MaraoCards.js",
+    "anchors": [
+      ".body.climate-card>.title",
+      ".body.climate-card .current-temperature",
+      ".body.climate-card.climate-detail {"
+    ],
+    "consumers": [
+      "md_climate_card"
+    ],
+    "hooks": [
+      ".body.climate-card .current-temperature (measured reading)",
+      ".body.climate-card>.title (title)",
+      ".climate-detail (popup only); use :not(.climate-detail) for main-only"
+    ],
+    "indirect": [
+      "Climate detail popup"
+    ],
+    "verificationComponents": [
+      "climate"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-climate-card.test.js"
+    ]
+  },
+  {
+    "behavior": "family-rendering",
+    "file": "custom_components/marao_dashboard/frontend/MaraoCards.js",
+    "anchors": [
+      "function cardStyles()"
+    ],
+    "consumers": [
+      "md_title_card",
+      "md_weather_card",
+      "md_room_card",
+      "md_scene_collection_card",
+      "md_security_card",
+      "md_access_slide_action_card",
+      "md_access_hold_action_card",
+      "md_base_card",
+      "md_media_app_card",
+      "md_camera_card",
+      "md_light_card",
+      "md_cover_card",
+      "md_climate_card",
+      "md_fan_card",
+      "md_media_card",
+      "md_access_card",
+      "md_sensor_card",
+      "md_switch_card",
+      "md_number_card",
+      "md_wallbox_current_card",
+      "md_vacuum_card",
+      "md_battery_card",
+      "md_dishwasher_card",
+      "md_washing_machine_card",
+      "md_graph_card",
+      "md_toggle_graph_card",
+      "md_navigation_card",
+      "md_entity_group_card",
+      "md_alarm_controls_card",
+      "md_header_card",
+      "md_glance_card",
+      "md_scene_card",
+      "md_access_action_card",
+      "md_people_card"
+    ],
+    "hooks": [
+      "Read the relevant family branch, not the entire renderer."
+    ],
+    "indirect": [
+      "Native wrappers share rendering."
+    ],
+    "verificationComponents": [
+      "control-grid"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-card-visibility.test.js"
+    ]
+  },
+  {
+    "behavior": "typography",
+    "file": "custom_components/marao_dashboard/frontend/MaraoCards.js",
+    "anchors": [
+      "font-family:var(--primary-font-family"
+    ],
+    "consumers": [
+      "md_title_card",
+      "md_weather_card",
+      "md_room_card",
+      "md_scene_collection_card",
+      "md_security_card",
+      "md_access_slide_action_card",
+      "md_access_hold_action_card",
+      "md_base_card",
+      "md_media_app_card",
+      "md_camera_card",
+      "md_light_card",
+      "md_cover_card",
+      "md_climate_card",
+      "md_fan_card",
+      "md_media_card",
+      "md_access_card",
+      "md_sensor_card",
+      "md_switch_card",
+      "md_number_card",
+      "md_wallbox_current_card",
+      "md_vacuum_card",
+      "md_battery_card",
+      "md_dishwasher_card",
+      "md_washing_machine_card",
+      "md_graph_card",
+      "md_toggle_graph_card",
+      "md_navigation_card",
+      "md_entity_group_card",
+      "md_alarm_controls_card",
+      "md_header_card",
+      "md_glance_card",
+      "md_scene_card",
+      "md_access_action_card",
+      "md_people_card"
+    ],
+    "hooks": [
+      "Inherited --primary-font-family, --font-size-primary, --font-weight-primary; prefer the requested family selector."
+    ],
+    "indirect": [
+      "Main and detail surfaces; global tokens affect most cards."
+    ],
+    "verificationComponents": [
+      "labels"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-text-scale.test.js"
+    ]
+  },
+  {
+    "behavior": "sliders",
+    "file": "custom_components/marao_dashboard/frontend/MaraoSlider.js",
+    "anchors": [
+      "sliderMarkup",
+      "sliderStyles",
+      "bindSlider"
+    ],
+    "consumers": [
+      "md_light_card",
+      "md_fan_card",
+      "md_cover_card"
+    ],
+    "hooks": [
+      "Inspect sliderMarkup options and caller class; use existing CSS custom properties before adding a variant."
+    ],
+    "indirect": [
+      "Member/detail controls"
+    ],
+    "verificationComponents": [
+      "slider"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-slider.test.js"
+    ]
+  },
+  {
+    "behavior": "numeric-stepper",
+    "file": "custom_components/marao_dashboard/frontend/MaraoCards.js",
+    "anchors": [
+      "function numberStepper",
+      ".number-stepper button {",
+      ".body:is(.climate-card,.number-card) .climate-stepper button {"
+    ],
+    "consumers": [
+      "md_climate_card",
+      "md_number_card",
+      "md_wallbox_current_card"
+    ],
+    "hooks": [
+      "className argument: climate-stepper, wallbox-stepper; .climate-detail ancestor separates popup"
+    ],
+    "indirect": [
+      "Climate details"
+    ],
+    "verificationComponents": [
+      "climate"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-climate-card.test.js"
+    ]
+  },
+  {
+    "behavior": "compact-control",
+    "file": "custom_components/marao_dashboard/frontend/MaraoCards.js",
+    "anchors": [
+      ".compact-header"
+    ],
+    "consumers": [
+      "md_access_slide_action_card",
+      "md_access_hold_action_card",
+      "md_light_card",
+      "md_cover_card",
+      "md_fan_card",
+      "md_access_card",
+      "md_access_action_card"
+    ],
+    "hooks": [
+      "Existing family selectors"
+    ],
+    "indirect": [
+      "Access action variants"
+    ],
+    "verificationComponents": [
+      "control-grid"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-climate-card.test.js"
+    ]
+  },
+  {
+    "behavior": "popups",
+    "file": "custom_components/marao_dashboard/frontend/MaraoCards.js",
+    "anchors": [
+      "class MaraoPopupCard"
+    ],
+    "consumers": [
+      "md_title_card",
+      "md_weather_card",
+      "md_room_card",
+      "md_scene_collection_card",
+      "md_security_card",
+      "md_access_slide_action_card",
+      "md_access_hold_action_card",
+      "md_base_card",
+      "md_energy_period_card",
+      "md_media_app_card",
+      "md_camera_card",
+      "md_light_card",
+      "md_cover_card",
+      "md_climate_card",
+      "md_fan_card",
+      "md_media_card",
+      "md_access_card",
+      "md_sensor_card",
+      "md_switch_card",
+      "md_number_card",
+      "md_wallbox_current_card",
+      "md_vacuum_card",
+      "md_battery_card",
+      "md_dishwasher_card",
+      "md_washing_machine_card",
+      "md_graph_card",
+      "md_toggle_graph_card",
+      "md_timeline_card",
+      "md_navigation_card",
+      "md_entity_group_card",
+      "md_alarm_controls_card",
+      "md_header_card",
+      "md_glance_card",
+      "md_scene_card",
+      "md_access_action_card",
+      "md_floor_plan_card",
+      "md_people_card",
+      "md_schedules_card"
+    ],
+    "hooks": [
+      "Inspect owning popup family"
+    ],
+    "indirect": [
+      "Automatic details, group member controls"
+    ],
+    "verificationComponents": [
+      "popup"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-navbar-card.test.js"
+    ]
+  },
+  {
+    "behavior": "strict-slide",
+    "file": "custom_components/marao_dashboard/frontend/MaraoRuntime.js",
+    "anchors": [
+      "class MaraoSlideToOpen"
+    ],
+    "consumers": [
+      "md_access_slide_action_card",
+      "md_access_hold_action_card",
+      "md_access_card",
+      "md_alarm_controls_card",
+      "md_access_action_card"
+    ],
+    "hooks": [
+      "Preserve mandatory gesture contracts"
+    ],
+    "indirect": [
+      "Alarm-grid disarm"
+    ],
+    "verificationComponents": [
+      "security"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-security.test.js"
+    ]
+  },
+  {
+    "behavior": "collections",
+    "file": "custom_components/marao_dashboard/frontend/MaraoCollections.js",
+    "anchors": [
+      "function peopleRows",
+      "function summaryAction"
+    ],
+    "consumers": [
+      "md_people_card",
+      "md_entity_group_card"
+    ],
+    "hooks": [
+      "peopleRows(config,hass)",
+      "summaryAction(group,ids,on,hass,isAccess)"
+    ],
+    "indirect": [
+      "Summary/generated members"
+    ],
+    "verificationComponents": [
+      "people",
+      "summary-controls"
+    ],
+    "focusedTests": [
+      "tests/frontend/collections.test.js"
+    ]
+  },
+  {
+    "behavior": "camera-events",
+    "file": "custom_components/marao_dashboard/frontend/MaraoFrigateEventsCard.js",
+    "anchors": [
+      "class "
+    ],
+    "consumers": [
+      "camera-events"
+    ],
+    "hooks": [
+      "Inspect this dedicated owner"
+    ],
+    "indirect": [],
+    "verificationComponents": [
+      "camera"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-frigate-events-card.test.js"
+    ]
+  },
+  {
+    "behavior": "navbar",
+    "file": "custom_components/marao_dashboard/frontend/MaraoNavigation.js",
+    "anchors": [
+      "class MaraoNavbarCard"
+    ],
+    "consumers": [
+      "navbar"
+    ],
+    "hooks": [
+      "Inspect this dedicated owner"
+    ],
+    "indirect": [],
+    "verificationComponents": [
+      "navbar"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-navbar-card.test.js"
+    ]
+  },
+  {
+    "behavior": "theme-tokens",
+    "file": "custom_components/marao_dashboard/frontend/themes/MaraoDashboard/marao-dashboard.yaml",
+    "anchors": [
+      "primary-font-family:",
+      "font-size-primary:"
+    ],
+    "consumers": [
+      "md_climate_card",
+      "md_title_card",
+      "md_weather_card",
+      "md_room_card",
+      "md_scene_collection_card",
+      "md_security_card",
+      "md_access_slide_action_card",
+      "md_access_hold_action_card",
+      "md_base_card",
+      "md_energy_period_card",
+      "md_media_app_card",
+      "md_camera_card",
+      "md_light_card",
+      "md_cover_card",
+      "md_fan_card",
+      "md_media_card",
+      "md_access_card",
+      "md_sensor_card",
+      "md_switch_card",
+      "md_number_card",
+      "md_wallbox_current_card",
+      "md_vacuum_card",
+      "md_battery_card",
+      "md_dishwasher_card",
+      "md_washing_machine_card",
+      "md_graph_card",
+      "md_toggle_graph_card",
+      "md_timeline_card",
+      "md_navigation_card",
+      "md_entity_group_card",
+      "md_alarm_controls_card",
+      "md_header_card",
+      "md_glance_card",
+      "md_scene_card",
+      "md_access_action_card",
+      "md_floor_plan_card",
+      "md_people_card",
+      "md_schedules_card",
+      "camera-events",
+      "navbar"
+    ],
+    "indirect": [
+      "All surfaces inheriting the changed token, including navigation and details"
+    ],
+    "hooks": [
+      "Use a family selector for local differences; global token affects every inheritor."
+    ],
+    "verificationComponents": [
+      "labels"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-text-scale.test.js"
+    ]
+  },
+  {
+    "behavior": "popup-focus",
+    "file": "custom_components/marao_dashboard/frontend/MaraoNavigation.js",
+    "anchors": [
+      "export function focusRestorer",
+      "export function focusableElements"
+    ],
+    "consumers": [
+      "md_title_card",
+      "md_weather_card",
+      "md_room_card",
+      "md_scene_collection_card",
+      "md_security_card",
+      "md_access_slide_action_card",
+      "md_access_hold_action_card",
+      "md_base_card",
+      "md_energy_period_card",
+      "md_media_app_card",
+      "md_camera_card",
+      "md_light_card",
+      "md_cover_card",
+      "md_climate_card",
+      "md_fan_card",
+      "md_media_card",
+      "md_access_card",
+      "md_sensor_card",
+      "md_switch_card",
+      "md_number_card",
+      "md_wallbox_current_card",
+      "md_vacuum_card",
+      "md_battery_card",
+      "md_dishwasher_card",
+      "md_washing_machine_card",
+      "md_graph_card",
+      "md_toggle_graph_card",
+      "md_timeline_card",
+      "md_navigation_card",
+      "md_entity_group_card",
+      "md_alarm_controls_card",
+      "md_header_card",
+      "md_glance_card",
+      "md_scene_card",
+      "md_access_action_card",
+      "md_floor_plan_card",
+      "md_people_card",
+      "md_schedules_card"
+    ],
+    "hooks": [
+      "Shared focus restoration and popup background boundaries; inspect caller."
+    ],
+    "verificationComponents": [
+      "popup"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-navbar-card.test.js"
+    ],
+    "indirect": [
+      "Popup openers and nested detail surfaces"
+    ]
+  },
+  {
+    "behavior": "group-member-details",
+    "file": "custom_components/marao_dashboard/frontend/MaraoGroupDetails.js",
+    "anchors": [
+      "export function createGroupScope",
+      "export function reconcileGroup"
+    ],
+    "consumers": [
+      "md_entity_group_card"
+    ],
+    "hooks": [
+      "Group scope, generated member controls; inspect member family renderers too."
+    ],
+    "verificationComponents": [
+      "summary-controls"
+    ],
+    "focusedTests": [
+      "tests/frontend/collections.test.js"
+    ],
+    "indirect": [
+      "Generated light/fan/cover/climate/access member controls"
+    ]
+  },
+  {
+    "behavior": "schedule-rendering",
+    "file": "frontend_src/schedules-card.js",
+    "anchors": [
+      "export class MaraoSchedulesCard"
+    ],
+    "consumers": [
+      "md_schedules_card"
+    ],
+    "hooks": [
+      "Editable source; build:editor emits MaraoSchedules.js."
+    ],
+    "verificationComponents": [
+      "schedules"
+    ],
+    "focusedTests": [
+      "tests/frontend/schedules.test.js"
+    ],
+    "indirect": []
+  },
+  {
+    "behavior": "floor-plan-rendering",
+    "file": "custom_components/marao_dashboard/frontend/MaraoFloorPlanCard.js",
+    "anchors": [
+      "export class MaraoFloorPlanCard"
+    ],
+    "consumers": [
+      "md_floor_plan_card"
+    ],
+    "hooks": [
+      "Dedicated floor-plan CSS and light controls"
+    ],
+    "verificationComponents": [
+      "floor-plan"
+    ],
+    "focusedTests": [
+      "tests/frontend/floor-plan.test.js"
+    ],
+    "indirect": []
+  },
+  {
+    "behavior": "timeline-rendering",
+    "file": "custom_components/marao_dashboard/frontend/MaraoRuntime.js",
+    "anchors": [
+      "class MaraoStateTimelineCard"
+    ],
+    "consumers": [
+      "md_timeline_card"
+    ],
+    "hooks": [
+      "Dedicated timeline styles; history data/layout remain shared."
+    ],
+    "verificationComponents": [
+      "chart-details"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-history-cards.test.js"
+    ],
+    "indirect": []
+  },
+  {
+    "behavior": "energy-rendering",
+    "file": "custom_components/marao_dashboard/frontend/MaraoRuntime.js",
+    "anchors": [
+      "class MaraoEnergyPeriodCard"
+    ],
+    "consumers": [
+      "md_energy_period_card"
+    ],
+    "hooks": [
+      "Dedicated energy period surface; history detail shared."
+    ],
+    "verificationComponents": [
+      "chart-details"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-energy-format.test.js"
+    ],
+    "indirect": []
+  }
+]

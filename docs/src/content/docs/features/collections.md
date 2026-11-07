@@ -17,6 +17,8 @@ Pictures are used when available unless you select an icon. Failed pictures fall
 
 Entity Groups summarize selected lights, covers, climates or batteries and open their individual controls. Choose **All entities** or **Active only** for the sheet. Lights default to Active only; the other types default to All entities. Filtering changes presentation, not the complete configured action scope.
 
+The card editor shows members once, using the same expandable rows as navigation settings. Drag the handle to reorder, expand a row to change its entity, display name or icon, and use its overflow menu for full card settings, move controls or deletion. **Add entity** below the list adds one compatible member without replacing existing settings. Changes share the outer card Save/Cancel. Renaming or moving members preserves their individual options; changing a member's entity keeps its section assignment.
+
 | Group | Active means |
 | --- | --- |
 | Lights | On |
@@ -43,3 +45,5 @@ members still count for actions; deleted controls do not. See [popup layouts](..
 Scene collections keep selected options in order, with local names and icons. Opening, viewing or editing a collection does not activate a scene. Confirm changes through the native card dialog's Save control.
 
 See the individual [card references](../../cards/) for editable examples and complete configuration fields.
+
+Groups can also use [embedded Popup content](../popups/#customize-content-in-the-opening-card). In Custom mode, saved popup children define membership independently of parent selections. Hidden children remain members; deleting a child removes it from summary scope. Built-in all/section actions operate only on their containing embedded occurrence. Switching to Automatic retains the custom snapshot. Legacy linked/managed sources keep their existing parent synchronization.

@@ -30,6 +30,7 @@ export function settingsChoices(field,{config={},states={},dashboard={},example=
   }
   if(field.kind==='energy_precision')return {emptyLabel:'Automatic',options:Array.from({length:7},(_,value)=>named(value))};
   if(field.kind==='energy_period')return {options:[{value:'day',label:'Day'},{value:'month',label:'Month'}]};
+  if(key==='alarm_layout')return {clear:false,emptyLabel:'Dropdown',options:[{value:'dropdown',label:'Dropdown'},{value:'grid',label:'Grid'}]};
   if(field.options?.length)return {options:field.options.map(option=>typeof option==='object'?option:named(option))};
   if(example.id==='md_people_card'&&field.path==='columns')return {options:Array.from({length:6},(_,value)=>named(value+1))};
   if(key==='event_provider')return {options:[{value:'auto',label:'Automatic'},{value:'frigate',label:'Frigate'},{value:'unifi_protect',label:'UniFi Protect'},{value:'netatmo',label:'Netatmo'}]};

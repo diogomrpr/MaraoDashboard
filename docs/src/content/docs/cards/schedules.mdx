@@ -4,8 +4,11 @@ description: "Manage device schedules and seasonal timer groups in Home Assistan
 ---
 
 import Playground from '../../../components/Playground.astro';
+import DesignGallery from '../../../design/DesignGallery.astro';
 
 Manage device schedules and seasonal timer groups in Home Assistant.
+
+<DesignGallery cardId="md_schedules_card" />
 
 ## Try it
 
@@ -26,14 +29,15 @@ targets:
   - valve.garden
 ```
 
-An administrator sets up the collection and acknowledges dedicated devices. Home Assistant owns the automations and stop timers; the browser does not need to stay open.
+An administrator sets up the collection and acknowledges dedicated devices. Home Assistant owns its automations; the browser does not need to stay open. Keep native Home Assistant backups before resource changes.
 
-Seasonal groups select which future starts are allowed. Pausing or switching groups does not cancel accepted timed runs.
+Groups are collapsible sections with only one open at a time. The active group opens initially; its switch activates or pauses it. Opening a section does not activate it. Pausing or switching groups does not cancel accepted timed runs. Use the labelled group-add control below the divider.
 
-Timers support selected weekdays/local start times, on-only operation or 1–1440 minute durations. Overlapping timed intervals and duplicate starts within a group are rejected.
+Timer rows show essential settings and an enable switch. Tap a timer to edit its name, local time, on/off action and weekdays in the popup. New timers use the card-configured devices and their parent section. Add a separate off timer rather than a duration; existing duration-based records retain their saved behavior.
 
-Structural external edits and ambiguous ownership are read-only until reconciled. Keep native backups and private recovery exports before resource changes.
+Edits save automatically and errors remain visible. Closing with the top-right close button flushes pending changes; the red trash action deletes the timer. Weekdays use a themed multi-select dropdown. Add a timer with the left-aligned plus; Delete group appears beneath it on the right.
 
+Configuration reloads and automation state changes refresh automatically. The card has no manual Refresh, Delete collection, device-status list, recovery export, duration editor or per-timer group/device picker. Structural external edits and ambiguous ownership remain read-only until reconciled.
 ## Settings
 
 The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.

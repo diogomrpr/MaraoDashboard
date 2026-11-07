@@ -180,3 +180,15 @@ def test_climate_additive_options_validate_without_rewriting_source():
         fields = {field["key"]: field for card in catalog["cards"] if card["id"] == "md_climate_card" for field in card["variables"]}
         assert fields["enable_popup"]["default"] is True
         assert fields["humidity_entity"]["domains"] == ["sensor"]
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_dishwasher_label_setting_preserves_saved_options(value):
+    card = {"template": "md_dishwasher_card", "entity_id": "sensor.dishwasher", "variables": {"show_reading_names": value, "active_program_entity": "sensor.program", "future": []}}
+    source = {"config_version": 2, "name": "Test", "landing_page": "home", "pages": [{"name": "Home", "path": "home", "entities": [card]}]}
+    before = deepcopy(source)
+    validate_pages(source, {"md_dishwasher_card": ["sensor"]})
+    assert source == before
+    card["variables"]["show_reading_names"] = "false"
+    with pytest.raises(ValueError, match="Show reading labels must be a boolean"):
+        validate_pages(source, {"md_dishwasher_card": ["sensor"]})

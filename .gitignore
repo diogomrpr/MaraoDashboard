@@ -43,6 +43,7 @@ yarn-error.log*
 !/.agents/skills/marao-ha-integration/
 !/.agents/skills/marao-ha-frontend/
 !/.agents/skills/marao-testing/
+!/.agents/skills/marao-card-design/
 
 # Generated build output
 ha-test/.cache/
@@ -74,3 +75,7 @@ ha-test/ssh/
 .ha-local-ssh/
 marao-dashboard-local-dev
 marao-dashboard-local-dev.pub
+
+docs/.design/
+docs/public/gallery/
+.card-design/

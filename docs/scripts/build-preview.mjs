@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {build} from 'esbuild';
 import * as mdi from '@mdi/js';
+import {parse} from 'yaml';
 
 const docs=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),root=path.dirname(docs),frontend=path.join(root,'custom_components/marao_dashboard/frontend');
 const mime={'.svg':'image/svg+xml','.png':'image/png','.ttf':'font/ttf','.css':'text/css','.woff2':'font/woff2'};
@@ -11,11 +12,20 @@ const dataURL=async filename=>`data:${mime[path.extname(filename)]||'application
 const staticImport=/import\(new URL\((`[^`]+`|'[^']+'|"[^"]+"),\s*import\.meta\.url\)(?:\.href)?\)/g;
 
 /** Bundle the existing runtime, adapting only its host/asset boundaries for an opaque frame. */
-export async function buildPreview(){
+export async function buildPreview({design=false,published=false}={}){
   const version=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8')).version;
   const mdiLicense=await fs.readFile(fileURLToPath(import.meta.resolve('@mdi/js/LICENSE')),'utf8');
   const iconMap=Object.fromEntries(Object.entries(mdi).filter(([name,value])=>name.startsWith('mdi')&&typeof value==='string').map(([name,value])=>['mdi:'+name.slice(3).replace(/[A-Z]/g,(letter,i)=>(i?'-':'')+letter.toLowerCase()),value]));
+  const editable=design&&!published;
+  const editableEntries={MaraoSchedules:'schedules-card.js',MaraoNativeModel:'legacy-model.js',MaraoNativeDashboard:'native-strategy.js',MaraoNativeBootstrap:'native-bootstrap.js',MaraoNativeCards:'native-cards.js',MaraoNativeCardMetadata:'native-card-metadata.js',MaraoOrdinaryMigration:'ordinary-migration-ui.js',MaraoTheme:'native-theme.js',MaraoHistoryData:'history-data.js',MaraoHistoryChart:'history-chart.js'};
   const plugin={name:'marao-offline-preview',setup(builder){
+    if(editable){
+      builder.onResolve({filter:/Marao\w+\.js$/},args=>{
+        const entry=editableEntries[path.basename(args.path,'.js')];
+        if(entry)return {path:path.join(root,'frontend_src',entry)};
+      });
+      builder.onLoad({filter:/marao-dashboard\.yaml$/},async args=>({contents:JSON.stringify(parse(await fs.readFile(args.path,'utf8'))),loader:'json'}));
+    }
     builder.onResolve({filter:/^virtual:preview-icons$/},()=>({path:'icons',namespace:'preview'}));
     builder.onLoad({filter:/.*/,namespace:'preview'},()=>({contents:'/*! @license @mdi/js\n'+mdiLicense.replaceAll('*/','* /')+'\n*/\nexport default '+JSON.stringify(iconMap),loader:'js'}));
     builder.onResolve({filter:/MaraoCamera\.js$/},()=>({path:path.join(docs,'playground/preview-assets-camera.js')}));
@@ -54,13 +64,13 @@ export async function buildPreview(){
     });
     builder.onResolve({filter:/^\.\/Marao\w+\.js$/},args=>({path:path.join(frontend,path.basename(args.path))}));
   }};
-  const result=await build({entryPoints:[path.join(docs,'playground/preview-entry.js')],bundle:true,write:false,format:'esm',platform:'browser',target:'es2022',minify:true,legalComments:'eof',plugins:[plugin],define:{__MARAO_VERSION__:JSON.stringify(version)},logLevel:'warning'});
+  const result=await build({entryPoints:[path.join(docs,'playground/preview-entry.js')],bundle:true,write:false,format:'esm',platform:'browser',target:'es2022',minify:true,legalComments:'eof',plugins:[plugin],define:{__MARAO_VERSION__:JSON.stringify(version),__MARAO_DESIGN_PREVIEW__:JSON.stringify(design)},logLevel:'warning'});
   const script=result.outputFiles[0].text.replace(/<\/script/gi,'<\\/script');
   if(/import\(new URL|import\(\w+\.href\)/.test(script))throw new Error('Preview contains an unbundled runtime import.');
   const hash=createHash('sha256').update(script).digest('base64');
   const policy=`default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline' data:; img-src data:; font-src data:; media-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'`;
   const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${policy}"><title>Marao card preview</title><style>html{font-family:Montserrat,system-ui,sans-serif;color:var(--primary-text-color,#263338);background:var(--primary-background-color,#f3f3ee)}body{margin:0;min-width:0;min-height:460px}*{box-sizing:border-box}#status{padding:0 16px 12px;overflow-wrap:anywhere;font-size:14px}#status:empty{display:none}home-assistant{display:block;min-height:420px}</style></head><body><main id="preview"></main><p id="status" role="status"></p><script type="module">${script}</script></body></html>`;
-  const output=path.join(docs,'public/playground/frame.html');await fs.mkdir(path.dirname(output),{recursive:true});await fs.writeFile(output,html);
+  const output=path.join(docs,published?'public/gallery/frame.html':design?'.design/frame.html':'public/playground/frame.html');await fs.mkdir(path.dirname(output),{recursive:true});await fs.writeFile(output,html);
   await fs.writeFile(path.join(path.dirname(output),'icons.json'),JSON.stringify({license:mdiLicense,icons:iconMap}));
   return {output,bytes:Buffer.byteLength(html),version};
 }

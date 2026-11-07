@@ -80,3 +80,26 @@ test('color popup changes update the fictional light’s authoritative color and
   assert.deepEqual(simulation.hass.states['light.living_room'].attributes.hs_color,[214.3,13.7]);
   assert.deepEqual(fixtureStates['light.living_room'].attributes.rgb_color,[255,190,100]);
 });
+
+
+test('energy preview statistics produce usable day and month consumption including timezone boundaries',async()=>{
+  const {periodRange,statisticsBuckets,energyTotal}=await import('../../frontend_src/history-data.js');
+  const simulation=createSimulation({states:fixtureStates});
+  const metadata=await simulation.hass.callWS({type:'recorder/get_statistics_metadata',statistic_ids:['sensor.energy']});
+  assert.equal(metadata[0].statistics_unit_of_measurement,'kWh');
+  for(const period of ['day','month']){
+    const range=periodRange('2026-03-29T12:00:00Z',0,period,'Europe/Lisbon');
+    const response=await simulation.hass.callWS({type:'recorder/statistics_during_period',statistic_ids:['sensor.energy'],start_time:new Date(range.start).toISOString(),end_time:new Date(range.end).toISOString(),period:period==='month'?'day':'hour',types:['change']});
+    const records=response['sensor.energy'];
+    const result=statisticsBuckets(records,{range,period,timeZone:'Europe/Lisbon',now:range.end});
+    assert.equal(records.length,period==='day'?23:31);
+    assert.equal(records[0].start,+range.start);
+    assert.equal(records.at(-1).end,+range.end);
+    assert.ok(result.samples.every(sample=>Number.isFinite(sample.value)));
+    assert.equal(result.limited,false);
+    assert.ok(Math.abs(energyTotal(result.samples)-records.length*(period==='day'?.4:6.8))<1e-8);
+  }
+  const empty=createSimulation({states:fixtureStates,scenario:{simulation:{empty:true}}});
+  assert.deepEqual(await empty.hass.callWS({type:'recorder/statistics_during_period',statistic_ids:['sensor.energy']}),{'sensor.energy':[]});
+  empty.dispose();simulation.dispose();
+});

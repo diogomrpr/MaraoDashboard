@@ -1,3 +1,4 @@
+import {popupContentError} from './MaraoPopupContent.js';
 import {memberId,summarySections,collectionLabel} from './MaraoCollections.js';
 import {popupCanonical,createManagedView,popupHashFor,popupDashboardCards} from './MaraoPopupManaged.js';
 import {commitPopupDocument,reconcilePopupTransaction,popupAuthoringAllowed,POPUP_UNCERTAIN} from './MaraoPopupTransaction.js';
@@ -11,6 +12,7 @@ export const popupRole = config => POPUP_ROLES.includes(config.template)
   && !(config.template==='md_access_card'&&config.variables?.access_mode&&!['auto','popup'].includes(config.variables.access_mode));
 export const canonicalLayout = popupCanonical;
 export function popupViewError(config) {
+  const contentError=popupContentError(config);if(contentError)return contentError;
   if(Object.hasOwn(config,'popup_view') && (typeof config.popup_view!=='string'||!/^[a-z0-9][a-z0-9_-]*$/.test(config.popup_view)))return 'Choose a same-dashboard Sections view.';
 }
 export function resolvePopupView(document,path) {
@@ -112,6 +114,57 @@ export function appendPopupView(document,opener,currentPath,view) {
 }
 
 const popupPT={
+  'Replacing popup:':'Popup a substituir:',
+  "Popup content":"Conteúdo do popup",
+  "Custom":"Personalizado",
+  "Choose a popup template":"Escolher um modelo de popup",
+  "Choose a popup template.":"Escolha um modelo de popup.",
+  "Choose compatible entities for this template.":"Escolha entidades compatíveis com este modelo.",
+  "Template entities":"Entidades do modelo",
+  "Template":"Modelo",
+  "Empty":"Vazio",
+  "Lights":"Luzes",
+  "Covers":"Estores",
+  "Batteries":"Baterias",
+  "Climate group":"Grupo de climatização",
+  "Scene Collection":"Coleção de cenas",
+  "Climate":"Climatização",
+  "Media":"Multimédia",
+  "Camera":"Câmara",
+  "Energy Period":"Período de energia",
+  "Graph history":"Histórico do gráfico",
+  "Security":"Segurança",
+  "Access":"Acesso",
+  "Floor Plan lighting":"Iluminação da planta",
+  "Image ID":"ID da imagem",
+  "Replace popup content":"Substituir conteúdo do popup",
+  "Copy current popup":"Copiar popup atual",
+  "Applying replaces this card’s popup draft. Linked sources stay unchanged. Cancel the card dialog to discard all edits.":"Aplicar substitui o conteúdo provisório deste popup. As origens associadas são mantidas. Cancele o diálogo do cartão para descartar todas as alterações.",
+  "Preview a template before applying it.":"Pré-visualize um modelo antes de o aplicar.",
+  "Customized children keep their own targets. Edit them here; parent changes do not update them.":"Os cartões personalizados mantêm os seus próprios destinos. Edite-os aqui; as alterações do cartão de origem não os atualizam.",
+  "Preview is available when the native view host has loaded.":"A pré-visualização estará disponível quando a vista nativa carregar.",
+  "Preview":"Pré-visualizar",
+  "Apply":"Aplicar",
+  "Visual":"Visual",
+  "Title":"Título",
+  "Section":"Secção",
+  "Column span":"Colunas da secção",
+  "Card columns":"Colunas do cartão",
+  "Move section up":"Mover secção para cima",
+  "Move section down":"Mover secção para baixo",
+  "Delete section":"Eliminar secção",
+  "Add section":"Adicionar secção",
+  "This popup content needs a compatible Marao version.":"Este conteúdo de popup exige uma versão compatível do Marao.",
+  "Popup content is invalid.":"O conteúdo do popup é inválido.",
+  "Popup content must use a native Sections layout.":"O conteúdo do popup exige uma disposição nativa de Secções.",
+  "Popup content contains an invalid card or section.":"O conteúdo do popup contém um cartão ou uma secção inválidos.",
+  "This popup cannot be copied losslessly. Keep editing its linked layout.":"Não é possível copiar este popup sem perdas. Continue a editar a disposição associada.",
+  "Popup source changed. Preview the copy again.":"A origem do popup mudou. Pré-visualize novamente a cópia.",
+  "Height":"Altura",
+  "Maximum height":"Altura máxima",
+  "Icon":"Ícone",
+  "The card changed. Close and try again.":"O cartão mudou. Feche e tente novamente.",
+
   'Popup layout':'Disposição do popup','Automatic':'Automática','Edit popup':'Editar popup',
   'Save this card before editing its popup.':'Guarde este cartão antes de editar o seu popup.',
   'Save this dashboard before editing its popup.':'Guarde este painel antes de editar o seu popup.',
