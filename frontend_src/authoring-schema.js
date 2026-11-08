@@ -30,6 +30,7 @@ function cardShape(entry,docs) {
   }
   if(entry.entity_group||entry.scene_collection||entry.people)properties.entities=members;
   if(entry.entity_group)Object.assign(properties,{id:{type:'string'},entity_type:{enum:['light','cover','battery','climate']},popup_filter:{enum:['active','all']},summary_sections:{type:'array',items:{type:'object',additionalProperties:true}}});
+  if(entry.id==='md_media_card')properties.apple_tv={...properties.apple_tv,properties:{plex:{properties:{display:{enum:['inline','popup'],default:'inline'}}}}};
   if(entry.people)properties.columns={type:'integer',minimum:1,maximum:6};
   if(entry.schedules)Object.assign(properties,{group_id:{type:'string'},targets:{type:'array',items:entity}});
   properties.variables={...object,properties:variables};

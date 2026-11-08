@@ -2476,7 +2476,7 @@ test('Plex component retains browse content on HA updates, navigates within one 
   const {MaraoPlexWatchCard}=await import('../../custom_components/marao_dashboard/frontend/MaraoPlex.js');
   const beforeDocument=globalThis.document,beforeWindow=globalThis.window;
   t.after(()=>{globalThis.document=beforeDocument;globalThis.window=beforeWindow;});
-  const node=tag=>Object.assign(new EventTarget(),{tagName:tag,children:[],dataset:{},style:{},attributes:new Map(),isConnected:true,
+  const node=tag=>Object.assign(new EventTarget(),{tagName:tag,children:[],dataset:{},style:{},classList:{toggle(){}},attributes:new Map(),isConnected:true,
     append(...items){for(const item of items){item.parentNode=this;this.children.push(item);}},replaceChildren(...items){this.children=[];this.append(...items);},
     setAttribute(key,value){this.attributes.set(key,value);},getAttribute(key){return this.attributes.get(key);},removeAttribute(key){this.attributes.delete(key);},
     focus(){},remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(child=>child!==this);},
@@ -2509,7 +2509,7 @@ test('Plex component does not automatically retry failed reads or accept obsolet
   const parent={entity_id:'media_player.safe',apple_tv:{plex:{client_entity:'media_player.plex_safe',scan_clients_entity:'button.scan',app_source:'Plex',library_root:{media_content_type:'server',media_content_id:'plex://safe/server'}}}};
   let calls=0,release;const connection={},hass={connected:true,user:{id:'one'},connection,states:{'media_player.safe':{state:'idle',attributes:{}}},callService(){},callWS:async()=>{calls++;throw new Error('Browse rejected');}};
   const card=new MaraoPlexWatchCard();card.setConfig({parent});card.isConnected=true;card.hass=hass;await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(card._contentError,'Browse rejected');for(let index=0;index<4;index++){card.hass={...hass};card.preview=false;}assert.equal(calls,1);
+  assert.equal(card._contentError,'');assert.deepEqual(card._home.failures,{resume:'Browse rejected',movies:'Browse rejected',shows:'Browse rejected'});for(let index=0;index<4;index++){card.hass={...hass};card.preview=false;}assert.equal(calls,1);
   const delayed={...hass,callWS:()=>new Promise(resolve=>{release=resolve;})};card._reset();card.hass=delayed;await new Promise(resolve=>setImmediate(resolve));
   delayed.user.id='two';
   const freshReads=[],fresh={...delayed,callWS:async command=>{freshReads.push(command);return{media_content_type:'server',media_content_id:'plex://safe/server',title:'New account',children:[]};}};card.hass=fresh;await new Promise(resolve=>setImmediate(resolve));

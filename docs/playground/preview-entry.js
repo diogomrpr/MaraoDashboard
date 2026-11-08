@@ -75,7 +75,7 @@ async function render(message){
   if(!allowed.has(message.config?.type))throw new Error('Choose a public Marao card.');
   if(!message.states||Array.isArray(message.states)||typeof message.states!=='object')throw new Error('Invalid fictional entity states.');
   const revision=++renderRevision;
-  request=message;simulation?.dispose();simulation=null;card?.remove();card=null;holder.replaceChildren();status.textContent='';globalThis.__maraoPreview.reset();
+  request=message;lastHeight=0;simulation?.dispose();simulation=null;card?.remove();card=null;holder.replaceChildren();status.textContent='';globalThis.__maraoPreview.reset();
   for(const dialog of root.shadowRoot.querySelectorAll('dialog'))dialog.remove();
   const dashboard=clone(message.dashboard||message.scenario?.dashboard||defaultDashboard());
   root.lovelace={config:dashboard,rawConfig:dashboard,editMode:false,current_view:0,setEditMode(){showError('Dashboard editing is available in Home Assistant.');}};
@@ -87,6 +87,12 @@ async function render(message){
   if(message.config.type==='custom:marao-navbar-card'){
     setDashboardNavigation(root,{...safePreviewData(message.config),show_cache_reset:false,show_editor_button:false});
     card=root.shadowRoot.querySelector('[data-marao-navigation-surface]');
+  }else if(message.scenario?.presentation==='plex-library'&&message.config.type==='custom:marao-media-card'){
+    await import('../../custom_components/marao_dashboard/frontend/MaraoPlex.js');
+    if(revision!==renderRevision)return;
+    card=document.createElement('marao-plex-watch-card');
+    card.setConfig({parent:safePreviewData(message.config),full:message.config.apple_tv?.plex?.display!=='popup'});
+    card.hass=simulation.hass;holder.append(card);
   }else{
     const element=document.createElement(message.config.type.slice(7));holder.append(element);card=element;card.hass=simulation.hass;card.setConfig(safePreviewData(message.config));
   }

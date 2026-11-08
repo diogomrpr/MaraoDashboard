@@ -842,6 +842,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
     if (card.id === 'md_media_card') properties.apple_tv = { anyOf: [{ type: ['boolean', 'null'] }, object({
       remote_entity: binding(['remote']), volume_remote_entity: binding(['remote', 'media_player']),
       plex: {anyOf:[{const:false},{...object({
+        display:{type:'string',enum:['inline','popup']},
         playback_app:{type:'string',enum:['plex','rivulet']},browse_entity:binding(['media_player']),
         client_entity:binding(['media_player']),scan_clients_entity:binding(['button']),app_source:{type:'string',minLength:1},
         library_root:{...object({media_content_id:{type:'string',pattern:'^plex://'},media_content_type:{const:'server'}}),required:['media_content_id','media_content_type']},
