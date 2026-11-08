@@ -42,3 +42,25 @@
 - Preview browser/watch closed; no persistent test edits. All five outcomes reviewed, including the explicit nested-default host limitation. Final assets remain installed. Manual watch list: card Help, starter target/source selection, entity recommendations, new picker language, native Save/Cancel/default-return behavior on the user's HA version.
 
 - Preview shutdown returned a diagnostic for an in-flight `MaraoFrontend.release.json` fetch aborted by `Browser.close` at `17:57:14 UTC`; that preview exit is not reported as a clean pass. A fresh read-only installed-manifest check then returned 200 OK and matched the complete `0.26.0` graph. No reinstall, warning suppression or runtime-error relabeling was used.
+
+## Gallery authoring follow-up — 2026-11-07
+
+- [x] Audit the actual saved gallery and realistic pages, recording starting commit, full occurrence inventory, effective configuration fields and shared consumers.
+- [x] Complete effective native forms and public Security action discovery; preserve legacy field locations, aliases and opaque data.
+- [x] Add shared editor entry points for existing runtime details, popup headers/group actions and native grid/stack editing for legacy containers.
+- [x] Correct neutral Light fixture bindings without weakening safety validation; retain exact historical fixtures and Header retirement.
+- [x] Extend existing targeted checks with gallery-wide authoring and preservation cases; keep documentation/catalog fields aligned.
+- [x] Rebuild and install final frontend, correct only affected safe gallery bindings with exact backup/concurrency comparison, and verify served identity.
+- [x] Perform representative native-browser editing/Cancel checks, retain detailed authoring coverage evidence and hand off installed changes.
+
+Authoring follow-up acceptance and limits are recorded in [gallery-authoring-evidence.md](gallery-authoring-evidence.md). Final installed identity: `adc74d52d1926222300d5c7eae3f703629b27145c9843e40cfe91ed4dfb3db22`.
+
+## Requested Chrome audit — 2026-11-07–08
+
+- [x] Visit each individual/combined gallery route and exercise representative existing native editors for every card family, including legacy details and dedicated Floor Plan editing.
+- [x] Exercise all 13 filtered templates and Empty, native picker creation, nested dialogs, section/child layout and visibility, duplicate/delete/template recognition, invalid YAML and combined outer Save/Cancel restoration.
+- [x] Fix browser-observed grid metadata/loading and nested-dialog lifecycle defects at their shared roots; verify labels and native text-autofill configuration.
+- [x] Run focused regressions, rebuild/install final frontend, verify Chrome's active asset identity and restore temporary saved configuration/browser preferences.
+- [ ] Observe completed physical popup card dragging within/between sections and section reorder. Available input also failed on the ordinary native page; callbacks/move controls do not establish gesture success.
+
+Actual coverage, unresolved environment/fixture diagnostics and the physical-drag limitation are recorded in [chrome-audit-evidence.md](chrome-audit-evidence.md). This record does not replace the earlier historical evidence with an unqualified full-runtime pass.

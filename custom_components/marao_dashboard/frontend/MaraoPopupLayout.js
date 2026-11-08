@@ -7,6 +7,7 @@ export const popupHash = popupHashFor;
 export const popupRole = config => POPUP_ROLES.includes(config.template)
   && !(config.template==='md_climate_card'&&config.variables?.enable_popup===false)
   && !(config.template==='md_graph_card'&&!config.variables?.history_popup)
+  && !(config.template==='md_energy_period_card'&&config.popup===true)
   && !(config.template==='md_media_card'&&config.variables?.media_display==='inline')
   && !(config.template==='md_security_card'&&config.tap_action)
   && !(config.template==='md_access_card'&&config.variables?.access_mode&&!['auto','popup'].includes(config.variables.access_mode));

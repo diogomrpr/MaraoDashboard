@@ -25,7 +25,7 @@ type: custom:marao-base-card
 entity_id: sensor.house_power
 ```
 
-Compatible entity domains: `sensor`, `binary_sensor`, `number`, `input_number`, `switch`, `input_boolean`.
+Compatible entity domains: `sensor`, `binary_sensor`, `number`, `input_number`, `switch`, `input_boolean`, `input_select`, `media_player`.
 
 Tap an Activity icon to inspect recorded events with date and type filters. Optional variables.activity_entities adds explicitly related sources. Automatic Updated and last-activation timestamps move into Activity; timestamp-sensor readings remain data.
 
@@ -39,9 +39,18 @@ The table lists the shared catalog fields and this card’s structured options. 
 
 | YAML path | Setting | Value type | Catalog default | Behavior |
 | --- | --- | --- | --- | --- |
-| `entity_id` | Entity | entity | Not set | A sensor, binary_sensor, number, input_number, switch, input_boolean entity from your Home Assistant. Searchable suggestions are available. |
+| `entity_id` | Entity | entity | Not set | A sensor, binary_sensor, number, input_number, switch, input_boolean, input_select, media_player entity from your Home Assistant. Searchable suggestions are available. |
 | `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `show_name` | Show name | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_icon` | Show icon | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_state` | Show state | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_label` | Show label | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `tap_action` | tap action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `hold_action` | hold action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `double_tap_action` | double tap action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `variables.md_label_prefix` | State label prefix | text | Not set | State label prefix for this card. |
+| `variables.active_color` | Active color | color | Not set | Active color for this card. |
 | `variables.card_color` | Card color | color | Not set | Optional card background color. |
 | `variables.custom_label` | Label prefix | text | Not set | Binary state is shown by the card and icon. Prefix-only labels are omitted; useful labels and readings remain. |
 | `variables.action_color` | Action color | color | Not set | Optional action background color; does not change the action’s safety rules. |

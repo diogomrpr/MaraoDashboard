@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {popupCardChoices} from '../../frontend_src/popup-content-editor.js';
-import {nativeCardStub} from '../../frontend_src/native-cards.js';
+import {nativeCardStub,nativeEntitySuggestion} from '../../frontend_src/native-cards.js';
+import {composeNativeCard,validateNativeCardConfig} from '../../frontend_src/card-composition.js';
 import {popupTemplatesFor,matchingPopupTemplate,popupTemplateCandidate,preparePopupCopy} from '../../frontend_src/popup-content.js';
 
 test('popup templates are filtered by native and generic family and Entity Group kind',()=>{
@@ -78,3 +79,58 @@ test('registered native child editors load without fetching dashboard or broad p
   }finally{globalThis.customElements=previous;}
 });
 
+
+
+test('Access templates retain the opening slider and safe close button for explicit popup mode',()=>{
+  for(const [entity,service,label] of [['lock.safe','lock','Unlock slider and lock button'],['cover.safe','cover','Opening slider and close button']]){
+    const parent={type:'custom:marao-access-card',entity_id:entity,variables:{access_mode:'popup',action_color:'blue'},opaque:{keep:true}};
+    const before=structuredClone(parent),context={entities:[{entity_id:entity,device_class:'door',supported_features:3}]};
+    assert.equal(popupTemplatesFor(parent)[0].label,label);
+    const candidate=popupTemplateCandidate(parent,'access',{},context),children=candidate.layout.sections[0].cards;
+    assert.deepEqual(children.map(card=>card.type),['custom:marao-access-slide-action-card','custom:marao-access-action-card']);
+    assert.deepEqual(children.map(card=>card.variables.action_service),service==='lock'?['lock.unlock','lock.lock']:['cover.open_cover','cover.close_cover']);
+    assert.ok(children.every(card=>card.variables.access_mode===undefined));
+    for(const child of children){validateNativeCardConfig(child,context.entities);const result=composeNativeCard(child,{...context,instanceId:'child'});assert.equal(result.card.template,child.template);assert.deepEqual(result.popups,[]);}
+    assert.deepEqual(parent,before);
+    const openOnly=popupTemplateCandidate({...parent,entity_id:'cover.opener'},'access',{}, {entities:[{entity_id:'cover.opener',device_class:'door',supported_features:1}]}).layout.sections[0].cards;
+    assert.deepEqual(openOnly.map(card=>card.type),['custom:marao-access-slide-action-card']);
+  }
+});
+
+test('the native popup picker exposes independently configurable and validated access controls',()=>{
+  const choices=popupCardChoices(),hass={states:{'lock.safe':{entity_id:'lock.safe',state:'locked',attributes:{}}}};
+  for(const [role,label]of [['md_access_slide_action_card','Access opener'],['md_access_action_card','Access close / lock']]){
+    assert.equal(choices.find(choice=>choice.value===role)?.label,label);
+    const card=nativeCardStub(role,hass,['lock.safe']);validateNativeCardConfig(card);
+    const result=composeNativeCard(card,{instanceId:'picker'});assert.equal(result.card.template,role);assert.deepEqual(result.popups,[]);
+    if(role==='md_access_action_card'){
+      assert.equal(result.card.variables.action_service,'lock.lock');
+      assert.throws(()=>validateNativeCardConfig({...card,variables:{...card.variables,action_service:'lock.unlock'}}),/access opener slide/);
+    }else assert.throws(()=>validateNativeCardConfig({...card,tap_action:{action:'call-service',service:'lock.unlock'}}),/strict slide/);
+  }
+});
+
+
+test('access picker defaults and suggestions skip covers lacking the selected capability',()=>{
+  const hass={states:{'cover.open_only':{state:'closed',attributes:{device_class:'door',supported_features:1}},'cover.close_only':{state:'open',attributes:{device_class:'door',supported_features:2}},'lock.safe':{state:'locked',attributes:{}}}};
+  assert.equal(nativeCardStub('md_access_action_card',hass,['cover.open_only','lock.safe']).entity_id,'lock.safe');
+  assert.equal(nativeCardStub('md_access_slide_action_card',hass,['cover.close_only','lock.safe']).entity_id,'lock.safe');
+  assert.equal(nativeCardStub('md_access_slide_action_card',hass,['cover.open_only']).entity_id,'cover.open_only');
+  assert.equal(nativeCardStub('md_access_action_card',hass,['cover.close_only']).entity_id,'cover.close_only');
+  assert.equal(nativeEntitySuggestion('md_access_action_card',hass,'cover.open_only'),null);
+  assert.equal(nativeEntitySuggestion('md_access_slide_action_card',hass,'cover.close_only'),null);
+});
+
+test('legacy standalone popups copy their current cards and grouped controls into an independent native canvas',()=>{
+  const popup={type:'custom:marao-popup-card',hash:'#details',name:'Details',cards:[{type:'custom:marao-card',template:'md_light_card',entity:'light.safe',variables:{enable_slider:false},future:[]},{type:'markdown',content:'Kept'}],future:false};
+  const dashboard={views:[{path:'home',cards:[popup]}]},before=structuredClone(dashboard);
+  const prepared=preparePopupCopy(popup,dashboard,'home');
+  assert.deepEqual(prepared.content.layout,{type:'sections',title:'Details',max_columns:1,sections:[{type:'grid',cards:[{...popup.cards[0],type:'custom:marao-light-card',grid_options:{columns:12}},{...popup.cards[1],grid_options:{columns:12}}]}]});
+  assert.deepEqual(prepared.accept(dashboard),prepared.content);assert.deepEqual(dashboard,before);
+  const changed=structuredClone(dashboard);changed.views[0].cards[0].cards=[];assert.throws(()=>prepared.accept(changed),/missing or duplicated|source changed/);
+  const group={...popup,entity_group:{id:'lights',entity_type:'light',popup_filter:'all',members:[{entity_id:'light.safe',future:[]}],entities:['light.safe']}};
+  const copied=preparePopupCopy(group,{views:[]},'home').content;
+  const cards=copied.layout.sections.flatMap(section=>section.cards);
+  assert.ok(cards.some(card=>card.type==='custom:marao-summary-actions'&&card.popup_scope==='embedded'));
+  assert.ok(cards.some(card=>card.entity_id==='light.safe'&&card.future.length===0));
+});

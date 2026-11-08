@@ -215,7 +215,7 @@
     },
     {
       "id": "md_access_slide_action_card",
-      "label": "Access",
+      "label": "Access opener",
       "icon": "mdi:door-open",
       "domains": [
         "lock",
@@ -276,17 +276,18 @@
           "multiple": true
         }
       ],
-      "hidden": true
+      "hidden": false
     },
     {
       "id": "md_access_hold_action_card",
-      "label": "Access",
+      "label": "Security action",
       "icon": "mdi:shield-alert",
       "domains": [
         "button",
         "switch",
         "input_boolean",
-        "alarm_control_panel"
+        "alarm_control_panel",
+        "lock"
       ],
       "description": "A deliberate security service action with a 1.2-second hold.",
       "variables": [
@@ -338,9 +339,17 @@
           "advanced": true,
           "description": "",
           "multiple": true
+        },
+        {
+          "key": "action_service",
+          "label": "Action service",
+          "kind": "text",
+          "selector": "text",
+          "advanced": true,
+          "description": ""
         }
       ],
-      "hidden": true
+      "hidden": false
     },
     {
       "id": "md_base_card",
@@ -352,7 +361,9 @@
         "number",
         "input_number",
         "switch",
-        "input_boolean"
+        "input_boolean",
+        "input_select",
+        "media_player"
       ],
       "description": "A compact entity reading or status.",
       "variables": [
@@ -1313,7 +1324,8 @@
       "icon": "mdi:washing-machine",
       "domains": [
         "binary_sensor",
-        "sensor"
+        "sensor",
+        "input_select"
       ],
       "description": "A focused running-state card for a washing machine.",
       "variables": []
@@ -1412,6 +1424,17 @@
           "selector": "energy_precision",
           "advanced": false,
           "description": "Auto trims trailing zeros. Choose 0\u20136 fixed decimal places."
+        },
+        {
+          "key": "graph_entity",
+          "label": "History sensor",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "domains": [
+            "sensor"
+          ]
         }
       ]
     },
@@ -1420,7 +1443,10 @@
       "label": "Toggle graph",
       "icon": "mdi:chart-areaspline",
       "domains": [
-        "sensor"
+        "sensor",
+        "switch",
+        "input_boolean",
+        "binary_sensor"
       ],
       "description": "A live metric graph that also controls a related toggle.",
       "variables": [
@@ -1550,6 +1576,17 @@
           "selector": "energy_precision",
           "advanced": false,
           "description": "Auto trims trailing zeros. Choose 0\u20136 fixed decimal places."
+        },
+        {
+          "key": "graph_entity",
+          "label": "History sensor",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "domains": [
+            "sensor"
+          ]
         }
       ]
     },
@@ -1619,6 +1656,15 @@
         {
           "key": "activity_entities",
           "label": "Related activity entities",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "multiple": true
+        },
+        {
+          "key": "summary_entities",
+          "label": "Summary entities",
           "kind": "entity",
           "selector": "entity",
           "advanced": true,
@@ -1828,7 +1874,7 @@
     },
     {
       "id": "md_access_action_card",
-      "label": "Access",
+      "label": "Access close / lock",
       "icon": "mdi:lock",
       "domains": [
         "lock",
@@ -1894,7 +1940,7 @@
           "multiple": true
         }
       ],
-      "hidden": true
+      "hidden": false
     },
     {
       "id": "md_floor_plan_card",
@@ -2144,5 +2190,39 @@
         }
       ]
     }
-  }
+  },
+  "common_variables": [
+    {
+      "key": "custom_label",
+      "label": "Custom state label",
+      "kind": "text",
+      "selector": "text",
+      "advanced": true,
+      "description": ""
+    },
+    {
+      "key": "md_label_prefix",
+      "label": "State label prefix",
+      "kind": "text",
+      "selector": "text",
+      "advanced": true,
+      "description": ""
+    },
+    {
+      "key": "card_color",
+      "label": "Card color",
+      "kind": "color",
+      "selector": "color",
+      "advanced": true,
+      "description": ""
+    },
+    {
+      "key": "active_color",
+      "label": "Active color",
+      "kind": "color",
+      "selector": "color",
+      "advanced": true,
+      "description": ""
+    }
+  ]
 }

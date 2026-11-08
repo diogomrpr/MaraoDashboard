@@ -1345,6 +1345,7 @@ function historyEntityState(hass, config) {
 }
 
 class MaraoStateTimelineCard extends HTMLElement {
+  static async getConfigElement(){await import(new URL('./MaraoNativeCardEditor.js'+new URL(import.meta.url).search,import.meta.url));return document.createElement('marao-native-card-editor');}
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
@@ -1684,6 +1685,7 @@ function energyTariff(config, hass, preferences) {
 }
 
 class MaraoEnergyPeriodCard extends HTMLElement {
+  static async getConfigElement(){await import(new URL('./MaraoNativeCardEditor.js'+new URL(import.meta.url).search,import.meta.url));return document.createElement('marao-native-card-editor');}
   constructor() {
     super();
     this.attachShadow({ mode: "open" });

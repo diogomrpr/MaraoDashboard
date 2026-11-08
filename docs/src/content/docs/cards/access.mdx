@@ -23,9 +23,13 @@ In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste
 ```yaml
 type: custom:marao-access-card
 entity_id: lock.front_door
+variables:
+  access_mode: popup
 ```
 
 Compatible entity domains: `lock`, `cover`, `button`, `switch`, `script`, `input_boolean`, `alarm_control_panel`.
+
+In Popup settings, choose Unlock slider and lock button for a lock, or Opening slider and close button for a door/garage cover. From Empty, use native Add card to select Marao Access opener and Marao Access close / lock; both are independently configurable. The outer Save/Cancel controls all popup changes.
 
 Tap an Activity icon to inspect recorded events with date and type filters. Optional variables.activity_entities adds explicitly related sources. Automatic Updated and last-activation timestamps move into Activity; timestamp-sensor readings remain data.
 
@@ -42,6 +46,17 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `entity_id` | Entity | entity | Not set | A lock, cover, button, switch, script, input_boolean, alarm_control_panel entity from your Home Assistant. Searchable suggestions are available. |
 | `name` | Name | text | Not set | Optional display name; otherwise use the entity’s friendly name. |
 | `icon` | Icon | icon | Not set | Optional icon name such as mdi:lightbulb-outline. Searchable suggestions are available. |
+| `show_name` | Show name | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_icon` | Show icon | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_state` | Show state | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `show_label` | Show label | boolean | Not set | Optional native card appearance setting. Normal availability warnings remain visible. |
+| `tap_action` | tap action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `hold_action` | hold action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `double_tap_action` | double tap action | json | Not set | Configure through Home Assistant’s native action selector. Role and access safety checks still apply. |
+| `variables.custom_label` | Custom state label | text | Not set | Custom state label for this card. |
+| `variables.md_label_prefix` | State label prefix | text | Not set | State label prefix for this card. |
+| `variables.card_color` | Card color | color | Not set | Optional card background color. |
+| `variables.active_color` | Active color | color | Not set | Active color for this card. |
 | `variables.access_mode` | Access behavior | select | `auto` | Access behavior for this card. Choices: `auto`, `popup`, `slide`, `close`, `hold`. |
 | `variables.popup_hash` | Popup hash | text | Not set | Optional link to an existing external popup hash. Omit it to use this card’s automatic details. |
 | `variables.action_service` | Action service | text | Not set | Action service for this card. Searchable suggestions are available. |

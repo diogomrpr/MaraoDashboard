@@ -151,12 +151,12 @@ export function createCardComposition({ root = 'marao-dashboard', language = 'en
     if (role === 'md_timeline_card') return { type: 'custom:marao-state-timeline-card', entity: entity.entity_id, name: variables.timeline_name || entity.name || friendly(entity.entity_id) };
     return { type: 'custom:marao-card', template: role, entity: entity.entity_id, name: entity.name || friendly(entity.entity_id), ...(entity.icon ? { icon: entity.icon } : {}), ...(Object.keys(variables).length ? { variables } : domain(entity.entity_id) === 'climate' ? { variables: { show_graph: false, show_mode_buttons: true } } : {}) };
   };
-  const accessAction = (entity, title, icon, service, label, color) => { const variables=copy(entity.variables || {}); delete variables.popup_hash; return { type: 'custom:marao-card', template: ['lock.unlock', 'cover.open_cover'].includes(service) ? 'md_access_slide_action_card' : 'md_access_action_card', entity: entity.entity_id, name: title, icon, variables: { ...variables, action_service: service, action_requires_hold: false, action_label_key: label, action_color: `var(--color-${color})` } }; };
+  const accessAction = (entity, title, icon, service, label, color) => { const variables=copy(entity.variables || {}); delete variables.popup_hash; delete variables.access_mode; return { type: 'custom:marao-card', template: ['lock.unlock', 'cover.open_cover'].includes(service) ? 'md_access_slide_action_card' : 'md_access_action_card', entity: entity.entity_id, name: title, icon, variables: { ...variables, action_service: service, action_requires_hold: false, action_label_key: label, action_color: `var(--color-${color})` } }; };
   const roomCard = entity => {
     const role = entity.template;
     if (role === 'md_access_action_card') return entityCard({ ...entity, variables: { ...entity.variables, action_service: entity.variables?.action_service || (domain(entity.entity_id) === 'lock' ? 'lock.lock' : 'cover.close_cover') } });
     if (role === 'md_access_slide_action_card') return entityCard(entity);
-    if (role === 'md_access_hold_action_card' && !isAccess(entity)) return actionCard(entity);
+    if (role === 'md_access_hold_action_card') return actionCard(entity);
     if (role === 'md_security_card' && !own(entity, 'tap_action')) return entityCard({ ...entity, variables: { popup_hash: hash('alarm', entity.entity_id), ...entity.variables } });
     if (isAccess(entity)) {
       if (openOnly(entity) && entity.variables?.access_mode !== 'popup') return accessAction(entity, entity.name || friendly(entity.entity_id), 'mdi:door-open', 'cover.open_cover', 'access.open', 'red');
@@ -166,7 +166,7 @@ export function createCardComposition({ root = 'marao-dashboard', language = 'en
     if (domain(entity.entity_id) === 'camera' || domain(entity.entity_id) === 'media_player' && entity.template === 'md_media_card') return entityCard({ ...entity, variables: { popup_hash: hash(domain(entity.entity_id) === 'camera' ? 'camera' : 'media', entity.entity_id), ...entity.variables } });
     return entityCard(entity);
   };
-  const actionCard = entity => ({ type: 'custom:marao-card', template: 'md_access_hold_action_card', entity: entity.entity_id, name: entity.name || friendly(entity.entity_id), show_state: false, variables: copy(entity.variables || {}), tap_action: entity.variables?.action_service ? { action: 'call-service', service: entity.variables.action_service, entity_id: entity.entity_id, haptic: 'heavy' } : domain(entity.entity_id) === 'button' ? { action: 'perform-action', perform_action: 'button.press', target: { entity_id: entity.entity_id }, haptic: 'heavy' } : { action: 'toggle', haptic: 'heavy' }, ...(entity.icon ? { icon: entity.icon } : {}) });
+  const actionCard = entity => {if(domain(entity.entity_id)==='lock')entity={...entity,variables:{...entity.variables,action_service:entity.variables?.action_service||'lock.lock'}};return { type: 'custom:marao-card', template: 'md_access_hold_action_card', entity: entity.entity_id, name: entity.name || friendly(entity.entity_id), show_state: false, variables: copy(entity.variables || {}), tap_action: entity.variables?.action_service ? { action: 'call-service', service: entity.variables.action_service, entity_id: entity.entity_id, haptic: 'heavy' } : domain(entity.entity_id) === 'button' ? { action: 'perform-action', perform_action: 'button.press', target: { entity_id: entity.entity_id }, haptic: 'heavy' } : { action: 'toggle', haptic: 'heavy' }, ...(entity.icon ? { icon: entity.icon } : {}) };};
   const sceneCard = entity => ({ ...(Object.keys(entity.variables || {}).length ? {variables: copy(entity.variables)} : {}), type: 'custom:marao-card', template: entity.template || 'md_switch_card', entity: entity.entity_id, name: entity.name || friendly(entity.entity_id), icon: entity.icon || 'mdi:palette-outline', tap_action: domain(entity.entity_id) === 'scene' ? { action: 'perform-action', perform_action: 'scene.turn_on', target: { entity_id: entity.entity_id }, haptic: 'heavy' } : { action: 'toggle', haptic: 'heavy' } });
   const energyCard = (entity, popupHash, popup = false) => ({ type: 'custom:marao-energy-period-card', ...pick(entity.variables || {}, ['display_unit', 'display_precision', 'sub_entities', 'calculate_cost', 'cost_per_kwh']), entity: entity.entity_id, name: entity.name, period: entity.variables?.period || 'day', popup_hash: popupHash, popup, icon: entity.icon || 'mdi:flash' });
   const climatePopup = entity => ({ ...header(entity.variables?.mode_selector_hash || hash('climate-mode', entity.entity_id), entity.entity_id, `${entity.name || friendly(entity.entity_id)} ${t('climate.mode_suffix')}`, 'mdi:thermostat'), cards: [entityCard({ ...entity, variables: { show_graph: false, ...entity.variables, show_mode_buttons: true } })] });
@@ -208,11 +208,12 @@ export function createCardComposition({ root = 'marao-dashboard', language = 'en
       for (const key of ['hold_action', 'double_tap_action']) if (own(item, key)) summary[key] = copy(item[key]);
       return { type: 'vertical-stack', cards: [summary, ...createMediaContent(item, grid)] };
     }
-    if (role === 'md_entity_group_card') return groupCard(item);
-    if (role === 'md_scene_collection_card') return { type: 'custom:marao-card', template: 'md_navigation_card', name: item.name, icon: item.icon || 'mdi:palette-outline', show_state: false, tap_action: navigate(variables.popup_hash) };
+    const appearance=pick(item,['show_name','show_icon','show_state','show_label']),appearanceVariables=pick(variables,['custom_label','md_label_prefix','card_color','active_color']);
+    if (role === 'md_entity_group_card') {const card=groupCard(item);return {...card,...appearance,variables:{...card.variables,...appearanceVariables}};}
+    if (role === 'md_scene_collection_card') return { type: 'custom:marao-card', template: 'md_navigation_card', name: item.name, icon: item.icon || 'mdi:palette-outline', show_state: false, ...appearance,...(Object.keys(appearanceVariables).length?{variables:appearanceVariables}:{}), tap_action: navigate(variables.popup_hash) };
     let card;
     if (role === 'md_title_card') card = titleCard(item.name);
-    else if (role === 'md_energy_period_card') card = energyCard(item, variables.popup_hash);
+    else if (role === 'md_energy_period_card') card = energyCard(item, variables.popup_hash, item.popup===true);
     else if (item.page) card = { type: 'custom:marao-card', template: role, ...(item.entity_id ? { entity: item.entity_id } : {}), name: item.name || friendly(item.page), icon: item.icon || 'mdi:open-in-new', show_label: false, tap_action: navigate(`/${root}/${item.page}`), ...(object(item.variables) ? { variables: item.variables } : {}) };
     else if (['md_navigation_card', 'md_room_card', 'md_header_card', 'md_glance_card'].includes(role) && !item.entity_id) card = { type: 'custom:marao-card', template: role, variables: copy(variables) };
     else if (role === 'md_access_hold_action_card') card = actionCard(item);
@@ -228,12 +229,12 @@ export function createCardComposition({ root = 'marao-dashboard', language = 'en
   };
   const popups = entity => {
     const item = { ...entity, name: name(entity) }, role = item.template, variables = item.variables || {};
-    if (['ha_card', 'md_access_slide_action_card', 'md_access_action_card'].includes(role)) return [];
+    if (['ha_card', 'md_access_slide_action_card', 'md_access_action_card', 'md_access_hold_action_card'].includes(role)) return [];
     if (role === 'md_security_card' && !own(item, 'tap_action')) return [{ ...header(variables.popup_hash || hash('alarm', item.entity_id), item.entity_id, item.name, 'mdi:shield-home'), cards: [{ type: 'custom:marao-card', template: 'md_alarm_controls_card', entity: item.entity_id, name: item.name, ...(own(variables, 'alarm_layout') ? { variables: { alarm_layout: variables.alarm_layout } } : {}) }] }];
     if (role === 'md_entity_group_card') return groupPopups(item);
     if (role === 'md_floor_plan_card') return [{ ...header(variables.lights_popup ?? `#page-${item._page_instance}-${item.id}-lights`, null, item.name, 'mdi:lightbulb-group-outline'), cards: variables.lights.map(light => entityCard({...light,template:'md_light_card',variables:{enable_slider:false}})) }];
     if (role === 'md_scene_collection_card') return [{ ...header(variables.popup_hash, null, item.name, item.icon || 'mdi:palette-outline'), cards: entries(item.entities).length ? entries(item.entities).map(sceneCard) : [{ type: 'markdown', content: t('overview.scenes_empty') }] }];
-    if (role === 'md_energy_period_card' || role === 'md_graph_card' && variables.history_popup) {
+    if (role === 'md_energy_period_card' && item.popup!==true || role === 'md_graph_card' && variables.history_popup) {
       const card = role === 'md_energy_period_card' ? energyCard(item, null, true) : catalog.energy_units[item.unit_of_measurement]?.[0] === 'power' || variables.power_devices?.length ? { type: 'custom:marao-power-history-card', entity: variables.graph_entity || item.graph_entity || item.entity_id, name: item.name, ...pick(variables, ['power_devices', 'display_unit', 'display_precision', 'graph_color']) } : { type: 'custom:marao-card', template: item.template || 'md_graph_card', entity: item.entity_id, name: item.name, icon: item.icon || 'mdi:flash', variables: { show_graph_fill: true, show_graph_line: true, show_icon: true, ...variables, ...(item.graph_entity && !variables.graph_entity ? { graph_entity: item.graph_entity } : {}) } };
       return [{ ...header(variables.popup_hash, item.entity_id, item.name, item.icon || 'mdi:flash'), cards: [card] }];
     }

@@ -76,10 +76,12 @@ export function accessCardConfig(config, hass) {
   let mode = config.variables?.access_mode ?? "auto";
   const domain = domainOf(config.entity);
   if (mode === "auto") {
-    if (config.template !== "md_access_card" || ["lock", "cover"].includes(domain)) return config;
-    mode = domain === "script" ? "slide" : "hold";
+    if(!Object.hasOwn(config.variables||{},'access_mode')&&config.template==='md_access_hold_action_card'&&domain==='lock'&&(config.variables?.action_service||config.tap_action?.service||config.tap_action?.perform_action)==='lock.unlock')return config;
+    if(config.template==='md_access_hold_action_card'&&domain==='lock')mode='hold';
+    else {if (config.template !== "md_access_card" || ["lock", "cover"].includes(domain)) return config;
+    mode = domain === "script" ? "slide" : "hold";}
   }
-  const domains = { popup: ["lock", "cover"], slide: ["lock", "cover", "button", "switch", "script"], close: ["lock", "cover"], hold: ["button", "switch", "input_boolean", "alarm_control_panel"] };
+  const domains = { popup: ["lock", "cover"], slide: ["lock", "cover", "button", "switch", "script"], close: ["lock", "cover"], hold: ["button", "switch", "input_boolean", "alarm_control_panel", "lock"] };
   if (!Object.hasOwn(domains, mode) || !domains[mode].includes(domain)) throw new Error(localize("access.invalid_behavior", hass, {}, "Access behavior is incompatible with the selected entity."));
   const variables = { ...config.variables };
   if (mode === "slide") {
@@ -87,6 +89,12 @@ export function accessCardConfig(config, hass) {
     if (["tap_action", "hold_action", "double_tap_action"].some(key => config[key] && config[key].action !== "none")) throw new Error(localize("access.strict_slide", hass, {}, "Access openers use only the strict slide"));
   }
   let tap_action = config.tap_action;
+  if(mode==='hold'&&domain==='lock') {
+    const action=config.tap_action,service=action?.service||action?.perform_action;
+    const unsafeAction=action&&action.action!=='none'&&(!['call-service','perform-action'].includes(action.action)||service!=='lock.lock'||(action.target?.entity_id||action.entity_id)!==config.entity||action.entity_id&&action.entity_id!==config.entity||action.target&&Object.keys(action.target).some(key=>key!=='entity_id')||Object.keys(action.data||action.service_data||{}).length);
+    if(variables.action_service&&variables.action_service!=='lock.lock'||unsafeAction||['hold_action','double_tap_action'].some(key=>config[key]&&config[key].action!=='none'))throw new Error(localize('access.slide_required',hass,{},'Use the access slide to open or unlock.'));
+    variables.action_service='lock.lock';
+  }
   if (mode === "close") {
     const service = domain === "lock" ? "lock.lock" : "cover.close_cover";
     if (variables.action_service && variables.action_service !== service) throw new Error(localize("access.slide_required", hass, {}, "Use the access slide to open or unlock."));
@@ -2651,6 +2659,7 @@ function localCardHelpers(configs) {
 }
 
 export class MaraoControlGrid extends BaseElement {
+  static getConfigElement(){return MaraoCard.getConfigElement();}
   constructor() {
     super(); this.attachShadow?.({ mode: 'open' }); this._request = 0; this._children = []; this._config = { columns: 2, cards: [] };
   }
@@ -2770,6 +2779,7 @@ export class MaraoControlGrid extends BaseElement {
 }
 
 export class MaraoPopupCard extends BaseElement {
+  static getConfigElement(){return MaraoCard.getConfigElement();}
   constructor() { super(); this.attachShadow?.({ mode: "open" }); this._config = {}; this._hass = null; this._open = false; this._focus = null; this._childrenRenderId = 0; this._backgroundState = []; }
   setConfig(config) { const layoutError=popupViewError(config);if(layoutError)throw new Error(layoutError);this._sourceConfig=structuredClone(config);if(config.entity_group){const error=sectionsError(config.entity_group);if(error)throw new Error(collectionLabel(error,this._hass));} this._config = { height: "auto", max_height: "100%", ...config, ...(config.cards ? { cards: config.cards.map(canonicalCard) } : {}) }; this._renderHost(); this._sync(); if (this._open) this._renderChildren(); }
   get preview() { return Boolean(this._preview || this.nativeOwner?.preview || nativeEditing(this)); }
@@ -3156,6 +3166,7 @@ export class MaraoPopupCard extends BaseElement {
 }
 
 export class MaraoPowerHistoryCard extends BaseElement {
+  static getConfigElement(){return MaraoCard.getConfigElement();}
   constructor() { super(); this.attachShadow?.({ mode: 'open' }); this._loadId = 0; }
   setConfig(config) {
     if (!/^(sensor|number|input_number)\.[a-z0-9_]+$/.test(config?.entity || '')) throw new Error('Choose a power sensor.');

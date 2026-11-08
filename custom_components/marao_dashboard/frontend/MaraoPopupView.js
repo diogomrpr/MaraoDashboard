@@ -41,6 +41,7 @@ export function mountPopupView(owner,host) {
 export function registerPopupActions(api) {
   if(!globalThis.customElements||customElements.get('marao-summary-actions'))return;
   class SummaryActions extends (globalThis.HTMLElement || class {}) {
+    static async getConfigElement(){await import(new URL('./MaraoNativeCardEditor.js'+new URL(import.meta.url).search,import.meta.url));return document.createElement('marao-native-card-editor');}
     constructor(){super();this.attachShadow({mode:'open'});}
     setConfig(config) {
       const error=popupViewError(config);if(error)throw new Error(error);
