@@ -48,7 +48,7 @@ function fixture(t) {
   const dependencies = {
     log() {},delay: async () => assert.fail('No pending checks expected in this fixture'),
     client: {readConfig: () => ({url: 'http://' + state.target + ':8123', sshHost: state.target})},
-    verify: async args => {state.calls.push(['gate', ...args]);if (state.fail === 'unit') throw Error('Unit gate failed');return {passed: true, verified_cleanup: true, unit: true, parallel: false, head: current(), filename: '/private/mock-unit-report.json'};},
+    verify: async args => {state.calls.push(['gate', ...args]);if (state.fail === 'unit') throw Error('Unit gate failed');const report = {passed: true, verified_cleanup: true, unit: true, parallel: false, head: current(), filename: '/private/mock-unit-report.json'};return args.includes('--report') ? report : {filename: report.filename, report};},
     install: async () => {state.calls.push(['install']);if (state.fail === 'install') throw Error('Not installed / not ready for test');return {installed: true, version: identity(read('package.json').version), config: {token: 'never-save-this'}};},
     run(command, args, extra) {
       state.calls.push([command, ...args]);

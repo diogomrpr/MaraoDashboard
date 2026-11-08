@@ -159,9 +159,10 @@ export async function runRelease(root, options, dependencies = {}) {
     if (state.stage === 'complete') return {version: state.version, url: state.url, documentationRun: state.documentationRun, resumed: true};
     const verify = dependencies.verify || (args => require(path.join(root, 'tests/verify-publish.js')).verifyPublish(args));
     log('Checking affected units across ' + state.baseTag + ' → ' + state.commit);
-    const report = await verify(['--base', state.baseTag, ...(state.report ? ['--report', state.report] : [])]);
+    const outcome = await verify(['--base', state.baseTag, ...(state.report ? ['--report', state.report] : [])]);
+    const report = outcome.report || outcome;
     assert.ok(report.passed && report.verified_cleanup && report.unit && !report.parallel, 'Publication gate did not confirm serial unit success');
-    assert.equal(report.head, state.commit, 'Unit report belongs to another commit');state.report = report.filename;state.stage = 'checked';save();candidate();
+    assert.equal(report.head, state.commit, 'Unit report belongs to another commit');state.report = outcome.filename || report.filename;state.stage = 'checked';save();candidate();
     const client = dependencies.client || require(path.join(root, 'ha-test/client.js'));
     const config = client.readConfig(options.configFile && path.resolve(options.configFile));
     assert.equal(new URL(config.url).hostname, '192.168.0.28');assert.equal(config.sshHost, '192.168.0.28');
