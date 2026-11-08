@@ -9,6 +9,7 @@ const unit = (file, pattern) => ({ id: 'unit:' + file + (pattern ? ':' + pattern
   inputs: [...(file === 'verification' ? ['tests/verification-map.js'] : []), 'tests/frontend/' + file + '.test.js', 'tests/frontend/package.json', 'custom_components/package.json', runtime, 'frontend_src',
     ...(file === 'accessibility-profiles' ? ['tests/test-ha-dashboard-accessibility.js'] : []),
     ...(file === 'camera-request-ledger' ? ['tests/camera-request-ledger.js'] : []),
+    ...(file === 'release-workflow' ? ['ha-test/release.mjs', 'tests/verify-publish.js', 'ha-test/prepare-frontend.js', 'ha-test/prepare-native-frontend.js'] : []),
     ...(/verification|upgrade|release-gate/.test(file) ? ['ha-test', 'tests/verify-release.js', 'tests/verify-publish.js', 'tests/test-ha-upgrade.js', 'tests/verification-browser.js'] : [])], exclusive: false });
 const python = file => ({ id: 'python:' + file, kind: 'offline', command: ['python', '-m', 'pytest', '-q', 'tests/components/marao_dashboard/' + file + '.py'],
   inputs: ['tests/components/marao_dashboard/' + file + '.py', backend, 'tests/conftest.py', 'pyproject.toml'], exclusive: false });
@@ -143,6 +144,7 @@ const components = {
   lifecycle: { python: ['test_init', 'test_config_flow', 'test_config_patch', 'test_frontend_assets'], upgrade: true },
   'saved-history': { python: ['test_history'], upgrade: true },
   packaging: { units: [['package-boundary'], ['brand-assets']], package: true },
+  'release-workflow': { units: [['release-workflow']] },
   gallery: { units: [['gallery-cases']], python: ['test_gallery_fixtures'] },
   verification: { units: [['verification'], ['verification-development'], ['verification-policy'], ['verification-reuse'], ['verification-browser'], ['verification-evidence'], ['accessibility-profiles'], ['upgrade-prepared'], ['upgrade-runner'], ['release-gate']],
     browser: [browser('tooling-layout', 'test-ha-dashboard-accessibility', ['--focused', '--families', 'md_light_card', '--scenario', 'iphone-normal', '--screenshots', 'review', '--popups', '--popup-hash', '#marao-dashboard-test-value-sliders-popup'], false),
@@ -253,6 +255,7 @@ const rules = [
   [/^tests\/test-frontend-upgrade-cache-local\.js$/, ['frontend-refresh', 'lifecycle']],
   [/^custom_components\/marao_dashboard\/(manifest\.json|strings\.json)|^(custom_components\/package\.json|hacs\.json|package(-lock)?\.json)$/, ['packaging']],
   [/^\.github\/workflows\//, ['verification']],
+  [/^ha-test\/release\.mjs$/, ['release-workflow']],
   [/^ha-test\/(client|prepare)\.js$/, ['verification']],
   [/^ha-test\//, ['gallery']],
   [/^(pyproject\.toml|tests\/(conftest\.py|coverage_bootstrap\.py|requirements\.txt))$/, ['lifecycle']],

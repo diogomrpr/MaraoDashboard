@@ -206,6 +206,15 @@ Use `.agents/skills/marao-card-design/SKILL.md` for card appearance, behavior, c
   only, serially, across the whole release candidate. Automatic Tests CI and
   version hooks also run unit tests only. Retain applicable exact-commit
   hassfest/HACS validation as package metadata checks.
+- For an explicit release request, use `npm run release -- --version <x.y.z>
+  --notes-file <reviewed-notes.md>` from a clean, reviewed checkout based on
+  current `origin/main`; pass `--config <ignored-local.json>` when using an
+  isolated worktree. The command owns version/build/commit, the existing serial
+  publication gate, final disposable installation, PR/tag, complete asset upload,
+  exact-commit GitHub checks, merge/publication and tagged documentation deploy.
+  Use `--plan` for a read-only overview; rerun the same command to resume a failed
+  step. Do not replace it with ad-hoc release commands or add integration/full
+  tests. Reconcile reported conflicts or fix the command before continuing.
 - Before publishing every release, install the final release candidate, including
   its version metadata, on disposable Home Assistant `192.168.0.28`. A release
   request authorizes this installation. Batch it once after final code and version
