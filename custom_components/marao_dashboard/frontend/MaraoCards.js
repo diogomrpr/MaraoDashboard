@@ -76,7 +76,7 @@ export function accessCardConfig(config, hass) {
   let mode = config.variables?.access_mode ?? "auto";
   const domain = domainOf(config.entity);
   if (mode === "auto") {
-    if(config.template==='md_access_hold_action_card'&&domain==='lock'&&(config.variables?.action_service||config.tap_action?.service||config.tap_action?.perform_action)==='lock.unlock')return config;
+    if(!Object.hasOwn(config.variables||{},'access_mode')&&config.template==='md_access_hold_action_card'&&domain==='lock'&&(config.variables?.action_service||config.tap_action?.service||config.tap_action?.perform_action)==='lock.unlock')return config;
     if(config.template==='md_access_hold_action_card'&&domain==='lock')mode='hold';
     else {if (config.template !== "md_access_card" || ["lock", "cover"].includes(domain)) return config;
     mode = domain === "script" ? "slide" : "hold";}
