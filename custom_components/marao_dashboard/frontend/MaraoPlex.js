@@ -7,6 +7,11 @@ const styles=`${dropdown.dropdownStyles}${press.pressStyles}
 ha-card{display:block;box-sizing:border-box;padding:16px;border-radius:var(--ha-card-border-radius,28px);background:var(--marao-card-background,var(--ha-card-background));color:var(--marao-card-text-color,var(--primary-text-color));min-width:0}
 h3,p{margin:0;overflow-wrap:anywhere}h3{font-size:var(--font-size-primary,1.125rem)}p{line-height:1.4}button{font:inherit;color:inherit;cursor:pointer;min-width:48px;min-height:48px;padding:12px;border:0;border-radius:14px;background:var(--secondary-background-color);overflow-wrap:anywhere;white-space:normal}button:disabled{opacity:.5;cursor:default}button:focus{outline:none}
 .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}.toolbar>.target{flex:1;min-width:min(100%,140px)}.body,section{display:grid;gap:12px;min-width:0}section+section{margin-top:12px}.shelf-heading{display:flex;align-items:center;gap:4px}.shelf-heading h3{flex:1}.shelf-heading button{width:48px;height:48px;padding:10px}.items{display:flex;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;gap:12px;min-width:0}.items>.item{flex:0 0 176px;width:176px;scroll-snap-align:start}.items>.load-more{flex:0 0 176px;align-self:center}.poster{width:160px;height:240px}.item{box-sizing:border-box;display:flex;flex-direction:column;align-items:stretch;text-align:start;gap:8px;padding:8px;background:transparent}.poster{display:grid;place-items:center;aspect-ratio:2/3;width:100%;overflow:hidden;border-radius:10px;background:var(--opacity-contrast-100,rgba(128,128,128,.16))}.poster img{width:100%;height:100%;object-fit:cover;grid-area:1/1}.poster ha-icon{grid-area:1/1;z-index:1;align-self:end;justify-self:end;margin:8px;border-radius:50%;background:var(--ha-card-background,var(--card-background-color));--mdc-icon-size:32px}.item span:last-child{overflow-wrap:anywhere;font-weight:600}.status{margin-top:12px}.status:empty{display:none}.browse{width:100%;margin-top:12px}.target-name{display:block;min-height:48px;box-sizing:border-box;padding:12px;font-weight:600}ha-card[data-problem]{--marao-icon-color:currentColor}
+section[data-problem]{padding:14px;border-radius:20px}.shelf-error{display:flex;gap:8px;align-items:start;line-height:1.4}.shelf-error ha-icon{flex:0 0 24px}.poster[data-problem]{background:var(--marao-problem-error-background);color:var(--marao-problem-error-text)}
+ha-card.compact{padding:0;overflow:hidden}.compact>.toolbar{display:none}.compact>.status{padding-inline:18px}.compact>.status:empty{display:none}
+.summary{display:grid;grid-template-columns:minmax(0,1fr) 116px;gap:16px 12px;position:relative;isolation:isolate;width:100%;padding:20px 18px 16px;border-radius:inherit;background:linear-gradient(135deg,color-mix(in srgb,var(--primary-color) 8%,var(--ha-card-background)),var(--ha-card-background));text-align:start}
+.summary-copy{display:flex;flex-direction:column;gap:7px;min-width:0;align-self:center}.summary-target{font-size:var(--font-size-caption,.9375rem);color:var(--secondary-text-color);line-height:1.25;overflow-wrap:anywhere}.summary-title{display:flex;align-items:center;gap:8px;font-size:calc(var(--font-size-primary,1.125rem) * 1.3);font-weight:700;line-height:1.15}.summary-title ha-icon{flex:0 0 24px;--mdc-icon-size:24px}.summary-content{font-size:var(--font-size-caption,.9375rem);color:var(--secondary-text-color);line-height:1.35;overflow-wrap:anywhere}
+.summary-art{position:relative;height:116px;align-self:center;pointer-events:none}.summary-art .poster{position:absolute;width:66px;height:96px;top:9px;left:0;box-shadow:0 5px 14px #0003;transform:rotate(-12deg);border:2px solid var(--ha-card-background);border-radius:9px}.summary-art .poster:nth-child(2){left:23px;top:2px;transform:rotate(-1deg)}.summary-art .poster:nth-child(3){left:46px;top:12px;transform:rotate(11deg)}
 `;
 
 export class MaraoPlexWatchCard extends Base {
@@ -40,7 +45,7 @@ export class MaraoPlexWatchCard extends Base {
   getCardSize(){return this._config?.full?6:3;}
   _t(value){return plexText(this._hass,value);}
   _reset(){
-    ++this._epoch;++this._generation;this._browser=null;this._cache=new Map();this._artwork=new Map();this._home=null;this._folder=null;this._history=[];this._shelves=new Map();this._loading=false;this._attempted=false;this._artworkError=false;this._contentError='';this._launchState={};
+    ++this._epoch;++this._generation;this._browser=null;this._cache=new Map();this._artwork=new Map();this._home=null;this._folder=null;this._history=[];this._shelves=new Map();this._loading=false;this._attempted=false;this._contentError='';this._launchState={};
     if(this._body)this._draw();
   }
   _mount(){
@@ -96,8 +101,8 @@ export class MaraoPlexWatchCard extends Base {
     try{const home=await plexHome(target.plex,folder=>{
       if(generation!==this._generation||epoch!==this._epoch||!this.isConnected)throw new Error('Playback cancelled. Choose a TV and try again.');
       return this._read(folder);
-    });if(generation!==this._generation||epoch!==this._epoch||!this.isConnected)return;this._home=home;this._contentError=home.error;this._folder=null;this._history=[];if(this._config.initialFolder){const folder=this._config.initialFolder;delete this._config.initialFolder;this._loading=false;return this._navigate(folder);}}
-    catch(error){if(generation!==this._generation||epoch!==this._epoch||!this.isConnected)return;this._contentError=plexError(error);}
+    });if(generation!==this._generation||epoch!==this._epoch||!this.isConnected)return;this._home=home;this._folder=null;this._history=[];if(this._config.initialFolder){const folder=this._config.initialFolder;delete this._config.initialFolder;this._loading=false;return this._navigate(folder);}}
+    catch(error){if(generation!==this._generation||epoch!==this._epoch||!this.isConnected)return;const message=plexError(error);this._home={resume:[],movies:[],shows:[],recent:[],libraries:[],failures:{resume:message,movies:message,shows:message}};}
     if(generation===this._generation&&epoch===this._epoch){this._loading=false;this._draw();}
   }
   async _navigate(folder,back=false){
@@ -105,13 +110,22 @@ export class MaraoPlexWatchCard extends Base {
     this._loading=true;this._contentError='';this._draw();
     try{const node=await this._read(folder);if(generation!==this._generation||epoch!==this._epoch||!this.isConnected)return;
       if(!back)this._history.push(folder);this._folder=node;
-    }catch(error){if(generation!==this._generation||epoch!==this._epoch||!this.isConnected)return;this._contentError=plexError(error);}
+    }catch(error){if(generation!==this._generation||epoch!==this._epoch||!this.isConnected)return;if(!back)this._history.push(folder);this._folder={...folder,title:folder.title||this._t('Plex library'),children:[]};this._contentError=plexError(error);}
     if(generation===this._generation&&epoch===this._epoch){this._loading=false;this._draw();}
   }
   _clearSections(){this._sectionEvents?.abort();for(const observer of this._sectionObservers||[])observer.disconnect();this._sectionObservers=[];}
-  _section(title,items,empty,key=title){
+  _shelfError(section,error){
+    section.dataset.problem='error';section.setAttribute('style',actions.problemStyle({kind:'error'}));
+    if(section.querySelector('.shelf-error'))return;
+    const message=document.createElement('p');message.className='shelf-error';message.setAttribute('role','alert');
+    const icon=document.createElement('ha-icon');icon.setAttribute('icon','mdi:alert-circle-outline');icon.setAttribute('aria-hidden','true');
+    const label=document.createElement('span');label.textContent=this._t(error);message.append(icon,label);section.append(message);
+    const retry=this._button(this._t('Retry'),()=>{this._browser=null;if(error==='Unable to load artwork.')this._artwork.clear();this._loading=false;this._folder?this._navigate(this._folder,true):this._loadHome();},section);retry.disabled=this._loading;retry.setAttribute('aria-label',`${this._t('Retry')}: ${section.querySelector('h3')?.textContent||this._t('Plex library')}`);
+  }
+  _section(title,items,empty,key=title,error=''){
     const section=document.createElement('section'),header=document.createElement('div'),heading=document.createElement('h3');header.className='shelf-heading';heading.textContent=title;header.append(heading);section.append(header);this._body.append(section);
-    if(!items?.length){const text=document.createElement('p');text.textContent=this._t(empty||'This folder is empty.');section.append(text);return;}
+    if(error)this._shelfError(section,error);
+    if(!items?.length){if(!error){const text=document.createElement('p');text.textContent=this._t(empty||'This folder is empty.');section.append(text);}return;}
     const grid=document.createElement('div');grid.className='items';grid.dataset.shelf=key;section.append(grid);
     const signal=this._sectionEvents.signal,saved=this._shelves.get(key)||{offset:0,shown:24};let shown=0;
     const arrows=[-1,1].map(direction=>{const button=this._button('',()=>{grid.scrollBy({left:direction*(grid.querySelector('.item')?.getBoundingClientRect().width+12||188),behavior:globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});},header);button.setAttribute('aria-label',`${this._t(direction<0?'Previous':'Next')}: ${title}`);const icon=document.createElement('ha-icon');icon.setAttribute('icon',direction<0?'mdi:chevron-left':'mdi:chevron-right');icon.setAttribute('aria-hidden','true');button.append(icon);return button;});
@@ -144,33 +158,49 @@ export class MaraoPlexWatchCard extends Base {
       if(epoch!==this._epoch||generation!==this._generation||account!==this._hass?.user?.id||connection!==this._hass?.connection||!poster.isConnected)return;
       if(typeof signed!=='string'||!signed.startsWith(path+'?'))throw new Error('Unable to load artwork.');
       const image=document.createElement('img');image.loading='lazy';image.alt='';image.src=this._hass.hassUrl?this._hass.hassUrl(signed):signed;
-      image.onerror=()=>{image.remove();if(epoch===this._epoch&&generation===this._generation){this._artworkError=true;this._syncStatus();}};poster.append(image);
-    }catch{if(epoch===this._epoch&&generation===this._generation&&poster.isConnected){this._artworkError=true;this._syncStatus();}}
+      image.onerror=()=>{image.remove();if(epoch===this._epoch&&generation===this._generation)this._imageError(poster);};poster.append(image);
+    }catch{if(epoch===this._epoch&&generation===this._generation&&poster.isConnected)this._imageError(poster);}
+  }
+  _imageError(poster){
+    poster.dataset.problem='error';const section=poster.closest('section');if(section)this._shelfError(section,'Unable to load artwork.');
+  }
+  _summary(){
+    const button=this._button('',opener=>this._openBrowser(opener),this._body);button.className='summary';
+    const copy=document.createElement('span');copy.className='summary-copy';
+    const target=document.createElement('span');target.className='summary-target';target.textContent=this._selected?.name||this._t('Choose an Apple TV.');
+    const title=document.createElement('span');title.className='summary-title';title.textContent=this._t('Plex library');const arrow=document.createElement('ha-icon');arrow.setAttribute('icon','mdi:arrow-top-right');arrow.setAttribute('aria-hidden','true');title.append(arrow);
+    const content=document.createElement('span');content.className='summary-content';content.textContent=this._home?.resume?.[0]?.title||this._t(this._loading?'Loading library…':'Movies and TV Series');copy.append(target,title,content);button.append(copy);
+    const artwork=document.createElement('span');artwork.className='summary-art';artwork.setAttribute('aria-hidden','true');button.append(artwork);
+    const items=[...new Map([...(this._home?.resume||[]),...(this._home?.movies||[]),...(this._home?.shows||[])].map(item=>[item.media_content_id,item])).values()].slice(0,3);
+    for(const item of items){const poster=document.createElement('span');poster.className='poster';artwork.append(poster);if(item.thumbnail)this._image(poster,item);}
+    if(!items.length){const icon=document.createElement('ha-icon');icon.setAttribute('icon','mdi:movie-open-outline');icon.style.cssText='--mdc-icon-size:64px;position:absolute;inset:24px';artwork.append(icon);}
+    button.setAttribute('aria-label',`${this._t('Open library')}: ${this._selected?.name||this._t('Plex library')}`);button.setAttribute('aria-description',content.textContent);
   }
   _draw(){
     if(!this._body)return;for(const rail of this._body.querySelectorAll('[data-shelf]')){const state=this._shelves.get(rail.dataset.shelf);if(state)state.offset=rail.scrollLeft;}this._clearSections();this._sectionEvents=new AbortController();this._body.replaceChildren();this._toolbar.querySelectorAll('[data-navigation]').forEach(node=>node.remove());
     const nav=(label,action)=>{const button=this._button(this._t(label),action,this._toolbar);button.dataset.navigation='';return button;};
+    const compact=this._config?.full===false;this._surface.classList.toggle('compact',compact);
+    if(compact){this._summary();this._syncStatus();return;}
     if(this._config?.full||this._expanded){
       if(this._history.length||this._folder)nav('Back',()=>{this._history.pop();if(this._history.length)this._navigate(this._history.at(-1),true);else{++this._generation;this._loading=false;this._folder=null;this._draw();}});
       else if(this._expanded)nav('Back',()=>{this._launch.cancel();this._expanded=false;this._draw();});
     }
-    nav('Refresh',()=>{this._browser=null;this._cache.clear();this._artwork.clear();this._artworkError=false;this._loading=false;if(this._folder)this._navigate(this._folder,true);else this._loadHome();});
+    nav('Refresh',()=>{this._browser=null;this._cache.clear();this._artwork.clear();this._loading=false;if(this._folder)this._navigate(this._folder,true);else this._loadHome();});
     if(this.preview){const heading=document.createElement('h3');heading.textContent=this._t('Plex library');this._body.append(heading);this._syncStatus();return;}
-    if(this._loading){const loading=document.createElement('p');loading.textContent=this._t('Loading library…');loading.setAttribute('role','status');this._body.append(loading);}
-    else if(this._folder)this._section(this._folder.title,this._folder.children||[]);
+    if(this._loading&&!this._home){const loading=document.createElement('p');loading.textContent=this._t('Loading library…');loading.setAttribute('role','status');this._body.append(loading);}
+    else if(this._folder)this._section(this._folder.title,this._folder.children||[],null,this._folder.media_content_id,this._contentError);
     else if(this._home){
-      this._section(this._t('Continue Watching'),this._home.resume,this._home.failures?.resume||(this._home.resume===null?'Continue Watching is not available for this library.':'Nothing to continue.'),'continue');
-      this._section(this._t('Movies'),this._home.movies,this._home.failures?.movies,'movies');
-      this._section(this._t('TV Series'),this._home.shows,this._home.failures?.shows,'shows');
+      this._section(this._t('Continue Watching'),this._home.resume,this._home.resume===null?'Continue Watching is not available for this library.':'Nothing to continue.','continue',this._home.failures?.resume);
+      this._section(this._t('Movies'),this._home.movies,null,'movies',this._home.failures?.movies);
+      this._section(this._t('TV Series'),this._home.shows,null,'shows',this._home.failures?.shows);
       const browse=this._button(this._t('Browse library'),button=>this._openBrowser(button,(this._selected||plexTarget(this._config.parent)).plex.library_root),this._body);browse.className='browse';
     }
-    if(this._contentError)this._button(this._t('Retry'),()=>{this._loading=false;this._browser=null;this._cache.clear();if(this._folder)this._navigate(this._folder,true);else this._loadHome();},this._body);
     this._syncStatus();
   }
   _syncStatus(){
     if(!this._status)return;
     const availability=plexLaunchProblem(this._launchContext()),available=!availability;
-    const error=this._contentError||this._launchState?.error||(this._artworkError?'Unable to load artwork.':'');
+    const error=this._launchState?.error||'';
     const message=error||availability|| (this._launchState?.pending?(rivuletPlayback(this._selected?.plex)?'Starting Rivulet…':'Starting Plex…'):this._launchState?.accepted?'Playback requested.':'');
     this._status.textContent=this._t(message);this._status.setAttribute('role',error?'alert':'status');
     const problem=actions.cardProblem({entity:this._selected?.entity_id},this._hass,{error:plexText(this._hass,error)});

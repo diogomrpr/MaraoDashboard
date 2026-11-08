@@ -1,4 +1,5 @@
 import {cameraImage,safePreviewData} from './preview-assets.js';
+import {browsePlexFixture,plexPoster} from '../examples/plex-library.js';
 import {periodRange} from '../../frontend_src/history-data.js';
 import {controllerConfig,startConfig,controllerId,DAYS} from '../../frontend_src/schedule-model.js';
 
@@ -32,7 +33,7 @@ export function createSimulation({states={},config={},scenario={},language='en',
   const dataGuard=async(operation)=>{if(flags.loading)return new Promise(()=>{});if(flags.failure)throw new Error('Simulated request failed. Choose another scenario to retry.');if(flags.disconnected)throw new Error('Disconnected');};
   const connection={connected:!flags.disconnected,subscribeEvents:async(callback)=>{subscriptions.add(callback);return()=>subscriptions.delete(callback);},subscribeMessage:async(callback,message)=>{if(message.type==='weather/subscribe_forecast'){queueMicrotask(()=>callback({forecast:forecast(message.forecast_type)}));return()=>{};}throw unsupported(message.type);}};
   const forecast=(type='daily')=>Array.from({length:type==='hourly'?24:7},(_,i)=>({datetime:new Date(Date.now()+i*(type==='hourly'?3600000:86400000)).toISOString(),condition:['sunny','partlycloudy','cloudy','rainy'][i%4],temperature:20+i%4,...(type==='hourly'?{}:{templow:12+i%3}),precipitation:i%3,precipitation_probability:(i%4)*20,wind_speed:8+i}));
-  let hass={language,locale:{language,number_format:'language',time_format:'24',date_format:'language',first_weekday:'monday'},user:{id:'demo-user',name:'Alex (fictional)',is_admin:true},connected:!flags.disconnected,connection,states:flags.loading?undefined:store,entities:registry,devices:Object.fromEntries(Object.values(registry).map(e=>[e.device_id,{id:e.device_id,name:e.name,manufacturer:'Marao demo'}])),areas:{living_room:{name:'Living room'},kitchen:{name:'Kitchen'}},services:simulatedServices,themes:{darkMode:theme==='dark'},config:{time_zone:'Europe/Lisbon',unit_system:{temperature:'°C',length:'km',mass:'kg',volume:'L'},currency:'EUR',components:['automation','timer','input_select','weather']},localize:()=>undefined,hassUrl:path=>String(path).startsWith('data:image/')?path:cameraImage,formatEntityState:state=>state?.state||'',formatEntityAttributeValue:(state,key)=>String(state?.attributes?.[key]??''),callService,callWS,callApi};
+  let hass={language,locale:{language,number_format:'language',time_format:'24',date_format:'language',first_weekday:'monday'},user:{id:'demo-user',name:'Alex (fictional)',is_admin:true},connected:!flags.disconnected,connection,states:flags.loading?undefined:store,entities:registry,devices:Object.fromEntries(Object.values(registry).map(e=>[e.device_id,{id:e.device_id,name:e.name,manufacturer:'Marao demo'}])),areas:{living_room:{name:'Living room'},kitchen:{name:'Kitchen'}},services:simulatedServices,themes:{darkMode:theme==='dark'},config:{time_zone:'Europe/Lisbon',unit_system:{temperature:'°C',length:'km',mass:'kg',volume:'L'},currency:'EUR',components:['automation','timer','input_select','weather']},localize:()=>undefined,hassUrl:path=>String(path).startsWith('/api/plex_image_proxy/')?plexPoster(path):String(path).startsWith('data:image/')?path:cameraImage,formatEntityState:state=>state?.state||'',formatEntityAttributeValue:(state,key)=>String(state?.attributes?.[key]??''),callService,callWS,callApi};
 
   function targets(data){return [...new Set([data.entity_id].flat().filter(id=>typeof id==='string'))];}
   async function callService(domain,service,data={}) {
@@ -91,6 +92,11 @@ export function createSimulation({states={},config={},scenario={},language='en',
   async function callWS(message) {
     await dataGuard(message.type);
     const {type}=message;
+    if(type==='media_player/browse_media'){
+      if(message.entity_id!=='media_player.plex')throw unsupported('choose the fictional Plex client');
+      return browsePlexFixture(message.media_content_id,flags);
+    }
+    if(type==='auth/sign_path'&&/^\/api\/plex_image_proxy\/demo-plex\/\d+$/.test(message.path))return {path:message.path+'?docs=1'};
     if(type==='get_states')return clone(Object.values(store));
     if(type==='get_config')return clone(hass.config);
     if(type==='get_services')return clone(simulatedServices);

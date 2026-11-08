@@ -5,7 +5,7 @@ export const PLEX_LAUNCH_TIMEOUT = 30000;
 export const rivuletPlayback = mapping => mapping?.playback_app === 'rivulet';
 
 export const PLEX_PT = {
-  'Plex library': 'Biblioteca Plex', 'Continue Watching': 'Continuar a ver', 'Browse library': 'Explorar biblioteca',
+  'Plex library': 'Biblioteca Plex', 'Open library': 'Abrir biblioteca', 'Library layout': 'Disposição da biblioteca', 'On dashboard': 'No painel', 'Popup': 'Janela', 'Choose a Plex library layout.': 'Escolha uma disposição da biblioteca Plex.', 'Movies and TV Series': 'Filmes e séries', 'Continue Watching': 'Continuar a ver', 'Browse library': 'Explorar biblioteca',
   'Movies':'Filmes', 'TV Series':'Séries de TV', 'Previous':'Anterior', 'Next':'Seguinte',
   'Recently Added': 'Adicionados recentemente', 'Apple TV': 'Apple TV', 'Back': 'Voltar', 'Refresh': 'Atualizar',
   'Retry': 'Tentar novamente', 'Load more': 'Carregar mais', 'Loading library…': 'A carregar biblioteca…',
@@ -67,6 +67,7 @@ export function plexConfigError(value, parent = {}, entities = []) {
   if (value === undefined || value === false) return '';
   if (!object(value)) return 'Plex options must be an object or false.';
   if (!entity(parent.entity_id || parent.entity, 'media_player')) return 'Choose an Apple TV.';
+  if (value.display !== undefined && !['inline','popup'].includes(value.display)) return 'Choose a Plex library layout.';
   if (value.playback_app !== undefined && !['plex','rivulet'].includes(value.playback_app)) return 'Choose Plex or Rivulet for playback.';
   if (value.browse_entity && !entity(value.browse_entity,'media_player')) return 'Choose a Plex media player for browsing.';
   if (!rivuletPlayback(value)) {
@@ -90,7 +91,7 @@ export function plexTarget(card, key = 'parent', label) {
   if (!object(card?.apple_tv?.plex) || plexConfigError(card.apple_tv.plex, card)) return null;
   return {key, entity_id: card.entity_id || card.entity, name: label || card.name || card.entity_id || card.entity, plex: structuredClone(card.apple_tv.plex)};
 }
-export function plexTargetIdentity(target) { return JSON.stringify([target?.entity_id, target?.plex]); }
+export function plexTargetIdentity(target) { return JSON.stringify([target?.entity_id, target?.plex && {...target.plex,display:undefined}]); }
 export function plexTargets(dashboard, parent) {
   const first = plexTarget(parent), targets = first ? [first] : [], seen = new Set(targets.map(plexTargetIdentity));
   const root = first?.plex.library_root.media_content_id;
@@ -167,7 +168,9 @@ export function plexHubKind(item) {
   return /(?:^|\.)(?:recentlyadded|recent)(?:\.|$)/i.test(name) ? 'recent' : null;
 }
 export async function plexHome(mapping, read) {
-  const root = await read(mapping.library_root);
+  let root;
+  try { root = await read(mapping.library_root); }
+  catch (failure) { const error=plexError(failure); return {resume:[],movies:[],shows:[],recent:[],libraries:[],error,failures:{resume:error,movies:error,shows:error}}; }
   const recommended = root.children?.find(item => item.media_content_id.endsWith('/Recommended'));
   let error='';const failures={};
   const children=async (folder,shelves=[])=>{try{return (await read(folder)).children||[];}catch(failure){const message=plexError(failure);error ||= message;for(const shelf of shelves)failures[shelf] ||= message;return[];}};
@@ -175,7 +178,7 @@ export async function plexHome(mapping, read) {
   const candidates=hubs.filter(item=>plexHubKind(item)==='continue');
   const ambiguous=!mapping.continue_watching&&candidates.length>1;
   const continuing = mapping.continue_watching || (!ambiguous&&candidates[0]);
-  if(ambiguous)error='Choose a Continue Watching folder in Apple TV options.';
+  if(ambiguous)error=failures.resume='Choose a Continue Watching folder in Apple TV options.';
   const resume = continuing ? await children(continuing,['resume']) : null;
   const recent = [];
   for (const hub of hubs.filter(item => plexHubKind(item) === 'recent')) recent.push(...await children(hub));

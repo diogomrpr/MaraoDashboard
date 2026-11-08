@@ -27,6 +27,18 @@ test('Plex setup stays with the existing Apple TV and preserves Save, Cancel and
   form.change({...form.data,enabled:false});content.querySelector('[data-save]').dispatchEvent(new Event('click'));assert.equal(saves.at(-1).plex,false);
 });
 
+test('Plex layout selector saves only explicit choices and preserves opaque settings',t=>{
+  const options={remote_entity:'remote.safe',apps:[],plex:plexOptions(),future:false};
+  const f=nativeFormHarness(t,{type:'custom:marao-media-card',entity_id:'media_player.safe',apple_tv:options},{language:'pt',states:{}}),saves=[];
+  const dialog=globalThis.document.createElement('div'),content=dialog.querySelector('.dialog-content');
+  f.editor._dialog=()=>dialog;f.editor._closeDialog=()=>{};f.editor._openMediaOptions({entity_id:'media_player.safe',apple_tv:options},value=>saves.push(value));
+  const form=f.forms.find(form=>form.schema.some(field=>field.name==='display')),field=form.schema.find(field=>field.name==='display');
+  assert.equal(field.label,'Disposição da biblioteca');assert.deepEqual(field.selector.select.options.map(option=>option.value),['inline','popup']);
+  content.querySelector('[data-save]').dispatchEvent(new Event('click'));assert.deepEqual(saves.at(-1),options);
+  form.change({...form.data,display:'popup'});content.querySelector('[data-save]').dispatchEvent(new Event('click'));
+  assert.deepEqual(saves.at(-1),{...options,plex:{...options.plex,display:'popup'}});assert.deepEqual(options.plex,plexOptions());
+});
+
 test('Plex setup read failure leaves the draft and saved parent unchanged without device calls',async t=>{
   const f=nativeFormHarness(t,{type:'custom:marao-media-card',entity_id:'media_player.safe',apple_tv:{plex:plexOptions()}},{language:'en',user:{id:'safe'},connection:{},states:{},callWS:async()=>{throw new Error('Browse rejected');},callService:()=>assert.fail('setup must be read-only')});
   const create=globalThis.document.createElement;

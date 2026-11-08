@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {plexURI,plexReference,plexConfigError,plexTarget,plexTargets,plexHome,browsePlex,plexBrowseEntity,plexServerRoots,rivuletLink,cleanPlexNode,plexImagePath,plexError,PlexLaunch} from '../../custom_components/marao_dashboard/frontend/MaraoPlexModel.js';
+import {plexURI,plexReference,plexConfigError,plexTarget,plexTargets,plexTargetIdentity,plexHome,browsePlex,plexBrowseEntity,plexServerRoots,rivuletLink,cleanPlexNode,plexImagePath,plexError,PlexLaunch} from '../../custom_components/marao_dashboard/frontend/MaraoPlexModel.js';
 import {composeNativeCard,validateNativeCardConfig} from '../../frontend_src/card-composition.js';
 import {nativeCardGridOptions} from '../../frontend_src/native-cards.js';
 import {patchNativeCard,nativeCardFormData} from '../../frontend_src/native-card-editor.js';
@@ -211,5 +211,40 @@ test('shelves retain independent offsets and batches, suppress scroll clicks and
   rail.children.at(-1).onclick({stopPropagation(){}});assert.equal(rail.children.filter(node=>node.className==='item').length,40);assert.equal(rail.scrollLeft,188);assert.equal(other.scrollLeft,0);
   rail.listeners.pointerdown({clientX:0,clientY:0});rail.listeners.pointermove({clientX:50,clientY:0});let stopped=false;rail.listeners.click({detail:1,preventDefault(){},stopImmediatePropagation(){stopped=true;}});assert.equal(stopped,true);
   const selected={...plexTarget(parent()),entity_id:'media_player.other',plex:{...mapping(),client_entity:'media_player.other_plex'}};card._selected=selected;card._config={parent:parent()};card._inSheet=()=>true;card._navigate=folder=>{card.navigated=folder;};card._openBrowser(null,titles[0]);assert.equal(card.navigated,titles[0]);assert.deepEqual(card._selected,selected);
+  card._body=new Element();
+  card._section('Movies',[],null,'movies','Movies failed');card._section('TV Series',titles,null,'shows');
+  assert.equal(card._body.children[0].dataset.problem,'error');assert.equal(card._body.children[1].dataset.problem,undefined);
+  card._surface=new Element();card._status=new Element();card._contentError='Movies failed';card._syncStatus();
+  assert.notEqual(card._surface.dataset.problem,'error','Shelf errors must not tint the whole library');
+  card._body=new Element();card._home={resume:[titles[0]],movies:[],shows:[],failures:{movies:'Movies failed'}};
+  let opens=0;card._openBrowser=()=>opens++;card._summary();const summary=card._body.children[0];
+  summary.onclick({stopPropagation(){}});assert.equal(opens,1,'Opening a library never requests playback');
+  card._home=null;card._draw=()=>{};card._read=async()=>null;card._loading=false;card.isConnected=true;await card._loadHome();
+  assert.deepEqual(Object.keys(card._home.failures),['resume','movies','shows'],'Unexpected library responses also stay shelf-specific');
+  delete card._navigate;const failedFolder={media_content_id:'plex://safe-server/9',media_content_type:'show',title:'Failed series'};card._read=async()=>{throw new Error('Folder failed');};await card._navigate(failedFolder);
+  assert.equal(card._folder.title,'Failed series');assert.equal(card._contentError.length>0,true);assert.deepEqual(card._history,[failedFolder]);
   card._clearSections();assert.equal(card._sectionEvents.signal.aborted,true);
+});
+
+
+test('a failed library root produces three independent shelf errors',async()=>{
+  const home=await plexHome(mapping(),async()=>{throw new Error('Library failed');});
+  assert.deepEqual(home.failures,{resume:'Library failed',movies:'Library failed',shows:'Library failed'});
+  assert.deepEqual([home.resume,home.movies,home.shows],[[],[],[]]);
+});
+
+
+test('Plex layouts preserve old mappings and compose only the selected presentation',()=>{
+  for(const display of [undefined,'inline','popup']){
+    const source=parent();if(display!==undefined)source.apple_tv.plex.display=display;
+    const before=structuredClone(source);validateNativeCardConfig(source);
+    const definition=catalog.cards.find(c=>c.id==='md_media_card'),data=nativeCardFormData(source,definition);
+    assert.deepEqual(patchNativeCard(source,definition,data,{...data,name:'Changed'}),{...source,name:'Changed'});
+    const output=JSON.stringify(composeNativeCard(source,{instanceId:'plex-layout-test'}));
+    assert.equal(output.includes('"full":false'),display==='popup');
+    assert.deepEqual(source,before);
+  }
+  assert.match(plexConfigError({...mapping(),display:'other'},parent()),/layout/);
+  const inline=plexTarget(parent()),popup={...inline,plex:{...inline.plex,display:'popup'}};
+  assert.equal(plexTargetIdentity(inline),plexTargetIdentity(popup),'Layout cannot duplicate a television target');
 });

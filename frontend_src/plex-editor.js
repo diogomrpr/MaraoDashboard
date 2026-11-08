@@ -3,7 +3,7 @@ import {browsePlex, plexBrowseEntity, plexServerRoots, rivuletPlayback, plexConf
 export function mountPlexOptions(editor, host, player, original) {
   const t = value => plexText(editor._hass,value), initial = original && typeof original === 'object' ? structuredClone(original) : {};
   const candidates = (player.apple_tv?.apps || []).map(app=>app.source).filter(source=>/^(plex|com\.plexapp\.plex)$/i.test(source || ''));
-  const data = {enabled:Boolean(original && typeof original === 'object'),playback_app:initial.playback_app || 'plex',browse_entity:initial.browse_entity || '',client_entity:initial.client_entity || '',scan_clients_entity:initial.scan_clients_entity || '',app_source:initial.app_source || (candidates.length === 1 ? candidates[0] : 'Plex')};
+  const data = {enabled:Boolean(original && typeof original === 'object'),playback_app:initial.playback_app || 'plex',display:initial.display || 'inline',browse_entity:initial.browse_entity || '',client_entity:initial.client_entity || '',scan_clients_entity:initial.scan_clients_entity || '',app_source:initial.app_source || (candidates.length === 1 ? candidates[0] : 'Plex')};
   const initialData={...data};
   let changed = false, folders = {...initial}, registry = [];
   const heading = document.createElement('h3'); heading.textContent=t('Plex setup');
@@ -14,6 +14,7 @@ export function mountPlexOptions(editor, host, player, original) {
   const sync = () => { choose.disabled=!data.enabled;state.textContent=folders.library_root?t('Library configured'):t('Choose a Plex server folder.');hint.textContent=t(rivuletPlayback(data)?'Use the same Plex server and profile in Home Assistant and Rivulet. Play a title in Rivulet once so Home Assistant can discover a session for browsing. The browse entity is optional and never receives Rivulet playback commands.':'Use the same Plex profile in Home Assistant and the Apple TV app. Open Plex once on the TV so Home Assistant can discover its client.'); };
   const renderForm=()=>{form.replaceChildren();editor._mountForm(form,data,[
     editor._schema('enabled','Enable Plex library',{boolean:{}}),
+    editor._schema('display','Library layout',{select:{mode:'dropdown',options:[{value:'inline',label:t('On dashboard')},{value:'popup',label:t('Popup')}]}}),
     editor._schema('playback_app','Playback app',{select:{mode:'dropdown',options:[{value:'plex',label:'Plex'},{value:'rivulet',label:'Rivulet'}]}}),
     editor._schema('browse_entity','Plex browse entity (optional)',{entity:{domain:['media_player'],integration:'plex'}}),
     ...(!rivuletPlayback(data)?[
@@ -68,7 +69,7 @@ export function mountPlexOptions(editor, host, player, original) {
     if(!changed)return original;
     if(!data.enabled)return false;
     const value={...folders};
-    for(const key of ['playback_app','browse_entity','client_entity','scan_clients_entity','app_source']){
+    for(const key of ['playback_app','display','browse_entity','client_entity','scan_clients_entity','app_source']){
       if(data[key]!==initialData[key]||!rivuletPlayback(data)&&['client_entity','scan_clients_entity','app_source'].includes(key)&&!Object.hasOwn(value,key)){
         if(data[key])value[key]=data[key];else delete value[key];
       }

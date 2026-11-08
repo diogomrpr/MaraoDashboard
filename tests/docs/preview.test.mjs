@@ -4,6 +4,28 @@ import {createSimulation} from '../../docs/playground/simulation.js';
 import {browserEnvironment,cameraImage,safePreviewData} from '../../docs/playground/preview-assets.js';
 import {fixtureStates} from '../../docs/examples/fixtures.js';
 import {ScheduleSession} from '../../frontend_src/schedule-api.js';
+import {getExample} from '../../docs/examples/manifest.js';
+import {browsePlex,plexHome,plexLaunchProblem,plexTarget} from '../../custom_components/marao_dashboard/frontend/MaraoPlexModel.js';
+
+test('Plex galleries use real browse contracts, fictional artwork and visible partial failures',async()=>{
+  const example=getExample('plex-library'),source=structuredClone(example.config);
+  for(const id of ['default','empty','partial-failure']){
+    const scenario=example.scenarios.find(s=>s.id===id),simulation=createSimulation({config:scenario.config,states:scenario.states,scenario});
+    const mapping=scenario.config.apple_tv.plex;
+    assert.equal(plexLaunchProblem({hass:simulation.hass,target:plexTarget(scenario.config)}),'');
+    const home=await plexHome(mapping,folder=>browsePlex(simulation.hass,mapping.client_entity,folder,'demo-plex'));
+    assert.deepEqual([home.resume.length,home.movies.length,home.shows.length],id==='empty'?[0,0,0]:id==='partial-failure'?[2,0,2]:[2,3,2]);
+    if(id==='partial-failure')assert.match(home.failures.movies,/fictional movie library/);
+    const signed=await simulation.hass.callWS({type:'auth/sign_path',path:'/api/plex_image_proxy/demo-plex/101'});
+    assert.match(simulation.hass.hassUrl(signed.path),/^data:image\/svg\+xml,/);
+    await assert.rejects(simulation.hass.callWS({type:'media_player/browse_media',entity_id:'media_player.private',media_content_id:'plex://demo-plex/server'}),/fictional Plex client/);
+    await assert.rejects(browsePlex(simulation.hass,mapping.client_entity,{media_content_type:'server',media_content_id:'plex://another-server/server'},'demo-plex'),/selected server/);
+    const series=await browsePlex(simulation.hass,mapping.client_entity,home.shows[0]||{media_content_type:'show',media_content_id:'plex://demo-plex/201'},'demo-plex');
+    if(id!=='empty')assert.equal(series.children[0].media_content_type,'season');
+    simulation.dispose();
+  }
+  assert.deepEqual(example.config,source);
+});
 
 test('real card service boundary changes only cloned fictional state',async()=>{
   const original=structuredClone(fixtureStates),updates=[],actions=[];

@@ -1,5 +1,26 @@
 [
   {
+    "behavior": "plex-library",
+    "file": "custom_components/marao_dashboard/frontend/MaraoPlex.js",
+    "anchors": [
+      "export class MaraoPlexWatchCard",
+      "_section(",
+      "_summary("
+    ],
+    "consumers": [
+      "md_media_card"
+    ],
+    "indirect": [
+      "Plex library reference; compact/full library and owned popup"
+    ],
+    "verificationComponents": [
+      "plex"
+    ],
+    "focusedTests": [
+      "tests/frontend/marao-plex.test.js"
+    ]
+  },
+  {
     "behavior": "weather-presentation",
     "file": "custom_components/marao_dashboard/frontend/MaraoWeather.js",
     "anchors": [

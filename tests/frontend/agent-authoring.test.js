@@ -37,6 +37,7 @@ test('metadata covers public native types, documented examples, aliases and audi
   for(const type of Object.values(NATIVE_CARD_TYPES))assert.ok(metadata.cards.some(card=>card.type===type),type);
   for(const docs of documentedCards) {
     const definition=describeAuthoring({type:docs.config.type});
+    if(docs.relatedTo){assert.equal(validateDashboard({config:documentFor(docs.config)}).valid,true,docs.id);continue;}
     assert.deepEqual(definition.examples[0],docs.config);
     assert.equal(validateDashboard({config:documentFor(docs.config)}).valid,true,docs.id);
     assert.ok(definition.documentation_url.endsWith('/'+docs.slug+'/'));
@@ -44,6 +45,7 @@ test('metadata covers public native types, documented examples, aliases and audi
   assert.deepEqual(describeAuthoring({type:'custom:marao-light-card'}).effective_defaults,{variables:{enable_slider:true,use_light_color:false}});
   assert.equal(metadata.cards.some(card=>Object.hasOwn(card,'states')),false);
   assert.equal(metadata.schema.$schema,'https://json-schema.org/draft/2020-12/schema');
+  assert.deepEqual(describeAuthoring({type:'custom:marao-media-card'}).schema.properties.apple_tv.properties.plex.properties.display.enum,['inline','popup']);
   assert.equal(Object.hasOwn(describeAuthoring({type:'custom:marao-entity-group-card'}).schema.properties,'entity_id'),false);
   const generic={type:'custom:marao-card',template:'hc_light_card',entity:'light.one',future:null};
   assert.equal(validateDashboard({config:documentFor(generic)}).valid,true);
