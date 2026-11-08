@@ -17,7 +17,7 @@ if(!proposal){
  await fs.mkdir(workspace,{recursive:true});
  const files=execFileSync('git',['ls-files','--cached','--others','--exclude-standard','--','docs','frontend_src','custom_components/marao_dashboard/frontend','custom_components/package.json','.agents/skills','tests','openspec','package.json','package-lock.json','AGENTS.md','.gitignore'],{cwd:root,encoding:'utf8'}).trim().split('\n').filter(Boolean);
  const tracked=new Set(execFileSync('git',['ls-files'],{cwd:root,encoding:'utf8'}).trim().split('\n'));
- const owned=file=>file.startsWith('docs/src/design/')||file.startsWith('.agents/skills/marao-card-design/')||['docs/examples/card-reference-overrides.json','docs/scripts/card-context.mjs','docs/scripts/design-workspace.mjs','docs/scripts/build-gallery.mjs','docs/scripts/prepare-preview.mjs','docs/scripts/design-preview-plugin.mjs','tests/docs/design-workflow.test.mjs'].includes(file);
+ const owned=file=>file.startsWith('docs/src/design/')||file.startsWith('.agents/skills/marao-card-design/')||['docs/examples/card-reference-overrides.json','docs/scripts/card-context.mjs','docs/scripts/design-workspace.mjs','docs/scripts/apply-card-design.mjs','docs/scripts/build-gallery.mjs','docs/scripts/prepare-preview.mjs','docs/scripts/design-preview-plugin.mjs','tests/docs/design-workflow.test.mjs','tests/docs/apply-card-design.test.mjs'].includes(file);
  const hashes={};
  for(const file of files){
   if(!tracked.has(file)&&!owned(file))continue;
@@ -30,7 +30,7 @@ if(!proposal){
  execFileSync('git',['init','-q'],{cwd:workspace});
  execFileSync('git',['add','--',...Object.keys(hashes)],{cwd:workspace});
  execFileSync('git',['-c','core.hooksPath=/dev/null','-c','user.name=Marao Preview','-c','user.email=preview@localhost','commit','-qm','Preview baseline'],{cwd:workspace});
- proposal={task:id,source:root,commit:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),card:card.card,revision:0,changeKind:null,affectedConsumers:[],scopeDecision:null,designApproved:false,applyAuthorized:false,hashes};
+ proposal={task:id,source:root,commit:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),baseline:execFileSync('git',['rev-parse','HEAD'],{cwd:workspace,encoding:'utf8'}).trim(),card:card.card,revision:0,changeKind:null,affectedConsumers:[],scopeDecision:null,designApproved:false,applyAuthorized:false,hashes};
  await fs.writeFile(manifest,JSON.stringify(proposal,null,2));
  for(const dependency of ['node_modules','docs/node_modules']){
   const source=path.join(root,dependency),target=path.join(workspace,dependency);

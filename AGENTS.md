@@ -28,6 +28,13 @@ Use `.agents/skills/marao-card-design/SKILL.md` for card appearance, behavior, c
 
 ## Task routing and completion
 
+- When the user asks to apply approved documentation/card-preview changes, use
+  `npm run card:apply -- --task <id>` following the card-design skill's
+  `references/apply.md`. This command owns patch promotion, selected checks and
+  disposable installation; do not replace it with manual copies or ad-hoc sync.
+  Resolve reported drift or missing authoring work, then rerun it. Reuse the
+  user's existing authorization for the same revision and consumer scope.
+
 - Start with the requested outcome and concrete acceptance cases. Use the short
   path for small fixes restoring documented behavior, refactors and documentation
   corrections: inspect the affected path, implement, verify and report. A new
