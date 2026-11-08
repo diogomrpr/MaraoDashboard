@@ -117,8 +117,8 @@ export function nativeCardGridOptions(config) {
   let rows = compact.has(template) ? 2 : 3;
   if (template === 'md_title_card') rows = 1;
   if (['md_light_card', 'md_fan_card'].includes(template) && config.variables?.enable_slider !== false) rows = 3;
-  if (['md_header_card', 'md_weather_card', 'md_wallbox_current_card', 'md_alarm_controls_card'].includes(template)) rows = 4;
-  if (['md_climate_card', 'md_dishwasher_card'].includes(template)) rows = 'auto';
+  if (['md_header_card', 'md_wallbox_current_card', 'md_alarm_controls_card'].includes(template)) rows = 4;
+  if (['md_climate_card', 'md_dishwasher_card', 'md_weather_card'].includes(template)) rows = 'auto';
   if (template === 'md_camera_card') rows = 5;
   if (template === 'md_floor_plan_card') rows = 8;
   if (template === 'md_media_card' && config.variables?.media_display === 'inline') rows = config.apple_tv?.plex ? 'auto' : config.apple_tv ? 12 : 5;
