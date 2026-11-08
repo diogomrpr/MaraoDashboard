@@ -950,6 +950,7 @@ function cardStyles() {
     .compact-header>.icon { flex:0 0 48px; width:48px; height:48px; align-self:flex-start; }
     .compact-copy:empty { display:none; }
     .compact-copy>.title, .compact-copy>.state, .compact-copy>.climate { grid-area:auto; }
+    .compact-copy>.title, .compact-copy>.state.placeholder { grid-area:1 / 1; }
     .body.cover-card .title { font-size:calc(var(--font-size-primary,1.125rem) * 1.25); }
     .body.cover-card .slider-state { padding-inline:16px; }
     .body.standard-control>.control { align-self:stretch; width:100%; margin-top:auto; }
