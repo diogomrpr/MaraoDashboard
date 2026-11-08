@@ -35,7 +35,8 @@
     "docs:test": "node --test --test-concurrency=1 tests/docs/*.test.mjs",
     "card:context": "node docs/scripts/card-context.mjs",
     "docs:design": "node docs/scripts/design-workspace.mjs",
-    "card:apply": "node docs/scripts/apply-card-design.mjs"
+    "card:apply": "node docs/scripts/apply-card-design.mjs",
+    "release": "node ha-test/release.mjs"
   },
   "devDependencies": {
     "chart.js": "4.5.1",

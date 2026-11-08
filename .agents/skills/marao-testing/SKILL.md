@@ -53,6 +53,18 @@ release unless the user explicitly asks. `verify:publish` and `verify:release`
 without an upgrade-report argument enforce that default. Report what passed and what was left to the user; never
 claim a manual handoff is automated coverage.
 
+For an explicit release request, use `npm run release -- --version <x.y.z>
+--notes-file <reviewed-notes.md>` from a clean reviewed checkout based on current
+`origin/main`. Add `--config <ignored-local.json>` for an isolated worktree. It
+versions/builds/commits, calls the existing serial unit publication gate, verifies
+final installation on `192.168.0.28`, creates the PR/tag and complete draft assets,
+requires exact-commit GitHub checks, merges/publishes and confirms tagged docs.
+Use `--plan` without source/HA/GitHub writes. Rerun the same command and unchanged
+notes to resume from its private Git journal; no moved tags, asset clobbering,
+automatic full preparation or additional integration suites are permitted.
+Preserve unrelated work before starting. A request to implement the release tool
+does not itself request publication of a version.
+
 ## Add an assertion where it can catch the defect
 
 | Changed contract | Existing test layer |
