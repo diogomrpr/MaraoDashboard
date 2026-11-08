@@ -384,7 +384,7 @@ test('People and section drafts retain native placement and unknown member data 
 
 test('optional color fields represent unset and CSS values without HTML color coercion',()=>{
   const editor=Object.create(MaraoCardEditor.prototype),entry=card('md_light_card');
-  assert.deepEqual(editor._variableSchema({key:'card_color',kind:'color',label:'Card color'}).selector,{text:{}});
+  assert.deepEqual(editor._variableSchema({key:'card_color',kind:'color',label:'Card color'}).selector,{text:{autocomplete:'off'}});
   for(const value of ['', 'var(--primary-color)', '#123456']) {
     const config={type:'custom:marao-light-card',entity_id:'light.test',variables:{card_color:value}},data=nativeCardFormData(config,entry);
     assert.deepEqual(patchNativeCard(config,entry,data,{...data,name:'Desk'}),{...config,name:'Desk'});
@@ -783,11 +783,14 @@ test('native grid editing retains group order, content, unknown options and raw-
   const a={type:'custom:marao-light-card',entity_id:'light.a',future:[]},b={type:'markdown',content:'Kept'},c={type:'custom:marao-card',template:'md_sensor_card',entity:'sensor.safe'};
   const original={type:'custom:marao-control-grid',columns:2,cards:[a,b,c],groups:[{columns:1,count:1,future:false},{columns:2,count:2,future:[]}],native_cards:[2],future:{keep:[]}};
   const native=controlGridEditorValue(original);
-  assert.deepEqual(native,{type:'vertical-stack',cards:[{type:'grid',square:false,columns:1,count:1,future:false,cards:[a]},{type:'grid',square:false,columns:2,count:2,future:[],cards:[b,c]}]});
+  assert.deepEqual(JSON.parse(JSON.stringify(native)),{type:'vertical-stack',cards:[{type:'grid',square:false,columns:1,cards:[a]},{type:'grid',square:false,columns:2,cards:[b,c]}]});
+  assert.deepEqual(Object.keys(native.cards[0]).sort(),['cards','columns','square','type']);
+  assert.deepEqual(patchControlGrid(original,structuredClone(native)),original);
   assert.deepEqual(patchControlGrid(original,native),original);
+  const edited=structuredClone(native);edited.cards[0].cards[0].name='Changed';assert.deepEqual(patchControlGrid(original,edited),{...original,cards:[{...a,name:'Changed'},b,c]});
   native.cards.reverse();assert.deepEqual(patchControlGrid(original,native),{...original,cards:[b,c,a],groups:[original.groups[1],original.groups[0]],native_cards:[1]});
   assert.deepEqual(original.cards,[a,b,c]);
-  const invalid=structuredClone(native);invalid.cards[0].cards.pop();assert.throws(()=>patchControlGrid(original,invalid),/raw cards/);
+  const invalid=structuredClone(native);invalid.cards[0].cards.pop();assert.throws(()=>patchControlGrid(original,invalid),/identity is ambiguous|raw cards/);
 });
 
 test('every gallery card is reproducible through its native editor or dedicated visual editor',async t=>{
@@ -846,4 +849,34 @@ test('popup settings refresh immediately when native history or energy presentat
     const form=f.forms.find(form=>form.schema.some(field=>field.name===key));form.change({...form.data,[key]:value});
     assert.equal(renders,1);assert.equal(f.editor._config[key]??f.editor._config.variables?.history_popup,value);
   }
+});
+
+test('native grid editors wait for connection when returning from YAML to visual mode',async t=>{
+  const saved=new Map(['customElements','location'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
+  t.after(()=>{for(const [key,value]of saved)if(value)Object.defineProperty(globalThis,key,value);else delete globalThis[key];});
+  globalThis.customElements={get:()=>true};globalThis.location={pathname:'/marao-dashboard/home',origin:'http://192.168.0.28:8123'};
+  const original={type:'custom:marao-control-grid',cards:[{type:'markdown',content:'Kept'}],future:[]};
+  const f=nativeFormHarness(t,original),host=f.editor.shadowRoot.querySelector('[data-fields]');
+  f.editor.isConnected=false;host.isConnected=false;f.editor._render();
+  assert.equal(f.editor._mounted,false);await new Promise(resolve=>setImmediate(resolve));assert.equal(host.children.length,0);
+  f.editor.isConnected=true;host.isConnected=true;f.editor.connectedCallback();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(host.children[0].value.type,'grid');assert.deepEqual(f.editor._config,original);
+});
+
+test('closing a nested settings dialog cannot close the native outer card editor',t=>{
+  const f=nativeFormHarness(t,{type:'custom:marao-media-card',entity_id:'media_player.safe'}),create=globalThis.document.createElement;
+  globalThis.document.createElement=()=>{const node=create();node.remove=()=>{node.removed=true;};return node;};
+  f.editor.isConnected=true;f.editor._containForm=async()=>{};let localClosed=0,restored=0;f.editor._focusWithoutScroll=()=>{restored++;};
+  const dialog=f.editor._dialog('Settings');dialog.addEventListener('closed',()=>{localClosed++;});
+  const event=new Event('closed',{bubbles:true,composed:true});dialog.dispatchEvent(event);
+  assert.equal(event.cancelBubble,true);assert.equal(dialog.removed,true);assert.equal(localClosed,1);assert.equal(restored,1);
+  assert.deepEqual(f.editor._config,{type:'custom:marao-media-card',entity_id:'media_player.safe'});
+});
+
+test('native configuration text fields disable personal autofill through the HA selector API',t=>{
+  const f=nativeFormHarness(t,{type:'custom:marao-light-card',entity_id:'light.safe'});
+  assert.equal(f.forms[0].schema.find(field=>field.name==='name').selector.text.autocomplete,'off');
+  const selector={text:{autocomplete:'new-password',type:'password'}};
+  assert.deepEqual(f.editor._schema('secret','Secret',selector).selector,selector);
+  assert.deepEqual(selector,{text:{autocomplete:'new-password',type:'password'}});
 });

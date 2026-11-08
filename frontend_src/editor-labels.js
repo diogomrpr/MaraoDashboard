@@ -1,6 +1,9 @@
 import { FLOOR_PT_LABELS } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlanText.js';
 import {PLEX_PT} from '../custom_components/marao_dashboard/frontend/MaraoPlexModel.js';
 export const PT_LABELS = {
+  "Apple TV options":"Opções da Apple TV",
+  "Add entity":"Adicionar entidade",
+  "Grid group identity is ambiguous. Edit the original YAML to preserve its options.":"A identidade do grupo de grelha é ambígua. Edite o YAML original para preservar as suas opções.",
   "Wallbox charging current":"Corrente de carregamento Wallbox",
   "Use a native Grid card for square cells or a grid title.":"Use um cartão Grelha nativo para células quadradas ou um título de grelha.",
   "Show name":"Mostrar nome",

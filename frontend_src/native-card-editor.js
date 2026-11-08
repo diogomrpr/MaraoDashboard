@@ -79,10 +79,11 @@ export function patchNativeCard(config, card, previous, next) {
   return result;
 }
 
+const gridGroupMetadata=Symbol('Marao grid group');
 export function controlGridEditorValue(config) {
-  if(!config.groups)return {...clone(config),type:'grid',columns:config.columns??2,square:false};
+  if(!config.groups)return {type:'grid',columns:config.columns??2,square:false,cards:clone(config.cards)};
   let offset=0;
-  return {type:'vertical-stack',cards:config.groups.map(group=>{const cards=clone(config.cards.slice(offset,offset+group.count));offset+=group.count;return {...clone(group),type:'grid',square:false,cards};})};
+  return {type:'vertical-stack',cards:config.groups.map(group=>{const cards=clone(config.cards.slice(offset,offset+group.count));offset+=group.count;return {type:'grid',columns:group.columns,square:false,cards,[gridGroupMetadata]:group};})};
 }
 export function patchControlGrid(config,value) {
   // shortcut: legacy control grids keep adaptive geometry; use native Grid for square cells or grid titles.
@@ -92,7 +93,16 @@ export function patchControlGrid(config,value) {
   if(config.groups) {
     if(value.type!=='vertical-stack'||!Array.isArray(value.cards)||value.cards.some(group=>group.type!=='grid'||!group.cards?.length))throw new Error('Keep a grid for each control group.');
     next.cards=value.cards.flatMap(group=>clone(group.cards));
-    next.groups=value.cards.map(({type,square,cards,...group})=>({...clone(group),columns:group.columns||1,count:cards.length}));
+    const previous=controlGridEditorValue(config).cards;
+    next.groups=value.cards.map((grid,index)=>{
+      // Symbols survive native object spreads without becoming unsupported YAML keys or saved IDs.
+      let metadata=grid[gridGroupMetadata];
+      if(!metadata&&value.cards.length===previous.length&&previous.every((card,i)=>i===index||canonicalLayout(card)===canonicalLayout(value.cards[i])))metadata=config.groups[index];
+      if(!metadata){const matches=previous.flatMap((card,i)=>canonicalLayout(card)===canonicalLayout(grid)?[i]:[]);if(matches.length===1)metadata=config.groups[matches[0]];}
+      if(!metadata&&value.cards.length>previous.length&&previous.every(card=>value.cards.some(next=>canonicalLayout(next)===canonicalLayout(card))))metadata={};
+      if(!metadata)throw new Error('Grid group identity is ambiguous. Edit the original YAML to preserve its options.');
+      return {...clone(metadata),columns:grid.columns||1,count:grid.cards.length};
+    });
   }else {
     if(value.type!=='grid'||!Array.isArray(value.cards))throw new Error('Use a native Grid card.');
     next.cards=clone(value.cards);if(own(config,'columns')||value.columns!==2)next.columns=value.columns||2;
@@ -311,6 +321,7 @@ export class MaraoCardEditor extends Base {
       this._mountForm(host,clone(original),fields,value=>{const error=popupViewError(value);if(error){this._setStatus(this._l(error));return;}this._setStatus('');this._commitDescriptor({...this._config,...value});});return true;
     }
     if(type!=='custom:marao-control-grid')return false;
+    if(this.isConnected===false){this._mounted=false;return true;}
     const epoch=this._documentEpoch,lifecycle=this._lifecycle;
     loadLovelaceEditor(this.hass,globalThis.location?.pathname,{picker:false}).then(()=>{
       if(epoch!==this._documentEpoch||lifecycle!==this._lifecycle||!host.isConnected)return;
@@ -504,7 +515,11 @@ export class MaraoCardEditor extends Base {
   }
   _dialog(title) {
     const dialog=document.createElement('ha-dialog');dialog.width='large';dialog.open=true;dialog.heading=this._l(title);dialog.headerTitle=this._l(title);dialog.innerHTML='<div class="dialog-content"></div>';
-    const invoking=this.shadowRoot.activeElement;dialog.addEventListener('closed',()=>{dialog.remove();if(this.isConnected)this._focusWithoutScroll(invoking?.isConnected?invoking:this.shadowRoot.querySelector('button'));},{once:true});
+    const invoking=this.shadowRoot.activeElement,closed=event=>{
+      event.stopPropagation();if(event.target!==dialog)return;
+      dialog.removeEventListener('closed',closed);dialog.remove();
+      if(this.isConnected)this._focusWithoutScroll(invoking?.isConnected?invoking:this.shadowRoot.querySelector('button'));
+    };dialog.addEventListener('closed',closed);
     this.shadowRoot.append(dialog);this._containForm(dialog).catch(error=>this._setStatus(this._error(error)));return dialog;
   }
   _closeDialog(dialog){dialog.open=false;}

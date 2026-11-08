@@ -141,7 +141,7 @@ export const cardFormMethods = {
     });
   },
 
-  _schema(name, label, selector, required = false) { return { name, label: this._l(label), required, selector }; },
+  _schema(name, label, selector, required = false) { return { name, label: this._l(label), required, selector: selector.text ? {...selector,text:{autocomplete:'off',...selector.text}} : selector }; },
 
   _mountForm(host, data, schema, changed) {
     const form = document.createElement("ha-form"); form.hass = this._hass; form.data = data; form.schema = schema;
