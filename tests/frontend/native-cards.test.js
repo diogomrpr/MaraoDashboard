@@ -101,6 +101,15 @@ test('native resize limits allow compact widths and preserve smaller explicit im
   assert.deepEqual(nativeCardGridOptions({ ...light, grid_options: { columns: 2, rows: 1 } }), { columns: 6, rows: 3, min_columns: 2, min_rows: 1 });
 });
 
+test('Weather lets Sections measure its content height while preserving saved sizing', () => {
+  const weather = config('md_weather_card', { entity_id: 'weather.test', grid_options: { columns: 12 } });
+  assert.deepEqual(MaraoNativeCard.prototype.getGridOptions.call({ _config: weather }), { columns: 12, rows: 'auto', min_columns: 6, min_rows: 2 });
+  const authored = { ...weather, grid_options: { columns: 6, rows: 7 } }, before = structuredClone(authored);
+  assert.equal(nativeCardGridOptions(authored).rows, 'auto');
+  compose(authored);
+  assert.deepEqual(authored, before, 'Preferred automatic height must not rewrite explicit saved sizing');
+});
+
 test('duplicated native cards own different automatic sheets despite identical saved identifiers', () => {
   for (const [template, entity_id, variables] of [
     ['md_climate_card', 'climate.test', {}], ['md_media_card', 'media_player.test', {}],

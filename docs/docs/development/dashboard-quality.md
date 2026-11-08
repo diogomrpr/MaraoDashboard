@@ -807,7 +807,7 @@ items, timelines, chart plots/statistics and configured device rows keep their
 normal slots while data loads or fails. Do not retain stale measurements to fill
 those slots. Only presentation metadata such as names and capability descriptors
 may survive missing attributes; service dispatch still checks the live entity.
-Weather uses a static condition-based sky, large temperature and available current metrics. Hourly and daily forecasts open in the shared popup. Alarm actions retain the
+Weather uses a static condition-based sky, large temperature and available current metrics. Native Weather cards default to automatic height so wrapped titles, readings and enlarged text reserve their full space in Home Assistant sections, while explicit authored grid sizes remain preserved. Hourly and daily forecasts open in the shared popup. Alarm actions retain the
 code-entry slot in all layouts. Only Dropdown and Grid are offered; omission renders Dropdown without changing
 saved configuration. Dropdown commits actions without a hold,
 while Grid uses two arming columns, held bypass and a full-width strict Disarm
