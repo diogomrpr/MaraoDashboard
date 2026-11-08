@@ -9,7 +9,7 @@ import {parse} from 'yaml';
 const docs=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),root=path.dirname(docs),frontend=path.join(root,'custom_components/marao_dashboard/frontend');
 const mime={'.svg':'image/svg+xml','.png':'image/png','.ttf':'font/ttf','.css':'text/css','.woff2':'font/woff2'};
 const dataURL=async filename=>`data:${mime[path.extname(filename)]||'application/octet-stream'};base64,${(await fs.readFile(filename)).toString('base64')}`;
-const staticImport=/import\(new URL\((`[^`]+`|'[^']+'|"[^"]+"),\s*import\.meta\.url\)(?:\.href)?\)/g;
+const staticImport=/import\(new URL\((`[^`]+`|'[^']+'|"[^"]+")(?:\s*\+\s*new URL\(import\.meta\.url\)\.search)?,\s*import\.meta\.url\)(?:\.href)?\)/g;
 
 /** Bundle the existing runtime, adapting only its host/asset boundaries for an opaque frame. */
 export async function buildPreview({design=false,published=false}={}){
@@ -66,7 +66,7 @@ export async function buildPreview({design=false,published=false}={}){
   }};
   const result=await build({entryPoints:[path.join(docs,'playground/preview-entry.js')],bundle:true,write:false,format:'esm',platform:'browser',target:'es2022',minify:true,legalComments:'eof',plugins:[plugin],define:{__MARAO_VERSION__:JSON.stringify(version),__MARAO_DESIGN_PREVIEW__:JSON.stringify(design)},logLevel:'warning'});
   const script=result.outputFiles[0].text.replace(/<\/script/gi,'<\\/script');
-  if(/import\(new URL|import\(\w+\.href\)/.test(script))throw new Error('Preview contains an unbundled runtime import.');
+  if(/import\(new URL|import\(\w+\.href\)/.test(script))throw new Error('Preview contains an unbundled runtime import: '+script.slice(script.search(/import\(new URL|import\(\w+\.href\)/),script.search(/import\(new URL|import\(\w+\.href\)/)+220));
   const hash=createHash('sha256').update(script).digest('base64');
   const policy=`default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline' data:; img-src data:; font-src data:; media-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'`;
   const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${policy}"><title>Marao card preview</title><style>html{font-family:Montserrat,system-ui,sans-serif;color:var(--primary-text-color,#263338);background:var(--primary-background-color,#f3f3ee)}body{margin:0;min-width:0;min-height:460px}*{box-sizing:border-box}#status{padding:0 16px 12px;overflow-wrap:anywhere;font-size:14px}#status:empty{display:none}home-assistant{display:block;min-height:420px}</style></head><body><main id="preview"></main><p id="status" role="status"></p><script type="module">${script}</script></body></html>`;
