@@ -146,6 +146,29 @@ test('confirmed cover interpolation retargets from the drawn value, keeps target
  motion.matches=false;time=3000;control.update(90,90,{follow:true});document.hidden=true;document.dispatchEvent(new Event('visibilitychange'));assert.equal(frames.size,0);assert.equal(properties.get('--marao-slider-fraction'),'0.9');control.destroy();assert.equal(frames.size,0);
 });
 
+test('cover label waits for valid layout and appears on its initial side without entry motion', t => {
+  const old = {ResizeObserver: globalThis.ResizeObserver, document: globalThis.document};
+  t.after(() => Object.assign(globalThis, old));
+  let resize, needed = 0;
+  const fonts = new EventTarget(), animations = [];
+  globalThis.document = {fonts};
+  globalThis.ResizeObserver = class {constructor(callback) {resize = callback;}observe() {}disconnect() {}};
+  const {input} = slider(), track = input.parentElement;
+  track.dataset = {};track.clientWidth = 0;input.value = '0';input.dataset.sliderCurrent = '0';
+  track.getBoundingClientRect = () => ({left: 0, right: track.clientWidth});
+  const label = {style: {maxWidth: ''}, getBoundingClientRect: () => ({width: needed, left: track.dataset.stateSide === 'left' ? 0 : track.clientWidth - needed}), animate: (...args) => {animations.push(args);return {cancel() {}};}};
+  track.querySelector = () => label;
+  const control = bindSlider(input);
+  assert.equal(track.dataset.stateSide, undefined, 'Detached zero-width layout must not select the left side');
+  track.clientWidth = 248;resize([]);assert.equal(track.dataset.stateSide, undefined, 'Unmeasurable text must not establish an initial side');
+  needed = 96;resize([]);assert.equal(track.dataset.stateSide, 'right');assert.equal(animations.length, 0);
+  control.update(49, 49);assert.equal(track.dataset.stateSide, 'left');assert.equal(animations.length, 1, 'A later target-side change retains its animation');
+  needed = 120;fonts.dispatchEvent(new Event('loadingdone'));
+  assert.equal(track.dataset.stateSide, 'right');assert.equal(animations.length, 1, 'Font layout correction must be immediate');
+  track.clientWidth = 448;resize([]);assert.equal(track.dataset.stateSide, 'left');assert.equal(animations.length, 1, 'Resize is layout, not slider motion');
+  control.destroy();
+});
+
 test('cover label exits its edge and re-enters opposite, cancels old motion and honors reduced motion', t => {
   const oldMatch = globalThis.matchMedia;
   const motion = Object.assign(new EventTarget(), {matches:false});
