@@ -34,7 +34,7 @@ export function plexPoster(path) {
   return 'data:image/svg+xml,'+encodeURIComponent(svg);
 }
 
-const config={type:'custom:marao-media-card',entity_id:'media_player.living_room',name:'Living room Apple TV',variables:{media_display:'inline'},apple_tv:{remote_entity:'remote.living_room',plex:{display:'popup',client_entity:'media_player.plex',scan_clients_entity:'button.plex_scan',app_source:'Plex',library_root:reference('server','server','Marao demonstration library')}}};
+const config={type:'custom:marao-plex-library-card',entity_id:'media_player.living_room',name:'Living room Apple TV',apple_tv:{plex:{display:'popup',client_entity:'media_player.plex',scan_clients_entity:'button.plex_scan',app_source:'Plex',library_root:reference('server','server','Marao demonstration library')}}};
 const states={
   'media_player.living_room':{attributes:{friendly_name:'Living room Apple TV',source:'Plex',source_list:['Plex','Rivulet']}},
   'media_player.plex':{entity_id:'media_player.plex',state:'idle',attributes:{friendly_name:'Fictional Plex client',supported_features:512}},
@@ -54,18 +54,17 @@ const examples=[
   {id:'unavailable',label:'Unavailable television',description:'Library browsing remains read-only and playback is disabled for an unavailable TV.',states:{'media_player.living_room':'unavailable'}},
   {id:'disconnected',label:'Disconnected',description:'Show a neutral connection problem without issuing playback commands.',simulation:{disconnected:true}},
 ];
-const bedroom={...config,entity_id:'media_player.bedroom',name:'Bedroom Apple TV',apple_tv:{...config.apple_tv,remote_entity:'remote.bedroom'}};
+const bedroom={...config,entity_id:'media_player.bedroom',name:'Bedroom Apple TV',apple_tv:structuredClone(config.apple_tv)};
 
 export const plexLibraryReference={
-  id:'plex-library',slug:'plex-library',relatedTo:'md_media_card',title:'Plex library',description:'Browse Continue Watching, Movies and TV Series, then play a title on your selected Apple TV through Plex or Rivulet.',config,domains:['media_player'],
+  id:'md_plex_library_card',slug:'plex-library',title:'Plex library',description:'Browse Continue Watching, Movies and TV Series, then play a title on your selected Apple TV through Plex or Rivulet.',config,domains:['media_player'],
   fields:[
     {path:'apple_tv.plex.display',label:'Library layout',kind:'select',options:['inline','popup'],default:'inline',description:'Full shelves (inline) or a compact poster card opening the full library (popup). Omission preserves full shelves.'},
-    {path:'entity_id',label:'Apple TV',kind:'entity',description:'The parent Media card’s Apple TV entity.'},
-    {path:'apple_tv.remote_entity',label:'Apple TV remote',kind:'entity',description:'The remote belonging to the same television.'},
+    {path:'entity_id',label:'Apple TV',kind:'entity',description:'The Apple TV used for playback.'},
     ...['playback_app','client_entity','browse_entity','scan_clients_entity','app_source','library_root','continue_watching'].map(key=>({path:'apple_tv.plex.'+key,label:key.replaceAll('_',' '),kind:['library_root','continue_watching'].includes(key)?'json':'text',description:({playback_app:'Plex (default) or Rivulet.',client_entity:'Plex playback client; required for Plex playback.',browse_entity:'Optional Plex metadata entity, including for Rivulet.',scan_clients_entity:'Plex scan-clients button; required for Plex playback.',app_source:'Exact Plex source supported by the Apple TV; required for Plex playback.',library_root:'Server reference selected through Choose library folders.',continue_watching:'Optional same-server folder when automatic discovery is ambiguous.'})[key]})),
   ],
-  notes:['Configure the library in the parent Media player card’s Apple TV options → Plex setup.'],
-  previewLimitations:['The gallery shows the real Plex library renderer with fictional titles, generated artwork and in-memory browse responses. Playback requests affect only fictional state; they do not play a video or connect to Home Assistant or Plex. Copy YAML exports the parent Media card configuration, not an independently configurable Plex card.'],
+  notes:['Add the Plex library card directly in Home Assistant and configure its Apple TV and Plex setup.'],
+  previewLimitations:['The gallery shows the real Plex library renderer with fictional titles, generated artwork and in-memory browse responses. Playback requests affect only fictional state; they do not play a video or connect to Home Assistant or Plex. Copy YAML exports the standalone Plex library card configuration.'],
   scenarios:examples.map(item=>{
     const current={...structuredClone(config),...structuredClone(item.patch||{})};
     current.apple_tv.plex.display=item.libraryMode==='popup'?'popup':'inline';

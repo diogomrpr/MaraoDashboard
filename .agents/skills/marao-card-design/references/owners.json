@@ -8,7 +8,8 @@
       "_summary("
     ],
     "consumers": [
-      "md_media_card"
+      "md_media_card",
+      "md_plex_library_card"
     ],
     "indirect": [
       "Plex library reference; compact/full library and owned popup"

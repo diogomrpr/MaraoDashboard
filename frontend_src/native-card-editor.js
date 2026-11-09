@@ -22,7 +22,7 @@ const runtimeAliases={'custom:marao-state-timeline-card':'md_timeline_card','cus
 const legacySummaries=new Set(['md_blinds_popup_card','md_climate_popup_card','md_lights_popup_card','md_maintenance_popup_card','md_bubble_popup_card','hc_bubble_popup_card','hc_slider_card']);
 const energyKeys=['period','display_unit','display_precision','sub_entities','calculate_cost','cost_per_kwh'];
 const primitiveKeys=config=>config.type==='custom:marao-energy-period-card'?energyKeys:config.type==='custom:marao-power-history-card'?['power_devices','display_unit','display_precision','graph_color']:[];
-const simpleAppearance=card=>!['md_energy_period_card','md_timeline_card','md_people_card','md_schedules_card','md_floor_plan_card'].includes(card.id);
+const simpleAppearance=card=>!['md_energy_period_card','md_timeline_card','md_people_card','md_schedules_card','md_floor_plan_card','md_plex_library_card'].includes(card.id);
 const editorCard=card=>card?{...card,variables:[...(simpleAppearance(card)?catalog.common_variables||[]:[]).filter(field=>!card.variables.some(item=>item.key===field.key)),...card.variables]}:card;
 
 const WORDS = {add:'Add',delete:'Delete',edit:'Edit',update:'Update',create:'Create',cancel:'Cancel',advanced:'Advanced options',searchEntities:'Search by name or entity ID',noResults:'No compatible entities match your search.',unknown:'Unknown',unavailable:'Unavailable'};
@@ -242,8 +242,8 @@ export class MaraoCardEditor extends Base {
       const pages=this._availablePages();if(data.page&&!pages.some(page=>page.path===data.page))pages.push({path:data.page,name:data.page});
       schema.push(this._schema('page','Target page',{select:{mode:'dropdown',options:pages.map(page=>({value:page.path,label:page.name}))}},true));
     }
-    if(card.domains?.length)schema.push(this._schema('entity_id',card.id==='md_header_card'?'Weather':card.id==='md_camera_card'?'Dashboard stream':'Entity',{entity:{domain:card.domains}},!card.entity_optional));
-    schema.push(...(card.id==='md_camera_card'?cameraTitleFields().map(field=>this._schema(field.path,field.label,{[field.kind]:{}})):[this._schema('name','Display name',{text:{}}),...(!['md_timeline_card'].includes(card.id)&&this._config.type!=='custom:marao-power-history-card'?[this._schema('icon','Icon',{icon:{}})]:[])]));
+    if(card.domains?.length)schema.push(this._schema('entity_id',card.id==='md_header_card'?'Weather':card.id==='md_camera_card'?'Dashboard stream':card.id==='md_plex_library_card'?'Apple TV':'Entity',{entity:{domain:card.domains}},!card.entity_optional));
+    schema.push(...(card.id==='md_camera_card'?cameraTitleFields().map(field=>this._schema(field.path,field.label,{[field.kind]:{}})):[this._schema('name','Display name',{text:{}}),...(!['md_timeline_card','md_plex_library_card'].includes(card.id)&&this._config.type!=='custom:marao-power-history-card'?[this._schema('icon','Icon',{icon:{}})]:[])]));
     if(card.scene_collection || card.people)schema.push(this._schema('scene_entities',card.people?'People':'Scenes',{entity:{domain:card.people?['person']:['scene','switch','input_boolean'],multiple:true}}));
     if(card.people)schema.push(this._schema('columns','Columns',{number:{min:1,max:6,step:1,mode:'box'}}));
     schema.push(...basic.map(field=>this._variableSchema(field,card.id==='md_switch_card'?data.var__power_entity:data.entity_id)));
@@ -279,6 +279,9 @@ export class MaraoCardEditor extends Base {
     const special=host.querySelector('[data-special]');
     if(card.entity_group)this._renderGroup(special,descriptor);
     if(card.schedules)this._renderSchedules(special,original);
+    if(card.id==='md_plex_library_card') {
+      const button=document.createElement('button');button.type='button';button.textContent=this._l('Plex setup');button.onclick=()=>{this._moveHaptic();this._openPlexOptions({...original,entity_id:data.entity_id,apple_tv:this._mediaEdited?this._mediaValue:original.apple_tv},value=>{this._mediaEdited=true;this._mediaValue=value;commit();});};special.append(button);
+    }
     if(card.id==='md_media_card') {
       const button=document.createElement('button');button.type='button';button.textContent=this._l('Apple TV options');button.onclick=()=>{this._moveHaptic();this._openMediaOptions({...original,entity_id:data.entity_id,apple_tv:this._mediaEdited?this._mediaValue:original.apple_tv??original.variables?.apple_tv},value=>{this._mediaEdited=true;this._mediaValue=value;commit();});};special.append(button);
     }

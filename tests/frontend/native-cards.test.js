@@ -14,8 +14,8 @@ const compose = (config, instanceId = 'one') => composeNativeCard(config, { inst
 const config = (template, extra = {}) => ({ type: nativeCardType(template), template, ...extra });
 
 test('all catalog identities expose independent native types, defaults and shared sizing without replacing runtime types', () => {
-  assert.equal(Object.keys(NATIVE_CARD_TYPES).length, 38);
-  assert.equal(new Set(Object.values(NATIVE_CARD_TYPES)).size, 38);
+  assert.equal(Object.keys(NATIVE_CARD_TYPES).length, 39);
+  assert.equal(new Set(Object.values(NATIVE_CARD_TYPES)).size, 39);
   for (const entry of catalog.cards) {
     const stub = nativeCardStub(entry.id, hass, Object.keys(hass.states));
     if (entry.id === 'md_floor_plan_card') stub.variables.image_id = 'a'.repeat(32);
@@ -41,7 +41,7 @@ test('native registration retains existing generic renderers and hides only cata
   const thirdParty = {type:'other-card',name:'Other',description:'Other'};
   globalThis.window = { customCards: [thirdParty] };
   registerNativeCards(); registerNativeCards();
-  assert.equal(registry.size, 41);
+  assert.equal(registry.size, 42);
   assert.equal(registry.get('marao-card'), runtime);
   assert.equal(window.customCards.length, catalog.cards.filter(card => !card.hidden).length+2);
   assert.equal(window.customCards.filter(card=>card.type==='marao-camera-events-card').length,1);
@@ -330,4 +330,29 @@ test('the Security action picker can recreate the gallery held Lock without an u
   assert.equal(stub.entity_id,'lock.safe');assert.doesNotThrow(()=>validateNativeCardConfig(stub));
   const result=compose(stub);assert.equal(result.card.template,'md_access_hold_action_card');assert.equal(result.card.variables.action_service,'lock.lock');
   assert.deepEqual(result.card.tap_action,{action:'call-service',service:'lock.lock',entity_id:'lock.safe',haptic:'heavy'});assert.deepEqual(result.popups,[]);
+});
+
+
+test('Plex library is independent, owns only library content and preserves existing media configurations', () => {
+  const saved={type:'custom:marao-plex-library-card',entity_id:'media_player.test',name:'Living room',apple_tv:{future:[],plex:{display:'popup',playback_app:'rivulet',library_root:{media_content_type:'server',media_content_id:'plex://safe-server/server'},future:{disabled:false}}},future:{keep:[]}},before=structuredClone(saved);
+  assert.equal(nativeCardSetup({...nativeCardStub('md_plex_library_card',hass),entity_id:'media_player.test'}), 'Choose a Plex server folder.');
+  assert.equal(nativeCardSetup(saved),null);
+  validateNativeCardConfig(saved);
+  const result=compose(saved);
+  assert.deepEqual(result.popups,[]);
+  assert.equal(result.card.type,'custom:marao-plex-watch-card');
+  assert.equal(result.card.full,false);
+  assert.deepEqual(result.card.parent,{entity_id:saved.entity_id,name:saved.name,apple_tv:saved.apple_tv});
+  assert.equal(nativeCardGridOptions(saved).rows,3);
+  const inline={...saved,apple_tv:{...saved.apple_tv,plex:{...saved.apple_tv.plex,display:'inline'}}};
+  assert.equal(compose(inline).card.full,true);
+  assert.equal(nativeCardGridOptions(inline).rows,'auto');
+  const omitted=structuredClone(inline);delete omitted.apple_tv.plex.display;
+  assert.equal(compose(omitted).card.full,true);
+  assert.throws(()=>validateNativeCardConfig({...saved,apple_tv:{plex:{...saved.apple_tv.plex,display:'invalid'}}}),/layout/);
+  const media={...saved,type:'custom:marao-media-card',variables:{media_display:'inline'}};
+  const legacy=compose(media);
+  assert.equal(legacy.card.type,'vertical-stack');
+  assert.ok(legacy.card.cards.some(card=>card.type==='custom:marao-plex-watch-card'&&card.full===false));
+  assert.deepEqual(saved,before);
 });

@@ -5,7 +5,8 @@ export const PLEX_LAUNCH_TIMEOUT = 30000;
 export const rivuletPlayback = mapping => mapping?.playback_app === 'rivulet';
 
 export const PLEX_PT = {
-  'Plex library': 'Biblioteca Plex', 'Open library': 'Abrir biblioteca', 'Library layout': 'Disposição da biblioteca', 'On dashboard': 'No painel', 'Popup': 'Janela', 'Choose a Plex library layout.': 'Escolha uma disposição da biblioteca Plex.', 'Movies and TV Series': 'Filmes e séries', 'Continue Watching': 'Continuar a ver', 'Browse library': 'Explorar biblioteca',
+  'Plex library': 'Biblioteca Plex',
+  'Browse a Plex library and play on the selected Apple TV through Plex or Rivulet.': 'Explore uma biblioteca Plex e reproduza na Apple TV selecionada através do Plex ou Rivulet.', 'Open library': 'Abrir biblioteca', 'Library layout': 'Disposição da biblioteca', 'On dashboard': 'No painel', 'Popup': 'Janela', 'Choose a Plex library layout.': 'Escolha uma disposição da biblioteca Plex.', 'Movies and TV Series': 'Filmes e séries', 'Continue Watching': 'Continuar a ver', 'Browse library': 'Explorar biblioteca',
   'Movies':'Filmes', 'TV Series':'Séries de TV', 'Previous':'Anterior', 'Next':'Seguinte',
   'Recently Added': 'Adicionados recentemente', 'Apple TV': 'Apple TV', 'Back': 'Voltar', 'Refresh': 'Atualizar',
   'Retry': 'Tentar novamente', 'Load more': 'Carregar mais', 'Loading library…': 'A carregar biblioteca…',
@@ -99,7 +100,7 @@ export function plexTargets(dashboard, parent) {
     if (!Array.isArray(cards)) return;
     cards.forEach((card, index) => {
       const key = `${path}/${index}`;
-      if (card?.type === 'custom:marao-media-card' || card?.template === 'md_media_card') {
+      if (['custom:marao-media-card','custom:marao-plex-library-card'].includes(card?.type) || ['md_media_card','md_plex_library_card'].includes(card?.template)) {
         const target = plexTarget(card, key, `${card.name || card.entity_id || card.entity} · ${viewName}`);
         if (target?.plex.library_root.media_content_id === root && !seen.has(plexTargetIdentity(target))) { seen.add(plexTargetIdentity(target)); targets.push(target); }
       }

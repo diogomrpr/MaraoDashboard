@@ -67,6 +67,7 @@ export function nativeCardSetup(config) {
     probe.variables = {...probe.variables, image_id:'0'.repeat(32)};
     message = 'Upload a floor-plan image.';
   }
+  if (descriptor.template === 'md_plex_library_card' && !descriptor.apple_tv?.plex) message ||= 'Choose a Plex server folder.';
   if (message) validateNativeCardConfig(probe);
   return message || null;
 }
@@ -120,6 +121,7 @@ export function nativeCardGridOptions(config) {
   if (['md_header_card', 'md_wallbox_current_card', 'md_alarm_controls_card'].includes(template)) rows = 4;
   if (['md_climate_card', 'md_dishwasher_card', 'md_weather_card'].includes(template)) rows = 'auto';
   if (template === 'md_camera_card') rows = 5;
+  if (template === 'md_plex_library_card') rows = config.apple_tv?.plex?.display === 'popup' ? 3 : 'auto';
   if (template === 'md_floor_plan_card') rows = 8;
   if (template === 'md_media_card' && config.variables?.media_display === 'inline') rows = config.apple_tv?.plex ? 'auto' : config.apple_tv ? 12 : 5;
   const explicit = config.grid_options || {};
