@@ -12,6 +12,7 @@ export const sliderStyles = `
     .slider:has(input:active:not(:disabled)) .slider-thumb { filter:brightness(.9); }
     .slider:has(.slider-state) { height:auto; overflow:hidden; border-radius:24px; }
     .slider-state { position:relative; box-sizing:border-box; flex:0 0 auto; width:max-content; max-width:calc((100% - 48px) * var(--marao-slider-label-fraction,.5)); padding:8px; margin-left:auto; color:var(--color-black,#1C1C1C); font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-primary,700); line-height:1.25; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+    .slider:not([data-state-side]) .slider-state { visibility:hidden; }
     .slider[data-state-side=left] .slider-state { margin-left:0; margin-right:auto; text-align:left; }
     .slider:has(.slider-state) .slider-track, .slider:has(.slider-state) input[type=range] { height:100%; }
     .slider:has(.slider-state) .slider-background, .slider:has(.slider-state) .slider-fill { height:calc(100% - 1px); }
@@ -41,15 +42,17 @@ export function bindSlider(input, { haptic, onInput, onStart, onCommit, onEnd, o
   const stateLabel = track?.querySelector?.('.slider-state');
   let labelTarget = fraction(Number(input.value)), labelAnimation;
   const stopLabel = () => { labelAnimation?.cancel(); labelAnimation = null; };
-  const placeLabel = () => {
+  const placeLabel = (animate = false) => {
     if (!stateLabel || destroyed) return;
+    const available = Math.max(0, track.clientWidth - 48);
+    if (!available) return;
     const previousSide = track.dataset.stateSide;
     const previousLeft = stateLabel.getBoundingClientRect().left;
     const previousMax = stateLabel.style.maxWidth;
     stateLabel.style.maxWidth = 'none';
     const needed = stateLabel.getBoundingClientRect().width;
     stateLabel.style.maxWidth = previousMax;
-    const available = Math.max(0, track.clientWidth - 48);
+    if (!needed) return;
     const left = available * labelTarget, right = available - left;
     const useLeft = left >= needed || right < needed && left >= right;
     const side = useLeft ? 'left' : 'right';
@@ -57,7 +60,7 @@ export function bindSlider(input, { haptic, onInput, onStart, onCommit, onEnd, o
     if (changed) stopLabel();
     track.dataset.stateSide = side;
     track.style.setProperty('--marao-slider-label-fraction', String(useLeft ? labelTarget : 1 - labelTarget));
-    if (changed && !input.disabled && !motion?.matches && !globalThis.document?.hidden && stateLabel.animate) {
+    if (changed && animate && !input.disabled && !motion?.matches && !globalThis.document?.hidden && stateLabel.animate) {
       const box = stateLabel.getBoundingClientRect(), rail = track.getBoundingClientRect();
       const exit = useLeft ? rail.right : rail.left - box.width;
       const entry = useLeft ? rail.left - box.width : rail.right;
@@ -67,10 +70,11 @@ export function bindSlider(input, { haptic, onInput, onStart, onCommit, onEnd, o
       ], { duration:420, easing:'linear' });
     }
   };
-  const labelObserver = stateLabel && globalThis.ResizeObserver ? new ResizeObserver(placeLabel) : null;
+  const measureLabel = () => placeLabel();
+  const labelObserver = stateLabel && globalThis.ResizeObserver ? new ResizeObserver(measureLabel) : null;
   labelObserver?.observe(track);
   labelObserver?.observe(stateLabel);
-  if (stateLabel) globalThis.document?.fonts?.addEventListener?.('loadingdone', placeLabel);
+  if (stateLabel) globalThis.document?.fonts?.addEventListener?.('loadingdone', measureLabel);
   const motion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
   const stop = () => { if (frame != null) globalThis.cancelAnimationFrame?.(frame); frame = null; segment = null; };
   const paint = (current, target) => {
@@ -80,8 +84,10 @@ export function bindSlider(input, { haptic, onInput, onStart, onCommit, onEnd, o
     input.parentElement?.style.setProperty('--marao-slider-progress', `${progress * 100}%`);
     input.parentElement?.style.setProperty('--marao-slider-fraction', String(progress));
     input.parentElement?.style.setProperty('--marao-slider-target-fraction', String(fraction(target)));
-    labelTarget = fraction(target);
-    placeLabel();
+    const nextTarget = fraction(target);
+    const moved = nextTarget !== labelTarget;
+    labelTarget = nextTarget;
+    placeLabel(moved);
   };
   const now = () => globalThis.performance?.now() ?? Date.now();
   const tick = time => {
@@ -160,7 +166,7 @@ export function bindSlider(input, { haptic, onInput, onStart, onCommit, onEnd, o
     destroy() {
       stop(); stopLabel();
       labelObserver?.disconnect();
-      if (stateLabel) globalThis.document?.fonts?.removeEventListener?.('loadingdone', placeLabel);
+      if (stateLabel) globalThis.document?.fonts?.removeEventListener?.('loadingdone', measureLabel);
       motion?.removeEventListener?.('change', settle);
       globalThis.document?.removeEventListener?.('visibilitychange', settle);
       destroyed = true;
