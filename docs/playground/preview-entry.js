@@ -87,12 +87,6 @@ async function render(message){
   if(message.config.type==='custom:marao-navbar-card'){
     setDashboardNavigation(root,{...safePreviewData(message.config),show_cache_reset:false,show_editor_button:false});
     card=root.shadowRoot.querySelector('[data-marao-navigation-surface]');
-  }else if(message.scenario?.presentation==='plex-library'&&message.config.type==='custom:marao-media-card'){
-    await import('../../custom_components/marao_dashboard/frontend/MaraoPlex.js');
-    if(revision!==renderRevision)return;
-    card=document.createElement('marao-plex-watch-card');
-    card.setConfig({parent:safePreviewData(message.config),full:message.config.apple_tv?.plex?.display!=='popup'});
-    card.hass=simulation.hass;holder.append(card);
   }else{
     const element=document.createElement(message.config.type.slice(7));holder.append(element);card=element;card.hass=simulation.hass;card.setConfig(safePreviewData(message.config));
   }

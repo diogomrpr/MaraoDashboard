@@ -197,6 +197,7 @@ export function createCardComposition({ root = 'marao-dashboard', language = 'en
   const pageCard = entity => {
     const item = { ...entity, name: name(entity) }, role = item.template, variables = item.variables || {};
     if(role==='md_people_card')return {...(own(entity,'columns')?{columns:entity.columns}:{}),type:'custom:marao-card',template:role,entities:copy(item.entities),...(own(entity,'name')?{name:entity.name}:{})};
+    if(role==='md_plex_library_card')return {type:'custom:marao-plex-watch-card',full:item.apple_tv?.plex?.display!=='popup',parent:{entity_id:item.entity_id,name:item.name,apple_tv:copy(item.apple_tv)}};
     if(role==='md_schedules_card')return {type:'custom:marao-schedules-runtime',...pick(item,['group_id','targets']),...(own(entity,'name')?{name:entity.name}:{})};
     if (role === 'ha_card') return raw(parseCardYaml(item.yaml));
     if (role === 'md_floor_plan_card') return { type:'custom:marao-floor-plan-card', name:item.name, ...copy(variables), lights_popup:variables.lights_popup ?? `#page-${item._page_instance}-${item.id}-lights` };

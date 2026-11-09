@@ -79,6 +79,19 @@ export const cardFormMethods = {
     render();
   },
 
+  _openPlexOptions(player, save) {
+    if (!this._contextReady) return this._withEditorContext(() => this._openPlexOptions(player, save));
+    const original = player.apple_tv && typeof player.apple_tv === 'object' ? clone(player.apple_tv) : {};
+    const dialog = this._dialog(this._l('Plex setup')), content = dialog.querySelector('.dialog-content');
+    content.innerHTML = `<div data-plex-options></div><p data-error role="alert"></p><div class="dialog-actions"><ha-button data-close>${this._t('cancel')}</ha-button><ha-button data-save appearance="filled">${this._t('update')}</ha-button></div>`;
+    const plex = mountPlexOptions(this, content.querySelector('[data-plex-options]'), player, original.plex, {required:true});
+    content.querySelector('[data-close]').addEventListener('click', () => this._closeDialog(dialog));
+    content.querySelector('[data-save]').addEventListener('click', () => {
+      try { save({...original,plex:plex.value()}); this._closeDialog(dialog); }
+      catch (error) { content.querySelector('[data-error]').textContent = this._error(error); }
+    });
+  },
+
   _openMediaOptions(player, save) {
     if (!this._contextReady) return this._withEditorContext(() => this._openMediaOptions(player, save));
     const original = player.apple_tv && typeof player.apple_tv === 'object' ? clone(player.apple_tv) : {};

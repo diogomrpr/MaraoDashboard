@@ -25,7 +25,7 @@ const families = {
   camera: ['md_camera_card'], history: ['md_graph_card', 'md_timeline_card', 'md_toggle_graph_card'],
 };
 const components = {
-  plex: {units:[['marao-plex'],['marao-card-visibility','Plex component|app shortcut'],['native-card-editor','Plex|app logo'],['native-cards','media']],editor:true},
+  plex: {units:[['marao-plex'],['marao-card-visibility','Plex component|app shortcut'],['native-card-editor','Plex|app logo'],['native-cards','media|Plex']],editor:true},
   activity: { units: [['activity'], ['marao-card-visibility','activity|access|glance'], ['native-cards','activity'], ['editor-model','activity']], editor:true },
   'agent-authoring': {units:[['agent-authoring'],['native-package']],editor:true},
   'documentation-brand': {units:[['brand-assets','canonical artwork']]},

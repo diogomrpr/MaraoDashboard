@@ -892,3 +892,22 @@ test('native configuration text fields disable personal autofill through the HA 
   assert.deepEqual(f.editor._schema('secret','Secret',selector).selector,selector);
   assert.deepEqual(selector,{text:{autocomplete:'new-password',type:'password'}});
 });
+
+
+test('standalone Plex setup edits library options without media controls or changing opaque settings',t=>{
+  const options={plex:plexOptions(),future:{empty:[]}},source={type:'custom:marao-plex-library-card',entity_id:'media_player.safe',name:'TV',apple_tv:options};
+  const f=nativeFormHarness(t,source,{language:'en',states:{}}),saves=[];
+  const dialog=globalThis.document.createElement('div'),content=dialog.querySelector('.dialog-content');
+  f.editor._dialog=()=>dialog;f.editor._closeDialog=()=>{};
+  f.editor._openPlexOptions({entity_id:source.entity_id,apple_tv:options},value=>saves.push(value));
+  const form=f.forms.find(form=>form.schema.some(field=>field.name==='client_entity'));
+  assert.ok(form);assert.equal(form.schema.some(field=>field.name==='enabled'),false);
+  assert.equal(f.forms.some(form=>form.schema.some(field=>field.name==='remote_entity')),false);
+  form.change({...form.data,display:'popup'});
+  content.querySelector('[data-close]').dispatchEvent(new Event('click'));assert.equal(saves.length,0);
+  content.querySelector('[data-save]').dispatchEvent(new Event('click'));
+  assert.deepEqual(saves,[{...options,plex:{...options.plex,display:'popup'}}]);
+  const entry=card('md_plex_library_card'),data=nativeCardFormData(source,entry);
+  assert.deepEqual(patchNativeCard(source,entry,data,{...data,name:'Renamed'}),{...source,name:'Renamed'});
+  assert.deepEqual(source.apple_tv,options);
+});

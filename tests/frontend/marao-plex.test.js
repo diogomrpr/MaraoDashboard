@@ -248,3 +248,12 @@ test('Plex layouts preserve old mappings and compose only the selected presentat
   const inline=plexTarget(parent()),popup={...inline,plex:{...inline.plex,display:'popup'}};
   assert.equal(plexTargetIdentity(inline),plexTargetIdentity(popup),'Layout cannot duplicate a television target');
 });
+
+
+test('Plex target discovery includes standalone libraries without requiring a Media player card',()=>{
+  const first={...parent(),type:'custom:marao-plex-library-card'},second={...first,entity_id:'media_player.bedroom',name:'Bedroom'};
+  const dashboard={views:[{path:'home',cards:[first],sections:[{cards:[{type:'vertical-stack',cards:[second]}]}]}]};
+  const before=structuredClone(dashboard);
+  assert.deepEqual(plexTargets(dashboard,first).map(target=>target.entity_id),[first.entity_id,second.entity_id]);
+  assert.deepEqual(dashboard,before);
+});

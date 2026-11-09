@@ -10,7 +10,7 @@ import {locationError} from '../../custom_components/marao_dashboard/frontend/Ma
 import {readDashboardSettings,patchDashboardSettings} from '../../frontend_src/dashboard-settings.js';
 
 test('every public registration has a reference, fields and distinct valid scenarios',()=>{
-  const expected=catalog.cards.filter(c=>!c.hidden).map(c=>c.id).concat(['camera-events','navbar','plex-library']).sort();
+  const expected=catalog.cards.filter(c=>!c.hidden).map(c=>c.id).concat(['camera-events','navbar']).sort();
   assert.deepEqual(cards.map(c=>c.id).sort(),expected);
   assert.equal(new Set(cards.map(c=>c.slug)).size,cards.length);
   for(const card of cards){

@@ -8,26 +8,23 @@ import DesignGallery from '../../../design/DesignGallery.astro';
 
 Browse Continue Watching, Movies and TV Series, then play a title on your selected Apple TV through Plex or Rivulet.
 
-<DesignGallery cardId="plex-library" />
+<DesignGallery cardId="md_plex_library_card" />
 
 ## Try it
 
 Try the card below. Select **Open playground** to choose a behavior or edit settings and YAML. Everything in the preview uses fictional devices. **Copy YAML** exports the card configuration, without demonstration states or service responses.
 
-<Playground cardId="plex-library" />
+<Playground cardId="md_plex_library_card" />
 
 ## Use in Home Assistant
 
-Plex library belongs to the [Media player](../media/) card. Add or edit a Media player card, then open **Apple TV options → Plex setup**. The YAML below configures that parent card; the gallery above shows its real library controls directly. There is no separate Plex card to add in Home Assistant.
+In Home Assistant, choose **Edit dashboard → Add card → Manual**, then paste the YAML below. Replace fictional entity IDs with your own. You can also find the card in Home Assistant’s card picker and use its native editor.
 
 ```yaml
-type: custom:marao-media-card
+type: custom:marao-plex-library-card
 entity_id: media_player.living_room
 name: Living room Apple TV
-variables:
-  media_display: inline
 apple_tv:
-  remote_entity: remote.living_room
   plex:
     display: popup
     client_entity: media_player.plex
@@ -43,13 +40,13 @@ Compatible entity domains: `media_player`.
 
 ## Library layout
 
-Choose **Library layout** in **Apple TV options → Plex setup**. **On dashboard** shows the complete library; **Popup** shows the compact poster card and opens all three shelves in a Marao popup. The compact card contains the TV name, library title, a content reference and poster artwork, with no bottom counters. Choose **On dashboard** for the parent Media card’s controls when placing it directly on your dashboard. Existing Plex configurations without this option keep full shelves.
+Choose **Library layout** in **Plex setup**. **On dashboard** shows the complete library; **Popup** shows the compact poster card and opens all three shelves in a Marao popup. The compact card contains the TV name, library title, a content reference and poster artwork, with no bottom counters. Existing Plex configurations without this option keep full shelves.
 
 The saved option is `apple_tv.plex.display: inline` or `popup`. Shelf request and artwork errors stay inside the affected shelf, each with its own Retry; a failed library request gives each of the three shelves its own error without coloring the entire library red.
 
 ## Setup and playback
 
-Open this card's **Apple TV options → Plex setup** to enable the owned Plex Watch section. It uses this card's television automatically. Choose **Plex** or **Rivulet** as the **Playback app** here rather than creating another TV card. With several configured Apple TV cards, the library's Marao dropdown lets you switch between their named mappings. Opening from a different Apple TV card selects that card's TV again.
+Add **Plex library** from the Home Assistant card picker, select an **Apple TV**, then open **Plex setup**. This card browses the library independently of Media player controls. Choose **Plex** or **Rivulet** as the **Playback app** here rather than creating another TV card. With several configured Apple TV cards, the library's Marao dropdown lets you switch between their named mappings. Opening from a different Apple TV card selects that card's TV again.
 
 Add Home Assistant's **Plex Media Server** integration first. Use the same single Plex server/profile in HA and the selected Apple TV app. For **Plex** playback, open Plex on the TV once so HA can discover its media-player client. Select that **Plex client**, the integration's **Scan-clients button**, and the exact **Plex app source** supported by this card's TV. **Choose library folders** browses HA's returned servers; choose **Use this server**. If Continue Watching discovery is ambiguous, open the appropriate recommendation folder and select **Use for Continue Watching**. Setup and browsing do not wake a television or change server settings.
 
@@ -57,17 +54,16 @@ The library home has exactly three open shelves: **Continue Watching**, **Movies
 
 One title tap gives strong haptic feedback and wakes an off TV. **Plex** playback opens Plex and waits up to 30 seconds for its mapped Plex client before sending one playback request. **Rivulet** playback sends a movie/episode link directly to the selected Apple TV; Rivulet opens and resumes at its saved position. It requires Rivulet with content-link support (confirmed in v1.2.0-122), already signed into the same selected Plex server/profile. The link does not switch servers/profiles. No Plex app launch or client scan is needed for Rivulet playback. Already-satisfied steps are skipped. Changing TV, closing the browser, editing the card or losing the connection cancels subsequent launch steps. Requests already sent to HA cannot be recalled. A readable failure allows an explicit retry; the existing Now playing display remains based on HA reports.
 
-The Watch section is available in automatic **Popup** and **On dashboard** media presentations. In a popup, library navigation stays in that sheet; inline cards open Marao's normal library sheet. Explicit custom popup layouts remain independently authored: switch deliberately to automatic details before enabling this section. Ordinary app shortcuts keep their existing source-launch action.
+The standalone card owns its inline library or compact popup opener. No Media player card is required. Existing Media player cards with `apple_tv.plex` keep their owned library and saved settings; no migration or dashboard rewrite occurs. Ordinary app shortcuts keep their existing source-launch action.
 
 For **Rivulet**, choose your configured server using **Choose library folders → Use this server**. HA 2026.10 exposes Plex browsing through a registered media-player entity, including inactive session entities. Play something once in Rivulet so HA can discover a session; then use **Retry** in the card. The card automatically finds an enabled Plex entity for that server, or you can choose a **Plex browse entity (optional)**. That entity supplies library/Continue Watching metadata and never receives Rivulet playback commands. Until discovery, the card shows a setup explanation and retains your real server selection. The official Plex app is not required for Rivulet playback.
 
-The optional configuration lives under `apple_tv.plex`; use the visual folder picker for the returned content references:
+The library configuration lives under `apple_tv.plex`; use the visual folder picker for the returned content references:
 
 ```yaml
-type: custom:marao-media-card
+type: custom:marao-plex-library-card
 entity_id: media_player.example_apple_tv
 apple_tv:
-  remote_entity: remote.example_apple_tv
   plex:
     client_entity: media_player.example_plex_client
     scan_clients_entity: button.example_plex_scan_clients
@@ -81,7 +77,6 @@ For Rivulet, replace the playback-only client/scan/source fields with `playback_
 
 ```yaml
 apple_tv:
-  remote_entity: remote.example_apple_tv
   plex:
     playback_app: rivulet
     # Optional: any registered Plex entity belonging to this server.
@@ -91,7 +86,7 @@ apple_tv:
       media_content_id: plex://example-server/server
 ```
 
-These IDs are fictional. Missing `playback_app` retains Plex playback. Missing `plex` or `plex: false` keeps the section disabled; an optional `continue_watching` object uses the same `media_content_type`/`media_content_id` shape. No Plex password or token belongs in this configuration. Credentials and poster authentication stay with HA through its Plex image proxy. This feature does not switch Plex profiles, manage the server/library, edit watch history, manage queues or stream via AirPlay.
+These IDs are fictional. Missing `playback_app` retains Plex playback. Missing `plex` or `plex: false` shows setup guidance; existing Media cards keep their section disabled; an optional `continue_watching` object uses the same `media_content_type`/`media_content_id` shape. No Plex password or token belongs in this configuration. Credentials and poster authentication stay with HA through its Plex image proxy. This feature does not switch Plex profiles, manage the server/library, edit watch history, manage queues or stream via AirPlay.
 ## Settings
 
 The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
@@ -99,8 +94,7 @@ The table lists the shared catalog fields and this card’s structured options. 
 | YAML path | Setting | Value type | Catalog default | Behavior |
 | --- | --- | --- | --- | --- |
 | `apple_tv.plex.display` | Library layout | select | `inline` | Full shelves (inline) or a compact poster card opening the full library (popup). Omission preserves full shelves. Choices: `inline`, `popup`. |
-| `entity_id` | Apple TV | entity | Not set | The parent Media card’s Apple TV entity. Searchable suggestions are available. |
-| `apple_tv.remote_entity` | Apple TV remote | entity | Not set | The remote belonging to the same television. Searchable suggestions are available. |
+| `entity_id` | Apple TV | entity | Not set | The Apple TV used for playback. Searchable suggestions are available. |
 | `apple_tv.plex.playback_app` | playback app | text | Not set | Plex (default) or Rivulet. |
 | `apple_tv.plex.client_entity` | client entity | text | Not set | Plex playback client; required for Plex playback. |
 | `apple_tv.plex.browse_entity` | browse entity | text | Not set | Optional Plex metadata entity, including for Rivulet. |
@@ -130,7 +124,7 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 
 ## Website preview limits
 
-The gallery shows the real Plex library renderer with fictional titles, generated artwork and in-memory browse responses. Playback requests affect only fictional state; they do not play a video or connect to Home Assistant or Plex. Copy YAML exports the parent Media card configuration, not an independently configurable Plex card.
+The gallery shows the real Plex library renderer with fictional titles, generated artwork and in-memory browse responses. Playback requests affect only fictional state; they do not play a video or connect to Home Assistant or Plex. Copy YAML exports the standalone Plex library card configuration.
 
 ## Layout and shared behavior
 

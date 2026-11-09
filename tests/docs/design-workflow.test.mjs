@@ -6,7 +6,7 @@ import {previewWindow} from '../../docs/src/design/preview-window.js';
 test('Card context resolves public aliases and identifies actual shared consumers',()=>{
  for(const card of cards)assert.equal(context(card.slug).card,card.id);
  const c=context('climate');assert.equal(context(c.type).card,c.card);
- assert.equal(context('plex-library').card,'plex-library');
+ assert.equal(context('plex-library').card,'md_plex_library_card');
  assert.equal(context('custom:marao-media-card').card,'md_media_card');
  const step=c.owners.find(o=>o.behavior==='numeric-stepper');assert.ok(step.consumers.includes('md_number_card'));assert.ok(step.consumers.includes('md_wallbox_current_card'));
  assert.throws(()=>context('nonexistent'),/Choose one card/);

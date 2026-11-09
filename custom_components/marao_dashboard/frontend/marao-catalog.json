@@ -874,6 +874,16 @@
       ]
     },
     {
+      "id": "md_plex_library_card",
+      "label": "Plex library",
+      "icon": "mdi:plex",
+      "domains": [
+        "media_player"
+      ],
+      "description": "Browse a Plex library and play on the selected Apple TV through Plex or Rivulet.",
+      "variables": []
+    },
+    {
       "id": "md_access_card",
       "label": "Access",
       "icon": "mdi:lock-outline",

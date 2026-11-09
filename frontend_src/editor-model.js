@@ -839,7 +839,7 @@ export function buildJsonSchema(catalog, entities, draft = {}, dashboardPath = '
       variables: object(Object.fromEntries((card.variables || []).map(field => [field.key, fieldSchema(field)]))),
       tap_action: action, hold_action: action, double_tap_action: action };
     if (card.id === 'md_camera_card') properties.variables.properties.event_provider = suggested(['auto', 'frigate', 'unifi_protect', 'netatmo']);
-    if (card.id === 'md_media_card') properties.apple_tv = { anyOf: [{ type: ['boolean', 'null'] }, object({
+    if (['md_media_card','md_plex_library_card'].includes(card.id)) properties.apple_tv = { anyOf: [{ type: ['boolean', 'null'] }, object({
       remote_entity: binding(['remote']), volume_remote_entity: binding(['remote', 'media_player']),
       plex: {anyOf:[{const:false},{...object({
         display:{type:'string',enum:['inline','popup']},
