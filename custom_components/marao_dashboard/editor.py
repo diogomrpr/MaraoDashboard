@@ -80,7 +80,11 @@ EDITOR_CATALOG: dict[str, Any] = {
         {
             "id": "md_weather_card", "label": "Weather", "icon": "mdi:weather-partly-cloudy", "domains": ["weather", "sensor"],
             "description": "Current weather with an optional native forecast.",
-            "variables": [_field("show_forecast", "Forecast", "boolean", default=True)],
+            "variables": [
+                _field("show_forecast", "Forecast", "boolean", default=True),
+                _field("station_entities", "Weather station sensors", "object", description="Map readings to sensor entity IDs."),
+                _field("show_wind_angle", "Wind angle label", "boolean", default=False, description="Show direction and degrees below the compass; the needle always follows the sensor."),
+            ],
         },
         {
             "id": "md_room_card", "label": "Room shortcut", "icon": "mdi:sofa", "domains": [],
