@@ -49,6 +49,8 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `variables.card_color` | Card color | color | Not set | Optional card background color. |
 | `variables.active_color` | Active color | color | Not set | Active color for this card. |
 | `variables.show_forecast` | Forecast | boolean | `true` | Forecast for this card. |
+| `variables.station_entities` | Weather station sensors | json | Not set | Map station readings to Home Assistant sensor entity IDs. Precipitation of at least 0.1 mm selects the rainy background; lower readings select the clear background. Supports temperature, humidity, dew_point, pressure, precipitation, wind_speed, wind_gust, wind_direction, illuminance and uv_index. |
+| `variables.show_wind_angle` | Wind angle label | boolean | `false` | Hide the direction and degrees beneath the compass. The compass needle still follows the wind direction sensor. |
 
 ## Behavior examples
 
@@ -60,6 +62,9 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 | Forecast | Show the native forecast below current conditions. |
 | Current conditions only | Hide the forecast without changing the weather entity. |
 | Rainy conditions | Weather icons and condition text follow the entity. |
+| Weather station: raining | Pair sensor readings into compact instruments; 0.1 mm or more shows the rainy scene. |
+| Weather station: not raining | A trace reading below 0.1 mm shows the clear scene. |
+| Weather station: wind angle hidden | Hide the compass text while its needle continues to follow the direction sensor. |
 | Loading state | Wait for Home Assistant state before showing controls. |
 | Unknown state | The entity exists but has no known state. Controls remain neutral and disabled. |
 | Unavailable | The entity is unavailable. No device action is dispatched. |

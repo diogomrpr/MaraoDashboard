@@ -125,6 +125,23 @@
           "advanced": false,
           "description": "",
           "default": true
+        },
+        {
+          "key": "station_entities",
+          "label": "Weather station sensors",
+          "kind": "object",
+          "selector": "object",
+          "advanced": false,
+          "description": "Map readings to sensor entity IDs."
+        },
+        {
+          "key": "show_wind_angle",
+          "label": "Wind angle label",
+          "kind": "boolean",
+          "selector": "boolean",
+          "advanced": false,
+          "description": "Show direction and degrees below the compass; the needle always follows the sensor.",
+          "default": false
         }
       ]
     },
