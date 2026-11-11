@@ -17,7 +17,14 @@ test('every public registration has a reference, fields and distinct valid scena
     assert.ok(card.description && card.notes.length,card.id);
     assert.equal(new Set(card.scenarios.map(s=>s.id)).size,card.scenarios.length,card.id);
     assert.ok(card.scenarios.length>1,card.id);
-    for(const entry of catalog.cards.find(c=>c.id===card.id)?.variables || [])assert.ok(card.fields.some(field=>field.path===`variables.${entry.key}`),`${card.id}.${entry.key}`);
+    for(const entry of catalog.cards.find(c=>c.id===card.id)?.variables || []){
+      if(card.id==='md_weather_card'&&entry.key==='station_entities'){
+        const readings=['temperature','humidity','dew_point','pressure','precipitation','wind_speed','wind_gust','wind_direction','illuminance','uv_index'];
+        assert.deepEqual(card.fields.filter(field=>field.path.startsWith('variables.station_entities.')).map(field=>field.path),readings.map(key=>`variables.station_entities.${key}`));
+        assert.ok(card.fields.filter(field=>field.path.startsWith('variables.station_entities.')).every(field=>field.kind==='entity'&&field.domains.length===1&&field.domains[0]==='sensor'));
+        assert.ok(!card.fields.some(field=>field.path==='variables.station_entities'),'Station readings use entity selectors rather than a YAML field');
+      }else assert.ok(card.fields.some(field=>field.path===`variables.${entry.key}`),`${card.id}.${entry.key}`);
+    }
     for(const scenario of card.scenarios){
       assert.ok(scenario.description && scenario.behavior,`${card.id}/${scenario.id}`);
       const roundTrip=parse(stringify(scenario.config));
