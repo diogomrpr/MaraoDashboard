@@ -92,6 +92,31 @@ function nativeFormHarness(t,config,hass={language:'en',states:{}}) {
   return {editor,forms,events};
 }
 
+test('weather station selectors preserve mappings, unknown data and explicit empty station mode',t=>{
+  const original={type:'custom:marao-weather-card',entity_id:'sensor.station_temperature',variables:{station_entities:{temperature:'sensor.temperature',wind_direction:'sensor.direction',future_sensor:'sensor.future'},show_wind_angle:true,future:{keep:[]}},grid_options:{rows:'auto'},future:false};
+  const {forms,events}=nativeFormHarness(t,original,{language:'pt',states:{}});
+  const form=forms.find(form=>form.schema.some(field=>field.name==='var__station_entities.temperature'));
+  const sensors=form.schema.filter(field=>field.name.startsWith('var__station_entities.'));
+  assert.deepEqual(sensors.map(field=>field.name.split('.').at(-1)),['temperature','humidity','dew_point','pressure','precipitation','wind_speed','wind_gust','wind_direction','illuminance','uv_index']);
+  assert.ok(sensors.every(field=>!field.required&&field.selector.entity.domain.length===1&&field.selector.entity.domain[0]==='sensor'&&!field.selector.entity.multiple));
+  assert.ok(!form.schema.some(field=>field.name==='var__station_entities'));
+  assert.equal(sensors.find(field=>field.name.endsWith('.wind_speed')).label,'Sensor de velocidade do vento');
+  assert.equal(form.data['var__station_entities.wind_direction'],'sensor.direction');
+  assert.equal(events.length,0);
+  form.change({...form.data,'var__station_entities.wind_speed':'sensor.wind'});
+  form.change({...form.data,'var__station_entities.temperature':''});
+  const expected=structuredClone(original);delete expected.variables.station_entities.temperature;expected.variables.station_entities.wind_speed='sensor.wind';
+  assert.deepEqual(events.at(-1),expected);
+  assert.equal(original.variables.station_entities.temperature,'sensor.temperature');
+  const only={...original,variables:{station_entities:{temperature:'sensor.temperature'}}};
+  const empty=nativeFormHarness(t,only),picker=empty.forms.find(form=>form.schema.some(field=>field.name==='var__station_entities.temperature'));
+  picker.change({...picker.data,'var__station_entities.temperature':''});
+  assert.deepEqual(empty.events.at(-1),{...only,variables:{station_entities:{}}});
+  const weather={type:'custom:marao-weather-card',entity_id:'weather.home',variables:{future:[]}};
+  const data=nativeCardFormData(weather,card('md_weather_card'));
+  assert.deepEqual(patchNativeCard(weather,card('md_weather_card'),data,{...data,name:'Outside'}),{...weather,name:'Outside'});
+});
+
 test('shared HA forms retain edited values and allow a picker callback to reset its selection',async t=>{
   const {editor}=nativeFormHarness(t,{type:'custom:marao-light-card',entity_id:'light.a'});
   editor._containForm=async()=>{};

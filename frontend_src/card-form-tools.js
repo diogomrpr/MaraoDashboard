@@ -1,4 +1,4 @@
-import {clone, entityMeta, moveItem, sensorThresholdError} from './editor-model.js';
+import {clone, entityMeta, moveItem, sensorThresholdError, weatherStationFields} from './editor-model.js';
 import {mediaAppLogoChoices,mediaAppLogoError} from '../custom_components/marao_dashboard/frontend/MaraoMediaApps.js';
 import {mountPlexOptions} from './plex-editor.js';
 
@@ -266,7 +266,7 @@ export const cardFormMethods = {
   },
 
   _expandedFields(fields) {
-    return fields.flatMap((field) => field.kind !== "vacuum_action" ? [field] : [
+    return fields.flatMap((field) => field.key === "station_entities" ? weatherStationFields() : field.kind !== "vacuum_action" ? [field] : [
       { key: `${field.key}.icon`, label: `${field.label} icon`, kind: "icon", advanced: true },
       { key: `${field.key}.on_action`, label: `${field.label} service`, kind: "text", advanced: true },
       { key: `${field.key}.segment`, label: `${field.label} segment`, kind: "number", advanced: true, description: "Explicit command data can override the default segment parameters." },
@@ -289,7 +289,7 @@ export const cardFormMethods = {
     if (["energy_unit", "energy_precision"].includes(field.kind) && value === "auto") value = "";
     if (field.kind === "energy_precision" && /^[0-6]$/.test(value)) value = Number(value);
     const empty = value === "" || value == null; const [parent, child] = field.key.split(".");
-    if (child) { variables[parent] ||= {}; if (empty) delete variables[parent][child]; else variables[parent][child] = value; if (!Object.keys(variables[parent]).length) delete variables[parent]; }
+    if (child) { variables[parent] ||= {}; if (empty) delete variables[parent][child]; else variables[parent][child] = value; if (!Object.keys(variables[parent]).length && parent !== "station_entities") delete variables[parent]; }
     else if (empty) delete variables[parent]; else variables[parent] = value;
   },
 
