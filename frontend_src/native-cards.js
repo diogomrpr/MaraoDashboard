@@ -265,6 +265,12 @@ export class MaraoNativeCard extends HTMLElementBase {
       const { card, popups } = composeNativeCard(this._config, { ...context, instanceId: this._instanceId });
       if (this._config.apple_tv?.plex && typeof this._config.apple_tv.plex === 'object') await import(new URL(`./MaraoPlex.js${query}`,import.meta.url));
       const configs = [card, ...popups];
+      if (configs.some(config => config.type.startsWith('custom:marao-') && !customElements.get(config.type.slice(7))) && window.MaraoDashboardRuntime?.ready) {
+        this._content.innerHTML = '<ha-card role="status" style="display:grid;place-items:center;height:100%;min-height:56px"><ha-circular-progress active></ha-circular-progress></ha-card>';
+        this._content.querySelector('[role="status"]').setAttribute('aria-label',editorLabel('Loading Home Assistant cards…',this._hass));
+        await window.MaraoDashboardRuntime.ready;
+        if (version !== this._renderVersion) return;
+      }
       const local = configs.every(config => config.type.startsWith('custom:') && customElements.get(config.type.slice(7)));
       const helpers = local ? { createCardElement(config) { const child = document.createElement(config.type.slice(7)); child.setConfig(config); return child; } } : await globalThis.loadCardHelpers?.();
       if (!helpers?.createCardElement) throw new Error(editorLabel('Loading Home Assistant cards…', this._hass));

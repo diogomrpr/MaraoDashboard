@@ -89,22 +89,32 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
 test('Duplicate frontend entry points share one document runtime without mixing graph ownership', async () => {
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'marao-runtime-owner-'));
   const previousWindow=globalThis.window, previousRegistry=globalThis.customElements;
+  const runtimeGate=Promise.withResolvers(),runtimeStarted=Promise.withResolvers();
   try {
     const entry=fs.readFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoDashboard.js',import.meta.url),'utf8');
     fs.writeFileSync(path.join(directory,'MaraoNavigation.js'),'globalThis.nativeNavigationLoads=(globalThis.nativeNavigationLoads||0)+1;export const navigationLocalize=()=>"Error";export const findElements=()=>[];');
-    fs.writeFileSync(path.join(directory,'MaraoRuntime.js'),'globalThis.nativeRuntimeLoads=(globalThis.nativeRuntimeLoads||0)+1;');
+    fs.writeFileSync(path.join(directory,'MaraoCards.js'),'export function registerMaraoCards(){globalThis.nativeBasicRegistrations=(globalThis.nativeBasicRegistrations||0)+1;}');
+    for(const name of ['MaraoFloorPlanCard.js','MaraoSchedules.js','MaraoFrigateEventsCard.js'])fs.writeFileSync(path.join(directory,name),'');
+    fs.writeFileSync(path.join(directory,'MaraoNativeCards.js'),'globalThis.nativeCardLoads=(globalThis.nativeCardLoads||0)+1;');
+    fs.writeFileSync(path.join(directory,'MaraoRuntime.js'),'globalThis.nativeRuntimeLoads=(globalThis.nativeRuntimeLoads||0)+1;globalThis.nativeRuntimeStarted.resolve();await globalThis.nativeRuntimeGate;');
+    globalThis.nativeRuntimeGate=runtimeGate.promise;globalThis.nativeRuntimeStarted=runtimeStarted;
     globalThis.customElements={get:()=>true};globalThis.window={};
     const names=['a'.repeat(64)+'--MaraoDashboard.js','MaraoDashboard.js'];
     for (const name of names) fs.writeFileSync(path.join(directory,name),entry);
     const native=await import(pathToFileURL(path.join(directory,names[0])));
     const active=window.MaraoFrontendPackage;
     const legacy=await import(pathToFileURL(path.join(directory,names[1])));
-    assert.equal(native.runtimeReady,legacy.runtimeReady);await native.runtimeReady;
+    assert.equal(native.runtimeReady,legacy.runtimeReady);
+    await runtimeStarted.promise;
+    assert.equal(globalThis.nativeBasicRegistrations,1,'Basic cards register before a delayed runtime download completes');
+    assert.equal(globalThis.nativeCardLoads,1);
+    runtimeGate.resolve();await native.runtimeReady;
     assert.equal(globalThis.nativeNavigationLoads,1);assert.equal(globalThis.nativeRuntimeLoads,1);
     assert.equal(window.MaraoFrontendPackage,active);assert.equal(active.identity,'a'.repeat(64));
   } finally {
     globalThis.window=previousWindow;globalThis.customElements=previousRegistry;
-    delete globalThis.nativeNavigationLoads;delete globalThis.nativeRuntimeLoads;
+    runtimeGate.resolve();
+    for(const key of ['nativeNavigationLoads','nativeRuntimeLoads','nativeBasicRegistrations','nativeCardLoads','nativeRuntimeGate','nativeRuntimeStarted'])delete globalThis[key];
     fs.rmSync(directory,{recursive:true,force:true});
   }
 });
