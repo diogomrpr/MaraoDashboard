@@ -4,6 +4,8 @@ The current product is a HACS **Dashboard** package. Home Assistant stores ordin
 
 ## Authoring and runtime
 
+Basic card definitions register before the larger content runtime downloads. Eager card dependencies load together; a registered card awaiting its content uses Home Assistant's progress indicator. Home Assistant retains ownership of missing-card errors and automatic rebuilding when definitions arrive; Marao does not patch the panel or replace its card elements.
+
 `frontend_src/native-cards.js` exposes the public catalog through Home Assistant's native card contract. `native-card-editor.js` owns configuration forms. `card-composition.js` validates and composes each saved card occurrence, including its automatic details. Preserve complete configuration, unknown fields, explicit emptiness and unrelated native layout/visibility whenever patching fields.
 
 `native-bootstrap.js` attaches one shared navbar from the versioned root `marao` settings. Its boundary uses the `hui-root` controller lifecycle and `lovelace.setEditMode`. Unsupported metadata remains untouched with native editing still reachable. Root settings are optional: an individual Marao card does not take ownership of the entire dashboard shell.

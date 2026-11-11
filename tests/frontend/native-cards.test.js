@@ -186,6 +186,22 @@ test('invalid access actions and mismatched native identities fail before compos
   assert.throws(() => composeNativeCard(config('md_light_card', { entity_id: 'light.test' })), /occurrence identity/);
 });
 
+test('registered native cards wait for delayed content before calling Home Assistant card helpers', async t => {
+  const previous={customElements:globalThis.customElements,document:globalThis.document,window:globalThis.window,loadCardHelpers:globalThis.loadCardHelpers};
+  t.after(()=>Object.assign(globalThis,previous));
+  const ready=Promise.withResolvers();let available=false,helperCalls=0;
+  globalThis.customElements={get:name=>name!=='marao-energy-period-card'||available};
+  globalThis.window={MaraoDashboardRuntime:{ready:ready.promise}};
+  globalThis.loadCardHelpers=()=>{helperCalls++;throw Error('A missing custom element would become a native error card');};
+  globalThis.document={createElement:()=>({setConfig(config){this.config=config;}})};
+  const content={querySelector:()=>({setAttribute(){}}),replaceChildren(...children){this.children=children;}};
+  const owner=Object.assign(Object.create(MaraoNativeCard.prototype),{_config:config('md_energy_period_card',{entity_id:'sensor.test'}),_instanceId:'delayed',_renderVersion:0,_children:[],_content:content,_details:{replaceChildren(){}},_forward(){}});
+  const rendering=owner._mount({dashboardRoot:'test-home',entities:[],language:'en'});
+  assert.match(content.innerHTML,/ha-circular-progress active/);assert.equal(helperCalls,0);assert.equal(content.children,undefined);
+  available=true;ready.resolve();await rendering;
+  assert.equal(helperCalls,0);assert.equal(content.children[0].config.type,'custom:marao-energy-period-card');
+});
+
 test('camera popup columns forward explicitly while omission retains released output',async()=>{
  const {composeNativeCard}=await import('../../frontend_src/card-composition.js');
  const config={type:'custom:marao-camera-card',entity:'camera.front',variables:{event_provider:'frigate',event_limit:7}};

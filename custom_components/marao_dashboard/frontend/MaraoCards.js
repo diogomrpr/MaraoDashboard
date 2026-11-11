@@ -1,16 +1,13 @@
-const {validatePopupContent}=await import(new URL(`./MaraoPopupContent.js${new URL(import.meta.url).search}`,import.meta.url));
-const {weatherMarkup,styleWeatherPopup}=await import(new URL(`./MaraoWeather.js${new URL(import.meta.url).search}`,import.meta.url));
-const {climateConfigError,climateHumidity}=await import(new URL(`./MaraoClimate.js${new URL(import.meta.url).search}`,import.meta.url));
-const {activityTimestamp,activitySources,hasActivity}=await import(new URL(`./MaraoActivityModel.js${new URL(import.meta.url).search}`,import.meta.url));
-const popupLayouts=await import(new URL(`./MaraoPopupView.js${new URL(import.meta.url).search}`,import.meta.url));
-const {popupViewError,popupGroupFromView}=await import(new URL(`./MaraoPopupLayout.js${new URL(import.meta.url).search}`,import.meta.url));
-const {peopleError,peopleRows,collectionLabel,escapeText,sectionsError} = await import(new URL(`./MaraoCollections.js${new URL(import.meta.url).search}`,import.meta.url));
-const {reconcileGroup}=await import(new URL(`./MaraoGroupDetails.js${new URL(import.meta.url).search}`,import.meta.url));
-const {mediaAppBrand,mediaAppLogoError}=await import(new URL(`./MaraoMediaApps.js${new URL(import.meta.url).search}`,import.meta.url));
-export {mediaAppBrand};
-const [dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities, names, sensorThresholds, pressModule, nativeContext] = await Promise.all([
+const [
+  {validatePopupContent}, {weatherMarkup,styleWeatherPopup}, {climateConfigError,climateHumidity},
+  {activityTimestamp,activitySources,hasActivity}, popupLayouts, {popupViewError,popupGroupFromView},
+  {peopleError,peopleRows,collectionLabel,escapeText,sectionsError}, {reconcileGroup}, {mediaAppBrand,mediaAppLogoError},
+  dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities, names, sensorThresholds, pressModule, nativeContext,
+] = await Promise.all([
+  'MaraoPopupContent.js', 'MaraoWeather.js', 'MaraoClimate.js', 'MaraoActivityModel.js', 'MaraoPopupView.js', 'MaraoPopupLayout.js', 'MaraoCollections.js', 'MaraoGroupDetails.js', 'MaraoMediaApps.js',
   'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js', 'MaraoNames.js', 'MaraoSensorThresholds.js', 'MaraoPressFeedback.js', 'MaraoNativeContext.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
+export {mediaAppBrand};
 const {nativeEditing, bindNativeEditing} = nativeContext;
 export {nativeEditing, bindNativeEditing};
 const { bindDropdown, dropdownStyles } = dropdownModule;
