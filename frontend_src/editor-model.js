@@ -20,6 +20,14 @@ export const cameraTitleFields = () => [
   { path: "show_name", label: "Show title", kind: "boolean", default: true },
 ];
 
+export const weatherStationFields = () => [
+  ['temperature','Temperature sensor'], ['humidity','Humidity sensor'],
+  ['dew_point','Dew point sensor'], ['pressure','Pressure sensor'],
+  ['precipitation','Rainfall sensor'], ['wind_speed','Wind speed sensor'],
+  ['wind_gust','Wind gust sensor'], ['wind_direction','Wind direction sensor'],
+  ['illuminance','Illuminance sensor'], ['uv_index','UV index sensor'],
+].map(([key,label]) => ({key:`station_entities.${key}`,label,kind:'entity',domains:['sensor']}));
+
 export function patchPath(config, path, value) {
   const result = structuredClone(config);
   const keys = path.split(".");

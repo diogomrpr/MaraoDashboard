@@ -28,6 +28,10 @@ entity_id: weather.home
 Compatible entity domains: `weather`, `sensor`.
 
 The static sky reflects the reported weather condition; no background is animated. A large whole-number temperature appears with available wind, humidity and pressure readings. Metrics wrap naturally without empty slots; displayed current and forecast values are rounded without changing reported data. Tap the card to open hourly predictions or up to seven days on matching condition scenery, according to the entity’s capabilities. Explicit custom tap and hold actions retain their configured behavior. Missing forecasts stay empty and reported errors remain visible. `variables.show_forecast: false` hides the forecast entry.
+
+## Weather station sensors
+
+In the card settings, choose each station reading from its own searchable sensor dropdown: temperature, humidity, dew point, pressure, rainfall, wind speed, wind gust, wind direction, illuminance and UV index. Leave unused selectors empty. Existing station sensor mappings load automatically; editing one selector preserves the others. No YAML is needed for sensor selection. The optional wind angle label stays hidden by default while the compass arrow follows the direction sensor.
 ## Settings
 
 The table lists the shared catalog fields and this card’s structured options. **Not set** means the example does not impose a value; Home Assistant and Marao use the entity’s capabilities and the card’s normal behavior. Structured values remain editable as YAML.
@@ -49,8 +53,17 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `variables.card_color` | Card color | color | Not set | Optional card background color. |
 | `variables.active_color` | Active color | color | Not set | Active color for this card. |
 | `variables.show_forecast` | Forecast | boolean | `true` | Forecast for this card. |
-| `variables.station_entities` | Weather station sensors | json | Not set | Map station readings to Home Assistant sensor entity IDs. Precipitation of at least 0.1 mm selects the rainy background; lower readings select the clear background. Supports temperature, humidity, dew_point, pressure, precipitation, wind_speed, wind_gust, wind_direction, illuminance and uv_index. |
-| `variables.show_wind_angle` | Wind angle label | boolean | `false` | Hide the direction and degrees beneath the compass. The compass needle still follows the wind direction sensor. |
+| `variables.station_entities.temperature` | Temperature sensor | entity | Not set | Temperature sensor for this card. Searchable suggestions are available. |
+| `variables.station_entities.humidity` | Humidity sensor | entity | Not set | Humidity sensor for this card. Searchable suggestions are available. |
+| `variables.station_entities.dew_point` | Dew point sensor | entity | Not set | Dew point sensor for this card. Searchable suggestions are available. |
+| `variables.station_entities.pressure` | Pressure sensor | entity | Not set | Pressure sensor for this card. Searchable suggestions are available. |
+| `variables.station_entities.precipitation` | Rainfall sensor | entity | Not set | Rainfall sensor for this card. Searchable suggestions are available. |
+| `variables.station_entities.wind_speed` | Wind speed sensor | entity | Not set | Wind speed sensor for this card. Searchable suggestions are available. |
+| `variables.station_entities.wind_gust` | Wind gust sensor | entity | Not set | Wind gust sensor for this card. Searchable suggestions are available. |
+| `variables.station_entities.wind_direction` | Wind direction sensor | entity | Not set | Wind direction sensor for this card. Searchable suggestions are available. |
+| `variables.station_entities.illuminance` | Illuminance sensor | entity | Not set | Illuminance sensor for this card. Searchable suggestions are available. |
+| `variables.station_entities.uv_index` | UV index sensor | entity | Not set | UV index sensor for this card. Searchable suggestions are available. |
+| `variables.show_wind_angle` | Wind angle label | boolean | `false` | Show direction and degrees below the compass; the needle always follows the sensor. |
 
 ## Behavior examples
 
@@ -64,7 +77,7 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 | Rainy conditions | Weather icons and condition text follow the entity. |
 | Weather station: raining | Pair sensor readings into compact instruments; 0.1 mm or more shows the rainy scene. |
 | Weather station: not raining | A trace reading below 0.1 mm shows the clear scene. |
-| Weather station: wind angle hidden | Hide the compass text while its needle continues to follow the direction sensor. |
+| Weather station: wind angle hidden | Hide the wind direction text while the compass needle follows the direction sensor. |
 | Loading state | Wait for Home Assistant state before showing controls. |
 | Unknown state | The entity exists but has no known state. Controls remain neutral and disabled. |
 | Unavailable | The entity is unavailable. No device action is dispatched. |
