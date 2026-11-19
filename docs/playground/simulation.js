@@ -15,7 +15,7 @@ const serviceNames={
   light:['turn_on','turn_off','toggle'],switch:['turn_on','turn_off','toggle'],input_boolean:['turn_on','turn_off','toggle'],
   fan:['turn_on','turn_off','toggle','set_percentage','set_preset_mode','oscillate','set_direction'],cover:['open_cover','close_cover','stop_cover','set_cover_position'],
   lock:['lock','unlock','open'],valve:['open_valve','close_valve','stop_valve','set_valve_position'],climate:['turn_on','turn_off','set_hvac_mode','set_temperature','set_fan_mode','set_preset_mode','set_swing_mode'],
-  home_connect:['start_selected_program'],number:['set_value'],input_number:['set_value'],input_select:['select_option'],select:['select_option'],scene:['turn_on'],script:['turn_on','turn_off','toggle'],button:['press'],
+  home_connect:['start_selected_program','set_program_and_options'],number:['set_value'],input_number:['set_value'],input_select:['select_option'],select:['select_option'],scene:['turn_on'],script:['turn_on','turn_off','toggle'],button:['press'],
   alarm_control_panel:['alarm_arm_home','alarm_arm_away','alarm_arm_night','alarm_arm_vacation','alarm_arm_custom_bypass','alarm_disarm','alarm_trigger'],
   media_player:['turn_on','turn_off','toggle','media_play','media_pause','media_play_pause','media_stop','media_next_track','media_previous_track','media_seek','volume_set','volume_mute','volume_up','volume_down','select_source','play_media'],
   remote:['send_command','turn_on','turn_off'],vacuum:['start','pause','stop','return_to_base','locate','set_fan_speed','send_command'],automation:['turn_on','turn_off','toggle','trigger'],timer:['start','cancel','finish'],homeassistant:['turn_on','turn_off','toggle'],
@@ -23,7 +23,7 @@ const serviceNames={
 export const simulatedServices=Object.fromEntries(Object.entries(serviceNames).map(([domain,names])=>[domain,Object.fromEntries(names.map(name=>[name,{name,fields:{}}]))]));
 export const unsupported=operation=>new Error(`Not available in the website preview: ${operation}`);
 
-export function createSimulation({states={},config={},scenario={},language='en',theme='light',dashboard={},onChange=()=>{}}={}) {
+export function createSimulation({states={},config={},scenario={},language='en',theme='light',dashboard={},onChange=()=>{},onService}={}) {
   const flags=scenario.simulation||{}, store=clone(safePreviewData(states)), records=new Map(),helpers={input_select:[],timer:[]},subscriptions=new Set();let helperCount=0,disposed=false;
   const now=()=>new Date().toISOString();
   const cycleFinish='sensor.demo_dishwasher_finish';
@@ -32,6 +32,7 @@ export function createSimulation({states={},config={},scenario={},language='en',
   const registry=Object.fromEntries(Object.values(store).map(s=>[s.entity_id,{entity_id:s.entity_id,unique_id:s.entity_id.replace('.','_'),device_id:s.entity_id,platform:s.entity_id.startsWith('camera.')?'frigate':s.entity_id.split('.')[0],name:s.attributes?.friendly_name}]));
   const dishwasherDevice='demo-dishwasher';
   const selectedProgram='select.demo_dishwasher_next', activeProgram='select.demo_dishwasher_active';
+  const dishwasherPower='switch.demo_dishwasher_power';
   const cameras=Array.isArray(config.cameras)?config.cameras:[{entity:config.entity_id||config.entity,...config.variables}];
   for(const camera of cameras){if(!camera?.entity||!registry[camera.entity])continue;const platform=camera.event_provider||camera.provider||'frigate';registry[camera.entity].platform=platform==='unifi_protect'?'unifiprotect':platform;registry[camera.entity].unique_id=camera.entity.split('.')[1]+'-outdoor';if(store[camera.entity])store[camera.entity].attributes={...store[camera.entity].attributes,client_id:camera.frigate_instance_id||'demo',camera_name:camera.frigate_camera||camera.entity.split('.')[1],entity_picture:cameraImage};}
   for(const entry of Object.values(registry)){
@@ -40,6 +41,7 @@ export function createSimulation({states={},config={},scenario={},language='en',
   }
   if(registry[selectedProgram])registry[selectedProgram].translation_key='selected_program';
   if(registry[activeProgram])registry[activeProgram].translation_key='active_program';
+  if(registry[dishwasherPower])registry[dishwasherPower].translation_key='power';
   const emit=()=>{if(disposed)return;hass={...hass,states:flags.loading?undefined:{...store}};onChange(hass);for(const cb of subscriptions)cb({event_type:'state_changed',data:{}});};
   const write=(id,value,attributes={})=>{if(!entityPattern.test(id))throw unsupported('invalid entity');const prior=store[id]||{entity_id:id,attributes:{friendly_name:id.split('.')[1].replaceAll('_',' ')},last_changed:now()};store[id]={...prior,state:String(value),attributes:{...prior.attributes,...attributes},last_updated:now(),...(prior.state!==String(value)?{last_changed:now()}:{}),context:{id:'documentation',parent_id:null,user_id:'demo-user'}};};
   const dataGuard=async(operation)=>{if(flags.loading)return new Promise(()=>{});if(flags.failure)throw new Error('Simulated request failed. Choose another scenario to retry.');if(flags.disconnected)throw new Error('Disconnected');};
@@ -49,19 +51,29 @@ export function createSimulation({states={},config={},scenario={},language='en',
 
   function targets(data){return [...new Set([data.entity_id].flat().filter(id=>typeof id==='string'))];}
   async function callService(domain,service,data={}) {
+    onService?.({domain,service,data:clone(data)});
     await dataGuard(`${domain}.${service}`);
     if(!serviceNames[domain]?.includes(service))throw unsupported(`${domain}.${service}`);
-    if(domain==='home_connect'&&service==='start_selected_program'){
+    if(domain==='home_connect'){
       if(data.device_id!==dishwasherDevice||!store[selectedProgram])throw unsupported('choose the fictional dishwasher');
       const selected=store[selectedProgram];
-      if(!selected.attributes.options.includes(selected.state))throw new Error('Select a dishwasher program first.');
+      const named=service==='set_program_and_options';
+      const fields=named?['device_id','affects_to','program']:['device_id'];
+      if((named&&data.affects_to!=='active_program')||Object.keys(data).some(key=>!fields.includes(key)))
+        throw unsupported('unsupported dishwasher program or options request');
+      const program=named?data.program:selected.state;
+      const runnable=store[activeProgram]?.attributes.options;
+      if(!selected.attributes.options.includes(program)||(named&&Array.isArray(runnable)&&!runnable.includes(program)))
+        throw new Error('Choose an available dishwasher program.');
       const ready=store['sensor.dishwasher']?.state==='ready'&&['closed','locked'].includes(store['sensor.demo_dishwasher_door']?.state);
-      const required=['switch.demo_dishwasher_power','binary_sensor.demo_dishwasher_connected','binary_sensor.demo_dishwasher_remote_control','binary_sensor.demo_dishwasher_remote_start'];
+      const required=[dishwasherPower,'binary_sensor.demo_dishwasher_connected','binary_sensor.demo_dishwasher_remote_control','binary_sensor.demo_dishwasher_remote_start'];
       if(!ready||!required.every(id=>store[id]?.state==='on'))throw new Error('The demonstration dishwasher is not ready.');
-      write(activeProgram,selected.state);
-      write('sensor.dishwasher',Number(store['number.demo_dishwasher_delay']?.state)>0?'delayedstart':'running');
+      // A named start has no settings from a previously selected program.
+      const delay=named?0:Number(store['number.demo_dishwasher_delay']?.state||0);
+      write(activeProgram,program);
+      write('sensor.dishwasher',delay>0?'delayedstart':'running');
       write('sensor.dishwasher_progress',0);
-      write(cycleFinish,finishIn(60+Number(store['number.demo_dishwasher_delay']?.state||0)/60));
+      write(cycleFinish,finishIn(60+delay/60));
       emit();return {};
     }
     const ids=targets(data);if(!ids.length)throw unsupported('choose a demo entity');
@@ -76,7 +88,12 @@ export function createSimulation({states={},config={},scenario={},language='en',
         write('sensor.dishwasher_progress','unavailable');
         write(cycleFinish,'unavailable');
       }
-      if(id==='switch.demo_dishwasher_power'&&domain==='switch'&&value!==state.state){
+      if(id===selectedProgram&&domain==='select'&&store[dishwasherPower]?.state!=='on')
+        throw new Error('The dishwasher must be powered on to change its selected program.');
+      if(id===dishwasherPower&&domain==='switch'&&value!==state.state){
+        if(!['ready','idle','inactive','finished','finish'].includes(store['sensor.dishwasher']?.state)||
+          !['binary_sensor.demo_dishwasher_connected','binary_sensor.demo_dishwasher_remote_control'].every(id=>store[id]?.state==='on'))
+          throw new Error('Dishwasher power control is unavailable.');
         write('sensor.dishwasher',value==='on'?'ready':'inactive');
         write(activeProgram,'unknown');
       }

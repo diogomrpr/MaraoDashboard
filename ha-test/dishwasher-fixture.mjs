@@ -17,7 +17,7 @@ export async function buildDishwasherFixture({folder, identity, sourceRoot = pat
   if (!/^[\w-]+$/.test(folder) || !/^[\da-f]{64}$/.test(identity)) throw new Error('Invalid installed Marao package');
   const docs = path.resolve(sourceRoot, 'docs');
   const {getScenario} = await import(pathToFileURL(path.join(docs, 'examples/manifest.js')));
-  const {config, states} = getScenario('dishwasher', 'ready');
+  const {config, states} = getScenario('dishwasher', 'power-off');
   if (config.type !== 'custom:marao-dishwasher-card' || !config.variables?.enable_program_start)
     throw new Error('The dishwasher controls example is missing from this checkout');
   const fixtureStates = Object.fromEntries([config.entity_id, ...Object.values(config.variables)]

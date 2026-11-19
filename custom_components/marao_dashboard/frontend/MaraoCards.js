@@ -1311,12 +1311,15 @@ export class MaraoCard extends BaseElement {
   get preview() { return Boolean(this._preview || this.nativeOwner?.preview || nativeEditing(this)); }
   set preview(value) {
     this._preview = Boolean(value);
-    if (this.preview) { this._cancelSliderGesture(); this._cancelHold(); this._disposeCamera(); this._clearAlarmPIN(); this._detailsPopup?._close(false); this._activeHistoryPopup?._close(false); }
+    if (this.preview) { this._dishwasherRequest?.wake?.cancel(); this._cancelSliderGesture(); this._cancelHold(); this._disposeCamera(); this._clearAlarmPIN(); this._detailsPopup?._close(false); this._activeHistoryPopup?._close(false); }
     if (this._authoritativeHass) this.hass = this._authoritativeHass;
   }
   setConfig(config) {
     validatePopupContent(config);
-    if (this._config.entity !== config.entity || this._config.variables?.selected_program_entity !== config.variables?.selected_program_entity) this._dishwasherRequest = null;
+    if (this._dishwasherRequest && (this._config.entity !== config.entity || this._config.template !== config.template || JSON.stringify(this._config.variables) !== JSON.stringify(config.variables))) {
+      this._dishwasherRequest.wake?.cancel();
+      this._dishwasherRequest = null;
+    }
     if (this._detailsPopup?._config?.cards?.[0]?.type === 'custom:marao-dishwasher-controls') this._detailsPopup._close(false);
     this._genericPopupConfig=null;
     if(config.popup_content?.mode==='custom'){
@@ -1381,13 +1384,14 @@ export class MaraoCard extends BaseElement {
   }
   set hass(value) {
     if(this._genericPopup)this._genericPopup.hass=value;
+    this._authoritativeHass = value;
     if (this._dishwasherRequest) {
       const operation = value?.states?.[this._config.entity]?.state;
-      if (operation && operation !== 'ready') this._dishwasherRequest.sent = false;
+      if (dishwasherCycleActive(operation)) this._dishwasherRequest.sent = false;
       if (value?.states?.[this._config.variables?.selected_program_entity]?.state === this._dishwasherRequest.program) this._dishwasherRequest.program = null;
+      this._dishwasherRequest.wake?.update(value);
     }
     if (this._detailsPopup?._open && this._config.template === 'md_dishwasher_card') this._detailsPopup.hass = value;
-    this._authoritativeHass = value;
     const previewChanged = this._renderedPreview !== this.preview;
     this._renderedPreview = this.preview;
     const entity = text(this._config.entity);
@@ -1442,6 +1446,7 @@ export class MaraoCard extends BaseElement {
   }
   get hass() { return this._hass; }
   disconnectedCallback() {
+    this._dishwasherRequest?.wake?.cancel();
     this._genericPopup?.remove();this._genericPopup=null;
     this._stopNativeEditing?.(); this._stopNativeEditing = null;
     globalThis.window?.removeEventListener?.('marao-runtime-ready', this._runtimeReady);
@@ -2676,7 +2681,9 @@ export class MaraoCard extends BaseElement {
   getCardSize() { return 2; }
 }
 
-export function dishwasherControls(config, hass) {
+const dishwasherCycleActive = operation => ['run','running','pause','paused','delayedstart','delayed'].includes(operation);
+
+export function dishwasherControls(config, hass, draft) {
   const v = config.variables || {};
   const state = id => stateOf(hass, id).state;
   const ready = id => Boolean(id && serviceConnectionReady(hass) && hass.states?.[id] && serviceTargetReady(hass, id));
@@ -2688,6 +2695,7 @@ export function dishwasherControls(config, hass) {
   const closed = ready(door) && (domainOf(door) === 'binary_sensor' ? state(door) === 'off' : ['closed', 'locked'].includes(state(door)));
   const power = v.power_entity;
   const powered = !power || ready(power) && state(power) === 'on';
+  const off = domainOf(power) === 'switch' && ready(power) && state(power) === 'off';
   const selected = v.selected_program_entity, entry = hass?.entities?.[selected];
   const choices = stateOf(hass, selected).attributes?.options;
   const remote = !v.remote_control_entity || ready(v.remote_control_entity) && state(v.remote_control_entity) === 'on';
@@ -2695,37 +2703,167 @@ export function dishwasherControls(config, hass) {
   const device = entry?.platform === 'home_connect' && entry.device_id;
   const bindingMatches = id => !id || !device || !hass.entities?.[id]?.device_id || hass.entities[id].device_id === device;
   const sameMachine = [config.entity, link, door, power, v.remote_control_entity, v.remote_start_entity].every(bindingMatches);
-  const canSelect = selected !== v.active_program_entity && device && entry?.translation_key === 'selected_program' && domainOf(selected) === 'select' && ready(selected) && Array.isArray(choices) && choices.length > 0;
+  const programBinding = selected !== v.active_program_entity && device && entry?.translation_key === 'selected_program' && domainOf(selected) === 'select' && Array.isArray(choices) && choices.length > 0;
+  const canSelect = programBinding && ready(selected);
   const canConfigure = connected && idle && powered && remote && sameMachine;
-  const running = ['run','running','pause','paused','delayedstart','delayed'].includes(operation);
+  const running = dishwasherCycleActive(operation);
+  const standby = idle || ['off','standby'].includes(operation);
+  const powerEntry = hass?.entities?.[power];
+  const verifiedPower = domainOf(power) === 'switch' && device && powerEntry?.device_id === device && powerEntry.platform === 'home_connect' && powerEntry.translation_key === 'power';
+  const local = (off && v.enable_program_start === true) || Boolean(draft);
+  const options = Array.isArray(choices) ? choices : [];
+  const activeEntry = hass?.entities?.[v.active_program_entity];
+  const runnable = activeEntry?.platform === 'home_connect' && activeEntry.translation_key === 'active_program' && activeEntry.device_id === device
+    ? stateOf(hass, v.active_program_entity).attributes?.options : undefined;
+  const supported = options.includes(draft) && (!Array.isArray(runnable) || runnable.includes(draft));
+  const configureOptions = canConfigure && (!draft || state(selected) === draft);
   let reason;
   if (!connected) reason = 'offline';
   else if (!sameMachine) reason = 'wrong_device';
-  else if (!idle) reason = running ? 'cycle_in_progress' : 'wait_ready';
-  else if (!powered) reason = 'power_first';
-  else if (operation !== 'ready') reason = 'wait_ready';
+  else if (local && !verifiedPower) reason = 'verify_power';
+  else if (local && !off && !powered) reason = 'power_first';
+  else if (!(local ? standby : idle)) reason = running ? 'cycle_in_progress' : 'wait_ready';
+  else if (!local && (!powered || operation !== 'ready')) reason = powered ? 'wait_ready' : 'power_first';
   else if (!link || !door) reason = 'missing_interlocks';
   else if (!remote || !remoteStart) reason = 'remote_disabled';
   else if (!ready(door)) reason = 'door_unknown';
   else if (!closed) reason = 'close_door';
-  else if (!canSelect || !choices.includes(state(selected))) reason = 'select_program';
-  else if (!device || !hass?.services?.home_connect?.start_selected_program) reason = 'start_unavailable';
+  else if (local && (!programBinding || !supported)) reason = draft ? 'program_unavailable' : 'choose_program';
+  else if (local && powered && !ready(selected)) reason = 'program_unavailable';
+  else if (!local && (!canSelect || !choices.includes(state(selected)))) reason = 'select_program';
+  else if (!hass?.services?.home_connect?.[local ? 'set_program_and_options' : 'start_selected_program'] || off && !hass?.services?.switch?.turn_on) reason = 'start_unavailable';
   const managedSwitch = (id, enabled) => ({entity:id, on:state(id)==='on', enabled:Boolean(enabled && bindingMatches(id) && domainOf(id)==='switch' && ready(id) && ['off','on'].includes(state(id)))});
   const delay = stateOf(hass, v.start_delay_entity), limits = delay.attributes || {};
   const hasRange = [limits.min, limits.max, limits.step].every(Number.isFinite) && limits.min <= limits.max && limits.step > 0;
   const numeric = delay.state != null && delay.state !== '' && Number.isFinite(Number(delay.state));
   return {
-    operation, running, connected, closed,
-    program: {entity:selected, value:state(selected), options:Array.isArray(choices) ? choices : [], enabled:Boolean(canConfigure && canSelect)},
+    operation, running, connected, closed, powered, off,
+    program: {entity:selected, value:local ? draft : state(selected), local, options:local && Array.isArray(runnable) ? options.filter(option=>runnable.includes(option)) : options,
+      enabled:Boolean(off && local ? standby && connected && sameMachine && verifiedPower && programBinding : canConfigure && canSelect)},
     start: {device, enabled:v.enable_program_start === true && !reason, reason},
     power: managedSwitch(power, connected && idle && remote && sameMachine),
     stop: {entity:v.stop_entity, enabled:Boolean(connected && running && remote && sameMachine && bindingMatches(v.stop_entity) && domainOf(v.stop_entity)==='button' && ready(v.stop_entity))},
-    delay: {entity:v.start_delay_entity, value:numeric ? Number(delay.state) : null, limits, enabled:Boolean(canConfigure && bindingMatches(v.start_delay_entity) && domainOf(v.start_delay_entity)==='number' && ready(v.start_delay_entity) && hasRange && numeric)},
-    half_load:managedSwitch(v.half_load_entity, canConfigure),
-    speed:managedSwitch(v.speed_entity, canConfigure),
-    intensive_zone:managedSwitch(v.intensive_zone_entity, canConfigure),
-    silence:managedSwitch(v.silence_entity, canConfigure || connected && running && powered && remote && sameMachine),
+    delay: {entity:v.start_delay_entity, value:numeric ? Number(delay.state) : null, limits, enabled:Boolean(configureOptions && bindingMatches(v.start_delay_entity) && domainOf(v.start_delay_entity)==='number' && ready(v.start_delay_entity) && hasRange && numeric)},
+    half_load:managedSwitch(v.half_load_entity, configureOptions),
+    speed:managedSwitch(v.speed_entity, configureOptions),
+    intensive_zone:managedSwitch(v.intensive_zone_entity, configureOptions),
+    silence:managedSwitch(v.silence_entity, configureOptions || connected && running && powered && remote && sameMachine),
   };
+}
+
+// A named program starts with its own defaults. Carry only options reported for
+// this same prepared program, in the units expected by Home Connect.
+function preparedDishwasherOptions(config, hass, device) {
+  const v = config.variables || {};
+  const options = {};
+  for (const [key, field] of [
+    ['half_load_entity', 'dishcare_dishwasher_option_half_load'],
+    ['speed_entity', 'dishcare_dishwasher_option_vario_speed_plus'],
+    ['intensive_zone_entity', 'dishcare_dishwasher_option_intensiv_zone'],
+    ['silence_entity', 'dishcare_dishwasher_option_silence_on_demand'],
+  ]) {
+    const id = v[key];
+    if (stateOf(hass, id).state !== 'on') continue;
+    if (domainOf(id) !== 'switch' || hass.entities?.[id]?.device_id !== device) return null;
+    options[field] = true;
+  }
+  const id = v.start_delay_entity;
+  const delay = stateOf(hass, id);
+  if (Number(delay.state) > 0) {
+    const secondsPerUnit = {s:1, min:60, h:3600}[delay.attributes?.unit_of_measurement];
+    const seconds = Number(delay.state) * secondsPerUnit;
+    if (domainOf(id) !== 'number' || hass.entities?.[id]?.device_id !== device || !Number.isSafeInteger(seconds)) return null;
+    options.b_s_h_common_option_start_in_relative = seconds;
+  }
+  return options;
+}
+
+export async function startDishwasherProgram(owner) {
+  const request = owner._dishwasherRequest;
+  if (!request?.draft || request.busy || request.sent || !owner.isConnected || owner.preview) return false;
+  const config = owner._config, hass = owner._hass;
+  const program = request.draft;
+  const initial = dishwasherControls(config, hass, program);
+  const {device, enabled} = initial.start;
+  if (!enabled || request.draftDevice && request.draftDevice !== device) return false;
+  const selected = initial.program.entity;
+  const prepared = stateOf(hass, selected).state === program;
+  const beforeOptions = prepared ? preparedDishwasherOptions(config, hass, device) : {};
+  const repaint = () => {
+    if (owner._detailsPopup?._open) owner._detailsPopup.hass = owner._authoritativeHass || owner._hass;
+  };
+  if (!beforeOptions) {
+    request.error = 'check_options';
+    repaint();
+    return false;
+  }
+  let resolve, timer, acknowledged = !initial.off;
+  const done = new Promise(complete => { resolve = complete; });
+  const wake = {
+    phase: 'waking',
+    cancel: () => finish(false, 'start_cancelled'),
+    update(current) {
+      if (request.wake !== wake) return;
+      if (!owner.isConnected || owner.preview || owner._dishwasherRequest !== request ||
+          current?.connection !== hass.connection || current?.user?.id !== hass.user?.id || !serviceConnectionReady(current)) {
+        wake.cancel();
+        return;
+      }
+      if (wake.phase === 'starting') return;
+      const model = dishwasherControls(owner._config, current, program);
+      if (!model.start.enabled || model.start.device !== device || model.power.entity !== initial.power.entity || model.program.entity !== selected) {
+        finish(false, model.start.reason || 'start_cancelled');
+        return;
+      }
+      if (!acknowledged || !model.powered || model.operation !== 'ready') return;
+      const stillPrepared = stateOf(current, selected).state === program;
+      const options = prepared && stillPrepared ? preparedDishwasherOptions(config, current, device) : {};
+      if (!options || Object.entries(beforeOptions).some(([key, value]) => options[key] !== value)) {
+        finish(false, 'check_options');
+        return;
+      }
+      wake.phase = 'starting';  // Reserve dispatch before HA can send another update.
+      repaint();
+      void callServiceWithNotification(current, 'home_connect', 'set_program_and_options', {
+        device_id:device, affects_to:'active_program', program, ...options,
+      }, (outcome, error) => {
+        if (request.wake !== wake) return;
+        if (outcome === 'success') finish(true);
+        else if (outcome === 'error' || outcome === 'skipped') finish(false, 'request_failed', error);
+      });
+    },
+  };
+  function finish(success, reason, error) {
+    if (request.wake !== wake) return;
+    clearTimeout(timer);
+    request.wake = null;
+    request.busy = false;
+    request.error = reason;
+    request.errorDetail = error?.message;
+    if (success || wake.phase === 'starting' && ['start_cancelled','start_timeout'].includes(reason)) {
+      request.draft = null;
+      // A missing response after dispatch is ambiguous. Hold the Start action
+      // until a cycle is observed rather than issuing a duplicate command.
+      request.sent = !dishwasherCycleActive(stateOf(owner._authoritativeHass || owner._hass, config.entity).state);
+    }
+    repaint();
+    resolve(success);
+  }
+  request.wake = wake;
+  request.busy = true;
+  request.error = request.errorDetail = '';
+  timer = setTimeout(() => finish(false, 'start_timeout'), 30000);
+  repaint();
+  if (initial.off) {
+    void callServiceWithNotification(hass, 'switch', 'turn_on', {entity_id:initial.power.entity}, (outcome, error) => {
+      if (request.wake !== wake) return;
+      if (outcome === 'success') {
+        acknowledged = true;
+        wake.update(owner._authoritativeHass || owner._hass);
+      } else if (outcome === 'error' || outcome === 'skipped') finish(false, 'power_failed', error);
+    });
+  } else wake.update(hass);
+  return done;
 }
 
 class MaraoDishwasherControls extends BaseElement {
@@ -2749,15 +2887,24 @@ class MaraoDishwasherControls extends BaseElement {
   async _send(role, value) {
     const request = this._request;
     if (this.preview || this.nativeOwner?.preview || !this.isConnected || request.busy || request.sent) return;
-    const model = dishwasherControls(this._config, this._hass);
+    const model = dishwasherControls(this._config, this._hass, request.draft);
     const control = model[role];
     if (!control?.enabled) return;
-    if (role === 'program' && (!control.options.includes(value) || control.value === value)) return;
+    if (role === 'program' && (!control.options.includes(value) || control.value === value && (!request.draft || model.off))) return;
     if (role === 'start' && (request.program || request.sent)) return;
     if (role === 'stop' && !this._confirmStop) return;
     const nextDelay = role === 'delay' ? numberStepValue(control.value, control.limits, value) : null;
     if (role === 'delay' && nextDelay === control.value) return;
     haptic('heavy');
+    request.error = request.errorDetail = this._error = '';
+    if (role === 'program' && control.local && model.off) {
+      request.draft = value;
+      request.draftDevice = model.start.device;
+      this._render();
+      return;
+    }
+    if (role === 'start' && request.draft) return startDishwasherProgram(this.nativeOwner || this);
+    if (role === 'program') request.draft = null;
     const domain = role === 'start' ? 'home_connect' : domainOf(control.entity);
     const service = {start:'start_selected_program', stop:'press', delay:'set_value', program:'select_option'}[role] || (control.on ? 'turn_off' : 'turn_on');
     const data = role === 'start' ? {device_id:control.device} : {entity_id:control.entity};
@@ -2765,7 +2912,6 @@ class MaraoDishwasherControls extends BaseElement {
     if (role === 'delay') data.value = nextDelay;
     this._confirmStop = false;
     request.busy = true;
-    this._error = '';
     if (role === 'program') request.program = value;
     this._render();
     try {
@@ -2783,11 +2929,11 @@ class MaraoDishwasherControls extends BaseElement {
   _render() {
     if (!this._config || !this._hass) return;
     const h = this._hass, v = this._config.variables || {};
-    const model = dishwasherControls(this._config, h);
-    const {program, start, power} = model;
     const request = this._request;
-    if (program.value === request.program) request.program = null;
-    if (model.operation !== 'ready') request.sent = false;
+    const model = dishwasherControls(this._config, h, request.draft);
+    const {program, start, power} = model;
+    if (stateOf(h, program.entity).state === request.program) request.program = null;
+    if (model.running) request.sent = false;
     if (!model.stop.enabled) this._confirmStop = false;
     const disabled = this.preview || this.nativeOwner?.preview || request.busy || request.sent;
     const status = !serviceConnectionReady(h) || v.connection_entity && !model.connected
@@ -2810,7 +2956,9 @@ class MaraoDishwasherControls extends BaseElement {
       const open = this._sections?.has(key) || false;
       return `<section><h3><button class="disclosure" type="button" data-section="${key}" aria-expanded="${open}">${esc(this._text(key))}<ha-icon aria-hidden="true" icon="mdi:chevron-${open ? 'up' : 'down'}"></ha-icon></button></h3>${open ? content : ''}</section>`;
     };
-    const startReason = request.program ? 'confirm_program' : start.reason;
+    const startReason = request.wake ? null : request.program ? 'confirm_program' : start.reason;
+    const startLabel = request.wake?.phase || (request.sent ? 'start_requested' : program.local && model.off ? 'power_and_start' : 'start');
+    const error = request.errorDetail || (request.error && this._text(request.error)) || this._error;
     const seconds = model.delay.limits.unit_of_measurement === 's' && model.delay.value != null;
     let delayLabel = model.delay.value;
     if (seconds) {
@@ -2835,16 +2983,16 @@ class MaraoDishwasherControls extends BaseElement {
       ${warnings.map(key=>`<p class="cycle-warning"><ha-icon icon="mdi:alert-circle-outline" aria-hidden="true"></ha-icon>${esc(this._text(key))}</p>`).join('')}
       </section>
       ${program.entity && !(model.running && v.active_program_entity) ? `<section><h3 id="program-heading">${esc(this._text('program'))}</h3><div class="marao-dropdown">
-      <button type="button" aria-labelledby="program-heading selected-program" aria-haspopup="menu" aria-expanded="false"${disabled || !program.enabled ? ' disabled' : ''}><span id="selected-program">${esc(this._option(program.value) || this._text('unknown'))}</span><ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon></button>
+      <button type="button" aria-labelledby="program-heading selected-program" aria-haspopup="menu" aria-expanded="false"${disabled || !program.enabled ? ' disabled' : ''}><span id="selected-program">${esc(this._option(program.value) || this._text(program.local ? 'choose_program' : 'unknown'))}</span><ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon></button>
       <div class="marao-dropdown-options" role="menu" aria-labelledby="program-heading" hidden>${program.options.map(option=>`<button type="button" role="menuitemradio" data-option="${esc(option)}">${esc(this._option(option))}<ha-icon icon="mdi:check" aria-hidden="true"></ha-icon></button>`).join('')}</div></div></section>` : ''}
-      ${v.enable_program_start === true && !model.running ? `<section><button type="button" class="start" data-start${disabled || startReason || request.sent ? ' disabled' : ''}>${esc(this._text(request.sent ? 'start_requested' : 'start'))}</button>${startReason ? `<p class="cycle-hint">${esc(this._text(startReason))}</p>` : ''}</section>` : ''}
+      ${v.enable_program_start === true && !model.running ? `<section aria-live="polite"><button type="button" class="start" data-start${disabled || startReason || request.sent ? ' disabled' : ''}>${esc(this._text(startLabel))}</button>${startReason && startReason !== 'choose_program' ? `<p class="cycle-hint">${esc(this._text(startReason))}</p>` : ''}</section>` : ''}
       ${model.stop.entity && model.running ? `<section>${this._confirmStop ? `<p>${esc(this._text('stop_question'))}</p><div class="confirm"><button type="button" data-keep>${esc(this._text('keep_running'))}</button><button type="button" data-confirm-stop>${esc(this._text('confirm_stop'))}</button></div>` : `<button type="button" data-stop${disabled || !model.stop.enabled ? ' disabled' : ''}>${esc(this._text('stop'))}</button>`}</section>` : ''}
-      ${optionKeys.length || model.delay.entity ? disclosure('options', `${optionKeys.map(switchRow).join('')}${model.delay.entity ? `<div class="delay"><span>${esc(this._text('start_delay'))}</span>${numberStepper(delayLabel, this._text('start_delay'), !seconds && model.delay.limits.unit_of_measurement ? ' '+model.delay.limits.unit_of_measurement : '', '', disabled || !model.delay.enabled, h)}</div>` : ''}`) : ''}
+      ${optionKeys.length || model.delay.entity ? disclosure('options', `${program.local && (model.off || request.draft !== stateOf(h, program.entity).state) ? `<p class="cycle-hint">${esc(this._text('options_after_power'))}</p>` : ''}${optionKeys.map(switchRow).join('')}${model.delay.entity ? `<div class="delay"><span>${esc(this._text('start_delay'))}</span>${numberStepper(delayLabel, this._text('start_delay'), !seconds && model.delay.limits.unit_of_measurement ? ' '+model.delay.limits.unit_of_measurement : '', '', disabled || !model.delay.enabled, h)}</div>` : ''}`) : ''}
       ${indicators.length || power.entity ? disclosure('machine_status', `${indicators.length ? `<dl class="machine-status">${indicators.map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>` : ''}
       ${power.entity ? `<button type="button" class="power" data-power${disabled || !power.enabled ? ' disabled' : ''}><span>${esc(this._text(!serviceTargetReady(h,power.entity) ? 'power_unknown' : power.on ? 'turn_off' : 'turn_on'))}</span><ha-icon icon="mdi:power" aria-hidden="true"></ha-icon></button>` : ''}
       `) : ''}
       ${!hasControls ? `<p class="cycle-hint">${esc(this._text('monitor_only'))}</p>` : ''}
-      ${this._error ? `<p role="alert">${esc(this._error)}</p>` : ''}</article>`;
+      ${error ? `<p role="alert">${esc(error)}</p>` : ''}</article>`;
     if (html === this._markup) return;
     const active = this.shadowRoot.activeElement;
     const focus = active?.closest('.marao-dropdown') ? '[aria-haspopup="menu"]' : active?.hasAttribute('data-power') ? '[data-power]' : active?.hasAttribute('data-start') ? '[data-start]' : null;

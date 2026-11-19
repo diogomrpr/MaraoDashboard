@@ -47,7 +47,7 @@ variables:
 
 Compatible entity domains: `sensor`, `input_select`.
 
-Tap Cycle controls to prepare a wash or manage the current cycle. Choosing a program prepares it. Start asks Home Connect to start the selected program.
+Tap Cycle controls to prepare a wash or manage the current cycle. With the dishwasher powered off, choose an available program. The card keeps your choice until you tap Start, then turns on the dishwasher, waits for it to report that it is ready and starts the chosen program. When the dishwasher is already on, choosing a program prepares it on the appliance before you tap Start.
 
 Only map appliance power to a switch intended for the dishwasher. Connect a door sensor and appliance connection sensor to show why a command is unavailable.
 
@@ -103,10 +103,10 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 | Scenario | What it demonstrates |
 | --- | --- |
 | Default | Try the configured card with fictional devices. |
+| Start from power off | Open Cycle controls, choose Quick 45° and tap Start. The dishwasher stays off until Start, then powers on and runs the chosen program. |
 | Choose and start a program | Open the ready dishwasher. Choose a program, then press Start to run it. |
 | Door open | Open the controls to see what is preventing a start. |
 | Remote start disabled | Review the prepared program and see why remote start is unavailable. |
-| Appliance powered off | Turn on appliance power before preparing the next cycle. |
 | Readings only | A status-only installation keeps its running cycle and readings. |
 | Icons and values | Hide indicator captions while keeping their accessible names. |
 | Idle | Inactive hides stale cycle values and retains the actual operation state. |

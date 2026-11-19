@@ -47,6 +47,37 @@ test('dishwasher selection prepares a cycle and an independent device action sta
   blocked.dispose();demo.dispose();
 });
 
+test('a powered-off dishwasher wakes before a named start and never runs the old selection', async () => {
+  const sample=getExample('dishwasher').scenarios.find(s=>s.id==='power-off');
+  const {power_entity:power, selected_program_entity:selected, active_program_entity:active, remote_start_entity:remote}=sample.config.variables;
+  const operation=sample.config.entity_id;
+  const calls=[], reports=[];
+  const demo=createSimulation({...sample,onService:call=>calls.push(call),onChange:hass=>
+    reports.push([hass.states[power].state,hass.states[operation].state,hass.states[active].state])});
+  const device=demo.hass.entities[selected].device_id, powerBinding=demo.hass.entities[power];
+  assert.deepEqual([powerBinding.platform,powerBinding.translation_key,powerBinding.device_id],['home_connect','power',device]);
+  const program='dishcare_dishwasher_program_quick_45';
+  const request={device_id:device,affects_to:'active_program',program};
+  const namedStart=()=>demo.callService('home_connect','set_program_and_options',request);
+  assert.equal(demo.states[power].state,'off');
+  assert.equal(demo.states[selected].attributes.options.length,7);
+  assert.equal(demo.states[selected].state,'dishcare_dishwasher_program_eco_50');
+  await assert.rejects(namedStart(), /not ready/);
+  await assert.rejects(demo.callService('select','select_option',{entity_id:selected,option:program}), /powered on/);
+  await demo.callService('switch','turn_on',{entity_id:power});
+  await assert.rejects(demo.callService('home_connect','set_program_and_options',{...request,program:'unsupported'}), /available dishwasher program/);
+  await namedStart();
+  assert.deepEqual(reports,[['on','ready','unknown'],['on','running',program]]);
+  assert.deepEqual(calls.at(-1),{domain:'home_connect',service:'set_program_and_options',data:request});
+  demo.dispose();
+
+  const blocked=createSimulation({...sample,states:{...sample.states,[remote]:{...sample.states[remote],state:'off'}}});
+  await blocked.callService('switch','turn_on',{entity_id:power});
+  await assert.rejects(blocked.callService('home_connect','set_program_and_options',request), /not ready/);
+  assert.equal(blocked.states[active].state,'unknown');
+  blocked.dispose();
+});
+
 test('real card service boundary changes only cloned fictional state',async()=>{
   const original=structuredClone(fixtureStates),updates=[],actions=[];
   const simulation=createSimulation({states:original,onChange:hass=>updates.push(hass),onAction:text=>actions.push(text)});
