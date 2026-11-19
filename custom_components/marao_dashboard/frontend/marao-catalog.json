@@ -1342,6 +1342,158 @@
             "sensor",
             "input_select"
           ]
+        },
+        {
+          "key": "selected_program_entity",
+          "label": "Program selector",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": false,
+          "description": "",
+          "domains": [
+            "select"
+          ]
+        },
+        {
+          "key": "power_entity",
+          "label": "Dishwasher power switch",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": false,
+          "description": "",
+          "domains": [
+            "switch"
+          ]
+        },
+        {
+          "key": "door_entity",
+          "label": "Door status",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": false,
+          "description": "",
+          "domains": [
+            "sensor",
+            "binary_sensor"
+          ]
+        },
+        {
+          "key": "connection_entity",
+          "label": "Appliance connection",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": false,
+          "description": "",
+          "domains": [
+            "binary_sensor"
+          ]
+        },
+        {
+          "key": "remote_start_entity",
+          "label": "Remote start permission",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": false,
+          "description": "",
+          "domains": [
+            "binary_sensor"
+          ]
+        },
+        {
+          "key": "enable_program_start",
+          "label": "Allow starting the selected Home Connect program",
+          "kind": "boolean",
+          "selector": "boolean",
+          "advanced": false,
+          "description": ""
+        },
+        {
+          "key": "remote_control_entity",
+          "label": "Remote control enabled",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "domains": [
+            "binary_sensor"
+          ]
+        },
+        {
+          "key": "stop_entity",
+          "label": "Stop program button",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "domains": [
+            "button"
+          ]
+        },
+        {
+          "key": "start_delay_entity",
+          "label": "Start delay",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "domains": [
+            "number"
+          ]
+        },
+        {
+          "key": "half_load_entity",
+          "label": "Half load",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "domains": [
+            "switch"
+          ]
+        },
+        {
+          "key": "speed_entity",
+          "label": "Speed option",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "domains": [
+            "switch"
+          ]
+        },
+        {
+          "key": "intensive_zone_entity",
+          "label": "Intensive zone",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "domains": [
+            "switch"
+          ]
+        },
+        {
+          "key": "silence_entity",
+          "label": "Silence on demand",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "domains": [
+            "switch"
+          ]
+        },
+        {
+          "key": "child_lock_entity",
+          "label": "Child lock",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": true,
+          "description": "",
+          "domains": [
+            "switch"
+          ]
         }
       ]
     },

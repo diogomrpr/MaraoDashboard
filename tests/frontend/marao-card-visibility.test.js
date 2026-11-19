@@ -438,13 +438,15 @@ test("card registration can be retried after the custom-element registry becomes
   const registered = new Map();
   globalThis.customElements = {
     get: (name) => registered.get(name),
-    define: (name, klass) => registered.set(name, klass),
+    define: (name, klass) => {
+      assert.equal(registered.has(name), false, name + " was registered twice");
+      registered.set(name, klass);
+    },
   };
   try {
     registerMaraoCards();
-    assert.deepEqual([...registered.keys()], ["marao-summary-actions", "marao-card", "marao-power-history-card", "marao-control-grid", "marao-navbar-card", "marao-popup-card"]);
     registerMaraoCards();
-    assert.equal(registered.size, 6);
+    assert.deepEqual([...registered.keys()], ["marao-summary-actions", "marao-card", "marao-dishwasher-controls", "marao-power-history-card", "marao-control-grid", "marao-navbar-card", "marao-popup-card"]);
   } finally {
     globalThis.customElements = previousRegistry;
   }

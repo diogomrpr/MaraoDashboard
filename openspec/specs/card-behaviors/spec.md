@@ -650,3 +650,21 @@ The builder SHALL offer one Access family whose settings select automatic, popup
 #### Scenario: Existing access aliases are loaded
 - **WHEN** saved access opener, close/lock or security action cards have no new behavior setting
 - **THEN** their original behavior and authored options remain unchanged, and their editor exposes the unified behavior setting
+
+### Requirement: Dishwasher cycle sheet
+A visible control on the Dishwasher card SHALL open its own bottom sheet. The sheet SHALL show the reported appliance state, progress, finish time or remaining duration, active program and refill warnings when applicable. The native editor SHALL expose optional bindings for program selection, power, start delay, wash options, door state, remote permissions, child-lock status and Stop.
+
+#### Scenario: Prepare and start
+- **WHEN** the user chooses a program or configures supported cycle options
+- **THEN** the card sends only the requested setting and waits for the appliance to confirm the selected program
+- **AND** Start requires explicit enablement, a ready and connected appliance, a closed or locked door and a confirmed program from its Home Connect selected-program control
+- **AND** configured power and remote permissions must permit the action before the card asks Home Connect to start the selected program
+
+#### Scenario: Follow or stop a cycle
+- **WHEN** a cycle is active
+- **THEN** the sheet displays reported cycle information and disables power-off and program selection
+- **AND** when a usable Stop button is configured, a separate confirmation is required before sending Stop
+
+#### Scenario: Monitoring-only configuration
+- **WHEN** a dashboard has only the existing operation and reading bindings
+- **THEN** the card and sheet show the reported readings, and those bindings authorize no appliance commands

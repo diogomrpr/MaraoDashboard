@@ -135,11 +135,12 @@ function dishwasherReadings(variables, hass, operation) {
   return fields.filter(([key]) => variables[key]).map(([key,en,ptLabel]) => {
     const entity = variables[key], state = stateOf(hass, entity);
     const unavailable = !hass?.states || hass?.connected === false || hass?.connection?.connected === false || !serviceTargetReady(hass, entity);
-    const label = localize(`dishwasher.${key.replace('_entity','')}`, hass, {}, pt ? ptLabel : en);
+    const timestamp = key === 'remaining_time_entity' && state.attributes?.device_class === 'timestamp';
+    const label = timestamp ? localize('dishwasher.finishes_at', hass, {}, 'Finishes at') : localize(`dishwasher.${key.replace('_entity','')}`, hass, {}, pt ? ptLabel : en);
     const raw = text(state.state), percent = raw && Number(raw);
     const progress = key === 'progress_entity';
-    const valid = !unavailable && (!progress || raw !== '' && Number.isFinite(percent) && percent >= 0 && percent <= 100);
-    const value = valid ? progress ? `${formatEnergyNumber(percent, undefined, hass)} %` : entityStateLabel(state, entity, 'md_sensor_card', hass) : '—';
+    const valid = !unavailable && (!timestamp || Number.isFinite(Date.parse(raw))) && (!progress || raw !== '' && Number.isFinite(percent) && percent >= 0 && percent <= 100);
+    const value = valid ? timestamp ? new Intl.DateTimeFormat(hass.language, {hour:'numeric', minute:'2-digit', timeZone:hass.config?.time_zone}).format(new Date(raw)) : progress ? `${formatEnergyNumber(percent, undefined, hass)} %` : entityStateLabel(state, entity, 'md_sensor_card', hass) : '—';
     const icon = key === 'active_program_entity' && valid ? dishwasherProgramIcon(state) : 'mdi:timer-sand';
     const ring = progress ? `<svg class="dishwasher-ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="44"></circle><circle class="ring-value" cx="50" cy="50" r="44" pathLength="100" stroke-dasharray="${valid ? percent : 0} 100"></circle></svg>` : `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>`;
     return `<div class="dishwasher-stat${valid ? '' : ' neutral'}${variables.show_reading_names===false?' no-label':''}"><dt>${esc(label)}</dt><dd><span class="dishwasher-indicator"${progress && valid ? ` role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"` : ""}>${ring}<span class="dishwasher-stat-value">${esc(value)}</span></span></dd></div>`;
@@ -981,6 +982,7 @@ function cardStyles() {
     .body.icon-only { display:flex; align-items:center; justify-content:center; gap:0; min-height:64px; padding:12px; }
     .body.icon-only .icon { grid-area:auto; align-self:auto; }
     .history-control { position:relative; z-index:3; grid-column:1/-1; min-width:48px; min-height:48px; border:0; border-radius:12px; padding:8px 12px; background:var(--secondary-background-color); color:var(--primary-text-color); font:inherit; font-family:var(--primary-font-family); font-size:var(--font-size-secondary,1rem); font-weight:var(--font-weight-secondary,500); overflow-wrap:anywhere; pointer-events:auto; }
+    [data-dishwasher-open] {display:flex;align-items:center;justify-content:space-between;gap:8px;}
     .history-control:focus { outline:none; }
     .problem { grid-column:1/-1; grid-row:-1; display:flex; align-items:flex-start; gap:8px; min-width:0; max-width:100%; font-size:var(--font-size-secondary,1rem); line-height:1.25; }
     .binary-state { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
@@ -1314,6 +1316,8 @@ export class MaraoCard extends BaseElement {
   }
   setConfig(config) {
     validatePopupContent(config);
+    if (this._config.entity !== config.entity || this._config.variables?.selected_program_entity !== config.variables?.selected_program_entity) this._dishwasherRequest = null;
+    if (this._detailsPopup?._config?.cards?.[0]?.type === 'custom:marao-dishwasher-controls') this._detailsPopup._close(false);
     this._genericPopupConfig=null;
     if(config.popup_content?.mode==='custom'){
       const error=popupViewError(config);if(error)throw new Error(error);
@@ -1377,6 +1381,12 @@ export class MaraoCard extends BaseElement {
   }
   set hass(value) {
     if(this._genericPopup)this._genericPopup.hass=value;
+    if (this._dishwasherRequest) {
+      const operation = value?.states?.[this._config.entity]?.state;
+      if (operation && operation !== 'ready') this._dishwasherRequest.sent = false;
+      if (value?.states?.[this._config.variables?.selected_program_entity]?.state === this._dishwasherRequest.program) this._dishwasherRequest.program = null;
+    }
+    if (this._detailsPopup?._open && this._config.template === 'md_dishwasher_card') this._detailsPopup.hass = value;
     this._authoritativeHass = value;
     const previewChanged = this._renderedPreview !== this.preview;
     this._renderedPreview = this.preview;
@@ -2236,6 +2246,8 @@ export class MaraoCard extends BaseElement {
     const graphMarkup = showsGraph && graphStatus === "ready" ? this._graphMarkup(graphEntity, variables, graphData) : "";
     const historyLabel = localize('history.title', this._hass, {}, 'History');
     const historyCaption = graphStatus === 'error' ? localize('common.retry', this._hass, {}, 'Retry') : graphStatus === 'loading' ? localize('common.loading', this._hass, {}, 'Loading…') : historyLabel;
+    const dishwasherOpener = kind === 'md_dishwasher_card'
+      ? `<button type="button" class="history-control" data-dishwasher-open aria-haspopup="dialog"${this.preview || controlsDisabled ? ' disabled' : ''}>${esc(localize('dishwasher.controls', this._hass, {}, 'Cycle controls'))}<ha-icon icon="mdi:chevron-up" aria-hidden="true"></ha-icon></button>` : '';
     const historyControl = showsGraph && !graphCard && !historyEntry ? `<button type="button" class="history-control" ${graphStatus === 'error' ? 'data-graph-retry' : 'data-history-open'} aria-label="${esc(historyCaption)}"${this.preview || this._graphAvailability(graphEntity) ? ' disabled' : ''}>${iconOnly ? '<ha-icon icon="mdi:chart-line" aria-hidden="true"></ha-icon>' : esc(historyCaption)}</button>` : '';
     const readingContent = readings ? `<dl class="readings${kind === 'md_dishwasher_card' ? ' dishwasher-readings' : ''}">${readings}</dl>` : "";
     const supportedVacuum = kind === 'md_vacuum_card' ? vacuumActions(state, variables) : [];
@@ -2249,7 +2261,7 @@ export class MaraoCard extends BaseElement {
     const formattedReading = !iconOnly && formatting && (['md_graph_card','md_toggle_graph_card','md_sensor_card','md_base_card'].includes(kind) || kind === 'md_switch_card' && variables.power_entity);
     const stateMarkup = showState && !stateInSlider && (!activityTimestamp(entity,state) || customLabel || variables.md_label_prefix) && !["md_wallbox_current_card", "md_number_card"].includes(kind) ? `<div class="state${!displayValue ? " placeholder" : ""}">${esc(displayValue || "—")}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${glance ? " data-glance" : ""}${kind === "md_room_card" ? " data-room" : ""}${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem,null,!glance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? ` climate-card${climateDetail?" climate-detail":""}` : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${kind === "md_number_card" ? " number-card" : ""}${kind === "md_scene_card" ? " scene-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}${kind === "md_cover_card" ? " cover-card" : ""}${accessPopup ? " access-popup-action" : ""}${accessPopup && kind === "md_access_action_card" ? " access-close-action" : ""}">${accessPopup ? `${accessIcon}${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${details}` : uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${coverActions}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${historyControl}${historyEntry && graphStatus === 'error' ? `<button type="button" data-graph-retry aria-label="${esc(localize('common.retry',this._hass,{},'Retry'))}"><ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon></button>` : ''}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
+    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${glance ? " data-glance" : ""}${kind === "md_room_card" ? " data-room" : ""}${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem,null,!glance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? ` climate-card${climateDetail?" climate-detail":""}` : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${kind === "md_number_card" ? " number-card" : ""}${kind === "md_scene_card" ? " scene-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}${kind === "md_cover_card" ? " cover-card" : ""}${accessPopup ? " access-popup-action" : ""}${accessPopup && kind === "md_access_action_card" ? " access-close-action" : ""}">${accessPopup ? `${accessIcon}${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${details}` : uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${coverActions}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${dishwasherOpener}${historyControl}${historyEntry && graphStatus === 'error' ? `<button type="button" data-graph-retry aria-label="${esc(localize('common.retry',this._hass,{},'Retry'))}"><ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon></button>` : ''}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
     for (const button of this.shadowRoot.querySelectorAll('[data-exhaust-action]')) button.addEventListener('click', event => {
       event.stopPropagation(); haptic('heavy'); this._coverAction(entity, button.dataset.exhaustAction);
     });
@@ -2292,6 +2304,18 @@ export class MaraoCard extends BaseElement {
       event.preventDefault();event.stopPropagation();if(!button.disabled)this._openActivity(button,button.getAttribute('data-activity-open'));
     }));
     this.shadowRoot.querySelector('[data-problem-details]')?.addEventListener('click', event => { event.stopPropagation(); showCardDetails(this, problem.reason, event.currentTarget); });
+    this.shadowRoot.querySelector('[data-dishwasher-open]')?.addEventListener('click', event => {
+      event.stopPropagation();
+      if (this.preview || !serviceConnectionReady(this._hass) || !serviceTargetReady(this._hass, entity)) return;
+      haptic('heavy');
+      this._detailsPopup?._close(false);
+      const popup = new MaraoPopupCard();
+      popup.nativeOwner = this;
+      popup.setConfig({title: this._label(entity, config, state), cards: [{type: 'custom:marao-dishwasher-controls', entity, variables}]});
+      popup.hass = this._hass;
+      popup._openSheet(focusRestorer(event.currentTarget));
+      this._detailsPopup = popup;
+    });
     this.shadowRoot.querySelectorAll('[data-history-open]').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); if (!button.disabled) this._openHistory(button); }));
     this.shadowRoot.querySelector('[data-light-color]')?.addEventListener('click', event => { event.stopPropagation(); this._openLightColor(event.currentTarget); });
     const actionButton = this.shadowRoot.querySelector("[data-card-action]");
@@ -2650,6 +2674,215 @@ export class MaraoCard extends BaseElement {
   }
 
   getCardSize() { return 2; }
+}
+
+export function dishwasherControls(config, hass) {
+  const v = config.variables || {};
+  const state = id => stateOf(hass, id).state;
+  const ready = id => Boolean(id && serviceConnectionReady(hass) && hass.states?.[id] && serviceTargetReady(hass, id));
+  const operation = text(state(config.entity)).toLowerCase();
+  const idle = ['ready', 'idle', 'inactive', 'finished', 'finish'].includes(operation);
+  const link = v.connection_entity;
+  const connected = ready(config.entity) && (!link || ready(link) && state(link) === 'on');
+  const door = v.door_entity;
+  const closed = ready(door) && (domainOf(door) === 'binary_sensor' ? state(door) === 'off' : ['closed', 'locked'].includes(state(door)));
+  const power = v.power_entity;
+  const powered = !power || ready(power) && state(power) === 'on';
+  const selected = v.selected_program_entity, entry = hass?.entities?.[selected];
+  const choices = stateOf(hass, selected).attributes?.options;
+  const remote = !v.remote_control_entity || ready(v.remote_control_entity) && state(v.remote_control_entity) === 'on';
+  const remoteStart = !v.remote_start_entity || ready(v.remote_start_entity) && state(v.remote_start_entity) === 'on';
+  const device = entry?.platform === 'home_connect' && entry.device_id;
+  const bindingMatches = id => !id || !device || !hass.entities?.[id]?.device_id || hass.entities[id].device_id === device;
+  const sameMachine = [config.entity, link, door, power, v.remote_control_entity, v.remote_start_entity].every(bindingMatches);
+  const canSelect = selected !== v.active_program_entity && device && entry?.translation_key === 'selected_program' && domainOf(selected) === 'select' && ready(selected) && Array.isArray(choices) && choices.length > 0;
+  const canConfigure = connected && idle && powered && remote && sameMachine;
+  const running = ['run','running','pause','paused','delayedstart','delayed'].includes(operation);
+  let reason;
+  if (!connected) reason = 'offline';
+  else if (!sameMachine) reason = 'wrong_device';
+  else if (!idle) reason = running ? 'cycle_in_progress' : 'wait_ready';
+  else if (!powered) reason = 'power_first';
+  else if (operation !== 'ready') reason = 'wait_ready';
+  else if (!link || !door) reason = 'missing_interlocks';
+  else if (!remote || !remoteStart) reason = 'remote_disabled';
+  else if (!ready(door)) reason = 'door_unknown';
+  else if (!closed) reason = 'close_door';
+  else if (!canSelect || !choices.includes(state(selected))) reason = 'select_program';
+  else if (!device || !hass?.services?.home_connect?.start_selected_program) reason = 'start_unavailable';
+  const managedSwitch = (id, enabled) => ({entity:id, on:state(id)==='on', enabled:Boolean(enabled && bindingMatches(id) && domainOf(id)==='switch' && ready(id) && ['off','on'].includes(state(id)))});
+  const delay = stateOf(hass, v.start_delay_entity), limits = delay.attributes || {};
+  const hasRange = [limits.min, limits.max, limits.step].every(Number.isFinite) && limits.min <= limits.max && limits.step > 0;
+  const numeric = delay.state != null && delay.state !== '' && Number.isFinite(Number(delay.state));
+  return {
+    operation, running, connected, closed,
+    program: {entity:selected, value:state(selected), options:Array.isArray(choices) ? choices : [], enabled:Boolean(canConfigure && canSelect)},
+    start: {device, enabled:v.enable_program_start === true && !reason, reason},
+    power: managedSwitch(power, connected && idle && remote && sameMachine),
+    stop: {entity:v.stop_entity, enabled:Boolean(connected && running && remote && sameMachine && bindingMatches(v.stop_entity) && domainOf(v.stop_entity)==='button' && ready(v.stop_entity))},
+    delay: {entity:v.start_delay_entity, value:numeric ? Number(delay.state) : null, limits, enabled:Boolean(canConfigure && bindingMatches(v.start_delay_entity) && domainOf(v.start_delay_entity)==='number' && ready(v.start_delay_entity) && hasRange && numeric)},
+    half_load:managedSwitch(v.half_load_entity, canConfigure),
+    speed:managedSwitch(v.speed_entity, canConfigure),
+    intensive_zone:managedSwitch(v.intensive_zone_entity, canConfigure),
+    silence:managedSwitch(v.silence_entity, canConfigure || connected && running && powered && remote && sameMachine),
+  };
+}
+
+class MaraoDishwasherControls extends BaseElement {
+  constructor() { super(); this.attachShadow({mode: 'open'}); }
+  setConfig(config) { this._config = config; }
+  set hass(hass) { this._hass = hass; if (this.isConnected) this._render(); }
+  connectedCallback() { this._render(); }
+  disconnectedCallback() { this._dropdown?.destroy(); this._dropdown = null; this._markup = null; }
+  get _request() {
+    const owner = this.nativeOwner || this;
+    return owner._dishwasherRequest ||= {};
+  }
+  _text(key) { return localize('dishwasher.' + key, this._hass); }
+  _option(value) {
+    const state = stateOf(this._hass, this._config.variables?.selected_program_entity);
+    if (!value) return '';
+    const formatted = this._hass?.formatEntityState?.(state, value);
+    if (formatted && formatted !== value) return formatted;
+    return String(value).split('.').pop().replace(/^dishcare_dishwasher_program_/, '').replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
+  }
+  async _send(role, value) {
+    const request = this._request;
+    if (this.preview || this.nativeOwner?.preview || !this.isConnected || request.busy || request.sent) return;
+    const model = dishwasherControls(this._config, this._hass);
+    const control = model[role];
+    if (!control?.enabled) return;
+    if (role === 'program' && (!control.options.includes(value) || control.value === value)) return;
+    if (role === 'start' && (request.program || request.sent)) return;
+    if (role === 'stop' && !this._confirmStop) return;
+    const nextDelay = role === 'delay' ? numberStepValue(control.value, control.limits, value) : null;
+    if (role === 'delay' && nextDelay === control.value) return;
+    haptic('heavy');
+    const domain = role === 'start' ? 'home_connect' : domainOf(control.entity);
+    const service = {start:'start_selected_program', stop:'press', delay:'set_value', program:'select_option'}[role] || (control.on ? 'turn_off' : 'turn_on');
+    const data = role === 'start' ? {device_id:control.device} : {entity_id:control.entity};
+    if (role === 'program') data.option = value;
+    if (role === 'delay') data.value = nextDelay;
+    this._confirmStop = false;
+    request.busy = true;
+    this._error = '';
+    if (role === 'program') request.program = value;
+    this._render();
+    try {
+      await callServiceWithNotification(this._hass, domain, service, data, (outcome, error) => {
+        if (outcome === 'error') this._error = error?.message || this._text('request_failed');
+        if (outcome === 'error' || outcome === 'skipped') request.program = null;
+        if (outcome === 'success' && role === 'start') request.sent = true;
+      });
+    } finally {
+      request.busy = false;
+      if (this.isConnected) this._render();
+      else if (this.nativeOwner?._detailsPopup?._open) this.nativeOwner._detailsPopup.hass = this.nativeOwner.hass;
+    }
+  }
+  _render() {
+    if (!this._config || !this._hass) return;
+    const h = this._hass, v = this._config.variables || {};
+    const model = dishwasherControls(this._config, h);
+    const {program, start, power} = model;
+    const request = this._request;
+    if (program.value === request.program) request.program = null;
+    if (model.operation !== 'ready') request.sent = false;
+    if (!model.stop.enabled) this._confirmStop = false;
+    const disabled = this.preview || this.nativeOwner?.preview || request.busy || request.sent;
+    const status = !serviceConnectionReady(h) || v.connection_entity && !model.connected
+      ? this._text('offline_label') : entityStateLabel(stateOf(h, this._config.entity), this._config.entity, 'md_dishwasher_card', h);
+    const readings = dishwasherReadings({...v, show_reading_names: true}, h, model.operation);
+    const indicators = [];
+    if (v.door_entity) indicators.push([this._text('door'), entityStateLabel(stateOf(h, v.door_entity), v.door_entity, '', h)]);
+    if (v.connection_entity) indicators.push([this._text('connection'), this._text(!serviceConnectionReady(h) || !serviceTargetReady(h,v.connection_entity) ? 'unknown' : stateOf(h,v.connection_entity).state === 'on' ? 'connected' : 'offline_label')]);
+    for (const [field,key] of [['remote_control_entity','remote_control'], ['remote_start_entity','remote_start'], ['child_lock_entity','child_lock']]) {
+      if (v[field]) indicators.push([this._text(key), entityStateLabel(stateOf(h, v[field]), v[field], '', h)]);
+    }
+    const warnings = ['salt', 'rinse_aid'].filter(key => dishwasherWarning(stateOf(h, v[key + '_entity'])));
+    const optionKeys = ['half_load','speed','intensive_zone','silence'].filter(key => model[key].entity);
+    const hasControls = program.entity || v.enable_program_start || power.entity || v.stop_entity || model.delay.entity || optionKeys.length;
+    const switchRow = key => {
+      const control = model[key];
+      return `<button type="button" class="power" data-role="${key}" aria-pressed="${control.on}"${disabled || !control.enabled ? ' disabled' : ''}><span>${esc(this._text(key))}</span><span>${esc(entityStateLabel(stateOf(h, control.entity), control.entity, '', h))}</span></button>`;
+    };
+    const disclosure = (key, content) => {
+      const open = this._sections?.has(key) || false;
+      return `<section><h3><button class="disclosure" type="button" data-section="${key}" aria-expanded="${open}">${esc(this._text(key))}<ha-icon aria-hidden="true" icon="mdi:chevron-${open ? 'up' : 'down'}"></ha-icon></button></h3>${open ? content : ''}</section>`;
+    };
+    const startReason = request.program ? 'confirm_program' : start.reason;
+    const seconds = model.delay.limits.unit_of_measurement === 's' && model.delay.value != null;
+    let delayLabel = model.delay.value;
+    if (seconds) {
+      const duration = [['hour', Math.floor(delayLabel / 3600)], ['minute', Math.floor(delayLabel % 3600 / 60)], ['second', delayLabel % 60]];
+      delayLabel = duration.filter(([unit, n]) => n || delayLabel === 0 && unit === 'minute')
+        .map(([unit, n]) => new Intl.NumberFormat(h.language, {style:'unit', unit, unitDisplay:'short'}).format(n)).join(' ');
+    }
+    const html = `<style>${cardStyles()}
+      .cycle-sheet .disclosure{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;background:transparent;border-top:1px solid var(--divider-color);border-radius:0;padding-inline:4px;font-weight:700;text-align:start}
+      :host{min-width:0}.cycle-sheet{display:grid;gap:20px;padding:4px 12px 20px}.cycle-sheet section{display:grid;gap:8px;min-width:0}
+      .cycle-sheet h3,.cycle-sheet p,.cycle-sheet dl{margin:0;overflow-wrap:anywhere}
+      .cycle-sheet h3{font:inherit;font-weight:700}.cycle-status{display:flex;align-items:center;gap:12px;font-size:var(--font-size-primary,1.125rem);font-weight:700}
+      .cycle-symbol{display:grid;place-items:center;flex:none;width:48px;height:48px;border-radius:16px;background:var(--secondary-background-color)}
+      .machine-status{display:grid;gap:6px}.machine-status div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px}.machine-status dd{margin:0;font-weight:600}
+      .delay,.confirm{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}.delay .number-stepper{display:flex;align-items:center;justify-content:center;max-width:100%}.delay .number-value{min-width:2.5em;text-align:center}
+      .cycle-sheet button{font-family:inherit}.cycle-sheet .start{width:100%;background:var(--primary-color);color:var(--text-primary-color,var(--primary-background-color));font-weight:700}
+      .cycle-sheet button:disabled{background:var(--secondary-background-color);color:var(--secondary-text-color);cursor:default}
+      .cycle-hint,.machine-status dt{color:var(--secondary-text-color)}.cycle-warning{display:flex;gap:8px;align-items:center}.cycle-sheet .power{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    </style><article class="cycle-sheet">
+      <section><p class="cycle-status" role="status"><span class="cycle-symbol"><ha-icon icon="mdi:dishwasher" aria-hidden="true"></ha-icon></span>${esc(status)}</p>
+      ${readings ? `<dl class="readings dishwasher-readings">${readings}</dl>` : ''}
+      ${warnings.map(key=>`<p class="cycle-warning"><ha-icon icon="mdi:alert-circle-outline" aria-hidden="true"></ha-icon>${esc(this._text(key))}</p>`).join('')}
+      </section>
+      ${program.entity && !(model.running && v.active_program_entity) ? `<section><h3 id="program-heading">${esc(this._text('program'))}</h3><div class="marao-dropdown">
+      <button type="button" aria-labelledby="program-heading selected-program" aria-haspopup="menu" aria-expanded="false"${disabled || !program.enabled ? ' disabled' : ''}><span id="selected-program">${esc(this._option(program.value) || this._text('unknown'))}</span><ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon></button>
+      <div class="marao-dropdown-options" role="menu" aria-labelledby="program-heading" hidden>${program.options.map(option=>`<button type="button" role="menuitemradio" data-option="${esc(option)}">${esc(this._option(option))}<ha-icon icon="mdi:check" aria-hidden="true"></ha-icon></button>`).join('')}</div></div></section>` : ''}
+      ${v.enable_program_start === true && !model.running ? `<section><button type="button" class="start" data-start${disabled || startReason || request.sent ? ' disabled' : ''}>${esc(this._text(request.sent ? 'start_requested' : 'start'))}</button>${startReason ? `<p class="cycle-hint">${esc(this._text(startReason))}</p>` : ''}</section>` : ''}
+      ${model.stop.entity && model.running ? `<section>${this._confirmStop ? `<p>${esc(this._text('stop_question'))}</p><div class="confirm"><button type="button" data-keep>${esc(this._text('keep_running'))}</button><button type="button" data-confirm-stop>${esc(this._text('confirm_stop'))}</button></div>` : `<button type="button" data-stop${disabled || !model.stop.enabled ? ' disabled' : ''}>${esc(this._text('stop'))}</button>`}</section>` : ''}
+      ${optionKeys.length || model.delay.entity ? disclosure('options', `${optionKeys.map(switchRow).join('')}${model.delay.entity ? `<div class="delay"><span>${esc(this._text('start_delay'))}</span>${numberStepper(delayLabel, this._text('start_delay'), !seconds && model.delay.limits.unit_of_measurement ? ' '+model.delay.limits.unit_of_measurement : '', '', disabled || !model.delay.enabled, h)}</div>` : ''}`) : ''}
+      ${indicators.length || power.entity ? disclosure('machine_status', `${indicators.length ? `<dl class="machine-status">${indicators.map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>` : ''}
+      ${power.entity ? `<button type="button" class="power" data-power${disabled || !power.enabled ? ' disabled' : ''}><span>${esc(this._text(!serviceTargetReady(h,power.entity) ? 'power_unknown' : power.on ? 'turn_off' : 'turn_on'))}</span><ha-icon icon="mdi:power" aria-hidden="true"></ha-icon></button>` : ''}
+      `) : ''}
+      ${!hasControls ? `<p class="cycle-hint">${esc(this._text('monitor_only'))}</p>` : ''}
+      ${this._error ? `<p role="alert">${esc(this._error)}</p>` : ''}</article>`;
+    if (html === this._markup) return;
+    const active = this.shadowRoot.activeElement;
+    const focus = active?.closest('.marao-dropdown') ? '[aria-haspopup="menu"]' : active?.hasAttribute('data-power') ? '[data-power]' : active?.hasAttribute('data-start') ? '[data-start]' : null;
+    this._dropdown?.destroy();
+    this.shadowRoot.innerHTML = this._markup = html;
+    for (const button of this.shadowRoot.querySelectorAll('[data-section]')) button.onclick = () => {
+      const key = button.dataset.section;
+      haptic('heavy');
+      this._sections ||= new Set();
+      if (this._sections.has(key)) this._sections.delete(key); else this._sections.add(key);
+      this._render();
+      this.shadowRoot.querySelector(`[data-section="${key}"]`)?.focus({preventScroll:true});
+    };
+    const picker = this.shadowRoot.querySelector('.marao-dropdown');
+    if (picker) this._dropdown = bindDropdown(picker, {
+      trigger: picker.querySelector('[aria-haspopup]'), menu: picker.querySelector('[role=menu]'),
+      choices: [...picker.querySelectorAll('[data-option]')].map(button=>({button,value:button.dataset.option})),
+      value: () => program.value, activeElement: () => this.shadowRoot.activeElement,
+      haptic: () => haptic('heavy'), onSelect: option => this._send('program', option),
+    });
+    for (const button of this.shadowRoot.querySelectorAll('[data-role]')) button.onclick = () => this._send(button.dataset.role);
+    for (const button of this.shadowRoot.querySelectorAll('[data-number-step]')) {
+      const direction = button.dataset.numberStep === 'increase' ? 1 : -1;
+      if (numberStepValue(model.delay.value, model.delay.limits, direction) === model.delay.value) button.disabled = true;
+      button.onclick = () => this._send('delay',direction);
+    }
+    const stop = this.shadowRoot.querySelector('[data-stop]');
+    if (stop) stop.onclick = () => { haptic('heavy'); this._confirmStop = true; this._render(); this.shadowRoot.querySelector('[data-keep]')?.focus(); };
+    const confirm = this.shadowRoot.querySelector('[data-confirm-stop]');
+    if (confirm) confirm.onclick = () => this._send('stop');
+    const keep = this.shadowRoot.querySelector('[data-keep]');
+    if (keep) keep.onclick = () => { haptic('heavy'); this._confirmStop = false; this._render(); this.shadowRoot.querySelector('[data-stop]')?.focus(); };
+    const startButton = this.shadowRoot.querySelector('[data-start]');
+    if (startButton) startButton.onclick = () => { if (!request.program && !request.sent) this._send('start'); };
+    const powerButton = this.shadowRoot.querySelector('[data-power]');
+    if (powerButton) powerButton.onclick = () => this._send('power');
+    if (focus) this.shadowRoot.querySelector(focus)?.focus({preventScroll:true});
+  }
 }
 
 function localCardHelpers(configs) {
@@ -3229,7 +3462,7 @@ export class MaraoPowerHistoryCard extends BaseElement {
 
 export function registerMaraoCards() {
   popupLayouts.registerPopupActions({haptic,isAccessCover,callService:callServiceWithNotification});
-  for (const [name, klass] of [["marao-card", MaraoCard], ["marao-power-history-card", MaraoPowerHistoryCard], ["marao-control-grid", MaraoControlGrid], ["marao-navbar-card", MaraoNavbarCard], ["marao-popup-card", MaraoPopupCard]]) {
+  for (const [name, klass] of [["marao-card", MaraoCard], ["marao-dishwasher-controls", MaraoDishwasherControls], ["marao-power-history-card", MaraoPowerHistoryCard], ["marao-control-grid", MaraoControlGrid], ["marao-navbar-card", MaraoNavbarCard], ["marao-popup-card", MaraoPopupCard]]) {
     if (globalThis.customElements && !globalThis.customElements.get(name)) globalThis.customElements.define(name, klass);
   }
 

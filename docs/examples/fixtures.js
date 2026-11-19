@@ -1,6 +1,16 @@
 // Fictional public examples. Never import a Home Assistant installation or its credentials.
 const stamp = '2026-11-02T10:00:00.000Z';
 const state = (entity_id, value, friendly_name, attributes = {}) => ({entity_id, state:String(value), attributes:{friendly_name,...attributes}, last_changed:stamp, last_updated:stamp, context:{id:'documentation',parent_id:null,user_id:null}});
+// Home Connect advertises service values separately from the translated choices.
+export const dishwasherPrograms = {
+  dishcare_dishwasher_program_intensiv_70: ['Intensive 70°', 'Intensivo 70°'],
+  dishcare_dishwasher_program_auto_2: ['Auto', 'Automático'],
+  dishcare_dishwasher_program_eco_50: ['Eco 50°', 'Eco 50°'],
+  dishcare_dishwasher_program_quick_45: ['Quick 45°', 'Rápido 45°'],
+  dishcare_dishwasher_program_pre_rinse: ['Pre-rinse', 'Pré-lavagem'],
+  dishcare_dishwasher_program_quick_65: ['Quick 65°', 'Rápido 65°'],
+  dishcare_dishwasher_program_machine_care: ['Machine Care', 'Limpeza da máquina'],
+};
 const entries = [
   state('light.living_room','on','Living room',{brightness:180,color_mode:'rgb',supported_color_modes:['rgb','color_temp'],rgb_color:[255,190,100],hs_color:[34.8,60.8],color_temp_kelvin:3000,min_color_temp_kelvin:2000,max_color_temp_kelvin:6500,supported_features:40}),
   state('light.kitchen','off','Kitchen',{brightness:120,color_mode:'brightness',supported_color_modes:['brightness'],supported_features:0}),
@@ -58,11 +68,29 @@ const entries = [
   state('sensor.sam_area','Kitchen','Sam area',{area_id:'kitchen'}),
   state('valve.garden','closed','Garden valve',{current_position:0,supported_features:3}),
 ];
+const dishwasherControls = [
+  state('sensor.demo_dishwasher_finish','2026-11-02T10:35:00.000Z','Estimated finish',{device_class:'timestamp'}),
+  state('select.demo_dishwasher_next','dishcare_dishwasher_program_eco_50','Next program',{options:Object.keys(dishwasherPrograms)}),
+  state('select.demo_dishwasher_active','dishcare_dishwasher_program_eco_50','Active program',{options:Object.keys(dishwasherPrograms)}),
+  state('switch.demo_dishwasher_power','on','Appliance power'),
+  state('sensor.demo_dishwasher_door','closed','Dishwasher door'),
+  state('binary_sensor.demo_dishwasher_connected','on','Appliance connection',{device_class:'connectivity'}),
+  state('button.demo_dishwasher_stop',stamp,'Stop program'),
+  state('number.demo_dishwasher_delay','0','Start delay',{min:0,max:86400,step:900,unit_of_measurement:'s'}),
+  state('binary_sensor.demo_dishwasher_remote_control','on','Remote control'),
+  state('binary_sensor.demo_dishwasher_remote_start','on','Remote start'),
+  state('switch.demo_dishwasher_half_load','off','Half load'),
+  state('switch.demo_dishwasher_speed','off','Speed'),
+  state('switch.demo_dishwasher_intensive_zone','off','Intensive zone'),
+  state('switch.demo_dishwasher_silence','off','Silence on demand'),
+  state('switch.demo_dishwasher_child_lock','off','Child lock'),
+];
+export const dishwasherFixtureStates = Object.fromEntries(dishwasherControls.map(entry=>[entry.entity_id,entry]));
 export const fixtureStates = Object.fromEntries(entries.map(entry => [entry.entity_id,entry]));
-export const entityMetadata = entries.map(({entity_id,state,attributes})=>({entity_id,state,name:attributes.friendly_name,...attributes}));
+export const entityMetadata = [...entries,...dishwasherControls].map(({entity_id,state,attributes})=>({entity_id,state,name:attributes.friendly_name,...attributes}));
 export const demoDashboard = {title:'Marao example',views:[{path:'home',title:'Home',icon:'mdi:home'},{path:'living-room',title:'Living room',icon:'mdi:sofa'},{path:'kitchen',title:'Kitchen',icon:'mdi:silverware-fork-knife'},{path:'away',title:'Away',icon:'mdi:home-export-outline'}]};
-export function scenarioStates(changes = {}) {
-  const result = structuredClone(fixtureStates);
+export function scenarioStates(changes = {}, extraStates = {}) {
+  const result = structuredClone({...fixtureStates,...extraStates});
   for (const [id,change] of Object.entries(changes)) {
     if (change === null) {delete result[id];continue;}
     if (typeof change !== 'object') result[id] = {...result[id],state:String(change)};

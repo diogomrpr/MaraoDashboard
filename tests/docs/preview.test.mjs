@@ -27,6 +27,26 @@ test('Plex galleries use real browse contracts, fictional artwork and visible pa
   assert.deepEqual(example.config,source);
 });
 
+test('dishwasher selection prepares a cycle and an independent device action starts it', async () => {
+  const card=getExample('dishwasher'), ready=card.scenarios.find(s=>s.id==='ready');
+  const demo=createSimulation(ready), {selected_program_entity:selected,active_program_entity:active}=ready.config.variables;
+  const option='dishcare_dishwasher_program_quick_45', device=demo.hass.entities[selected].device_id;
+  assert.equal(demo.states[active].state,'unknown');
+  await demo.callService('select','select_option',{entity_id:selected,option});
+  assert.equal(demo.states[ready.config.entity_id].state,'ready');
+  assert.equal(demo.states[active].state,'unknown');
+  await demo.callService('home_connect','start_selected_program',{device_id:device});
+  assert.equal(demo.states[active].state,option);
+  assert.equal(demo.states[ready.config.entity_id].state,'running');
+  await demo.callService('button','press',{entity_id:ready.config.variables.stop_entity});
+  assert.equal(demo.states[ready.config.entity_id].state,'ready');
+  assert.equal(demo.states[active].state,'unknown');
+  const blocked=createSimulation(card.scenarios.find(s=>s.id==='door-open'));
+  await assert.rejects(blocked.callService('home_connect','start_selected_program',{device_id:device}), /not ready/);
+  assert.equal(blocked.states[ready.config.entity_id].state,'ready');
+  blocked.dispose();demo.dispose();
+});
+
 test('real card service boundary changes only cloned fictional state',async()=>{
   const original=structuredClone(fixtureStates),updates=[],actions=[];
   const simulation=createSimulation({states:original,onChange:hass=>updates.push(hass),onAction:text=>actions.push(text)});
