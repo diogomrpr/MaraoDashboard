@@ -25,13 +25,31 @@ type: custom:marao-dishwasher-card
 entity_id: sensor.dishwasher
 variables:
   progress_entity: sensor.dishwasher_progress
-  remaining_time_entity: sensor.dishwasher_remaining
-  active_program_entity: sensor.dishwasher_program
+  remaining_time_entity: sensor.demo_dishwasher_finish
+  active_program_entity: select.demo_dishwasher_active
+  selected_program_entity: select.demo_dishwasher_next
+  enable_program_start: true
+  stop_entity: button.demo_dishwasher_stop
+  power_entity: switch.demo_dishwasher_power
+  start_delay_entity: number.demo_dishwasher_delay
+  door_entity: sensor.demo_dishwasher_door
+  connection_entity: binary_sensor.demo_dishwasher_connected
+  remote_control_entity: binary_sensor.demo_dishwasher_remote_control
+  remote_start_entity: binary_sensor.demo_dishwasher_remote_start
+  half_load_entity: switch.demo_dishwasher_half_load
+  speed_entity: switch.demo_dishwasher_speed
+  intensive_zone_entity: switch.demo_dishwasher_intensive_zone
+  silence_entity: switch.demo_dishwasher_silence
+  child_lock_entity: switch.demo_dishwasher_child_lock
   salt_entity: binary_sensor.dishwasher_salt
   rinse_aid_entity: binary_sensor.dishwasher_rinse
 ```
 
 Compatible entity domains: `sensor`, `input_select`.
+
+Tap Cycle controls to prepare a wash or manage the current cycle. Choosing a program prepares it. Start asks Home Connect to start the selected program.
+
+Only map appliance power to a switch intended for the dishwasher. Connect a door sensor and appliance connection sensor to show why a command is unavailable.
 
 Progress, remaining time and the actually active program are optional cycle readings, shown only while running, paused or awaiting a delayed start.
 
@@ -63,6 +81,20 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `variables.salt_entity` | Salt warning | entity | Not set | Salt warning for this card. Searchable suggestions are available. |
 | `variables.rinse_aid_entity` | Rinse-aid warning | entity | Not set | Rinse-aid warning for this card. Searchable suggestions are available. |
 | `variables.active_program_entity` | Active program | entity | Not set | Active program for this card. Searchable suggestions are available. |
+| `variables.selected_program_entity` | Program selector | entity | Not set | Program selector for this card. Searchable suggestions are available. |
+| `variables.power_entity` | Dishwasher power switch | entity | Not set | Dishwasher power switch for this card. Searchable suggestions are available. |
+| `variables.door_entity` | Door status | entity | Not set | Door status for this card. Searchable suggestions are available. |
+| `variables.connection_entity` | Appliance connection | entity | Not set | Appliance connection for this card. Searchable suggestions are available. |
+| `variables.remote_start_entity` | Remote start permission | entity | Not set | Remote start permission for this card. Searchable suggestions are available. |
+| `variables.enable_program_start` | Allow starting the selected Home Connect program | boolean | Not set | Allow starting the selected Home Connect program for this card. |
+| `variables.remote_control_entity` | Remote control enabled | entity | Not set | Remote control enabled for this card. Searchable suggestions are available. |
+| `variables.stop_entity` | Stop program button | entity | Not set | Stop program button for this card. Searchable suggestions are available. |
+| `variables.start_delay_entity` | Start delay | entity | Not set | Start delay for this card. Searchable suggestions are available. |
+| `variables.half_load_entity` | Half load | entity | Not set | Half load for this card. Searchable suggestions are available. |
+| `variables.speed_entity` | Speed option | entity | Not set | Speed option for this card. Searchable suggestions are available. |
+| `variables.intensive_zone_entity` | Intensive zone | entity | Not set | Intensive zone for this card. Searchable suggestions are available. |
+| `variables.silence_entity` | Silence on demand | entity | Not set | Silence on demand for this card. Searchable suggestions are available. |
+| `variables.child_lock_entity` | Child lock | entity | Not set | Child lock for this card. Searchable suggestions are available. |
 
 ## Behavior examples
 
@@ -71,8 +103,12 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 | Scenario | What it demonstrates |
 | --- | --- |
 | Default | Try the configured card with fictional devices. |
+| Choose and start a program | Open the ready dishwasher. Choose a program, then press Start to run it. |
+| Door open | Open the controls to see what is preventing a start. |
+| Remote start disabled | Review the prepared program and see why remote start is unavailable. |
+| Appliance powered off | Turn on appliance power before preparing the next cycle. |
+| Readings only | A status-only installation keeps its running cycle and readings. |
 | Icons and values | Hide indicator captions while keeping their accessible names. |
-| Ready, no cycle data | Normal missing cycle readings do not create an appliance warning. |
 | Idle | Inactive hides stale cycle values and retains the actual operation state. |
 | Cycle with missing readings | A missing optional reading leaves the operation and other readings visible. |
 | Finished | The completed cycle follows the reported state. |
