@@ -1,0 +1,3 @@
+- [x] Allow a program to be chosen while the dishwasher is off.
+- [x] Power on and start the chosen program once after readiness and interlock verification.
+- [x] Verify the simulated flow and its cancellation on interlock loss.
