@@ -8,8 +8,8 @@ card and mode dropdown instead of providing a clear readings-and-controls layout
 
 ## What Changes
 
-- Use the agreed Readings first layout: a larger unitless current temperature,
-  optional humidity, readable actual activity, and a rounded vertical target
+- Use the readings-first layout with a larger current temperature with a degree
+  symbol, larger optional humidity, bold activity at the bottom, and a rounded vertical target
   selector at the right. Keep 8px above and below the selector. Normal compact
   presentation is approximately 150px tall, with growth for supported content
   and typography rather than a fixed height cap.
@@ -22,10 +22,9 @@ card and mode dropdown instead of providing a clear readings-and-controls layout
   Omission means enabled, preserving existing automatic popup availability.
   Disabling it exposes supported mode choices inline, subject to an existing
   explicit `show_mode_buttons: false`, and keeps the target selector on the card.
-- Present climate-owned details as current temperature/humidity at the top,
-  supported HVAC mode controls next, and the identical target selector at the
-  lower right. Leave the lower-left area unused for a separately requested future
-  feature; add no placeholder UI or new feature there.
+- Present climate-owned details with current temperature and humidity at the
+  top, supported HVAC mode controls next, and activity and the identical target
+  selector at the bottom.
 - Use 48-by-48 mode buttons with 28px icons and no visible button labels. Prefer
   one row when every supported mode fits; reflow without shrinking or hiding
   choices. A localized heading such as `Mode - Heat` identifies the selection.
@@ -37,7 +36,7 @@ The affected set is `custom:marao-climate-card` and its shared
 climate groups, automatic details and managed climate popup layouts. Shared
 numeric-control consumers are reviewed for compatibility, not redesigned.
 
-Non-goals are the future lower-left feature, humidity control, extra fan-speed,
+Non-goals are humidity control, extra fan-speed,
 swing or preset controls, changes to other card families, new dependencies,
 thermostat service semantics, and a broad verification campaign.
 

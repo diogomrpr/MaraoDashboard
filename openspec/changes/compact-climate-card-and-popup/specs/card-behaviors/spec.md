@@ -3,12 +3,17 @@
 ## MODIFIED Requirements
 
 ### Requirement: Climate mode and target controls
-Climate SHALL separate reported temperature/activity, requested mode and numeric target, using unitless temperatures and mode-aware colors. Controls SHALL honor graph/mode/setpoint options. Multiple modes SHALL open enabled climate details; single-mode activation SHALL retain direct on behavior. Requests SHALL appear by the next frame and remain pending until reconciled, without inventing reported measurements or activity.
+Climate SHALL separate reported temperature/activity, requested mode and numeric target, with mode-aware colors. The measured temperature SHALL show a degree symbol and targets SHALL remain unitless. Controls SHALL honor graph/mode/setpoint options. Multiple modes SHALL open enabled climate details; single-mode activation SHALL retain direct on behavior. Requests SHALL appear by the next frame and remain pending until reconciled, without inventing reported measurements or activity.
 
 #### Scenario: A multi-mode climate card is activated
 - **WHEN** an available climate entity exposes multiple supported modes and its built-in popup is enabled
 - **THEN** default card activation opens its climate details with supported mode choices
 - **AND** no device command is dispatched merely by opening the details
+
+#### Scenario: An enabled thermostat reports idle
+- **WHEN** Home Assistant reports idle for a thermostat with an operating mode enabled
+- **THEN** its card and details show the mode color as a border around the neutral card surface
+- **AND** the mode color fills the card surface when Home Assistant reports active operation
 
 #### Scenario: A temperature or mode change has delayed confirmation
 - **WHEN** a usable thermostat receives an accepted target or supported HVAC mode request
@@ -42,7 +47,7 @@ Climate SHALL separate reported temperature/activity, requested mode and numeric
 ## ADDED Requirements
 
 ### Requirement: Compact climate readings and selector
-Climate cards SHALL emphasize current temperature beside optional humidity and a rounded vertical up/target/down selector at the right. Title and activity SHALL fit beside that selector when space permits, with 8px above and below it. Temperatures SHALL omit degrees and units in visible and accessible text. Graph, custom-label and hidden-field options SHALL retain their meanings.
+Climate cards SHALL emphasize current temperature and optional humidity beside a rounded vertical up/target/down selector at the right with 8px above and below it. Reported activity SHALL appear in bold at the bottom of the card when state is shown. Graph, custom-label and hidden-field options SHALL retain their meanings.
 
 #### Scenario: A full-width climate card renders at normal text size
 - **WHEN** a typical scalar-target card has no explicit larger sizing or additional content
@@ -97,7 +102,7 @@ Climate settings SHALL expose `variables.enable_popup` as a boolean. Omission SH
 - **AND** the saved source remains unchanged on failure
 
 ### Requirement: Climate details composition
-Climate-owned details SHALL place current temperature and configured humidity at the top, supported HVAC modes next, and the same rounded vertical target selector at the lower right. Its geometry, steps, bounds, pending feedback and availability SHALL match the card's selector. The lower-left area SHALL contain no new feature or placeholder. Explicit custom popup content SHALL retain its authored layout.
+Climate-owned details SHALL place current temperature and configured humidity at the top, supported HVAC modes next, and reported activity and the same rounded vertical target selector at the bottom. The selector's geometry, steps, bounds, pending feedback and availability SHALL match the card's selector. Explicit custom popup content SHALL retain its authored layout.
 
 #### Scenario: Built-in climate details open
 - **WHEN** the user opens automatic or project-managed climate details

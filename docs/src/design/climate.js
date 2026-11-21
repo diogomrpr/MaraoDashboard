@@ -2,7 +2,7 @@ import {scenarios} from './scenarios.js';
 // Localized gallery labels. Card markup and behavior come from the real Marao runtime.
 export const climateScenarios=scenarios('md_climate_card',{
   default:{pt:'Predefinido',descriptionPt:'Leitura medida e objetivo com modos disponíveis.'},
-  'single-mode':{pt:'Aquecer e desligar',descriptionPt:'Um único modo de funcionamento e desligado.'},
+  'single-mode':{pt:'Aquecer e desligar',descriptionPt:'Em espera no modo aquecimento, o cartão tem um contorno laranja.'},
   range:{pt:'Intervalo de temperatura',descriptionPt:'Objetivos inferior e superior no modo automático.'},
   off:{pt:'Desligado',descriptionPt:'A leitura medida mantém-se visível.'},
   graph:{pt:'Histórico de temperatura',descriptionPt:'Histórico de temperatura comunicado.'},

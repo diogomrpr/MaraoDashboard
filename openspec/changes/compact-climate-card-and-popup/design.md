@@ -36,8 +36,7 @@ authored data while adding the two settings.
 
 **Non-Goals:** a second state machine, additional subscriptions, a new card type,
 an independently configurable detail renderer, a new popup ownership format,
-unrelated numeric-card redesign, or implementation of the future lower-left
-feature. That area has no placeholder label, disabled control or fake data.
+or unrelated numeric-card redesign.
 
 ## Decisions
 
@@ -90,10 +89,12 @@ card and popup diverge in bounds, pending requests and error handling.
 
 Use the agreed layout at normal typography:
 
-- A large current-temperature reading, approximately 46px at the normal 18px
-  primary font, derived from shared scalable typography tokens.
-- Name, current reading, optional humidity and reported activity in the content
-  beside the right-hand vertical selector. Keep 8px above and below the selector.
+- A current-temperature reading with a degree symbol, approximately 56px at the
+  normal 18px primary font. Optional humidity uses approximately 22px at that
+  text size. Both scale with the primary font.
+- Name, current reading and optional humidity beside the right-hand vertical
+  selector, with bold reported activity at the bottom. Keep 8px above and below
+  the selector in the ordinary card.
 - A selector approximately 60px wide and 134px tall for a scalar target, with
   full-size up/down buttons and the target between them. Approximately 150px is
   the resulting card reference, not a fixed min/max height for every state.

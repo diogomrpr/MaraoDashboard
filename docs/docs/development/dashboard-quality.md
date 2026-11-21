@@ -341,8 +341,8 @@ Popups must use modal semantics. While open, background content is inert, focus
 stays within the popup, and closing restores focus to the invoking control.
 The popup close control follows the same visible 48-by-48 rule.
 
-Climate values intentionally omit degrees and temperature units in both visual
-and accessible text.
+Climate measured temperature includes a degree symbol in visible and accessible
+text. Climate targets omit units and degree symbols.
 
 ## Entity and command states
 
@@ -565,15 +565,16 @@ large and readable.
 - Repeated steps use the latest requested target; mode changes use only targets
   supported by the reported capabilities. Preserve focus and allow further valid
   input while pending. No configuration setting or persisted request is needed.
-- Omit degree symbols and units from all visual and accessible climate values.
+- Show the measured temperature with a degree symbol, such as `20°`.
 - A single supported mode turns on directly to that mode.
 - Multiple supported modes open enabled Marao details. `enable_popup: false` suppresses built-in details while preserving authored actions, references and layouts; supported modes appear inline unless `show_mode_buttons: false`.
-- Climate uses intrinsic compact sizing (about 150px for a normal scalar target), a large unitless measured reading, actual activity and optional `humidity_entity` percentage beside the shared vertical target selector, with 8px above and below it. Invalid humidity is neutral and never disables usable climate controls. Authored grid sizes, ranges, graphs and enlarged typography may grow.
-- Details place readings first, icon modes second and the identical selector at the lower right, with no lower-left placeholder. Modes use 48px named buttons with 28px icons, a non-color selection cue and a localized selected/pending-mode heading. Wrap choices without shrinking. Missing measured/target values retain guarded placeholders.
+- Climate uses intrinsic compact sizing with a large measured temperature and optional `humidity_entity` percentage beside the shared vertical target selector, with 8px above and below it. The bold activity label sits at the bottom of the card. Invalid humidity is neutral and never disables usable climate controls. Authored grid sizes, ranges, graphs and enlarged typography may grow.
+- Details place readings first, icon modes second, and activity and the identical selector at the bottom. Modes use 48px named buttons with 28px icons, a non-color selection cue and a localized selected/pending-mode heading. Wrap choices without shrinking. Missing measured/target values retain guarded placeholders.
 - Mode and setpoint controls use a readable theme surface and state-colored
   selection treatment.
-- Climate card background follows heat, cool, heat/cool, auto, dry, fan, off,
-  transitional, unknown, and unavailable theme states.
+- Climate cards and their details show the mode color as a border on a neutral
+  surface when Home Assistant reports idle. Active equipment uses a filled mode
+  color. Off and availability problems retain their neutral presentation.
 
 ### Floating navbar
 

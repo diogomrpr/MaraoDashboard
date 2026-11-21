@@ -2056,11 +2056,10 @@ async function main() {
       fontSize: parseFloat(getComputedStyle(element).fontSize),
     }));
     if (
-      !climateCurrentTemperatureDetails.text ||
-      /current|[°º]/i.test(climateCurrentTemperatureDetails.text) ||
+      !/^-?\d+(?:[.,]\d+)?°$/.test(climateCurrentTemperatureDetails.text) ||
       climateCurrentTemperatureDetails.fontSize < 28
     ) {
-      throw new Error(`Climate current temperature must be a large unitless value: ${JSON.stringify(climateCurrentTemperatureDetails)}`);
+      throw new Error(`Climate current temperature must be a large value with a degree symbol: ${JSON.stringify(climateCurrentTemperatureDetails)}`);
     }
     const climateTemperature = page.locator('.marao-popup-sheet [data-number-step="increase"]').first();
     if (await climateTemperature.count() !== 1) throw new Error("Climate target temperature stepper did not render.");

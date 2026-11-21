@@ -38,7 +38,7 @@ test("mode feedback is immediate across cards, without changing measurements or 
   assert.match(main.shadowRoot.innerHTML, /role="status"[^>]*>Updating/);
   const sheet = climateCard(t, hass, { show_mode_buttons: true, enable_popup: false });
   assert.match(sheet.shadowRoot.innerHTML, /climate-mode active[^>]*data-climate-mode="cool"/);
-  assert.match(sheet.shadowRoot.innerHTML, /class="climate current-temperature"[^>]*>20</);
+  assert.match(sheet.shadowRoot.innerHTML, /class="climate current-temperature"[^>]*>20°</);
   assert.deepEqual(state, reportedClimate("off"));
   acknowledge(); await pending;
   assert.match(main.shadowRoot.innerHTML, /Updating/);
@@ -415,7 +415,8 @@ test("climate modes use named icon buttons and retain measured/target slots", t 
   assert.match(html, /data-climate-mode="heat"[^>]*aria-label="Heat"[^>]*aria-pressed="true"/);
   assert.doesNotMatch(html, /data-scene-select|role="menuitemradio"/);
   assert.equal((html.match(/data-climate-mode=/g)||[]).length,4);
-  assert.match(html, /class="climate current-temperature"[^>]*>20</);
+  assert.match(html, /class="climate current-temperature" aria-label="[^"]*20°">20°</);
+  assert.match(html, /class="climate-status"><div class="climate-activity">Idle</);
   assert.equal(displayedTarget(card), "21");
   assert.equal(climateDefaultAction(['heat','cool'],{enable_popup:false,mode_selector_hash:'#saved'}),null);
   assert.equal(climateDefaultAction(['heat'],{enable_popup:false}).data.hvac_mode,'heat');

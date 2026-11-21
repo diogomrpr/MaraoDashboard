@@ -2,6 +2,25 @@
 
 ## MODIFIED Requirements
 
+### Requirement: Localized content and information hierarchy
+All user-facing runtime actions, states, errors and labels SHALL be localized.
+Configured abnormal alerts SHALL take priority when actionable, followed by home
+summary and normal controls organized by task or room. Climate measured
+temperature SHALL include a degree symbol in visible and accessible text.
+Climate targets SHALL omit units and degree symbols.
+
+#### Scenario: An ordinary dashboard has no configured abnormal alert
+- **WHEN** the overview is rendered
+- **THEN** task and room controls remain prominent without a forced security-first layout
+
+#### Scenario: A climate target is read or adjusted
+- **WHEN** its value or accessible label is presented
+- **THEN** the temperature number contains no temperature unit or degree symbol
+
+#### Scenario: A climate measurement is shown
+- **WHEN** the thermostat reports a current temperature
+- **THEN** its card and details show the measured number followed by a degree symbol
+
 ### Requirement: Compact summary title width
 Visible titles SHALL use the full padded content width except light, fan, cover and standard access controls SHALL group title and useful secondary content beside their icon, and compact climate cards SHALL group title/readings beside their right-hand target selector. Titles SHALL wrap without shrinking or clipping. Other families SHALL retain their full-width title composition. Hidden-title/icon and icon-only roles SHALL remain intact. Redundant normal binary-state text SHALL remain omitted.
 
