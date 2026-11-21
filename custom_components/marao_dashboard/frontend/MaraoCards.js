@@ -1154,21 +1154,20 @@ function cardStyles() {
     .body.slider-header, .body.slider-header.binary-card:not(:has(>.state)) { grid-template-columns:minmax(0,1fr) auto; grid-template-areas:'title icon' 'state state' 'control control'; }
     .body.slider-header:not(:has(>.icon)) .title { grid-column:1/-1; }
     .body.standard-control.slider-header { display:flex; }
-    .body.climate-card {display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto 1fr auto;grid-template-areas:'title target' 'climate target' 'state target' 'modes modes';gap:4px 12px;padding:8px 14px;min-height:0;}
-    .body.climate-card:not(:has(.climate-mode-picker)) {grid-template-rows:auto 1fr auto;grid-template-areas:'title target' 'climate target' 'state target';}
+    .body.climate-card {display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto 1fr auto;grid-template-areas:'title target' 'climate target' 'state target';gap:4px 12px;padding:8px 14px;min-height:0;}
+    .body.climate-card:has(>.climate-mode-picker) {grid-template-rows:auto 1fr auto auto;grid-template-areas:'title target' 'climate target' 'modes modes' 'state state';}
     .body.climate-card>.title {grid-area:title;font-size:var(--font-size-primary,1.125rem);}
     .body.climate-card>.climate-readings {grid-area:climate;min-width:0;overflow-wrap:anywhere;}
-    .body.climate-card .current-temperature {font-size:calc(var(--font-size-primary,1.125rem) * 2.56);line-height:1.2;}
-    .climate-humidity,.climate-activity {font-size:var(--font-size-secondary,1rem);line-height:1.25;}
+    .body.climate-card .current-temperature {height:auto;white-space:normal;font-size:calc(var(--font-size-primary,1.125rem) * 3.1);line-height:1.15;}
+    .climate-humidity {font-size:calc(var(--font-size-primary,1.125rem) * 1.2);line-height:1.25;}
+    .climate-activity {font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-primary,700);line-height:1.25;}
     .body.climate-card>.state {display:none;}
-    .body.climate-card>.climate-pending {grid-area:state;}
+    .body.climate-card>.climate-status {grid-area:state;align-self:end;min-width:0;overflow-wrap:anywhere;}
     .body.climate-card>.climate-number-control {grid-area:target;justify-self:end;align-self:stretch;}
     .body:is(.climate-card,.number-card) .climate-stepper {box-sizing:border-box;min-width:60px;min-height:134px;height:100%;padding:3px;gap:4px;max-width:100%;}
     .body.climate-card .number-value {height:auto;white-space:normal!important;overflow:visible;}
     .body:is(.climate-card,.number-card) .climate-stepper button {width:48px;height:48px;}
-    .body.climate-card>.icon {grid-column:1;grid-row:auto;justify-self:start;}
-    .body.climate-card.climate-detail {grid-template-rows:auto auto auto auto;grid-template-areas:'title title' 'climate climate' 'modes modes' '. target';}
-    .body.climate-card.climate-detail:has(.climate-pending) {grid-template-areas:'title title' 'climate climate' 'state state' 'modes modes' '. target';}
+    .body.climate-card.climate-detail {grid-template-rows:auto auto auto 1fr;grid-template-areas:'title title' 'climate climate' 'modes modes' 'state target';}
     .climate-modes {display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;}
     .body.climate-card.climate-detail .climate-modes {justify-content:space-between;}
     .climate-modes button {position:relative;flex:0 0 48px;width:48px;height:48px;padding:10px;}
@@ -1176,8 +1175,9 @@ function cardStyles() {
     .climate-modes button.active {background:var(--marao-icon-background,var(--primary-color));color:var(--marao-icon-color,var(--primary-text-color));}
     .mode-check {position:absolute;right:1px;bottom:0;font-size:12px;line-height:1;}
     @container marao-card (max-width:190px) {
-      .body.climate-card {grid-template-columns:minmax(0,1fr);grid-template-areas:'title' 'climate' 'state' 'target' 'modes';}
-      .body.climate-card.climate-detail {grid-template-areas:'title' 'climate' 'state' 'modes' 'target';}
+      .body.climate-card {grid-template-columns:minmax(0,1fr);grid-template-areas:'title' 'climate' 'target' 'state';}
+      .body.climate-card:has(>.climate-mode-picker) {grid-template-areas:'title' 'climate' 'target' 'modes' 'state';}
+      .body.climate-card.climate-detail {grid-template-areas:'title' 'climate' 'modes' 'target' 'state';}
     }
     .body.number-card {grid-template-columns:minmax(0,1fr) 60px;grid-template-rows:auto auto;grid-template-areas:'title title' 'value target';gap:8px;padding:12px;min-height:0;}
     .body.number-card>.title {grid-area:title;min-width:0;}
@@ -2099,6 +2099,7 @@ export class MaraoCard extends BaseElement {
     const batteryGroup = entityGroup && variables.entity_type === 'battery' && summary.minimumReading !== null;
     const batteryConfig = batteryGroup && variables.md_color ? { ...config, variables: { ...variables, active_color: variables.md_color } } : config;
     const appearance = stateAppearance(batteryGroup ? 'md_battery_card' : kind, batteryGroup ? summary.minimumReading : value, batteryConfig, this._hass);
+    const climateOutline = kind === "md_climate_card" && state.attributes?.hvac_action === "idle" ? appearance.background : undefined;
     const interactionUnavailable = ["unknown", "unavailable"].includes(text(interactionState.state, "unknown").toLowerCase());
     const stateDisabled = loading || entityGroup && (this._hass?.connected === false || this._hass?.connection?.connected === false)
       || Boolean(entity || toggleEntity || entityGroup) && (toggleEntity ? interactionUnavailable : appearance.unavailable);
@@ -2113,7 +2114,8 @@ export class MaraoCard extends BaseElement {
       ? /[:：]$/.test(customLabel) ? "" : customLabel
       : `${variables.custom_label || variables.md_label_prefix || ""}${summary?.label || (requestedClimate?.pending ? climateModeLabel(value, this._hass) : (formattedPrimary ? energyLabel(formattedPrimary, variables, this._hass) : entityStateLabel(state, entity, kind, this._hass)))}`;
     const climatePending = requestedClimate?.pending ? `<div class="climate-pending" role="status">${esc(localize("climate.updating", this._hass, {}, "Updating…"))}</div>` : "";
-    const currentTemperature = climate && climate.current_temperature != null ? text(climate.current_temperature) : "";
+    const measuredTemperature = text(climate?.current_temperature);
+    const currentTemperature = measuredTemperature ? `${measuredTemperature}°` : "";
     const climateReadingLabel = currentTemperature ? localize("climate.current_temperature", this._hass, { value: currentTemperature }, `Current ${currentTemperature}`) : "";
     const climateModes = Array.isArray(climate?.hvac_modes) ? climate.hvac_modes.filter(Boolean).map(text) : [];
     const climateDetail=Boolean(climate && this.climateDetail);
@@ -2141,7 +2143,9 @@ export class MaraoCard extends BaseElement {
       ? `<div class="scene-options marao-dropdown" data-scene-picker data-scene-identity="${esc(JSON.stringify([entity,sceneOptions]))}"><button type="button" data-scene-select aria-label="${esc(this._label(entity, config, state))}" aria-haspopup="menu" aria-expanded="false"${controlsDisabled || !sceneOptions.length ? " disabled" : ""}><span data-scene-label>${esc(entityStateLabel(state, entity, kind, this._hass))}</span><ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon></button><div class="marao-dropdown-options" data-scene-menu role="menu" aria-label="${esc(this._label(entity, config, state))}" hidden>${sceneOptions.map(option=>`<button type="button" role="menuitemradio" tabindex="-1" data-scene-option="${esc(option)}" aria-checked="${!controlsDisabled && option === value}"${controlsDisabled ? " disabled" : ""}><span>${esc(option)}</span><ha-icon icon="mdi:check" aria-hidden="true"></ha-icon></button>`).join('')}</div></div>`
       : "";
     const humidity=climate?climateHumidity(variables,this._hass):null;
-    const climateControls = climate ? `<div class="climate-readings"><div class="climate current-temperature" aria-label="${esc(climateReadingLabel)}">${esc(currentTemperature || '—')}</div>${humidity===null?'':`<div class="climate-humidity" aria-label="${esc(localize('climate.humidity',this._hass,{},String(this._hass?.language||'').startsWith('pt')?'Humidade':'Humidity'))}">${esc(humidity)}</div>`}${config.show_state===false?'':`<div class="climate-activity">${esc(interactionUnavailable?'—':climateModeLabel(climate.hvac_action || state.state,this._hass))}</div>`}</div>` : "";
+    const climateControls = climate ? `<div class="climate-readings"><div class="climate current-temperature" aria-label="${esc(climateReadingLabel)}">${esc(currentTemperature || '—')}</div>${humidity===null?'':`<div class="climate-humidity" aria-label="${esc(localize('climate.humidity',this._hass,{},String(this._hass?.language||'').startsWith('pt')?'Humidade':'Humidity'))}">${esc(humidity)}</div>`}</div>` : "";
+    const climateActivity = climate && config.show_state !== false
+      ? `<div class="climate-activity">${esc(interactionUnavailable ? '—' : climateModeLabel(climate.hvac_action || state.state, this._hass))}</div>` : "";
     const previewAvailable = !loading && !interactionUnavailable && this._hass?.connected !== false && this._hass?.connection?.connected !== false;
     const mediaAvailable = previewAvailable && value !== "off";
     let media = "";
@@ -2266,7 +2270,13 @@ export class MaraoCard extends BaseElement {
     const formattedReading = !iconOnly && formatting && (['md_graph_card','md_toggle_graph_card','md_sensor_card','md_base_card'].includes(kind) || kind === 'md_switch_card' && variables.power_entity);
     const stateMarkup = showState && !stateInSlider && (!activityTimestamp(entity,state) || customLabel || variables.md_label_prefix) && !["md_wallbox_current_card", "md_number_card"].includes(kind) ? `<div class="state${!displayValue ? " placeholder" : ""}">${esc(displayValue || "—")}</div>` : "";
     const primaryMarkup = formattedReading ? `<div class="formatted-values">${stateMarkup}${details}</div>` : stateMarkup;
-    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${glance ? " data-glance" : ""}${kind === "md_room_card" ? " data-room" : ""}${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem,null,!glance)}"` : ""}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? ` climate-card${climateDetail?" climate-detail":""}` : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${kind === "md_number_card" ? " number-card" : ""}${kind === "md_scene_card" ? " scene-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}${kind === "md_cover_card" ? " cover-card" : ""}${accessPopup ? " access-popup-action" : ""}${accessPopup && kind === "md_access_action_card" ? " access-close-action" : ""}">${accessPopup ? `${accessIcon}${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${details}` : uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${iconElement}`}${climateControls}${climatePending}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${coverActions}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${dishwasherOpener}${historyControl}${historyEntry && graphStatus === 'error' ? `<button type="button" data-graph-retry aria-label="${esc(localize('common.retry',this._hass,{},'Retry'))}"><ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon></button>` : ''}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
+    const graphRetry = historyEntry && graphStatus === 'error'
+      ? `<button type="button" data-graph-retry aria-label="${esc(localize('common.retry', this._hass, {}, 'Retry'))}"><ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon></button>` : "";
+    const climateStatus = climate && (iconElement || graphRetry || climateActivity || climatePending)
+      ? `<div class="climate-status">${iconElement}${graphRetry}${climatePending}${climateActivity}</div>` : "";
+    const surfaceState = problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem,null,!glance)}"`
+      : climateOutline ? ` style="outline:4px solid ${climateOutline};outline-offset:-4px"` : "";
+    const contentChanged = this._setMarkup(`<style>${cardStyles()}</style><ha-card${glance ? " data-glance" : ""}${kind === "md_room_card" ? " data-room" : ""}${binary !== null && kind !== "md_room_card" ? ` data-binary-state="${binary}"` : ""}${uniformControl ? ' class="control-surface"' : ""}${camera ? ` data-camera-card role="group" aria-label="${esc(this._label(entity, config, state))}"` : ""}${roomDescription && !action ? ` role="group" aria-label="${esc(this._label(entity, config, state))}" aria-description="${esc(roomDescription)}"` : ""}${surfaceState}${showsGraph ? ` data-graph-history-state="${graphStatus}"` : ""}${titleCard ? ' class="title-surface"' : ""}${loading ? ' aria-busy="true"' : ""}>${graphMarkup}${artwork}${actionControl}${holdProgress}<div class="body${feedback ? " has-problem" : ""}${problem?.complete ? " complete-problem" : ""}${camera ? " camera-card" : ""}${sliderHeader ? " slider-header" : ""}${formattedReading ? " formatted-reading" : ""}${iconOnly ? " icon-only" : ""}${binaryLayout ? " binary-card" : ""}${showName && kind === "md_navigation_card" ? " navigation-card" : ""}${titleCard ? " title-card" : ""}${glance ? " glance-card" : ""}${kind === "md_media_app_card" ? " media-app-card" : ""}${kind === "md_room_card" ? " room-card" : ""}${kind === "md_weather_card" ? " weather-card" : ""}${climate ? ` climate-card${climateDetail?" climate-detail":""}` : ""}${showsGraph ? " graph-card" : ""}${kind === "md_wallbox_current_card" ? " wallbox-card" : ""}${kind === "md_number_card" ? " number-card" : ""}${kind === "md_scene_card" ? " scene-card" : ""}${modeButtons ? " with-climate-modes" : ""}${uniformControl ? " standard-control" : ""}${kind === "md_cover_card" ? " cover-card" : ""}${accessPopup ? " access-popup-action" : ""}${accessPopup && kind === "md_access_action_card" ? " access-close-action" : ""}">${accessPopup ? `${accessIcon}${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${details}` : uniformControl && !iconOnly ? `<div class="compact-header"><div class="compact-copy">${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}</div>${iconElement}</div>` : `${showName ? `<div class="title">${esc(this._label(entity, config, state))}</div>` : ""}${primaryMarkup}${formattedReading ? "" : details}${holdHint}${climate ? "" : iconElement}`}${climateControls}${climateStatus}${media}${range ? `<div class="${controlClass}">${range}</div>` : ""}${coverActions}${sceneDropdown}${shortcutButtons}${modeButtons}${readingContent}${vacuumControls}${problemMessage}${dishwasherOpener}${historyControl}${climate ? "" : graphRetry}${this._mediaError && previewAvailable && pictureURL ? `<button type="button" class="graph-status" data-media-retry>${esc(localize("common.retry", this._hass, {}, "Retry"))}</button>` : ""}${roomBottom}</div></ha-card>`, JSON.stringify([action, vacuum]));
     for (const button of this.shadowRoot.querySelectorAll('[data-exhaust-action]')) button.addEventListener('click', event => {
       event.stopPropagation(); haptic('heavy'); this._coverAction(entity, button.dataset.exhaustAction);
     });
@@ -2284,12 +2294,14 @@ export class MaraoCard extends BaseElement {
 
     }
     if (card && !problem) {
-      if (appearance.background) card.style.setProperty("--marao-card-background", appearance.background);
-      if (appearance.text) card.style.setProperty("--marao-card-text-color", appearance.text);
-      if (appearance.stateText) card.style.setProperty("--marao-state-color", appearance.stateText);
-      if (appearance.icon) card.style.setProperty("--marao-icon-color", appearance.icon);
-      if (appearance.iconBackground) card.style.setProperty("--marao-icon-background", appearance.iconBackground);
-      if (appearance.accent) card.style.setProperty("--marao-accent-color", appearance.accent);
+      if (!climateOutline) {
+        if (appearance.background) card.style.setProperty("--marao-card-background", appearance.background);
+        if (appearance.text) card.style.setProperty("--marao-card-text-color", appearance.text);
+        if (appearance.stateText) card.style.setProperty("--marao-state-color", appearance.stateText);
+        if (appearance.icon) card.style.setProperty("--marao-icon-color", appearance.icon);
+        if (appearance.iconBackground) card.style.setProperty("--marao-icon-background", appearance.iconBackground);
+        if (appearance.accent) card.style.setProperty("--marao-accent-color", appearance.accent);
+      }
       if (kind === "md_navigation_card" && variables.md_icon_color && !appearance.unavailable) card.style.setProperty("--marao-icon-color", text(variables.md_icon_color));
       if (artwork) {
         card.style.setProperty("--marao-card-text-color", "#fff");

@@ -344,8 +344,8 @@ Use `.agents/skills/marao-card-design/SKILL.md` for card appearance, behavior, c
   and restore the normal shell after leaving it.
 - Sliders retain a contrasting rounded track, current-value fill, independently
   moving target thumb, containment, and strong feedback. Numeric inputs use the
-  shared up/down control. Climate values intentionally show no unit visually or
-  in accessible text.
+  shared up/down control. Climate measured temperature includes a degree symbol
+  visually and in accessible text. Climate targets are unitless.
 - Use the Marao light/dark theme and state colors with sufficient contrast; do
   not communicate state by color alone. The user-approved exception is normal
   room lighting: use the room background without a visible lighting-status row
