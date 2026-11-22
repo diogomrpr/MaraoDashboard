@@ -64,6 +64,18 @@ function createCardElement(config){
   return element;
 }
 globalThis.loadCardHelpers=async()=>({createCardElement});
+customElements.define('hui-view',class extends HTMLElement{
+  set lovelace(context){
+    if(this._lovelace===context)return;
+    this._lovelace=context;
+    this.style.display='grid';this.style.gap='8px';
+    const cards=(context.config.views[this.index]?.sections||[]).flatMap(section=>section.cards||[]);
+    this.replaceChildren(...cards.map(config=>{
+      const card=createCardElement(config);card.nativeOwner=this;return card;
+    }));
+  }
+  set hass(value){for(const card of this.children)card.hass=value;}
+});
 customElements.define('hui-card',class extends HTMLElement{load(){this.child=createCardElement(this.config);this.replaceChildren(this.child);this.child.hass=this._hass;}set hass(value){this._hass=value;if(this.child)this.child.hass=value;}});
 document.addEventListener('hass-more-info',()=>showError('The More info dialog is available in Home Assistant.'));
 document.addEventListener('hass-notification',event=>showError(event.detail?.message||'Home Assistant reported an error.'));

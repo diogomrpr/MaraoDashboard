@@ -2,10 +2,38 @@ import {customPopup,validatePopupContent,embeddedPopupContext} from './MaraoPopu
 import {findNativeHost,nativeEditing,bindNativeEditing,nativeDashboardConfig} from './MaraoNativeContext.js';
 import {resolvePopupView,popupGroupFromView,popupViewError,popupLabel as label} from './MaraoPopupLayout.js';
 import {createGroupScope,updateGroupScope,groupActionStyles} from './MaraoGroupDetails.js';
-import {managedPopupIssue} from './MaraoPopupManaged.js';
+import {managedPopupIssue,popupCardEntries,popupTemplate} from './MaraoPopupManaged.js';
+import {canonicalTemplate} from './MaraoNames.js';
 const parent=node=>node?.parentNode || node?.host || node?.getRootNode?.()?.host;
 const metadata=hass=>Object.values(hass?.states || {}).map(state=>({entity_id:state.entity_id,device_class:state.attributes?.device_class}));
 export const dashboardConfig=root=>nativeDashboardConfig(root?.lovelace);
+const accessRoles=['md_access_slide_action_card','md_access_action_card'];
+const accessTarget=card=>{
+  const entity=card.entity_id||card.entity;
+  return card.type?.startsWith('custom:marao-')&&accessRoles.includes(canonicalTemplate(popupTemplate(card)))&&/^(lock|cover)\./.test(entity||'')?entity:'';
+};
+
+export function accessPopupTarget(owner) {
+  const config=owner._config;
+  if(config.entity_group)return '';
+  if(customPopup(config)||config.popup_view){
+    let view;
+    try {
+      if(customPopup(config))view=config.popup_content.layout;
+      else {
+        const root=findNativeHost(owner), dashboard=dashboardConfig(root);
+        if(managedPopupIssue(dashboard,config.popup_view,root?._maraoPopupSync?.get(config.popup_view)))return '';
+        view=resolvePopupView(dashboard,config.popup_view).view;
+      }
+    } catch {return '';}
+    const targets=new Set(popupCardEntries(view).map(({card})=>accessTarget(card)).filter(Boolean));
+    return targets.size===1?targets.values().next().value:'';
+  }
+  const entity=config.entity;
+  if(!/^(lock|cover)\./.test(entity||''))return '';
+  const containsAction=cards=>cards.some(card=>accessTarget(card)===entity||containsAction(card.cards||(card.card?[card.card]:[])));
+  return containsAction(config.cards||[])?entity:'';
+}
 function failure(host,error,hass) {const p=document.createElement('p');p.setAttribute('role','alert');p.textContent=label(error.message,hass);host.replaceChildren(p);}
 function ownsFocus(view){let node=globalThis.document?.activeElement;while(node?.shadowRoot?.activeElement)node=node.shadowRoot.activeElement;for(;node;node=parent(node))if(node===view)return true;return false;}
 
