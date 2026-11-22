@@ -374,8 +374,7 @@ export function entityGroupState(type, entities, hass) {
   let label = !ids.length ? localize('group.empty', hass, {}, 'No entities configured')
     : !usable.length ? localize(`common.${state}`, hass, {}, state)
     : type === 'battery' ? `${formatEnergyNumber(reading, undefined, hass)}%`
-    : activeEntities.length ? localize('common.active_count', hass, { count: activeEntities.length }, `${activeEntities.length} active`)
-    : type === 'cover' ? localize('group.all_closed', hass, {}, 'All closed') : localize('common.all_off', hass, {}, 'All off');
+    : localize('common.active_count', hass, { count: activeEntities.length }, `${activeEntities.length} active`);
   if (type === 'battery' && activeEntities.length) label += ' · ' + localize('group.low_count', hass, { count: activeEntities.length }, `${activeEntities.length} low`);
   return { state, label, activeEntities, unavailableEntities, available: usable.length, reading, minimumReading };
 }
@@ -1118,7 +1117,7 @@ function cardStyles() {
     .vacuum-actions button { padding:10px 4px; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); }
     .body.room-card { display:flex; flex-direction:column; align-items:stretch; gap:8px; }
     .room-bottom { position:relative; display:flex; align-items:flex-end; min-height:48px; margin-top:auto; gap:8px; }
-    .room-artwork { --room-artwork-size:clamp(48px,65cqi,128px); position:absolute; right:calc(-1 * var(--room-edge-inset,14px)); bottom:0; width:calc(.9 * var(--room-artwork-size)); height:var(--room-artwork-size); max-height:calc(100% + 36px); overflow:hidden; color:var(--marao-icon-color,var(--icon-color)); opacity:.2; pointer-events:none; }
+    .room-artwork { --room-artwork-size:clamp(52px,70cqi,140px); position:absolute; right:calc(-1 * var(--room-edge-inset,14px)); bottom:-22px; width:calc(.9 * var(--room-artwork-size)); height:var(--room-artwork-size); max-height:calc(100% + 42px); overflow:hidden; color:var(--marao-icon-color,var(--icon-color)); opacity:.2; pointer-events:none; }
     .room-artwork :is(ha-icon,ha-state-icon) { display:block; width:var(--room-artwork-size); height:var(--room-artwork-size); --mdc-icon-size:var(--room-artwork-size); }
     .room-lights-off { position:relative; z-index:3; box-sizing:border-box; display:flex; align-items:center; justify-content:center; flex:0 0 48px; width:48px; height:48px; padding:0; border:1px solid currentColor; border-radius:50%; background:var(--ha-card-background,var(--card-background-color)); color:var(--primary-text-color); pointer-events:auto; }
     ha-card[data-room] { background:linear-gradient(to top right,var(--marao-room-light),var(--marao-room-climate)); transition:--marao-room-light .3s ease,--marao-room-climate .3s ease; }
@@ -1146,7 +1145,7 @@ function cardStyles() {
       .body.wallbox-card { grid-template-areas:'title' 'control' 'wallbox'; }
       .body.binary-card:not(:has(>.state)) { grid-template-columns:minmax(0,1fr); grid-template-areas:'title' 'icon' 'climate' 'control'; }
       .body.room-card { --room-edge-inset:clamp(0px,calc((100cqi - 64px) / 2),4px); }
-      .body.room-card .room-artwork { bottom:-8px; }
+      .body.room-card .room-artwork { bottom:-36px; }
       .control.number-control { grid-area:control; justify-self:start; }
       .number-stepper { min-width:56px; max-width:100%; }
       .wallbox-shortcuts, .climate-modes { grid-template-columns:minmax(0,1fr); }
@@ -3343,14 +3342,10 @@ export class MaraoPopupCard extends BaseElement {
     }
   }
   _accessEntity() {
-    const entity = this._config.entity;
-    if (!/^(lock|cover)\./.test(entity || '') || this._historyContext || this._message) return '';
-    const containsAction = cards => cards.some(card => card.entity === entity && ['md_access_slide_action_card', 'md_access_action_card'].includes(canonicalTemplate(card.template))
-      || containsAction(card.cards || (card.card ? [card.card] : [])));
-    return containsAction(this._config.cards || []) ? entity : '';
+    return this._historyContext || this._message ? '' : popupLayouts.accessPopupTarget(this);
   }
   _updateAccessHeader() {
-    const entity = this._accessEntity();
+    const entity = this._overlay?.querySelector('.marao-popup-sheet')?.dataset?.accessEntity;
     if (!entity) return;
     const status = this._overlay?.querySelector('[data-access-state]');
     if (!status) return;

@@ -496,14 +496,14 @@ Except Access summary cards, normal binary cards omit redundant on/off, stable l
   deliberate custom labels and visible neutral availability problems. Other
   families also omit the redundant round on/off badge while retaining their normal icons and meaningful state content.
 - Room titles wrap across the full content width. The configured room icon is
-  noninteractive decoration below the title, deliberately cropped at the right
-  and bottom without clipping text, problems or real controls. Other families
-  retain their shared icon and state-cue contracts.
+  noninteractive decoration below the title. Place it low enough for the card's
+  bottom edge to hide the icon's base, while keeping text, problems and controls
+  readable. Crop it at the right edge as well.
 - The Cases view keeps at least two safe room lights so the combined action and
   its disabled state can be checked without affecting hardware.
 
 - Optional `climate_entity` adds a separate 48px off-only button beside lights, with an 8px gap. Reported mode colors remain during idle; actual activity controls the active icon. Native TURN_OFF takes precedence over supported off mode, with one dispatch and no fallback retry. Climate availability is independent of lights and navigation.
-- Room color endpoints run from lighting at bottom left to climate at top right. One active source fills both endpoints; neither active is neutral. Retain endpoint properties and controls across reports, interpolate colors for roughly 300ms, and snap for problems or reduced motion. Raise the cropped artwork so the mark remains recognizable without covering titles or controls.
+- Room color endpoints run from lighting at bottom left to climate at top right. One active source fills both endpoints; neither active is neutral. Retain endpoint properties and controls across reports, interpolate colors for roughly 300ms, and snap for problems or reduced motion.
 
 ### Glance readings
 

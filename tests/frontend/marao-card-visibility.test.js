@@ -224,8 +224,8 @@ test('typed groups count complete membership independently of filtering and dupl
     assert.equal(summary.available, values.filter(state => !['unknown', 'unavailable'].includes(state)).length);
     assert.equal(summary.state, 'on');
   }
-  assert.equal(entityGroupState('cover', ['cover.closed', 'cover.closing'], { states: { 'cover.closed': { state: 'closed' }, 'cover.closing': { state: 'closing' } } }).label, 'All closed');
-  assert.equal(entityGroupState('climate', ['climate.off'], { states: { 'climate.off': { state: 'off' } } }).label, 'All off');
+  assert.equal(entityGroupState('cover', ['cover.closed', 'cover.closing'], { states: { 'cover.closed': { state: 'closed' }, 'cover.closing': { state: 'closing' } } }).label, '0 active');
+  assert.equal(entityGroupState('climate', ['climate.off'], { states: { 'climate.off': { state: 'off' } } }).label, '0 active');
   assert.equal(entityGroupState('light', ['light.unknown'], { states: { 'light.unknown': { state: 'unknown' } } }).state, 'unknown');
   assert.equal(entityGroupState('light', ['light.unavailable'], { states: { 'light.unavailable': { state: 'unavailable' } } }).state, 'unavailable');
   assert.equal(entityGroupState('light', [], { states: {} }).label, 'No entities configured');
@@ -309,7 +309,7 @@ test('entity-free group cards preserve counts, readable inactive/empty states an
   assert.match(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
   assert.match(card.shadowRoot.innerHTML, /Disconnected/);
   card.hass = { states: { 'light.on': { state: 'off' }, 'light.off': { state: 'off' } } };
-  assert.match(card.shadowRoot.innerHTML, /All off/);
+  assert.match(card.shadowRoot.innerHTML, /<div class="state">0 active<\/div>/);
   card.setConfig({ ...card._config, variables: { entity_type: 'light', summary_entities: [] } });
   assert.match(card.shadowRoot.innerHTML, /No entities configured/);
   assert.doesNotMatch(card.shadowRoot.innerHTML, /data-card-action[^>]* disabled/);
@@ -2337,7 +2337,8 @@ test('access popup owns the live state and action cards retain only their action
     {type:'custom:marao-card',template:'md_access_action_card',entity},
   ]}]};
   const saved = JSON.stringify(popup._config), label = {textContent:''}, icon = {};
-  popup._overlay = {querySelector: selector => selector === '[data-access-state]' ? {querySelector: () => label} : selector === '[data-access-icon]' ? icon : null};
+  assert.equal(popup._accessEntity(), entity);
+  popup._overlay = {querySelector: selector => selector === '.marao-popup-sheet' ? {dataset:{accessEntity:entity}} : selector === '[data-access-state]' ? {querySelector: () => label} : selector === '[data-access-icon]' ? icon : null};
   for (const state of ['locked','unlocked','unlocking','unknown','unavailable']) {
     popup._hass = {states:{[entity]:{state,attributes:{}}}};
     popup._updateAccessHeader();
@@ -2364,6 +2365,27 @@ test('access popup owns the live state and action cards retain only their action
   }
   assert.equal(JSON.stringify(popup._config), saved);
   popup._config = {entity,cards:[{type:'custom:marao-card',template:'md_sensor_card',entity}]};
+  assert.equal(popup._accessEntity(), '');
+});
+
+test('saved access layouts use the shared header only for an unambiguous configured target', () => {
+  const popup = new MaraoPopupCard();
+  const entity = 'lock.safe';
+  const view = {type:'sections',path:'access',sections:[{cards:[
+    {type:'custom:marao-access-slide-action-card',entity_id:entity},
+    {type:'custom:marao-access-action-card',entity_id:entity},
+  ]}]};
+  const before = structuredClone(view);
+  popup._config = {entity:'lock.opener',popup_content:{version:1,mode:'custom',layout:view}};
+  assert.equal(popup._accessEntity(), entity);
+  popup.nativeOwner = {localName:'hui-root',lovelace:{rawConfig:{views:[view]}}};
+  popup._config = {entity:'lock.opener',popup_view:'access'};
+  assert.equal(popup._accessEntity(), entity);
+  assert.deepEqual(view, before);
+
+  view.sections[0].cards[1].entity_id = 'lock.other';
+  assert.equal(popup._accessEntity(), '');
+  popup._config.popup_view = 'missing';
   assert.equal(popup._accessEntity(), '');
 });
 
