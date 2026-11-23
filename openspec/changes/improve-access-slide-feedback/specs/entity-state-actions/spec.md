@@ -56,14 +56,48 @@ Access feedback SHALL survive ordinary unrelated state renders for its current r
 - **THEN** static blue pending/confirmation treatment and distinct pending/checkmark icons still communicate the interaction
 - **AND** no browser vibration capability is required to use the slider
 
-#### Scenario: A deliberate slide finishes beyond the right edge
-- **WHEN** a gesture starts on the handle, establishes horizontal intent and reaches or passes the right completion boundary
-- **AND** release remains within the track’s vertical lane
-- **THEN** it dispatches once with the same sending and acceptance feedback
-- **AND** releasing above/below the lane, reversing below completion or cancelling still dispatches nothing
-
 ### Requirement: Access popup state hierarchy
-A lock, door, gate or garage popup containing its access actions SHALL show the authoritative state and matching state icon once in its header. Child action cards SHALL omit repeated normal entity state and state icons. They SHALL have decorative action icons on the left. Unlock/open SHALL show its label only inside the slider; close/lock SHALL center its action label across the card. The header SHALL have a minimum 112px height, grow with wrapped text, and retain scalable title/state typography (22.5px and 18px at the default theme size). Close/lock SHALL retain an explicit tap target with larger centered action text; open/unlock SHALL retain the strict slider, request feedback and cancellation guards. Existing configuration and other popup families SHALL retain their meaning.
+A lock, door, gate or garage popup containing its access actions SHALL show the
+authoritative state and matching icon once in its header. Child action cards
+SHALL show their action and omit the repeated normal entity state and state icon.
+Existing configuration and other popup families SHALL retain their meaning.
+
+#### Scenario: An access popup shows its opening and closing actions
+- **WHEN** the popup displays open/unlock and close/lock actions
+- **THEN** the header is at least 112px high, grows with wrapped text and uses scalable title and state typography (22.5px and 18px at the default theme size)
+- **AND** both actions have decorative icons on the left
+- **AND** open/unlock shows its label only in the strict slider and retains feedback and cancellation guards
+- **AND** close/lock uses an explicit tap target with larger action text centered across the card
+
+## MODIFIED Requirements
+
+### Requirement: Strict slide for opening and unlocking access points
+Open/unlock of locks, doors, garages and gates SHALL use only the strict slide
+control, with a concise localized visible label and semantic action/target name.
+The control SHALL require a start on the thumb and establish horizontal intent
+before pointer capture. It SHALL update the thumb from the final horizontal
+position and dispatch once when the thumb is in the completion range on release,
+including releases above, below, or beyond the right edge of the track.
+No keyboard, tap, hold or alternate button path SHALL execute the same risky
+access action.
+
+#### Scenario: The strict slide completes deliberately
+- **WHEN** a gesture starting on the thumb establishes horizontal intent and is released with the thumb in the completion range
+- **THEN** the explicit open/unlock action dispatches once with completion feedback, including when the pointer is outside the track
+
+### Requirement: Strict slide cancellation
+Strict access slides SHALL cancel without dispatch on taps, incomplete or reversed
+travel below the completion boundary, vertical intent before capture, pointer loss or
+cancellation, route change, page hiding, removal or disabling. Cancellation SHALL
+reset visible progress and preserve authoritative state.
+
+#### Scenario: The gesture is intended to scroll vertically
+- **WHEN** vertical motion occurs before horizontal intent is established
+- **THEN** the access slide cancels without capturing scrolling or dispatching an action
+
+#### Scenario: A partial slide is interrupted
+- **WHEN** the pointer is cancelled, released with the thumb below the completion boundary, or the route/page/component/availability changes
+- **THEN** progress resets and no open/unlock action or completion haptic occurs
 
 #### Scenario: The access state changes while the popup is open
 - **WHEN** Home Assistant reports a new access state

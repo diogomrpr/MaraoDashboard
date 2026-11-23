@@ -483,18 +483,41 @@ test("slide completion uses the final release position for touch and pointer inp
   }
 });
 
-test("slide control cancels release above or below the lane even beyond its right end", () => {
-  for (const input of ['pointer', 'touch']) for (const y of [-1, 65]) {
+test("access slide uses thumb travel when released above or below the track", () => {
+  for (const [releaseX, expected] of [[194, 1], [193, 0], [280, 1]]) {
+    for (const input of ['pointer', 'touch']) for (const y of [-1, 65]) {
+      const { serviceCalls, slide, track } = slideFixture();
+      const point = (x, y) => {
+        const event = pointerEvent(track, x, y);
+        if (input === 'touch') { delete event.pointerId; event.identifier = 7; }
+        return event;
+      };
+      const start = point(10, 20); slide._start(start, start);
+      const move = point(210, 20); slide._move(move, move);
+      const end = point(releaseX, y); slide._end(end, end); slide._end(end, end);
+      assert.equal(serviceCalls.length, expected, `${input}: release at (${releaseX}, ${y})`);
+      assert.equal(slide._progress, 0);
+      slide.disconnectedCallback();
+    }
+  }
+});
+
+test("alarm disarm slide requires release within the track's vertical lane", () => {
+  for (const [y, expected] of [[-1, []], [20, [['alarm_disarm', 'slide']]], [65, []]]) {
     const { serviceCalls, slide, track } = slideFixture();
-    const point = (x, y) => {
-      const event = pointerEvent(track, x, y);
-      if (input === 'touch') { delete event.pointerId; event.identifier = 7; }
-      return event;
+    const entity = 'alarm_control_panel.safe';
+    slide.setAttribute('entity', entity);
+    slide.setAttribute('state', 'armed_home');
+    slide._hass.states[entity] = { state: 'armed_home' };
+    const host = {
+      _config: { template: 'md_alarm_controls_card', entity, variables: { alarm_layout: 'grid' } },
+      _sendAlarm: (...args) => serviceCalls.push(args),
     };
-    const start = point(10, 20); slide._start(start, start);
-    const move = point(240, 20); slide._move(move, move);
-    const end = point(280, y); slide._end(end, end);
-    assert.deepEqual(serviceCalls, []);
+    slide.getRootNode = () => ({ host });
+    const start = pointerEvent(track, 10, 20); slide._start(start, start);
+    const move = pointerEvent(track, 240, 20); slide._move(move, move);
+    const end = pointerEvent(track, 280, y); slide._end(end, end);
+    assert.deepEqual(serviceCalls, expected);
     assert.equal(slide._progress, 0);
     slide.disconnectedCallback();
   }

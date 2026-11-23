@@ -1304,18 +1304,18 @@ class MaraoSlideToOpen extends HTMLElement {
   _end(event, point) {
     if (!point || (point.pointerId ?? point.identifier) !== this._pointerId) return;
     const track = event.currentTarget;
-    const bounds = track.getBoundingClientRect();
-    const releasedInLane = point.clientX >= bounds.left
+    const bounds = this._alarmOwner() ? track.getBoundingClientRect() : null;
+    const releaseAllowed = !bounds || (point.clientX >= bounds.left
       && point.clientY >= bounds.top
-      && point.clientY <= bounds.bottom;
-    if (this._horizontalIntent && releasedInLane) {
+      && point.clientY <= bounds.bottom);
+    if (this._horizontalIntent && releaseAllowed) {
       // Release can carry a newer position than the browser's last move event.
       const previousProgress = this._progress;
       this._setProgress(this._startProgress + (point.clientX - this._startX) / Math.max(1, track.clientWidth - 62));
       this._hapticProgress(previousProgress, this._progress);
     }
     const completed = this._horizontalIntent
-      && releasedInLane
+      && releaseAllowed
       && this._progress >= MARAO_SLIDE_COMPLETE_AT;
     if (this._horizontalIntent) {
       event.preventDefault();

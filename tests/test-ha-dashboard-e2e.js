@@ -358,7 +358,6 @@ async function checkActionDispatches(page, serviceCalls) {
   await gesture([[0.3, 0]]);
   await gesture([[0.01, 30]]);
   await gesture([[1, 0], [0, 0]]);
-  await gesture([[1, 0], [1, -80]]);
   await gesture([[1, 0]], { cancel: true });
   await assertCount(lock, "unlock", before, 0, "Cancelled access gestures");
   const unrelated = "input_boolean.marao_dashboard_test_light";
@@ -370,11 +369,11 @@ async function checkActionDispatches(page, serviceCalls) {
   await page.evaluate(({entity, original}) => document.querySelector('home-assistant').hass.callService('input_boolean', original === 'on' ? 'turn_on' : 'turn_off', {entity_id: entity}), {entity: unrelated, original});
   await page.waitForFunction(({entity, original}) => document.querySelector('home-assistant').hass.states[entity].state === original, {entity: unrelated, original});
   await idleTrack.dispose();
-  await gesture([[1, 0]], { afterStart: async () => {
+  await gesture([[1, 0], [1, -80]], { afterStart: async () => {
     await page.evaluate(entity => document.querySelector('home-assistant').hass.callService('input_boolean', 'toggle', {entity_id: entity}), unrelated);
     await page.waitForFunction(({entity, original}) => document.querySelector('home-assistant').hass.states[entity].state !== original, {entity: unrelated, original});
   } });
-  await assertCount(lock, "unlock", before, 1, "Completed access slide during unrelated HA update");
+  await assertCount(lock, "unlock", before, 1, "Completed access slide released outside the track during unrelated HA update");
   await page.evaluate(({entity, original}) => document.querySelector('home-assistant').hass.callService('input_boolean', original === 'on' ? 'turn_on' : 'turn_off', {entity_id: entity}), {entity: unrelated, original});
   const lockBefore = count(lock, "lock");
   await page.locator(".marao-popup-sheet marao-card").filter({
