@@ -424,11 +424,11 @@ The control must:
 - accept starts across the entire measured round handle, including its edges, and reject the surrounding track;
 - require deliberate travel to the completion boundary;
 - establish horizontal intent before capturing the pointer;
-- cancel when vertical motion indicates page scrolling;
+- cancel when vertical motion indicates page scrolling before horizontal intent is established;
 - do nothing on track/thumb tap, incomplete travel, early release, reversal
-  below the boundary, release above/below the track or to its left, pointer cancellation,
-  route change, page hiding, or component removal;
-- allow horizontal overtravel beyond the right edge when release stays within the track’s vertical lane;
+  below the boundary, pointer cancellation, route change, page hiding, or component removal;
+- use the final horizontal position to complete when the thumb is in range,
+  including releases above, below, or beyond the right edge of the track;
 - dispatch once, only after valid completion on release;
 - reset clearly on cancellation and remain driven by Home Assistant state.
 
@@ -709,7 +709,8 @@ For affected interactions, verify:
   repeated failed requests.
 
 Strict-slide release coverage includes tap, partial drag, near-complete cancel,
-reverse drag, vertical-intent cancel, release above/below the track, valid right-edge overtravel, pointer cancellation,
+reverse drag, vertical-intent cancel, completed and incomplete releases above or
+below the track, right-edge overtravel, pointer cancellation,
 route change, valid completion, unavailable, and disconnect cases. Verify the
 10% haptic boundary logic with the focused component test; browser automation
 cannot prove physical vibration strength.

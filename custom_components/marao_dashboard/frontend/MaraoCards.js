@@ -549,7 +549,9 @@ export function stateAppearance(kind, state, config, hass) {
   const primaryBackground = /^var\(\s*--(?:primary-color|room-card-active-background)\s*[,)]/.test(background);
   foreground = primaryBackground ? "var(--text-primary-color,var(--active-text-color))" : /^var\(\s*--color-(?:blue|yellow|orange|gold|peach|teal|lilac)\s*[,)]/.test(background)
     ? "var(--color-black)" : foreground || "var(--active-text-color)";
-  const iconBackground = primaryBackground || foreground === "var(--color-black)" ? "var(--active-overlay-color)" : undefined;
+  const accessStateSurface = kind === "md_access_card" && (background === green || background === red);
+  const iconBackground = accessStateSurface ? `color-mix(in srgb, ${background}, black 50%)`
+    : primaryBackground || foreground === "var(--color-black)" ? "var(--active-overlay-color)" : undefined;
   return { background, text: foreground, icon: kind === "md_navigation_card" ? variables.md_icon_color || foreground : foreground, ...(iconBackground ? { iconBackground } : {}), accent, unavailable };
 }
 
