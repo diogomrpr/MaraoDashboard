@@ -49,9 +49,10 @@ test('timeline dropdowns synchronize selection/reset and dispose replaced or clo
  globalThis.document=Object.assign(new EventTarget(),{createElement:tag=>new Node(tag)});globalThis.window=new EventTarget();
  const {readFile}=await import('node:fs/promises'),{bindDropdown,dropdownStyles}=await import('../../custom_components/marao_dashboard/frontend/MaraoDropdown.js');
  const {dateKey}=await import('../../custom_components/marao_dashboard/frontend/MaraoActivityModel.js');
- const source=(await readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoActivity.js',import.meta.url),'utf8')).replace(/^const \{.*?\}=await import.*\n/gm,'').replace('export function','function');
+ const {languageCode,formatLocale}=await import('../../custom_components/marao_dashboard/frontend/MaraoLocale.js');
+ const source=(await readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoActivity.js',import.meta.url),'utf8')).replace(/^const \{.*?\}\s*=\s*await import.*\n/gm,'').replace('export function','function');
  let records=[{time:Date.now()-1000,source:'light.a',kind:'state',origin:'user',initiator:'alex',before:'off',after:'on'}],queries=0,haptics=0;
- const create=new Function('activityRange','dateKey','filterActivity','loadActivity','bindDropdown','dropdownStyles',source+';return createActivity;')(activityRange,dateKey,filterActivity,async()=>{queries++;return {records,errors:[]};},bindDropdown,dropdownStyles);
+ const create=new Function('activityRange','dateKey','filterActivity','loadActivity','bindDropdown','dropdownStyles','languageCode','formatLocale',source+';return createActivity;')(activityRange,dateKey,filterActivity,async()=>{queries++;return {records,errors:[]};},bindDropdown,dropdownStyles,languageCode,formatLocale);
  const host=new Node(),activity=create(host,{hass:{language:'en',config:{time_zone:'UTC'},states:{}},sources:['light.a'],haptic(){haptics++;}}),flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();
  const field=label=>host.querySelectorAll('.marao-activity-field').find(node=>node.children[0].textContent===label),trigger=field=>field.children[1].children[0],menu=field=>field.children[1].children[1],selected=field=>trigger(field).children[0].textContent,choose=(field,label)=>menu(field).children.find(node=>node.children[0].textContent===label).dispatchEvent(new Event('click'));
  const date=field('Date');assert.equal(selected(date),'Today');assert.equal(queries,1);choose(date,'Today');assert.equal(queries,1);
