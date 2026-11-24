@@ -1,12 +1,14 @@
 ---
 title: "Security action"
-description: "A deliberate security service action with a 1.2-second hold."
+description: "Standalone security action with a 1.2-second hold."
+sidebar:
+  hidden: true
 ---
 
 import Playground from '../../../components/Playground.astro';
 import DesignGallery from '../../../design/DesignGallery.astro';
 
-A deliberate security service action with a 1.2-second hold.
+Standalone security action with a 1.2-second hold.
 
 <DesignGallery cardId="md_access_hold_action_card" />
 
@@ -30,6 +32,8 @@ variables:
 Compatible entity domains: `button`, `switch`, `input_boolean`, `alarm_control_panel`, `lock`.
 
 A risky action requires the complete security hold. Choose its entity and optional native service in the card editor. A lock can only use lock.lock here; unlocking requires Access opener.
+
+See [Access](../access/) for the summary card and its popup.
 
 ## Settings
 

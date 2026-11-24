@@ -5,7 +5,7 @@ description: Understand Marao's appearance, language and state feedback.
 
 Marao provides coordinated light and dark appearances, Montserrat typography and touch-first controls. Its cards retain their own appearance on ordinary Home Assistant dashboards. Dashboard-wide shell changes apply only when [Marao settings](../../start/dashboard/) are enabled, and the normal Home Assistant shell returns when you leave.
 
-The selected Home Assistant language controls Marao labels. English and Portuguese are supported. Card names and deliberate custom labels remain yours.
+Set **Language** in your Home Assistant profile to use Marao in English or Portuguese (Portugal). Other languages use English for Marao's own interface text. Dates and numbers follow your Home Assistant formatting preferences. Saved card names, custom labels, and names supplied by integrations retain their original spelling.
 
 ## State feedback
 

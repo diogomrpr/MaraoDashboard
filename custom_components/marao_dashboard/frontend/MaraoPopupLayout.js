@@ -1,3 +1,4 @@
+import { languageCode } from './MaraoLocale.js';
 import {popupContentError} from './MaraoPopupContent.js';
 import {memberId,summarySections,collectionLabel} from './MaraoCollections.js';
 import {popupCanonical,createManagedView,popupHashFor,popupDashboardCards} from './MaraoPopupManaged.js';
@@ -199,7 +200,7 @@ const popupPT={
   'Make custom':'Tornar personalizado',
   'Creating layout…':'A criar disposição…','Section action must belong to its linked Sections view.':'A ação da secção tem de pertencer à vista Secções associada.',
 };
-export const popupLabel=(value,hass)=>String(hass?.language || '').startsWith('pt')?popupPT[value] || value:value;
+export const popupLabel=(value,hass)=>languageCode(hass) === 'pt'?popupPT[value] || value:value;
 
 const authoringAllowed=popupAuthoringAllowed;
 export async function readPopupLayout(context) {

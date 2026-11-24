@@ -1,3 +1,4 @@
+import { formatLocale } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import { createPowerToolbar } from '../custom_components/marao_dashboard/frontend/MaraoHistoryLayout.js';
 import { bindDropdown, dropdownStyles } from '../custom_components/marao_dashboard/frontend/MaraoDropdown.js';
 import { normalizeSamples, periodRange, reduceSamples } from './history-data.js';
@@ -107,7 +108,7 @@ export function createPowerHistory(host, initial, createChart) {
   const render = () => {
     if (destroyed) return;
     const interval = range(), unavailable = availability(options.entity);
-    const formatter = new Intl.DateTimeFormat(options.hass?.locale?.language || options.hass?.language, { timeZone: zone(),
+    const formatter = new Intl.DateTimeFormat(formatLocale(options.hass), { timeZone: zone(),
       ...(period === 'month' ? { month: 'long', year: 'numeric' } : { day: 'numeric', month: 'short', year: 'numeric' }) });
     title.textContent = period === 'week' ? formatter.formatRange(interval.start, new Date(+interval.end - 1)) : formatter.format(interval.start);
     trigger.disabled = previous.disabled = Boolean(loading || unavailable); next.disabled = Boolean(loading || unavailable || +periodRange(interval.start, 1, period, zone()).start > now());

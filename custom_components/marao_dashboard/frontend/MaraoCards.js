@@ -1,13 +1,13 @@
 const [
-  {validatePopupContent}, {weatherMarkup,styleWeatherPopup}, {climateConfigError,climateHumidity},
-  {activityTimestamp,activitySources,hasActivity}, popupLayouts, {popupViewError,popupGroupFromView},
+  {popupContentError}, {weatherMarkup,styleWeatherPopup}, {climateConfigError,climateHumidity},
+  {activityTimestamp,activitySources,hasActivity}, popupLayouts, {popupViewError,popupGroupFromView,popupLabel},
   {peopleError,peopleRows,collectionLabel,escapeText,sectionsError}, {reconcileGroup}, {mediaAppBrand,mediaAppLogoError},
-  dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities, names, sensorThresholds, pressModule, nativeContext,
+  dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities, names, sensorThresholds, pressModule, nativeContext, { languageCode, formatLocale },
 ] = await Promise.all([
   'MaraoPopupContent.js', 'MaraoWeather.js', 'MaraoClimate.js', 'MaraoActivityModel.js', 'MaraoPopupView.js', 'MaraoPopupLayout.js', 'MaraoCollections.js', 'MaraoGroupDetails.js', 'MaraoMediaApps.js',
-  'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js', 'MaraoNames.js', 'MaraoSensorThresholds.js', 'MaraoPressFeedback.js', 'MaraoNativeContext.js',
+  'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js', 'MaraoNames.js', 'MaraoSensorThresholds.js', 'MaraoPressFeedback.js', 'MaraoNativeContext.js', 'MaraoLocale.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
-export {mediaAppBrand};
+export {mediaAppBrand, formatLocale};
 const {nativeEditing, bindNativeEditing} = nativeContext;
 export {nativeEditing, bindNativeEditing};
 const { bindDropdown, dropdownStyles } = dropdownModule;
@@ -130,7 +130,7 @@ export function dishwasherProgramIcon(state) {
 function dishwasherReadings(variables, hass, operation) {
   // Cycle sensors may be absent or retain their previous cycle while idle.
   if (!['run', 'running', 'pause', 'paused', 'delayedstart', 'delayed'].includes(text(operation).toLowerCase().replace(/[ _-]/g, ''))) return '';
-  const pt = String(hass?.language || hass?.locale?.language).startsWith('pt');
+  const pt = languageCode(hass) === 'pt';
   const fields = [['progress_entity','Progress','Progresso'],['remaining_time_entity','Remaining','Tempo restante'],['active_program_entity','Program','Programa']];
   return fields.filter(([key]) => variables[key]).map(([key,en,ptLabel]) => {
     const entity = variables[key], state = stateOf(hass, entity);
@@ -140,7 +140,7 @@ function dishwasherReadings(variables, hass, operation) {
     const raw = text(state.state), percent = raw && Number(raw);
     const progress = key === 'progress_entity';
     const valid = !unavailable && (!timestamp || Number.isFinite(Date.parse(raw))) && (!progress || raw !== '' && Number.isFinite(percent) && percent >= 0 && percent <= 100);
-    const value = valid ? timestamp ? new Intl.DateTimeFormat(hass.language, {hour:'numeric', minute:'2-digit', timeZone:hass.config?.time_zone}).format(new Date(raw)) : progress ? `${formatEnergyNumber(percent, undefined, hass)} %` : entityStateLabel(state, entity, 'md_sensor_card', hass) : '—';
+    const value = valid ? timestamp ? new Intl.DateTimeFormat(formatLocale(hass), {hour:'numeric', minute:'2-digit', timeZone:hass.config?.time_zone}).format(new Date(raw)) : progress ? `${formatEnergyNumber(percent, undefined, hass)} %` : entityStateLabel(state, entity, 'md_sensor_card', hass) : '—';
     const icon = key === 'active_program_entity' && valid ? dishwasherProgramIcon(state) : 'mdi:timer-sand';
     const ring = progress ? `<svg class="dishwasher-ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-track" cx="50" cy="50" r="44"></circle><circle class="ring-value" cx="50" cy="50" r="44" pathLength="100" stroke-dasharray="${valid ? percent : 0} 100"></circle></svg>` : `<ha-icon icon="${esc(icon)}" aria-hidden="true"></ha-icon>`;
     return `<div class="dishwasher-stat${valid ? '' : ' neutral'}${variables.show_reading_names===false?' no-label':''}"><dt>${esc(label)}</dt><dd><span class="dishwasher-indicator"${progress && valid ? ` role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"` : ""}>${ring}<span class="dishwasher-stat-value">${esc(value)}</span></span></dd></div>`;
@@ -187,8 +187,13 @@ function actionControlLabel(config, state, entity, action, hass) {
   if (config.template === "md_media_app_card" && config.variables?.app_source) return text(config.variables.app_source);
   const command = text(action?.data?.command).trim();
   if (command) return localize(`controls.command.${command.toLowerCase()}`, hass, {}, climateModeLabel(command, hass));
-  const service = text(action?.service || action?.perform_action).split(".").pop();
-  if (service) return localize(`controls.action.${service}`, hass, {}, climateModeLabel(service, hass));
+  const serviceId = text(action?.service || action?.perform_action);
+  if (serviceId) {
+    const [domain, service] = serviceId.includes(".") ? serviceId.split(".") : ["", serviceId];
+    const nativeKey = `component.${domain}.services.${service}.name`;
+    const nativeLabel = domain && hass?.localize?.(nativeKey);
+    return localize(`controls.action.${service}`, hass, {}, nativeLabel && nativeLabel !== nativeKey ? nativeLabel : climateModeLabel(service, hass));
+  }
   const label = text(state?.attributes?.friendly_name || entity || config?.template, "Marao");
   if (action?.action === "navigate") return localize("actions.open", hass, { name: label }, `Open ${label}`);
   if (action?.action === "toggle") return localize("actions.toggle", hass, { name: label }, `Toggle ${label}`);
@@ -197,15 +202,15 @@ function actionControlLabel(config, state, entity, action, hass) {
 
 const climateNumber = value => value == null || value === "" || typeof value === "boolean" ? NaN : Number(value);
 
-function climateTarget(attributes, mode) {
+function climateTarget(attributes, mode, hass) {
   const single = climateNumber(attributes.temperature ?? attributes.target_temperature);
   const low = climateNumber(attributes.target_temp_low ?? attributes.target_temperature_low);
   const high = climateNumber(attributes.target_temp_high ?? attributes.target_temperature_high);
-  if (mode === "heat_cool") return Number.isFinite(low) && Number.isFinite(high) && low <= high ? `${low}–${high}` : "—";
-  if (Number.isFinite(single)) return text(single);
-  if (mode === "cool" && Number.isFinite(high)) return text(high);
-  if (Number.isFinite(low)) return text(low);
-  if (Number.isFinite(high)) return text(high);
+  if (mode === "heat_cool") return Number.isFinite(low) && Number.isFinite(high) && low <= high ? `${formatEnergyNumber(low, undefined, hass)}–${formatEnergyNumber(high, undefined, hass)}` : "—";
+  if (Number.isFinite(single)) return formatEnergyNumber(single, undefined, hass);
+  if (mode === "cool" && Number.isFinite(high)) return formatEnergyNumber(high, undefined, hass);
+  if (Number.isFinite(low)) return formatEnergyNumber(low, undefined, hass);
+  if (Number.isFinite(high)) return formatEnergyNumber(high, undefined, hass);
   return "—";
 }
 
@@ -325,7 +330,7 @@ export function entityStateLabel(state, entity, kind, hass) {
   if (kind === "md_climate_card") return climateModeLabel(value, hass);
   if (kind === "md_dishwasher_card") {
     const operation = { run: "running", pause: "paused", finish: "finished", inactive: "idle", ready: "ready", delayedstart: "delayed", actionrequired: "attention", aborting: "aborting" }[value] || value;
-    return localize(`dishwasher.${operation}`, hass, {}, localize(`common.${value}`, hass, {}, value));
+    return localize(`dishwasher.${operation}`, hass, {}, localize(`common.${value}`, hass, {}, hass?.formatEntityState?.(presentationState(state, entity, kind)) || value));
   }
   const formatted = hass?.formatEntityState?.(presentationState(state, entity, kind));
   if (formatted && formatted !== value) return text(formatted);
@@ -1230,7 +1235,7 @@ export function energyValue(raw, sourceUnit, variables = {}) {
 export function formatEnergyNumber(value, precision, hass) {
   const preference = hass?.locale?.number_format;
   const languages = { comma_decimal: 'en-US', decimal_comma: 'de', space_comma: 'fr', quote_decimal: 'de-CH', none: 'en-US' };
-  const locale = preference === 'system' ? undefined : languages[preference] || hass?.locale?.language || hass?.language || globalThis.navigator?.language;
+  const locale = preference === 'system' ? undefined : languages[preference] || formatLocale(hass);
   const digits = precision ?? 6;
   return new Intl.NumberFormat(locale, { minimumFractionDigits: precision ?? 0, maximumFractionDigits: digits, useGrouping: preference !== 'none' }).format(Number(value.toFixed(digits)) === 0 ? 0 : value);
 }
@@ -1316,7 +1321,8 @@ export class MaraoCard extends BaseElement {
     if (this._authoritativeHass) this.hass = this._authoritativeHass;
   }
   setConfig(config) {
-    validatePopupContent(config);
+    const contentError = popupContentError(config);
+    if (contentError) throw new Error(popupLabel(contentError, this._hass));
     if (this._dishwasherRequest && (this._config.entity !== config.entity || this._config.template !== config.template || JSON.stringify(this._config.variables) !== JSON.stringify(config.variables))) {
       this._dishwasherRequest.wake?.cancel();
       this._dishwasherRequest = null;
@@ -1324,9 +1330,8 @@ export class MaraoCard extends BaseElement {
     if (this._detailsPopup?._config?.cards?.[0]?.type === 'custom:marao-dishwasher-controls') this._detailsPopup._close(false);
     this._genericPopupConfig=null;
     if(config.popup_content?.mode==='custom'){
-      const error=popupViewError(config);if(error)throw new Error(error);
+      const error=popupViewError(config);if(error)throw new Error(popupLabel(error,this._hass));
       const content=config.popup_content;
-      if(content.version!==1||content.layout?.type!=='sections'||!Array.isArray(content.layout.sections))throw new Error('Popup content must use a native Sections layout.');
       this._genericPopupHash||='#marao-custom-'+Array.from(crypto.getRandomValues(new Uint8Array(8)),value=>value.toString(16).padStart(2,'0')).join('');
       const hash=this._genericPopupHash,variables={...config.variables},routes=[variables.popup_hash,variables.mode_selector_hash,variables.lights_popup];
       const next={...config,variables};
@@ -1344,7 +1349,7 @@ export class MaraoCard extends BaseElement {
     if (config.variables?.activity_entities !== undefined && (!Array.isArray(config.variables.activity_entities) || config.variables.activity_entities.some(id => typeof id !== 'string' || !/^[a-z_]+\.[a-z0-9_]+$/.test(id)))) throw new Error(localize('activity.invalid_sources',this._hass,{},'Related activity entities must be an explicit list of entity IDs.'));
     if (config.template === 'md_room_card' && config.variables?.climate_entity != null && config.variables.climate_entity !== '' && !/^climate\.[a-z0-9_]+$/.test(config.variables.climate_entity)) throw new Error(localize('room.invalid_climate',this._hass,{},'Choose a climate entity.'));
     if(config.template==='md_media_app_card'){const error=mediaAppLogoError(config.variables?.app_logo,this._hass);if(error)throw new Error(error);}
-    if(['md_glance_card','md_dishwasher_card'].includes(config.template) && Object.hasOwn(config.variables || {},'show_reading_names') && typeof config.variables.show_reading_names!=='boolean')throw new Error(String(this._hass?.language||'').startsWith('pt')?'Mostrar nomes das leituras tem de ser um valor booleano.':'Show reading labels must be a boolean.');
+    if(['md_glance_card','md_dishwasher_card'].includes(config.template) && Object.hasOwn(config.variables || {},'show_reading_names') && typeof config.variables.show_reading_names!=='boolean')throw new Error(languageCode(this._hass) === 'pt'?'Mostrar nomes das leituras tem de ser um valor booleano.':'Show reading labels must be a boolean.');
     if(config.template==='md_climate_card'){const error=climateConfigError(config.variables,this._hass);if(error)throw new Error(error);}
     if(config.template==='md_people_card'){const error=peopleError(config);if(error)throw new Error(collectionLabel(error,this._hass));}
     this.shadowRoot?.querySelector("marao-slide-to-open")?._clearFeedback?.();
@@ -1775,17 +1780,17 @@ export class MaraoCard extends BaseElement {
     const key = `${kind}:${entity}`;
     if (kind === "md_climate_card") {
       const settings = climateSettings(entity, state);
-      const target = climateTarget(settings.attributes, settings.mode);
+      const target = climateTarget(settings.attributes, settings.mode, this._hass);
       const label = this._config.variables?.setpoint_label || localize("climate.target_temperature", this._hass, {}, "Target temperature");
       return numberStepper(target, label, "", "climate-stepper", disabled, this._hass);
     }
     if (kind === "md_number_card") {
       const value = Number(state.state);
-      return numberStepper(Number.isFinite(value) ? value : '—', this._label(entity, this._config, state), text(attrs.unit_of_measurement), "number-card-stepper", disabled, this._hass);
+      return numberStepper(Number.isFinite(value) ? formatEnergyNumber(value, undefined, this._hass) : '—', this._label(entity, this._config, state), text(attrs.unit_of_measurement), "number-card-stepper", disabled, this._hass);
     }
     if (kind === "md_wallbox_current_card") {
       const value = Number(state.state);
-      return numberStepper(Number.isFinite(value) ? value : '—', this._label(entity, this._config, state), text(attrs.unit_of_measurement || 'A'), "wallbox-stepper", disabled, this._hass);
+      return numberStepper(Number.isFinite(value) ? formatEnergyNumber(value, undefined, this._hass) : '—', this._label(entity, this._config, state), text(attrs.unit_of_measurement || 'A'), "wallbox-stepper", disabled, this._hass);
     }
     const ranges = {
       md_light_card: [0, 100, this._sliderCurrent(kind, attrs, entity), "brightness", 1],
@@ -1959,7 +1964,7 @@ export class MaraoCard extends BaseElement {
       localize: key => localize(key, this._hass, {}, key),
       format: value => energy ? climate ? formatEnergyNumber(value, undefined, this._hass)
         : energyLabel({value, unit: energyValue(state.state, state.attributes?.unit_of_measurement, historyVariables)?.unit || ''}, historyVariables, this._hass)
-        : `${new Intl.NumberFormat(this._hass?.locale?.language || this._hass?.language, {maximumFractionDigits: 3}).format(value)}${climate ? '' : ` ${state.attributes?.unit_of_measurement || ''}`}`.trim(),
+        : `${new Intl.NumberFormat(formatLocale(this._hass), {maximumFractionDigits: 3}).format(value)}${climate ? '' : ` ${state.attributes?.unit_of_measurement || ''}`}`.trim(),
       onRetry: () => { this._graphErrors.delete(entity); this._graphHistory.delete(entity); this._loadGraphHistory(entity); },
     };
   }
@@ -2115,12 +2120,12 @@ export class MaraoCard extends BaseElement {
       ? /[:：]$/.test(customLabel) ? "" : customLabel
       : `${variables.custom_label || variables.md_label_prefix || ""}${summary?.label || (requestedClimate?.pending ? climateModeLabel(value, this._hass) : (formattedPrimary ? energyLabel(formattedPrimary, variables, this._hass) : entityStateLabel(state, entity, kind, this._hass)))}`;
     const climatePending = requestedClimate?.pending ? `<div class="climate-pending" role="status">${esc(localize("climate.updating", this._hass, {}, "Updating…"))}</div>` : "";
-    const measuredTemperature = text(climate?.current_temperature);
-    const currentTemperature = measuredTemperature ? `${measuredTemperature}°` : "";
+    const measuredTemperature = climateNumber(climate?.current_temperature);
+    const currentTemperature = Number.isFinite(measuredTemperature) ? `${formatEnergyNumber(measuredTemperature, undefined, this._hass)}°` : "";
     const climateReadingLabel = currentTemperature ? localize("climate.current_temperature", this._hass, { value: currentTemperature }, `Current ${currentTemperature}`) : "";
     const climateModes = Array.isArray(climate?.hvac_modes) ? climate.hvac_modes.filter(Boolean).map(text) : [];
     const climateDetail=Boolean(climate && this.climateDetail);
-    const modeHeading=`${localize('climate.mode',this._hass,{},String(this._hass?.language||'').startsWith('pt')?'Modo':'Mode')} - ${climateModeLabel(value,this._hass)}`;
+    const modeHeading=`${localize('climate.mode',this._hass,{},languageCode(this._hass) === 'pt'?'Modo':'Mode')} - ${climateModeLabel(value,this._hass)}`;
     const modeButtons = climate && (climateDetail || variables.enable_popup===false && variables.show_mode_buttons!==false)
       ? `<div class="climate-mode-picker"><div class="climate-mode-heading">${esc(modeHeading)}</div><div class="climate-modes" role="group" aria-label="${esc(modeHeading)}">${climateModes.map(mode=>`<button class="climate-mode${mode===value?' active':''}" type="button" data-climate-mode="${esc(mode)}" aria-label="${esc(climateModeLabel(mode,this._hass))}" aria-pressed="${mode===value}"${controlsDisabled?' disabled':''}><ha-icon icon="${esc(climateModeIcon(mode))}" aria-hidden="true"></ha-icon>${mode===value?'<span class="mode-check" aria-hidden="true">✓</span>':''}</button>`).join('')}</div></div>` : '';
     const shortcuts = kind === "md_wallbox_current_card"
@@ -2144,7 +2149,7 @@ export class MaraoCard extends BaseElement {
       ? `<div class="scene-options marao-dropdown" data-scene-picker data-scene-identity="${esc(JSON.stringify([entity,sceneOptions]))}"><button type="button" data-scene-select aria-label="${esc(this._label(entity, config, state))}" aria-haspopup="menu" aria-expanded="false"${controlsDisabled || !sceneOptions.length ? " disabled" : ""}><span data-scene-label>${esc(entityStateLabel(state, entity, kind, this._hass))}</span><ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon></button><div class="marao-dropdown-options" data-scene-menu role="menu" aria-label="${esc(this._label(entity, config, state))}" hidden>${sceneOptions.map(option=>`<button type="button" role="menuitemradio" tabindex="-1" data-scene-option="${esc(option)}" aria-checked="${!controlsDisabled && option === value}"${controlsDisabled ? " disabled" : ""}><span>${esc(option)}</span><ha-icon icon="mdi:check" aria-hidden="true"></ha-icon></button>`).join('')}</div></div>`
       : "";
     const humidity=climate?climateHumidity(variables,this._hass):null;
-    const climateControls = climate ? `<div class="climate-readings"><div class="climate current-temperature" aria-label="${esc(climateReadingLabel)}">${esc(currentTemperature || '—')}</div>${humidity===null?'':`<div class="climate-humidity" aria-label="${esc(localize('climate.humidity',this._hass,{},String(this._hass?.language||'').startsWith('pt')?'Humidade':'Humidity'))}">${esc(humidity)}</div>`}</div>` : "";
+    const climateControls = climate ? `<div class="climate-readings"><div class="climate current-temperature" aria-label="${esc(climateReadingLabel)}">${esc(currentTemperature || '—')}</div>${humidity===null?'':`<div class="climate-humidity" aria-label="${esc(localize('climate.humidity',this._hass,{},languageCode(this._hass) === 'pt'?'Humidade':'Humidity'))}">${esc(humidity)}</div>`}</div>` : "";
     const climateActivity = climate && config.show_state !== false
       ? `<div class="climate-activity">${esc(interactionUnavailable ? '—' : climateModeLabel(climate.hvac_action || state.state, this._hass))}</div>` : "";
     const previewAvailable = !loading && !interactionUnavailable && this._hass?.connected !== false && this._hass?.connection?.connected !== false;
@@ -2158,7 +2163,7 @@ export class MaraoCard extends BaseElement {
       ? `<div class="media-artwork" aria-hidden="true"><img src="${esc(state.attributes.entity_picture)}" alt=""></div>` : "";
     const glance = kind === "md_glance_card";
     let readings = glance ? [1,2,3].filter((index) => variables[`entity${index}`]).map((index) => readingMarkup(variables[`entity${index}`], variables[`entity${index}_name`], variables[`entity${index}_icon`], this._hass, "md_sensor_card", config.show_icon !== false && variables.show_icon !== false, variables.show_reading_names !== false)).join("") : "";
-    const locale = this._hass?.locale?.language || this._hass?.language || "en";
+    const locale = formatLocale(this._hass);
     let details = "";
     if (kind === "md_switch_card" && variables.power_entity) {
       const reading = formattedPower ? energyLabel(formattedPower, variables, this._hass) : Number.isFinite(Number(power.state)) && power.state !== "" && power.state != null
@@ -2977,7 +2982,7 @@ class MaraoDishwasherControls extends BaseElement {
     if (seconds) {
       const duration = [['hour', Math.floor(delayLabel / 3600)], ['minute', Math.floor(delayLabel % 3600 / 60)], ['second', delayLabel % 60]];
       delayLabel = duration.filter(([unit, n]) => n || delayLabel === 0 && unit === 'minute')
-        .map(([unit, n]) => new Intl.NumberFormat(h.language, {style:'unit', unit, unitDisplay:'short'}).format(n)).join(' ');
+        .map(([unit, n]) => new Intl.NumberFormat(formatLocale(h), {style:'unit', unit, unitDisplay:'short'}).format(n)).join(' ');
     }
     const html = `<style>${cardStyles()}
       .cycle-sheet .disclosure{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;background:transparent;border-top:1px solid var(--divider-color);border-radius:0;padding-inline:4px;font-weight:700;text-align:start}
@@ -3558,11 +3563,19 @@ export class MaraoPowerHistoryCard extends BaseElement {
   static getConfigElement(){return MaraoCard.getConfigElement();}
   constructor() { super(); this.attachShadow?.({ mode: 'open' }); this._loadId = 0; }
   setConfig(config) {
-    if (!/^(sensor|number|input_number)\.[a-z0-9_]+$/.test(config?.entity || '')) throw new Error('Choose a power sensor.');
+    if (!/^(sensor|number|input_number)\.[a-z0-9_]+$/.test(config?.entity || '')) throw new Error(localize("power.choose_sensor", this._hass, {}, "Choose a power sensor."));
     const errors = historyData.validatePowerDevices(config, config.entity);
-    if (errors.length) throw new Error(errors[0]);
-    if (config.display_unit != null && energyUnits[config.display_unit]?.[0] !== 'power') throw new Error('Power devices require power sensors in W or kW.');
-    if (config.display_precision != null && (!Number.isInteger(config.display_precision) || config.display_precision < 0 || config.display_precision > 6)) throw new Error('Decimal places must be an integer from 0 to 6.');
+    if (errors.length) {
+      const labels = {
+        'Power devices must be a list.': 'power.devices_list',
+        'Choose a power sensor for each device.': 'power.device_sensor',
+        'Power devices must be unique and different from the house sensor.': 'power.devices_unique',
+        'Power device names must be text.': 'power.device_name',
+      };
+      throw new Error(localize(labels[errors[0]], this._hass, {}, errors[0]));
+    }
+    if (config.display_unit != null && energyUnits[config.display_unit]?.[0] !== 'power') throw new Error(localize("power.invalid_unit", this._hass, {}, "Power devices require power sensors in W or kW."));
+    if (config.display_precision != null && (!Number.isInteger(config.display_precision) || config.display_precision < 0 || config.display_precision > 6)) throw new Error(localize("energy.invalid_precision", this._hass, {}, "Decimal places must be an integer from 0 to 6."));
     this._config = structuredClone(config); this._failed = false; this._sync();
   }
   set hass(value) {

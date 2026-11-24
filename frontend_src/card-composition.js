@@ -1,3 +1,4 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {validatePopupContent,customPopup} from '../custom_components/marao_dashboard/frontend/MaraoPopupContent.js';
 import {popupViewError,resolvePopupView,popupGroupFromView} from '../custom_components/marao_dashboard/frontend/MaraoPopupLayout.js';
 import labels from '../custom_components/marao_dashboard/frontend/marao-generator-labels.json' with { type: 'json' };
@@ -135,7 +136,7 @@ export function resolveSource(source, entities = []) {
 
 // Shared by import/conversion and each ordinary Home Assistant card occurrence.
 export function createCardComposition({ root = 'marao-dashboard', language = 'en' } = {}) {
-  const locale = String(language).toLowerCase().split('-')[0];
+  const locale = languageCode(language);
   const t = key => labels[locale]?.[key] || labels.en[key] || key;
   const name = item => item.name_key && item.name === labels.en[item.name_key] ? t(item.name_key) : item.name || friendly(item.entity_id || item.path || item.id);
   const rawCards = new WeakSet();

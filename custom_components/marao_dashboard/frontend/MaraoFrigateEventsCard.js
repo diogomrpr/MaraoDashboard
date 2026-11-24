@@ -1,3 +1,4 @@
+const { languageCode, formatLocale } = await import(new URL(`./MaraoLocale.js${new URL(import.meta.url).search}`, import.meta.url));
 const {cameraEventsStub,refreshCardMetadata}=await import(new URL(`./MaraoNativeCardMetadata.js${new URL(import.meta.url).search}`,import.meta.url));
 const {normalizeEventSources,eventTimestamp,mergeSourceEvents,filterEventRows,customEventRange,eventWord}=await import(new URL(`./MaraoEventModel.js${new URL(import.meta.url).search}`,import.meta.url));
 const {bindDropdown,dropdownStyles}=await import(new URL(`./MaraoDropdown.js${new URL(import.meta.url).search}`,import.meta.url));
@@ -237,7 +238,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   }
 
   setConfig(config) {
-    this._sources=normalizeEventSources(config || {});
+    this._sources=normalizeEventSources(config || {}, this._hass);
     this._sourceResults=[];this._cameraFilter='';this._timeFilter='all';this._timeRange=null;this._filter='';
     this._entityName = undefined;
     const requestedLimit = Number(config.limit ?? 12);
@@ -745,7 +746,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     const seconds = eventTime(event);
     if (!seconds) return "";
     try {
-      return new Intl.DateTimeFormat(this._hass?.locale?.language, {
+      return new Intl.DateTimeFormat(formatLocale(this._hass), {
         dateStyle: "medium",
         timeStyle: "short",
         timeZone:this._hass?.config?.time_zone || 'UTC',
@@ -948,7 +949,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     this._dropdowns ||= [];
     definitions.forEach(([key,options],i)=>{
       let picker=host.querySelector(`[data-picker="${key}"]`);
-      const signature=JSON.stringify([options,this._hass?.language]);
+      const signature=JSON.stringify([options,languageCode(this._hass)]);
       if(!picker){picker=document.createElement('div');picker.className='marao-dropdown';picker.dataset.picker=key;host.append(picker);}
       if(picker._signature!==signature || !this._dropdowns[i]){
         this._dropdowns[i]?.destroy();const focused=picker.contains(this.shadowRoot.activeElement);
@@ -971,7 +972,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
     coverage.hidden=Boolean(this._selected)||!coverage.textContent;
 
   }
-  _formatRange(){const format=new Intl.DateTimeFormat(this._hass?.language,{dateStyle:'short',timeStyle:'short',timeZone:this._hass?.config?.time_zone || 'UTC'});return `${format.format(this._timeRange.start)} – ${format.format(this._timeRange.end)}`;}
+  _formatRange(){const format=new Intl.DateTimeFormat(formatLocale(this._hass),{dateStyle:'short',timeStyle:'short',timeZone:this._hass?.config?.time_zone || 'UTC'});return `${format.format(this._timeRange.start)} – ${format.format(this._timeRange.end)}`;}
   _showCustomRange(){
     if(this.shadowRoot.querySelector('.range-editor'))return;
     const form=document.createElement('section');form.className='range-editor';
@@ -984,7 +985,7 @@ export class MaraoFrigateEventsCard extends HTMLElementBase {
   _renderEvent(event, index) {
     const undated=eventTimestamp(event)===null && this._filteredEvents().find(row=>eventTimestamp(row.event)===null)?.index===index;
     const timestamp=eventTimestamp(event);
-    const time=timestamp===null?'':new Intl.DateTimeFormat(this._hass?.locale?.language || this._hass?.language,{timeStyle:'short',timeZone:this._hass?.config?.time_zone || 'UTC'}).format(new Date(timestamp*1000));
+    const time=timestamp===null?'':new Intl.DateTimeFormat(formatLocale(this._hass),{timeStyle:'short',timeZone:this._hass?.config?.time_zone || 'UTC'}).format(new Date(timestamp*1000));
     const icon=({person:'mdi:walk',car:'mdi:car',vehicle:'mdi:car',dog:'mdi:dog',cat:'mdi:cat',motion:'mdi:motion-sensor'})[this._eventTypes(event)[0]] || 'mdi:camera';
     return `${undated?`<h3 class="undated" style="grid-column:1/-1">${escapeHtml(eventWord('undated',this._hass))}</h3>`:''}<article class="event-row" data-index="${index}">
       <div class="event-rail"><span class="event-icon" aria-hidden="true"><ha-icon icon="${icon}"></ha-icon></span>${time?`<time class="event-time" datetime="${new Date(timestamp*1000).toISOString()}">${escapeHtml(time)}</time>`:''}</div>

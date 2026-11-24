@@ -1,12 +1,22 @@
-export function normalizeEventSources(config){
- if(config.columns!==undefined&&(!Number.isSafeInteger(config.columns)||config.columns<1))throw new Error('Event columns must be a positive integer.');
- if(config.cameras!==undefined&&!Array.isArray(config.cameras))throw new Error('Camera sources must be a list.');
- if(config.entity&&config.cameras?.length)throw new Error('Choose entity or cameras, not both.');
+import { languageCode } from './MaraoLocale.js';
+export const EVENT_CONFIG_PT = {
+  "Event columns must be a positive integer.": "As colunas de eventos têm de ser um número inteiro positivo.",
+  "Camera sources must be a list.": "As fontes de câmara têm de ser uma lista.",
+  "Choose entity or cameras, not both.": "Escolha uma entidade ou uma lista de câmaras.",
+  "Choose unique camera sources.": "Escolha fontes de câmara diferentes.",
+  "Camera provider options must be text.": "As opções do fornecedor da câmara têm de ser texto.",
+};
+
+export function normalizeEventSources(config, hass){
+ const label = value => languageCode(hass) === 'pt' ? EVENT_CONFIG_PT[value] : value;
+ if(config.columns!==undefined&&(!Number.isSafeInteger(config.columns)||config.columns<1))throw new Error(label('Event columns must be a positive integer.'));
+ if(config.cameras!==undefined&&!Array.isArray(config.cameras))throw new Error(label('Camera sources must be a list.'));
+ if(config.entity&&config.cameras?.length)throw new Error(label('Choose entity or cameras, not both.'));
  const sources=config.cameras!==undefined?config.cameras:config.entity?[config]:[];
  const seen=new Set();
  return sources.map(source=>{
-  if(!source||typeof source!=='object'||Array.isArray(source)||!/^camera\.[a-z0-9_]+$/.test(source.entity||'')||seen.has(source.entity)||source.name!==undefined&&typeof source.name!=='string')throw new Error('Choose unique camera sources.');
-  for(const key of ['event_provider','provider','frigate_instance_id','frigate_camera','unifi_protect_media_source'])if(source[key]!==undefined&&typeof source[key]!=='string')throw new Error('Camera provider options must be text.');
+  if(!source||typeof source!=='object'||Array.isArray(source)||!/^camera\.[a-z0-9_]+$/.test(source.entity||'')||seen.has(source.entity)||source.name!==undefined&&typeof source.name!=='string')throw new Error(label('Choose unique camera sources.'));
+  for(const key of ['event_provider','provider','frigate_instance_id','frigate_camera','unifi_protect_media_source'])if(source[key]!==undefined&&typeof source[key]!=='string')throw new Error(label('Camera provider options must be text.'));
   seen.add(source.entity);return {...source};
  });
 }
@@ -32,4 +42,4 @@ export function civilInstant(value,timeZone){
 }
 export function customEventRange(start,end,zone){const a=civilInstant(start,zone),b=civilInstant(end,zone);if(a>=b)throw new Error('Invalid range');return {start:a,end:b};}
 export const eventWords={en:{camera:'Camera',allCameras:'All cameras',type:'Event type',allTypes:'All types',time:'Date/time',all:'All loaded events',hour:'Last hour',day:'Last 24 hours',today:'Today',yesterday:'Yesterday',custom:'Custom range',start:'Start',end:'End',apply:'Apply',cancel:'Cancel',invalid:'Choose valid, unambiguous start/end times in the Home Assistant time zone.',coverage:'Filters apply to loaded recent events; this is not a complete archive search.',undated:'Time unavailable',excluded:'Records without timestamps are excluded from time filters.',setup:'Choose camera sources in the card editor.',empty:'No loaded events match these filters.',limit:'per-source limit',loading:'Loading',error:'Could not load events',unavailable:'Unavailable'},pt:{camera:'Câmara',allCameras:'Todas as câmaras',type:'Tipo de evento',allTypes:'Todos os tipos',time:'Data/hora',all:'Todos os eventos carregados',hour:'Última hora',day:'Últimas 24 horas',today:'Hoje',yesterday:'Ontem',custom:'Intervalo personalizado',start:'Início',end:'Fim',apply:'Aplicar',cancel:'Cancelar',invalid:'Escolha horas de início/fim válidas e inequívocas no fuso horário do Home Assistant.',coverage:'Os filtros aplicam-se aos eventos recentes carregados; não é uma pesquisa completa do arquivo.',undated:'Hora indisponível',excluded:'Os registos sem hora são excluídos dos filtros de tempo.',setup:'Escolha as câmaras no editor do cartão.',empty:'Nenhum evento carregado corresponde aos filtros.',limit:'limite por câmara',loading:'A carregar',error:'Não foi possível carregar eventos',unavailable:'Indisponível'}};
-export const eventWord=(key,hass)=>eventWords[String(hass?.language||'').startsWith('pt')?'pt':'en'][key]||key;
+export const eventWord=(key,hass)=>eventWords[languageCode(hass) === 'pt'?'pt':'en'][key]||key;

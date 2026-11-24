@@ -1,3 +1,4 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {nativeDashboardConfig,nativeDashboardHasDraft} from '../custom_components/marao_dashboard/frontend/MaraoNativeContext.js';
 import {popupCanonical,managedPopupIssue} from '../custom_components/marao_dashboard/frontend/MaraoPopupManaged.js';
 import {popupAuthoringAllowed,commitPopupDocument,reconcilePopupTransaction} from '../custom_components/marao_dashboard/frontend/MaraoPopupTransaction.js';
@@ -42,7 +43,7 @@ export function createPopupCoordinator(root,options={}) {
       if(!same(config(),original)){pending=true;waitHost=true;return;}
       await reconcilePopupTransaction(context,original);if(!current(token))return;
       const entities=Object.values(hass.states||{}).map(state=>({...state.attributes,entity_id:state.entity_id}));
-      const proposed=planManagedPopups(original,{entities,hass,dashboardRoot:path,language:hass.language});
+      const proposed=planManagedPopups(original,{entities,hass,dashboardRoot:path,language:languageCode(hass)});
       if(same(original,proposed)){root._maraoPopupSync=new Map();notify();return;}
       root._maraoPopupSync=new Map(paths().map(source=>[source,{busy:true}]));busy=true;notify();
       await commitPopupDocument(context,original,proposed);

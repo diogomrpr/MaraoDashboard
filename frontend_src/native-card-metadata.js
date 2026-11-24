@@ -1,3 +1,4 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {editorLabel} from './editor-labels.js';
 
 // Symbol.for also identifies our entries across the separately bundled native hosts.
@@ -9,7 +10,7 @@ export function registerCardMetadata(picker, registration, label, description = 
   refreshCardMetadata(undefined, [registration]);
 }
 export function refreshCardMetadata(hass, picker = globalThis.window?.customCards || []) {
-  const language = hass?.locale?.language || hass?.language || globalThis.navigator?.language || 'en';
+  const language = languageCode(hass);
   for (const card of picker) {
     const text = card[owner];
     if (!text || text.language === language) continue;

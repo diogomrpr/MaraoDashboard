@@ -1,3 +1,4 @@
+import { languageCode, formatLocale } from './MaraoLocale.js';
 const PT = {
   'History': 'Histórico', 'Selected reading': 'Leitura selecionada', 'Previous reading': 'Leitura anterior', 'Next reading': 'Leitura seguinte',
   'Minimum': 'Mínimo', 'Maximum': 'Máximo', 'Sample average': 'Média das amostras', 'No readings in this period.': 'Sem leituras neste período.',
@@ -12,8 +13,8 @@ const PT = {
 };
 
 export function historyText(options, key) {
-  const translated = options.localize?.(key), language = options.hass?.locale?.language || options.hass?.language || 'en';
-  return translated && translated !== key ? translated : (language.startsWith('pt') ? PT[key] : null) || key;
+  const translated = options.localize?.(key);
+  return translated && translated !== key ? translated : (languageCode(options.hass) === 'pt' ? PT[key] : null) || key;
 }
 
 export function readableGraphColor(host, preferred, { background, tint } = {}) {
@@ -128,7 +129,7 @@ export function createHistoryPlaceholder(container, options = {}) {
   next.textContent = options.bars ? '›' : text('Next reading');
   for (const button of root.querySelectorAll('button')) button.disabled = true;
   status.textContent = options.loadingText || 'Loading…'; coverage.hidden = true;
-  renderHistoryBreakdown(frame, options.breakdown, { text, language: options.hass?.language || 'en' });
+  renderHistoryBreakdown(frame, options.breakdown, { text, language: formatLocale(options.hass) });
   if (options.power && options.series?.length > 1) for (const item of options.series) { const row = frame.make('div','',frame.comparison); const heading = frame.make('span','history-item-heading',row); frame.make('span','history-swatch',heading); frame.make('span','',heading).textContent = item.name; frame.make('span','',row).textContent = '—'; }
   else frame.comparison.hidden = true;
   return frame;

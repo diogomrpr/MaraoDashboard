@@ -1,3 +1,4 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {findNativeHost,nativeDashboardConfig,nativeEditing} from '../custom_components/marao_dashboard/frontend/MaraoNativeContext.js';
 import { catalog } from './native-model.js';
 import { editorLabel } from './editor-labels.js';
@@ -185,7 +186,7 @@ export class MaraoNativeCard extends HTMLElementBase {
     }).catch(error => {
       if (!this.isConnected) return;
       this._themeError ||= document.createElement('p'); this._themeError.setAttribute('role', 'alert');
-      this._themeError.textContent = `${String(this._hass?.language || '').startsWith('pt') ? 'Não foi possível carregar o tema Marao.' : 'The Marao theme could not load.'} ${error.message}`;
+      this._themeError.textContent = `${languageCode(this._hass) === 'pt' ? 'Não foi possível carregar o tema Marao.' : 'The Marao theme could not load.'} ${error.message}`;
       this.shadowRoot.append(this._themeError);
     });
     this._refresh();
@@ -237,7 +238,7 @@ export class MaraoNativeCard extends HTMLElementBase {
     // State updates only reach existing controls; configuration metadata can recompose.
     const bound = new Set([this._config.entity_id, ...(Array.isArray(this._config.entities) ? this._config.entities : []).map(entity => typeof entity === 'string' ? entity : entity.entity_id)]);
     const dashboardRoot = this._host?.panel?.url_path || globalThis.location?.pathname.split('/')[1] || 'marao-dashboard';
-    const language = this._hass?.language || 'en';
+    const language = languageCode(this._hass);
     const dashboard=nativeDashboardConfig(this._host?.lovelace);
     let viewHost=this;while(viewHost&&viewHost.localName!=='hui-view')viewHost=viewHost.parentNode||viewHost.host||viewHost.getRootNode?.()?.host;
     const currentView=dashboard?.views?.[viewHost?.index ?? this._host?.lovelace?.current_view];

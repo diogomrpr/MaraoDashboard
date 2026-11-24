@@ -1,3 +1,4 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 const {mountLocationPreferences}=await import(new URL(`./MaraoLocationPreferences.js${new URL(import.meta.url).search}`,import.meta.url));
 import {mountLocationSettings} from './location-settings.js';
 import {createSettingsRow,SETTINGS_ROW_CSS} from './settings-row.js';
@@ -50,7 +51,7 @@ export async function openDashboardSettings(root,opener,owner) {
   if(!root?.hass?.user?.is_admin || root.lovelace?.editMode || root._maraoSettingsDialog)return;
   const hass=root.hass,path=location.pathname.split('/')[1],user=hass.user.id;
   const valid=()=>root.isConnected&&location.pathname.split('/')[1]===path&&root.hass?.user?.id===user&&root.hass?.user?.is_admin&&!root.lovelace?.editMode&&root._maraoSettingsDialog===dialog;
-  const t=words[String(hass.language).startsWith('pt')?'pt':'en'];
+  const t=words[languageCode(hass) === 'pt'?'pt':'en'];
   const dialog=document.createElement('dialog');dialog.className='marao-settings settings-rows';root._maraoSettingsDialog=dialog;
   dialog.innerHTML=`<style>${CSS}</style><header><h2 id="marao-settings-title"></h2><button type="button" data-close>×</button></header><div class="body"><p data-loading role="status"></p><button type="button" data-retry hidden></button><div data-settings hidden><h3 data-navbar></h3><p class="hint"></p><ha-sortable data-sortable handle-selector=".drag-handle" draggable-selector=".route" no-style disabled><div data-routes></div></ha-sortable><div data-add></div><section class="shortcuts"><h3 data-shortcuts></h3><div data-flags></div></section></div></div><footer><p class="status" role="alert"></p><button type="button" class="save" data-save disabled></button></footer>`;
   dialog.setAttribute('aria-labelledby','marao-settings-title');
@@ -133,10 +134,10 @@ export async function openDashboardSettings(root,opener,owner) {
   render();
   const validateLocation=mountLocationSettings(dialog.querySelector('[data-settings]'),draft,hass,mountForm,schema,viewFor,navigation.haptic);
   const browser=document.createElement('section');browser.className='shortcuts';
-  const heading=document.createElement('h4');heading.textContent=String(hass.language).startsWith('pt')?'Este navegador':'This browser';browser.append(heading);(validateLocation.section||dialog.querySelector('[data-settings]')).append(browser);
+  const heading=document.createElement('h4');heading.textContent=languageCode(hass) === 'pt'?'Este navegador':'This browser';browser.append(heading);(validateLocation.section||dialog.querySelector('[data-settings]')).append(browser);
   root._maraoRefreshSettings=()=>{if(!valid()){busy=false;close();return;}refresh();};
   const refresh=owner?._config.current_room?.enabled?mountLocationPreferences(browser,owner,valid,draft):()=>{};
-  if(!owner?._config.current_room?.enabled){const hint=document.createElement('p');hint.textContent=String(hass.language).startsWith('pt')?'Ative a divisão atual e guarde para escolher o sensor de divisão deste navegador.':'Enable Current room and Save before choosing the Area sensor for this browser.';browser.append(hint);}
+  if(!owner?._config.current_room?.enabled){const hint=document.createElement('p');hint.textContent=languageCode(hass) === 'pt'?'Ative a divisão atual e guarde para escolher o sensor de divisão deste navegador.':'Enable Current room and Save before choosing the Area sensor for this browser.';browser.append(hint);}
 
   const add=mountForm(dialog.querySelector('[data-add]'),{},[schema('destination',t.add,{navigation:{}})],value=>{
     if(!value.destination)return;navigation.haptic('heavy');const view=viewFor(value.destination);
@@ -150,7 +151,7 @@ export async function openDashboardSettings(root,opener,owner) {
     navigation.haptic('heavy');busy=true;sortable.disabled=true;dialog.querySelector('[data-save]').disabled=true;dialog.querySelector('[data-save]').textContent=t.saving;
     try{await saveDashboardSettings(root.hass,path,baseline,draft,valid,JSON.stringify(baseline.marao?.navbar?.current_room)!==JSON.stringify(draft.navbar.current_room)?recovery=>{
       const blob=new Blob([JSON.stringify(recovery,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
-      link.href=url;link.download=`marao-location-recovery-${Date.now()}.json`;link.textContent=String(hass.language).startsWith('pt')?'Descarregar recuperação':'Download recovery';dialog.querySelector('footer').prepend(link);link.click();
+      link.href=url;link.download=`marao-location-recovery-${Date.now()}.json`;link.textContent=languageCode(hass) === 'pt'?'Descarregar recuperação':'Download recovery';dialog.querySelector('footer').prepend(link);link.click();
       const revoke=()=>{URL.revokeObjectURL(url);dialog.removeEventListener('close',revoke);};dialog.addEventListener('close',revoke);
     }:undefined);busy=false;close();}
     catch(error){dialog.querySelector('.status').textContent=error.message==='settings_stale'?t.conflict:(error.message||t.error);busy=false;sortable.disabled=false;dialog.querySelector('[data-save]').disabled=false;dialog.querySelector('[data-save]').textContent=t.save;}

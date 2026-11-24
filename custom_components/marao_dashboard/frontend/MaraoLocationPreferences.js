@@ -1,9 +1,10 @@
+const { languageCode } = await import(new URL(`./MaraoLocale.js${new URL(import.meta.url).search}`, import.meta.url));
 const {locationLabel,deviceRoomPreferenceKey,writeLocationPreference,writeDeviceRoomPreference,readRoomPreference,resolveLocation}=await import(new URL(`./MaraoLocation.js${new URL(import.meta.url).search}`,import.meta.url));
 const {haptic}=await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`,import.meta.url));
 export function mountLocationPreferences(host,owner,isCurrent,draft){
  const hass=owner._hass,user=hass.user.id;owner._routes();const key=owner._locationKey;
  const valid=()=>Boolean(key)&&deviceRoomPreferenceKey(window.location.origin,owner._config.dashboard_root,owner._hass?.user?.id)===key&&!owner._root()?.lovelace?.editMode&&isCurrent()&&owner.isConnected&&!owner._editing&&owner._hass?.connected!==false&&owner._hass?.connection?.connected!==false&&owner._hass?.user?.is_admin&&owner._hass.user.id===user&&owner._locationKey===key&&owner._config.current_room?.enabled;
- const pt=String(hass.language).startsWith('pt'),t=(a,b)=>pt?b:a;
+ const pt=languageCode(hass) === 'pt',t=(a,b)=>pt?b:a;
  const hint=document.createElement('p');hint.textContent=t('Choose the Area sensor for this browser/WebView. No person is required. The choice applies immediately, independently of Save, and stays across reloads while this site’s storage survives. Other browsers, profiles, apps and origins need their own selection.','Escolha o sensor de divisão para este navegador/WebView. Não é necessária uma pessoa. A escolha aplica-se imediatamente, independentemente de Guardar, e mantém-se ao recarregar enquanto o armazenamento deste site existir. Outros navegadores, perfis, aplicações e origens precisam da sua própria seleção.');host.append(hint);
  const form=document.createElement('ha-form');form.hass=hass;form.schema=[{name:'area_sensor',selector:{entity:{domain:['sensor']}}}];form.computeLabel=()=>t('Area sensor for this browser','Sensor de divisão deste navegador');host.append(form);
  const clear=document.createElement('button');clear.type='button';clear.textContent=t('Clear / Reset this selection','Limpar / Repor esta seleção');host.append(clear);

@@ -1,3 +1,4 @@
+import { languageCode } from './MaraoLocale.js';
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const entity = (value, domain) => typeof value === 'string' && new RegExp(`^${domain}\\.[a-z0-9_]+$`).test(value);
 export const PLEX_PLAY_MEDIA = 512;
@@ -42,7 +43,7 @@ export const PLEX_PT = {
   'Use the same Plex server and profile in Home Assistant and Rivulet. Play a title in Rivulet once so Home Assistant can discover a session for browsing. The browse entity is optional and never receives Rivulet playback commands.': 'Use o mesmo servidor e perfil Plex no Home Assistant e no Rivulet. Reproduza um título no Rivulet uma vez para o Home Assistant descobrir uma sessão para explorar. A entidade de exploração é opcional e nunca recebe comandos de reprodução do Rivulet.',
   'No Plex browsing entity for this server. Play a title in Rivulet once, then Retry.': 'Não existe uma entidade de exploração Plex para este servidor. Reproduza um título no Rivulet uma vez e depois tente novamente.',
 };
-export function plexText(hass, value) { return String(hass?.language || hass?.locale?.language || '').startsWith('pt') ? PLEX_PT[value] || value : value; }
+export function plexText(hass, value) { return languageCode(hass) === 'pt' ? PLEX_PT[value] || value : value; }
 export function plexError(error) {
   const message = String(error?.message || error?.body?.message || (typeof error === 'string' ? error : '') || 'Unable to browse Plex.');
   return message.replace(/https?:\/\/[^\s<>"']+/gi, '[Plex URL]').replace(/(?:x-plex-token|token|authsig)\s*[=:]\s*[^\s&,;]+/gi, '[credential]');
