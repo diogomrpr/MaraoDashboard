@@ -641,8 +641,9 @@ Built-in media playback, volume, app and Apple TV remote buttons are tap control
 
 - Camera cards use Home Assistant feeds and Marao-owned Frigate/UniFi Protect
   event presentation. Activating a camera card opens live popup video above events.
-  Dashboard and popup streams use their explicit selected camera entities through
-  native HA playback. Tapping popup video opens that same video full screen. Do not
+  Dashboard and popup streams start with native HA playback for their selected
+  entities. If native playback fails for a Frigate camera, the card can use that
+  camera's authenticated go2rtc proxy. Tapping popup video opens that same video full screen. Do not
   autoplay audio. Show unavailable feeds and provider failures explicitly.
   Healthy camera cards show only full-width video and an optional slim title
   above it. Hidden titles leave no row. Loading, snapshot, buffering and recovery

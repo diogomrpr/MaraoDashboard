@@ -2,7 +2,7 @@
 
 Camera cards use explicit Home Assistant entities. `entity_id` selects the dashboard stream and event identity; optional `variables.popup_stream_entity` selects popup video and otherwise falls back to that entity. Native card forms expose camera selectors and preserve other options. Composition places an untitled camera above the shared recorded-events browser.
 
-Playback uses HA's `ha-camera-stream`, its native WebRTC/fallback behavior and authenticated signaling. Marao does not discover quality variants, probe speed or implement an HLS engine. Fullscreen reuses the native video where supported, with the existing full-window dialog fallback, and restores listeners/controls on exit without forcing orientation.
+Playback starts with HA's `ha-camera-stream` and its native WebRTC/fallback behavior. If that path fails for a camera with Frigate identity metadata, the shared player can start MSE through the Frigate integration's authenticated proxy for that camera. The selected entity supplies the Frigate instance and stream name. Fullscreen reuses the active video, with the full-window dialog fallback, and restores listeners and controls on exit without forcing orientation.
 
 Each stream occurrence owns its async work. Visibility, inert state, removal and changed targets release playback resources. Retired results must not reactivate an old host. Per-offer signaling ownership and cancellation remain separate from the primary HA connection. Do not read or patch private player engine fields.
 

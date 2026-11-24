@@ -1,4 +1,4 @@
-// HA selects native WebRTC where supported, with its native transport fallback.
+// Prefer working HA-native playback; use authorized provider live fallback only after failure.
 // Rechecked 2026-10-18: frontend/src/components/{ha-camera-stream,ha-hls-player,
 // ha-web-rtc-player}.ts on home-assistant/frontend (dev); older hass binding retained.
 export const CAMERA_REGISTRATION_MS = 10000;
@@ -145,7 +145,119 @@ export function cameraVideo(host) {
 
 function decodedFrames(video) {
   const quality = video?.getVideoPlaybackQuality?.();
-  return quality ? quality.totalVideoFrames - quality.droppedVideoFrames : undefined;
+  const frames = quality ? quality.totalVideoFrames - quality.droppedVideoFrames : undefined;
+  return Number.isFinite(frames) ? frames : undefined;
+}
+
+// Frigate documents these attributes on its camera entities. Do not infer a
+// different camera from friendly names, entity suffixes or a default instance.
+export function frigateLiveIdentity(state) {
+  const {client_id:instance,camera_name:camera} = state?.attributes || {};
+  if (typeof instance !== 'string' || typeof camera !== 'string' || !instance || !camera
+    || [instance,camera].some(value => ['.','..','None'].includes(value) || /[/\\\u0000-\u001f]/.test(value))) return null;
+  return {instance,camera};
+}
+const MSE_VIDEO_CODECS = ['avc1.640029','avc1.64002A','avc1.640033','avc1.42E01E','hvc1.1.6.L153.B0'];
+export function cameraMseSupport(scope = globalThis) {
+  const Source = scope.ManagedMediaSource || scope.MediaSource;
+  const codecs = MSE_VIDEO_CODECS.filter(codec => Source?.isTypeSupported?.(`video/mp4; codecs="${codec}"`));
+  return Source && scope.WebSocket && codecs.length ? {Source,codecs} : null;
+}
+export async function frigateLiveURL(hass, entity, signal) {
+  const identity = frigateLiveIdentity(hass.states?.[entity]);
+  if (signal.aborted || !identity || !cameraMseSupport() || !hass.fetchWithAuth || !hass.hassUrl) return null;
+  const instance = encodeURIComponent(identity.instance), source = encodeURIComponent(identity.camera);
+  const base = new URL(hass.hassUrl('/'));
+  const response = await hass.fetchWithAuth(`/api/frigate/${instance}/go2rtc/api/streams?src=${source}`, {signal});
+  let path;
+  if (response.status === 404) path = `/api/frigate/${instance}/mse/api/ws`;
+  else {
+    if (!response.ok) throw new Error('failed');
+    const stream = await response.json();
+    // A src-scoped lookup must describe exactly that stream, never pick an
+    // arbitrary entry from a server-wide list (which may include other cameras).
+    if (!Array.isArray(stream?.producers)) return null;
+    path = `/api/frigate/${instance}/go2rtc/ws/api/ws`;
+  }
+  if (signal.aborted) return null;
+  const signed = await hass.callWS({type:'auth/sign_path',path:`${path}?src=${source}`,expires:60});
+  if (signal.aborted) return null;
+  if (typeof signed?.path !== 'string') throw new Error('failed');
+  const url = new URL(signed.path,base);
+  if (url.origin !== base.origin || url.username || url.password || url.hash || url.pathname !== path
+    || url.searchParams.get('src') !== identity.camera || !url.searchParams.get('authSig')
+    || [...url.searchParams.keys()].sort().join(',') !== 'authSig,src') throw new Error('failed');
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  return url.href;
+}
+
+// Small protocol adapter, not a second camera card. The shared owner decides
+// whether decoded video advances, when to fail over and when to dispose it.
+export class CameraMse {
+  constructor(video, url, failed) {
+    const support = cameraMseSupport();
+    if (!support) throw new Error('compatibility');
+    this.video = video; this.failed = failed; this.queue = []; this.bytes = 0; this.closed = false;
+    this.source = new support.Source();
+    this.socket = new WebSocket(url); this.socket.binaryType = 'arraybuffer';
+    this.fail = () => { if (!this.closed) { this.close(); failed(); } };
+    this.openSource = () => {
+      if (!this.closed && this.socket.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify({type:'mse',value:support.codecs.join(',')}));
+    };
+    this.source.addEventListener('sourceopen',this.openSource,{once:true});
+    this.socket.onopen = () => {
+      if (this.closed) return;
+      try {
+        video.disableRemotePlayback = true;
+        if (globalThis.ManagedMediaSource && this.source instanceof ManagedMediaSource) video.srcObject = this.source;
+        else { this.objectURL = URL.createObjectURL(this.source); video.src = this.objectURL; }
+      } catch { this.fail(); }
+    };
+    this.socket.onmessage = event => {
+      if (this.closed) return;
+      try {
+        if (typeof event.data === 'string') {
+          const message = JSON.parse(event.data);
+          if (message.type === 'error') { this.fail(); return; }
+          if (message.type !== 'mse') return;
+          if (this.buffer || typeof message.value !== 'string' || !support.Source.isTypeSupported(message.value)) { this.fail(); return; }
+          this.buffer = this.source.addSourceBuffer(message.value); this.buffer.mode = 'segments';
+          this.buffer.addEventListener('updateend',this.drain = () => this.append());
+          this.buffer.addEventListener('error',this.fail); this.append();
+        } else if (event.data instanceof ArrayBuffer) {
+          if (this.bytes + event.data.byteLength > 8 * 1024 * 1024) { this.fail(); return; }
+          this.queue.push(event.data); this.bytes += event.data.byteLength; this.append();
+        }
+      } catch { this.fail(); }
+    };
+    this.socket.onerror = this.fail; this.socket.onclose = this.fail;
+  }
+  append() {
+    if (this.closed || !this.buffer || this.buffer.updating) return;
+    try {
+      const ranges = this.buffer.buffered;
+      if (ranges?.length && ranges.end(ranges.length-1) - ranges.start(0) > 30) {
+        this.buffer.remove(ranges.start(0),ranges.end(ranges.length-1)-10); return;
+      }
+      const chunk = this.queue.shift();
+      if (chunk) { this.bytes -= chunk.byteLength; this.buffer.appendBuffer(chunk); }
+      // Starting at the live edge is necessary when the incoming timeline has
+      // a nonzero origin; otherwise Safari can buffer forever at currentTime 0.
+      if (ranges?.length && this.video.currentTime < ranges.start(0)) this.video.currentTime = ranges.start(0);
+    } catch { this.fail(); }
+  }
+  close() {
+    if (this.closed) return;
+    this.closed = true; this.queue = []; this.bytes = 0;
+    this.socket.onopen = this.socket.onmessage = this.socket.onerror = this.socket.onclose = null;
+    this.socket.close();
+    this.source.removeEventListener('sourceopen',this.openSource);
+    this.buffer?.removeEventListener('updateend',this.drain); this.buffer?.removeEventListener('error',this.fail);
+    try { if (this.source.readyState === 'open' && this.buffer) { if (this.buffer.updating) this.buffer.abort(); this.source.removeSourceBuffer(this.buffer); } } catch { /* Browser may already have detached its MediaSource. */ }
+    this.video.pause(); this.video.srcObject = null; this.video.removeAttribute('src'); this.video.load();
+    if (this.objectURL) URL.revokeObjectURL(this.objectURL);
+    this.buffer = null;
+  }
 }
 
 export class CameraPlayback {
@@ -159,7 +271,7 @@ export class CameraPlayback {
       .camera-stage{position:relative;box-sizing:border-box;width:100%;max-width:none;aspect-ratio:16/9;overflow:hidden;background:#000;color:#fff;border:0;padding:0;margin:0;outline:none}
       .camera-stage:modal{--video-max-height:100%;position:fixed;inset:0;width:100dvw;height:100dvh;max-width:100dvw;max-height:100dvh;aspect-ratio:auto;pointer-events:auto}
       .camera-fullscreen-close{display:none}.camera-stage:modal .camera-fullscreen-close{display:block;position:absolute;z-index:3;top:env(safe-area-inset-top,0px);right:env(safe-area-inset-right,0px);width:48px;height:48px;border:0;border-radius:50%;background:#222;color:#fff;font-size:24px;pointer-events:auto}
-      .camera-stage>ha-camera-stream,.camera-poster{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
+      .camera-stage>ha-camera-stream,.camera-stage>video,.camera-poster{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
       .camera-poster{z-index:1;background:#000}.camera-poster[hidden]{display:none}
       .camera-feedback{box-sizing:border-box;display:flex;align-items:center;flex-wrap:wrap;gap:8px;position:absolute;z-index:2;inset:auto 0 0;max-height:100%;overflow:auto;padding:8px;background:var(--ha-card-background,var(--card-background-color,#fff));color:var(--primary-text-color,#000);overflow-wrap:anywhere;font-size:var(--font-size-secondary,1rem);line-height:1.25;pointer-events:auto}
       .camera-feedback[hidden]{display:none}.camera-live[data-camera-state="buffering"] .camera-feedback{inset:auto auto 8px 8px;max-width:calc(100% - 16px);border-radius:8px}
@@ -197,7 +309,9 @@ export class CameraPlayback {
     return true;
   }
   update(hass, entity, label) {
-    const replaced = this.entity !== entity;
+    const identity = JSON.stringify(frigateLiveIdentity(hass?.states?.[entity]));
+    const replaced = this.entity !== entity || this.liveIdentity !== undefined && this.liveIdentity !== identity;
+    this.liveIdentity = identity;
     this.hass = hass; this.entity = entity; this.label = label;
     if (replaced) { this.stop(); this.resetStream(); this.state = 'idle'; this.problem(''); }
     const eligible = this.eligible();
@@ -220,7 +334,7 @@ export class CameraPlayback {
     if (capabilityChanged) { this.stop(); this.state = 'idle'; this.problem(''); }
     this.poster.hidden = this.state === 'live' || this.state === 'buffering' || !picture || this.posterFailed;
     if (!this.attempt && !['error', 'snapshot', 'blocked'].includes(this.state)) this.resetStream();
-    if (this.player) {
+    if (this.player && !this.mse) {
       this.updateNativeHass(); this.player.stateObj = hass.states[this.streamEntity];
       if (!cameraAvailable(hass, this.streamEntity)) { this.fail('failed'); return; }
       if (!clearNativeCameraPoster(this.player)) { this.fail('compatibility'); return; }
@@ -229,13 +343,16 @@ export class CameraPlayback {
     this.describe();
   }
   resetStream() {
-    this.streamEntity = this.entity;
+    this.streamEntity = this.entity; this.fallbackTried = false;
+  }
+  canUseFrigate() {
+    return !this.fallbackTried && frigateLiveIdentity(this.hass?.states?.[this.streamEntity]) && cameraMseSupport();
   }
   async start() {
     // A still-only entity must not start HA's MJPEG fallback or a native session.
-    if (!cameraSupportsStream(this.hass?.states?.[this.entity])) { this.fail('unsupported', true); return; }
-    const generation = ++this.generation;
     if (!this.streamEntity) this.resetStream();
+    if (!cameraSupportsStream(this.hass?.states?.[this.entity])) { this.fail('unsupported', !this.canUseFrigate()); return; }
+    const generation = ++this.generation;
     this.lastProgressAt = performance.now();
     this.attempt = true; this.state = 'loading'; this.reason = ''; this.nativeError = ''; this.problem(''); this.describe();
     this.timer = setTimeout(() => {
@@ -288,7 +405,7 @@ export class CameraPlayback {
     if (generation !== this.generation || !this.player) return;
     const roots = rootsWithin(this.player);
     for (const root of roots) this.mediaObserver.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'hidden'] });
-    if (!clearNativeCameraPoster(this.player, roots)) { this.fail('compatibility'); return; }
+    if (!this.mse && !clearNativeCameraPoster(this.player, roots)) { this.fail('compatibility'); return; }
     const video = cameraVideo(this.player);
     if (video && video === this.video) return;
     if (this.video) {
@@ -299,7 +416,10 @@ export class CameraPlayback {
     this.unbind();
     if (!video) {
       const nativeError = roots.map(root => root.querySelector('ha-alert')?.textContent?.trim()).filter(Boolean).join(' · ');
-      if (nativeError) { this.nativeError = nativeError; this.problem(nativeError); this.describe(); }
+      if (nativeError) {
+        if (this.canUseFrigate()) { this.fail('failed', false, nativeError); return; }
+        this.nativeError = nativeError; this.problem(nativeError); this.describe();
+      }
       // Snapshot-only entities never start a host; its image fallback means streaming failed.
       if (roots.some(root => root.querySelector('img'))) this.fail('failed', false, nativeError);
       return;
@@ -309,7 +429,11 @@ export class CameraPlayback {
     this.mediaHandlers = {
       timeupdate: () => this.progress(generation), playing: () => this.progress(generation),
       waiting: () => this.waiting(), stalled: () => this.waiting(), pause: () => this.waiting(),
-      error: () => { this.nativeError = video.error?.message || this.message('failed'); this.problem(this.nativeError); this.waiting(); this.describe(); },
+      error: () => {
+        if (this.mse || this.canUseFrigate()) { this.fail('failed'); return; }
+        this.nativeError = video.error?.message || this.message('failed');
+        this.problem(this.nativeError); this.waiting(); this.describe();
+      },
       canplay: () => this.autoplay(generation), loadeddata: () => this.autoplay(generation),
     };
     for (const [type, handler] of Object.entries(this.mediaHandlers)) video.addEventListener(type, handler);
@@ -350,8 +474,28 @@ export class CameraPlayback {
     const generation = this.generation;
     this.timer = setTimeout(() => { if (generation === this.generation) this.fail('timeout', false, this.nativeError); }, CAMERA_PLAYBACK_MS);
   }
+  async startFrigate() {
+    const generation = ++this.generation;
+    this.attempt = true; this.state = 'loading'; this.reason = ''; this.nativeError = ''; this.problem(''); this.describe();
+    this.discovery = new AbortController();
+    this.timer = setTimeout(() => { if (generation === this.generation) this.fail('timeout'); }, CAMERA_PLAYBACK_MS);
+    try {
+      const url = await frigateLiveURL(this.hass,this.streamEntity,this.discovery.signal);
+      if (generation !== this.generation || !this.eligible()) return;
+      if (!url) { this.fail('failed'); return; }
+      const video = document.createElement('video');
+      video.muted = true; video.defaultMuted = true; video.autoplay = true; video.playsInline = true; video.controls = false;
+      video.setAttribute('muted',''); video.setAttribute('autoplay',''); video.setAttribute('playsinline','');
+      this.player = video;
+      this.mse = new CameraMse(video,url,() => { if (generation === this.generation) this.fail('failed'); });
+      this.stage.prepend(video); this.mediaObserver = new MutationObserver(() => this.bind(generation));
+      this.lastProgressAt = performance.now(); this.monitor = setInterval(() => this.observeProgress(generation),500); this.bind(generation);
+    } catch { if (generation === this.generation) this.fail('failed'); }
+  }
   fail(reason, snapshot = false, nativeError = "") {
+    const fallback = !snapshot && this.canUseFrigate() && this.eligible?.();
     this.stop();
+    if (fallback) { this.fallbackTried = true; this.startFrigate(); return; }
     if (snapshot && this.posterFailed) { snapshot = false; reason = 'poster_failed'; }
     this.nativeError = nativeError; this.reason = reason; this.state = snapshot ? 'snapshot' : 'error';
     this.poster.hidden = !this.picture || this.posterFailed;
@@ -462,6 +606,7 @@ export class CameraPlayback {
     clearTimeout(this.feedbackRelease); this.feedbackPressed = false;
     if (this.attempt || this.player) ++this.generation;
     clearTimeout(this.timer); clearInterval(this.monitor); this.monitor = null; this.mediaObserver?.disconnect(); this.mediaObserver = null; this.unbind();
+    this.discovery?.abort(); this.discovery = null; this.mse?.close(); this.mse = null;
     this.signaling?.close(); this.signaling = null;
     this.stage?.removeEventListener('context-request', this.contextRequest); this.contextRequest = null; this.contexts?.clear();
     this.player?.remove(); this.player = null; this.attempt = false;
