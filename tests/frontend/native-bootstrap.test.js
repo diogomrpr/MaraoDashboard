@@ -3,16 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {readDashboardSettings} from '../../frontend_src/dashboard-settings.js';
+import {languageCode} from '../../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 
 function harness(window) {
   const calls=[],languages=[];
   const source=fs.readFileSync(new URL('../../frontend_src/native-bootstrap.js',import.meta.url),'utf8')
-    .replace("import {refreshCardMetadata} from './native-card-metadata.js';",'')
-    .replace("import {readDashboardSettings} from './dashboard-settings.js';",'')
-    .replace("import {createPopupCoordinator} from './popup-coordinator.js';",'')
+    .replace(/^import .*;\n/gm,'')
     .replace(/const query = .*?;\nconst navigation = .*?;\n/,'')
     .replaceAll('export function ','function ');
-  const context={window,readDashboardSettings,refreshCardMetadata:hass=>languages.push(hass?.language),createPopupCoordinator:()=>({sync(){},dispose(){}}),navigation:{setDashboardNavigation:(root,config)=>calls.push({root,config})},location:{pathname:'/marao-dashboard/empty'},queueMicrotask(){}};
+  const context={window,readDashboardSettings,languageCode,refreshCardMetadata:hass=>languages.push(hass?.language),createPopupCoordinator:()=>({sync(){},dispose(){}}),navigation:{setDashboardNavigation:(root,config)=>calls.push({root,config})},location:{pathname:'/marao-dashboard/empty'},queueMicrotask(){}};
   context.globalThis=context;
   vm.runInNewContext(source+';globalThis.attach=attachDashboardHost;globalThis.compatible=nativeHostCompatible;globalThis.findHost=findDashboardHost;',context);
   return {...context,calls,languages};
