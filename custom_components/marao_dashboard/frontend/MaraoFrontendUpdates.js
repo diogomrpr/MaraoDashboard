@@ -90,9 +90,17 @@ export function createFrontendUpdates({ host = window, loadedVersion, context, r
           if (event?.data?.url_path && event.data.url_path !== context().dashboard) return;
           startupManifest = undefined;
           const dashboard = context().dashboard;
-          const response = await host.fetch(host.MaraoFrontendPackage.manifestURL,{cache:'no-store',credentials:'same-origin'});
-          if (!response.ok) throw new Error('Could not read the installed Marao frontend identity.');
-          const info = await response.json();
+          const {manifestURL} = host.MaraoFrontendPackage;
+          const loader = host.MaraoInstalledFrontendPackage;
+          let info;
+          if (loader?.manifestURL === manifestURL && typeof loader.readRelease === 'function') {
+            info = await loader.readRelease();
+          } else {
+            // Cached legacy entry points only publish the full manifest URL.
+            const response = await host.fetch(manifestURL,{cache:'no-store',credentials:'same-origin'});
+            if (!response.ok) throw new Error('Could not read the installed Marao frontend identity.');
+            info = await response.json();
+          }
           if (!/^[a-f0-9]{64}$/.test(info.identity || '')) throw new Error('Invalid installed Marao frontend identity.');
           if (token !== generation || stopped || context().dashboard !== dashboard) return;
           // HA regenerates the strategy after native saves; reload only when the installed graph changes.

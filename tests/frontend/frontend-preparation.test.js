@@ -150,11 +150,18 @@ async function nativeFixture(t,{ordinary=false}={}) {
   let document=ordinary?{title:'Saved native edits',marao:{version:1,navbar:{routes:[]},migration:{original_source:'Immutable origin is not active input'}},unknown:{retain:[]},views:[{title:'Home',path:'home',type:'sections',max_columns:8,sections:[{type:'grid',cards:[{type:'markdown',content:'Keep native edits',grid_options:{columns:9},future:[]}]}]},{title:'Cases',path:'card-test',cards:[]}]}:createEnvelope(JSON.stringify({config_version:2,name:'Safe',landing_page:'card-test',navigation:[],pages:[{name:'Cases',path:'card-test',entities:[]}]}),'marao-dashboard');
   const folder='MaraoFrontend', installed=f.remote+'/www/community/'+folder;
   const previous = 'a'.repeat(64) + '--MaraoCards.js';
+  const oldFont='c'.repeat(64)+'--fonts--Montserrat.woff2';
+  const attachment='d'.repeat(64)+'--extra.txt';
   fs.mkdirSync(installed,{recursive:true});fs.writeFileSync(installed+'/'+previous,'old');
+  fs.writeFileSync(installed+'/'+oldFont,'old font bytes');
+  fs.writeFileSync(installed+'/MaraoFrontend.release.json',JSON.stringify({files:localHashes(installed)}));
+  fs.writeFileSync(installed+'/'+previous+'.gz',require('node:zlib').gzipSync('old'));
+  fs.writeFileSync(installed+'/'+attachment,'unmanaged attachment');
   fs.writeFileSync(installed+'/marao-converter.html','offline converter');
   const candidate=f.root+'/native-stage', dist=candidate+'/dist';fs.mkdirSync(dist,{recursive:true});
   const identity='b'.repeat(64);
-  for(const file of ['MaraoFrontend.js','MaraoFrontend.release.json',...['MaraoNativeDashboard.js','MaraoNativeBootstrap.js','MaraoNativeCards.js','MaraoNativeCardEditor.js','MaraoOrdinaryMigration.js','MaraoDashboard.js'].map(file=>identity+'--'+file)]) fs.writeFileSync(dist+'/'+file,'native candidate '+file);
+  for(const file of ['MaraoFrontend.js',...['MaraoNativeDashboard.js','MaraoNativeBootstrap.js','MaraoNativeCards.js','MaraoNativeCardEditor.js','MaraoOrdinaryMigration.js','MaraoDashboard.js'].map(file=>identity+'--'+file)]) fs.writeFileSync(dist+'/'+file,'native candidate '+file);
+  fs.writeFileSync(dist+'/MaraoFrontend.release.json',JSON.stringify({identity,files:localHashes(dist)}));
   f.dependencies.buildFrontend=async()=>({destination:candidate,identity});
   f.dependencies.connect=async()=>({close(){},async call(message) {
     f.calls.push(message.type);
@@ -169,15 +176,16 @@ async function nativeFixture(t,{ordinary=false}={}) {
     if(method==='GET' && endpoint.startsWith('/hacsfiles/'+folder+'/')) {f.calls.push('GET '+endpoint);return fs.readFileSync(installed+'/'+endpoint.split('/').at(-1),'utf8');}
     return api(config,method,endpoint,...args);
   };
-  return {...f,installed,dist,previous,get document(){return document;},replaceDocument(value){document=structuredClone(value);}};
+  return {...f,installed,dist,previous,attachment,get document(){return document;},replaceDocument(value){document=structuredClone(value);}};
 }
 
 function assertNativeInstallation(f) {
   const files = fs.readdirSync(f.dist), js = files.filter(file => file.endsWith('.js'));
-  assert.deepEqual(fs.readdirSync(f.installed).sort(), [...files, ...js.map(file => file+'.gz'), 'marao-converter.html'].sort());
+  assert.deepEqual(fs.readdirSync(f.installed).sort(), [...files, ...js.map(file => file+'.gz'), 'marao-converter.html', f.attachment].sort());
   for (const file of files) assert.deepEqual(fs.readFileSync(path.join(f.installed,file)),fs.readFileSync(path.join(f.dist,file)));
   for (const file of js) assert.deepEqual(require('node:zlib').gunzipSync(fs.readFileSync(path.join(f.installed,file+'.gz'))),fs.readFileSync(path.join(f.dist,file)));
   assert.equal(fs.readFileSync(f.installed+'/marao-converter.html','utf8'),'offline converter');
+  assert.equal(fs.readFileSync(f.installed+'/'+f.attachment,'utf8'),'unmanaged attachment');
 }
 
 test('native sync installs a complete graph without changing source, fixtures or restarting HA; repeat is a no-op',async t=>{

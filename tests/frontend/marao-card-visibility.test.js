@@ -589,6 +589,84 @@ test("graph cards sample full history to a card-scale trace", () => {
   assert.match(markup, /<polygon class="fill"/);
 });
 
+function mountHistoryGraph(hass, entity = 'sensor.power', variables = {}) {
+  const card = new MaraoCard();
+  card.setConfig({entity, template:'md_graph_card', variables});
+  card.hass = hass;
+  return card;
+}
+
+test('duplicate graphs share only the pending read and retain independent live histories', async t => {
+  t.mock.timers.enable({apis:['Date'], now:Date.parse('2026-10-31T12:00:00.990Z')});
+  const entity = 'sensor.power', pending = Promise.withResolvers(), urls = [];
+  const stamp = ago => new Date(Date.now() - ago).toISOString();
+  const reading = (value, ago) => ({state:value, attributes:{unit_of_measurement:'W'}, last_updated:stamp(ago)});
+  const hass = {connection:{}, user:{id:'one'}, states:{[entity]:reading('4', 1000)},
+    callApi: (_method, url) => { urls.push(url); return pending.promise; }};
+  const first = mountHistoryGraph(hass);
+  t.mock.timers.tick(20);
+  const second = mountHistoryGraph({...hass, states:{...hass.states}});
+  assert.equal(urls.length, 1, 'Nearly simultaneous starts also share across a wall-clock second');
+  const records = [reading('3', 2000)];
+  pending.resolve([records]);
+  await new Promise(resolve => setImmediate(resolve));
+  first._rememberGraphReading(entity, reading('5', 0));
+  assert.deepEqual(first._graphHistory.get(entity).map(r => r.state), ['3','5']);
+  assert.deepEqual(second._graphHistory.get(entity).map(r => r.state), ['3']);
+  assert.deepEqual(records.map(r => r.state), ['3']);
+  mountHistoryGraph(hass);
+  assert.equal(urls.length, 2, 'New cards read fresh history after settlement');
+  await new Promise(resolve => setImmediate(resolve));
+});
+
+test('graph reads isolate query flags, connection, user, entity, new observations and later windows', async t => {
+  t.mock.timers.enable({apis:['Date'], now:Date.parse('2026-10-31T12:00:00Z')});
+  const calls = [];
+  const state = {state:'4', attributes:{}, last_updated:new Date().toISOString()};
+  const hass = {connection:{}, user:{id:'one'}, states:{'sensor.power':state, 'sensor.other':state},
+    callApi: (_method, url) => { const call = Promise.withResolvers(); calls.push({url, ...call}); return call.promise; }};
+  const graph = mountHistoryGraph(hass);
+  mountHistoryGraph(hass, 'sensor.power', {display_precision:2});
+  assert.match(calls[0].url, /no_attributes=/);
+  assert.doesNotMatch(calls[1].url, /no_attributes=/);
+  mountHistoryGraph({...hass, connection:{}});
+  mountHistoryGraph({...hass, user:{id:'two'}});
+  mountHistoryGraph(hass, 'sensor.other');
+  const newer = mountHistoryGraph({...hass, states:{'sensor.power':{...state, last_updated:'2026-10-31T12:00:00.001Z'}}});
+  t.mock.timers.tick(1001);
+  mountHistoryGraph(newer._hass);
+  assert.equal(calls.length, 7);
+  calls[0].reject(new Error('Recorder unavailable'));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok(graph._graphErrors.has('sensor.power'));
+  const joined = mountHistoryGraph(newer._hass);
+  assert.equal(calls.length, 7, 'Settling the older window preserves the newer pending read');
+  for (const call of calls.slice(1, -1)) call.resolve([]);
+  calls.at(-1).reject(new Error('Recorder unavailable'));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok(joined._graphErrors.has('sensor.power'));
+  const retry = mountHistoryGraph(newer._hass);
+  assert.equal(calls.length, 8, 'Failed reads leave no shared cache entry');
+  calls.at(-1).resolve([]);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(retry._graphStatus('sensor.power'), 'empty');
+});
+
+test('a graph switching users discards the former user’s pending history', async () => {
+  const calls = [];
+  const entity = 'sensor.power';
+  const hass = {connection:{}, user:{id:'one'}, states:{[entity]:{state:'4', attributes:{}}},
+    callApi: () => { const call = Promise.withResolvers(); calls.push(call); return call.promise; }};
+  const graph = mountHistoryGraph(hass);
+  hass.user.id = 'two';
+  graph.hass = hass;
+  assert.equal(calls.length, 2);
+  calls[1].resolve([]);
+  calls[0].resolve([[{state:'125', attributes:{}, last_updated:new Date().toISOString()}]]);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(graph._graphStatus(entity), 'empty');
+});
+
 test("graph history failures remain readable without repeated requests and recover after reconnect", async () => {
   const card = new MaraoCard();
   card.setConfig({ entity: "sensor.power", template: "md_graph_card" });

@@ -24,3 +24,12 @@ No data migration. Build, run targeted units, install backend/frontend once with
 Targeted asset tests passed (compression/identity and stale/partial-package rejection), as did history/calendar/energy/navbar units and registration assertions. Existing local navbar browser checks passed in Chromium and WebKit, including recovery with blocked runtime, edit-mode header restoration, view replacement and shell cleanup. Camera transport/playback checks and the full suite were not run.
 
 Installed fingerprint `0795d3ba6d0a75af` on disposable HA. Dashboard and configuration bytes and 195 helper values were preserved. A cold/warm browser sample confirmed 186296 encoded bytes for 583108 decoded bytes of Marao scripts, zero script transfer on warm reload, successful Rooms navigation and no page exceptions. This is desktop Chromium evidence, not real-phone timing. Local empty-month bucket microbenchmark improved from roughly 4.8 ms to 0.04 ms per call after cache reuse; it does not predict total popup latency.
+
+## Native cache follow-up
+
+The starting point is `d92de6c6`. The affected consumers are daily and monthly energy cards, cards showing 24-hour graphs, HACS startup and update detection, and owned font and image references in the package. The acceptance cases cover period rollover during an in-flight read, concurrent graph mounts, same-size package replacement, older loaders and installs, and reuse of the same media bytes across releases.
+
+- Cache each energy period's request start as well as its completion. An open interval needs a final read when revisited after its end. A read crossing that boundary cannot overwrite the final result.
+- Coalesce overlapping Recorder reads for equivalent graph requests on the same authenticated connection. Keep rendered histories and live observations local to each card.
+- Put a small JSON release record on the first line of the stable HACS JavaScript entry. A loader fetches that entry fresh as text and reads the record. Every supported native package has this entry, including packages installed by a rollback. Entries predating the record resolve through their full release manifest. The public inventory and old cached loaders keep their existing contract.
+- Address each owned font and image by its SHA-256 and flat path. The stable aliases referenced by saved picture cards continue to ship. Executable modules still belong to one release graph.

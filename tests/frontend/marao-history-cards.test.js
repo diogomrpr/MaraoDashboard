@@ -331,6 +331,50 @@ for (const period of ['month', 'day']) test(`energy ${period} prefetches four pe
   assert.equal(urls.filter(url => url.includes(currentKey)).length, count + 1, 'returning to a stale current period refreshes it');
 });
 
+for (const period of ['day', 'month']) test(`energy fetches the final ${period} once after the calendar boundary`, async t => {
+  t.mock.timers.enable({apis:['Date'], now:Date.parse('2026-10-31T23:59:59.900Z')});
+  const card = create(MaraoEnergyPeriodCard, false);
+  card.setConfig({...card._config, period});
+  let value = '100';
+  const reads = [];
+  card._hass = {states:{'sensor.history':state()}, config:{time_zone:'UTC'}, callApi:async (_method, url) => {
+    reads.push(url);
+    return [[{...state(value), entity_id:'sensor.history'}]];
+  }};
+  await card._load();
+  const original = reads[0];
+  value = '105';
+  t.mock.timers.tick(200);
+  await card._load();
+  card._offset = -1; await card._load();
+  assert.equal(card._history[0].state, '105');
+  assert.equal(reads.filter(url => url === original).length, 2, 'A partial interval needs one final query even within the freshness minute');
+  t.mock.timers.tick(61000);
+  card._offset = 0; await card._load();
+  card._offset = -1; await card._load();
+  assert.equal(reads.filter(url => url === original).length, 2, 'The finalized interval is reusable on later visits');
+});
+
+test('an energy read spanning midnight cannot replace the final history for the selected day', async t => {
+  t.mock.timers.enable({apis:['Date'], now:Date.parse('2026-10-31T23:59:59.900Z')});
+  const card = create(MaraoEnergyPeriodCard, false);
+  const partial = Promise.withResolvers();
+  let reads = 0;
+  const records = value => [[{...state(value), entity_id:'sensor.history'}]];
+  card._hass = {states:{'sensor.history':state()}, config:{time_zone:'UTC'}, callApi:async () =>
+    ++reads === 1 ? partial.promise : records('105')};
+  const startedBeforeMidnight = card._load();
+  t.mock.timers.tick(200);
+  card._offset = -1;
+  await card._load();
+  assert.equal(card._history[0].state, '105', 'The selected day can start its final read while the partial read is pending');
+  partial.resolve(records('100'));
+  await startedBeforeMidnight;
+  await card._load();
+  assert.equal(card._history[0].state, '105');
+  assert.equal(reads, 2);
+});
+
 test('energy navigation shares pending background requests and retries failed cached periods', async () => {
   const card = create(MaraoEnergyPeriodCard), urls = [];
   let finish, fail = false;

@@ -1258,6 +1258,27 @@ export function energyLabel(reading, variables, hass) {
 }
 
 const historyTimestamps = new WeakMap();
+const pendingGraphReads = new WeakMap();
+function graphHistoryRead(hass, entity, includeAttributes) {
+  const owner = hass.connection || hass;
+  let reads = pendingGraphReads.get(owner);
+  if (!reads) { reads = new Map(); pendingGraphReads.set(owner, reads); }
+  const key = JSON.stringify([hass.user?.id, entity, includeAttributes]);
+  const end = Date.now(), pending = reads.get(key);
+  const state = stateOf(hass, entity);
+  const observed = state.last_updated ?? state.last_changed ?? state.state;
+  // Cards mounting together may ask a few milliseconds apart. Keep the exact
+  // window of the first request and start a new one for later mounts.
+  if (pending && pending.observed === observed && end >= pending.end && end - pending.end < 1000) return pending;
+  const start = new Date(end - 24 * 60 * 60 * 1000);
+  const query = new URLSearchParams({ filter_entity_id: entity, end_time: new Date(end).toISOString() });
+  if (!includeAttributes) { query.set("minimal_response", ""); query.set("no_attributes", ""); }
+  const entry = { end, observed, forget() { if (reads.get(key) === entry) reads.delete(key); } };
+  entry.promise = hass.callApi("GET", `history/period/${start.toISOString()}?${query}`).finally(entry.forget);
+  reads.set(key, entry);
+  return entry;
+}
+
 function historyTimestamp(record) {
   if (!historyTimestamps.has(record)) {
     const stamp = record.time ?? record.timestamp ?? record.last_updated ?? record.last_changed;
@@ -1423,10 +1444,15 @@ export class MaraoCard extends BaseElement {
     const graphEntity = this._config.variables?.graph_entity || this._config.variables?.power_entity
       || (["md_graph_card", "md_toggle_graph_card"].includes(this._config.template) ? entity : "");
     const graphAvailability = this._graphAvailability(graphEntity, value);
-    if (graphEntity && this._graphAvailabilityState !== graphAvailability) {
+    const graphOwnerChanged = graphEntity && (this._graphConnection !== value?.connection || this._graphUser !== value?.user?.id);
+    if (graphEntity) { this._graphConnection = value?.connection; this._graphUser = value?.user?.id; }
+    if (graphEntity && (this._graphAvailabilityState !== graphAvailability || graphOwnerChanged)) {
+      this._graphRequests.get(graphEntity)?.forget();
       this._graphRequests.delete(graphEntity);
       this._graphHistory.delete(graphEntity);
       this._graphErrors.delete(graphEntity);
+      this._graphData = null;
+      this._ownedGraphRecords = null;
     } else if (graphEntity && !graphAvailability && this._graphHistory.has(graphEntity)
       && previous?.states?.[graphEntity] !== value?.states?.[graphEntity]) {
       // Keep actual live observations once a newer report replaces them, so an
@@ -1436,7 +1462,7 @@ export class MaraoCard extends BaseElement {
     this._graphAvailabilityState = graphAvailability;
     const accessSlide = this.shadowRoot?.querySelector('marao-slide-to-open');
     // Keep the elements under a scrolling finger mounted when other entities update.
-    if (!previewChanged && previous?.states && value?.states && this._config.template !== 'md_header_card'
+    if (!previewChanged && !graphOwnerChanged && previous?.states && value?.states && this._config.template !== 'md_header_card'
       && wasServiceReady === this._serviceReady
       && previous.connected === value.connected && previous.connection?.connected === value.connection?.connected
       && ["themes", "locale", "language", "localize", "entities", "services", "config", "callApi"].every(key => previous[key] === value[key])
@@ -1860,17 +1886,10 @@ export class MaraoCard extends BaseElement {
   _loadGraphHistory(entity) {
     if (this.isConnected === false || !entity || this._graphAvailability(entity) || !this._hass?.callApi || this._graphHistory.has(entity)
       || this._graphErrors.has(entity) || this._graphRequests.has(entity)) return;
-    const request = Symbol(entity);
+    const read = graphHistoryRead(this._hass, entity, this._energyGraphSource(stateOf(this._hass, entity)));
+    const request = { forget: read.forget };
     this._graphRequests.set(entity, request);
-    const end = new Date();
-    const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-    const query = new URLSearchParams({
-      filter_entity_id: entity,
-      end_time: end.toISOString(),
-    });
-    const state = stateOf(this._hass, entity);
-    if (!this._energyGraphSource(state)) { query.set("minimal_response", ""); query.set("no_attributes", ""); }
-    this._hass.callApi("GET", `history/period/${start.toISOString()}?${query}`)
+    read.promise
       .then((response) => {
         if (this._graphRequests.get(entity) !== request || this.isConnected === false) return;
         this._graphHistory.set(entity, Array.isArray(response?.[0]) ? response[0] : []);

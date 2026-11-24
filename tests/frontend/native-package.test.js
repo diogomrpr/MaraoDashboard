@@ -67,12 +67,26 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     const mediaBase=pathToFileURL(fs.realpathSync(path.join(directory,'dist',first.identity+'--MaraoCards.js'))).href;
     for(const app of mediaApps){const image=new AssetURL('./media-apps/'+(app.file||app.id+'.png'),mediaBase);assert.ok(fs.existsSync(image),app.id+' chooser image ships in the flat package');assert.equal(image.protocol,'file:');}
     const base=pathToFileURL(fs.realpathSync(asset)).href;
+    const sourceDirectory = path.resolve('custom_components/marao_dashboard/frontend');
+    const owned = JSON.parse(fs.readFileSync(path.join(sourceDirectory,'marao-owned-assets.json')));
+    const mediaURLs = new Map();
+    for (const file of owned.filter(name => /\.(?:svg|png|jpe?g|webp|gif|ttf|woff2?|ico)$/i.test(name))) {
+      const digest = createHash('sha256').update(fs.readFileSync(path.join(sourceDirectory,file))).digest('hex');
+      const flat = file.replaceAll('/','--');
+      const name = digest+'--'+flat;
+      const url = new AssetURL('./'+file+'?v=old#detail',base);
+      assert.equal(path.basename(url.pathname),name,file+' URL must change with its bytes');
+      assert.equal(url.search,'?v=old');assert.equal(url.hash,'#detail');
+      assert.equal(manifest.files[name],digest);
+      assert.equal(manifest.files['MaraoAsset--'+flat],digest,'Saved picture/font aliases still address the same bytes');
+      mediaURLs.set(file,name);
+    }
     const css = fs.readFileSync(path.join(directory,'dist',first.identity+'--MaraoFonts.css'),'utf8');
-    const font = first.identity+'--fonts--Montserrat.woff2';
+    const font = mediaURLs.get('fonts/Montserrat.woff2');
     assert.ok(css.includes(`url('${font}') format('woff2')`));
     assert.equal(fs.readFileSync(path.join(directory,'dist',font)).toString('ascii',0,4),'wOF2');
     assert.ok(fs.readFileSync(path.join(directory,'dist','MaraoAsset--fonts--Montserrat.ttf')).equals(fs.readFileSync('custom_components/marao_dashboard/frontend/fonts/Montserrat.ttf')));
-    for (const file of ['MaraoNativeCardEditor.js','MaraoOrdinaryMigration.js','MaraoNativeBootstrap.js','brand/mark.svg','fonts/Montserrat.ttf','MaraoTheme.js']) {
+    for (const file of ['MaraoNativeCardEditor.js','MaraoOrdinaryMigration.js','MaraoNativeBootstrap.js','MaraoTheme.js']) {
       const url=new AssetURL('./'+file+'?v=old#detail',base);
       assert.equal(path.basename(url.pathname),first.identity+'--'+file.replaceAll('/','--'));
       assert.equal(url.search,'?v=old');assert.equal(url.hash,'#detail');
@@ -88,6 +102,14 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     assert.equal(fs.existsSync(path.join(directory,'dist','obsolete.js')),false);
     assert.ok(fs.existsSync(path.join(directory,'dist',first.identity+'--fonts--OFL.txt')));
     const next=await buildFrontend(directory,'0.22.0-beta.2');assert.notEqual(next.identity,first.identity);
+    const nextBase = pathToFileURL(fs.realpathSync(path.join(directory,'dist',next.identity+'--MaraoNativeDashboard.js'))).href;
+    const {AssetURL: NextURL} = await import(pathToFileURL(path.join(directory,'dist',next.identity+'--MaraoAssetURL.js')));
+    for (const [file,name] of mediaURLs) {
+      const url = new NextURL('./'+file,nextBase);
+      assert.equal(path.basename(url.pathname),name,'Unchanged media must retain its URL through an upgrade: '+file);
+      assert.ok(fs.existsSync(url));
+    }
+    assert.ok(fs.readFileSync(path.join(directory,'dist',next.identity+'--MaraoFonts.css'),'utf8').includes(`url('${font}')`));
     assert.ok(fs.existsSync(path.join(directory,'dist',stableImage)),'Persisted ordinary image addresses survive a package identity change');
     assert.equal(JSON.parse(fs.readFileSync(path.join(directory,'dist','MaraoFrontend.release.json'))).package_version,'0.22.0-beta.2');
     const nextIndex=JSON.parse(fs.readFileSync(path.join(directory,'dist','MaraoAuthoring.json')));
@@ -104,8 +126,16 @@ test('a cached HACS loader hints only installed modules until a runtime owns the
   const resolver=identity+'--MaraoAssetURL.js';
   const original={window:globalThis.window,document:globalThis.document,fetch:globalThis.fetch};
   t.after(()=>Object.assign(globalThis,original));
-  const hints=[];
-  globalThis.fetch=async()=>({ok:true,json:async()=>({compiler_contract:1,identity,files:{[resolver]:'checksum'}})});
+  const hints=[],requests=[];
+  let entryText='// Previously installed loader without an embedded release record';
+  globalThis.fetch=async(url,options)=>{
+    assert.equal(options.cache,'no-store');
+    const file=path.basename(new URL(url).pathname);
+    requests.push(file);
+    if(file==='MaraoFrontend.js')return new Response(entryText);
+    assert.equal(file,'MaraoFrontend.release.json');
+    return Response.json({compiler_contract:1,identity,files:{[resolver]:'checksum'}});
+  };
   globalThis.window={};
   globalThis.document={createElement:()=>({}),head:{append:link=>hints.push([link.rel,path.basename(new URL(link.href).pathname)])}};
   await import(pathToFileURL(loader));
@@ -113,6 +143,21 @@ test('a cached HACS loader hints only installed modules until a runtime owns the
   window.MaraoDashboardRuntime={};
   await import(pathToFileURL(loader).href+'?second-registration');
   assert.equal(hints.length,1,'A second resource keeps the active graph');
+  assert.deepEqual(requests,['MaraoFrontend.js','MaraoFrontend.release.json','MaraoFrontend.js','MaraoFrontend.release.json']);
+  const meta=JSON.parse(fs.readFileSync(path.resolve('dist/MaraoFrontend.release.json')));
+  entryText=fs.readFileSync(path.resolve('dist/MaraoFrontend.js'),'utf8');
+  const readRelease=window.MaraoInstalledFrontendPackage.readRelease;
+  requests.length=0;
+  const current=await readRelease();
+  assert.equal(current.identity,meta.identity);
+  assert.equal(current.package_version,meta.package_version);
+  assert.ok(current.preload.every(file=>Object.hasOwn(meta.files,meta.identity+'--'+file)));
+  const different='b'.repeat(64);
+  entryText=entryText.replace(meta.identity,different);
+  assert.equal((await readRelease()).identity,different,'Same-length replacement is visible on the next check');
+  entryText=entryText.replace(different,'invalid');
+  await assert.rejects(readRelease(),/Invalid Marao frontend identity/);
+  assert.deepEqual(requests,Array(3).fill('MaraoFrontend.js'),'Reads the current release record without downloading the hash inventory');
 });
 
 test('Duplicate frontend entry points share one document runtime without mixing graph ownership', async () => {

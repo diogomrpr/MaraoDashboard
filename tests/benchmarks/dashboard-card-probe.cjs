@@ -9,12 +9,16 @@ function probe({ origin, route }) {
   const resourceSummary = () => {
     let encoded = 0, maraoEncoded = 0, transfer = 0, count = 0;
     const assets = {};
-    let cachedCount = 0;
+    let cachedCount = 0, releaseChecks = 0, releaseTransfer = 0;
     for (const entry of performance.getEntriesByType("resource")) {
       count++;
       encoded += entry.encodedBodySize;
       transfer += entry.transferSize;
       const pathname = new URL(entry.name).pathname;
+      if (entry.initiatorType === "fetch" && /^\/hacsfiles\/[^/]+\/MaraoFrontend(?:\.release\.json|\.js)$/.test(pathname)) {
+        releaseChecks++;
+        releaseTransfer += entry.transferSize;
+      }
       if (!/^\/(?:api\/marao_dashboard|marao_dashboard)\//.test(pathname) && !/^\/hacsfiles\/[^/]+\/[a-f0-9]{64}--/i.test(pathname)) continue;
       const name = pathname.split("/").pop().replace(/^[a-f0-9]{16,64}--/i, "").replace(/^fonts--/, "");
       if (!/^(?:Marao[a-zA-Z0-9._-]*|Montserrat[a-zA-Z0-9._-]*|marao-[a-zA-Z0-9._-]*)\.(?:[cm]?js|json|woff2|ttf|css)$/i.test(name)) continue;
@@ -22,7 +26,7 @@ function probe({ origin, route }) {
       assets[name] = (assets[name] ?? 0) + entry.encodedBodySize;
       if (!entry.transferSize) cachedCount++;
     }
-    return { encoded, maraoEncoded, transfer, count, assets, cachedCount };
+    return { encoded, maraoEncoded, transfer, count, assets, cachedCount, releaseChecks, releaseTransfer };
   };
   window.addEventListener("pagehide", () => {
     window.benchSignal({ event: "exit", docKey, resources: resourceSummary() });

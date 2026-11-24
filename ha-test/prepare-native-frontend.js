@@ -39,6 +39,22 @@ function matchesInstalledPackage(config, destination, ssh, assets, installed, ex
     decoded[index].split(/\s+/)[0] === assets[file.slice(0, -3)]);
 }
 
+// HACS can install arbitrary release attachments alongside the declared graph.
+// A hash prefix alone does not establish that an attachment belonged to Marao.
+function retainedAttachments(config, destination, ssh, installed, expected) {
+  const extra = Object.keys(installed).filter(file => !Object.hasOwn(expected, file));
+  const graphName = /^(?:[a-f0-9]{64}--|MaraoAsset--)[^/]+$/;
+  const manifest = 'MaraoFrontend.release.json';
+  if (!installed[manifest] || !extra.some(file => graphName.test(file))) return extra;
+  const bytes = ssh(config, 'cat ' + quote(destination + '/' + manifest)).stdout;
+  assert.equal(hash(bytes), installed[manifest], 'Installed manifest changed during native preparation');
+  let files;
+  try { files = JSON.parse(bytes)?.files; }
+  catch { return extra; } // Preserve unproven ownership while repairing a partial installation.
+  if (!files || typeof files !== 'object' || Array.isArray(files)) return extra;
+  return extra.filter(file => !graphName.test(file) || !Object.hasOwn(files, file.replace(/(\.js)\.gz$/, '$1')));
+}
+
 async function nativeState(config,connect=client.connect) {
   const connection=await connect(config);
   try {
@@ -100,10 +116,7 @@ async function prepareNativeFrontend(config,state,dependencies={}) {
   const frontendRoot=path.join(candidate.destination,'dist'), assets=localHashes(frontendRoot), installed=frontendHashes(config,destination,ssh);
   const sidecars = hacsSidecars(frontendRoot, assets);
   const expected = {...assets, ...Object.fromEntries([...sidecars].map(([name, bytes]) => [name, hash(bytes)]))};
-  // HACS may also install release attachments, such as the offline converter.
-  // A previous version's fingerprinted graph and stable owned aliases are replaceable.
-  const retained = Object.keys(installed).filter(file => !Object.hasOwn(expected, file) &&
-    !/^(?:[a-f0-9]{64}--|MaraoAsset--)[^/]+$/.test(file));
+  const retained = retainedAttachments(config, destination, ssh, installed, expected);
   for (const file of retained) expected[file] = installed[file];
   const reusable = matchesInstalledPackage(config, destination, ssh, assets, installed, expected, sidecars);
   const documentBefore=JSON.stringify(state.dashboard), version=candidate.identity;

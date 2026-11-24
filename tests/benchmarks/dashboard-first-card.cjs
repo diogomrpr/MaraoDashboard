@@ -22,7 +22,7 @@ assert(arm && /^[a-z0-9_-]+$/i.test(arm) && Object.hasOwn(profiles, profile) && 
 assert(/^\/marao-dashboard(?:\/[a-z0-9_-]+)?\/?$/i.test(route) && (!warm || warm === "warm"));
 
 function totals(summaries) {
-  const result = {count: 0, encoded: 0, transfer: 0, maraoEncoded: 0, cachedCount: 0};
+  const result = {count: 0, encoded: 0, transfer: 0, maraoEncoded: 0, cachedCount: 0, releaseChecks: 0, releaseTransfer: 0};
   const assets = {};
   for (const summary of summaries) {
     for (const key of Object.keys(result)) result[key] += summary[key];

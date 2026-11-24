@@ -76,6 +76,20 @@ test('only the initial native subscription reuses a fresh check for the same ins
   await flush();assert.equal(reconnecting.checks(),1);
 });
 
+test('native update events use the installed loader’s fresh release check', async t => {
+  const version='a'.repeat(64), next='b'.repeat(64);
+  const e=automatic(t,{native:true,version,loaderSample:{manifestCheckedAt:10000}});
+  let reads=0;
+  e.host.MaraoInstalledFrontendPackage.readRelease=async()=>{reads++;return {identity:next};};
+  await flush();
+  assert.equal(reads,0,'Startup consumes the validated loader sample');
+  e.nativeEvent({url_path:'marao-dashboard'});
+  await flush();
+  assert.equal(reads,1);
+  assert.equal(e.checks(),0,'Matching loader and active root use the compact record');
+  assert.equal(e.refreshes.length,1);
+});
+
 test('native configuration events use HA rendering while graph changes defer and refresh once', async t => {
   const e=automatic(t,{native:true,version:'a'.repeat(64)});await flush();assert.equal(e.checks(),1);
   e.nativeEvent({url_path:'another-dashboard'});await flush();assert.equal(e.checks(),1);

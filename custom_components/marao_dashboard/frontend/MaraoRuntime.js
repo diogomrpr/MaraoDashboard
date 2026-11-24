@@ -1984,14 +1984,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     clearTimeout(this._refreshTimer);
     if (!this.isConnected || this.preview) return;
     this._refreshTimer = setTimeout(() => {
-      if (!this.preview && document.visibilityState !== 'hidden' && !historyEntityState(this._hass, this._config) && !this._loading) {
-        const key = this._range().start.toISOString();
-        const cached = this._periodCache.get(key)?.result;
-        if (key !== this._loadedKey || cached && !cached.failed && Date.now() - cached.loadedAt >= 60000) {
-          this._loadedKey = '';
-          this._load();
-        }
-      }
+      this._load();
       this._scheduleRefresh();
     }, 60000);
   }
@@ -2057,7 +2050,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const key = range.start.toISOString();
     let entry = this._periodCache.get(key);
     if (!entry) {
-      entry = {};
+      entry = { requestedAt: Date.now() };
       this._periodCache.set(key, entry);
       entry.promise = this._fetchPeriod(range).then(result => (entry.result = { ...result, loadedAt: Date.now() }));
     }
@@ -2126,16 +2119,18 @@ class MaraoEnergyPeriodCard extends HTMLElement {
   async _load() {
     if (this.isConnected === false || this.preview || globalThis.document?.visibilityState === "hidden" || !this._config || historyEntityState(this._hass, this._config)) return;
     const range = this._range(), key = range.start.toISOString();
-    if (this._loadedKey === key) return;
+    const cached = this._periodCache.get(key), now = Date.now();
+    // Only a read issued after the boundary can cover the complete day or month.
+    const expired = now >= +range.end ? cached?.requestedAt < +range.end
+      : cached?.result && !cached.result.failed && now - cached.result.loadedAt >= 60000;
+    if (this._loadedKey === key && !expired) return;
     this._loadedKey = key;
     const loadId = ++this._loadId;
     if (this._periodCache.size) {
       const nearby = new Set(this._nearbyPeriods().map(range => range.start.toISOString()));
       for (const cachedKey of this._periodCache.keys()) if (!nearby.has(cachedKey)) this._periodCache.delete(cachedKey);
     }
-    const cached = this._periodCache.get(key)?.result;
-    // The open period is still accumulating; refresh it on return after a minute.
-    if (cached?.failed || cached && key === this._range(0).start.toISOString() && Date.now() - cached.loadedAt >= 60000) this._periodCache.delete(key);
+    if (expired || cached?.result?.failed) this._periodCache.delete(key);
     const entry = this._requestPeriod(range);
     if (!entry.result) {
       this._loading = true;
@@ -2145,6 +2140,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     }
     const result = entry.result || await entry.promise;
     if (loadId !== this._loadId || this.isConnected === false) return;
+    if (key !== this._range().start.toISOString() || entry.requestedAt < +range.end && Date.now() >= +range.end) return this._load();
     this._series = result.series;
     this._history = result.series[this._config.entity]?.records || [];
     this._error = Boolean(result.error || result.series[this._config.entity]?.error);
