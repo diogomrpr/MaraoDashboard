@@ -89,3 +89,60 @@ export function createActivity(host, options) {
   query();
   return {update(next){hass=next.hass;},destroy(){destroyed=true;generation++;for(const control of [...dropdowns])control.destroy();host.replaceChildren();}};
 }
+
+// The chart switch belongs to the expanded activity sheet. Ordinary activity
+// lists keep their existing controls and do not request chart code.
+export function createActivityDetail(host, options, {owner, scroll, current, label, haptic, loadHistoryChart}) {
+  const activity = createActivity(host, options);
+  scroll.style.overflow = 'hidden';
+  scroll.style.display = 'flex';
+  scroll.style.flexDirection = 'column';
+  host.style.cssText = 'display:flex;flex-direction:column;min-height:0;flex:1';
+  if (!owner._graphEntity?.() || !['md_sensor_card','md_switch_card'].includes(owner._config.template)) return activity;
+
+  const button = caption => {
+    const control = document.createElement('button');
+    control.type = 'button'; control.textContent = caption;
+    control.style.cssText = 'min-height:48px;min-width:48px';
+    return control;
+  };
+  const chart = button(label('activity.chart', 'Chart'));
+  let graph, graphHost, error;
+  const showActivity = () => {
+    graph?.destroy(); graph = null;
+    graphHost?.remove(); graphHost = null;
+    host.querySelector('.marao-activity').hidden = false;
+  };
+  chart.onclick = async () => {
+    if (!current() || chart.disabled) return;
+    haptic('heavy');
+    if (graphHost) { showActivity(); return; }
+    chart.disabled = true;
+    try {
+      const module = await loadHistoryChart();
+      if (!current()) return;
+      const back = button(label('activity.title', 'Activity'));
+      back.onclick = chart.onclick;
+      graphHost = document.createElement('div');
+      const canvas = document.createElement('div');
+      graphHost.append(back, canvas); host.append(graphHost);
+      graph = module.createHistoryChart(canvas, owner._historyOptions());
+      error?.remove(); error = null;
+      host.querySelector('.marao-activity').hidden = true;
+    } catch {
+      if (!current()) return;
+      showActivity();
+      if (!error) {
+        error = document.createElement('p');
+        error.setAttribute('data-chart-error', ''); error.setAttribute('role', 'alert');
+        host.append(error);
+      }
+      error.textContent = label('timeline.history_unavailable', 'History unavailable');
+    } finally { chart.disabled = false; }
+  };
+  host.querySelector('header')?.append(chart);
+  return {
+    update(next) { activity.update(next); graph?.update(owner._historyOptions()); },
+    destroy() { graph?.destroy(); graphHost?.remove(); activity.destroy(); },
+  };
+}

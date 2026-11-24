@@ -1,8 +1,39 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {dishwasherControls, startDishwasherProgram} from '../../custom_components/marao_dashboard/frontend/MaraoCards.js';
+import {dishwasherControls, registerMaraoCards, startDishwasherProgram} from '../../custom_components/marao_dashboard/frontend/MaraoCards.js';
 import {getExample, getScenario} from '../../docs/examples/manifest.js';
 import {createSimulation} from '../../docs/playground/simulation.js';
+
+test('direct dishwasher controls display current state after a close during the first detail import', async t => {
+  const previous = {customElements:globalThis.customElements, document:globalThis.document};
+  t.after(() => Object.assign(globalThis, previous));
+  const registry = new Map();
+  globalThis.customElements = {get:name => registry.get(name), define:(name, ctor) => registry.set(name, ctor)};
+  globalThis.document = {createElement:() => ({setAttribute(){}})};
+  registerMaraoCards();
+  const control = Object.assign(Object.create(registry.get('marao-dishwasher-controls').prototype), {
+    isConnected:false, setAttribute(){}, removeAttribute(){},
+    shadowRoot:{innerHTML:'', replaceChildren(){}, querySelector:() => null, querySelectorAll:() => []},
+  });
+  const config = {entity:'sensor.dishwasher', variables:{}};
+  const hass = {language:'en', states:{'sensor.dishwasher':{state:'ready', attributes:{}}}};
+  control.setConfig(config);
+  control.hass = hass;
+  assert.equal(control._loading, undefined);
+  control.isConnected = true;
+  control.connectedCallback();
+  const loading = control._loading;
+  assert.ok(loading instanceof Promise);
+  control.isConnected = false;
+  control.disconnectedCallback();
+  await loading;
+  assert.equal(control.shadowRoot.innerHTML, '');
+  control.isConnected = true;
+  control.connectedCallback();
+  assert.match(control.shadowRoot.innerHTML, /class="cycle-sheet"/);
+  assert.match(control.shadowRoot.innerHTML, /monitor_only/);
+  control.disconnectedCallback();
+});
 
 test('dishwasher Start requires a ready appliance and targets its selected program device', () => {
   const example = getExample('dishwasher').scenarios.find(item => item.id === 'ready');

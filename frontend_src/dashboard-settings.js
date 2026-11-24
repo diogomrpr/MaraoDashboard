@@ -1,5 +1,6 @@
 import {locationError} from '../custom_components/marao_dashboard/frontend/MaraoLocation.js';
-export const SETTINGS_VERSION = 1;
+import {readSettings, validateSettings} from './dashboard-settings-validation.js';
+export {SETTINGS_VERSION} from './dashboard-settings-validation.js';
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 export function dashboardViewForAddress(document, dashboardPath, address, origin) {
@@ -31,24 +32,8 @@ export function moveNavbarRoute(routes, oldIndex, newIndex) {
   return next;
 }
 
-export function validateDashboardSettings(value) {
-  if (!object(value) || value.version !== SETTINGS_VERSION) throw new Error('Unsupported Marao dashboard settings version.');
-  if (!object(value.navbar) || !Array.isArray(value.navbar.routes)) throw new Error('Marao navigation requires a route list.');
-  for (const route of value.navbar.routes) {
-    if (!object(route) || typeof (route.url || route.path) !== 'string' || !(route.url || route.path).trim()
-      || typeof route.label !== 'string' || !route.label.trim()) throw new Error('Each navigation destination needs an address and label.');
-    const address = route.url || route.path;
-    if (!address.startsWith('/') && !/^https?:\/\//i.test(address)) throw new Error('Navigation addresses must be dashboard paths or HTTP links.');
-  }
-  const error=locationError(value.navbar.current_room);if(error)throw new Error(error);
-  for (const key of ['show_cache_reset', 'show_editor_button']) if (Object.hasOwn(value, key) && typeof value[key] !== 'boolean') throw new Error('Marao shortcut settings must be booleans.');
-  return value;
-}
-
-export function readDashboardSettings(document) {
-  if (!Object.hasOwn(document || {}, 'marao')) return undefined;
-  return validateDashboardSettings(document.marao);
-}
+export const validateDashboardSettings = value => validateSettings(value, locationError);
+export const readDashboardSettings = document => readSettings(document, locationError);
 
 export function patchDashboardSettings(document, settings) {
   if (!object(document) || document.strategy || !Array.isArray(document.views)) throw new Error('Use an ordinary Home Assistant dashboard.');

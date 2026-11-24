@@ -1,11 +1,16 @@
+import { sha256 } from './recovery-hash.js';
 import { convertDocument } from './convert-document.js';
 import { resolveSource } from './compile-dashboard.js';
 import { nativeCardType } from './card-composition.js';
 import { validateDashboardSettings } from './dashboard-settings.js';
 import { parseCardYaml, parseCardsYaml } from './lovelace-model.js';
 import { rewriteOwnedAssets } from './native-dependencies.js';
-import { compactMigrationProvenance, provenanceLeafRecords } from './ordinary-provenance.js';
+import { compactMigrationProvenance, expandMigrationProvenance, provenanceLeafRecords } from './ordinary-provenance.js';
 import { copy, domain, entries, object, parseSource, SourceError, STRATEGY_TYPE, unwrapDocument } from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
+
+import { detachMigrationProvenance, readMigrationArchive, matchesEmbeddedOrigin } from './migration-archive.js';
+export { archiveFromBackup, detachMigrationProvenance, readMigrationArchive, restoreMigrationProvenance, validateMigrationReference } from './migration-archive.js';
+export { sha256 } from './recovery-hash.js';
 
 export const ORDINARY_MIGRATION_VERSION = 1;
 const own = (value, key) => Object.hasOwn(value, key);
@@ -213,51 +218,47 @@ export function convertOrdinaryDocument(text, context = {}) {
     source, fromVersion: legacy.fromVersion, root, privacy: legacy.privacy, accounting: origin.accounting, assumptions: legacy.assumptions, supplements: copy(context.supplements || []) };
 }
 
-// SHA-256 integrity also works on a local HTTP HA origin without SubtleCrypto.
-// These hashes detect changed recovery data; they are not authentication or locks.
-export async function sha256(text) {
-  const bytes = new TextEncoder().encode(text);
-  if (globalThis.crypto?.subtle) return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(byte => byte.toString(16).padStart(2, '0')).join('');
-  const constants = [], initial = [];
-  for (let candidate = 2; constants.length < 64; candidate++) {
-    let prime = true;
-    for (let divisor = 2; divisor * divisor <= candidate; divisor++) if (candidate % divisor === 0) { prime = false; break; }
-    if (prime) { if (initial.length < 8) initial.push((Math.sqrt(candidate) % 1 * 0x100000000) | 0); constants.push((Math.cbrt(candidate) % 1 * 0x100000000) | 0); }
-  }
-  const padded = new Uint8Array(Math.ceil((bytes.length + 9) / 64) * 64); padded.set(bytes); padded[bytes.length] = 128;
-  const data = new DataView(padded.buffer), bits = bytes.length * 8;
-  data.setUint32(padded.length - 8, Math.floor(bits / 0x100000000)); data.setUint32(padded.length - 4, bits >>> 0);
-  const rotate = (value, count) => value >>> count | value << (32 - count), words = new Int32Array(64), state = initial;
-  for (let offset = 0; offset < padded.length; offset += 64) {
-    for (let index = 0; index < 64; index++) {
-      if (index < 16) words[index] = data.getInt32(offset + index * 4);
-      else { const a = words[index - 15], b = words[index - 2]; words[index] = words[index - 16] + (rotate(a, 7) ^ rotate(a, 18) ^ a >>> 3) + words[index - 7] + (rotate(b, 17) ^ rotate(b, 19) ^ b >>> 10); }
-    }
-    let [a, b, c, d, e, f, g, h] = state;
-    for (let index = 0; index < 64; index++) {
-      const first = h + (rotate(e, 6) ^ rotate(e, 11) ^ rotate(e, 25)) + (e & f ^ ~e & g) + constants[index] + words[index];
-      const second = (rotate(a, 2) ^ rotate(a, 13) ^ rotate(a, 22)) + (a & b ^ a & c ^ b & c);
-      h = g; g = f; f = e; e = d + first | 0; d = c; c = b; b = a; a = first + second | 0;
-    }
-    [a, b, c, d, e, f, g, h].forEach((value, index) => { state[index] = state[index] + value | 0; });
-  }
-  return state.map(value => (value >>> 0).toString(16).padStart(8, '0')).join('');
+// Only authoring and recovery entry points call this. Ordinary startup uses
+// HA's native views and never opens or validates a separate archive.
+export async function prepareArchivedConversion(text, context = {}) {
+  const result = convertOrdinaryDocument(text, context);
+  // Preserve the exact stored v1 or v2 record when detaching an existing
+  // ordinary dashboard, including older records eligible for compaction.
+  const native = result.kind === 'ordinary' ? result.originalDocument : result.document;
+  const { document, archive } = await detachMigrationProvenance(native);
+  if (!archive) return { ...result, archive: null };
+  if (result.kind !== 'ordinary') return { ...result, document, archive };
+  if (!isRoot(context.dashboardRoot)) fail('dashboard_root_needed');
+  const origin = expandMigrationProvenance(archive.record);
+  return { ...result, changed: true, document, archive, root: context.dashboardRoot, fromVersion: origin.source_version,
+    sourceText: origin.original_source, supplements: origin.supplements, accounting: origin.accounting };
 }
 
 export async function createRecoveryExport(result, { packageVersion = '', originalDocument = result.originalDocument, root = result.root } = {}) {
   if (!result.changed || !isRoot(root) || typeof result.originalText !== 'string' || !object(originalDocument)) fail('native_recovery_missing');
-  const record = { kind: 'marao-native-conversion', version: 1, root, original_text: result.originalText, original_document: copy(originalDocument),
+  const detached = result.document?.marao?.migration?.version === 3;
+  if (detached) await readMigrationArchive(result.document.marao.migration, result.archive);
+  const record = { kind: 'marao-native-conversion', version: detached ? 2 : 1, root, original_text: result.originalText, original_document: copy(originalDocument),
     source_text: result.sourceText, supplements: copy(result.supplements || []), proposed_document: copy(result.document),
     manifest: { source_version: result.fromVersion, native_authoring_version: 1, package_version: packageVersion } };
+  if (detached) record.migration_archive = copy(result.archive);
   record.sha256 = await recoveryHashes(record);
   return record;
 }
 
-const recoveryHashes = async record => Object.fromEntries(await Promise.all(['original_text', 'original_document', 'source_text', 'supplements', 'proposed_document', 'manifest', 'root'].map(async key => [key, await sha256(typeof record[key] === 'string' ? record[key] : canonicalDocument(record[key]))])));
+async function recoveryHashes(record) {
+  const fields = ['original_text', 'original_document', 'source_text', 'supplements', 'proposed_document', 'manifest', 'root'];
+  if (record.version === 2) fields.push('migration_archive');
+  return Object.fromEntries(await Promise.all(fields.map(async key => [key,
+    await sha256(typeof record[key] === 'string' ? record[key] : canonicalDocument(record[key]))])));
+}
 
 export async function validateRecoveryExport(record) {
-  if (!object(record) || record.kind !== 'marao-native-conversion' || record.version !== 1 || !isRoot(record.root) || typeof record.original_text !== 'string' || typeof record.source_text !== 'string' || !object(record.original_document) || !Array.isArray(record.supplements) || !object(record.manifest) || record.manifest.native_authoring_version !== 1 || typeof record.manifest.package_version !== 'string' || !object(record.sha256)) fail('native_recovery_invalid');
+  if (!object(record) || record.kind !== 'marao-native-conversion' || ![1, 2].includes(record.version) || !isRoot(record.root) || typeof record.original_text !== 'string' || typeof record.source_text !== 'string' || !object(record.original_document) || !Array.isArray(record.supplements) || !object(record.manifest) || record.manifest.native_authoring_version !== 1 || typeof record.manifest.package_version !== 'string' || !object(record.sha256)) fail('native_recovery_invalid');
   validateOrdinaryDocument(record.proposed_document);
+  const reference = record.proposed_document.marao?.migration;
+  if (record.version === 2) await readMigrationArchive(reference, record.migration_archive);
+  else if (reference?.version === 3) fail('native_recovery_missing');
   const hashes = await recoveryHashes(record);
   if (canonicalDocument(hashes) !== canonicalDocument(record.sha256)) fail('native_recovery_changed');
   return record;
@@ -274,6 +275,14 @@ export function classifyRecovery(current, record) {
   if (current?.marao?.migration?.version === 2 && proposed.marao?.migration?.version === 1) {
     const migration = compactMigrationProvenance(proposed.marao.migration);
     if (value === canonicalDocument({...proposed, marao:{...proposed.marao, migration}})) return 'converted';
+  }
+  const reference = current?.marao?.migration, embedded = proposed.marao?.migration;
+  if (reference?.version === 3 && [1, 2].includes(embedded?.version)
+    && value === canonicalDocument({...proposed, marao:{...proposed.marao, migration:reference}})) {
+    if (matchesEmbeddedOrigin(reference, embedded)) return 'converted';
+    // An older receipt may predate both compaction and detachment.
+    const compact = compactMigrationProvenance(embedded);
+    if (compact !== embedded && matchesEmbeddedOrigin(reference, compact)) return 'converted';
   }
   return 'divergent';
 }

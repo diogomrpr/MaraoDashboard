@@ -171,7 +171,7 @@ function validateLegacy(source) {
   }
 }
 
-const LEGACY_NAMES = Object.freeze({ home: 'Home', rooms: 'Rooms', security: 'Security', energy: 'Energy', wallbox: 'Wallbox', media: 'Media', lights: 'Lights', blinds: 'Blinds', climate: 'Climate', maintenance: 'Maintenance' });
+const LEGACY_NAMES = /* @__PURE__ */ Object.freeze({ home: 'Home', rooms: 'Rooms', security: 'Security', energy: 'Energy', wallbox: 'Wallbox', media: 'Media', lights: 'Lights', blinds: 'Blinds', climate: 'Climate', maintenance: 'Maintenance' });
 const onlyEntities = value => entries(value).filter(item => typeof item.entity_id === 'string');
 
 function legacyContainer(source, kind, registry) {
@@ -361,9 +361,9 @@ function orderedPages(source, context) {
 }
 
 // Source-format steps are retained as new steps are appended; release numbers are unrelated.
-export const SOURCE_MIGRATIONS = Object.freeze([
-  Object.freeze({ from: 0, to: 1, convert: explicitMembership }),
-  Object.freeze({ from: 1, to: 2, convert: orderedPages }),
+export const SOURCE_MIGRATIONS = /* @__PURE__ */ Object.freeze([
+  /* @__PURE__ */ Object.freeze({ from: 0, to: 1, convert: explicitMembership }),
+  /* @__PURE__ */ Object.freeze({ from: 1, to: 2, convert: orderedPages }),
 ]);
 
 export function runMigrationChain(source, context, migrations, currentVersion) {

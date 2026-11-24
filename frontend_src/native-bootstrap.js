@@ -1,6 +1,6 @@
 import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {refreshCardMetadata} from './native-card-language.js';
-import {readDashboardSettings} from './dashboard-settings.js';
+import {readSettings} from './dashboard-settings-validation.js';
 import {createPopupCoordinator} from './popup-coordinator.js';
 // Cached older loaders publish installed metadata before loading this graph.
 if (globalThis.window?.MaraoInstalledFrontendPackage && !window.MaraoFrontendPackage) {
@@ -23,13 +23,16 @@ export function findDashboardHost(path) {
 
 // The resources can register before HA has mounted its first Lovelace view.
 // Give that view a paint before using the link for other cards.
-export function waitForInitialViewPaint(demand) {
+export function waitForInitialViewPaint(demand, cardPaint) {
   const path = rootPath(), address = location.pathname;
   const panel = document.querySelector('home-assistant')?.hass?.panels?.[path];
   if (panel?.component_name !== 'lovelace' || document.hidden || demand.aborted) return;
   return new Promise(resolve => {
-    let observed, mutation, painting = false, firstCheck = true;
+    let observed, mutation, painting = false;
+    let finished = false;
     const finish = () => {
+      if (finished) return;
+      finished = true;
       checkInitialView = null;
       mutation?.disconnect();
       clearTimeout(timeout);
@@ -46,12 +49,31 @@ export function waitForInitialViewPaint(demand) {
       if (root.lovelace.rawConfig?.strategy || root.lovelace.config?.strategy || root.lovelace.editMode) return finish();
       if (painting) return;
       const index = root.lovelace.current_view;
-      const active = [...root.shadowRoot.querySelectorAll('#view hui-view')].some(view =>
+      const active = [...root.shadowRoot.querySelectorAll('#view hui-view')].find(view =>
         !view.hidden && (index == null || view.index == null || view.index === index));
       if (active) {
-        if (firstCheck) return finish();
         painting = true;
-        requestAnimationFrame(() => requestAnimationFrame(finish));
+        const dashboard = root.lovelace.config || root.lovelace.rawConfig;
+        const view = dashboard?.views?.[index ?? active.index ?? 0];
+        const usesMaraoCard = node => typeof node?.type === 'string' && node.type.startsWith('custom:marao-')
+          || (Array.isArray(node?.cards) && node.cards.some(usesMaraoCard)) || (Array.isArray(node?.sections) && node.sections.some(usesMaraoCard))
+          || Boolean(node?.card && usesMaraoCard(node.card));
+        // Give ordinary cards a layout pass to report a visible surface.
+        // Only an otherwise empty first screen needs to start raw custom
+        // cards from the view definition before that first card paints.
+        const afterLayout = () => {
+          if (finished) return;
+          const runtime = window.MaraoDashboardRuntime;
+          if (cardPaint && runtime?.hasVisibleCard) {
+            cardPaint.then(finish);
+            return;
+          }
+          const specialty = runtime?.loadViewContent?.(view);
+          if (specialty) specialty.then(() => requestAnimationFrame(() => requestAnimationFrame(finish)), finish);
+          else if (cardPaint && usesMaraoCard(view)) cardPaint.then(finish);
+          else finish();
+        };
+        requestAnimationFrame(() => requestAnimationFrame(afterLayout));
       } else if (observed !== root.shadowRoot) {
         mutation?.disconnect();
         observed = root.shadowRoot;
@@ -68,7 +90,6 @@ export function waitForInitialViewPaint(demand) {
     window.addEventListener('location-changed', check);
     window.addEventListener('popstate', check);
     check();
-    firstCheck = false;
   });
 }
 
@@ -95,7 +116,7 @@ export function attachDashboardHost(root) {
       if (!config || config.strategy) {navigation.setDashboardNavigation(root, null);return;}
       this.path ||= path;
       try {
-        const settings = readDashboardSettings(config);
+        const settings = readSettings(config, navigation.locationError);
         navigation.setDashboardNavigation(root, settings ? {...settings.navbar,
           show_cache_reset: settings.show_cache_reset !== false, show_editor_button: settings.show_editor_button !== false,
           dashboard_root: path, native_editor: true} : null);

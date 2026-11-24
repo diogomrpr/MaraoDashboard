@@ -1,5 +1,5 @@
 // Playwright serializes this self-contained function into each document.
-function probe({ origin, route }) {
+function probe({ origin, route, trace }) {
   if (window.top !== window || location.origin !== origin) return;
   const docKey = crypto.randomUUID?.() ?? String(Math.random());
   performance.setResourceTimingBufferSize(4000);
@@ -97,6 +97,7 @@ function probe({ origin, route }) {
   const tick = () => {
     const found = observe();
     if ((!visibleDone && found.visible) || (!usableDone && found.usable)) {
+      const observedAt = trace ? performance.now() : undefined;
       requestAnimationFrame(() => requestAnimationFrame(() => {
         const now = observe();
         const marks = {};
@@ -108,7 +109,13 @@ function probe({ origin, route }) {
           marks.usable = now.usable;
           usableDone = true;
         }
-        if (Object.keys(marks).length) window.benchSignal({ event: "mark", docKey, marks, resources: resourceSummary() });
+        if (Object.keys(marks).length) {
+          if (trace) {
+            const samples = window.dashboardSurfaceMarks ||= {};
+            for (const name of Object.keys(marks)) samples[name] = {observedAt, confirmedAt:performance.now()};
+          }
+          window.benchSignal({ event: "mark", docKey, marks, resources: resourceSummary() });
+        }
         if (!usableDone || !visibleDone) setTimeout(tick, 40);
       }));
     } else if (!usableDone || !visibleDone) setTimeout(tick, 40);

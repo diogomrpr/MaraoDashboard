@@ -21,3 +21,12 @@ The [HACS startup follow-up](first-visit-hacs.md) compares the installed first-p
 The [cache fixes and warm startup measurements](cache-behavior.md) cover energy rollover, the release check, cross-release font and image reuse, and shared pending graph reads.
 
 The [WebSocket startup trace](websocket-startup.md) measures the saved dashboard transfer, the lossless provenance reduction and the cold slow-4G icon downloads.
+
+The [first-card dependency review and recovery measurements](essential-startup.md) cover archive access, editing, settings, optional renderers and the remaining Home Assistant startup traffic.
+
+## Native first-card dependencies and archived recovery
+
+- [x] Keep converted dashboards intact and verify on-demand archive storage, recovery and export.
+- [x] Separate editing, settings, hidden popup contents and specialty code from the ordinary card path. Preserve direct specialty loading and input priority.
+- [x] Install the package, measure three cold and warm pairs on each shaped link, and compare the full first-card requests and HA configuration frame.
+- [x] Check all 16 captured direct links, native editing, popup actions and a single-dispatch disposable helper.

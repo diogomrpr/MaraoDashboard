@@ -6,6 +6,7 @@ import {SETTINGS_ROW_CSS} from '../../frontend_src/settings-row.js';
 import {languageCode} from '../../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {validateDashboardSettings,readDashboardSettings,patchDashboardSettings,saveDashboardSettings,dashboardViewForAddress,patchNavbarRoute,moveNavbarRoute} from '../../frontend_src/dashboard-settings.js';
 import {mountLocationSettings} from '../../frontend_src/location-settings.js';
+import {mountMigrationSettings} from '../../frontend_src/dashboard-migration-settings.js';
 
 function mappingDOM(t){
  const previous=globalThis.document;t.after(()=>{globalThis.document=previous;});
@@ -53,7 +54,7 @@ function loadingDialogFixture() {
   const root={isConnected:true,hass:{language:'en',user:{id:'admin',is_admin:true},callWS(){settingsStarted=true;return settings;}},shadowRoot:new Node()};
   const source=readFileSync(new URL('../../frontend_src/dashboard-settings-dialog.js',import.meta.url),'utf8')
     .replace(/^const \{mountLocationPreferences\}=await import.*\n/m,'').replace(/^import .*\n/gm,'').replace(/^const navigation=await import.*\n/m,'const navigation=globalThis.navigation;\n').replace('export async function','async function');
-  const context={SETTINGS_ROW_CSS,languageCode,document:{createElement:()=>new Node()},location:{pathname:'/house/home'},window:{addEventListener(){}},customElements:{get:()=>false},
+  const context={SETTINGS_ROW_CSS,languageCode,mountMigrationSettings,document:{createElement:()=>new Node()},location:{pathname:'/house/home'},window:{addEventListener(){}},customElements:{get:()=>false},
     loadCardHelpers(){controlsStarted=true;return controls;},navigation:{focusRestorer:()=>()=>{},haptic(){}},mountLocationSettings(){return()=>{};},AbortController,structuredClone,readDashboardSettings,moveNavbarRoute,queueMicrotask};
   vm.runInNewContext(source+';globalThis.openSettings=openDashboardSettings;',context);
   return {root,open:()=>context.openSettings(root,{}),started:()=>settingsStarted&&controlsStarted,resolveSettings,rejectSettings,

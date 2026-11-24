@@ -1864,6 +1864,8 @@ test('live group filtering retains eligible nodes, cancels removed controls and 
     popup._config = { entity_group: { entity_type: 'light', popup_filter: 'active', entities: ['light.first', 'light.second'] },
       cards: [{ entity: 'light.first' }, { entity: 'light.second' }] };
     popup._overlay = { querySelector: selector => selector === '.marao-popup-content' ? host : close };
+    // This fixture represents an already opened group with its renderer mounted.
+    popup._renderGroup = (await import('../../custom_components/marao_dashboard/frontend/MaraoGroupDetails.js')).reconcileGroup;
     popup._groupChildren = new Map(); popup._groupHelpers = { createCardElement: node };
     popup._groupLayout=new Map([['',{cells:host,buttons:[],info:{},entities:['light.first','light.second']}]]);
     popup.hass = { states: { 'light.first': { state: 'on' }, 'light.second': { state: 'on' } } };

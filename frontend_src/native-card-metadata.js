@@ -1,12 +1,17 @@
-import {editorLabel} from './editor-labels.js';
+import {languageCode} from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
+import {nativeCardPortuguese} from './native-card-data.js';
 import {cardText, refreshCardMetadata} from './native-card-language.js';
 export {refreshCardMetadata};
+
+export function nativeCardLabel(label, hass) {
+  return languageCode(hass) === 'pt' && Object.hasOwn(nativeCardPortuguese, label) ? nativeCardPortuguese[label] : label;
+}
 
 export function registerCardMetadata(picker, registration, label, description = label) {
   if (picker.some(card => card.type === registration.type)) return;
   // The registering bundle supplies the translations. The host also refreshes
   // picker entries on dashboards with no mounted Marao cards.
-  Object.defineProperty(registration, cardText, {value:{label, description, translate:editorLabel}});
+  Object.defineProperty(registration, cardText, {value:{label, description, translate:nativeCardLabel}});
   picker.push(registration);
   refreshCardMetadata(undefined, [registration]);
 }

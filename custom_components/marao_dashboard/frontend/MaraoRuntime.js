@@ -10,11 +10,15 @@ async function waitForHomeAssistantRegistry() {
 }
 await waitForHomeAssistantRegistry();
 const cardsModule = await import(new URL(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
-const { nativeEditing, bindNativeEditing, loadHistoryChart, createHistoryPlaceholder, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, fitNativeGrid, updateCardSurface, problemLabel, showCardDetails, layoutState, registerMaraoCards } = cardsModule;
+const { nativeEditing, bindNativeEditing, loadHistoryChart, createHistoryPlaceholder, historySamples, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, fitNativeGrid, updateCardSurface, problemLabel, showCardDetails, layoutState, registerMaraoCards } = cardsModule;
+const {periodRange:historyPeriodRange, energyBuckets, statisticsBuckets, energyTotal} =
+  await import(new URL(`./MaraoHistoryData.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
 registerMaraoCards();
-await import(new URL(`./MaraoFloorPlanCard.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
-await import(new URL(`./MaraoSchedules.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
-await import(new URL(`./MaraoNativeCards.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
+// Older installations can register this file directly as their resource.
+if (!window.MaraoDashboardRuntime) {
+  await Promise.all(['MaraoFloorPlanCard.js','MaraoSchedules.js','MaraoNativeCards.js'].map(file =>
+    import(new URL(`./${file}${MARAO_RESOURCE_QUERY}`, import.meta.url))));
+}
 
 const MARAO_FONT_URL = new URL(`./MaraoFonts.css${MARAO_RESOURCE_QUERY}`,import.meta.url).href;
 const { languageCode, formatLocale } = await import(new URL(`./MaraoLocale.js${new URL(import.meta.url).search}`, import.meta.url));
@@ -2402,11 +2406,41 @@ window.MaraoDashboard = {
 window.dispatchEvent(new Event('marao-runtime-ready'));
 console.info("%c Marao Dashboard loaded", "color: #d4b392; font-weight: 700;");
 
-// Optional content must not delay registration of basic dashboard cards.
-await Promise.all([
-  import(new URL(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`, import.meta.url)).then(module => module.registerMaraoCameraEventCards()),
-  Promise.all([
+let preloadRegistration;
+export function startCameraPreloading() {
+  return preloadRegistration ||= Promise.all([
     import(new URL(`./MaraoNavigation.js${MARAO_RESOURCE_QUERY}`, import.meta.url)),
-    import(new URL(`./MaraoCameraPreload.js${MARAO_RESOURCE_QUERY}`, import.meta.url)),
-  ]).then(([navigation, camera]) => navigation.registerCameraPreloader(record => camera.syncCameraPreload(record, {localize, haptic}))),
-]);
+    import(new URL(`./MaraoCameraPreloadConfig.js${MARAO_RESOURCE_QUERY}`, import.meta.url)),
+  ]).then(([navigation, {preloadCameras}]) => {
+    // HA reuses the Lovelace config object across state updates. Evaluate the
+    // opt-in once per document and load playback only when a camera requests it.
+    const checked = new WeakSet();
+    let loading;
+    navigation.registerCameraPreloader(record => {
+      const config = record.root.lovelace?.config || record.root.lovelace?.rawConfig;
+      if (loading || !config || checked.has(config)) return;
+      checked.add(config);
+      if (!preloadCameras(config).size) return;
+      loading = import(new URL(`./MaraoCameraPreload.js${MARAO_RESOURCE_QUERY}`, import.meta.url)).then(camera => {
+        // Registration revisits the current live records after async import.
+        navigation.registerCameraPreloader(active => camera.syncCameraPreload(active, {localize, haptic}));
+      }).catch(error => {
+        loading = null;
+        console.error('Marao camera preload could not initialize', error);
+        if (!record.released) record.root.dispatchEvent(new CustomEvent('hass-notification', {
+          bubbles:true, composed:true, detail:{message:localize('camera.failed', record.root.hass) + ' ' + error.message},
+        }));
+      });
+    });
+  }).catch(error => {
+    preloadRegistration = null;
+    throw error;
+  });
+}
+
+if (!window.MaraoDashboardRuntime) {
+  await Promise.all([
+    import(new URL(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`, import.meta.url)).then(module => module.registerMaraoCameraEventCards()),
+    startCameraPreloading(),
+  ]);
+}

@@ -1,6 +1,7 @@
 import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import { assertNativeSupport, readMetadata } from './native-session.js';
-import { canonicalDocument, classifyDashboard, classifyRecovery, convertOrdinaryDocument, createRecoveryExport, validateRecoveryExport } from './ordinary-model.js';
+import { archiveFromBackup, canonicalDocument, classifyDashboard, classifyRecovery, prepareArchivedConversion, createRecoveryExport, validateRecoveryExport } from './ordinary-model.js';
+import { ensureMigrationArchive } from './migration-archive-store.js';
 import { copy, SourceError } from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
 
 const fail = code => { throw new SourceError(code, '$'); };
@@ -10,10 +11,10 @@ export class OrdinaryConversionSession {
   constructor(hass, root, { compatibility, packageVersion = '' } = {}) {
     if (typeof root !== 'string' || !/^[a-z0-9][a-z0-9_-]*-[a-z0-9_-]+$/.test(root)) fail('dashboard_root_needed');
     this.hass = hass; this.root = root; this.compatibility = compatibility; this.packageVersion = packageVersion;
-    this._epoch = 0; this._saving = null; this._uncertain = false;
+    this._epoch = 0; this._saving = null; this._uncertain = false; this.canRestoreArchive = false;
   }
 
-  invalidate() { this._epoch++; this._invalidated = true; this.acknowledgement = null; }
+  invalidate() { this._epoch++; this._invalidated = true; this.acknowledgement = null; this.canRestoreArchive = false; }
 
   async current() {
     assertNativeSupport(this.hass);
@@ -24,10 +25,10 @@ export class OrdinaryConversionSession {
     if (this._saving) fail('native_conversion_busy');
     this._requireAdmin();
     const epoch = ++this._epoch;
-    this.result = null; this.recovery = null; this.acknowledgement = null; this._uncertain = false;
+    this.result = null; this.recovery = null; this.acknowledgement = null; this._uncertain = false; this.canRestoreArchive = false;
     const baseline = await this.current();
     const classified = classifyDashboard(baseline);
-    if (classified.kind === 'ordinary') fail('ordinary_conversion_unneeded');
+    if (classified.kind === 'ordinary' && ![1, 2].includes(baseline.marao?.migration?.version)) fail('ordinary_conversion_unneeded');
     // Existing registrations are never recreated or silently retargeted.
     if (classified.kind === 'strategy' && baseline.strategy.dashboard_root !== this.root) fail('native_root_conflict');
     await this._requireCompatibility();
@@ -38,11 +39,11 @@ export class OrdinaryConversionSession {
       // A separate source export is accepted only when it matches the saved source.
       if (canonicalDocument(input.document) !== canonicalDocument(classified.source)) fail('native_conversion_stale');
     } else if (canonicalDocument(input.document) !== canonicalDocument(baseline)) fail('native_conversion_stale');
-    const metadata = context.entities && context.areas ? context : { ...await readMetadata(this.hass), ...context };
+    const metadata = classified.kind === 'ordinary' || context.entities && context.areas ? context : { ...await readMetadata(this.hass), ...context };
     // A pasted source can identify the same strategy, but its outer envelope is
     // still authoritative for opaque native settings and recovery provenance.
     const conversionText = classified.kind === 'strategy' && input.kind !== 'strategy' ? JSON.stringify(baseline, null, 2) + '\n' : supplied;
-    const result = convertOrdinaryDocument(conversionText, { ...metadata, dashboardRoot: this.root, language: languageCode(this.hass) });
+    const result = await prepareArchivedConversion(conversionText, { ...metadata, dashboardRoot: this.root, language: languageCode(this.hass) });
     result.originalText = supplied;
     const recovery = await createRecoveryExport(result, { originalDocument: baseline, root: this.root, packageVersion: this.packageVersion });
     if (epoch !== this._epoch) fail('native_conversion_stale');
@@ -67,32 +68,51 @@ export class OrdinaryConversionSession {
     this._epoch++; this.recovery = copy(recovery); this.baseline = copy(recovery.original_document);
     this.result = { document: copy(recovery.proposed_document) }; this.acknowledgement = null;
     this._uncertain = state === 'divergent';
+    this.canRestoreArchive = state === 'converted' && current.marao?.migration?.version === 3;
     return state;
   }
 
   async inspectRecovery() {
     if (!this.recovery) fail('native_recovery_missing');
     await validateRecoveryExport(this.recovery);
-    const state = classifyRecovery(await this.current(), this.recovery);
+    const current = await this.current(), state = classifyRecovery(current, this.recovery);
     this._uncertain = state === 'divergent';
+    this.canRestoreArchive = state === 'converted' && current.marao?.migration?.version === 3;
     return state;
   }
 
   save() {
     if (this._saving) return this._saving;
-    const pending = this._save().finally(() => { if (this._saving === pending) this._saving = null; });
+    const pending = this._save().then(result => { this.canRestoreArchive = false; return result; })
+      .finally(() => { if (this._saving === pending) this._saving = null; });
     this._saving = pending; return pending;
   }
 
   async _save() {
     this._requireAdmin();
     const epoch = this._epoch;
+    const hass = this.hass, connection = hass.connection, user = hass.user?.id;
+    const isCurrent = () => epoch === this._epoch && !this._invalidated && this.hass.user?.is_admin
+      && this.hass.user.id === user && this.hass.connection === connection;
     if (!this.recovery || !this.result || this.acknowledgement !== canonicalDocument(this.recovery)) fail('native_recovery_missing');
     if (this._uncertain) fail('native_conversion_recheck');
     await validateRecoveryExport(this.recovery);
     await this._requireCompatibility();
-    const current = await this.current(), state = classifyRecovery(current, this.recovery);
-    if (epoch !== this._epoch) fail('native_conversion_stale');
+    let current = await this.current(), state = classifyRecovery(current, this.recovery);
+    if (!isCurrent()) fail('native_conversion_stale');
+    if (state === 'divergent') fail('native_conversion_stale');
+    const reference = state === 'converted' ? current.marao?.migration : this.recovery.proposed_document.marao?.migration;
+    if (reference?.version === 3) {
+      const archive = this.recovery.migration_archive ?? await archiveFromBackup(reference, this.recovery);
+      await ensureMigrationArchive(hass.callWS.bind(hass), reference, archive, isCurrent);
+      // Archive writes can complete while another editor changes the saved
+      // dashboard. Read again even when repairing an already saved pointer.
+      const initialState = state;
+      current = await this.current();
+      if (!isCurrent()) fail('native_conversion_stale');
+      state = classifyRecovery(current, this.recovery);
+      if (initialState === 'converted' && state !== initialState) fail('native_conversion_stale');
+    }
     if (state === 'converted') return { status: 'converted', written: false, document: copy(current) };
     if (state !== 'original') fail('native_conversion_stale');
     this._requireAdmin();

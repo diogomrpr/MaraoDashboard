@@ -3,11 +3,13 @@ import {validatePopupContent,customPopup} from '../custom_components/marao_dashb
 import {popupViewError,resolvePopupView,popupGroupFromView} from '../custom_components/marao_dashboard/frontend/MaraoPopupLayout.js';
 import labels from '../custom_components/marao_dashboard/frontend/marao-generator-labels.json' with { type: 'json' };
 import { appleTVOptions, copy, defaultTemplate, domain, entries, friendly, isAccess, object, sections, slug } from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
-import { catalog, validateSourceStructure } from './source-validation.js';
+import { validateCatalogSource } from './source-validation.js';
+import { energyUnits, nativeCardEntries } from './native-card-data.js';
 
 // Existing renderer element names are public and retain their original contracts.
 const adapterNames = { md_energy_period_card: 'marao-energy-card', md_floor_plan_card: 'marao-floorplan-card' };
-export const NATIVE_CARD_TYPES = Object.freeze(Object.fromEntries(catalog.cards.map(card => [card.id,
+const validationCatalog = {cards:nativeCardEntries, energy_units:energyUnits};
+export const NATIVE_CARD_TYPES = Object.freeze(Object.fromEntries(nativeCardEntries.map(card => [card.id,
   `custom:${adapterNames[card.id] || `marao-${card.id.slice(3).replaceAll('_', '-')}`}`])));
 export const nativeCardType = template => NATIVE_CARD_TYPES[template];
 export const templateForNativeType = type => Object.keys(NATIVE_CARD_TYPES).find(template => NATIVE_CARD_TYPES[template] === type);
@@ -31,7 +33,7 @@ export function validateNativeCardConfig(config, entities = []) {
   const card = { ...descriptor, id: descriptor.id || 'card' };
   const pages = [{ name: 'Native card', path: 'native', entities: [card] }];
   if (card.page && card.page !== 'native') pages.push({ name: 'Destination', path: card.page, entities: [] });
-  validateSourceStructure({ config_version: 2, name: 'Native card', landing_page: 'native', navigation: [], pages }, entities);
+  validateCatalogSource({ config_version: 2, name: 'Native card', landing_page: 'native', navigation: [], pages }, entities, validationCatalog);
   return config;
 }
 
@@ -234,7 +236,7 @@ export function createCardComposition({ root = 'marao-dashboard', language = 'en
     if (role === 'md_floor_plan_card') return [{ ...header(variables.lights_popup ?? `#page-${item._page_instance}-${item.id}-lights`, null, item.name, 'mdi:lightbulb-group-outline'), cards: variables.lights.map(light => entityCard({...light,template:'md_light_card',variables:{enable_slider:false}})) }];
     if (role === 'md_scene_collection_card') return [{ ...header(variables.popup_hash, null, item.name, item.icon || 'mdi:palette-outline'), cards: entries(item.entities).length ? entries(item.entities).map(sceneCard) : [{ type: 'markdown', content: t('overview.scenes_empty') }] }];
     if (role === 'md_energy_period_card' && item.popup!==true || role === 'md_graph_card' && variables.history_popup) {
-      const card = role === 'md_energy_period_card' ? energyCard(item, null, true) : catalog.energy_units[item.unit_of_measurement]?.[0] === 'power' || variables.power_devices?.length ? { type: 'custom:marao-power-history-card', entity: variables.graph_entity || item.graph_entity || item.entity_id, name: item.name, ...pick(variables, ['power_devices', 'display_unit', 'display_precision', 'graph_color']) } : { type: 'custom:marao-card', template: item.template || 'md_graph_card', entity: item.entity_id, name: item.name, icon: item.icon || 'mdi:flash', variables: { show_graph_fill: true, show_graph_line: true, show_icon: true, ...variables, ...(item.graph_entity && !variables.graph_entity ? { graph_entity: item.graph_entity } : {}) } };
+      const card = role === 'md_energy_period_card' ? energyCard(item, null, true) : energyUnits[item.unit_of_measurement]?.[0] === 'power' || variables.power_devices?.length ? { type: 'custom:marao-power-history-card', entity: variables.graph_entity || item.graph_entity || item.entity_id, name: item.name, ...pick(variables, ['power_devices', 'display_unit', 'display_precision', 'graph_color']) } : { type: 'custom:marao-card', template: item.template || 'md_graph_card', entity: item.entity_id, name: item.name, icon: item.icon || 'mdi:flash', variables: { show_graph_fill: true, show_graph_line: true, show_icon: true, ...variables, ...(item.graph_entity && !variables.graph_entity ? { graph_entity: item.graph_entity } : {}) } };
       return [{ ...header(variables.popup_hash, item.entity_id, item.name, item.icon || 'mdi:flash'), cards: [card] }];
     }
     if (role === 'md_climate_card') return variables.enable_popup===false?[]:[climatePopup(item)];

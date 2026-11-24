@@ -152,19 +152,38 @@ test('a cached HACS loader hints only installed modules until a runtime owns the
   assert.equal(current.identity,meta.identity);
   assert.equal(current.package_version,meta.package_version);
   assert.ok(current.preload.every(file=>Object.hasOwn(meta.files,meta.identity+'--'+file)));
+  const previousPerformance=globalThis.performance;
+  t.after(()=>{globalThis.performance=previousPerformance;});
+  const timing={responseStatus:200,transferSize:1300,encodedBodySize:1000,workerStart:0,deliveryType:''};
+  globalThis.performance={now:()=>0,getEntriesByName:()=>[timing]};
+  for(const file of ['MaraoNativeDashboard.js','MaraoDashboard.js']) fs.writeFileSync(path.join(directory,meta.identity+'--'+file),'export {};');
+  await import(pathToFileURL(loader).href+'?fresh-network');
+  assert.equal(requests.length,1,'A full same-origin network response already identifies its version');
+  timing.workerStart=1;
+  await import(pathToFileURL(loader).href+'?service-worker');
+  assert.equal(requests.length,2,'A worker-served response still checks the installed version');
+  requests.length=0;
   const different='b'.repeat(64);
   entryText=entryText.replace(meta.identity,different);
   assert.equal((await readRelease()).identity,different,'Same-length replacement is visible on the next check');
   entryText=entryText.replace(different,'invalid');
   await assert.rejects(readRelease(),/Invalid Marao frontend identity/);
-  assert.deepEqual(requests,Array(3).fill('MaraoFrontend.js'),'Reads the current release record without downloading the hash inventory');
+  assert.deepEqual(requests,Array(2).fill('MaraoFrontend.js'),'Reads the current release record without downloading the hash inventory');
 });
 
-test('Duplicate frontend entry points share one document runtime without mixing graph ownership', async () => {
+test('Duplicate frontend entry points share one document runtime without mixing graph ownership', async t => {
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'marao-runtime-owner-'));
   const previousWindow=globalThis.window, previousRegistry=globalThis.customElements, previousDocument=globalThis.document;
   const preloads=[];
-  const runtimeGate=Promise.withResolvers(),runtimeStarted=Promise.withResolvers();
+  const runtimeGate=Promise.withResolvers(),runtimeStarted=Promise.withResolvers(),mounted=Promise.withResolvers();
+  const previousObserver=globalThis.IntersectionObserver, previousFrame=globalThis.requestAnimationFrame;
+  const observed=new Map();
+  globalThis.IntersectionObserver=class {
+    constructor(callback){this.callback=callback;}
+    observe(el){observed.set(el,this.callback);}
+    disconnect(){}
+  };
+  globalThis.requestAnimationFrame=callback=>queueMicrotask(callback);
   try {
     const entry=fs.readFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoDashboard.js',import.meta.url),'utf8');
     fs.writeFileSync(path.join(directory,'MaraoNavigation.js'),'globalThis.nativeNavigationLoads=(globalThis.nativeNavigationLoads||0)+1;export const navigationLocalize=()=>"Error";export const findElements=()=>[];');
@@ -175,7 +194,7 @@ test('Duplicate frontend entry points share one document runtime without mixing 
     fs.writeFileSync(path.join(directory,'MaraoNativeCards.js'),'globalThis.nativeCardLoads=(globalThis.nativeCardLoads||0)+1;');
     fs.writeFileSync(path.join(directory,'MaraoRuntime.js'),'globalThis.nativeRuntimeLoads=(globalThis.nativeRuntimeLoads||0)+1;globalThis.nativeRuntimeStarted.resolve();await globalThis.nativeRuntimeGate;');
     globalThis.nativeRuntimeGate=runtimeGate.promise;globalThis.nativeRuntimeStarted=runtimeStarted;
-    globalThis.customElements={get:()=>true};globalThis.window={};
+    globalThis.customElements={get:()=>true};globalThis.window={MaraoNativeBootstrap:{waitForInitialViewPaint(signal,paint){mounted.resolve();return paint;}}};
     globalThis.document={createElement:()=>({}),head:{append:link=>preloads.push([link.rel,path.basename(new URL(link.href).pathname)])}};
     const names=['a'.repeat(64)+'--MaraoDashboard.js','MaraoDashboard.js'];
     for (const name of names) fs.writeFileSync(path.join(directory,name),entry);
@@ -183,17 +202,37 @@ test('Duplicate frontend entry points share one document runtime without mixing 
     const active=window.MaraoFrontendPackage;
     const legacy=await import(pathToFileURL(path.join(directory,names[1])));
     assert.equal(native.runtimeReady,legacy.runtimeReady);
+    await mounted.promise;
+    const runtime=window.MaraoDashboardRuntime, belowFold={}, onScreen={};
+    const hiddenFeature=runtime.requestContent(['custom:marao-schedules-runtime'],belowFold);
+    const visibleFeature=runtime.requestContent(['custom:marao-energy-period-card'],onScreen);
+    observed.get(belowFold)([{isIntersecting:false}]);
+    observed.get(onScreen)([{isIntersecting:true}]);
     await runtimeStarted.promise;
+    assert.equal(globalThis.firstSpecialtyRegistration,undefined,'Only the on-screen specialty starts');
+    const oldViewport=[globalThis.innerWidth,globalThis.innerHeight];
+    t.after(()=>{[globalThis.innerWidth,globalThis.innerHeight]=oldViewport;});
+    globalThis.innerWidth=393;globalThis.innerHeight=852;
+    const firstHit=Promise.withResolvers();let covered=true;
+    const button={matches:()=>false,getBoundingClientRect:()=>({left:0,top:0,right:100,bottom:50})};
+    globalThis.document.elementFromPoint=()=>{firstHit.resolve();return covered?null:button;};
+    const surface={isConnected:true,querySelectorAll:()=>[button]};runtime.observeCard(surface);
+    observed.get(surface)([{isIntersecting:true,target:surface}]);
+    await firstHit.promise;
+    assert.equal(globalThis.firstSpecialtyRegistration,undefined,'A covered card cannot accept a tap yet');
+    covered=false;
+    await hiddenFeature;
     assert.deepEqual(preloads,[['modulepreload','MaraoCardRendering.js'],['modulepreload','MaraoNativeCards.js']],
       'One owner hints the two unconditional dependencies before specialty registration');
     assert.equal(globalThis.nativeBasicRegistrations,1,'Basic cards register before a delayed runtime download completes');
     assert.equal(globalThis.nativeCardLoads,1);
-    runtimeGate.resolve();await native.runtimeReady;
+    runtimeGate.resolve();await visibleFeature;await native.runtimeReady;
     assert.equal(globalThis.firstSpecialtyRegistration,1,'Ordinary card adapters can render before specialty modules begin evaluating');
     assert.equal(globalThis.nativeNavigationLoads,1);assert.equal(globalThis.nativeRuntimeLoads,1);
     assert.equal(window.MaraoFrontendPackage,active);assert.equal(active.identity,'a'.repeat(64));
   } finally {
     globalThis.window=previousWindow;globalThis.customElements=previousRegistry;globalThis.document=previousDocument;
+    globalThis.IntersectionObserver=previousObserver;globalThis.requestAnimationFrame=previousFrame;
     runtimeGate.resolve();
     for(const key of ['firstSpecialtyRegistration','nativeNavigationLoads','nativeRuntimeLoads','nativeBasicRegistrations','nativeCardLoads','nativeRuntimeGate','nativeRuntimeStarted'])delete globalThis[key];
     fs.rmSync(directory,{recursive:true,force:true});

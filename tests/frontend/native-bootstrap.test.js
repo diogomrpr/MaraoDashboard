@@ -14,7 +14,7 @@ function harness(window, environment = {}) {
     .replace(/^import .*;\n/gm,'')
     .replace(/const query = .*?;\nconst navigation = .*?;\n/,'')
     .replaceAll('export function ','function ');
-  const context={window,readDashboardSettings,languageCode,refreshCardMetadata:hass=>refreshCardMetadata(hass,picker),createPopupCoordinator:()=>({sync(){},dispose(){}}),navigation:{setDashboardNavigation:(root,config)=>calls.push({root,config})},location:{pathname:'/marao-dashboard/empty'},queueMicrotask(){}};
+  const context={window,readSettings:readDashboardSettings,languageCode,refreshCardMetadata:hass=>refreshCardMetadata(hass,picker),createPopupCoordinator:()=>({sync(){},dispose(){}}),navigation:{setDashboardNavigation:(root,config)=>calls.push({root,config})},location:{pathname:'/marao-dashboard/empty'},queueMicrotask(){}};
   Object.assign(context,environment);
   context.globalThis=context;
   vm.runInNewContext(source+';globalThis.attach=attachDashboardHost;globalThis.compatible=nativeHostCompatible;globalThis.findHost=findDashboardHost;globalThis.waitForPaint=waitForInitialViewPaint;',context);
@@ -63,7 +63,12 @@ test('new ordinary views paint before background content and mounted views or sp
   h.attach(root);views.push({index:0},{index:1,hidden:true});mutated();assert.equal(frames.length,0);
   views.push({});mutated();
   assert.equal(frames.length,1);frames.shift()();assert.equal(frames.length,1);frames.shift()();await first;
-  await h.waitForPaint(demand.signal);assert.equal(frames.length,0);
+  const mounted=h.waitForPaint(demand.signal);frames.shift()();frames.shift()();await mounted;
+  root.lovelace.config.views=[{}, {sections:[{cards:[{type:'custom:marao-weather-card'}]}]}];
+  const paint=Promise.withResolvers();let painted=false;
+  const content=h.waitForPaint(demand.signal,paint.promise).then(()=>{painted=true;});
+  frames.shift()();frames.shift()();await Promise.resolve();assert.equal(painted,false);
+  paint.resolve();await content;assert.equal(frames.length,0);
   views.length=0;
   const requested=h.waitForPaint(demand.signal);demand.abort();await requested;assert.equal(frames.length,0);
 });

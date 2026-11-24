@@ -1,7 +1,7 @@
-// MaraoFrontend.release {"compiler_contract":1,"identity":"5372e3e361c48896e5444f038ae5b783abccf11676ef054ef7c2a062997fbaaf","package_version":"0.37.6","preload":["MaraoAssetURL.js","MaraoNavigation.js","MaraoNativeBootstrap.js"]}
+// MaraoFrontend.release {"compiler_contract":1,"identity":"b8f985ee9459eaf5a53ac3232788b92f9ac7859d4053f4685ca839326e9ab8e6","package_version":"0.37.6","preload":["MaraoAssetURL.js","MaraoNavigation.js","MaraoNativeBootstrap.js","MaraoCards.js","MaraoCardRendering.js","MaraoNativeCards.js"]}
 const root = new URL('./', import.meta.url);
 const manifestURL = new URL('MaraoFrontend.release.json', root);
-const preloadFiles = ["MaraoAssetURL.js","MaraoNavigation.js","MaraoNativeBootstrap.js"];
+const preloadFiles = ["MaraoAssetURL.js","MaraoNavigation.js","MaraoNativeBootstrap.js","MaraoCards.js","MaraoCardRendering.js","MaraoNativeCards.js"];
 async function readRelease() {
   const options = {cache:'no-store', credentials:'same-origin'};
   const entry = await fetch(new URL('MaraoFrontend.js', root), options);
@@ -22,9 +22,14 @@ async function readRelease() {
   if (meta.compiler_contract !== 1 || typeof meta.identity !== 'string' || !/^[a-f0-9]{64}$/.test(meta.identity)) throw new Error('Invalid Marao frontend identity.');
   return meta;
 }
-const meta = await readRelease();
+// A full network response already delivered this exact entry. Cached, worker
+// and unobservable responses still discover the installed release explicitly.
+const transfer = globalThis.performance?.getEntriesByName?.(import.meta.url, 'resource').at(-1);
+const freshEntry = transfer?.responseStatus === 200 && transfer.transferSize > 300 &&
+  transfer.encodedBodySize > 0 && !transfer.workerStart && !transfer.deliveryType;
+const meta = freshEntry ? {"compiler_contract":1,"identity":"b8f985ee9459eaf5a53ac3232788b92f9ac7859d4053f4685ca839326e9ab8e6","package_version":"0.37.6","preload":["MaraoAssetURL.js","MaraoNavigation.js","MaraoNativeBootstrap.js","MaraoCards.js","MaraoCardRendering.js","MaraoNativeCards.js"]} : await readRelease();
 const fileURL = file => new URL(meta.identity + '--' + file, root);
-window.MaraoInstalledFrontendPackage = {identity:meta.identity, package_version:meta.package_version, entryURL:import.meta.url, rootURL:root.href, baseURL:root.href, manifestURL:manifestURL.href, manifestCheckedAt:performance.now(), readRelease};
+window.MaraoInstalledFrontendPackage = {identity:meta.identity, package_version:meta.package_version, preload:meta.preload, entryURL:import.meta.url, rootURL:root.href, baseURL:root.href, manifestURL:manifestURL.href, manifestCheckedAt:performance.now(), readRelease};
 window.MaraoFrontendPackage ||= window.MaraoInstalledFrontendPackage;
 if (!window.MaraoDashboardRuntime && globalThis.document?.head) {
   for (const file of preloadFiles) {

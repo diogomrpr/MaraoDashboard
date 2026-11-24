@@ -4,7 +4,11 @@ import {validateConfig} from './editor-model.js';
 
 export {catalog};
 
-export function validateSourceStructure(source, entities = []) {
-  const errors = validateConfig(source, formatVersion(source), entities, catalog.energy_units, catalog);
+export function validateCatalogSource(source, entities, cardCatalog) {
+  const errors = validateConfig(source, formatVersion(source), entities, cardCatalog.energy_units, cardCatalog);
   if (errors.length) throw new Error(errors.join('\n'));
+}
+
+export function validateSourceStructure(source, entities = []) {
+  validateCatalogSource(source, entities, catalog);
 }

@@ -22,17 +22,21 @@ The frontend converts a complete saved strategy document to ordinary views and c
 
 If native-editor compatibility cannot be established, conversion stays unavailable and the original strategy remains readable.
 
-The ordinary native document becomes the active configuration. Source, embedded/custom YAML and accounting remain under `marao.migration` as provenance. They never regenerate over native edits. Recovery retains complete source and opaque envelope fields. HA APIs expose received configuration, not original storage-file bytes, so retain the independent HA backup.
+The ordinary native document becomes the active configuration. Marao saves the conversion history separately in Home Assistant and verifies it before saving the dashboard. The dashboard carries a SHA-256 checksum and byte length under `marao.migration`. Every editable view stays in the normal HA configuration. The portable recovery file retains the original source, custom YAML and conversion details. Keep the independent HA backup for the original storage files.
 
 ### Reduce startup traffic on an already converted dashboard
 
-Home Assistant sends the whole saved dashboard when a browser opens it. Older conversions stored the same source twice and an accounting row for each source field. The converter now stores exact duplicates once. The compact record retains the source, original YAML, mappings and unknown fields. Live cards and editing do not need to expand it.
+Home Assistant sends the whole saved dashboard when a browser opens it. Earlier Marao conversions kept their history inside the dashboard. They continue to work, and an ordinary page visit or update never rewrites them. Dashboards created directly in Home Assistant have no historical Marao conversion data.
 
-For a dashboard converted with an earlier Marao package, open the matching offline converter, paste a current native dashboard JSON export, choose **Translate**, and enter its existing address when prompted. If the converter reports a smaller migration record, download the recovery copy and review the proposed dashboard before importing it at the same address. Keep other editors closed during import. **Download full migration record** expands the original data for inspection. A normal page visit or package refresh leaves the saved dashboard alone. A dashboard created directly in Home Assistant has no Marao migration record to compact.
+To move the history out of startup, open **Marao settings** as an administrator. Under **Migration recovery**, select **Download original dashboard backup**. Keep the file privately, select the archive checkbox, and choose **Save**. This saves the history in HA's shared frontend storage and verifies its checksum before updating the dashboard. Keep other editors closed during the save.
+
+**Export saved dashboard with recovery data** loads the history on demand and downloads a self-contained copy with the latest saved views. To move between HA instances, keep this file or the converter's recovery file. After manually importing a dashboard that contains the checksum, open **Marao settings** on the destination, choose **Restore archive from file**, and select the matching file. Restoring the history leaves the current cards and views intact. A missing archive does not block the dashboard from opening. Export reports when it cannot verify the archive.
+
+The offline converter can also read a matching recovery file and export the original migration details without connecting to HA. Normal HA startup, navigation and editing require no archive download.
 
 Fixed source columns become Sections widths. Five equal columns use a native Grid card because Sections' twelve-column grid cannot express them exactly. Full-page floor plans use Panel views. Later native layouts do not inherit the old source column limits. Explicit/custom-extended external popups keep their authored ownership.
 
-**Authenticated HA users can read the complete native configuration, including retained source data.** A hidden dashboard or administrator-only editor does not make it private. Review raw/unknown settings deliberately; privacy hints cannot identify every sensitive value.
+**Authenticated HA users can read the dashboard and the archive referenced by its checksum.** Home Assistant requires administrator access to write the shared archive. Keep recovery downloads private and review raw settings before sharing either export.
 
 ### Recover an interrupted conversion
 

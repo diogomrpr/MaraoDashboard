@@ -2,6 +2,7 @@ const [locationModule, refreshModule, updatesModule, themeModule, pressModule, {
   'MaraoLocation.js', 'MaraoFrontendRefresh.js', 'MaraoFrontendUpdates.js', 'MaraoTheme.js', 'MaraoPressFeedback.js', 'MaraoLocale.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
 const {locationError,locationLabel,locationPreferenceKey,deviceRoomPreferenceKey,readRoomPreference,forgetDeviceRoomPreference,resolveLocation} = locationModule;
+export { locationError };
 const { bindNavbarRefresh, refreshFrontend } = refreshModule;
 const {bindPressFeedback,pressStyles,pressTarget}=pressModule;
 const { createFrontendUpdates } = updatesModule;

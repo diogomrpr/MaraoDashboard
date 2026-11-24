@@ -12,10 +12,11 @@ const knownCommands = new Set([
   "config/category_registry/list", "config_entries/get", "config_entries/subscribe",
   "config/entity_registry/subscribe", "config/device_registry/subscribe", "frontend/subscribe_panels",
   "frontend/subscribe_themes", "frontend/subscribe_user_data", "frontend/get_version", "get_manifest",
+  "frontend/get_system_data", "frontend/set_system_data", "frontend/subscribe_system_data",
   "system_health/info", "map/subscribe_zones", "ping", "pong",
 ]);
 
-function observeSocket(socket, elapsed, events) {
+function observeSocket(socket, elapsed, events, viewPath) {
   const pending = new Map();
   events.push({ at: elapsed(), phase: "socket" });
   function record({ payload }, direction) {
@@ -32,6 +33,10 @@ function observeSocket(socket, elapsed, events) {
       if (direction === "send" && typeof id === "number") pending.set(id, command);
       if (type === "result" || type === "event") command = pending.get(id) || "other";
       const entry = { at: received, direction, command };
+      if (direction === "send" && typeof message.key === "string" && message.key.startsWith("marao.migration.")
+        && ["frontend/get_system_data", "frontend/set_system_data", "frontend/subscribe_system_data"].includes(type)) {
+        entry.migrationArchive = true;
+      }
       if (direction === "receive") {
         entry.kind = type === "result" || type === "event" ? type : "protocol";
         entry.bytes = Buffer.byteLength(batch ? JSON.stringify(message) : payload);
@@ -40,9 +45,25 @@ function observeSocket(socket, elapsed, events) {
           const config = message.result;
           const size = value => Buffer.byteLength(JSON.stringify(value));
           entry.config = { bytes: size(config), views: config.views.length, viewBytes: size(config.views) };
+          const index = !viewPath ? 0 : config.views.findIndex((view, i) => String(view.path ?? i) === viewPath);
+          if (index >= 0) {
+            entry.config.activeViewBytes = size(config.views[index]);
+            entry.config.otherViewsBytes = size(config.views.filter((_, i) => i !== index));
+          }
+          const {views, marao, ...rootFields} = config;
+          entry.config.otherRootBytes = size(rootFields);
+          if (marao && typeof marao === "object") {
+            const {navbar, migration, ...otherSettings} = marao;
+            entry.config.navbarBytes = navbar ? size(navbar) : 0;
+            entry.config.otherSettingsBytes = size(otherSettings);
+          }
           if (config.marao?.migration) {
             const migration = config.marao.migration;
             entry.config.migrationBytes = size(migration);
+            entry.config.migrationVersion = [1, 2, 3].includes(migration.version) ? migration.version : "unknown";
+            entry.config.archiveReferenceOnly = migration.version === 3 && Object.keys(migration).length === 3
+              && typeof migration.sha256 === "string" && /^[0-9a-f]{64}$/.test(migration.sha256)
+              && Number.isSafeInteger(migration.bytes) && migration.bytes > 0;
             entry.config.provenance = Object.fromEntries(
               ["original_source", "original_document", "accounting", "yaml", "supplements"]
                 .filter(key => Object.hasOwn(migration, key)).map(key => [key, size(migration[key])]));
@@ -65,6 +86,9 @@ function documentTrace({ origin }) {
   for (const tag of ["home-assistant", "hui-root", "hui-view", "marao-card", "marao-weather-card"]) {
     customElements.whenDefined(tag).then(() => mark(tag + "Defined", true));
   }
+  customElements.whenDefined("marao-card").then(() => {
+    window.MaraoDashboardRuntime?.firstCardPaint?.then(() => mark("runtimePaintReleased", true));
+  });
   function inside(root, selector) {
     if (!root) return null;
     const direct = root.querySelector(selector);
@@ -91,6 +115,11 @@ function documentTrace({ origin }) {
     inspect();
     const nav = performance.getEntriesByType("navigation")[0];
     const resources = [];
+    const types = [
+      ["js", /javascript|ecmascript|\.[cm]?js$/], ["json", /json\s|\.json$/],
+      ["css", /text\/css|\.css$/], ["font", /font\/|\.(?:woff2?|ttf)$/],
+      ["image", /image\/|\.(?:png|svg|webp|jpe?g|ico)$/],
+    ];
     for (const entry of performance.getEntriesByType("resource")) {
       const url = new URL(entry.name);
       if (url.origin !== origin) continue;
@@ -99,10 +128,20 @@ function documentTrace({ origin }) {
       const ha = path.match(/^\/frontend_(?:latest|es5)\/((?:\d+|app|core|entrypoint|hass-icons)\.[a-f0-9]+\.js)$/);
       const iconPack = /^\/static\/mdi\/[a-f0-9]+\.json$/.test(path);
       const name = marao?.[1] || ha?.[1] || (iconPack ? "ha-mdi-pack" : path.startsWith("/frontend_") ? "ha-frontend" : path.startsWith("/static/") ? "ha-static" : "other-local");
+      let category = "other-local";
+      if (marao) category = "marao";
+      else if (ha || path.startsWith("/frontend_")) category = "ha-frontend";
+      else if (iconPack) category = "ha-mdi";
+      else if (path.startsWith("/static/translations/")) category = "ha-translations";
+      else if (path.startsWith("/static/") && /\.(?:woff2?|ttf)$/.test(path)) category = "ha-font";
+      else if (path.startsWith("/static/")) category = "ha-static";
+      else if (path.startsWith("/hacsfiles/")) category = "other-hacs";
+      else if (path.startsWith("/auth/") || path.startsWith("/api/")) category = "ha-api";
+      const type = types.find(([, pattern]) => pattern.test((entry.contentType || "") + " " + path))?.[0] || "other";
       resources.push({ name, start: Math.round(entry.startTime), end: Math.round(entry.responseEnd),
-        initiator: entry.initiatorType, worker: entry.workerStart > 0, encoded: entry.encodedBodySize, transfer: entry.transferSize });
+        category, type, initiator: entry.initiatorType, worker: entry.workerStart > 0, encoded: entry.encodedBodySize, transfer: entry.transferSize });
     }
-    return { now: performance.now(), marks, resources,
+    return { now: performance.now(), marks, surfaces:window.dashboardSurfaceMarks, resources,
       navigation: Object.fromEntries(["responseStart", "responseEnd", "domInteractive", "domContentLoadedEventEnd"].map(k => [k, Math.round(nav[k])])) };
   };
 }

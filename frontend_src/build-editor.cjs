@@ -7,12 +7,15 @@ const repoRoot = path.resolve(__dirname, "..");
 const frontendRoot = path.join(repoRoot, "custom_components", "marao_dashboard", "frontend");
 const check = process.argv.includes("--check");
 const {buildAuthoring,authoringFiles}=require('./build-authoring.cjs');
+const {nativeCardDataPlugin} = require('./native-card-data-plugin.cjs');
 const entries = {
   MaraoCardRendering: 'card-rendering.js',
   MaraoSchedules: 'schedules-card.js',
   MaraoNativeModel: 'legacy-model.js',
   MaraoNativeDashboard: 'native-strategy.js',
   MaraoNativeBootstrap: 'native-bootstrap.js',
+  MaraoErrorLabels: 'editor-labels.js',
+  MaraoPopupSync: 'popup-sync.js',
   MaraoPopupManagement: 'popup-management.js',
   MaraoNativeCards: 'native-cards.js',
   MaraoNativeCardMetadata: 'native-card-metadata.js',
@@ -54,7 +57,7 @@ async function build() {
       entryPoints: Object.fromEntries(Object.entries(entries).map(([name, file]) => [name, path.join(repoRoot, 'frontend_src', file)])),
       bundle: true, entryNames: '[name]', assetNames: 'assets/[name]-[hash]', format: 'esm', legalComments: 'eof',
       loader: {'.ttf': 'file'}, minify: true, metafile: true, outdir: outputRoot, platform: 'browser', target: 'es2022',
-      plugins: [{
+      plugins: [nativeCardDataPlugin, {
         name: 'marao-owned-assets',
         setup(build) {
           build.onLoad({filter: /[/\\]marao-owned-assets\.json$/}, () => ({contents: JSON.stringify(ownedAssets), loader: 'json'}));

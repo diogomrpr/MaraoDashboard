@@ -95,7 +95,8 @@ Object.setPrototypeOf(AssetURL, globalThis.URL);
   // Every HACS version installs the same entry name. A cached loader can read
   // this public record from the current installation, including after rollback.
   const releaseMarker = '// MaraoFrontend.release ';
-  const preloadFiles = ['MaraoAssetURL.js', 'MaraoNavigation.js', 'MaraoNativeBootstrap.js'];
+  const preloadFiles = ['MaraoAssetURL.js', 'MaraoNavigation.js', 'MaraoNativeBootstrap.js',
+    'MaraoCards.js', 'MaraoCardRendering.js', 'MaraoNativeCards.js'];
   const descriptor = {compiler_contract:1, identity, package_version:version,
     preload:preloadFiles.filter(file => fs.existsSync(path.join(dist,identity+'--'+file)))};
   const loader = `${releaseMarker}${JSON.stringify(descriptor)}
@@ -122,9 +123,14 @@ async function readRelease() {
   if (meta.compiler_contract !== 1 || typeof meta.identity !== 'string' || !/^[a-f0-9]{64}$/.test(meta.identity)) throw new Error('Invalid Marao frontend identity.');
   return meta;
 }
-const meta = await readRelease();
+// A full network response already delivered this exact entry. Cached, worker
+// and unobservable responses still discover the installed release explicitly.
+const transfer = globalThis.performance?.getEntriesByName?.(import.meta.url, 'resource').at(-1);
+const freshEntry = transfer?.responseStatus === 200 && transfer.transferSize > 300 &&
+  transfer.encodedBodySize > 0 && !transfer.workerStart && !transfer.deliveryType;
+const meta = freshEntry ? ${JSON.stringify(descriptor)} : await readRelease();
 const fileURL = file => new URL(meta.identity + '--' + file, root);
-window.MaraoInstalledFrontendPackage = {identity:meta.identity, package_version:meta.package_version, entryURL:import.meta.url, rootURL:root.href, baseURL:root.href, manifestURL:manifestURL.href, manifestCheckedAt:performance.now(), readRelease};
+window.MaraoInstalledFrontendPackage = {identity:meta.identity, package_version:meta.package_version, preload:meta.preload, entryURL:import.meta.url, rootURL:root.href, baseURL:root.href, manifestURL:manifestURL.href, manifestCheckedAt:performance.now(), readRelease};
 window.MaraoFrontendPackage ||= window.MaraoInstalledFrontendPackage;
 if (!window.MaraoDashboardRuntime && globalThis.document?.head) {
   for (const file of preloadFiles) {

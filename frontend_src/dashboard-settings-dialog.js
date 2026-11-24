@@ -1,6 +1,7 @@
 import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 const {mountLocationPreferences}=await import(new URL(`./MaraoLocationPreferences.js${new URL(import.meta.url).search}`,import.meta.url));
 import {mountLocationSettings} from './location-settings.js';
+import {mountMigrationSettings} from './dashboard-migration-settings.js';
 import {createSettingsRow,SETTINGS_ROW_CSS} from './settings-row.js';
 import {saveDashboardSettings, readDashboardSettings, validateDashboardSettings, dashboardViewForAddress, patchNavbarRoute, moveNavbarRoute} from './dashboard-settings.js';
 const navigation=await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`,import.meta.url));
@@ -31,6 +32,10 @@ const CSS=`
 .marao-settings .warning{font-size:.875rem;color:var(--error-color)}
 .marao-settings .shortcuts{margin-top:24px;padding-top:20px;border-top:1px solid var(--divider-color)}
 .marao-settings [data-flags]{margin-top:12px}
+.marao-settings .migration-recovery{display:grid;gap:12px}
+.marao-settings .migration-recovery label{display:flex;align-items:center;gap:12px;min-height:48px;flex-wrap:wrap}
+.marao-settings .migration-recovery input{min-height:48px;max-width:100%;font:inherit}
+.marao-settings .migration-recovery input[type=checkbox]{width:48px;margin:0}
 .marao-settings footer{padding:12px 20px max(16px,env(safe-area-inset-bottom));border-top:1px solid var(--divider-color);background:var(--ha-card-background)}
 .marao-settings .status:empty{display:none}
 .marao-settings .status{color:var(--error-color);margin-bottom:12px}
@@ -50,7 +55,7 @@ async function loadControls() {
 export async function openDashboardSettings(root,opener,owner) {
   if(!root?.hass?.user?.is_admin || root.lovelace?.editMode || root._maraoSettingsDialog)return;
   const hass=root.hass,path=location.pathname.split('/')[1],user=hass.user.id;
-  const valid=()=>root.isConnected&&location.pathname.split('/')[1]===path&&root.hass?.user?.id===user&&root.hass?.user?.is_admin&&!root.lovelace?.editMode&&root._maraoSettingsDialog===dialog;
+  const valid=()=>root.isConnected&&location.pathname.split('/')[1]===path&&root.hass?.connection===hass.connection&&root.hass?.user?.id===user&&root.hass?.user?.is_admin&&!root.lovelace?.editMode&&root._maraoSettingsDialog===dialog;
   const t=words[languageCode(hass) === 'pt'?'pt':'en'];
   const dialog=document.createElement('dialog');dialog.className='marao-settings settings-rows';root._maraoSettingsDialog=dialog;
   dialog.innerHTML=`<style>${CSS}</style><header><h2 id="marao-settings-title"></h2><button type="button" data-close>×</button></header><div class="body"><p data-loading role="status"></p><button type="button" data-retry hidden></button><div data-settings hidden><h3 data-navbar></h3><p class="hint"></p><ha-sortable data-sortable handle-selector=".drag-handle" draggable-selector=".route" no-style disabled><div data-routes></div></ha-sortable><div data-add></div><section class="shortcuts"><h3 data-shortcuts></h3><div data-flags></div></section></div></div><footer><p class="status" role="alert"></p><button type="button" class="save" data-save disabled></button></footer>`;
@@ -146,10 +151,12 @@ export async function openDashboardSettings(root,opener,owner) {
     dialog.querySelector('[data-routes]').lastElementChild?.scrollIntoView({block:'nearest'});
   });
   mountForm(dialog.querySelector('[data-flags]'),{show_cache_reset:draft.show_cache_reset!==false,show_editor_button:draft.show_editor_button!==false},[schema('show_cache_reset',t.cache,{boolean:{}}),schema('show_editor_button',t.editor,{boolean:{}})],value=>{for(const key of ['show_cache_reset','show_editor_button'])if(value[key]!== (draft[key]!==false))draft[key]=value[key];});
+  const archiveOnSave=mountMigrationSettings(dialog.querySelector('[data-settings]'),{baseline,hass,path,language:languageCode(hass),valid});
   dialog.querySelector('[data-save]').onclick=async()=>{
     if(busy||!valid())return;try{validateLocation();validateDashboardSettings(draft);}catch{dialog.querySelector('.status').textContent=t.invalid;return;}
     navigation.haptic('heavy');busy=true;sortable.disabled=true;dialog.querySelector('[data-save]').disabled=true;dialog.querySelector('[data-save]').textContent=t.saving;
-    try{await saveDashboardSettings(root.hass,path,baseline,draft,valid,JSON.stringify(baseline.marao?.navbar?.current_room)!==JSON.stringify(draft.navbar.current_room)?recovery=>{
+    try{const migration=await archiveOnSave?.();
+    await saveDashboardSettings(root.hass,path,baseline,migration?{...draft,migration}:draft,valid,JSON.stringify(baseline.marao?.navbar?.current_room)!==JSON.stringify(draft.navbar.current_room)?recovery=>{
       const blob=new Blob([JSON.stringify(recovery,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
       link.href=url;link.download=`marao-location-recovery-${Date.now()}.json`;link.textContent=languageCode(hass) === 'pt'?'Descarregar recuperação':'Download recovery';dialog.querySelector('footer').prepend(link);link.click();
       const revoke=()=>{URL.revokeObjectURL(url);dialog.removeEventListener('close',revoke);};dialog.addEventListener('close',revoke);

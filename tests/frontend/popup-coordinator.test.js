@@ -5,16 +5,41 @@ import {planPopupEdit} from '../../frontend_src/popup-management.js';
 import {managedPopupIssue} from '../../custom_components/marao_dashboard/frontend/MaraoPopupManaged.js';
 import {createGroupScope} from '../../custom_components/marao_dashboard/frontend/MaraoGroupDetails.js';
 
-function fixture(loadPlanner = () => import('../../frontend_src/popup-management.js')){
+const loadDefaultSupport = () => import('../../frontend_src/popup-sync.js');
+function fixture(loadPlanner = () => import('../../frontend_src/popup-management.js'), loadSupport = loadDefaultSupport){
   const owner={type:'custom:marao-camera-card',entity_id:'camera.fake',variables:{event_columns:2}};
   const first=planPopupEdit({views:[{path:'home',type:'sections',sections:[{cards:[owner]}]}]},owner,'home','/marao-dashboard/home',{});
   let saved=structuredClone(first.config),callback,dirty=false,route='marao-dashboard',released=0;const writes=[],records=new Map();
   const connection={connected:true,async subscribeEvents(fn,type){assert.equal(type,'lovelace_updated');callback=fn;return()=>released++;}};
   const root={isConnected:true,panel:{url_path:'marao-dashboard'},hass:{user:{id:'admin',is_admin:true},connected:true,connection,states:{},async callWS(){return structuredClone(saved);}},lovelace:{config:structuredClone(saved),mode:'storage',editMode:true,async saveConfig(next){writes.push(structuredClone(next));saved=structuredClone(next);this.config=structuredClone(next);callback({data:{url_path:'marao-dashboard'}});}},requestUpdate(){}};
   const journal={async read(key){return records.get(key);},async stage(key,value){records.set(key,value);},async clear(key){records.delete(key);}};
-  const coordinator=createPopupCoordinator(root,{route:()=>route,dirty:()=>dirty,journal,loadPlanner});
+  const coordinator=createPopupCoordinator(root,{route:()=>route,dirty:()=>dirty,journal,loadPlanner,loadSupport});
   return {root,coordinator,writes,records,path:first.path,get released(){return released;},set dirty(value){dirty=value;},set route(value){route=value;},set saved(value){saved=structuredClone(value);},async event(path='marao-dashboard'){callback({data:{url_path:path}});await coordinator.settled();},async saveParent(change){change(root.lovelace.config);saved=structuredClone(root.lovelace.config);await this.event();}};
 }
+test('direct managed views stay inert until checked; unrelated views and events fetch no popup support', async t => {
+  const previous = globalThis.document;
+  t.after(() => {globalThis.document = previous;});
+  globalThis.document = {createElement: () => ({setAttribute(){}, remove(){}})};
+  const download = Promise.withResolvers();
+  let loads = 0;
+  const f = fixture(undefined, () => {loads++;return download.promise;});
+  const view = {index:0,inert:false};
+  f.root.shadowRoot = {querySelector:()=>view,append(){}};
+  f.root.lovelace.editMode = false;
+  f.coordinator.sync();
+  await f.event('another-dashboard');
+  assert.equal(loads, 0);
+  f.root.hass.user = {id:'viewer',is_admin:false};
+  view.index = 1;
+  f.coordinator.sync();
+  assert.equal(loads, 1);
+  assert.equal(view.inert, true);
+  download.resolve(await loadDefaultSupport());
+  await f.coordinator.settled();
+  assert.equal(view.inert, false);
+  assert.equal(f.writes.length, 0);
+  f.coordinator.dispose();
+});
 test('popup planning loads on a confirmed save and cannot apply a superseded parent', async () => {
   const requested = Promise.withResolvers(), download = Promise.withResolvers();
   let loads = 0;
@@ -77,7 +102,7 @@ test('superseded summary actions dispatch zero calls and standalone stale source
   const scope=createGroupScope(owner,{id:'all',entities:['light.old']},{entity_type:'light'},{haptic(){},callService(){calls++;},isAccessCover:()=>false},node(),()=>{});
   doc.views[0].sections[0].cards[0].entity_id='camera.new';
   await scope.buttons[0].button.onclick();assert.equal(calls,0);
-  f.coordinator.sync();assert.equal(view.inert,true);assert.match(notice.textContent,/Edit popup/);
+  f.coordinator.sync();assert.equal(view.inert,true);await f.coordinator.settled();assert.match(notice.textContent,/Edit popup/);
   f.root.lovelace.editMode=true;f.coordinator.sync();assert.equal(view.inert,false);assert.equal(notice.removed,true);f.coordinator.dispose();
 });
 

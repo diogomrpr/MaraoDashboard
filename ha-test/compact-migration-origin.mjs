@@ -1,10 +1,15 @@
-// Plan by default. --apply saves only the losslessly compacted migration origin.
+// Plan by default. --apply compacts embedded provenance; --archive --apply
+// detaches it after verifying an independent private backup and durable archive.
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 import path from 'node:path';
+import {setTimeout as delay} from 'node:timers/promises';
 import {deflateRawSync} from 'node:zlib';
 import client from './client.js';
 import preparation from './prepare.js';
 import {compactMigrationProvenance, expandMigrationProvenance} from '../frontend_src/ordinary-provenance.js';
+import {detachMigrationProvenance, restoreMigrationProvenance} from '../frontend_src/migration-archive.js';
+import {ensureMigrationArchive, fetchMigrationArchive, migrationArchiveKey} from '../frontend_src/migration-archive-store.js';
 
 const urlPath = 'marao-dashboard';
 const readDashboard = connection => connection.call({type:'lovelace/config', url_path:urlPath, force:true});
@@ -29,10 +34,33 @@ function readStorage(config, key) {
   return {raw, document:stored.data.config};
 }
 
+async function verifyPersistedArchive(config, reference, archive) {
+  // Project a single named string inside HA. Other system settings never
+  // leave HA, even when the file is shared with other frontend integrations.
+  const file = quote(path.posix.join(config.remoteConfigPath, '.storage', 'frontend.system_data'));
+  const key = quote(migrationArchiveKey(reference));
+  const python = 'import hashlib,json,sys; data=json.load(open(sys.argv[1],encoding="utf-8"))["data"]; value=data.get(sys.argv[2]); print(hashlib.sha256(value.encode()).hexdigest() if isinstance(value,str) else "")';
+  const command = `if test ! -f ${file}; then exit 0; fi
+if command -v jq >/dev/null; then
+  jq -j --arg key ${key} '.data[$key] | select(type=="string")' ${file} | sha256sum
+else
+  python3 -c ${quote(python)} ${file} ${key}
+fi`;
+  const expected = createHash('sha256').update(JSON.stringify(archive)).digest('hex');
+  // HA schedules frontend.system_data writes after acknowledging the WebSocket.
+  const deadline = Date.now() + 15000;
+  do {
+    if (preparation.ssh(config, command).stdout.trim().split(/\s+/)[0] === expected) return;
+    await delay(300);
+  } while (Date.now() < deadline);
+  throw new Error('The migration archive could not be verified on disk. The dashboard was not written.');
+}
+
 async function run() {
   const args = process.argv.slice(2);
-  requireCondition(args.length === 0 || (args.length === 1 && args[0] === '--apply'),
-    'Usage: node ha-test/compact-migration-origin.mjs [--apply]');
+  requireCondition(new Set(args).size === args.length && args.every(arg => ['--apply','--archive'].includes(arg)),
+    'Usage: node ha-test/compact-migration-origin.mjs [--archive] [--apply]');
+  const archiveMode = args.includes('--archive'), apply = args.includes('--apply');
   const configFile = process.env.MARAO_TEST_CONFIG || client.configPath;
   const config = client.readConfig(configFile);
   requireCondition(new URL(config.url).hostname === '192.168.0.28', 'Requires the disposable test Home Assistant.');
@@ -42,12 +70,29 @@ async function run() {
     requireCondition(!Object.hasOwn(before, 'strategy') && before.marao?.version === 1 && Array.isArray(before.views),
       'Requires an ordinary Marao dashboard with supported settings.');
     const origin = before.marao.migration;
-    const packed = compactMigrationProvenance(origin);
-    const changed = packed !== origin;
-    const next = changed ? {...before, marao:{...before.marao, migration:packed}} : before;
-    if (changed) requireCondition(same(expandMigrationProvenance(packed), origin), 'Migration provenance did not round-trip exactly.');
+    const callWS = message => connection.call(message);
+    let next = before, archive;
+    if (archiveMode && origin?.version === 3) {
+      archive = await fetchMigrationArchive(callWS, origin);
+      await verifyPersistedArchive(config, origin, archive);
+      const restored = await restoreMigrationProvenance(before, archive);
+      console.log(JSON.stringify({changed:false, verifiedArchive:true, views:before.views.length,
+        dashboard:sizes(before), restored:sizes(restored)}));
+      return;
+    }
+    if (archiveMode) {
+      ({document:next, archive} = await detachMigrationProvenance(before));
+      if (archive) requireCondition(same(await restoreMigrationProvenance(next, archive), before), 'Archive did not restore the original dashboard.');
+    } else {
+      const packed = compactMigrationProvenance(origin);
+      if (packed !== origin) {
+        requireCondition(same(expandMigrationProvenance(packed), origin), 'Migration provenance did not round-trip exactly.');
+        next = {...before, marao:{...before.marao, migration:packed}};
+      }
+    }
+    const changed = !same(next, before);
     console.log(JSON.stringify({changed, views:before.views.length, before:sizes(before), proposed:sizes(next)}));
-    if (!args.length || !changed) return;
+    if (!apply || !changed) return;
 
     const dashboards = await connection.call({type:'lovelace/dashboards/list'});
     const dashboard = dashboards.find(item => item.url_path === urlPath);
@@ -62,7 +107,13 @@ async function run() {
     const privateFile = {mode:0o600, flag:'wx', flush:true};
     fs.writeFileSync(path.join(backup, 'storage-before.json'), disk.raw, privateFile);
     fs.writeFileSync(path.join(backup, 'dashboard-proposed.json'), JSON.stringify(next), privateFile);
+    if (archive) fs.writeFileSync(path.join(backup, 'migration-archive.json'), JSON.stringify(archive), privateFile);
     console.log('Private recovery files retained in ' + backup);
+    if (archive) {
+      const reference = next.marao.migration;
+      await ensureMigrationArchive(callWS, reference, archive, () => true);
+      await verifyPersistedArchive(config, reference, archive);
+    }
     requireCondition(readStorage(config, key).raw === disk.raw && same(await readDashboard(connection), before),
       'The dashboard changed during preflight. No change was saved.');
 

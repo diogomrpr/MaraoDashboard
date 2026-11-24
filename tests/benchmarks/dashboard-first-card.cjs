@@ -10,6 +10,9 @@ const { readConfig, accessToken, setBrowserToken } = require("../../ha-test/clie
 const probe = require("./dashboard-card-probe.cjs");
 const { observeSocket, documentTrace } = require("./dashboard-startup-trace.cjs");
 const trace = process.env.MARAO_STARTUP_TRACE === "1";
+// Optional diagnostic for a warm page held open after the measured milestone.
+const followupModule = process.env.MARAO_POST_CARD_MODULE;
+assert(!followupModule || trace && /^Marao[A-Za-z0-9]+\.js$/.test(followupModule));
 
 // Set MARAO_TEST_CONFIG to point at an ignored local config in another checkout.
 // 'warm' revisits in a new page sharing the first cold trial's authenticated cache.
@@ -37,6 +40,7 @@ function totals(summaries) {
 async function visitDashboard(context, origin, trial, visit, browser, wireFrames) {
   const page = await context.newPage();
   const socketEvents = [];
+  const packageRequests = [];
   if (trace) {
     const session = await context.newCDPSession(page);
     session.on("Network.webSocketHandshakeResponseReceived", ({ response }) => {
@@ -47,7 +51,15 @@ async function visitDashboard(context, origin, trial, visit, browser, wireFrames
     await session.send("Network.enable");
     await page.addInitScript(documentTrace, {origin});
     page.on("websocket", socket => {
-      if (new URL(socket.url()).host === new URL(origin).host) observeSocket(socket, () => Math.round(performance.now() - start), socketEvents);
+      if (new URL(socket.url()).host === new URL(origin).host) observeSocket(socket, () => Math.round(performance.now() - start), socketEvents, route.split("/")[2]);
+    });
+    // Resource Timing only lists completed bodies. A feature request can
+    // already be competing for bandwidth when the first control is usable.
+    page.on("request", request => {
+      const url = new URL(request.url());
+      if (url.origin !== origin) return;
+      const match = url.pathname.match(/^\/hacsfiles\/[^/]+\/(?:[a-f0-9]{64}--)?(Marao[\w.-]+\.js)$/);
+      if (match) packageRequests.push({at:Math.round(performance.now() - start), file:match[1]});
     });
   }
   const documents = new Set();
@@ -55,6 +67,7 @@ async function visitDashboard(context, origin, trial, visit, browser, wireFrames
   const marks = {};
   const errors = {pageErrors: 0, httpErrors: 0, localFailed: 0, externalFailed: 0};
   const scriptResponses = new Map();
+  const failedPackageScripts = [];
   const scriptEncodings = {};
   const packageIdentities = new Set();
   let manifestResponses = 0;
@@ -66,8 +79,9 @@ async function visitDashboard(context, origin, trial, visit, browser, wireFrames
     const url = new URL(response.url());
     if (url.origin !== origin) return;
     if (/^\/hacsfiles\/[^/]+\/MaraoFrontend\.release\.json$/.test(url.pathname) && response.request().method() === "GET") manifestResponses++;
-    const asset = url.pathname.match(/^\/hacsfiles\/[^/]+\/([a-f0-9]{64})--Marao[\w.-]*\.js$/);
+    const asset = url.pathname.match(/^\/hacsfiles\/[^/]+\/([a-f0-9]{64})--(Marao[\w.-]*\.js)$/);
     if (!asset) return;
+    if (trace && response.status() >= 400) failedPackageScripts.push({identity:asset[1], file:asset[2], status:response.status()});
     packageIdentities.add(asset[1]);
     scriptResponses.set(url.href, (scriptResponses.get(url.href) || 0) + 1);
     const encoding = response.headers()["content-encoding"] || "identity";
@@ -98,7 +112,7 @@ async function visitDashboard(context, origin, trial, visit, browser, wireFrames
     if (marks.visible && marks.usable) finish("ok");
   });
   // Install the binding first so the earliest document can report its navigation.
-  await page.addInitScript(probe, {origin, route});
+  await page.addInitScript(probe, {origin, route, trace});
 
   try {
     // Node's monotonic clock stays continuous across frontend-triggered reloads.
@@ -118,12 +132,38 @@ async function visitDashboard(context, origin, trial, visit, browser, wireFrames
       if (document) document.offset = Math.round(performance.now() - start - document.now);
       const wire = wireFrames.filter(frame => frame.time >= wallStart && frame.time <= wallStart + (marks.usable?.seconds || 0) * 1000)
         .map(frame => ({at: frame.time - wallStart, bytes: frame.bytes}));
-      timeline = {socketEvents, document, wire};
+      const archiveRequests = { reads: 0, writes: 0, subscriptions: 0 };
+      for (const event of socketEvents) {
+        if (!event.migrationArchive) continue;
+        if (event.command === "frontend/get_system_data") archiveRequests.reads++;
+        if (event.command === "frontend/set_system_data") archiveRequests.writes++;
+        if (event.command === "frontend/subscribe_system_data") archiveRequests.subscriptions++;
+      }
+      timeline = {socketEvents, document, wire, archiveRequests, failedPackageScripts, packageRequests};
     }
-    console.log(JSON.stringify({
+    const result = {
       arm, profile, trial, visit, route, outcome, browser: browser.version(),
       documents: documents.size, ...errors, ...marks, timeline,
-    }));
+    };
+    if (outcome === "ok" && visit === "warm" && followupModule) {
+      // Freeze cutoff evidence before observing traffic on the untouched page.
+      result.timeline = structuredClone(timeline);
+      if (!packageRequests.some(request => request.file === followupModule)) {
+        await page.waitForRequest(request => {
+          const url = new URL(request.url());
+          return url.origin === origin && url.pathname.endsWith("--" + followupModule);
+        }, {timeout:6000}).catch(error => { if (error.name !== "TimeoutError") throw error; });
+      }
+      const readyAfterInputSampleMs = await page.evaluate(() => {
+        const snapshot = window.dashboardTrace?.();
+        const ready = snapshot?.marks.runtimePaintReleased;
+        const sampled = snapshot?.surfaces?.usable?.observedAt;
+        return Number.isFinite(ready) && Number.isFinite(sampled) ? Math.round(ready - sampled) : null;
+      });
+      result.postCard = {module:followupModule, requestedAt:packageRequests.find(request => request.file === followupModule)?.at ?? null,
+        readyAfterInputSampleMs, observedUntil:Math.round(performance.now()-start)};
+    }
+    console.log(JSON.stringify(result));
     assert.equal(outcome, "ok", "The dashboard did not reach both milestones");
   } finally {
     clearTimeout(timeout);
