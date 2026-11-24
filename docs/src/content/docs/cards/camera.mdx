@@ -35,7 +35,9 @@ Compatible entity domains: `camera`.
 
 The summary uses the bound camera; popup_stream_entity optionally selects a different camera for popup video. Event metadata stays associated with the configured event camera.
 
-The card opens video and recent events. Preloading is optional and uses resources while viewing other pages.
+The card opens video and recent events. If Home Assistant's native stream fails, the selected Frigate camera can play through the Frigate integration's authenticated go2rtc proxy. This requires a go2rtc stream named for the Frigate camera and a browser with Media Source support for its video codec. Use the existing Frigate camera entity. Authentication stays in the Frigate integration.
+
+Inline and popup video apply this fallback to their own selected camera. Preloading is optional and uses resources while viewing other pages.
 
 ## Settings
 
