@@ -1,6 +1,6 @@
 import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {findNativeHost,nativeDashboardConfig,nativeEditing} from '../custom_components/marao_dashboard/frontend/MaraoNativeContext.js';
-import { catalog } from './native-model.js';
+import { catalog } from './source-validation.js';
 import { editorLabel } from './editor-labels.js';
 import { uid } from './schedule-model.js';
 import { composeNativeCard, nativeCardDescriptor, nativeCardType, validateNativeCardConfig } from './card-composition.js';
@@ -135,9 +135,13 @@ export function nativeCardGridOptions(config) {
 const nativeHost = findNativeHost;
 
 function metadata(hass) {
-  return Object.values(hass?.states || {}).map(state => ({ entity_id: state.entity_id,
+  return Object.values(hass?.states || {}).map(entityMetadata);
+}
+
+function entityMetadata(state) {
+  return { entity_id: state.entity_id,
     name: state.attributes?.friendly_name, unit_of_measurement: state.attributes?.unit_of_measurement,
-    device_class: state.attributes?.device_class, supported_features: state.attributes?.supported_features }));
+    device_class: state.attributes?.device_class, supported_features: state.attributes?.supported_features };
 }
 
 /** One ordinary HA card. Runtime controls and detail sheets keep their shared owners. */
@@ -165,10 +169,12 @@ export class MaraoNativeCard extends HTMLElementBase {
 
   setConfig(config) {
     this._setup = nativeCardSetup(config);
-    if (!this._setup) validateNativeCardConfig(config, metadata(this._hass));
+    const entities = metadata(this._hass);
+    if (!this._setup) validateNativeCardConfig(config, entities);
     this._config = copy(config);
     this._compositionKey = null;
-    this._refresh();
+    // HA creates a card with its config before assigning hass or attaching it.
+    if (this._hass || this.isConnected) this._refresh(entities);
   }
 
   set hass(value) { this._hass = value; refreshCardMetadata(value); this._refresh(); }
@@ -231,24 +237,36 @@ export class MaraoNativeCard extends HTMLElementBase {
     }
   }
 
-  _refresh() {
+  _refresh(entities) {
     if (!this._config) return;
     this._bindHost();
-    const entities = metadata(this._hass);
-    // State updates only reach existing controls; configuration metadata can recompose.
-    const bound = new Set([this._config.entity_id, ...(Array.isArray(this._config.entities) ? this._config.entities : []).map(entity => typeof entity === 'string' ? entity : entity.entity_id)]);
     const dashboardRoot = this._host?.panel?.url_path || globalThis.location?.pathname.split('/')[1] || 'marao-dashboard';
     const language = languageCode(this._hass);
     const dashboard=nativeDashboardConfig(this._host?.lovelace);
     let viewHost=this;while(viewHost&&viewHost.localName!=='hui-view')viewHost=viewHost.parentNode||viewHost.host||viewHost.getRootNode?.()?.host;
     const currentView=dashboard?.views?.[viewHost?.index ?? this._host?.lovelace?.current_view];
     this._climateDetail=currentView?.marao_popup?.family==='md_climate_card' && currentView.marao_popup.settings.entity_id===(this._config.entity_id||this._config.entity);
-    const source=dashboard?.views?.filter((view,index)=>String(view.path ?? index)===this._config.popup_view);
-    if(this._config.popup_view)for(const entity of entities)bound.add(entity.entity_id);
-    const key = JSON.stringify([dashboardRoot, language, source, entities.filter(entity => bound.has(entity.entity_id))]);
+    let keyEntities, source;
+    if (this._config.popup_view) {
+      // A linked view can supply members outside this card's entity list.
+      entities ??= metadata(this._hass);
+      keyEntities = entities;
+      source = dashboard?.views?.filter((view, index) => String(view.path ?? index) === this._config.popup_view);
+    } else {
+      const ids = new Set([this._config.entity_id || this._config.entity]);
+      if (Array.isArray(this._config.entities)) {
+        for (const member of this._config.entities) ids.add(typeof member === 'string' ? member : member.entity_id);
+      }
+      keyEntities = [];
+      for (const id of ids) {
+        const state = this._hass?.states?.[id];
+        if (state) keyEntities.push(entityMetadata(state));
+      }
+    }
+    const key = JSON.stringify([dashboardRoot, language, source, keyEntities]);
     if (this._compositionKey === key) { this._forward(); return; }
     this._compositionKey = key;
-    this._mount({ entities, dashboardRoot, language, dashboard });
+    this._mount({ entities: entities ?? metadata(this._hass), dashboardRoot, language, dashboard });
   }
 
   async _mount(context) {

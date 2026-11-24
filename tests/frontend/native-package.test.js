@@ -67,6 +67,11 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     const mediaBase=pathToFileURL(fs.realpathSync(path.join(directory,'dist',first.identity+'--MaraoCards.js'))).href;
     for(const app of mediaApps){const image=new AssetURL('./media-apps/'+(app.file||app.id+'.png'),mediaBase);assert.ok(fs.existsSync(image),app.id+' chooser image ships in the flat package');assert.equal(image.protocol,'file:');}
     const base=pathToFileURL(fs.realpathSync(asset)).href;
+    const css = fs.readFileSync(path.join(directory,'dist',first.identity+'--MaraoFonts.css'),'utf8');
+    const font = first.identity+'--fonts--Montserrat.woff2';
+    assert.ok(css.includes(`url('${font}') format('woff2')`));
+    assert.equal(fs.readFileSync(path.join(directory,'dist',font)).toString('ascii',0,4),'wOF2');
+    assert.ok(fs.readFileSync(path.join(directory,'dist','MaraoAsset--fonts--Montserrat.ttf')).equals(fs.readFileSync('custom_components/marao_dashboard/frontend/fonts/Montserrat.ttf')));
     for (const file of ['MaraoNativeCardEditor.js','MaraoOrdinaryMigration.js','MaraoNativeBootstrap.js','brand/mark.svg','fonts/Montserrat.ttf','MaraoTheme.js']) {
       const url=new AssetURL('./'+file+'?v=old',base);
       assert.equal(path.basename(url.pathname),first.identity+'--'+file.replaceAll('/','--'));
@@ -94,7 +99,9 @@ test('Duplicate frontend entry points share one document runtime without mixing 
     const entry=fs.readFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoDashboard.js',import.meta.url),'utf8');
     fs.writeFileSync(path.join(directory,'MaraoNavigation.js'),'globalThis.nativeNavigationLoads=(globalThis.nativeNavigationLoads||0)+1;export const navigationLocalize=()=>"Error";export const findElements=()=>[];');
     fs.writeFileSync(path.join(directory,'MaraoCards.js'),'export function registerMaraoCards(){globalThis.nativeBasicRegistrations=(globalThis.nativeBasicRegistrations||0)+1;}');
-    for(const name of ['MaraoFloorPlanCard.js','MaraoSchedules.js','MaraoFrigateEventsCard.js'])fs.writeFileSync(path.join(directory,name),'');
+    for(const name of ['MaraoFloorPlanCard.js','MaraoSchedules.js','MaraoFrigateEventsCard.js']) {
+      fs.writeFileSync(path.join(directory,name),'globalThis.firstSpecialtyRegistration ??= globalThis.nativeCardLoads || 0;');
+    }
     fs.writeFileSync(path.join(directory,'MaraoNativeCards.js'),'globalThis.nativeCardLoads=(globalThis.nativeCardLoads||0)+1;');
     fs.writeFileSync(path.join(directory,'MaraoRuntime.js'),'globalThis.nativeRuntimeLoads=(globalThis.nativeRuntimeLoads||0)+1;globalThis.nativeRuntimeStarted.resolve();await globalThis.nativeRuntimeGate;');
     globalThis.nativeRuntimeGate=runtimeGate.promise;globalThis.nativeRuntimeStarted=runtimeStarted;
@@ -109,12 +116,13 @@ test('Duplicate frontend entry points share one document runtime without mixing 
     assert.equal(globalThis.nativeBasicRegistrations,1,'Basic cards register before a delayed runtime download completes');
     assert.equal(globalThis.nativeCardLoads,1);
     runtimeGate.resolve();await native.runtimeReady;
+    assert.equal(globalThis.firstSpecialtyRegistration,1,'Ordinary card adapters can render before specialty modules begin evaluating');
     assert.equal(globalThis.nativeNavigationLoads,1);assert.equal(globalThis.nativeRuntimeLoads,1);
     assert.equal(window.MaraoFrontendPackage,active);assert.equal(active.identity,'a'.repeat(64));
   } finally {
     globalThis.window=previousWindow;globalThis.customElements=previousRegistry;
     runtimeGate.resolve();
-    for(const key of ['nativeNavigationLoads','nativeRuntimeLoads','nativeBasicRegistrations','nativeCardLoads','nativeRuntimeGate','nativeRuntimeStarted'])delete globalThis[key];
+    for(const key of ['firstSpecialtyRegistration','nativeNavigationLoads','nativeRuntimeLoads','nativeBasicRegistrations','nativeCardLoads','nativeRuntimeGate','nativeRuntimeStarted'])delete globalThis[key];
     fs.rmSync(directory,{recursive:true,force:true});
   }
 });

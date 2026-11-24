@@ -180,6 +180,36 @@ test('native preview and live native editing forward inert state before hass and
   assert.equal(order.at(-1)[0], 'preview');
 });
 
+test('native wrappers compose once on first state, forward readings and recompose on referenced metadata changes', () => {
+  const state = id => ({entity_id:id, state:'off', attributes:{friendly_name:id}});
+  const states = {'light.bound':state('light.bound'), 'light.other':state('light.other')};
+  const mounts = [];
+  const owner = Object.assign(Object.create(MaraoNativeCard.prototype), {
+    _children:[], _content:{}, _bindHost(){}, _mount(context){mounts.push(context);},
+  });
+  owner.setConfig(config('md_light_card', {entity:'light.bound'}));
+  assert.equal(mounts.length, 0);
+  owner.hass = {states, language:'en'};
+  owner._refresh();
+  assert.equal(mounts.length, 1);
+  assert.deepEqual(mounts[0].entities.map(entity => entity.entity_id), Object.keys(states));
+  states['light.bound'].state = 'on';
+  states['light.other'].attributes.friendly_name = 'Other lamp';
+  owner._refresh();
+  assert.equal(mounts.length, 1);
+  states['light.bound'].attributes.friendly_name = 'Bound lamp';
+  owner._refresh();
+  assert.equal(mounts.length, 2);
+  assert.deepEqual(mounts[1].entities.map(entity => entity.name), ['Bound lamp', 'Other lamp']);
+
+  owner.setConfig(config('md_entity_group_card', {id:'lights', name:'Lights', entity_type:'light', entities:['light.bound'], popup_view:'other-lights'}));
+  assert.equal(mounts.length, 3);
+  delete states['light.other'];
+  owner._refresh();
+  assert.equal(mounts.length, 4);
+  assert.deepEqual(mounts[3].entities.map(entity => entity.entity_id), ['light.bound']);
+});
+
 test('invalid access actions and mismatched native identities fail before composition', () => {
   assert.throws(() => validateNativeCardConfig(config('md_access_slide_action_card', { entity_id: 'lock.test', tap_action: { action: 'toggle' } })), /strict slide/);
   assert.throws(() => validateNativeCardConfig({ type: 'custom:marao-light-card', template: 'md_access_card', entity_id: 'lock.test' }), /card type/);

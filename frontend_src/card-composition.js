@@ -3,8 +3,7 @@ import {validatePopupContent,customPopup} from '../custom_components/marao_dashb
 import {popupViewError,resolvePopupView,popupGroupFromView} from '../custom_components/marao_dashboard/frontend/MaraoPopupLayout.js';
 import labels from '../custom_components/marao_dashboard/frontend/marao-generator-labels.json' with { type: 'json' };
 import { appleTVOptions, copy, defaultTemplate, domain, entries, friendly, isAccess, object, sections, slug } from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
-import { catalog, validateSource } from './native-model.js';
-import { parseCardYaml } from './lovelace-model.js';
+import { catalog, validateSourceStructure } from './source-validation.js';
 
 // Existing renderer element names are public and retain their original contracts.
 const adapterNames = { md_energy_period_card: 'marao-energy-card', md_floor_plan_card: 'marao-floorplan-card' };
@@ -28,11 +27,11 @@ export function nativeCardDescriptor(config) {
 export function validateNativeCardConfig(config, entities = []) {
   const descriptor = nativeCardDescriptor(config);
   const error=popupViewError(config);if(error)throw new Error(error);
-  // Reuse the source validators on one card, without imposing page ownership on HA.
+  // These synthetic pages contain only a catalog card, with no raw YAML fragments.
   const card = { ...descriptor, id: descriptor.id || 'card' };
   const pages = [{ name: 'Native card', path: 'native', entities: [card] }];
   if (card.page && card.page !== 'native') pages.push({ name: 'Destination', path: card.page, entities: [] });
-  validateSource({ config_version: 2, name: 'Native card', landing_page: 'native', navigation: [], pages }, entities);
+  validateSourceStructure({ config_version: 2, name: 'Native card', landing_page: 'native', navigation: [], pages }, entities);
   return config;
 }
 
@@ -140,7 +139,6 @@ export function createCardComposition({ root = 'marao-dashboard', language = 'en
   const t = key => labels[locale]?.[key] || labels.en[key] || key;
   const name = item => item.name_key && item.name === labels.en[item.name_key] ? t(item.name_key) : item.name || friendly(item.entity_id || item.path || item.id);
   const rawCards = new WeakSet();
-  const raw = value => { const card = copy(value); rawCards.add(card); return card; };
   const header = (popupHash, entity, title, icon) => ({ type: 'custom:marao-popup-card', hash: popupHash, ...(entity ? { entity } : {}), name: title, icon, show_icon: true, show_name: true, show_state: true, height: 'auto', max_height: '100%' });
   const owned = card => !rawCards.has(card) && (card.type === 'custom:marao-card' ? Boolean(card.template) && !['md_title_card', 'md_navbar_card', 'md_popup_card'].includes(card.template) : ['custom:marao-timeline-card', 'custom:marao-energy-period-card', 'custom:marao-frigate-events-card', 'custom:marao-slide-to-open'].includes(card.type));
   const structural = card => ['custom:marao-navbar-card', 'custom:marao-popup-card'].includes(card.type);
@@ -200,7 +198,6 @@ export function createCardComposition({ root = 'marao-dashboard', language = 'en
     if(role==='md_people_card')return {...(own(entity,'columns')?{columns:entity.columns}:{}),type:'custom:marao-card',template:role,entities:copy(item.entities),...(own(entity,'name')?{name:entity.name}:{})};
     if(role==='md_plex_library_card')return {type:'custom:marao-plex-watch-card',full:item.apple_tv?.plex?.display!=='popup',parent:{entity_id:item.entity_id,name:item.name,apple_tv:copy(item.apple_tv)}};
     if(role==='md_schedules_card')return {type:'custom:marao-schedules-runtime',...pick(item,['group_id','targets']),...(own(entity,'name')?{name:entity.name}:{})};
-    if (role === 'ha_card') return raw(parseCardYaml(item.yaml));
     if (role === 'md_floor_plan_card') return { type:'custom:marao-floor-plan-card', name:item.name, ...copy(variables), lights_popup:variables.lights_popup ?? `#page-${item._page_instance}-${item.id}-lights` };
     if (role === 'md_media_card' && variables.media_display === 'inline') {
       const summary = roomCard(item);

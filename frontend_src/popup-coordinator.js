@@ -3,13 +3,28 @@ import {nativeDashboardConfig,nativeDashboardHasDraft} from '../custom_component
 import {popupCanonical,managedPopupIssue} from '../custom_components/marao_dashboard/frontend/MaraoPopupManaged.js';
 import {popupAuthoringAllowed,commitPopupDocument,reconcilePopupTransaction} from '../custom_components/marao_dashboard/frontend/MaraoPopupTransaction.js';
 import {popupLabel} from '../custom_components/marao_dashboard/frontend/MaraoPopupLayout.js';
-import {planManagedPopups} from './popup-management.js';
 const same=(a,b)=>popupCanonical(a)===popupCanonical(b);
+
+let plannerModule, plannerAttempt = 0;
+function loadPopupPlanner() {
+  if (!plannerModule) {
+    const params = new URL(import.meta.url).searchParams;
+    if (plannerAttempt) params.set('marao_retry', String(plannerAttempt));
+    const query = params.size ? '?' + params : '';
+    plannerModule = import(new URL(`./MaraoPopupManagement.js${query}`, import.meta.url)).catch(error => {
+      plannerModule = undefined;
+      plannerAttempt++;
+      throw error;
+    });
+  }
+  return plannerModule;
+}
 
 // Observes confirmed HA saves. Loading a dashboard never repairs or writes it.
 export function createPopupCoordinator(root,options={}) {
   const route=options.route||(()=>globalThis.location?.pathname.split('/')[1]);
   const dirty=options.dirty||(()=>nativeDashboardHasDraft(root));
+  const loadPlanner = options.loadPlanner || loadPopupPlanner;
   let subscription,unsubscribe,identity,epoch=0,pending=false,running=false,disposed=false;
   let blockedView,wasInert,notice;
   const config=()=>nativeDashboardConfig(root.lovelace);
@@ -42,6 +57,10 @@ export function createPopupCoordinator(root,options={}) {
       // a host update; do not mistake a draft for a saved parent change.
       if(!same(config(),original)){pending=true;waitHost=true;return;}
       await reconcilePopupTransaction(context,original);if(!current(token))return;
+      const {planManagedPopups} = await loadPlanner();
+      if (!current(token)) return;
+      // Another save may have completed while the planner was downloading.
+      if (!same(config(), original)) { pending = true; return; }
       const entities=Object.values(hass.states||{}).map(state=>({...state.attributes,entity_id:state.entity_id}));
       const proposed=planManagedPopups(original,{entities,hass,dashboardRoot:path,language:languageCode(hass)});
       if(same(original,proposed)){root._maraoPopupSync=new Map();notify();return;}
@@ -50,7 +69,7 @@ export function createPopupCoordinator(root,options={}) {
       if(current(token)){root._maraoPopupSync=new Map();notify();}
     }catch(error){
       if(current(token)){root._maraoPopupSync=new Map(paths().map(source=>[source,{error:error.message}]));notify();}
-    }finally{running=false;if(busy)protect();if(pending&&!waitHost&&current(token))queueMicrotask(()=>{if(!root._maraoPopupWrite)drain();});}
+    }finally{running=false;if(busy)protect();if(pending&&!waitHost&&current(epoch))queueMicrotask(()=>{if(!root._maraoPopupWrite)drain();});}
   }
   function stop(){epoch++;unsubscribe?.();unsubscribe=null;subscription=null;identity=null;pending=false;root._maraoPopupSync=new Map();releaseView();}
   return {

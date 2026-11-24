@@ -1,13 +1,11 @@
-import catalog from '../custom_components/marao_dashboard/frontend/marao-catalog.json' with { type: 'json' };
 import { adaptNativeDashboard, formatVersion, migrateSource, runMigrationChain, SOURCE_MIGRATIONS, SOURCE_VERSION } from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
-import { validateConfig } from './editor-model.js';
+import { validateSourceStructure } from './source-validation.js';
 import { validateCardYaml } from './lovelace-model.js';
 
-export { catalog };
+export { catalog } from './source-validation.js';
 
 export function validateSource(source, entities = []) {
-  const errors = validateConfig(source, formatVersion(source), entities, catalog.energy_units, catalog);
-  if (errors.length) throw new Error(errors.join('\n'));
+  validateSourceStructure(source, entities);
   validateCardYaml(source);
   return source;
 }

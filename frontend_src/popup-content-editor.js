@@ -1,5 +1,5 @@
 import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
-import {catalog} from './native-model.js';
+import {catalog} from './source-validation.js';
 import {nativeCardType} from './card-composition.js';
 import {popupTemplatesFor,popupTemplateCandidate,preparePopupCopy,popupContentIdentity,matchingPopupTemplate} from './popup-content.js';
 import {popupContentError} from '../custom_components/marao_dashboard/frontend/MaraoPopupContent.js';

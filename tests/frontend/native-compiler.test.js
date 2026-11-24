@@ -14,6 +14,20 @@ test('complete independent native output preserves empty navigation, raw content
   assert.deepEqual(source, before);
 });
 
+test('historical YAML nested in an owned grid retains raw identity and its original nested card types', () => {
+  const input = structuredClone(source);
+  const yaml = 'type: custom:button-card\ncards:\n  - type: custom:mini-graph-card\nopaque: []';
+  input.pages[0].sections = [{columns:2, entities:[
+    {template:'md_light_card', entity_id:'light.fixture'},
+    {template:'ha_card', yaml},
+  ]}];
+  const grid = compileDashboard(input).views[0].cards[0];
+  assert.equal(grid.type, 'custom:marao-control-grid');
+  assert.deepEqual(grid.native_cards, [1]);
+  assert.deepEqual(grid.cards[1], {type:'custom:button-card', cards:[{type:'custom:mini-graph-card'}], opaque:[]});
+  assert.equal(input.pages[0].sections[0].entities[1].yaml, yaml);
+});
+
 test('invalid bindings, future source and unsafe YAML fail without a starter reset', () => {
   for (const card of [{ template: 'md_light_card', entity_id: 'lock.safe' }, { template: 'ha_card', yaml: 'type: !secret private' }]) {
     const input = structuredClone(source); input.pages[0].sections[0].entities = [card];

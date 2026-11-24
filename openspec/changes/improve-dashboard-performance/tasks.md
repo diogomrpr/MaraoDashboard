@@ -11,3 +11,7 @@
 ## 3. Navbar and installation
 - [x] 3.1 Remove periodic layout polling, coalesce event-driven updates and skip unchanged styles; verify navbar lifecycle tests.
 - [x] 3.2 Rebuild assets, review selected affected scope, install on disposable HA preserving configuration, and confirm compression and navigation with a focused check.
+
+## Native frontend first-visit follow-up
+
+The [first-visit audit](first-visit.md) records the paired cold and warm measurements, shared resource review, rendering changes and compatibility checks for the 0.37.6 frontend.

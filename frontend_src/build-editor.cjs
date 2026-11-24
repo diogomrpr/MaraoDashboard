@@ -12,6 +12,7 @@ const entries = {
   MaraoNativeModel: 'legacy-model.js',
   MaraoNativeDashboard: 'native-strategy.js',
   MaraoNativeBootstrap: 'native-bootstrap.js',
+  MaraoPopupManagement: 'popup-management.js',
   MaraoNativeCards: 'native-cards.js',
   MaraoNativeCardMetadata: 'native-card-metadata.js',
   MaraoNativeCardEditor: 'native-card-editor.js',
@@ -71,6 +72,9 @@ async function build() {
       }
       if (!file.endsWith('MaraoHistoryChart.js') && inputs.some(input => /node_modules\/(chart\.js|@kurkle\/color)\//.test(input))) {
         throw new Error('Chart.js must remain in the on-demand numeric detail bundle.');
+      }
+      if (['MaraoNativeBootstrap.js', 'MaraoNativeCards.js'].includes(path.basename(file)) && inputs.some(input => /node_modules\/yaml\//.test(input))) {
+        throw new Error('The YAML parser must stay out of ordinary dashboard startup: ' + path.basename(file));
       }
     }
     fs.copyFileSync(path.join(repoRoot, 'node_modules', 'yaml', 'LICENSE'), path.join(outputRoot, 'YAML.LICENSE.txt'));

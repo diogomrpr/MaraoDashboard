@@ -13,9 +13,8 @@ if (!window.MaraoDashboardRuntime) {
     // Register ordinary HA cards before downloading the larger content runtime.
     const cards = await import(new URL(`./MaraoCards.js${query}`,import.meta.url));
     cards.registerMaraoCards();
-    await Promise.all(['MaraoFloorPlanCard.js','MaraoSchedules.js'].map(file => import(new URL(`./${file}${query}`,import.meta.url))));
     await import(new URL(`./MaraoNativeCards.js${query}`,import.meta.url));
-    return Promise.all(['MaraoRuntime.js','MaraoFrigateEventsCard.js'].map(file => import(new URL(`./${file}${query}`,import.meta.url))));
+    return Promise.all(['MaraoRuntime.js','MaraoFloorPlanCard.js','MaraoSchedules.js','MaraoFrigateEventsCard.js'].map(file => import(new URL(`./${file}${query}`,import.meta.url))));
   })().catch(error => {
     console.error('Marao dashboard content failed to initialize',error);
     const message=document.createElement('p');message.setAttribute('role','alert');
