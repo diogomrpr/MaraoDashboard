@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import { color as chartColor } from 'chart.js/helpers';
 import * as data from '../../frontend_src/history-data.js';
 import { powerStateAt } from '../../frontend_src/power-history.js';
+import { formatLocale, languageCode } from '../../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 const layoutSource=fs.readFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoHistoryLayout.js',import.meta.url),'utf8');
 const source=fs.readFileSync(new URL('../../frontend_src/history-chart.js',import.meta.url),'utf8');
 function fixture(options={}){
@@ -31,12 +32,12 @@ function fixture(options={}){
   }
   class Observer{constructor(callback){this.callback=callback;observers.push(this);}observe(){}disconnect(){this.disconnected=true;}}
   class VisibilityObserver{constructor(callback){this.callback=callback;visibilityObservers.push(this);}observe(){}disconnect(){this.disconnected=true;}}
-  const context=vm.createContext({...data,Chart:FakeChart,LineController:'line',LineElement:'lineElement',PointElement:'point',BarController:'bar',BarElement:'barElement',LinearScale:'linear',Filler:'fill',
+  const context=vm.createContext({...data,formatLocale,languageCode,Chart:FakeChart,LineController:'line',LineElement:'lineElement',PointElement:'point',BarController:'bar',BarElement:'barElement',LinearScale:'linear',Filler:'fill',
     chartColor,document:doc,ResizeObserver:Observer,IntersectionObserver:VisibilityObserver,AbortController,CustomEvent,
     requestAnimationFrame:callback=>{frames.set(++frameId,callback);return frameId;},cancelAnimationFrame:id=>frames.delete(id),
     getComputedStyle:element=>({color:chartColor(options.theme?.[/^var\((--[^)]+)\)$/.exec(element.style.color)?.[1]]||element.style.color||options.theme?.['--primary-text-color']||'#233044').rgbString(),fontSize:'16px',getPropertyValue:key=>options.theme?.[key]||''})});
   context.powerStateAt=powerStateAt;
-  vm.runInContext(layoutSource.replaceAll('export ', '') + '\n' + source.replace(/^import .*;\n/gm,'').replaceAll('export function','function')+'\nglobalThis.create=createHistoryChart;',context);
+  vm.runInContext(layoutSource.replace(/^import .*;\n/gm,'').replaceAll('export ', '') + '\n' + source.replace(/^import .*;\n/gm,'').replaceAll('export function','function')+'\nglobalThis.create=createHistoryChart;',context);
   const container=new Element('div'),end=Date.parse('2026-10-18T12:00:00Z');
   const samples=[{time:end-5*3600000,value:12.123456},{time:end-3600000,value:40.123456},{time:end-600000,value:null},{time:end,value:20.123456}];
   const renderer=context.create(container,{samples,end,hass:{locale:{language:'en'},config:{time_zone:'Europe/Lisbon'}},format:value=>value.toFixed(6),stateClass:'measurement',...options});

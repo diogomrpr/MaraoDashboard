@@ -17,6 +17,7 @@ await import(new URL(`./MaraoSchedules.js${MARAO_RESOURCE_QUERY}`, import.meta.u
 await import(new URL(`./MaraoNativeCards.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
 
 const MARAO_FONT_URL = new URL(`./MaraoFonts.css${MARAO_RESOURCE_QUERY}`,import.meta.url).href;
+const { languageCode, formatLocale } = await import(new URL(`./MaraoLocale.js${new URL(import.meta.url).search}`, import.meta.url));
 
 if (
   globalThis.document?.head
@@ -273,6 +274,59 @@ const TRANSLATIONS = {
     "common.closing": "Closing",
     "common.running": "Running",
     "common.idle": "Idle",
+    "common.playing": "Playing",
+    "common.paused": "Paused",
+    "common.buffering": "Buffering",
+    "common.standby": "Standby",
+    "common.recording": "Recording",
+    "common.cleaning": "Cleaning",
+    "common.returning": "Returning to base",
+    "common.docked": "Docked",
+    "common.jammed": "Jammed",
+    "common.armed_home": "Armed at home",
+    "common.armed_away": "Armed away",
+    "common.armed_night": "Armed at night",
+    "common.armed_vacation": "Armed on vacation",
+    "common.armed_custom_bypass": "Armed with bypass",
+    "common.arming": "Arming",
+    "common.disarming": "Disarming",
+    "common.disarmed": "Disarmed",
+    "common.pending": "Pending",
+    "common.triggered": "Alarm triggered",
+    "controls.action.turn_on": "Turn on",
+    "controls.action.turn_off": "Turn off",
+    "controls.action.toggle": "Toggle",
+    "controls.action.press": "Press",
+    "controls.action.open_cover": "Open",
+    "controls.action.close_cover": "Close",
+    "controls.action.stop_cover": "Stop",
+    "controls.action.set_cover_position": "Set position",
+    "controls.action.lock": "Lock",
+    "controls.action.unlock": "Unlock",
+    "controls.action.volume_up": "Increase volume",
+    "controls.action.volume_down": "Decrease volume",
+    "controls.action.volume_mute": "Mute or unmute",
+    "controls.action.media_previous_track": "Previous track",
+    "controls.action.media_next_track": "Next track",
+    "controls.action.media_play_pause": "Play or pause",
+    "controls.action.select_source": "Select source",
+    "controls.action.select_option": "Select option",
+    "controls.action.set_value": "Set value",
+    "controls.action.set_hvac_mode": "Set climate mode",
+    "controls.command.home": "Home",
+    "controls.command.menu": "Menu",
+    "controls.command.back": "Back",
+    "controls.command.play_pause": "Play or pause",
+    "controls.command.volume_up": "Increase volume",
+    "controls.command.volume_down": "Decrease volume",
+    "timeline.entity_required": "Marao state timeline requires an entity",
+    "power.choose_sensor": "Choose a power sensor.",
+    "power.invalid_unit": "Power devices require power sensors in W or kW.",
+    "energy.invalid_precision": "Decimal places must be an integer from 0 to 6.",
+    "energy.invalid_sub_entities": "Invalid energy breakdown entities.",
+    "energy.duplicate_sources": "Energy breakdown sources must be unique.",
+    "energy.invalid_tariff": "Invalid price per kWh.",
+    "energy.invalid_cost": "Invalid energy cost option.",
     "media.nothing_playing": "Nothing playing",
     "media.metadata_missing": "Media details unavailable",
     "media.previous": "Previous",
@@ -351,6 +405,15 @@ const TRANSLATIONS = {
     "common.all_closed": "All closed",
     "common.all_good": "All good",
     "common.active_count": "{count} active",
+    "common.active_count.one": "{count} active",
+    "common.on_count.one": "{count} on",
+    "common.open_count.one": "{count} open",
+    "common.need_attention_count.one": "{count} needs attention",
+    "common.partial_summary.one": "{label}, {count} unavailable",
+    "power.devices_list": "Power devices must be a list.",
+    "power.device_sensor": "Choose a power sensor for each device.",
+    "power.devices_unique": "Power devices must be unique and different from the house sensor.",
+    "power.device_name": "Power device names must be text.",
     "common.partial_summary": "{label}, {count} unavailable",
     "group.empty": "No entities configured",
     "group.no_active": "No active entities",
@@ -572,6 +635,59 @@ const TRANSLATIONS = {
     "common.closing": "A fechar",
     "common.running": "Em execução",
     "common.idle": "Inativo",
+    "common.playing": "Em reprodução",
+    "common.paused": "Em pausa",
+    "common.buffering": "A carregar…",
+    "common.standby": "Em espera",
+    "common.recording": "A gravar",
+    "common.cleaning": "A limpar",
+    "common.returning": "A regressar à base",
+    "common.docked": "Na base",
+    "common.jammed": "Bloqueado",
+    "common.armed_home": "Armado em casa",
+    "common.armed_away": "Armado fora",
+    "common.armed_night": "Armado à noite",
+    "common.armed_vacation": "Armado em férias",
+    "common.armed_custom_bypass": "Armado com exclusões",
+    "common.arming": "A armar",
+    "common.disarming": "A desarmar",
+    "common.disarmed": "Desarmado",
+    "common.pending": "Pendente",
+    "common.triggered": "Alarme disparado",
+    "controls.action.turn_on": "Ligar",
+    "controls.action.turn_off": "Desligar",
+    "controls.action.toggle": "Alternar",
+    "controls.action.press": "Premir",
+    "controls.action.open_cover": "Abrir",
+    "controls.action.close_cover": "Fechar",
+    "controls.action.stop_cover": "Parar",
+    "controls.action.set_cover_position": "Definir posição",
+    "controls.action.lock": "Trancar",
+    "controls.action.unlock": "Destrancar",
+    "controls.action.volume_up": "Aumentar o volume",
+    "controls.action.volume_down": "Diminuir o volume",
+    "controls.action.volume_mute": "Ativar ou desativar o som",
+    "controls.action.media_previous_track": "Faixa anterior",
+    "controls.action.media_next_track": "Faixa seguinte",
+    "controls.action.media_play_pause": "Reproduzir ou pausar",
+    "controls.action.select_source": "Selecionar fonte",
+    "controls.action.select_option": "Selecionar opção",
+    "controls.action.set_value": "Definir valor",
+    "controls.action.set_hvac_mode": "Definir modo de climatização",
+    "controls.command.home": "Início",
+    "controls.command.menu": "Menu",
+    "controls.command.back": "Voltar",
+    "controls.command.play_pause": "Reproduzir ou pausar",
+    "controls.command.volume_up": "Aumentar o volume",
+    "controls.command.volume_down": "Diminuir o volume",
+    "timeline.entity_required": "A cronologia de estados Marao precisa de uma entidade",
+    "power.choose_sensor": "Escolha um sensor de potência.",
+    "power.invalid_unit": "Os dispositivos de potência exigem sensores em W ou kW.",
+    "energy.invalid_precision": "As casas decimais têm de ser um número inteiro entre 0 e 6.",
+    "energy.invalid_sub_entities": "As entidades da discriminação da energia são inválidas.",
+    "energy.duplicate_sources": "As fontes da discriminação da energia têm de ser únicas.",
+    "energy.invalid_tariff": "Preço por kWh inválido.",
+    "energy.invalid_cost": "Opção de custo de energia inválida.",
     "media.nothing_playing": "Nada a reproduzir",
     "media.metadata_missing": "Detalhes indisponíveis",
     "media.previous": "Anterior",
@@ -650,6 +766,15 @@ const TRANSLATIONS = {
     "common.all_closed": "Tudo fechado",
     "common.all_good": "Tudo bem",
     "common.active_count": "{count} ativos",
+    "common.active_count.one": "{count} ativo",
+    "common.on_count.one": "{count} ligado",
+    "common.open_count.one": "{count} aberto",
+    "common.need_attention_count.one": "{count} precisa de atenção",
+    "common.partial_summary.one": "{label}, {count} indisponível",
+    "power.devices_list": "Os dispositivos de potência têm de ser uma lista.",
+    "power.device_sensor": "Escolha um sensor de potência para cada dispositivo.",
+    "power.devices_unique": "Os dispositivos têm de ser únicos e diferentes do sensor da casa.",
+    "power.device_name": "Os nomes dos dispositivos têm de ser texto.",
     "common.partial_summary": "{label}, {count} indisponíveis",
     "group.empty": "Sem entidades configuradas",
     "group.no_active": "Sem entidades ativas",
@@ -791,7 +916,7 @@ const TRANSLATIONS = {
     "climate.mode.heat_cool": "Aquecer/Arrefecer",
     "climate.mode.auto": "Auto",
     "climate.mode.fan_only": "Ventilação",
-    "climate.mode.dry": "Secar",
+    "climate.mode.dry": "Desumidificar",
     "nav.home": "Início",
     "nav.rooms": "Divisões",
     "overview.lights": "Iluminação",
@@ -852,23 +977,16 @@ const TRANSLATIONS = {
     "security.armed_home": "Armado em casa",
     "security.armed_away": "Armado fora",
     "security.disarmed": "Desarmado",
-    "security.triggered": "Acionado!"
+    "security.triggered": "Alarme disparado"
   }
 };
 
-function normalizeLanguage(hassOrLanguage) {
-  const language =
-    typeof hassOrLanguage === "string"
-      ? hassOrLanguage
-      : hassOrLanguage?.language || hassOrLanguage?.locale?.language || "en";
-  const normalized = String(language || "en").toLowerCase();
-  return TRANSLATIONS[normalized] ? normalized : normalized.split(/[-_]/)[0];
-}
-
 function localize(key, hassOrLanguage, placeholders = {}) {
-  const language = normalizeLanguage(hassOrLanguage);
+  const language = languageCode(hassOrLanguage);
   const catalog = TRANSLATIONS[language] || TRANSLATIONS.en;
-  const text = catalog[key] || TRANSLATIONS.en[key] || key;
+  const singular = `${key}.one`;
+  const label = placeholders.count === 1 && Object.hasOwn(TRANSLATIONS.en, singular) ? singular : key;
+  const text = catalog[label] || TRANSLATIONS.en[label] || key;
   return text.replace(/\{(\w+)\}/g, (_match, name) =>
     Object.prototype.hasOwnProperty.call(placeholders, name) ? placeholders[name] : `{${name}}`
   );
@@ -1484,7 +1602,7 @@ class MaraoStateTimelineCard extends HTMLElement {
   }
 
   setConfig(config) {
-    if (!config?.entity) throw new Error("Marao state timeline requires an entity");
+    if (!config?.entity) throw new Error(localize("timeline.entity_required", this._hass));
     this._config = { ...config }; this._layoutMetadata = {};
     this._history = null;
     this._loadedKey = "";
@@ -1611,7 +1729,7 @@ class MaraoStateTimelineCard extends HTMLElement {
   }
 
   _formatTime(timestamp, includeDate = false) {
-    const language = this._hass?.locale?.language || this._hass?.language || navigator.language;
+    const language = formatLocale(this._hass);
     return new Intl.DateTimeFormat(language, includeDate
       ? { weekday: "short", hour: "2-digit", minute: "2-digit" }
       : { hour: "2-digit", minute: "2-digit" }
@@ -1619,7 +1737,7 @@ class MaraoStateTimelineCard extends HTMLElement {
   }
 
   _formatTick(timestamp) {
-    const language = this._hass?.locale?.language || this._hass?.language || navigator.language;
+    const language = formatLocale(this._hass);
     return new Intl.DateTimeFormat(language, { hour: "2-digit", hourCycle: "h23" })
       .format(new Date(timestamp));
   }
@@ -1805,10 +1923,10 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     // they are regenerated, instead of producing an error card.
     const entity = config?.entity || config?.entity_id || null;
     const next = { period: "day", popup: false, ...config, entity };
-    if (next.sub_entities !== undefined && (!Array.isArray(next.sub_entities) || next.sub_entities.some(item => !item || !/^sensor\.[a-z0-9_]+$/.test(item.entity_id) || (item.cost_entity != null && item.cost_entity !== '' && !/^sensor\.[a-z0-9_]+$/.test(item.cost_entity)) || (item.name !== undefined && typeof item.name !== 'string')))) throw new Error('Invalid energy sub-entities');
-    if (new Set((next.sub_entities || []).map(item => item.entity_id)).size !== (next.sub_entities || []).length) throw new Error('Energy breakdown sources must be unique');
-    if (next.cost_per_kwh !== undefined && (!Number.isFinite(next.cost_per_kwh) || next.cost_per_kwh < 0)) throw new Error('Invalid price per kWh');
-    if (next.calculate_cost !== undefined && typeof next.calculate_cost !== 'boolean') throw new Error('Invalid energy cost option');
+    if (next.sub_entities !== undefined && (!Array.isArray(next.sub_entities) || next.sub_entities.some(item => !item || !/^sensor\.[a-z0-9_]+$/.test(item.entity_id) || (item.cost_entity != null && item.cost_entity !== '' && !/^sensor\.[a-z0-9_]+$/.test(item.cost_entity)) || (item.name !== undefined && typeof item.name !== 'string')))) throw new Error(localize("energy.invalid_sub_entities", this._hass));
+    if (new Set((next.sub_entities || []).map(item => item.entity_id)).size !== (next.sub_entities || []).length) throw new Error(localize("energy.duplicate_sources", this._hass));
+    if (next.cost_per_kwh !== undefined && (!Number.isFinite(next.cost_per_kwh) || next.cost_per_kwh < 0)) throw new Error(localize("energy.invalid_tariff", this._hass));
+    if (next.calculate_cost !== undefined && typeof next.calculate_cost !== 'boolean') throw new Error(localize("energy.invalid_cost", this._hass));
     const changed = !this._config || ["entity", "period", "popup", "calculate_cost", "cost_per_kwh"].some(key => this._config[key] !== next[key]) || JSON.stringify(this._config.sub_entities) !== JSON.stringify(next.sub_entities);
     this._config = next;
     if (changed) { this._layoutMetadata = {}; this._breakdownNames = {}; }
@@ -1917,7 +2035,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
 
   _periodLabel() {
     const { start } = this._range();
-    const language = this._hass?.locale?.language || this._hass?.language || navigator.language;
+    const language = formatLocale(this._hass);
     return this._config.period === "month"
       ? new Intl.DateTimeFormat(language, { month: "long", year: "numeric", timeZone: this._hass?.config?.time_zone || "UTC" }).format(start)
       : new Intl.DateTimeFormat(language, { weekday: "short", day: "numeric", month: "short", timeZone: this._hass?.config?.time_zone || "UTC" }).format(start);

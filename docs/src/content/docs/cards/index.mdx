@@ -1,20 +1,18 @@
 ---
 title: Cards
-description: Every public Marao card, with editable configuration and interactive behavior examples.
+description: Marao card families, standalone controls and interactive examples.
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Choose a card to try its real Marao controls with fictional devices, edit settings or YAML, and copy its configuration into Home Assistant. Site search finds card names, settings and behavior descriptions.
+Choose a card to try its real Marao controls with fictional devices, edit settings or YAML, and copy its configuration into Home Assistant. The Access and Alarm pages also link to their standalone controls. Site search finds card names, settings and behavior descriptions.
 
 <CardGrid>
   <LinkCard title="Title" description="An editable heading inside any page or section." href="./title/" />
   <LinkCard title="Weather" description="Current weather with an optional native forecast." href="./weather/" />
   <LinkCard title="Room shortcut" description="Open a page and switch off its explicitly selected lights." href="./room/" />
   <LinkCard title="Scene collection" description="Open an ordered collection of native scenes and toggle helpers." href="./scene-collection/" />
-  <LinkCard title="Alarm" description="Alarm state and supported controls with transient code entry." href="./security/" />
-  <LinkCard title="Access opener" description="Slide deliberately to unlock or open the selected access point." href="./access-slide-action/" />
-  <LinkCard title="Security action" description="A deliberate security service action with a 1.2-second hold." href="./access-hold-action/" />
+  <LinkCard title="Alarm" description="Alarm summary that opens its controls in a popup." href="./security/" />
   <LinkCard title="Status" description="A compact entity reading or status." href="./base/" />
   <LinkCard title="Energy period" description="A day or month reading and its independently named history popup." href="./energy-period/" />
   <LinkCard title="Media app" description="Open a configured source on the selected media player." href="./media-app/" />
@@ -25,7 +23,7 @@ Choose a card to try its real Marao controls with fictional devices, edit settin
   <LinkCard title="Fan / exhaust valve" description="Control fan speed or cover-backed exhaust opening with native commands." href="./fan/" />
   <LinkCard title="Media player" description="Media controls with artwork and generated popup controls." href="./media/" />
   <LinkCard title="Plex library" description="Browse Continue Watching, Movies and TV Series, then play a title on your selected Apple TV through Plex or Rivulet." href="./plex-library/" />
-  <LinkCard title="Access" description="Access controls with configurable popup, slide, close or security hold." href="./access/" />
+  <LinkCard title="Access" description="Access point summary with a popup or configurable inline controls." href="./access/" />
   <LinkCard title="Sensor" description="Show sensor state, last change, and state-aware colors." href="./sensor/" />
   <LinkCard title="Switch" description="Toggle a switch with optional power usage and graph." href="./switch/" />
   <LinkCard title="Number control" description="Increase or decrease a Home Assistant number entity." href="./number/" />
@@ -39,10 +37,8 @@ Choose a card to try its real Marao controls with fictional devices, edit settin
   <LinkCard title="Timeline" description="Show recent state transitions for any supported entity." href="./timeline/" />
   <LinkCard title="Page shortcut" description="Open another generated dashboard page." href="./navigation/" />
   <LinkCard title="Entity Group" description="Summarize selected lights, covers, batteries or thermostats and open their controls." href="./entity-group/" />
-  <LinkCard title="Alarm controls" description="Capability-aware alarm controls with transient PIN entry and guarded actions." href="./alarm-controls/" />
   <LinkCard title="Glance" description="Up to three independently configured readings." href="./glance/" />
   <LinkCard title="Scene selector" description="Native selector options and authoritative selection." href="./scene/" />
-  <LinkCard title="Access close / lock" description="An explicit safe close or lock action." href="./access-action/" />
   <LinkCard title="Floor Plan" description="Upload a room image and place light controls and illuminated strips." href="./floor-plan/" />
   <LinkCard title="People" description="Display explicitly selected people and their current places." href="./people/" />
   <LinkCard title="Schedules" description="Manage device schedules and seasonal timer groups in Home Assistant." href="./schedules/" />

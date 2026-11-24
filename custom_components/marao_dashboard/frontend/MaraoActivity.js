@@ -1,10 +1,11 @@
+const { languageCode, formatLocale } = await import(new URL(`./MaraoLocale.js${new URL(import.meta.url).search}`, import.meta.url));
 const {activityRange,dateKey,filterActivity,loadActivity}=await import(new URL(`./MaraoActivityModel.js${new URL(import.meta.url).search}`,import.meta.url));
 const {bindDropdown,dropdownStyles}=await import(new URL(`./MaraoDropdown.js${new URL(import.meta.url).search}`,import.meta.url));
 let nextActivityId=0;
 export function createActivity(host, options) {
   let generation=0,destroyed=false,data,limit=50,filter={},period='today',custom={},hass=options.hass,reset;
   const dropdowns=new Set();
-  const pt=String(hass.language).startsWith('pt'), t=(a,b)=>pt?b:a;
+  const pt=languageCode(hass) === 'pt', t=(a,b)=>pt?b:a;
   const names={state:t('State change','Alteração de estado'),activation:t('Activation','Ativação'),request:t('Recorded request','Pedido registado'),opened:t('Opened / unlocked','Aberto / destrancado'),closed:t('Closed / locked','Fechado / trancado'),availability:t('Availability change','Alteração de disponibilidade'),problem:t('Reported problem','Problema comunicado'),unknown:t('Unknown origin','Origem desconhecida'),user:t('User','Utilizador'),automation:t('Automation','Automação')};
   host.innerHTML=`<style>
   .marao-activity{display:flex;flex-direction:column;height:65dvh;max-height:65dvh;min-height:0;min-width:0;flex:1 1 auto;gap:12px;overflow:auto;font-family:var(--primary-font-family,Montserrat,sans-serif);font-size:var(--font-size-secondary,1rem);line-height:1.4}
@@ -60,14 +61,14 @@ export function createActivity(host, options) {
     let day,events;
     for(const row of rows.slice(0,limit)){
       const key=dateKey(row.time,hass.config?.time_zone||'UTC');
-      if(day!==key){day=key;const heading=document.createElement('h3'),date=document.createElement('time');date.dateTime=key;date.textContent=new Intl.DateTimeFormat(hass.language,{dateStyle:'long',timeZone:hass.config?.time_zone}).format(row.time);heading.append(date);events=document.createElement('div');events.className='marao-activity-day';list.append(heading,events);}
-      const article=document.createElement('article'),time=document.createElement('time');time.className='event-time';time.dateTime=new Date(row.time).toISOString();time.textContent=new Intl.DateTimeFormat(hass.language,{timeStyle:'short',timeZone:hass.config?.time_zone}).format(row.time);article.append(time);
+      if(day!==key){day=key;const heading=document.createElement('h3'),date=document.createElement('time');date.dateTime=key;date.textContent=new Intl.DateTimeFormat(formatLocale(hass),{dateStyle:'long',timeZone:hass.config?.time_zone}).format(row.time);heading.append(date);events=document.createElement('div');events.className='marao-activity-day';list.append(heading,events);}
+      const article=document.createElement('article'),time=document.createElement('time');time.className='event-time';time.dateTime=new Date(row.time).toISOString();time.textContent=new Intl.DateTimeFormat(formatLocale(hass),{timeStyle:'short',timeZone:hass.config?.time_zone}).format(row.time);article.append(time);
       const rail=document.createElement('div'),icon=document.createElement('span');rail.className='event-rail';rail.setAttribute('aria-hidden','true');icon.className='event-icon';const symbol=document.createElement('ha-icon');symbol.setAttribute('icon',row.kind==='request'?'mdi:gesture-tap':row.kind==='activation'?'mdi:play-circle-outline':'mdi:swap-horizontal');icon.append(symbol);rail.append(icon);article.append(rail);
       const body=document.createElement('div'),button=document.createElement('button');body.className='event-body';button.type='button';button.setAttribute('aria-expanded','false');
       const title=document.createElement('p');title.className='event-title';title.textContent=`${name(row.source)} · ${names[row.kind]}`;button.append(title);
       const state=document.createElement('p');state.textContent=row.kind==='request'?row.action||names.request:row.kind==='activation'?names.activation:`${row.before??'—'} → ${row.after??'—'}${row.unit?' '+row.unit:''}`;button.append(state);
       const origin=document.createElement('small');origin.textContent=`${names[row.origin]}${row.initiatorName?' · '+row.initiatorName:''}`;button.append(origin);
-      const detail=document.createElement('p');detail.hidden=true;detail.textContent=`${row.source} · ${new Intl.DateTimeFormat(hass.language,{timeStyle:'medium',timeZone:hass.config?.time_zone}).format(row.time)}${row.initiator?' · '+t('Recorded user ID: ','ID de utilizador registado: ')+row.initiator:''}`;
+      const detail=document.createElement('p');detail.hidden=true;detail.textContent=`${row.source} · ${new Intl.DateTimeFormat(formatLocale(hass),{timeStyle:'medium',timeZone:hass.config?.time_zone}).format(row.time)}${row.initiator?' · '+t('Recorded user ID: ','ID de utilizador registado: ')+row.initiator:''}`;
       button.onclick=()=>{options.haptic?.('heavy');detail.hidden=!detail.hidden;button.setAttribute('aria-expanded',String(!detail.hidden));};body.append(button,detail);article.append(body);events.append(article);
     }
     if(rows.length>limit){const more=document.createElement('button');more.textContent=t('Load earlier','Carregar anteriores');more.onclick=()=>{options.haptic?.('heavy');limit+=50;render();};list.append(more);}

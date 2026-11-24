@@ -1,8 +1,9 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {createSettingsRow} from './settings-row.js';
 
 // Edit only explicitly changed fields; retain unavailable references and opaque options.
 export function mountLocationSettings(host,draft,hass,mountForm,schema,pageFor,haptic=()=>{}){
- const pt=String(hass.language).startsWith('pt'),t=(en,local)=>pt?local:en;
+ const pt=languageCode(hass) === 'pt',t=(en,local)=>pt?local:en;
  const invalid=new Set();
  const section=document.createElement('section');section.className='shortcuts';host.append(section);
  const heading=document.createElement('h3');heading.textContent=t('Current room','Divisão atual');section.append(heading);

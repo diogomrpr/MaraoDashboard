@@ -1,3 +1,4 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {createSettingsRow,SETTINGS_ROW_CSS} from './settings-row.js';
 import {loadLovelaceEditor} from './lovelace-loader.js';
 import {renderPopupContent} from './popup-content-editor.js';
@@ -6,7 +7,7 @@ import {nativeDashboardConfig,findNativeEditorContext} from '../custom_component
 import {popupRole,popupHash,popupLabel,resolvePopupView,popupViewError,canonicalLayout,savePopupLayout} from '../custom_components/marao_dashboard/frontend/MaraoPopupLayout.js';
 import catalog from '../custom_components/marao_dashboard/frontend/marao-catalog.json' with {type:'json'};
 import {cardFormMethods} from './card-form-tools.js';
-import {PT_LABELS, MOVE_PT_LABELS} from './editor-labels.js';
+import {editorLabel, PT_LABELS, MOVE_PT_LABELS} from './editor-labels.js';
 import {clone, canonicalTemplate, cardForEntity, cameraTitleFields, formData, patchForm, sameFormValue, entityMeta, flattenEntities, mergeEntityValues, newEntityGroupId, entityGroupMemberCompatible, validateConfig} from './editor-model.js';
 import {openFloorPlanEditor} from './floor-plan-editor.js';
 import {templateForNativeType} from './card-composition.js';
@@ -128,11 +129,11 @@ export class MaraoCardEditor extends Base {
     this._installModel();this._render();
   }
   set hass(value) {
-    const language=this._hass?.language,admin=this._hass?.user?.is_admin;this._hass=value;
+    const language=languageCode(this._hass),admin=this._hass?.user?.is_admin;this._hass=value;
     this._entities=Object.entries(value?.states || {}).map(([entity_id,state])=>({entity_id,domain:entity_id.split('.')[0],state:state.state,name:state.attributes?.friendly_name || entity_id,...state.attributes}));
     this.shadowRoot?.querySelectorAll('ha-form').forEach(form=>{form.hass=value;});
     this.shadowRoot?.querySelectorAll('marao-native-card-editor, hui-card-element-editor').forEach(editor=>{editor.hass=value;});
-    if(this._config && (!this._mounted || language!==value?.language))this._render();
+    if(this._config && (!this._mounted || language!==languageCode(value)))this._render();
     else if(admin!==value?.user?.is_admin)this._renderPopupSelector();
     this._popupInline?.update();
     if(this._popupEditButton)this._popupEditButton.disabled=Boolean(this._popupBusy||this._popupUncertain||!value?.user?.is_admin||value.connected===false||value.connection?.connected===false);
@@ -165,7 +166,11 @@ export class MaraoCardEditor extends Base {
     if(card&&this._config.type==='custom:marao-state-timeline-card')card={...card,variables:[]};
     return card;
   }
-  _l(label) {return String(this._hass?.language || '').startsWith('pt')?(MOVE_PT_LABELS[label] || PT_LABELS[label] || PT_LABELS[label+'.']?.replace(/\.$/,'') || popupLabel(label,this._hass)):label;}
+  _l(label) {
+    if (languageCode(this._hass) !== 'pt') return label;
+    const localized = MOVE_PT_LABELS[label] || editorLabel(label, this._hass);
+    return localized === label ? popupLabel(label, this._hass) : localized;
+  }
   _t(key){return this._l(WORDS[key] || key);}
   _error(error){return this._l(String(error?.message || error));}
   _setStatus(message){const node=this.shadowRoot?.querySelector('[data-status]');if(node)node.textContent=message || '';}
@@ -359,7 +364,7 @@ export class MaraoCardEditor extends Base {
       const args={hass,root,opener,currentPath,path,editorDocument:document,isCurrent,journal:this._popupJournal};
       this._popupBusy=true;if(this._popupEditButton)this._popupEditButton.disabled=true;this._moveHaptic();
       this._setStatus(this._l('Creating layout…'));
-      const result=await savePopupLayout({...args,plan:baseline=>planPopupEdit(baseline,opener,currentPath,address,{entities:this._entities,dashboardRoot:path,language:hass.language,hass})});
+      const result=await savePopupLayout({...args,plan:baseline=>planPopupEdit(baseline,opener,currentPath,address,{entities:this._entities,dashboardRoot:path,language:languageCode(hass),hass})});
       const linked=result.path;this._popupSaved={opener:result.opener};
       if(!isCurrent())throw new Error('Dashboard changed. Reopen the card editor and try again.');
       if(!dialog.closeDialog())throw new Error('Save this card before editing its popup.');

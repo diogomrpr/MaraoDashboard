@@ -1,6 +1,6 @@
 const {locationError,locationLabel,locationPreferenceKey,deviceRoomPreferenceKey,readRoomPreference,forgetDeviceRoomPreference,resolveLocation}=await import(new URL(`./MaraoLocation.js${new URL(import.meta.url).search}`,import.meta.url));
-const [refreshModule, updatesModule, themeModule, pressModule] = await Promise.all([
-  'MaraoFrontendRefresh.js', 'MaraoFrontendUpdates.js', 'MaraoTheme.js', 'MaraoPressFeedback.js',
+const [refreshModule, updatesModule, themeModule, pressModule, { languageCode }] = await Promise.all([
+  'MaraoFrontendRefresh.js', 'MaraoFrontendUpdates.js', 'MaraoTheme.js', 'MaraoPressFeedback.js', 'MaraoLocale.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
 const { bindNavbarRefresh, refreshFrontend } = refreshModule;
 const {bindPressFeedback,pressStyles,pressTarget}=pressModule;
@@ -94,8 +94,7 @@ export const navigationTranslations = {
   }
 };
 export function navigationLocalize(key, hass, placeholders = {}, fallback = key) {
-  const language = typeof hass === 'string' ? hass : hass?.language || globalThis.document?.documentElement?.lang || 'en';
-  const translated = navigationTranslations[language.toLowerCase().split('-')[0]]?.[key] || navigationTranslations.en[key] || fallback;
+  const translated = navigationTranslations[languageCode(hass)]?.[key] || navigationTranslations.en[key] || fallback;
   return text(translated).replace(/\{(\w+)\}/g, (match, name) => Object.hasOwn(placeholders, name) ? placeholders[name] : match);
 }
 const localize = navigationLocalize;

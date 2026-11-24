@@ -1,3 +1,4 @@
+import { formatLocale } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import { createHistoryLayout, renderHistoryBreakdown, historyText, readableGraphColor } from '../custom_components/marao_dashboard/frontend/MaraoHistoryLayout.js';
 import { Chart, LineController, LineElement, PointElement, BarController, BarElement, LinearScale, Filler } from 'chart.js';
 import { color as chartColor } from 'chart.js/helpers';
@@ -13,7 +14,7 @@ export function createHistoryChart(container, initial) {
   const events = new AbortController();
   const readableColor = preferred => readableGraphColor(root, preferred);
   const seriesColor = index => readableColor(getComputedStyle(root).getPropertyValue(`--marao-chart-${index % 10 + 1}`).trim() || `hsl(${(210 + index * 137.5) % 360} 55% 48%)`);
-  const language = () => options.hass?.locale?.language || options.hass?.language || 'en';
+  const language = () => formatLocale(options.hass);
   const text = key => historyText(options, key);
   const formatter = () => new Intl.DateTimeFormat(language(), { timeZone:options.hass?.config?.time_zone || 'UTC',
     ...(options.bars ? options.interval==='hour'?{hour:'2-digit',minute:'2-digit',timeZoneName:'shortOffset'}:{month:'short',day:'numeric'}

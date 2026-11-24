@@ -119,6 +119,23 @@ test('runtime readiness is announced after translated labels become available', 
   assert.deepEqual(runtimeEvents.filter(event => event.type === 'marao-runtime-ready'), [{type:'marao-runtime-ready',localized:true}]);
 });
 
+test("the English and European Portuguese runtime catalogs have matching keys and placeholders", () => {
+  const { translations, localize } = window.MaraoDashboard;
+  const placeholders = value => [...new Set(value.match(/\{\w+\}/g) || [])].sort();
+  assert.deepEqual(Object.keys(translations.pt).sort(), Object.keys(translations.en).sort());
+  for (const [key, value] of Object.entries(translations.en)) {
+    assert.ok(translations.pt[key].trim(), key);
+    assert.deepEqual(placeholders(translations.pt[key]), placeholders(value), key);
+  }
+  assert.equal(localize("actions.for_target", { locale: { language: "pt-PT" } }, {
+    action: "Destrancar", name: "Porta da entrada",
+  }), "Destrancar Porta da entrada");
+  assert.equal(localize("controls.action.volume_up", "pt_PT"), "Aumentar o volume");
+  assert.equal(localize("common.active_count", "pt-PT", { count: 1 }), "1 ativo");
+  assert.equal(localize("common.active_count", "pt-PT", { count: 2 }), "2 ativos");
+  assert.equal(localize("controls.action.volume_up", "fr-FR"), "Increase volume");
+});
+
 test("loads the bundled Montserrat stylesheet without a runtime font CDN", async () => {
   assert.match(source,/\.\/MaraoFonts\.css/);
   assert.doesNotMatch(source,/fonts\.googleapis\.com|fonts\.gstatic\.com/);

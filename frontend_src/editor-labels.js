@@ -1,6 +1,23 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import { FLOOR_PT_LABELS } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlanText.js';
+import { EVENT_CONFIG_PT } from '../custom_components/marao_dashboard/frontend/MaraoEventModel.js';
 import {PLEX_PT} from '../custom_components/marao_dashboard/frontend/MaraoPlexModel.js';
 export const PT_LABELS = {
+  "Event provider": "Fornecedor de eventos",
+  "Frigate camera name": "Nome da câmara no Frigate",
+  "Frigate instance ID": "ID da instância do Frigate",
+  "UniFi Protect media source": "Fonte multimédia do UniFi Protect",
+  "Event limit": "Limite de eventos",
+  "Background color": "Cor de fundo",
+  "Charging shortcuts": "Atalhos de carregamento",
+  "Action 1": "Ação 1",
+  "Action 2": "Ação 2",
+  "Action 3": "Ação 3",
+  "Battery icon": "Ícone da bateria",
+  "Graph background": "Fundo do gráfico",
+  "Summary entities": "Entidades do resumo",
+  "Custom": "Personalizado",
+  "Popup content must use a native Sections layout.": "O conteúdo do popup tem de usar uma disposição Secções nativa.",
   "Apple TV options":"Opções da Apple TV",
   "Add entity":"Adicionar entidade",
   "Grid group identity is ambiguous. Edit the original YAML to preserve its options.":"A identidade do grupo de grelha é ambígua. Edite o YAML original para preservar as suas opções.",
@@ -38,6 +55,7 @@ export const PT_LABELS = {
   'Humidity sensor':'Sensor de humidade', 'Enable climate popup':'Ativar popup de climatização',
   'Choose a humidity sensor.':'Escolha um sensor de humidade.', 'Enable climate popup must be a boolean.':'Ativar popup de climatização tem de ser um valor booleano.',
   ...PLEX_PT,
+  ...EVENT_CONFIG_PT,
   'Show reading labels':'Mostrar nomes das leituras',
   'Show reading labels must be a boolean.':'Mostrar nomes das leituras tem de ser um valor booleano.',
   'Room climate':'Climatização da divisão', 'Related activity entities':'Entidades de atividade relacionadas', 'Related activity entities must be an explicit list of entity IDs.':'As entidades de atividade relacionadas têm de ser uma lista explícita de IDs de entidades.', 'Room climate must be a climate entity.':'A climatização da divisão tem de ser uma entidade de climatização.',
@@ -48,7 +66,7 @@ export const PT_LABELS = {
   'Choose artwork independently of the app source.':'Escolha a imagem independentemente da origem da aplicação.',
   'Choose a supported app logo.':'Escolha um logótipo de aplicação suportado.',
   "Camera Events":"Eventos de câmaras", "Browse explicitly selected camera events.":"Consultar eventos das câmaras selecionadas.",
-  "Event columns":"Colunas de eventos", "Event columns must be a positive integer.":"As colunas de eventos têm de ser um inteiro positivo.", "Preferred event columns inside the popup; reduces when space is limited.":"Número preferido de colunas de eventos na janela; reduz-se quando há pouco espaço.", "Add camera":"Adicionar câmara", "Camera":"Câmara", "Provider":"Fornecedor", "Frigate instance":"Instância Frigate", "Frigate camera":"Câmara Frigate", "Protect media source":"Fonte multimédia Protect", "Remove":"Remover", "People": "Pessoas", "People columns must be an integer from 1 to 6.":"As colunas de pessoas têm de ser um inteiro entre 1 e 6.", "Schedules": "Horários", "Section name": "Nome da secção", "Schedule collection": "Coleção de horários", "New collection": "Nova coleção", "Devices": "Dispositivos",
+  "Event columns":"Colunas de eventos", "Preferred event columns inside the popup; reduces when space is limited.":"Número preferido de colunas de eventos na janela; reduz-se quando há pouco espaço.", "Add camera":"Adicionar câmara", "Camera":"Câmara", "Provider":"Fornecedor", "Frigate instance":"Instância Frigate", "Frigate camera":"Câmara Frigate", "Protect media source":"Fonte multimédia Protect", "Remove":"Remover", "People": "Pessoas", "People columns must be an integer from 1 to 6.":"As colunas de pessoas têm de ser um inteiro entre 1 e 6.", "Schedules": "Horários", "Section name": "Nome da secção", "Schedule collection": "Coleção de horários", "New collection": "Nova coleção", "Devices": "Dispositivos",
   "People requires an explicit list of person entities.": "Pessoas exige uma lista explícita de entidades person.",
   "Choose unique person entities with textual names and icons.": "Escolha pessoas únicas com nomes e ícones de texto.",
   "Summary sections must be a list.": "As secções do resumo têm de ser uma lista.",
@@ -237,8 +255,8 @@ export const PT_LABELS = {
   "Action 1 command data": "Dados do comando da ação 1",
   "Action 2 command data": "Dados do comando da ação 2",
   "Action 3 command data": "Dados do comando da ação 3",
-  "Alarm state and supported controls with transient code entry.": "Estado e controlos do alarme com introdução temporária do código.",
-  "Slide deliberately to unlock or open the selected access point.": "Deslize para desbloquear ou abrir o acesso selecionado.",
+  "Alarm summary that opens its controls in a popup.": "Resumo do alarme que abre os controlos num popup.",
+  "Standalone slide to open or unlock.": "Controlo independente para deslizar e abrir ou destrancar.",
   "Apple TV options must be an object or false.": "As opções Apple TV têm de ser um objeto ou falso.",
   "Choose a compatible media remote entity.": "Escolha uma entidade de comando multimédia compatível.",
   "Media apps require an explicit ordered list of sources.": "As aplicações precisam de uma lista explícita e ordenada de origens.",
@@ -247,7 +265,7 @@ export const PT_LABELS = {
   "Open a page and switch off its explicitly selected lights.": "Abrir uma página e desligar as luzes escolhidas explicitamente.",
   "Open an ordered collection of native scenes and toggle helpers.": "Abrir uma coleção ordenada de cenários nativos e auxiliares de alternância.",
   "The authoritative alarm state and native alarm controls.": "Estado atual do alarme e controlos nativos.",
-  "A deliberate security service action with a 1.2-second hold.": "Uma ação de segurança que exige manter a pressão durante 1,2 segundos.",
+  "Standalone security action with a 1.2-second hold.": "Ação de segurança independente. Mantenha premido durante 1,2 segundos.",
   "A compact entity reading or status.": "Uma leitura ou estado compacto de uma entidade.",
   "A day or month reading and its independently named history popup.": "Uma leitura diária ou mensal e o seu popup de histórico com nome próprio.",
   "Open a configured source on the selected media player.": "Abrir uma origem configurada no leitor multimédia selecionado.",
@@ -433,7 +451,7 @@ export const PT_LABELS = {
   "Security hold": "Manter premido por segurança",
   "Access behavior is incompatible with the selected entity.": "O comportamento de acesso é incompatível com a entidade selecionada.",
   "Choose a supported access behavior.": "Escolha um comportamento de acesso suportado.",
-  "Access controls with configurable popup, slide, close or security hold.": "Controlos de acesso com popup, deslizar, fechar ou manter premido por segurança.",
+  "Access point summary with a popup or configurable inline controls.": "Resumo do ponto de acesso com popup ou controlos configuráveis no cartão.",
   "Access": "Acesso",
   "Sensor": "Sensor",
   "Switch": "Interruptor",
@@ -532,24 +550,24 @@ export const PT_LABELS = {
   "Alarm controls": "Controlos do alarme",
   "Person": "Pessoa",
   "Air quality": "Qualidade do ar",
-  "Capability-aware alarm controls with transient PIN entry and guarded actions.": "Controlos do alarme com PIN temporário e ações protegidas, adaptados às capacidades.",
+  "Standalone alarm controls with arming, disarming and PIN entry.": "Controlos independentes para armar, desarmar e introduzir o PIN.",
   "Date, weather and optional person and air quality.": "Data, meteorologia e pessoa e qualidade do ar opcionais.",
   "Up to three independently configured readings.": "Até três leituras configuradas de forma independente.",
   "Native selector options and authoritative selection.": "Opções de seleção nativas e seleção confirmada pelo Home Assistant.",
-  "An explicit safe close or lock action.": "Uma ação segura explícita para fechar ou trancar.",
+  "Standalone tap to close or lock.": "Controlo independente para tocar e fechar ou trancar.",
   "Reading 1": "Leitura 1",
-  "Reading 1 name": "Leitura 1 nome",
-  "Reading 1 icon": "Leitura 1 ícone",
+  "Reading 1 name": "Nome da leitura 1",
+  "Reading 1 icon": "Ícone da leitura 1",
   "Reading 2": "Leitura 2",
-  "Reading 2 name": "Leitura 2 nome",
-  "Reading 2 icon": "Leitura 2 ícone",
+  "Reading 2 name": "Nome da leitura 2",
+  "Reading 2 icon": "Ícone da leitura 2",
   "Reading 3": "Leitura 3",
-  "Reading 3 name": "Leitura 3 nome",
-  "Reading 3 icon": "Leitura 3 ícone"
+  "Reading 3 name": "Nome da leitura 3",
+  "Reading 3 icon": "Ícone da leitura 3"
 };
 export function editorLabel(label, hass) {
   if (label === "Mode buttons") label = "Mode selector";
-  const language = String(hass?.locale?.language || hass?.language || "en").toLowerCase().split("-")[0];
+  const language = languageCode(hass);
   return language === "pt" ? PT_LABELS[label] || PT_LABELS[label + "."]?.replace(/\.$/, "") || label : label;
 }
 

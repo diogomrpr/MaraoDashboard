@@ -1,3 +1,4 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {refreshCardMetadata} from './native-card-metadata.js';
 import {readDashboardSettings} from './dashboard-settings.js';
 import {createPopupCoordinator} from './popup-coordinator.js';
@@ -50,7 +51,7 @@ export function attachDashboardHost(root) {
       } catch (error) {
         navigation.setDashboardNavigation(root, null);
         if (!this.error) {this.error=document.createElement('p');this.error.setAttribute('role','alert');this.error.dataset.maraoSettingsError='';root.shadowRoot?.append(this.error);}
-        this.error.textContent = String(root.hass?.language || '').startsWith('pt') ? 'A configuração Marao não é suportada. Abra o editor do Home Assistant para a corrigir.' : 'Unsupported Marao settings. Open the Home Assistant editor to correct them.';
+        this.error.textContent = languageCode(root.hass) === 'pt' ? 'A configuração Marao não é suportada. Abra o editor do Home Assistant para a corrigir.' : 'Unsupported Marao settings. Open the Home Assistant editor to correct them.';
       }
     },
   };

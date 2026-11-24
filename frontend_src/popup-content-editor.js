@@ -1,3 +1,4 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {catalog} from './native-model.js';
 import {nativeCardType} from './card-composition.js';
 import {popupTemplatesFor,popupTemplateCandidate,preparePopupCopy,popupContentIdentity,matchingPopupTemplate} from './popup-content.js';
@@ -89,7 +90,7 @@ export class PopupInline {
     const key=canonicalLayout([parent,this.panel.hass?.language]);
     if(key!==this.templateKey){
       this.templateKey=key;this.templates=popupTemplatesFor(parent);this.candidates=new Map();this.templateErrors=new Map();
-      for(const entry of this.templates)try{this.candidates.set(entry.id,popupTemplateCandidate(parent,entry.id,{}, {entities:this.panel._entities,hass:this.panel.hass,language:this.panel.hass?.language}));}catch(error){this.templateErrors.set(entry.id,error);}
+      for(const entry of this.templates)try{this.candidates.set(entry.id,popupTemplateCandidate(parent,entry.id,{}, {entities:this.panel._entities,hass:this.panel.hass,language:languageCode(this.panel.hass)}));}catch(error){this.templateErrors.set(entry.id,error);}
     }
     return this.candidates;
   }
@@ -103,7 +104,7 @@ export class PopupInline {
     this.sourceCopy=null;
     try{
       if(panel._config.popup_content?.mode==='custom')content=copy(panel._config.popup_content);
-      else{this.sourceCopy=preparePopupCopy(panel._config,nativeDashboardConfig(panel.lovelace),decodeURIComponent(globalThis.location?.pathname?.split('/')[2]||''),{entities:panel._entities,hass:panel.hass,language:panel.hass?.language,sourceOpener:panel._popupCopyOrigin});content={...panel._config.popup_content,...this.sourceCopy.content};}
+      else{this.sourceCopy=preparePopupCopy(panel._config,nativeDashboardConfig(panel.lovelace),decodeURIComponent(globalThis.location?.pathname?.split('/')[2]||''),{entities:panel._entities,hass:panel.hass,language:languageCode(panel.hass),sourceOpener:panel._popupCopyOrigin});content={...panel._config.popup_content,...this.sourceCopy.content};}
     }catch(error){failure=error;}
     this.content=content;this.editable=Boolean(content);
     const key=canonicalLayout([content,this.templateKey,failure?.message]);if(key===this.key){if(this.view)this.view.hass=panel.hass;return;}this.key=key;

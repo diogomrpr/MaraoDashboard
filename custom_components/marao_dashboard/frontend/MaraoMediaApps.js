@@ -1,3 +1,4 @@
+import { languageCode } from './MaraoLocale.js';
 export const mediaApps = [
   { id: 'netflix', label: 'Netflix', file: 'netflix.svg', sources: ['Netflix', 'com.netflix.Netflix'], color: '#000', text: '#fff' },
   { id: 'spotify', label: 'Spotify', file: 'spotify.svg', symbol: true, sources: ['Spotify', 'com.spotify.client', 'com.spotify.Spotify'], color: '#121212', text: '#fff' },
@@ -10,7 +11,7 @@ export const mediaApps = [
   {id:'hbo-max',label:'HBO Max',sources:['HBO Max','Max','HBO Max: Stream Movies & TV'],color:'#10102c',text:'#fff'},
   {id:'f1-tv',label:'F1 TV',sources:['F1 TV','F1 TV: Stream F1® Live'],color:'#e10600',text:'#fff'},
 ];
-export const mediaAppLogoError = (value,hass) => value !== undefined && value !== '' && !mediaApps.some(app => app.id === value) ? (String(hass?.language||'').startsWith('pt')?'Escolha um logótipo de aplicação suportado.':'Choose a supported app logo.') : undefined;
+export const mediaAppLogoError = (value,hass) => value !== undefined && value !== '' && !mediaApps.some(app => app.id === value) ? (languageCode(hass) === 'pt'?'Escolha um logótipo de aplicação suportado.':'Choose a supported app logo.') : undefined;
 export const mediaAppLogoChoices = (localize = value => value) => [{value:'',label:localize('Automatic')},...mediaApps.map(app=>({value:app.id,label:app.label}))];
 export function mediaAppBrand(config) {
   const selected=config.variables?.app_logo,error=mediaAppLogoError(selected);if(error)throw new Error(error);

@@ -1,9 +1,10 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 const query = new URL(import.meta.url).search;
 await import(new URL(`./MaraoNativeBootstrap.js${query}`,import.meta.url));
 const model = () => import(new URL(`./MaraoNativeModel.js${query}`,import.meta.url));
 const theme = await import(new URL(`./MaraoTheme.js${query}`,import.meta.url));
 const navigation = await import(new URL(`./MaraoNavigation.js${query}`,import.meta.url));
-const language = hass => String(hass?.language || 'en').startsWith('pt');
+const language = hass => languageCode(hass) === 'pt';
 const rootFor = (config,hass) => {
   const route = globalThis.location?.pathname?.split('/')[1];
   return (hass?.panels?.[route]?.component_name || hass?.panels?.[route]?.component) === 'lovelace' ? route : config.dashboard_root || 'marao-dashboard';

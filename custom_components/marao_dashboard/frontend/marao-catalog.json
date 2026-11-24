@@ -205,7 +205,7 @@
       "domains": [
         "alarm_control_panel"
       ],
-      "description": "Alarm state and supported controls with transient code entry.",
+      "description": "Alarm summary that opens its controls in a popup.",
       "variables": [
         {
           "key": "alarm_layout",
@@ -241,7 +241,7 @@
         "switch",
         "script"
       ],
-      "description": "Slide deliberately to unlock or open the selected access point.",
+      "description": "Standalone slide to open or unlock.",
       "variables": [
         {
           "key": "access_mode",
@@ -306,7 +306,7 @@
         "alarm_control_panel",
         "lock"
       ],
-      "description": "A deliberate security service action with a 1.2-second hold.",
+      "description": "Standalone security action with a 1.2-second hold.",
       "variables": [
         {
           "key": "access_mode",
@@ -918,7 +918,7 @@
         "garage",
         "gate"
       ],
-      "description": "Access controls with configurable popup, slide, close or security hold.",
+      "description": "Access point summary with a popup or configurable inline controls.",
       "variables": [
         {
           "key": "access_mode",
@@ -1869,7 +1869,7 @@
       "domains": [
         "alarm_control_panel"
       ],
-      "description": "Capability-aware alarm controls with transient PIN entry and guarded actions.",
+      "description": "Standalone alarm controls with arming, disarming and PIN entry.",
       "variables": [
         {
           "key": "alarm_layout",
@@ -2059,7 +2059,7 @@
         "lock",
         "cover"
       ],
-      "description": "An explicit safe close or lock action.",
+      "description": "Standalone tap to close or lock.",
       "variables": [
         {
           "key": "access_mode",

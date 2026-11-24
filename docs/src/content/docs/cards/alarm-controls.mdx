@@ -1,12 +1,14 @@
 ---
 title: "Alarm controls"
-description: "Capability-aware alarm controls with transient PIN entry and guarded actions."
+description: "Standalone alarm controls with arming, disarming and PIN entry."
+sidebar:
+  hidden: true
 ---
 
 import Playground from '../../../components/Playground.astro';
 import DesignGallery from '../../../design/DesignGallery.astro';
 
-Capability-aware alarm controls with transient PIN entry and guarded actions.
+Standalone alarm controls with arming, disarming and PIN entry.
 
 <DesignGallery cardId="md_alarm_controls_card" />
 
@@ -30,6 +32,8 @@ Compatible entity domains: `alarm_control_panel`.
 This card places alarm controls directly on the page. Use Alarm for a compact summary that opens a sheet.
 
 Supported modes and code requirements come from the alarm entity. Dropdown is the default. Grid uses a Disarm slide and a 1.2-second bypass hold.
+
+See [Alarm](../security/) for the summary card and its popup.
 
 ## Settings
 

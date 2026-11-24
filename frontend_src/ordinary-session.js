@@ -1,3 +1,4 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import { assertNativeSupport, readMetadata } from './native-session.js';
 import { canonicalDocument, classifyDashboard, classifyRecovery, convertOrdinaryDocument, createRecoveryExport, validateRecoveryExport } from './ordinary-model.js';
 import { copy, SourceError } from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
@@ -41,7 +42,7 @@ export class OrdinaryConversionSession {
     // A pasted source can identify the same strategy, but its outer envelope is
     // still authoritative for opaque native settings and recovery provenance.
     const conversionText = classified.kind === 'strategy' && input.kind !== 'strategy' ? JSON.stringify(baseline, null, 2) + '\n' : supplied;
-    const result = convertOrdinaryDocument(conversionText, { ...metadata, dashboardRoot: this.root, language: this.hass.language });
+    const result = convertOrdinaryDocument(conversionText, { ...metadata, dashboardRoot: this.root, language: languageCode(this.hass) });
     result.originalText = supplied;
     const recovery = await createRecoveryExport(result, { originalDocument: baseline, root: this.root, packageVersion: this.packageVersion });
     if (epoch !== this._epoch) fail('native_conversion_stale');

@@ -1,3 +1,4 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import { OrdinaryConversionSession } from './ordinary-session.js';
 import { classifyDashboard } from './ordinary-model.js';
 
@@ -30,7 +31,7 @@ export class MaraoMigrationCard extends HTMLElement {
   connectedCallback() { this._mount(); }
   disconnectedCallback() { this._epoch++; this._busy = false; }
   getCardSize() { return 8; }
-  _t(key) { return (TEXT[String(this._hass?.language || 'en').startsWith('pt') ? 'pt' : 'en'])[key] || key; }
+  _t(key) { return (TEXT[languageCode(this._hass) === 'pt' ? 'pt' : 'en'])[key] || key; }
   _q(name) { return this.shadowRoot.querySelector(`[data-${name}]`); }
   _status(key, error = false) { this._q('status').textContent = this._t(key); this._q('status').setAttribute('role', error ? 'alert' : 'status'); }
   _error(error) {

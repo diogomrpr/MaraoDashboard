@@ -1,3 +1,4 @@
+import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 export {validateConfig} from './editor-model.js';
 import { convertDocument } from './convert-document.js';
 import { compileDashboard } from './compile-dashboard.js';
@@ -76,7 +77,7 @@ export class NativeSession {
     return {config:converted ? JSON.stringify(source,null,2)+'\n' : unwrapped.sourceText,conversion_pending:converted,dashboard_url:`/${this.root}/${source.landing_page}`,editor:{catalog:{version:catalog.version,config_version:catalog.config_version,cards:catalog.cards.map(card => Object.fromEntries(fields.filter(key => Object.hasOwn(card,key)).map(key => [key,card[key]])))},entities:context.entities.filter(entity => ids.has(entity.entity_id)),areas:context.areas,display_entity_ids:[...ids],native_card_labels}};
   }
   async preview(text) {
-    const result = convertDocument(text,{...await this.metadata(),dashboardRoot:this.root,language:this.hass.language});
+    const result = convertDocument(text,{...await this.metadata(),dashboardRoot:this.root,language:languageCode(this.hass)});
     return {config:result.sourceText,document:result.document,privacy:result.privacy};
   }
   save(text) {
@@ -88,7 +89,7 @@ export class NativeSession {
     assertNativeSupport(this.hass);
     if (!this.hass.user?.is_admin) throw new Error(message(this.hass,'admin'));
     if (!this.baseline) throw new Error(message(this.hass,'notNative'));
-    const result = convertDocument(text,{...await this.metadata(),dashboardRoot:this.root,language:this.hass.language});
+    const result = convertDocument(text,{...await this.metadata(),dashboardRoot:this.root,language:languageCode(this.hass)});
     const current = await this.current();
     if (JSON.stringify(current) !== JSON.stringify(this.baseline)) throw new Error(message(this.hass,'conflict'));
     const original = this.baseline.strategy.source_json;

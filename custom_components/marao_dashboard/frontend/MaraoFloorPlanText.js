@@ -1,3 +1,4 @@
+import { languageCode } from './MaraoLocale.js';
 const pt = {
   'Floor Plan':'Planta', 'Upload image':'Carregar imagem', 'Replace image':'Substituir imagem',
   'Images are stored in Home Assistant immediately. Save applies the arrangement.':'As imagens são guardadas imediatamente no Home Assistant. Guardar aplica a disposição.',
@@ -20,4 +21,4 @@ const pt = {
   'Full page must be a boolean.':'Página inteira deve ser um booleano.', 'Light name and icon must be text.':'Nome e ícone da luz devem ser texto.'
 };
 export const FLOOR_PT_LABELS = pt;
-export const floorText = (hass, label) => String(hass?.language || '').toLowerCase().startsWith('pt') ? pt[label] || label : label;
+export const floorText = (hass, label) => languageCode(hass) === 'pt' ? pt[label] || label : label;

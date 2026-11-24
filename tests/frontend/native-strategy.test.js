@@ -32,7 +32,10 @@ async function withStrategy(callback) {
     fs.writeFileSync(path.join(directory,'package.json'),'{"type":"module"}');
     for(const name of ['MaraoNativeBootstrap','MaraoNavigation','MaraoTheme','MaraoOrdinaryMigration']) fs.writeFileSync(path.join(directory,name+'.js'),'export {};');
     fs.writeFileSync(path.join(directory,'MaraoNativeModel.js'),`export {convertDocument} from ${JSON.stringify(new URL('../../frontend_src/convert-document.js',import.meta.url).href)};export const metadataSnapshot=()=>({entities:[],areas:[]});`);
-    fs.copyFileSync(new URL('../../frontend_src/native-strategy.js',import.meta.url),path.join(directory,'strategy.js'));
+    const strategy = fs.readFileSync(new URL('../../frontend_src/native-strategy.js', import.meta.url), 'utf8')
+      .replace("'../custom_components/marao_dashboard/frontend/MaraoLocale.js'",
+        JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoLocale.js', import.meta.url).href));
+    fs.writeFileSync(path.join(directory, 'strategy.js'), strategy);
     const {MaraoDashboardStrategy:Strategy}=await import(pathToFileURL(path.join(directory,'strategy.js')));
     await callback({Strategy,registry,MigrationCard});
   } finally {

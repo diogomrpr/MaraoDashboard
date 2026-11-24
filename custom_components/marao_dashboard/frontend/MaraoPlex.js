@@ -1,3 +1,4 @@
+const { languageCode } = await import(new URL(`./MaraoLocale.js${new URL(import.meta.url).search}`, import.meta.url));
 const query=new URL(import.meta.url).search;
 const [model,actions,dropdown,context,press]=await Promise.all(['MaraoPlexModel.js','MaraoCards.js','MaraoDropdown.js','MaraoNativeContext.js','MaraoPressFeedback.js'].map(file=>import(new URL(`./${file}${query}`,import.meta.url))));
 const {browsePlex,plexBrowseEntity,rivuletPlayback,rivuletLink,plexHome,plexURI,plexTarget,plexTargets,plexTargetIdentity,plexLaunchProblem,plexError,plexText,PlexLaunch}=model;
@@ -24,10 +25,12 @@ export class MaraoPlexWatchCard extends Base {
     this._launch.cancel();this._config=structuredClone(config);this._selected=plexTarget(config.parent);this._reset();
   }
   set hass(value){
+    const languageChanged=languageCode(this._hass)!==languageCode(value);
     const changed=this._account!==value?.user?.id || this._connection!==value?.connection;
     this._account=value?.user?.id;this._connection=value?.connection;
     this._hass=value;
     if(changed){this._launch.cancel();this._reset();}
+    else if(languageChanged&&this._body)this._draw();
     this._syncTargets();this._launch.update();this._popup&&(this._popup.hass=value);this._syncStatus();
     if(this.isConnected&&!this.preview&&!this._attempted&&!this._loading&&actions.serviceConnectionReady(value))this._loadHome();
   }
@@ -66,7 +69,7 @@ export class MaraoPlexWatchCard extends Base {
       if(!next){this._launch.cancel();this._selected=null;this._contentError='The selected TV is no longer available.';}
       else this._selected=next;
     }
-    const signature=JSON.stringify([this._targets,this._selected?.key,this._hass?.language]);
+    const signature=JSON.stringify([this._targets,this._selected?.key,languageCode(this._hass)]);
     if(!this._targetHost||signature===this._selectorKey)return;
     this._selectorKey=signature;this._picker?.destroy();this._picker=null;this._targetHost.replaceChildren();
     if(this._targets.length<2){const label=document.createElement('span');label.className='target-name';label.textContent=this._selected?.name||this._t('Choose an Apple TV.');this._targetHost.append(label);return;}
