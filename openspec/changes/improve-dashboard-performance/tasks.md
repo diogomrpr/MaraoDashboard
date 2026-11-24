@@ -15,3 +15,5 @@
 ## Native frontend first-visit follow-up
 
 The [first-visit audit](first-visit.md) records the paired cold and warm measurements, shared resource review, rendering changes and compatibility checks for the 0.37.6 frontend.
+
+The [HACS startup follow-up](first-visit-hacs.md) compares the installed first-pass package and subsequent request-graph changes with the same JavaScript compression on each arm.

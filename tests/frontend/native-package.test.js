@@ -73,11 +73,15 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     assert.equal(fs.readFileSync(path.join(directory,'dist',font)).toString('ascii',0,4),'wOF2');
     assert.ok(fs.readFileSync(path.join(directory,'dist','MaraoAsset--fonts--Montserrat.ttf')).equals(fs.readFileSync('custom_components/marao_dashboard/frontend/fonts/Montserrat.ttf')));
     for (const file of ['MaraoNativeCardEditor.js','MaraoOrdinaryMigration.js','MaraoNativeBootstrap.js','brand/mark.svg','fonts/Montserrat.ttf','MaraoTheme.js']) {
-      const url=new AssetURL('./'+file+'?v=old',base);
+      const url=new AssetURL('./'+file+'?v=old#detail',base);
       assert.equal(path.basename(url.pathname),first.identity+'--'+file.replaceAll('/','--'));
+      assert.equal(url.search,'?v=old');assert.equal(url.hash,'#detail');
       assert.ok(fs.existsSync(url));assert.ok(url instanceof AssetURL);assert.ok(url instanceof URL);
     }
     assert.equal(new AssetURL('https://external.invalid/image.png',base).href,'https://external.invalid/image.png');
+    for (const unmanaged of ['./unregistered.js','./MaraoAsset--fonts--Montserrat.ttf','../MaraoCards.js']) {
+      assert.equal(new AssetURL(unmanaged, base).href, new URL(unmanaged, base).href);
+    }
     assert.equal(new AssetURL(base).href,base);
     fs.writeFileSync(path.join(directory,'dist','obsolete.js'),'old');
     const second=await buildFrontend(directory);assert.equal(first.identity,second.identity);
@@ -91,9 +95,30 @@ test('HACS staging has one complete dist graph, reproducible identity and no sta
     assert.equal(nextCli.status,0,nextCli.stderr);assert.equal(JSON.parse(nextCli.stdout).package_version,'0.22.0-beta.2');
   } finally {fs.rmSync(directory,{recursive:true,force:true});}
 });
+test('a cached HACS loader hints only installed modules until a runtime owns the document', async t => {
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'marao-loader-'));
+  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  const loader=path.join(directory,'MaraoFrontend.js'), identity='a'.repeat(64);
+  fs.copyFileSync(path.resolve('dist/MaraoFrontend.js'),loader);
+  for(const file of ['MaraoNativeDashboard.js','MaraoDashboard.js']) fs.writeFileSync(path.join(directory,identity+'--'+file),'export {};');
+  const resolver=identity+'--MaraoAssetURL.js';
+  const original={window:globalThis.window,document:globalThis.document,fetch:globalThis.fetch};
+  t.after(()=>Object.assign(globalThis,original));
+  const hints=[];
+  globalThis.fetch=async()=>({ok:true,json:async()=>({compiler_contract:1,identity,files:{[resolver]:'checksum'}})});
+  globalThis.window={};
+  globalThis.document={createElement:()=>({}),head:{append:link=>hints.push([link.rel,path.basename(new URL(link.href).pathname)])}};
+  await import(pathToFileURL(loader));
+  assert.deepEqual(hints,[['modulepreload',resolver]],'An older install can omit newer bootstrap modules');
+  window.MaraoDashboardRuntime={};
+  await import(pathToFileURL(loader).href+'?second-registration');
+  assert.equal(hints.length,1,'A second resource keeps the active graph');
+});
+
 test('Duplicate frontend entry points share one document runtime without mixing graph ownership', async () => {
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'marao-runtime-owner-'));
-  const previousWindow=globalThis.window, previousRegistry=globalThis.customElements;
+  const previousWindow=globalThis.window, previousRegistry=globalThis.customElements, previousDocument=globalThis.document;
+  const preloads=[];
   const runtimeGate=Promise.withResolvers(),runtimeStarted=Promise.withResolvers();
   try {
     const entry=fs.readFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoDashboard.js',import.meta.url),'utf8');
@@ -106,6 +131,7 @@ test('Duplicate frontend entry points share one document runtime without mixing 
     fs.writeFileSync(path.join(directory,'MaraoRuntime.js'),'globalThis.nativeRuntimeLoads=(globalThis.nativeRuntimeLoads||0)+1;globalThis.nativeRuntimeStarted.resolve();await globalThis.nativeRuntimeGate;');
     globalThis.nativeRuntimeGate=runtimeGate.promise;globalThis.nativeRuntimeStarted=runtimeStarted;
     globalThis.customElements={get:()=>true};globalThis.window={};
+    globalThis.document={createElement:()=>({}),head:{append:link=>preloads.push([link.rel,path.basename(new URL(link.href).pathname)])}};
     const names=['a'.repeat(64)+'--MaraoDashboard.js','MaraoDashboard.js'];
     for (const name of names) fs.writeFileSync(path.join(directory,name),entry);
     const native=await import(pathToFileURL(path.join(directory,names[0])));
@@ -113,6 +139,8 @@ test('Duplicate frontend entry points share one document runtime without mixing 
     const legacy=await import(pathToFileURL(path.join(directory,names[1])));
     assert.equal(native.runtimeReady,legacy.runtimeReady);
     await runtimeStarted.promise;
+    assert.deepEqual(preloads,[['modulepreload','MaraoCardRendering.js'],['modulepreload','MaraoNativeCards.js']],
+      'One owner hints the two unconditional dependencies before specialty registration');
     assert.equal(globalThis.nativeBasicRegistrations,1,'Basic cards register before a delayed runtime download completes');
     assert.equal(globalThis.nativeCardLoads,1);
     runtimeGate.resolve();await native.runtimeReady;
@@ -120,7 +148,7 @@ test('Duplicate frontend entry points share one document runtime without mixing 
     assert.equal(globalThis.nativeNavigationLoads,1);assert.equal(globalThis.nativeRuntimeLoads,1);
     assert.equal(window.MaraoFrontendPackage,active);assert.equal(active.identity,'a'.repeat(64));
   } finally {
-    globalThis.window=previousWindow;globalThis.customElements=previousRegistry;
+    globalThis.window=previousWindow;globalThis.customElements=previousRegistry;globalThis.document=previousDocument;
     runtimeGate.resolve();
     for(const key of ['firstSpecialtyRegistration','nativeNavigationLoads','nativeRuntimeLoads','nativeBasicRegistrations','nativeCardLoads','nativeRuntimeGate','nativeRuntimeStarted'])delete globalThis[key];
     fs.rmSync(directory,{recursive:true,force:true});

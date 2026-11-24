@@ -37,10 +37,25 @@ async function visitDashboard(context, origin, trial, visit, browser) {
   const exited = new Map();
   const marks = {};
   const errors = {pageErrors: 0, httpErrors: 0, localFailed: 0, externalFailed: 0};
+  const scriptResponses = new Map();
+  const scriptEncodings = {};
+  const packageIdentities = new Set();
+  let manifestResponses = 0;
   let start, finish, timeout;
   const done = new Promise(resolve => { finish = resolve; });
   page.on("pageerror", () => { errors.pageErrors++; });
-  page.on("response", response => { if (response.status() >= 400) errors.httpErrors++; });
+  page.on("response", response => {
+    if (response.status() >= 400) errors.httpErrors++;
+    const url = new URL(response.url());
+    if (url.origin !== origin) return;
+    if (/^\/hacsfiles\/[^/]+\/MaraoFrontend\.release\.json$/.test(url.pathname) && response.request().method() === "GET") manifestResponses++;
+    const asset = url.pathname.match(/^\/hacsfiles\/[^/]+\/([a-f0-9]{64})--Marao[\w.-]*\.js$/);
+    if (!asset) return;
+    packageIdentities.add(asset[1]);
+    scriptResponses.set(url.href, (scriptResponses.get(url.href) || 0) + 1);
+    const encoding = response.headers()["content-encoding"] || "identity";
+    scriptEncodings[encoding] = (scriptEncodings[encoding] || 0) + 1;
+  });
   page.on("requestfailed", request => {
     if (new URL(request.url()).origin === origin) errors.localFailed++;
     else errors.externalFailed++;
@@ -55,7 +70,13 @@ async function visitDashboard(context, origin, trial, visit, browser) {
     const previous = [...exited].filter(([key]) => key !== signal.docKey).map(([, resources]) => resources);
     const resources = totals([...previous, signal.resources]);
     for (const [name, element] of Object.entries(signal.marks)) {
-      marks[name] ??= {seconds, element, documents: documents.size, ...resources};
+      // Response headers can arrive before their body finishes. Resource Timing
+      // above separately counts completed transfers, including modulepreloads.
+      const hacs = {
+        identities: [...packageIdentities], manifestResponses, scriptEncodings: {...scriptEncodings},
+        repeatedScriptResponses: [...scriptResponses.values()].reduce((sum, count) => sum + count - 1, 0),
+      };
+      marks[name] ??= {seconds, element, documents: documents.size, ...resources, hacs};
     }
     if (marks.visible && marks.usable) finish("ok");
   });

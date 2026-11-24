@@ -17,7 +17,7 @@ export async function buildPreview({design=false,published=false}={}){
   const mdiLicense=await fs.readFile(fileURLToPath(import.meta.resolve('@mdi/js/LICENSE')),'utf8');
   const iconMap=Object.fromEntries(Object.entries(mdi).filter(([name,value])=>name.startsWith('mdi')&&typeof value==='string').map(([name,value])=>['mdi:'+name.slice(3).replace(/[A-Z]/g,(letter,i)=>(i?'-':'')+letter.toLowerCase()),value]));
   const editable=design&&!published;
-  const editableEntries={MaraoSchedules:'schedules-card.js',MaraoNativeModel:'legacy-model.js',MaraoNativeDashboard:'native-strategy.js',MaraoNativeBootstrap:'native-bootstrap.js',MaraoPopupManagement:'popup-management.js',MaraoNativeCards:'native-cards.js',MaraoNativeCardMetadata:'native-card-metadata.js',MaraoOrdinaryMigration:'ordinary-migration-ui.js',MaraoTheme:'native-theme.js',MaraoHistoryData:'history-data.js',MaraoHistoryChart:'history-chart.js'};
+  const editableEntries={MaraoCardRendering:'card-rendering.js',MaraoSchedules:'schedules-card.js',MaraoNativeModel:'legacy-model.js',MaraoNativeDashboard:'native-strategy.js',MaraoNativeBootstrap:'native-bootstrap.js',MaraoPopupManagement:'popup-management.js',MaraoNativeCards:'native-cards.js',MaraoNativeCardMetadata:'native-card-metadata.js',MaraoOrdinaryMigration:'ordinary-migration-ui.js',MaraoTheme:'native-theme.js',MaraoHistoryData:'history-data.js',MaraoHistoryChart:'history-chart.js'};
   const plugin={name:'marao-offline-preview',setup(builder){
     if(editable){
       builder.onResolve({filter:/Marao\w+\.js$/},args=>{

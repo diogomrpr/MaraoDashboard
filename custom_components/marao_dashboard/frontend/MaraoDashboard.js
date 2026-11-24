@@ -4,16 +4,28 @@ if (!window.MaraoDashboardRuntime) {
   const state = window.MaraoDashboardRuntime = {};
   const identity = new URL(import.meta.url).pathname.match(/\/([a-f0-9]{64})--MaraoDashboard\.js$/)?.[1];
   const root = new URL('./',import.meta.url);
+  const demand = new AbortController();
+  state.requestContent = () => demand.abort();
   window.MaraoFrontendPackage = identity ? {identity,package_version:window.MaraoInstalledFrontendPackage?.package_version,entryURL:window.MaraoInstalledFrontendPackage?.entryURL,rootURL:root.href,baseURL:root.href,manifestURL:new URL('MaraoFrontend.release.json',root).href} : undefined;
   state.navigation = (async () => {
     while (!globalThis.customElements?.get('home-assistant')) await new Promise(resolve => setTimeout(resolve,16));
     return import(new URL(`./MaraoNavigation.js${query}`,import.meta.url));
   })();
   state.ready = state.navigation.then(navigation => (async () => {
-    // Register ordinary HA cards before downloading the larger content runtime.
+    // These are unconditional imports. The browser can fetch them together while
+    // the renderer keeps ownership of registration order.
+    if (identity && globalThis.document?.head) {
+      for (const file of ['MaraoCardRendering.js', 'MaraoNativeCards.js']) {
+        const link = document.createElement('link');
+        link.rel = 'modulepreload';
+        link.href = new URL(`./${file}${query}`, import.meta.url).href;
+        document.head.append(link);
+      }
+    }
     const cards = await import(new URL(`./MaraoCards.js${query}`,import.meta.url));
     cards.registerMaraoCards();
     await import(new URL(`./MaraoNativeCards.js${query}`,import.meta.url));
+    if (identity) await window.MaraoNativeBootstrap?.waitForInitialViewPaint?.(demand.signal);
     return Promise.all(['MaraoRuntime.js','MaraoFloorPlanCard.js','MaraoSchedules.js','MaraoFrigateEventsCard.js'].map(file => import(new URL(`./${file}${query}`,import.meta.url))));
   })().catch(error => {
     console.error('Marao dashboard content failed to initialize',error);

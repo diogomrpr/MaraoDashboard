@@ -8,6 +8,7 @@ const frontendRoot = path.join(repoRoot, "custom_components", "marao_dashboard",
 const check = process.argv.includes("--check");
 const {buildAuthoring,authoringFiles}=require('./build-authoring.cjs');
 const entries = {
+  MaraoCardRendering: 'card-rendering.js',
   MaraoSchedules: 'schedules-card.js',
   MaraoNativeModel: 'legacy-model.js',
   MaraoNativeDashboard: 'native-strategy.js',

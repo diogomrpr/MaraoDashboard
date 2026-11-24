@@ -1,23 +1,14 @@
-import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {editorLabel} from './editor-labels.js';
+import {cardText, refreshCardMetadata} from './native-card-language.js';
+export {refreshCardMetadata};
 
-// Symbol.for also identifies our entries across the separately bundled native hosts.
-const owner = Symbol.for('Marao.nativeCardText');
 export function registerCardMetadata(picker, registration, label, description = label) {
   if (picker.some(card => card.type === registration.type)) return;
-  Object.defineProperty(registration, owner, {value:{label, description}});
+  // The registering bundle supplies the translations. The host also refreshes
+  // picker entries on dashboards with no mounted Marao cards.
+  Object.defineProperty(registration, cardText, {value:{label, description, translate:editorLabel}});
   picker.push(registration);
   refreshCardMetadata(undefined, [registration]);
-}
-export function refreshCardMetadata(hass, picker = globalThis.window?.customCards || []) {
-  const language = languageCode(hass);
-  for (const card of picker) {
-    const text = card[owner];
-    if (!text || text.language === language) continue;
-    text.language = language;
-    card.name = `Marao ${editorLabel(text.label, {language})}`;
-    card.description = editorLabel(text.description, {language});
-  }
 }
 
 /** HA's two ordered pools are authoritative; never discover another target. */

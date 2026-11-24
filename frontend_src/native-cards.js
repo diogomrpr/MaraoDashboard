@@ -287,6 +287,7 @@ export class MaraoNativeCard extends HTMLElementBase {
       if (configs.some(config => config.type.startsWith('custom:marao-') && !customElements.get(config.type.slice(7))) && window.MaraoDashboardRuntime?.ready) {
         this._content.innerHTML = '<ha-card role="status" style="display:grid;place-items:center;height:100%;min-height:56px"><ha-circular-progress active></ha-circular-progress></ha-card>';
         this._content.querySelector('[role="status"]').setAttribute('aria-label',editorLabel('Loading Home Assistant cards…',this._hass));
+        window.MaraoDashboardRuntime.requestContent?.();
         await window.MaraoDashboardRuntime.ready;
         if (version !== this._renderVersion) return;
       }

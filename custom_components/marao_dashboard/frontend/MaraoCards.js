@@ -1,24 +1,30 @@
-const [
-  {popupContentError}, {weatherMarkup,styleWeatherPopup}, {climateConfigError,climateHumidity},
-  {activityTimestamp,activitySources,hasActivity}, popupLayouts, {popupViewError,popupGroupFromView,popupLabel},
-  {peopleError,peopleRows,collectionLabel,escapeText,sectionsError}, {reconcileGroup}, {mediaAppBrand,mediaAppLogoError},
-  dropdownModule, historyLayout, navigationModule, historyData, sliderModule, lightCapabilities, names, sensorThresholds, pressModule, nativeContext, { languageCode, formatLocale },
-] = await Promise.all([
-  'MaraoPopupContent.js', 'MaraoWeather.js', 'MaraoClimate.js', 'MaraoActivityModel.js', 'MaraoPopupView.js', 'MaraoPopupLayout.js', 'MaraoCollections.js', 'MaraoGroupDetails.js', 'MaraoMediaApps.js',
-  'MaraoDropdown.js', 'MaraoHistoryLayout.js', 'MaraoNavigation.js', 'MaraoHistoryData.js', 'MaraoSlider.js', 'MaraoLightCapabilities.js', 'MaraoNames.js', 'MaraoSensorThresholds.js', 'MaraoPressFeedback.js', 'MaraoNativeContext.js', 'MaraoLocale.js',
+const [rendering, navigationModule, pressModule] = await Promise.all([
+  'MaraoCardRendering.js', 'MaraoNavigation.js', 'MaraoPressFeedback.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
-export {mediaAppBrand, formatLocale};
-const {nativeEditing, bindNativeEditing} = nativeContext;
-export {nativeEditing, bindNativeEditing};
-const { bindDropdown, dropdownStyles } = dropdownModule;
-const {bindPressFeedback,pressStyles,pressTarget} = pressModule;
-const { bindSlider, sliderMarkup, sliderStyles } = sliderModule;
-const { lightColorCapabilities, lightColorAppearance, colorForeground } = lightCapabilities;
-export { lightColorCapabilities };
-const { sensorThresholdError, sensorThresholdColor } = sensorThresholds;
-const { canonicalCard, canonicalTemplate } = names;
-const { createHistoryPlaceholder, createPowerToolbar, readableGraphColor } = historyLayout;
-export { createHistoryPlaceholder };
+const {
+  popupContentError,
+  weatherMarkup, styleWeatherPopup,
+  climateConfigError, climateHumidity,
+  activityTimestamp, activitySources, hasActivity,
+  accessPopupTarget, mountPopupView, registerPopupActions,
+  popupViewError, popupGroupFromView, popupLabel,
+  peopleError, peopleRows, collectionLabel, escapeText, sectionsError,
+  reconcileGroup,
+  mediaAppBrand, mediaAppLogoError,
+  bindDropdown, dropdownStyles,
+  createHistoryPlaceholder, createPowerToolbar, readableGraphColor,
+  bindSlider, sliderMarkup, sliderStyles,
+  lightColorCapabilities, lightColorAppearance, colorForeground,
+  canonicalCard, canonicalTemplate,
+  sensorThresholdError, sensorThresholdColor,
+  nativeEditing, bindNativeEditing,
+  languageCode, formatLocale,
+  periodRange: historyPeriodRange, normalizeSamples: historySamples,
+  energyBuckets, statisticsBuckets, energyTotal, summary, reduceSamples, validatePowerDevices,
+} = rendering;
+export {mediaAppBrand, formatLocale, nativeEditing, bindNativeEditing, lightColorCapabilities,
+  createHistoryPlaceholder, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal};
+const {bindPressFeedback, pressStyles, pressTarget} = pressModule;
 const { MaraoNavbarCard, safeArea, navbarBottomGap, navbarRouteCurrent, navbarPartition, haptic, navigate, fullscreenUsers, findElements, focusRestorer, focusableElements, deepActiveElement, FOCUSABLE, beginFrontendInteraction } = navigationModule;
 export { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic, focusRestorer };
 let historyChartModule;
@@ -42,9 +48,6 @@ export function loadHistoryChart() {
   if (historyChartAttempt) url.searchParams.set('marao_retry', String(historyChartAttempt));
   return historyChartModule ||= import(url.href).catch(error => { historyChartModule = null; historyChartAttempt++; throw error; });
 }
-export const historyPeriodRange = historyData.periodRange;
-export const historySamples = historyData.normalizeSamples;
-export const { energyBuckets, statisticsBuckets, energyTotal } = historyData;
 const BaseElement = globalThis.HTMLElement || class {};
 
 const text = (value, fallback = "") => String(value ?? fallback);
@@ -1904,10 +1907,10 @@ export class MaraoCard extends BaseElement {
         if (reading?.error) cache.errors.add(historyTimestamp(record));
         return reading?.error ? null : reading?.value;
       };
-      cache.values = historyData.normalizeSamples(records || [], { convert });
+      cache.values = historySamples(records || [], { convert });
       cache.add = (record, live = false) => {
         cache.errors.delete(historyTimestamp(record));
-        const [sample] = historyData.normalizeSamples(live ? [] : [record], { convert, ...(live ? { live: record } : {}) });
+        const [sample] = historySamples(live ? [] : [record], { convert, ...(live ? { live: record } : {}) });
         if (sample) insertHistoryRecord(cache.values, sample);
       };
       this._graphData = cache;
@@ -1921,10 +1924,10 @@ export class MaraoCard extends BaseElement {
     const end = Date.now(), start = end - 24 * 60 * 60 * 1000;
     const values = data.values.filter(record => Number.isFinite(record.value));
     if (!values.length) return '<svg class="graph-background" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>';
-    const { minimum, maximum } = historyData.summary(values);
+    const { minimum, maximum } = summary(values);
     const spread = maximum - minimum || 1;
     const segments = [[]];
-    for (const record of historyData.reduceSamples(data.values, 240)) {
+    for (const record of reduceSamples(data.values, 240)) {
       if (!Number.isFinite(record.value)) { if (segments.at(-1).length) segments.push([]); continue; }
       const x = Math.max(0, Math.min(100, (record.time - start) / (end - start) * 100));
       const y = Math.max(6, Math.min(94, 94 - (record.value - minimum) / spread * 88));
@@ -3349,7 +3352,7 @@ export class MaraoPopupCard extends BaseElement {
     }
   }
   _accessEntity() {
-    return this._historyContext || this._message ? '' : popupLayouts.accessPopupTarget(this);
+    return this._historyContext || this._message ? '' : accessPopupTarget(this);
   }
   _updateAccessHeader() {
     const entity = this._overlay?.querySelector('.marao-popup-sheet')?.dataset?.accessEntity;
@@ -3438,7 +3441,7 @@ export class MaraoPopupCard extends BaseElement {
     if (this._message) { const message = document.createElement('p'); message.style.cssText = 'margin:0;overflow-wrap:anywhere;white-space:pre-line'; message.textContent = this._message; host.replaceChildren(message); return; }
     const renderId = ++this._childrenRenderId;
     this._nativePopupView?.destroy();this._nativePopupView=null;
-    if(this._config.popup_content?.mode==='custom'||this._config.popup_view){this._nativePopupView=popupLayouts.mountPopupView(this,host);return;}
+    if(this._config.popup_content?.mode==='custom'||this._config.popup_view){this._nativePopupView=mountPopupView(this,host);return;}
     this._groupHelpers = null; this._groupChildren = new Map(); this._groupEmpty = null; this._groupLayout = null;
     host.replaceChildren();
     const loading = document.createElement('p'); loading.setAttribute('role', 'status');
@@ -3564,7 +3567,7 @@ export class MaraoPowerHistoryCard extends BaseElement {
   constructor() { super(); this.attachShadow?.({ mode: 'open' }); this._loadId = 0; }
   setConfig(config) {
     if (!/^(sensor|number|input_number)\.[a-z0-9_]+$/.test(config?.entity || '')) throw new Error(localize("power.choose_sensor", this._hass, {}, "Choose a power sensor."));
-    const errors = historyData.validatePowerDevices(config, config.entity);
+    const errors = validatePowerDevices(config, config.entity);
     if (errors.length) {
       const labels = {
         'Power devices must be a list.': 'power.devices_list',
@@ -3631,7 +3634,7 @@ export class MaraoPowerHistoryCard extends BaseElement {
 }
 
 export function registerMaraoCards() {
-  popupLayouts.registerPopupActions({haptic,isAccessCover,callService:callServiceWithNotification});
+  registerPopupActions({haptic,isAccessCover,callService:callServiceWithNotification});
   for (const [name, klass] of [["marao-card", MaraoCard], ["marao-dishwasher-controls", MaraoDishwasherControls], ["marao-power-history-card", MaraoPowerHistoryCard], ["marao-control-grid", MaraoControlGrid], ["marao-navbar-card", MaraoNavbarCard], ["marao-popup-card", MaraoPopupCard]]) {
     if (globalThis.customElements && !globalThis.customElements.get(name)) globalThis.customElements.define(name, klass);
   }

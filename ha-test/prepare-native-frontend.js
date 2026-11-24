@@ -4,11 +4,40 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
+const {gzipSync} = require('node:zlib');
 const {execFileSync} = require('node:child_process');
 const client = require('./client');
 const quote = value => "'" + String(value).replace(/'/g,"'\\''") + "'";
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const rootGuard = base => '(test ! -L '+quote(base)+' || { test '+quote(base)+' = /config && test "$(readlink '+quote(base)+')" = /homeassistant && test ! -L /homeassistant; }) || exit 1';
+
+// HACS writes .js.gz next to every installed .js. Direct test sync bypasses that writer.
+function hacsSidecars(frontendRoot, assets) {
+  const sidecars = new Map();
+  for (const file of Object.keys(assets)) {
+    if (file.endsWith('.js') && !Object.hasOwn(assets, file + '.gz')) {
+      sidecars.set(file + '.gz', gzipSync(fs.readFileSync(path.join(frontendRoot, file)), {level:9}));
+    }
+  }
+  return sidecars;
+}
+
+function matchesInstalledPackage(config, destination, ssh, assets, installed, expected, sidecars) {
+  if (Object.keys(expected).length !== Object.keys(installed).length ||
+      Object.keys(expected).some(file => !Object.hasOwn(installed, file)) ||
+      Object.entries(assets).some(([file, digest]) => installed[file] !== digest)) return false;
+  // HACS gzip headers can include a timestamp and the original filename.
+  // Accept that representation only after checking its CRC and decoded source hash.
+  const differing = [...sidecars.keys()].filter(file => installed[file] !== expected[file]);
+  if (!differing.length) return true;
+  const paths = differing.map(file => quote(destination + '/' + file));
+  const result = ssh(config, `for file in ${paths.join(' ')}; do
+    if gzip -t "$file"; then gzip -dc "$file" | sha256sum /dev/stdin; else echo invalid; fi
+  done`);
+  const decoded = result.stdout.trim().split('\n');
+  return decoded.length === differing.length && differing.every((file, index) =>
+    decoded[index].split(/\s+/)[0] === assets[file.slice(0, -3)]);
+}
 
 async function nativeState(config,connect=client.connect) {
   const connection=await connect(config);
@@ -69,18 +98,35 @@ async function prepareNativeFrontend(config,state,dependencies={}) {
   const candidate=await (dependencies.buildFrontend || buildFrontend)();
   const runtimeIdentity=client.fingerprint(path.join(root,'custom_components/marao_dashboard/frontend'));
   const frontendRoot=path.join(candidate.destination,'dist'), assets=localHashes(frontendRoot), installed=frontendHashes(config,destination,ssh);
+  const sidecars = hacsSidecars(frontendRoot, assets);
+  const expected = {...assets, ...Object.fromEntries([...sidecars].map(([name, bytes]) => [name, hash(bytes)]))};
+  // HACS may also install release attachments, such as the offline converter.
+  // A previous version's fingerprinted graph and stable owned aliases are replaceable.
+  const retained = Object.keys(installed).filter(file => !Object.hasOwn(expected, file) &&
+    !/^(?:[a-f0-9]{64}--|MaraoAsset--)[^/]+$/.test(file));
+  for (const file of retained) expected[file] = installed[file];
+  const reusable = matchesInstalledPackage(config, destination, ssh, assets, installed, expected, sidecars);
   const documentBefore=JSON.stringify(state.dashboard), version=candidate.identity;
   const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'marao-native-sync-'));
   let staged=false;
   try {
-    if (!sameHashes(installed,assets)) {
-      fs.cpSync(frontendRoot,path.join(temporary,'frontend'),{recursive:true});
+    if (!reusable) {
+      const frontend = path.join(temporary, 'frontend');
+      fs.cpSync(frontendRoot,frontend,{recursive:true});
+      for (const [name, bytes] of sidecars) fs.writeFileSync(path.join(frontend, name), bytes);
       const archive=path.join(temporary,'frontend.tar.gz');
       execFileSync('tar',['--no-xattrs','-czf',archive,'-C',temporary,'frontend'],{stdio:'pipe',env:{...process.env,COPYFILE_DISABLE:'1'}});
       guard();ssh(config,'umask 077 && mkdir '+quote(stage));staged=true;
       (dependencies.upload || upload)(config,archive,stage+'/frontend.tar.gz');
       ssh(config,'tar -xzf '+quote(stage+'/frontend.tar.gz')+' -C '+quote(stage));
-      assert.ok(sameHashes(frontendHashes(config,stage+'/frontend',ssh),assets),'Native staging hashes differ');
+      if (retained.length) {
+        const commands = retained.map(file => {
+          const target = stage + '/frontend/' + file;
+          return 'mkdir -p ' + quote(path.posix.dirname(target)) + ' && cp -p ' + quote(destination + '/' + file) + ' ' + quote(target);
+        });
+        ssh(config, 'set -e\n' + commands.join('\n'));
+      }
+      assert.ok(sameHashes(frontendHashes(config,stage+'/frontend',ssh),expected),'Native staging hashes differ');
       guard();assert.ok(sameHashes(frontendHashes(config,destination,ssh),installed),'Native package changed while staging');
       const backup=stage+'/frontend-before';
       const swapped=ssh(config,`set -e
@@ -100,7 +146,7 @@ trap - 0 1 2 15`,{allowFailure:true});
     const current=await nativeState(config,dependencies.connect || client.connect);
     assert.ok(current && current.folder===state.folder,'Native registration changed during preparation');
     assert.ok(JSON.stringify(current.dashboard)===documentBefore,'Native source changed during preparation');
-    assert.ok(sameHashes(frontendHashes(config,destination,ssh),assets),'Installed native assets changed during verification');
+    assert.ok(sameHashes(frontendHashes(config,destination,ssh),reusable ? installed : expected),'Installed native assets changed during verification');
     assert.ok(sameHashes(localHashes(frontendRoot),assets),'Local native assets changed during verification');
     assert.equal(client.fingerprint(path.join(root,'frontend_src')),editorIdentity,'Editor source changed during native preparation');
     assert.equal(client.fingerprint(path.join(root,'custom_components/marao_dashboard/frontend')),runtimeIdentity,'Runtime source changed during native preparation');
