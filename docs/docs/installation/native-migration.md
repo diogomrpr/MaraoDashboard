@@ -24,6 +24,12 @@ If native-editor compatibility cannot be established, conversion stays unavailab
 
 The ordinary native document becomes the active configuration. Source, embedded/custom YAML and accounting remain under `marao.migration` as provenance. They never regenerate over native edits. Recovery retains complete source and opaque envelope fields. HA APIs expose received configuration, not original storage-file bytes, so retain the independent HA backup.
 
+### Reduce startup traffic on an already converted dashboard
+
+Home Assistant sends the whole saved dashboard when a browser opens it. Older conversions stored the same source twice and an accounting row for each source field. The converter now stores exact duplicates once. The compact record retains the source, original YAML, mappings and unknown fields. Live cards and editing do not need to expand it.
+
+For a dashboard converted with an earlier Marao package, open the matching offline converter, paste a current native dashboard JSON export, choose **Translate**, and enter its existing address when prompted. If the converter reports a smaller migration record, download the recovery copy and review the proposed dashboard before importing it at the same address. Keep other editors closed during import. **Download full migration record** expands the original data for inspection. A normal page visit or package refresh leaves the saved dashboard alone. A dashboard created directly in Home Assistant has no Marao migration record to compact.
+
 Fixed source columns become Sections widths. Five equal columns use a native Grid card because Sections' twelve-column grid cannot express them exactly. Full-page floor plans use Panel views. Later native layouts do not inherit the old source column limits. Explicit/custom-extended external popups keep their authored ownership.
 
 **Authenticated HA users can read the complete native configuration, including retained source data.** A hidden dashboard or administrator-only editor does not make it private. Review raw/unknown settings deliberately; privacy hints cannot identify every sensitive value.

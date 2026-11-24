@@ -2,11 +2,14 @@
 const assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
 const { once } = require("node:events");
+const { createInterface } = require("node:readline");
 const path = require("node:path");
 const { performance } = require("node:perf_hooks");
 const { chromium } = require("playwright");
 const { readConfig, accessToken, setBrowserToken } = require("../../ha-test/client");
 const probe = require("./dashboard-card-probe.cjs");
+const { observeSocket, documentTrace } = require("./dashboard-startup-trace.cjs");
+const trace = process.env.MARAO_STARTUP_TRACE === "1";
 
 // Set MARAO_TEST_CONFIG to point at an ignored local config in another checkout.
 // 'warm' revisits in a new page sharing the first cold trial's authenticated cache.
@@ -31,8 +34,22 @@ function totals(summaries) {
   return {...result, assets};
 }
 
-async function visitDashboard(context, origin, trial, visit, browser) {
+async function visitDashboard(context, origin, trial, visit, browser, wireFrames) {
   const page = await context.newPage();
+  const socketEvents = [];
+  if (trace) {
+    const session = await context.newCDPSession(page);
+    session.on("Network.webSocketHandshakeResponseReceived", ({ response }) => {
+      const extension = Object.entries(response.headers).find(([name]) => name.toLowerCase() === "sec-websocket-extensions")?.[1];
+      socketEvents.push({ at: Math.round(performance.now() - start), phase: "handshake",
+        perMessageDeflate: /(?:^|,)\s*permessage-deflate\b/i.test(extension || "") });
+    });
+    await session.send("Network.enable");
+    await page.addInitScript(documentTrace, {origin});
+    page.on("websocket", socket => {
+      if (new URL(socket.url()).host === new URL(origin).host) observeSocket(socket, () => Math.round(performance.now() - start), socketEvents);
+    });
+  }
   const documents = new Set();
   const exited = new Map();
   const marks = {};
@@ -41,7 +58,7 @@ async function visitDashboard(context, origin, trial, visit, browser) {
   const scriptEncodings = {};
   const packageIdentities = new Set();
   let manifestResponses = 0;
-  let start, finish, timeout;
+  let start, wallStart, finish, timeout;
   const done = new Promise(resolve => { finish = resolve; });
   page.on("pageerror", () => { errors.pageErrors++; });
   page.on("response", response => {
@@ -86,6 +103,7 @@ async function visitDashboard(context, origin, trial, visit, browser) {
   try {
     // Node's monotonic clock stays continuous across frontend-triggered reloads.
     start = performance.now();
+    wallStart = Date.now();
     page.goto(origin + route, {waitUntil: "commit", timeout: 210_000}).catch(error => {
       // A second document can take over before the first one commits.
       if (!error.message.includes("net::ERR_ABORTED")) finish("navigation-failed");
@@ -94,9 +112,17 @@ async function visitDashboard(context, origin, trial, visit, browser) {
       done,
       new Promise(resolve => { timeout = setTimeout(() => resolve("timeout"), 245_000); }),
     ]);
+    let timeline;
+    if (trace) {
+      const document = await page.evaluate(() => window.dashboardTrace?.());
+      if (document) document.offset = Math.round(performance.now() - start - document.now);
+      const wire = wireFrames.filter(frame => frame.time >= wallStart && frame.time <= wallStart + (marks.usable?.seconds || 0) * 1000)
+        .map(frame => ({at: frame.time - wallStart, bytes: frame.bytes}));
+      timeline = {socketEvents, document, wire};
+    }
     console.log(JSON.stringify({
       arm, profile, trial, visit, route, outcome, browser: browser.version(),
-      documents: documents.size, ...errors, ...marks,
+      documents: documents.size, ...errors, ...marks, timeline,
     }));
     assert.equal(outcome, "ok", "The dashboard did not reach both milestones");
   } finally {
@@ -115,7 +141,7 @@ async function run() {
   };
   const proxy = spawn("python3", [
     path.join(__dirname, "dashboard-link.py"), endpoint.port || (endpoint.protocol === "http:" ? "80" : "443"),
-    ...profiles[profile].map(String),
+    ...profiles[profile].map(String), ...(trace ? ["1"] : []),
   ], {stdio: ["ignore", "pipe", "inherit"]});
   try {
     const [portLine] = await Promise.race([
@@ -125,6 +151,8 @@ async function run() {
     ]);
     const port = String(portLine).trim();
     assert(/^\d+$/.test(port));
+    const wireFrames = [];
+    if (trace) createInterface({input:proxy.stdout}).on("line", line => wireFrames.push(JSON.parse(line)));
     for (let trial = 1; trial <= runs; trial++) {
       const browser = await chromium.launch({
         proxy: {server: "socks5://127.0.0.1:" + port},
@@ -135,8 +163,8 @@ async function run() {
           viewport: {width: 393, height: 852}, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: "en-US",
         });
         await context.addInitScript(setBrowserToken, tokens);
-        await visitDashboard(context, config.url, trial, "cold", browser);
-        if (warm && trial === 1) await visitDashboard(context, config.url, trial, "warm", browser);
+        await visitDashboard(context, config.url, trial, "cold", browser, wireFrames);
+        if (warm && trial === 1) await visitDashboard(context, config.url, trial, "warm", browser, wireFrames);
         await context.close();
       } finally {
         await browser.close();

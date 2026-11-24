@@ -4,6 +4,7 @@ import { nativeCardType } from './card-composition.js';
 import { validateDashboardSettings } from './dashboard-settings.js';
 import { parseCardYaml, parseCardsYaml } from './lovelace-model.js';
 import { rewriteOwnedAssets } from './native-dependencies.js';
+import { compactMigrationProvenance, provenanceLeafRecords } from './ordinary-provenance.js';
 import { copy, domain, entries, object, parseSource, SourceError, STRATEGY_TYPE, unwrapDocument } from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
 
 export const ORDINARY_MIGRATION_VERSION = 1;
@@ -60,18 +61,20 @@ const walk = (value, visit) => {
   if (Array.isArray(value)) value.forEach(child => walk(child, visit));
   else if (object(value)) Object.values(value).forEach(child => walk(child, visit));
 };
-const leafRecords = (value, path = '$', records = []) => {
-  if (Array.isArray(value) && value.length) value.forEach((child, index) => leafRecords(child, `${path}[${index}]`, records));
-  else if (object(value) && Object.keys(value).length) Object.entries(value).forEach(([key, child]) => leafRecords(child, `${path}.${key}`, records));
-  else records.push({ source: path, disposition: 'provenance' });
-  return records;
-};
 
 export function convertOrdinaryDocument(text, context = {}) {
   const input = classifyDashboard(text);
   if (input.kind === 'ordinary') {
     if (context.supplements?.length || context.fileReplacements && Object.keys(context.fileReplacements).length) fail('ordinary_conversion_unneeded');
     validateOrdinaryDocument(input.document);
+    const origin = input.document.marao?.migration;
+    const compact = compactMigrationProvenance(origin);
+    if (compact !== origin) {
+      if (!isRoot(context.dashboardRoot)) fail('dashboard_root_needed');
+      return { kind: 'ordinary', changed: true, document: { ...input.document, marao: { ...input.document.marao, migration: compact } },
+        originalText: text, originalDocument: input.document, sourceText: origin.original_source, fromVersion: origin.source_version,
+        root: context.dashboardRoot, privacy: [], accounting: origin.accounting, assumptions: [], supplements: origin.supplements };
+    }
     return { kind: 'ordinary', changed: false, document: copy(input.document), originalText: text, originalDocument: copy(input.document), privacy: [], accounting: [], assumptions: [] };
   }
   const originalRoot = input.document.strategy?.dashboard_root;
@@ -84,7 +87,7 @@ export function convertOrdinaryDocument(text, context = {}) {
   if (!isRoot(root)) fail('dashboard_root_needed');
   const source = legacy.source;
   const resolved = resolveSource(source, context.entities || []);
-  const accounting = leafRecords(source);
+  const accounting = provenanceLeafRecords(source);
   const mappings = [];
   const originals = [];
   const compiledViews = new Map(legacy.compiled.views.map(view => [view.path, view]));
@@ -193,9 +196,10 @@ export function convertOrdinaryDocument(text, context = {}) {
   const settings = { version: 1, navbar: { routes: (navbar?.routes || []).map(route => { const next = { ...copy(route), path: route.url || route.path }; delete next.url; return next; }) } };
   for (const key of ['show_cache_reset', 'show_editor_button']) if (own(source, key)) settings[key] = source[key];
   const sourceText = input.sourceText || (input.kind === 'source' ? text : JSON.stringify(input.document));
-  settings.migration = { version: ORDINARY_MIGRATION_VERSION, source_kind: input.kind, source_version: legacy.fromVersion,
+  const origin = { version: ORDINARY_MIGRATION_VERSION, source_kind: input.kind, source_version: legacy.fromVersion,
     original_source: sourceText, original_document: copy(input.document), supplements: copy(context.supplements || []),
     yaml: originals, accounting: [...accounting, ...mappings] };
+  settings.migration = compactMigrationProvenance(origin);
   validateDashboardSettings(settings);
   const envelopeExtras = input.kind === 'strategy' ? copy(input.document) : {};
   delete envelopeExtras.strategy;
@@ -206,7 +210,7 @@ export function convertOrdinaryDocument(text, context = {}) {
   const proposed = rewrite(document);
   validateOrdinaryDocument(proposed);
   return { kind: input.kind, changed: true, document: proposed, originalText: text, originalDocument: copy(input.document), sourceText,
-    source, fromVersion: legacy.fromVersion, root, privacy: legacy.privacy, accounting: settings.migration.accounting, assumptions: legacy.assumptions, supplements: copy(context.supplements || []) };
+    source, fromVersion: legacy.fromVersion, root, privacy: legacy.privacy, accounting: origin.accounting, assumptions: legacy.assumptions, supplements: copy(context.supplements || []) };
 }
 
 // SHA-256 integrity also works on a local HTTP HA origin without SubtleCrypto.
@@ -262,5 +266,14 @@ export async function validateRecoveryExport(record) {
 export function classifyRecovery(current, record) {
   if (!object(record?.original_document) || !object(record?.proposed_document)) fail('native_recovery_invalid');
   const value = canonicalDocument(current);
-  return value === canonicalDocument(record.original_document) ? 'original' : value === canonicalDocument(record.proposed_document) ? 'converted' : 'divergent';
+  if (value === canonicalDocument(record.original_document)) return 'original';
+  const proposed = record.proposed_document;
+  if (value === canonicalDocument(proposed)) return 'converted';
+  // An older recovery export can still recognize its exact converted dashboard
+  // after the one-time compaction of its migration record.
+  if (current?.marao?.migration?.version === 2 && proposed.marao?.migration?.version === 1) {
+    const migration = compactMigrationProvenance(proposed.marao.migration);
+    if (value === canonicalDocument({...proposed, marao:{...proposed.marao, migration}})) return 'converted';
+  }
+  return 'divergent';
 }

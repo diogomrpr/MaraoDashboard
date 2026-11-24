@@ -20,7 +20,52 @@ class Link:
         return self.available + self.latency
 
 
-async def relay(source, target, link):
+class WebSocketSizes:
+    """Report only large incoming on-wire frame lengths, after an HTTP upgrade."""
+
+    def __init__(self):
+        self.buffer = bytearray()
+        self.upgraded = None
+        self.remaining = 0
+        self.frame_size = 0
+
+    def feed(self, block):
+        if self.upgraded is False:
+            return
+        self.buffer.extend(block)
+        if self.upgraded is None:
+            prefix = b"HTTP/1.1 101"
+            if not self.buffer.startswith(prefix[:len(self.buffer)]):
+                self.upgraded = False
+                self.buffer.clear()
+                return
+            boundary = self.buffer.find(b"\r\n\r\n")
+            if boundary < 0:
+                if len(self.buffer) > 8192:
+                    self.upgraded = False
+                    self.buffer.clear()
+                return
+            self.upgraded = True
+            del self.buffer[:boundary + 4]
+        while self.buffer:
+            if not self.remaining:
+                if len(self.buffer) < 2:
+                    return
+                length = self.buffer[1] & 127
+                extra = 8 if length == 127 else 2 if length == 126 else 0
+                if len(self.buffer) < 2 + extra:
+                    return
+                self.frame_size = int.from_bytes(self.buffer[2:2 + extra], "big") if extra else length
+                self.remaining = self.frame_size
+                del self.buffer[:2 + extra]
+            consumed = min(self.remaining, len(self.buffer))
+            del self.buffer[:consumed]
+            self.remaining -= consumed
+            if not self.remaining and self.frame_size >= 8192:
+                print(json.dumps({"time": time.time_ns() // 1_000_000, "bytes": self.frame_size}), flush=True)
+
+
+async def relay(source, target, link, observe=None):
     # Scheduling ahead of writes pipelines propagation delay while bounding memory.
     queue = asyncio.Queue(maxsize=4)
 
@@ -38,6 +83,8 @@ async def relay(source, target, link):
                 return
             await asyncio.sleep(max(0, due - time.monotonic()))
             target.write(block)
+            if observe:
+                observe(block)
             await target.drain()
 
     tasks = [asyncio.create_task(read()), asyncio.create_task(write())]
@@ -49,7 +96,7 @@ async def relay(source, target, link):
         await asyncio.gather(*tasks, return_exceptions=True)
 
 
-async def serve(port, down, up, rtt):
+async def serve(port, down, up, rtt, trace=0):
     upload = Link(up, rtt)
     download = Link(down, rtt)
 
@@ -87,7 +134,7 @@ async def serve(port, down, up, rtt):
             await writer.drain()
             tasks = [
                 asyncio.create_task(relay(reader, remote, upload)),
-                asyncio.create_task(relay(upstream, writer, download)),
+                asyncio.create_task(relay(upstream, writer, download, WebSocketSizes().feed if trace else None)),
             ]
             await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         except (OSError, asyncio.IncompleteReadError, ValueError):

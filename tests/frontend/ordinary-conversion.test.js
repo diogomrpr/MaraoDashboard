@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { canonicalDocument, classifyDashboard, classifyRecovery, convertOrdinaryDocument, createRecoveryExport, sha256, validateRecoveryExport } from '../../frontend_src/ordinary-model.js';
+import { expandMigrationProvenance } from '../../frontend_src/ordinary-provenance.js';
 import { createEnvelope } from '../../custom_components/marao_dashboard/frontend/MaraoSource.js';
 
 const directory = new URL('../../ha-test/upgrade/fixtures/', import.meta.url);
@@ -17,7 +18,7 @@ test('v0.23.4 synthetic released-contract baseline matches an independently spec
   for (const [file, hash] of Object.entries(provenance.files)) assert.equal(createHash('sha256').update(text(file)).digest('hex'), hash, file);
   const input = text('v0.23.4-ordinary-envelope.json'), envelope = JSON.parse(input), before = structuredClone(envelope);
   const result = convertOrdinaryDocument(input, context), target = structuredClone(result.document);
-  const origin = target.marao.migration; delete target.marao.migration;
+  const origin = expandMigrationProvenance(target.marao.migration); delete target.marao.migration;
   assert.deepEqual(target, json('v0.23.4-ordinary-expected.json'));
   assert.equal(result.originalText, input);
   assert.equal(origin.original_source, text('v0.23.4-ordinary-source.json'));
@@ -28,6 +29,32 @@ test('v0.23.4 synthetic released-contract baseline matches an independently spec
   assert.ok(origin.accounting.some(item => item.source === '$.pages[1].sections[0].entities[1]' && item.target === '$.views[0].sections[0].cards[1]'));
   assert.equal(Object.hasOwn(target, 'strategy'), false);
   assert.equal(JSON.stringify(target).includes('custom:marao-control-grid'), false);
+});
+
+test('compacting an existing dashboard preserves native edits, exact recovery and prior conversion receipts', async () => {
+  const result = convertOrdinaryDocument(text('v0.23.4-ordinary-envelope.json'), context);
+  const legacy = structuredClone(result.document);
+  legacy.marao.migration = expandMigrationProvenance(legacy.marao.migration);
+  const receipt = await createRecoveryExport({...result, document:legacy});
+  legacy.views[0].title = 'A later native edit';
+  legacy.opaque = {order:[3, 1], empty:[]};
+  const input = JSON.stringify(legacy, null, 2);
+  const staged = convertOrdinaryDocument(input, context);
+  assert.equal(staged.kind, 'ordinary');
+  assert.equal(staged.changed, true);
+  assert.equal(staged.document.marao.migration.version, 2);
+  const expanded = structuredClone(staged.document);
+  expanded.marao.migration = expandMigrationProvenance(expanded.marao.migration);
+  assert.equal(JSON.stringify(expanded, null, 2), input);
+  const recovery = await createRecoveryExport(staged);
+  await validateRecoveryExport(recovery);
+  assert.equal(recovery.original_text, input);
+  assert.equal(classifyRecovery(legacy, recovery), 'original');
+  assert.equal(classifyRecovery(staged.document, recovery), 'converted');
+  assert.equal(classifyRecovery(staged.document, receipt), 'divergent');
+  assert.equal(classifyRecovery(result.document, receipt), 'converted');
+  assert.equal(convert(staged.document).changed, false);
+  assert.throws(() => convertOrdinaryDocument(input), /dashboard_root_needed/);
 });
 
 test('ordinary native documents are stable and do not inherit retired layout or source limits', () => {

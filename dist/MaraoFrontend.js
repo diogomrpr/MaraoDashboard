@@ -1,4 +1,4 @@
-// MaraoFrontend.release {"compiler_contract":1,"identity":"f9d51e01b49bd792c708777cc6bb1932b66cddac8ddd00249d9c93609a2beb3e","package_version":"0.37.6","preload":["MaraoAssetURL.js","MaraoNavigation.js","MaraoNativeBootstrap.js"]}
+// MaraoFrontend.release {"compiler_contract":1,"identity":"5372e3e361c48896e5444f038ae5b783abccf11676ef054ef7c2a062997fbaaf","package_version":"0.37.6","preload":["MaraoAssetURL.js","MaraoNavigation.js","MaraoNativeBootstrap.js"]}
 const root = new URL('./', import.meta.url);
 const manifestURL = new URL('MaraoFrontend.release.json', root);
 const preloadFiles = ["MaraoAssetURL.js","MaraoNavigation.js","MaraoNativeBootstrap.js"];
