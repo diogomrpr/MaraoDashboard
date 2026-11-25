@@ -1,11 +1,21 @@
 import { languageCode, formatLocale } from './MaraoLocale.js';
 import {escapeText as e} from './MaraoCollections.js';
-const labels={Wind:'Vento',Humidity:'Humidade',Pressure:'Pressão',Forecast:'Previsão',Today:'Hoje','Next 7 days':'Próximos 7 dias','Forecast unavailable':'Previsão indisponível','No forecast supplied':'Sem previsão disponível',Loading:'A carregar',Retry:'Tentar novamente',Precipitation:'Chuva',Rainfall:'Chuva','Weather station':'Estação meteorológica',Gusts:'Rajadas','Dew point':'Ponto de orvalho',Illuminance:'Luz','Light level':'Luz','UV index':'UV'};
+import { dashboardConnectionStatus, isDashboardOfflineError, observeDashboardConnection } from './MaraoConnection.js';
+import { periodRange } from './MaraoHistoryData.js';
+const labels={'Forecast unavailable offline':'Previsão indisponível sem ligação',Hourly:'Por hora',Updated:'Atualizado em',Wind:'Vento',Humidity:'Humidade',Pressure:'Pressão',Forecast:'Previsão','Next 7 days':'Próximos 7 dias','Forecast unavailable':'Previsão indisponível','No forecast supplied':'Sem previsão disponível',Loading:'A carregar',Retry:'Tentar novamente',Precipitation:'Chuva',Rainfall:'Chuva','Weather station':'Estação meteorológica',Gusts:'Rajadas','Dew point':'Ponto de orvalho',Illuminance:'Luz','Light level':'Luz','UV index':'UV'};
 const l=(h,text)=>languageCode(h) === 'pt'?labels[text]||text:text;
 const conditions={sunny:['Sunny','Sol'],partlycloudy:['Partly cloudy','Parcialmente nublado'],cloudy:['Cloudy','Nublado'],'clear-night':['Clear night','Céu limpo'],rainy:['Rain','Chuva'],pouring:['Heavy rain','Chuva forte'],snowy:['Snow','Neve'],'snowy-rainy':['Rain and snow','Chuva e neve'],fog:['Fog','Nevoeiro'],hail:['Hail','Granizo'],lightning:['Thunderstorms','Trovoada'],'lightning-rainy':['Thunderstorms and rain','Trovoada e chuva'],windy:['Windy','Vento'],'windy-variant':['Windy and cloudy','Vento e nuvens'],exceptional:['Exceptional conditions','Condições excecionais'],unknown:['Unknown','Desconhecido'],unavailable:['Unavailable','Indisponível']};
 const conditionText=(h,value)=>conditions[value]?.[languageCode(h) === 'pt'?1:0]||value;
 const number=value=>value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value));
 const reading=(h,value)=>{if(!number(value))return '—';const rounded=Math.round(Number(value));return new Intl.NumberFormat(formatLocale(h),{maximumFractionDigits:0,useGrouping:false}).format(rounded===0?0:rounded);};
+function savedObservation(hass,state){
+  const stamp=Date.parse(state?.last_updated);
+  if(!Number.isFinite(stamp)||dashboardConnectionStatus(hass)==='online')return '';
+  const formatted=new Intl.DateTimeFormat(formatLocale(hass),{
+    dateStyle:'medium',timeStyle:'short',timeZone:hass?.config?.time_zone
+  }).format(stamp);
+  return `<p>${e(l(hass,'Updated'))} <time datetime="${e(new Date(stamp).toISOString())}">${e(formatted)}</time></p>`;
+}
 export function weatherScene(condition,night=false){
   if(['unknown','unavailable','exceptional',''].includes(condition||''))return 'neutral';
   if(['lightning','lightning-rainy'].includes(condition))return 'storm';
@@ -40,7 +50,7 @@ export function weatherMarkup({hass,state,name,condition,unavailable,station,sho
   }
   const a=state.attributes||{},scene=unavailable?'neutral':weatherScene(state.state,hass?.states?.['sun.sun']?.state==='below_horizon'),unit=a.temperature_unit||hass?.config?.unit_system?.temperature||'';
   const metrics=[['Wind','weather-windy',a.wind_speed,a.wind_speed_unit||''],['Humidity','water-percent',a.humidity,'%'],['Pressure','gauge',a.pressure,a.pressure_unit||'']].filter(([, ,value])=>number(value)&&!unavailable);
-  return `<style>${weatherStyles}</style><ha-card class="weather-surface ${scene}"><div class="sky" aria-hidden="true"></div>${customAction||showForecast?`<button type="button" class="weather-tap-action" ${customAction?'data-weather-action':'data-weather-forecast'} aria-label="${e(customAction?name:l(hass,'Forecast')+': '+name)}"${unavailable||actionDisabled?' disabled':''}></button>`:''}<div class="weather-head">${showName?`<h2>${e(name)}</h2>`:''}</div><div class="weather-temperature">${e(!unavailable?reading(hass,a.temperature):'—')}<small>${e(!unavailable?unit:'')}</small></div>${showState?`<p class="weather-condition">${e(condition===state.state?conditionText(hass,condition):condition)}</p>`:''}${metrics.length?`<dl class="weather-metrics" data-count="${metrics.length}">${metrics.map(([label,icon,value,suffix])=>`<div><dt>${e(l(hass,label))}</dt><dd><span class="weather-reading">${e(reading(hass,value))}</span>${suffix?`<small>${e(suffix)}</small>`:''}</dd></div>`).join('')}</dl>`:''}</ha-card>`;
+  return `<style>${weatherStyles}</style><ha-card class="weather-surface ${scene}"><div class="sky" aria-hidden="true"></div>${customAction||showForecast?`<button type="button" class="weather-tap-action" ${customAction?'data-weather-action':'data-weather-forecast'} aria-label="${e(customAction?name:l(hass,'Forecast')+': '+name)}"${unavailable||actionDisabled?' disabled':''}></button>`:''}<div class="weather-head">${showName?`<h2>${e(name)}</h2>`:''}</div><div class="weather-temperature">${e(!unavailable?reading(hass,a.temperature):'—')}<small>${e(!unavailable?unit:'')}</small></div>${showState?`<p class="weather-condition">${e(condition===state.state?conditionText(hass,condition):condition)}</p>`:''}${unavailable?'':savedObservation(hass,state)}${metrics.length?`<dl class="weather-metrics" data-count="${metrics.length}">${metrics.map(([label,icon,value,suffix])=>`<div><dt>${e(l(hass,label))}</dt><dd><span class="weather-reading">${e(reading(hass,value))}</span>${suffix?`<small>${e(suffix)}</small>`:''}</dd></div>`).join('')}</dl>`:''}</ha-card>`;
 }
 export function styleWeatherPopup(popup){
   const config=popup._config?.cards?.[0];
@@ -57,8 +67,11 @@ export function styleWeatherPopup(popup){
   }
 }
 export function forecastRows(forecast,type,hass,unit=''){
+  const formatter=new Intl.DateTimeFormat(formatLocale(hass),{
+    month:'short',day:'numeric',...(type==='hourly'?{hour:'numeric',minute:'2-digit'}:{weekday:'short'}),timeZone:hass?.config?.time_zone
+  });
   return (forecast||[]).filter(row=>Number.isFinite(Date.parse(row.datetime))).slice(0,type==='hourly'?24:7).map(row=>{
-    const date=new Intl.DateTimeFormat(formatLocale(hass),{...(type==='hourly'?{hour:'numeric',minute:'2-digit'}:{weekday:'short',day:'numeric'}),timeZone:hass?.config?.time_zone}).format(new Date(row.datetime));
+    const date=formatter.format(new Date(row.datetime));
     const condition=hass?.formatEntityState?.({entity_id:'weather.forecast',state:row.condition,attributes:{}})||row.condition||'—';
     return `<li><span class="forecast-date"><strong>${e(date)}</strong><ha-icon icon="mdi:${e(({sunny:"weather-sunny",partlycloudy:"weather-partly-cloudy",cloudy:"weather-cloudy",'clear-night':"weather-night",rainy:"weather-rainy",pouring:"weather-pouring",snowy:"weather-snowy",'snowy-rainy':"weather-snowy-rainy",fog:"weather-fog",hail:"weather-hail",lightning:"weather-lightning",'lightning-rainy':"weather-lightning-rainy",windy:"weather-windy",'windy-variant':"weather-windy-variant"})[row.condition]||"weather-cloudy")}" aria-hidden="true"></ha-icon><span class="forecast-condition">${e(condition===row.condition?conditionText(hass,condition):condition)}</span>${number(row.precipitation_probability)?`<span class="forecast-precipitation">${e(l(hass,'Precipitation'))} ${e(reading(hass,row.precipitation_probability))}%</span>`:''}</span><strong class="forecast-temperature">${e([row.templow,row.temperature].filter(number).map(t=>`${reading(hass,t)} ${unit}`).join('–')||'—')}</strong></li>`;
   }).join('');
@@ -66,26 +79,96 @@ export function forecastRows(forecast,type,hass,unit=''){
 const Base=globalThis.HTMLElement||class{};
 export class MaraoWeatherForecast extends Base{
   constructor(){super();this.attachShadow?.({mode:'open'});this._generation=0;this._type='hourly';}
-  setConfig(config){this._config=config;this._type=(config.features&2)?'hourly':'daily';}
-  set hass(value){this._hass=value;if(this.isConnected){if(this._hass?.connected===false||this._hass?.connection?.connected===false||['unknown','unavailable'].includes(value.states?.[this._config.entity]?.state)){this._stop();this._error='Forecast unavailable';this._render();}else{this._render();if(!this._subscribing&&!this._unsubscribe)this._load();}}}
-  connectedCallback(){this._load();}
-  _stop(){this._generation++;this._unsubscribe?.();this._unsubscribe=null;this._subscribing=false;}
-  disconnectedCallback(){this._stop();}
-  async _load(){this._stop();if(this._hass?.connected===false||this._hass?.connection?.connected===false){this._error='Forecast unavailable';this._render();return;}const generation=this._generation;this._forecast=null;this._error='';this._subscribing=true;this._render();
+  setConfig(config){
+    this._stop();
+    this._config=config;
+    this._type=(config.features&2)?'hourly':'daily';
+    if(this.isConnected&&this._hass)this._load();
+  }
+  set hass(value){
+    const previousHass=this._hass;
+    if(previousHass&&(previousHass.connection!==value?.connection||previousHass.user?.id!==value?.user?.id)){
+      this._stop();
+      this._forecast=null;
+      this._error='';
+      this._offlineMiss=false;
+    }
+    this._hass=value;
+    if(!this.isConnected||!this._config)return;
+    const previous=this._backendStatus;
+    this._backendStatus=dashboardConnectionStatus(value);
+    const unavailable=['unknown','unavailable'].includes(value?.states?.[this._config.entity]?.state);
+    if(unavailable){
+      this._stop();
+      this._error='Forecast unavailable';
+      this._render();
+    }else if(!this._attempted||(previous&&previous!=='online'&&this._backendStatus==='online'))this._load();
+    else this._render();
+  }
+  connectedCallback(){
+    this._backendStatus=dashboardConnectionStatus(this._hass);
+    this._unobserve?.();
+    this._unobserve=observeDashboardConnection(()=>this._hass,status=>{
+      const previous=this._backendStatus;
+      this._backendStatus=status;
+      if(status==='online'&&previous!==status&&this._attempted)this._load();
+      else this._render();
+    });
+    if(this._hass&&this._config&&!this._attempted)this._load();
+  }
+  _stop(){
+    this._generation++;
+    this._unsubscribe?.();
+    this._unsubscribe=null;
+    this._attempted=false;
+    clearTimeout(this._expiry);
+  }
+  disconnectedCallback(){this._unobserve?.();this._stop();}
+  async _load(){
+    this._stop();
+    const generation=this._generation;
+    this._attempted=true;
+    this._forecast=null;
+    this._offlineMiss=false;
+    this._error='';
+    this._render();
     try{
       const features=this._config.features||0;
       if(!(features&(this._type==='hourly'?2:1))){this._forecast=this._type==='daily'?this._config.legacy||[]:[];return;}
-      const stop=await this._hass.connection.subscribeMessage(data=>{if(generation!==this._generation||!this.isConnected)return;this._forecast=data.forecast||[];this._render();},{type:'weather/subscribe_forecast',entity_id:this._config.entity,forecast_type:this._type});
+      if(this._hass?.connected===false||this._hass?.connection?.connected===false){this._offlineMiss=true;return;}
+      const stop=await this._hass.connection.subscribeMessage(data=>{
+        if(generation!==this._generation||!this.isConnected)return;
+        this._forecast=Array.isArray(data?.forecast)?data.forecast:[];
+        this._render();
+      },{type:'weather/subscribe_forecast',entity_id:this._config.entity,forecast_type:this._type});
       if(generation!==this._generation||!this.isConnected)stop();else this._unsubscribe=stop;
-    }catch(error){if(generation===this._generation)this._error=String(error?.message || 'Forecast unavailable');}finally{if(generation===this._generation){this._subscribing=false;this._render();}}
+    }catch(error){
+      const offline=await isDashboardOfflineError(error);
+      if(generation===this._generation){
+        this._offlineMiss=offline;
+        if(!offline)this._error=String(error?.message || 'Forecast unavailable');
+      }
+    }finally{if(generation===this._generation)this._render();}
   }
   _render(){if(!this.shadowRoot||!this._config)return;const h=this._hass,features=this._config.features||0;
     const state=h?.states?.[this._config.entity],attrs=state?.attributes||{},available=state&&!['unknown','unavailable'].includes(state.state)&&h?.connected!==false&&h?.connection?.connected!==false;
+    const now=Date.now(),hourly=this._type==='hourly';
+    const day=hourly?null:periodRange(now,0,'day',h?.config?.time_zone||'UTC');
+    const rows=(this._forecast||[]).filter(row=>{
+      const stamp=Date.parse(row?.datetime);
+      return hourly?stamp+3600000>now:stamp>=day.start;
+    });
+    clearTimeout(this._expiry);
+    if(rows.length&&this.isConnected){
+      const next=hourly?Math.min(...rows.map(row=>Date.parse(row.datetime)))+3600000:+day.end;
+      this._expiry=setTimeout(()=>this._render(),Math.min(next-now,2147483647));
+    }
+    const offline=this._offlineMiss||(!rows.length&&dashboardConnectionStatus(h)!=='online');
     this.shadowRoot.innerHTML=`<style>
 :host{display:block;min-width:0;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif);color:inherit;container-type:inline-size}.forecast-content{padding:0 12px 16px}.forecast-current{padding:8px 4px 24px}.forecast-current strong{display:block;font-size:clamp(3.5rem,22cqi,6rem);font-weight:500;line-height:1.05;letter-spacing:-.06em;overflow-wrap:anywhere}.forecast-current small{font-size:.3em;letter-spacing:0;vertical-align:top}.forecast-current p{margin:8px 0 0;font-size:var(--font-size-primary,1.125rem)}
 .tabs{display:flex;flex-wrap:wrap;gap:4px;padding:4px;border:1px solid #ffffff30;border-radius:20px;background:#0b23394d}button{min-height:48px;min-width:48px;border:0;border-radius:16px;padding:12px;font:inherit;color:inherit;background:#ffffff18;cursor:pointer}.tabs button{flex:1;background:transparent}button[aria-pressed=true]{background:#fff;color:#153c5b;font-weight:700}button:focus{outline:none}button:disabled{opacity:.5;cursor:default}
 ul{list-style:none;padding:0;margin:16px 0 0;display:grid;gap:10px}ul.hourly{grid-template-columns:repeat(auto-fit,minmax(min(100%,112px),1fr))}li{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:16px;border:1px solid #ffffff28;border-radius:22px;background:#0c233b40;overflow-wrap:anywhere;min-width:0}.forecast-date{display:grid;gap:8px;min-width:0}.forecast-date>strong{font-weight:500}.forecast-date ha-icon{--mdc-icon-size:30px}.forecast-condition,.forecast-precipitation{font-size:var(--font-size-secondary,1rem);line-height:1.35}.forecast-precipitation{opacity:.85}.forecast-temperature{font-size:calc(var(--font-size-primary,1.125rem) * 1.35);font-weight:500;text-align:right}.hourly li{flex-direction:column;align-items:start}.hourly .forecast-temperature{text-align:left;font-size:calc(var(--font-size-primary,1.125rem) * 1.6)}p{overflow-wrap:anywhere}.forecast-status{padding:20px 4px;line-height:1.5}
-</style><div class="forecast-content">${available?`<div class="forecast-current"><strong>${e(reading(h,attrs.temperature))}<small>${e(attrs.temperature_unit||this._config.unit||'')}</small></strong><p>${e((h?.formatEntityState?.(state)!==state.state&&h?.formatEntityState?.(state))||conditionText(h,state.state))}</p></div>`:''}<div class="tabs">${['hourly','daily'].map(type=>`<button type="button" data-type="${type}" aria-pressed="${this._type===type}"${!available||type==='hourly'&&!(features&2)?' disabled':''}>${e(l(h,type==='hourly'?'Today':'Next 7 days'))}</button>`).join('')}</div>${this._error?`<p class="forecast-status" role="alert">${e(l(h,'Forecast unavailable'))}${this._error!=='Forecast unavailable'?` <small>${e(this._error)}</small>`:''}</p><button data-retry>${e(l(h,'Retry'))}</button>`:this._forecast===null?`<p class="forecast-status" role="status">${e(l(h,'Loading'))}</p>`:this._forecast.length?`<ul class="${this._type}">${forecastRows(this._forecast,this._type,h,this._config.unit)}</ul>`:`<p class="forecast-status">${e(l(h,'No forecast supplied'))}</p>`}</div>`;
+</style><div class="forecast-content">${available?`<div class="forecast-current"><strong>${e(reading(h,attrs.temperature))}<small>${e(attrs.temperature_unit||this._config.unit||'')}</small></strong><p>${e((h?.formatEntityState?.(state)!==state.state&&h?.formatEntityState?.(state))||conditionText(h,state.state))}</p>${savedObservation(h,state)}</div>`:''}<div class="tabs">${['hourly','daily'].map(type=>`<button type="button" data-type="${type}" aria-pressed="${this._type===type}"${!available||type==='hourly'&&!(features&2)?' disabled':''}>${e(l(h,type==='hourly'?'Hourly':'Next 7 days'))}</button>`).join('')}</div>${this._error?`<p class="forecast-status" role="alert">${e(l(h,'Forecast unavailable'))}${this._error!=='Forecast unavailable'?` <small>${e(this._error)}</small>`:''}</p><button data-retry>${e(l(h,'Retry'))}</button>`:offline?`<p class="forecast-status" role="status">${e(l(h,'Forecast unavailable offline'))}</p>`:this._forecast==null?`<p class="forecast-status" role="status">${e(l(h,this._unsubscribe?'Forecast unavailable':'Loading'))}</p>`:rows.length?`<ul class="${this._type}">${forecastRows(rows,this._type,h,this._config.unit)}</ul>`:`<p class="forecast-status">${e(l(h,'No forecast supplied'))}</p>`}</div>`;
     this.shadowRoot.querySelectorAll('[data-type]').forEach(button=>button.onclick=()=>{if(this._type===button.dataset.type)return;this.dispatchEvent(new CustomEvent('haptic',{detail:'heavy',bubbles:true,composed:true}));this._type=button.dataset.type;this._load();});const retry=this.shadowRoot.querySelector('[data-retry]');if(retry)retry.onclick=()=>{this.dispatchEvent(new CustomEvent('haptic',{detail:'heavy',bubbles:true,composed:true}));this._load();};
   }
 }

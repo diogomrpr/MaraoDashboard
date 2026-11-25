@@ -1,3 +1,4 @@
+const {observeDashboardConnection}=await import(new URL(`./MaraoConnection.js${new URL(import.meta.url).search}`,import.meta.url));
 const { languageCode, formatLocale } = await import(new URL(`./MaraoLocale.js${new URL(import.meta.url).search}`, import.meta.url));
 const {activityRange,dateKey,filterActivity,loadActivity}=await import(new URL(`./MaraoActivityModel.js${new URL(import.meta.url).search}`,import.meta.url));
 const {bindDropdown,dropdownStyles}=await import(new URL(`./MaraoDropdown.js${new URL(import.meta.url).search}`,import.meta.url));
@@ -56,8 +57,17 @@ export function createActivity(host, options) {
     if(!data)return;
     list.replaceChildren();
     const rows=filterActivity(data.records,filter);
-    status.textContent=data.errors.length?t('Some recorded history could not be loaded. Results below are incomplete.','Não foi possível carregar parte do histórico. Os resultados estão incompletos.'):rows.length?'':t('No recorded events for these filters.','Sem eventos registados para estes filtros.');
-    if(data.errors.length){const coverage=document.createElement('p');coverage.textContent=data.errors.map(error=>`${error.kind==='history'?t('History','Histórico'):t('Activity','Atividade')} · ${dateKey(error.start,hass.config?.time_zone||'UTC')} · ${error.sources.map(name).join(', ')} · ${error.reason==='permission'?t('Permission limited','Permissão limitada'):t('Could not load','Não foi possível carregar')}`).join(' / ');list.append(coverage);const retry=document.createElement('button');retry.textContent=t('Retry','Tentar novamente');retry.onclick=()=>{options.haptic?.('heavy');query();};list.append(retry);}
+    const errors = data.errors.filter(error => error.reason !== 'offline');
+    const offline = errors.length < data.errors.length;
+    if (errors.length) {
+      status.textContent = t('Some recorded history could not be loaded. Results below are incomplete.','Não foi possível carregar parte do histórico. Os resultados estão incompletos.');
+    } else if (offline) {
+      status.textContent = data.readCount ? t('Part of this period is unavailable offline.','Parte deste período está indisponível offline.')
+        : t('This period is unavailable offline.','Este período está indisponível offline.');
+    } else {
+      status.textContent = rows.length ? '' : t('No recorded events for these filters.','Sem eventos registados para estes filtros.');
+    }
+    if(errors.length){const coverage=document.createElement('p');coverage.textContent=errors.map(error=>`${error.kind==='history'?t('History','Histórico'):t('Activity','Atividade')} · ${dateKey(error.start,hass.config?.time_zone||'UTC')} · ${error.sources.map(name).join(', ')} · ${error.reason==='permission'?t('Permission limited','Permissão limitada'):t('Could not load','Não foi possível carregar')}`).join(' / ');list.append(coverage);const retry=document.createElement('button');retry.textContent=t('Retry','Tentar novamente');retry.onclick=()=>{options.haptic?.('heavy');query();};list.append(retry);}
     let day,events;
     for(const row of rows.slice(0,limit)){
       const key=dateKey(row.time,hass.config?.time_zone||'UTC');
@@ -74,7 +84,7 @@ export function createActivity(host, options) {
     if(rows.length>limit){const more=document.createElement('button');more.textContent=t('Load earlier','Carregar anteriores');more.onclick=()=>{options.haptic?.('heavy');limit+=50;render();};list.append(more);}
   }
   async function query(){
-    const token=++generation;data=null;limit=50;updateFilters();let range;
+    const token=++generation;data=null;list.replaceChildren();limit=50;updateFilters();let range;
     try{range=activityRange(period,hass.config?.time_zone||'UTC',Date.now(),custom);}catch{list.replaceChildren();list.removeAttribute('aria-busy');status.textContent=t('Choose a valid range of up to 31 days.','Escolha um intervalo válido de até 31 dias.');return;}
     list.setAttribute('aria-busy','true');
     status.textContent=t('Loading recorded activity…','A carregar atividade registada…');
@@ -86,8 +96,30 @@ export function createActivity(host, options) {
     if(filter.origin&&!origins.includes(filter.origin))filter.origin='';if(filter.initiator&&!actors.includes(filter.initiator))filter.initiator='';
     for(const control of dropdowns)control.sync();render();
   }
+  const stopConnection = observeDashboardConnection(() => hass, status => { if (status === 'online') query(); });
+  let zone = hass.config?.time_zone || 'UTC', calendarDay = dateKey(Date.now(),zone), rolloverTimer;
+  function checkCalendar() {
+    const nextZone = hass.config?.time_zone || 'UTC', today = dateKey(Date.now(),nextZone);
+    if (nextZone === zone && today === calendarDay) return;
+    zone = nextZone; calendarDay = today;
+    if (period !== 'custom') query();
+    scheduleRollover();
+  }
+  function scheduleRollover() {
+    clearTimeout(rolloverTimer);
+    const now = Date.now();
+    rolloverTimer = setTimeout(checkCalendar, activityRange('today',zone,now).end - now);
+  }
+  scheduleRollover();
   query();
-  return {update(next){hass=next.hass;},destroy(){destroyed=true;generation++;for(const control of [...dropdowns])control.destroy();host.replaceChildren();}};
+  return {
+    update(next) { hass = next.hass; checkCalendar(); },
+    destroy() {
+      stopConnection(); clearTimeout(rolloverTimer); destroyed = true; generation++;
+      for (const control of [...dropdowns]) control.destroy();
+      host.replaceChildren();
+    },
+  };
 }
 
 // The chart switch belongs to the expanded activity sheet. Ordinary activity

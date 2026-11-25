@@ -1,3 +1,4 @@
+import {dashboardConnectionStatus,localConnectionReady} from '../custom_components/marao_dashboard/frontend/MaraoConnection.js';
 import {MANAGER,EVENT,DAYS,uid,controllerId,timerId,targetAdapter,validateTimer,startConfig,controllerConfig,recognized} from './schedule-model.js';
 const clone=value=>structuredClone(value);
 export const stable=value=>JSON.stringify(value,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v);
@@ -11,9 +12,14 @@ export function schedulesSession(hass,id) {
 }
 export class ScheduleSession {
   constructor(hass,id){this.hass=hass;this.id=id;this.receipt={collection_id:id,records:[],helpers:[]};}
-  guard(){if(!this.hass.user?.is_admin)throw new Error('Administrator access is required.');if(this.hass.connected===false||this.hass.connection?.connected===false)throw new Error('Disconnected');}
-  async ws(type,data={}){this.guard();return this.hass.callWS({type,...data});}
-  async config(method,id,body){this.guard();return this.hass.callApi(method,'config/automation/config/'+encodeURIComponent(id),body);}
+  guard(readOnly=false){
+    if(!this.hass.user?.is_admin)throw new Error('Administrator access is required.');
+    const available=readOnly?localConnectionReady(this.hass):dashboardConnectionStatus(this.hass)==='online';
+    if(!available)throw new Error('Disconnected');
+  }
+  async automationService(service,entity){this.guard();return this.hass.callService('automation',service,{entity_id:entity});}
+  async ws(type,data={}){this.guard(type==='get_states'||type==='get_config'||type.endsWith('/list'));return this.hass.callWS({type,...data});}
+  async config(method,id,body){this.guard(method==='GET');return this.hass.callApi(method,'config/automation/config/'+encodeURIComponent(id),body);}
   async stateList(){return Object.fromEntries((await this.ws('get_states')).map(state=>[state.entity_id,state]));}
   async preflight(){await this.ws('timer/list');await this.ws('input_select/list');const config=await this.ws('get_config');if(!config.components?.includes('automation'))throw new Error('UI-managed automations are required.');return true;}
   async record(id){try{return await this.config('GET',id);}catch(error){if([404,'404'].includes(error.status_code)||error.status===404)return null;throw error;}}
@@ -29,7 +35,7 @@ export class ScheduleSession {
     await this.automationEntity(config.id);return actual;
   }
   async read(force=false){
-    this.guard();if(this.reading)return this.reading;
+    this.guard(true);if(this.reading)return this.reading;
     this.reading=(async()=>{
       const config=await this.record(controllerId(this.id));
       if(!config){this.manifest=null;this.controller=null;this.timers=[];return this;}
@@ -82,7 +88,7 @@ export class ScheduleSession {
       m.targets[i][role]=await this.helper(role==='mode'?'input_select':'timer','Marao '+this.id+' '+i+' '+role,settings);await checkpoint();
     }
     m.status='ready';await checkpoint();
-    const entity=await this.automationEntity(current.id);await this.hass.callService('automation','turn_on',{entity_id:entity});await this.wait(s=>s[entity]?.state==='on');await this.read();
+    const entity=await this.automationEntity(current.id);await this.automationService('turn_on',entity);await this.wait(s=>s[entity]?.state==='on');await this.read();
   });}
   async manifestUpdate(transform){
     const before=await this.record(controllerId(this.id));if(!recognized(before)||stable(before)!==stable(this.controller))throw new Error('Configuration changed elsewhere. Refresh before saving.');
@@ -101,14 +107,14 @@ export class ScheduleSession {
     await this.read();if(this.divergent)throw new Error('Schedule configuration differs. Reconcile in the native editor.');
     const {enabled=true,...input}=data;const meta={...input,id:input.id || uid()};for(const key of ['config','customized','automation_entity'])delete meta[key];
     validateTimer(meta,this.manifest,this.timers);const old=this.timers.find(t=>t.id===meta.id);let before=old?.config || null;
-    if(old){await this.hass.callService('automation','turn_off',{entity_id:old.automation_entity});await this.manifestUpdate(m=>{m.schedules=m.schedules.filter(t=>t.id!==meta.id);});}
+    if(old){await this.automationService('turn_off',old.automation_entity);await this.manifestUpdate(m=>{m.schedules=m.schedules.filter(t=>t.id!==meta.id);});}
     const desired={...before,...startConfig(meta,this.manifest),initial_state:false};let saved=await this.save(desired,before);
     const entity=await this.automationEntity(saved.id);const contract=this.contract({...saved.variables.marao_schedule,automation_entity:entity});
     await this.manifestUpdate(m=>{m.schedules=m.schedules.filter(t=>t.id!==meta.id);m.schedules.push(contract);});
     const final={...saved};delete final.initial_state;saved=await this.save(final,saved);
-    await this.hass.callService('automation',enabled?'turn_on':'turn_off',{entity_id:entity});await this.read();
+    await this.automationService(enabled?'turn_on':'turn_off',entity);await this.read();
   });}
-  async enabled(timer,value){this.guard();const fresh=await this.record(timer.config.id);if(stable(fresh)!==stable(timer.config)||!recognized(fresh,this.manifest))throw new Error('Configuration changed elsewhere. Refresh before saving.');await this.hass.callService('automation',value?'turn_on':'turn_off',{entity_id:timer.automation_entity});await this.read();}
+  async enabled(timer,value){this.guard();const fresh=await this.record(timer.config.id);if(stable(fresh)!==stable(timer.config)||!recognized(fresh,this.manifest))throw new Error('Configuration changed elsewhere. Refresh before saving.');await this.automationService(value?'turn_on':'turn_off',timer.automation_entity);await this.read();}
   async removeTimer(timer){
     if(timer.customized)throw new Error('Customized automations must be managed in Home Assistant.');
     const current=await this.record(timer.config.id);if(stable(current)!==stable(timer.config))throw new Error('Configuration changed elsewhere. Refresh before saving.');
@@ -122,7 +128,7 @@ export class ScheduleSession {
     for(const state of Object.values(states).filter(s=>s.entity_id.startsWith('automation.')&&s.attributes?.id&&!owned.has(s.attributes.id))){const other=await this.record(state.attributes.id);if(other&&helpers.some(h=>stable(other).includes(JSON.stringify(h.entity_id))))throw new Error('Another automation depends on these helpers. Reconcile before cleanup.');}
     for(const helper of helpers){const records=await this.ws(helper.domain+'/list'),record=records.find(item=>item.id===helper.storage_id);if(!record)throw new Error('Helper is missing. Reconcile before cleanup.');const expected={...helper.baseline};if(helper===this.manifest.selection)expected.options=['paused',...this.manifest.groups.map(g=>g.id)];if(stable(record)!==stable(expected))throw new Error('Helper changed elsewhere. Cleanup stopped.');}
     const before=await this.record(controllerId(this.id));if(stable(before)!==stable(this.controller))throw new Error('Configuration changed elsewhere. Refresh before saving.');
-    const automation=await this.automationEntity(before.id);await this.hass.callService('automation','turn_off',{entity_id:automation});
+    const automation=await this.automationEntity(before.id);await this.automationService('turn_off',automation);
     for(const helper of helpers)await this.ws(helper.domain+'/delete',{[helper.domain+'_id']:helper.storage_id});
     this.receipt.records.push({id:before.id,before,intended:null});await this.config('DELETE',before.id);await this.read();
   });}

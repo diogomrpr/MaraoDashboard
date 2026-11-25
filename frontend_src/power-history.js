@@ -1,3 +1,4 @@
+import { dashboardConnectionStatus, isDashboardOfflineError, localConnectionReady, observeDashboardConnection } from '../custom_components/marao_dashboard/frontend/MaraoConnection.js';
 import { formatLocale } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import { createPowerToolbar } from '../custom_components/marao_dashboard/frontend/MaraoHistoryLayout.js';
 import { bindDropdown, dropdownStyles } from '../custom_components/marao_dashboard/frontend/MaraoDropdown.js';
@@ -29,7 +30,9 @@ async function readPowerChunk(hass, ids, from, end, convert) {
       } }).filter(sample => sample.time <= end);
       const baseline = powerStateAt(samples, from);
       const inside = samples.filter(sample => sample.time >= from);
-      if (baseline && baseline.time < from) inside.unshift({ time: from, value: baseline.value });
+      if (baseline && baseline.time < from) {
+        inside.unshift(dashboardConnectionStatus(hass) === 'online' ? { time: from, value: baseline.value } : baseline);
+      }
       series[id] = reduceSamples(inside, 8192);
     } catch { errors[id] = 'power.unit_error'; series[id] = []; }
   }
@@ -38,6 +41,7 @@ async function readPowerChunk(hass, ids, from, end, convert) {
 
 export async function loadPowerPeriod({ hass, ids, range, timeZone, convert, isCurrent = () => true, now = Date.now(), chunks }) {
   const series = Object.fromEntries(ids.map(id => [id, []])), errors = {};
+  let offline = false;
   const finish = Math.min(+range.end, +new Date(now));
   for (let from = +range.start; from < finish;) {
     if (!isCurrent()) return;
@@ -47,7 +51,15 @@ export async function loadPowerPeriod({ hass, ids, range, timeZone, convert, isC
     if (!activeIds.length) break;
     const key = JSON.stringify([timeZone, activeIds, from, Math.min(dayEnd, +range.end)]);
     let entry = chunks?.get(key);
-    if (entry && entry.loadedAt < Math.min(dayEnd, +now - 60000)) { chunks.delete(key); entry = null; }
+    if (entry && entry.loadedAt < Math.min(dayEnd, +now - 60000)) {
+      if (dashboardConnectionStatus(hass) === 'online') {
+        chunks.delete(key);
+        entry = null;
+      } else {
+        // The saved portion of an accumulating day can still be shown after midnight.
+        offline = true;
+      }
+    }
     if (!entry) {
       entry = { loadedAt: +now };
       entry.promise = readPowerChunk(hass, activeIds, from, end, convert).then(result => {
@@ -69,7 +81,16 @@ export async function loadPowerPeriod({ hass, ids, range, timeZone, convert, isC
         chunks.set(key, entry);
       }
     }
-    const result = await entry.promise;
+    let result;
+    try { result = await entry.promise; }
+    catch (error) {
+      if (!await isDashboardOfflineError(error)) throw error;
+      if (!isCurrent()) return;
+      offline = true;
+      for (const id of activeIds) series[id].push({ time: from, value: null });
+      from = end;
+      continue;
+    }
     if (!isCurrent()) return;
     for (const id of activeIds) {
       if (result.errors[id]) { errors[id] = result.errors[id]; series[id] = []; }
@@ -77,7 +98,7 @@ export async function loadPowerPeriod({ hass, ids, range, timeZone, convert, isC
     }
     from = end;
   }
-  return { series, errors };
+  return { series, errors, offline };
 }
 
 
@@ -85,11 +106,11 @@ export function createPowerHistory(host, initial, createChart) {
   let options = initial, period = 'day', selectedStart, request = 0, destroyed = false, loading = false, loadedKey = '', data, error;
   const cache = new Map(), chunks = new Map(), events = new AbortController();
   let probeTime, probeValues = {}, probing = false, pendingLive = {};
-  let prefetchFrame, prefetchTimer, background;
+  let prefetchFrame, prefetchTimer, background, rolloverTimer, rolloverTime;
   const { style, toolbar, picker, trigger, selectedLabel, menu, choices, previous, title, next, content } = createPowerToolbar(host, dropdownStyles);
   const text = key => options.localize?.(key) || key;
   const state = id => options.hass?.states?.[id];
-  const availability = id => !options.hass || options.hass.connected === false || options.hass.connection?.connected === false ? 'common.unavailable'
+  const availability = id => !localConnectionReady(options.hass) ? 'common.unavailable'
     : !state(id) || state(id).state === 'unknown' ? 'common.unknown' : state(id).state === 'unavailable' ? 'common.unavailable' : '';
   const sources = () => [{ entity_id: options.entity, name: options.name || state(options.entity)?.attributes?.friendly_name || options.entity }, ...(options.power_devices || [])];
   const zone = () => options.hass?.config?.time_zone || 'UTC';
@@ -127,9 +148,12 @@ export function createPowerHistory(host, initial, createChart) {
         samples, color: index ? undefined : options.graph_color, problem: problem ? text(problem) : '' };
     });
     const incompatible = options.convert(1, 'W', unit())?.error;
-    chart.update({ samples: mapped[0]?.samples || [], series: mapped, power: true, range: interval, recordedUntil: Math.min(+interval.end,now()), windows: false, unit: unit(), hass: options.hass,
+    const hasSavedReading = mapped[0]?.samples.some(sample => sample.time >= +interval.start && Number.isFinite(sample.value));
+    const offlineCoverage = data?.offline && text(hasSavedReading ? 'history.offline_partial' : 'history.offline_range');
+    chart.update({ samples: mapped[0]?.samples || [], series: mapped, power: true, range: interval, recordedUntil: Math.min(+interval.end,now()), extendLastState: dashboardConnectionStatus(options.hass) === 'online', windows: false, unit: unit(), hass: options.hass,
       showFill: false, showLine: true, stepped: true, stateClass: undefined, localize: options.localize,
       format: value => `${format(value)} ${unit()}`, axisFormat: value => format(value),
+      offlineCoverage: offlineCoverage || '',
       unavailable: unavailable ? text(unavailable) : '', loading, error: error ? text('power.load_error') : incompatible || mapped[0]?.problem && !unavailable ? text('power.unit_error') : '',
       selection: { time: probeTime, values: Object.fromEntries(Object.entries(probeValues).map(([id, item]) => [id, { ...item, value: Number.isFinite(item.value) ? display(item.value) : null }])) },
       onSelect: options.power_devices?.length ? selectTime : undefined, selectionKey: request,
@@ -138,15 +162,15 @@ export function createPowerHistory(host, initial, createChart) {
   };
   function captureLive() {
     const interval=range();
-    if(+interval.end<=now())return;
     const target=data?.series||pendingLive;
     for(const source of sources()){
       const live=state(source.entity_id),stamp=Date.parse(live?.last_updated||live?.last_changed);
-      if(availability(source.entity_id)||!Number.isFinite(stamp)||stamp<+interval.start||stamp>now())continue;
+      if(availability(source.entity_id)||!Number.isFinite(stamp)||stamp<+interval.start||stamp>=+interval.end||stamp>now())continue;
       const reading=options.convert(live.state,live.attributes?.unit_of_measurement,'W');
       if(reading?.error)continue;
       const samples=target[source.entity_id]||[];
-      if(!samples.length||stamp>samples.at(-1).time)target[source.entity_id]=reduceSamples([...samples,{time:stamp,value:reading?.value??null}],8192);
+      const known=powerStateAt(samples,stamp);
+      if(known?.time!==stamp || known.value===null)target[source.entity_id]=reduceSamples(normalizeSamples([...samples,{time:stamp,value:reading?.value??null}]),8192);
     }
   }
   function selectTime(time) {
@@ -167,8 +191,11 @@ export function createPowerHistory(host, initial, createChart) {
         catch { failed=true; }
         if(destroyed)return;
         if(request===epoch&&probeTime===stamp){
-          probeValues=Object.fromEntries(ids.map(id=>[id,{value:powerStateAt(result?.series[id]||[],stamp)?.value??null,
-            failed:failed||Boolean(result?.errors[id]),problem:failed?text('power.load_error'):result?.errors[id]?text(result.errors[id]):''}]));
+          probeValues=Object.fromEntries(ids.map(id=>{
+            const saved = result?.offline && data?.series[id]?.find(sample => sample.time === stamp);
+            return [id,{value:saved?.value ?? powerStateAt(result?.series[id]||[],stamp)?.value ?? null,
+              failed:failed||Boolean(result?.errors[id]),problem:failed?text('power.load_error'):result?.errors[id]?text(result.errors[id]):result?.offline&&!saved?text('history.offline_range'):''}];
+          }));
           render();return;
         }
       }
@@ -187,7 +214,7 @@ export function createPowerHistory(host, initial, createChart) {
       cache.set(key, entry);
       entry.promise = loadPowerPeriod({ chunks, hass: options.hass, ids: usableIds(), range: interval, timeZone: zone(), now: now(),
         convert: (value, source) => options.convert(value, source, 'W'),
-        isCurrent: () => !destroyed && cache.get(key) === entry && (loadedKey === key || entry.backgroundRequest === request) })
+        isCurrent: () => !destroyed && cache.get(key) === entry && (loadedKey === key || entry.backgroundRequest === request && dashboardConnectionStatus(options.hass) === 'online') })
         .then(result => {
           if (result) { entry.result = result; entry.loadedAt = now(); }
           else if (cache.get(key) === entry) cache.delete(key);
@@ -199,7 +226,7 @@ export function createPowerHistory(host, initial, createChart) {
   async function prefetch(epoch) {
     // Finish the active background request before starting another worker.
     if (background) await background.promise;
-    while (!destroyed && epoch === request && !loading) {
+    while (!destroyed && epoch === request && !loading && dashboardConnectionStatus(options.hass) === 'online') {
       const interval = [...firstPeriods(), ...nearby()].find(item => !cache.has(periodKey(item)));
       if (!interval) break;
       const entry = requestPeriod(interval, true);
@@ -210,6 +237,7 @@ export function createPowerHistory(host, initial, createChart) {
   }
   function schedulePrefetch() {
     cancelPrefetch();
+    if (dashboardConnectionStatus(options.hass) !== 'online') return;
     const epoch = request;
     // Let the selected chart paint before starting any neighboring history.
     prefetchFrame = (globalThis.requestAnimationFrame || (callback => setTimeout(callback, 0)))(() => {
@@ -217,11 +245,25 @@ export function createPowerHistory(host, initial, createChart) {
       prefetchTimer = setTimeout(() => { prefetchTimer = undefined; prefetch(epoch); }, 0);
     });
   }
+  function scheduleRollover() {
+    const boundary = selectedStart === undefined ? +periodRange(now(), 0, 'day', zone()).end : undefined;
+    if (rolloverTime === boundary) return;
+    clearTimeout(rolloverTimer);
+    rolloverTime = boundary;
+    if (boundary === undefined) return;
+    rolloverTimer = setTimeout(() => {
+      rolloverTime = undefined;
+      loadedKey = '';
+      cache.delete(periodKey(range()));
+      load();
+    }, Math.max(1, boundary + 1 - now()));
+  }
   async function load() {
     if (destroyed) return;
+    scheduleRollover();
     const interval = range(), key = periodKey(interval);
     if (availability(options.entity)) { cancelPrefetch(); request++; probeTime=undefined;probeValues={}; loading = false; loadedKey = ''; data = undefined; error = undefined; render(); return; }
-    if (key === loadedKey) { render(); return; }
+    if (key === loadedKey) { captureLive(); render(); return; }
     cancelPrefetch();
     const current = ++request;
     probeTime=undefined;probeValues={};pendingLive={};
@@ -257,14 +299,19 @@ export function createPowerHistory(host, initial, createChart) {
     if(+selectedStart===+periodRange(now(),0,period,zone()).start)selectedStart=undefined;
     load();
   }, { signal: events.signal });
+  const stopConnection = observeDashboardConnection(() => options.hass, status => {
+    if (status === 'online') {
+      loadedKey = ''; cache.clear(); chunks.clear(); load();
+    } else { cancelPrefetch(); render(); }
+  });
   load();
   return {
     update(nextOptions) {
       const priorIds = JSON.stringify([zone(), sources().map(source => [source.entity_id, availability(source.entity_id), state(source.entity_id)?.attributes?.unit_of_measurement])]);
       options = { ...options, ...nextOptions };
       if (priorIds !== JSON.stringify([zone(), sources().map(source => [source.entity_id, availability(source.entity_id), state(source.entity_id)?.attributes?.unit_of_measurement])])) { loadedKey = ''; cache.clear(); chunks.clear(); }
-      captureLive();load();
+      load();
     },
-    destroy() { if(destroyed)return; destroyed = true; request++; cancelPrefetch(); cache.clear(); chunks.clear(); probeTime=undefined; events.abort(); dropdown.destroy(); chart.destroy(); style.remove(); toolbar.remove(); content.remove(); },
+    destroy() { if(destroyed)return; destroyed = true; request++; stopConnection(); clearTimeout(rolloverTimer); cancelPrefetch(); cache.clear(); chunks.clear(); probeTime=undefined; events.abort(); dropdown.destroy(); chart.destroy(); style.remove(); toolbar.remove(); content.remove(); },
   };
 }

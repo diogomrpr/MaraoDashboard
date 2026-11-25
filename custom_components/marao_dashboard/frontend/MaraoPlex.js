@@ -1,7 +1,8 @@
 const { languageCode } = await import(new URL(`./MaraoLocale.js${new URL(import.meta.url).search}`, import.meta.url));
 const query=new URL(import.meta.url).search;
+const {dashboardConnectionStatus,isDashboardOfflineError,observeDashboardConnection}=await import(new URL(`./MaraoConnection.js${query}`,import.meta.url));
 const [model,actions,dropdown,context,press]=await Promise.all(['MaraoPlexModel.js','MaraoCards.js','MaraoDropdown.js','MaraoNativeContext.js','MaraoPressFeedback.js'].map(file=>import(new URL(`./${file}${query}`,import.meta.url))));
-const {browsePlex,plexBrowseEntity,rivuletPlayback,rivuletLink,plexHome,plexURI,plexTarget,plexTargets,plexTargetIdentity,plexLaunchProblem,plexError,plexText,PlexLaunch}=model;
+const {browsePlex,plexBrowseEntity,rivuletPlayback,rivuletLink,plexHome,plexURI,plexTarget,plexTargets,plexTargetIdentity,plexLaunchProblem,plexError,plexText,PlexLaunch,PLEX_OFFLINE_FOLDER}=model;
 const Base=globalThis.HTMLElement || class {};
 const styles=`${dropdown.dropdownStyles}${press.pressStyles}
 :host{display:block;min-width:0;font-family:var(--primary-font-family,Montserrat,system-ui,sans-serif);color:var(--primary-text-color)}
@@ -32,7 +33,8 @@ export class MaraoPlexWatchCard extends Base {
     if(changed){this._launch.cancel();this._reset();}
     else if(languageChanged&&this._body)this._draw();
     this._syncTargets();this._launch.update();this._popup&&(this._popup.hass=value);this._syncStatus();
-    if(this.isConnected&&!this.preview&&!this._attempted&&!this._loading&&actions.serviceConnectionReady(value))this._loadHome();
+    this._connectionChanged(dashboardConnectionStatus(value));
+    if(this.isConnected&&!this.preview&&!this._attempted&&!this._loading&&value?.callWS)this._loadHome();
   }
   get hass(){return this._hass;}
   get preview(){return Boolean(this._preview||this.nativeOwner?.preview||context.nativeEditing(this));}
@@ -42,9 +44,29 @@ export class MaraoPlexWatchCard extends Base {
     const location=()=>`${globalThis.location?.pathname || ''}${globalThis.location?.hash || ''}`,initial=location();
     for(const event of ['location-changed','hashchange','popstate'])globalThis.window?.addEventListener(event,()=>{if(location()!==initial){this._launch.cancel();this._popup?._close(false);}},{signal});
     globalThis.document?.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')this._launch.cancel();},{signal});
+    this._backendStatus=dashboardConnectionStatus(this._hass);
+    this._unobserve?.();
+    this._unobserve=observeDashboardConnection(()=>this._hass,status=>this._connectionChanged(status));
     this._mount();if(!this.preview&&this._hass)this._loadHome();
   }
-  disconnectedCallback(){this._events?.abort();this._launch.cancel();this._popup?._close(false);this._popup=null;this._reset();this._picker?.destroy();this._feedback?.destroy();this._clearSections();}
+  _connectionChanged(status){
+    const previous=this._backendStatus;
+    this._backendStatus=status;
+    if(!previous||previous===status||!this.isConnected||this.preview)return;
+    this._launch.update();
+    this._syncStatus();
+    if(status==='online'&&this._attempted){
+      this._cache.clear();
+      this._artwork.clear();
+      this._browser=null;
+      this._loading=false;
+      if(this._history.length){
+        this._home=null;
+        this._navigate(this._history.at(-1),true);
+      }else this._loadHome();
+    }
+  }
+  disconnectedCallback(){this._unobserve?.();this._events?.abort();this._launch.cancel();this._popup?._close(false);this._popup=null;this._reset();this._picker?.destroy();this._feedback?.destroy();this._clearSections();}
   getCardSize(){return this._config?.full?6:3;}
   _t(value){return plexText(this._hass,value);}
   _reset(){
@@ -84,7 +106,7 @@ export class MaraoPlexWatchCard extends Base {
   }
   _launchContext(){return{hass:this._hass,target:this._selected,ownerKey:JSON.stringify(this._config?.parent),active:this.isConnected&&globalThis.document?.visibilityState!=='hidden',preview:this.preview};}
   _read(folder){
-    const target=this._selected||plexTarget(this._config.parent), key=JSON.stringify([target.plex,folder]);
+    const target=this._selected||plexTarget(this._config.parent), key=JSON.stringify([target.plex,folder.media_content_type,folder.media_content_id]);
     const cache=this._cache;
     if(!cache.has(key)){
       const server=plexURI(target.plex.library_root.media_content_id).host,hass=this._hass,epoch=this._epoch;
@@ -92,7 +114,11 @@ export class MaraoPlexWatchCard extends Base {
       const pending=this._browser.then(client=>{
         if(epoch!==this._epoch||hass.user?.id!==this._hass?.user?.id||hass.connection!==this._hass?.connection||!this.isConnected)throw new Error('Playback cancelled. Choose a TV and try again.');
         return browsePlex(this._hass,client,folder,server);
-      }).catch(error=>{if(cache.get(key)===pending)cache.delete(key);throw error;});
+      }).catch(async error=>{
+        if(cache.get(key)===pending)cache.delete(key);
+        if(await isDashboardOfflineError(error)||hass?.connected===false||hass?.connection?.connected===false)throw new Error(PLEX_OFFLINE_FOLDER);
+        throw error;
+      });
       cache.set(key,pending);if(cache.size>24)cache.delete(cache.keys().next().value);
     }
     return this._cache.get(key);
@@ -110,14 +136,18 @@ export class MaraoPlexWatchCard extends Base {
   }
   async _navigate(folder,back=false){
     const generation=++this._generation,epoch=this._epoch;
+    if(!back)this._history.push(folder);
     this._loading=true;this._contentError='';this._draw();
     try{const node=await this._read(folder);if(generation!==this._generation||epoch!==this._epoch||!this.isConnected)return;
-      if(!back)this._history.push(folder);this._folder=node;
-    }catch(error){if(generation!==this._generation||epoch!==this._epoch||!this.isConnected)return;if(!back)this._history.push(folder);this._folder={...folder,title:folder.title||this._t('Plex library'),children:[]};this._contentError=plexError(error);}
+      this._folder=node;
+    }catch(error){if(generation!==this._generation||epoch!==this._epoch||!this.isConnected)return;this._folder={...folder,title:folder.title||this._t('Plex library'),children:[]};this._contentError=plexError(error);}
     if(generation===this._generation&&epoch===this._epoch){this._loading=false;this._draw();}
   }
   _clearSections(){this._sectionEvents?.abort();for(const observer of this._sectionObservers||[])observer.disconnect();this._sectionObservers=[];}
   _shelfError(section,error){
+    if(error===PLEX_OFFLINE_FOLDER){
+      const note=document.createElement('p');note.setAttribute('role','status');note.textContent=this._t(error);section.append(note);return;
+    }
     section.dataset.problem='error';section.setAttribute('style',actions.problemStyle({kind:'error'}));
     if(section.querySelector('.shelf-error'))return;
     const message=document.createElement('p');message.className='shelf-error';message.setAttribute('role','alert');
@@ -161,8 +191,8 @@ export class MaraoPlexWatchCard extends Base {
       if(epoch!==this._epoch||generation!==this._generation||account!==this._hass?.user?.id||connection!==this._hass?.connection||!poster.isConnected)return;
       if(typeof signed!=='string'||!signed.startsWith(path+'?'))throw new Error('Unable to load artwork.');
       const image=document.createElement('img');image.loading='lazy';image.alt='';image.src=this._hass.hassUrl?this._hass.hassUrl(signed):signed;
-      image.onerror=()=>{image.remove();if(epoch===this._epoch&&generation===this._generation)this._imageError(poster);};poster.append(image);
-    }catch{if(epoch===this._epoch&&generation===this._generation&&poster.isConnected)this._imageError(poster);}
+      image.onerror=()=>{image.remove();if(epoch===this._epoch&&generation===this._generation&&dashboardConnectionStatus(this._hass)==='online')this._imageError(poster);};poster.append(image);
+    }catch(error){if(!await isDashboardOfflineError(error)&&epoch===this._epoch&&generation===this._generation&&poster.isConnected)this._imageError(poster);}
   }
   _imageError(poster){
     poster.dataset.problem='error';const section=poster.closest('section');if(section)this._shelfError(section,'Unable to load artwork.');
@@ -185,12 +215,17 @@ export class MaraoPlexWatchCard extends Base {
     const compact=this._config?.full===false;this._surface.classList.toggle('compact',compact);
     if(compact){this._summary();this._syncStatus();return;}
     if(this._config?.full||this._expanded){
-      if(this._history.length||this._folder)nav('Back',()=>{this._history.pop();if(this._history.length)this._navigate(this._history.at(-1),true);else{++this._generation;this._loading=false;this._folder=null;this._draw();}});
+      if(this._history.length||this._folder)nav('Back',()=>{this._history.pop();if(this._history.length)this._navigate(this._history.at(-1),true);else{++this._generation;this._loading=false;this._folder=null;this._contentError='';if(this._home)this._draw();else this._loadHome();}});
       else if(this._expanded)nav('Back',()=>{this._launch.cancel();this._expanded=false;this._draw();});
     }
-    nav('Refresh',()=>{this._browser=null;this._cache.clear();this._artwork.clear();this._loading=false;if(this._folder)this._navigate(this._folder,true);else this._loadHome();});
+    nav('Refresh',()=>{
+      this._browser=null;
+      if(dashboardConnectionStatus(this._hass)==='online'){this._cache.clear();this._artwork.clear();}
+      this._loading=false;
+      if(this._history.length)this._navigate(this._history.at(-1),true);else this._loadHome();
+    });
     if(this.preview){const heading=document.createElement('h3');heading.textContent=this._t('Plex library');this._body.append(heading);this._syncStatus();return;}
-    if(this._loading&&!this._home){const loading=document.createElement('p');loading.textContent=this._t('Loading library…');loading.setAttribute('role','status');this._body.append(loading);}
+    if(this._loading&&(!this._home||this._history.length)){const loading=document.createElement('p');loading.textContent=this._t('Loading library…');loading.setAttribute('role','status');this._body.append(loading);}
     else if(this._folder)this._section(this._folder.title,this._folder.children||[],null,this._folder.media_content_id,this._contentError);
     else if(this._home){
       this._section(this._t('Continue Watching'),this._home.resume,this._home.resume===null?'Continue Watching is not available for this library.':'Nothing to continue.','continue',this._home.failures?.resume);

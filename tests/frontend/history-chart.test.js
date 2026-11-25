@@ -124,6 +124,23 @@ test('unavailable sources clear stale readouts and plots, hide summaries and dis
   f.renderer.update({unavailable:false,error:''});assert.equal(f.registry.size,1);f.renderer.destroy();
 });
 
+test('unread offline days stay blank after resize while neighboring power readings keep their original dates', () => {
+  const saved = Date.parse('2026-11-24T22:45:00Z');
+  const missing = Date.parse('2026-11-25T00:00:00Z');
+  const range = {start: saved - 3600000, end: missing + 86400000};
+  const f = fixture({power: true, windows: false, range, extendLastState: false,
+    samples: [{time: saved, value: 52}, {time: missing, value: null}], offlineCoverage: 'Part of this period is unavailable offline.'});
+  assert.deepEqual(Array.from(f.instances[0].data.datasets[0].data, p => [p.x, p.y]), [[saved, 52], [missing, null]]);
+  assert.equal(f.findClass('history-reading').children[1].dateTime, '2026-11-24T22:45:00.000Z');
+  assert.ok(f.elements('p').some(p => !p.hidden && p.textContent === 'Part of this period is unavailable offline.'));
+  f.renderer.update({samples: [{time: missing, value: null}], offlineCoverage: 'This period is unavailable offline.'});
+  f.observers[0].callback();
+  assert.equal(f.registry.size, 0);
+  assert.ok(f.elements('p').some(p => !p.hidden && p.attributes.role === 'status' && p.textContent === 'This period is unavailable offline.'));
+  assert.equal(f.elements('button').find(b => b.textContent === 'Retry').hidden, true);
+  f.renderer.destroy();
+});
+
 test('Portuguese controls and HA timestamps remain DOM text; energy range hides independent windows and never adds climate units',()=>{
   const end=Date.parse('2026-10-18T12:00:00Z');const f=fixture({hass:{locale:{language:'pt'},config:{time_zone:'Asia/Kolkata'}},localize:key=>key,windows:false,range:{start:end-86400000,end},stateClass:'total',format:value=>value.toFixed(1)});
   assert.equal(f.elements('button').some(button=>button.textContent==='Leitura anterior'),true);assert.equal(f.findClass('history-actions').hidden,true);

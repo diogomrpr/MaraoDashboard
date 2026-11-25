@@ -1,3 +1,4 @@
+import { isDashboardOfflineError } from './MaraoConnection.js';
 // Activity is recorded evidence. Keep dates that are measurements in the card.
 export const activationDomains = new Set(['button','input_button','scene']);
 export function activityTimestamp(entity, state) {
@@ -57,16 +58,33 @@ export function normalizeActivity(history, logbook, {start,end,sources,units={}}
 export function filterActivity(records, filter={}) {return records.filter(row=>(!filter.kind||row.kind===filter.kind)&&(!filter.source||row.source===filter.source)&&(!filter.origin||row.origin===filter.origin)&&(!filter.initiator||row.initiator===filter.initiator));}
 export async function loadActivity(hass, sources, range, current=()=>true) {
   const records=new Map(),errors=[];
+  let readCount = 0;
+  const units = Object.fromEntries(sources.map(id => [id, hass.states?.[id]?.attributes?.unit_of_measurement]));
   for(let start=range.start;start<range.end;) {
     const day=dateKey(start,hass.config?.time_zone||'UTC'),end=Math.min(range.end,dayStart(shiftDate(day,1),hass.config?.time_zone||'UTC'));
     for(let i=0;i<sources.length;i+=8) {
       if(!current())return null;
       const group=sources.slice(i,i+8).join(','),from=new Date(start).toISOString(),to=new Date(end).toISOString();
       for(const [kind,path] of [['history',`history/period/${from}?filter_entity_id=${encodeURIComponent(group)}&end_time=${to}`],['logbook',`logbook/${from}?entity=${encodeURIComponent(group)}&end_time=${to}`]]) {
-        try {const rows=await hass.callApi('GET',path);if(!current())return null;if(!Array.isArray(rows))throw new Error('shape');for(const row of normalizeActivity(kind==='history'?rows:[],kind==='logbook'?rows:[],{...range,sources,units:Object.fromEntries(sources.map(id=>[id,hass.states?.[id]?.attributes?.unit_of_measurement]))})){const previous=records.get(row.id);records.set(row.id,{...previous,...row,before:row.before??previous?.before,unit:row.unit||previous?.unit||''});}}catch(error) {if(!current())return null;errors.push({kind,reason:[401,403].includes(error?.status_code||error?.status)?'permission':'failed',sources:sources.slice(i,i+8),start,end});}
+        try {
+          const rows = await hass.callApi('GET',path);
+          if (!current()) return null;
+          if (!Array.isArray(rows)) throw new Error('shape');
+          const activity = normalizeActivity(kind === 'history' ? rows : [], kind === 'logbook' ? rows : [], {...range,sources,units});
+          for (const row of activity) {
+            const previous = records.get(row.id);
+            records.set(row.id, {...previous,...row,before:row.before ?? previous?.before,unit:row.unit || previous?.unit || ''});
+          }
+          readCount++;
+        } catch (error) {
+          const reason = await isDashboardOfflineError(error) ? 'offline'
+            : [401,403].includes(error?.status_code || error?.status) ? 'permission' : 'failed';
+          if (!current()) return null;
+          errors.push({kind,reason,sources:sources.slice(i,i+8),start,end});
+        }
       }
     }
     start=end;
   }
-  return {records:[...records.values()].sort((a,b)=>b.time-a.time||a.id.localeCompare(b.id)),errors};
+  return {records:[...records.values()].sort((a,b)=>b.time-a.time||a.id.localeCompare(b.id)),errors,readCount};
 }

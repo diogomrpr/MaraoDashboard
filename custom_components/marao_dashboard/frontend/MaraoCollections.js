@@ -1,3 +1,4 @@
+import { dashboardConnectionStatus } from './MaraoConnection.js';
 import { languageCode } from './MaraoLocale.js';
 // Shared configuration rules for native editors, conversion and runtime cards.
 export const memberId = member => typeof member === 'string' ? member : member?.entity_id;
@@ -46,7 +47,7 @@ export function summaryAction(group,ids,on,hass,isAccess) {
   for(const id of [...new Set(ids)]) {
     const state=hass?.states?.[id], attributes=state?.attributes || {}, features=Number(attributes.supported_features)||0;
     let service,data={};
-    if (!hass?.states || hass.connected===false || hass.connection?.connected===false || !state || ['unknown','unavailable'].includes(state.state)) {skipped.push([id,'Unavailable']);continue;}
+    if (!hass?.states || dashboardConnectionStatus(hass)!=='online' || !state || ['unknown','unavailable'].includes(state.state)) {skipped.push([id,'Unavailable']);continue;}
     if(group.entity_type==='light') service=on?'light.turn_on':'light.turn_off';
     if(group.entity_type==='cover') {
       const config=group.members?.find(member=>memberId(member)===id);

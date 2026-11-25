@@ -9,10 +9,11 @@ const [{floorPlanErrors, imageBounds, floorPosition}, {floorText}, {lightColorAp
 ]);
 export function floorLightState(light, hass) {
   const state = hass?.states?.[light.entity_id];
-  const ready = actions.serviceConnectionReady(hass) && ['on','off'].includes(state?.state);
-  const color = ready ? lightColorAppearance(state)?.background : null;
+  const available = hass?.connected !== false && hass?.connection?.connected !== false && ['on','off'].includes(state?.state);
+  const ready = available && actions.serviceConnectionReady(hass);
+  const color = available ? lightColorAppearance(state)?.background : null;
   const brightness = state?.attributes?.brightness;
-  return {ready, on:ready && state.state==='on', label:!ready?'Unavailable':state.state==='on'?'On':'Off', color,
+  return {ready, on:available && state.state==='on', label:!available?'Unavailable':state.state==='on'?'On':'Off', color,
     intensity:typeof brightness==='number' && Number.isFinite(brightness) && brightness>=0 && brightness<=255 ? .25+.75*brightness/255 : 1};
 }
 export class MaraoFloorPlanCard extends (globalThis.HTMLElement || class {}) {
@@ -26,6 +27,8 @@ export class MaraoFloorPlanCard extends (globalThis.HTMLElement || class {}) {
   set preview(value) { this._preview=Boolean(value); this._render(); }
   getCardSize() { return this._config?.full_page ? 12 : 6; }
   connectedCallback() {
+    this._stopConnection?.();
+    this._stopConnection=actions.observeDashboardConnection(()=>this._hass,()=>this._render());
     this._stopNativeEditing?.();this._stopNativeEditing=actions.bindNativeEditing(this,()=>this._render());
     this._press ||= bindPressFeedback(this.shadowRoot);
     this._actionLive=true;
@@ -34,7 +37,7 @@ export class MaraoFloorPlanCard extends (globalThis.HTMLElement || class {}) {
     this._viewport=()=>this._layout(); window.addEventListener('resize',this._viewport);
     window.visualViewport?.addEventListener('resize',this._viewport); this._layout();
   }
-  disconnectedCallback() { this._stopNativeEditing?.();this._stopNativeEditing=null;this._press?.destroy();this._press=null;this._actionLive=false; this._resize?.disconnect(); window.removeEventListener('resize',this._viewport); window.visualViewport?.removeEventListener('resize',this._viewport); }
+  disconnectedCallback() { this._stopConnection?.(); this._stopNativeEditing?.();this._stopNativeEditing=null;this._press?.destroy();this._press=null;this._actionLive=false; this._resize?.disconnect(); window.removeEventListener('resize',this._viewport); window.visualViewport?.removeEventListener('resize',this._viewport); }
   _t(label) { return floorText(this._hass,label); }
   _mount() {
     this._press?.destroy();this._press=null;

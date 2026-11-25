@@ -1,8 +1,10 @@
 import { languageCode } from './MaraoLocale.js';
+import { dashboardConnectionStatus } from './MaraoConnection.js';
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const entity = (value, domain) => typeof value === 'string' && new RegExp(`^${domain}\\.[a-z0-9_]+$`).test(value);
 export const PLEX_PLAY_MEDIA = 512;
 export const PLEX_LAUNCH_TIMEOUT = 30000;
+export const PLEX_OFFLINE_FOLDER = 'This folder is unavailable offline.';
 export const rivuletPlayback = mapping => mapping?.playback_app === 'rivulet';
 
 export const PLEX_PT = {
@@ -11,6 +13,7 @@ export const PLEX_PT = {
   'Movies':'Filmes', 'TV Series':'Séries de TV', 'Previous':'Anterior', 'Next':'Seguinte',
   'Recently Added': 'Adicionados recentemente', 'Apple TV': 'Apple TV', 'Back': 'Voltar', 'Refresh': 'Atualizar',
   'Retry': 'Tentar novamente', 'Load more': 'Carregar mais', 'Loading library…': 'A carregar biblioteca…',
+  [PLEX_OFFLINE_FOLDER]: 'Esta pasta está indisponível sem ligação.',
   'Nothing to continue.': 'Nada para continuar a ver.', 'This folder is empty.': 'Esta pasta está vazia.',
   'Continue Watching is not available for this library.': 'Continuar a ver não está disponível nesta biblioteca.',
   'Starting Plex…': 'A iniciar o Plex…', 'Playback requested.': 'Reprodução pedida.',
@@ -200,7 +203,7 @@ export async function plexHome(mapping, read) {
   return {resume,error,failures,movies:unique(movies),shows:unique(shows),recent:unique(recent),libraries};
 }
 
-const connected = hass => hass?.connected !== false && hass?.connection?.connected !== false && typeof hass?.callService === 'function';
+const connected = hass => dashboardConnectionStatus(hass) === 'online' && typeof hass?.callService === 'function';
 const ready = (hass, id) => Boolean(hass?.states?.[id]) && !['unknown','unavailable'].includes(hass.states[id].state);
 const supports = (hass, id, bit) => ready(hass,id) && (Number(hass.states[id].attributes?.supported_features) & bit) !== 0;
 const appOpen = (hass, target) => [hass.states[target.entity_id]?.attributes?.source, hass.states[target.entity_id]?.attributes?.app_name, hass.states[target.entity_id]?.attributes?.app_id].includes(target.plex.app_source);
