@@ -2538,7 +2538,7 @@ test('activating an Activity icon opens one read-only detail and never starts it
  card.shadowRoot.querySelectorAll=selector=>binding&&selector==='[data-activity-open]'?[button]:[];
  card._detailPopup=()=>({openHistory:(owner,opener,kind)=>opened.push({owner,opener,kind})});
  card.setConfig({template:'md_access_slide_action_card',entity:'button.gate',variables:{activity_entities:['binary_sensor.contact']}});
- binding=true;card.hass={connected:true,callService:(...args)=>calls.push(args),states:{'button.gate':{state:'2026-11-04T12:00:00Z',attributes:{}}}};
+ binding=true;card.hass={connected:true,callApi:async()=>[],callService:(...args)=>calls.push(args),states:{'button.gate':{state:'2026-11-04T12:00:00Z',attributes:{}}}};
  card._setMarkup=()=>false;card._render();
  const event=new Event('click',{cancelable:true});event.stopPropagation=()=>{stopped++;};button.dispatchEvent(event);assert.equal(opened.length,1);assert.equal(opened[0].kind,'activity');assert.equal(opened[0].opener,button);assert.equal(stopped,1);assert.equal(event.defaultPrevented,true);assert.deepEqual(calls,[]);
  card._preview=true;button.dispatchEvent(new Event('click'));assert.equal(opened.length,1);assert.deepEqual(calls,[]);

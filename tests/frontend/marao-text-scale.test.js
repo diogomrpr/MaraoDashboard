@@ -141,7 +141,7 @@ test("loads the bundled Montserrat stylesheet without a runtime font CDN", async
   assert.doesNotMatch(source,/fonts\.googleapis\.com|fonts\.gstatic\.com/);
   const font=await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoFonts.css',import.meta.url),'utf8');
   assert.match(font,/font-weight:\s*100 900/);
-  assert.match(font,/\.\/fonts\/Montserrat\.ttf/);
+  assert.match(font,/\.\/fonts\/Montserrat\.woff2/);
   assert.match(source, /data-marao-font/);
 });
 

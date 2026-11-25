@@ -166,7 +166,7 @@ def test_new_logos_and_activity_sources_remain_additive(logo):
 def test_additive_room_and_activity_catalog_fields_match_native_metadata():
     from custom_components.marao_dashboard.editor import EDITOR_CATALOG
     native = json.loads((Path(__file__).parents[3] / "custom_components/marao_dashboard/frontend/marao-catalog.json").read_text())
-    assert len(native["cards"]) == 38
+    assert len(native["cards"]) == 39
     cards = {card["id"]: card for card in native["cards"]}
     for card in EDITOR_CATALOG["cards"]:
         for field in card["variables"]:
