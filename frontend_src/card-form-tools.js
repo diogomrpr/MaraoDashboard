@@ -232,7 +232,7 @@ export const cardFormMethods = {
   _variableSchema(field, sourceId) {
     let selector = { text: {} };
     if(field.kind==='app_logo')selector={select:{mode:'dropdown',options:mediaAppLogoChoices(value=>this._l(value))}};
-    if (field.kind === "select") selector = { select: { mode: 'dropdown', options: field.options.map(value => ({ value, label: this._l(({ auto: 'Automatic', popup: 'Popup', inline: 'On dashboard', slide: 'Slide to open', close: 'Close or lock', hold: 'Security hold', dropdown: 'Dropdown', grid: 'Grid' })[value] || value) })) } };
+    if (field.kind === "select") selector = { select: { mode: 'dropdown', options: field.options.map(value => ({ value, label: this._l(({ auto: 'Automatic', low: 'Low', high: 'High', popup: 'Popup', inline: 'On dashboard', slide: 'Slide to open', close: 'Close or lock', hold: 'Security hold', dropdown: 'Dropdown', grid: 'Grid' })[value] || value) })) } };
     if (field.kind === "boolean") selector = { boolean: {} };
     if (field.kind === "entity") selector = { entity: { domain: field.domains || [], multiple: Boolean(field.multiple) } };
     if (field.kind === "energy_period") selector = { select: { mode: 'dropdown', options: [{ value: 'day', label: this._l('Day') }, { value: 'month', label: this._l('Month') }] } };

@@ -12,6 +12,32 @@ TEMPLATES = {role: [] for role in ("md_title_card", "md_room_card", "md_navigati
 TEMPLATES.update({"md_weather_card": ["weather"], "md_light_card": ["light"]})
 
 
+def test_camera_quality_options_preserve_configuration_and_validate_low_sources():
+    templates = {"md_camera_card": ["camera"]}
+    card = {
+        "template": "md_camera_card",
+        "entity_id": "camera.entry",
+        "variables": {
+            "stream_quality": "low",
+            "frigate_low_stream": "entry_low",
+            "popup_stream_entity": "camera.detail",
+            "future": {},
+        },
+    }
+    source = {"config_version": 2, "name": "Safe", "landing_page": "home",
+              "pages": [{"name": "Home", "path": "home", "entities": [card]}]}
+    before = deepcopy(source)
+    validate_pages(source, templates)
+    assert source == before
+    card["variables"]["low_stream_entity"] = "camera.low"
+    with pytest.raises(ValueError, match="Choose one low-quality source"):
+        validate_pages(source, templates)
+    del card["variables"]["low_stream_entity"]
+    card["variables"]["frigate_low_stream"] = "https://example.invalid/live"
+    with pytest.raises(ValueError, match="Enter a Frigate stream name"):
+        validate_pages(source, templates)
+
+
 def test_page_model_preserves_all_scopes_and_explicit_empty_or_absent_content():
     before = deepcopy(SOURCE)
     assert validate_pages(SOURCE, TEMPLATES) == {"home", "office", "empty", "absent"}

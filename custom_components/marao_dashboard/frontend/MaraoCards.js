@@ -1,5 +1,5 @@
-const [rendering, navigationModule, pressModule] = await Promise.all([
-  'MaraoCardRendering.js', 'MaraoNavigation.js', 'MaraoPressFeedback.js',
+const [rendering, navigationModule, pressModule, cameraOptions] = await Promise.all([
+  'MaraoCardRendering.js', 'MaraoNavigation.js', 'MaraoPressFeedback.js', 'MaraoCameraOptions.js',
 ].map(file => import(new URL(`./${file}${new URL(import.meta.url).search}`, import.meta.url))));
 const {
   popupContentError,
@@ -23,6 +23,7 @@ const {
 export {mediaAppBrand, formatLocale, nativeEditing, bindNativeEditing, lightColorCapabilities,
   createHistoryPlaceholder, historySamples};
 const {bindPressFeedback, pressStyles, pressTarget} = pressModule;
+const {cameraOptionsError, cameraPlaybackKey, cameraPoster} = cameraOptions;
 const { MaraoNavbarCard, safeArea, navbarBottomGap, navbarRouteCurrent, navbarPartition, haptic, navigate, fullscreenUsers, findElements, focusRestorer, focusableElements, deepActiveElement, FOCUSABLE, beginFrontendInteraction } = navigationModule;
 export { MaraoNavbarCard, safeArea, navbarRouteCurrent, navbarPartition, haptic, focusRestorer };
 let historyChartModule;
@@ -1390,6 +1391,12 @@ export class MaraoCard extends BaseElement {
     if (["md_security_card", "md_alarm_controls_card"].includes(config.template) && Object.hasOwn(config.variables || {}, "alarm_layout") && !["dropdown", "grid"].includes(config.variables.alarm_layout)) throw new Error(localize("alarm.invalid_layout", this._hass, {}, "Alarm layout must be dropdown or grid."));
     if (config.template === 'md_light_card' && Object.hasOwn(config.variables || {}, 'use_light_color') && typeof config.variables.use_light_color !== 'boolean') throw new Error(localize('light.invalid_color_background', this._hass, {}, 'Use light color as background must be a boolean.'));
     if (config.template === 'md_camera_card' && Object.hasOwn(config.variables || {}, 'preload_stream') && typeof config.variables.preload_stream !== 'boolean') throw new Error(localize('camera.invalid_preload', this._hass, {}, 'Preload stream must be a boolean.'));
+    if (config.template === 'md_camera_card') {
+      const error = cameraOptionsError(config.variables, languageCode(this._hass));
+      if (error) throw new Error(error);
+      if (cameraPlaybackKey(this._config?.entity, this._config?.variables) !== cameraPlaybackKey(config.entity, config.variables)
+        || this._config?.tap_action?.action !== config.tap_action?.action) this._disposeCamera();
+    }
     this._stateEntities = [...new Set(referencedEntities(config))];
     this._stateReferences = null;
     const previousGraph = this._graphEntity();
@@ -1527,7 +1534,8 @@ export class MaraoCard extends BaseElement {
     const slot = this._cameraSlot = document.createElement('div');
     slot.className = 'camera-live'; slot.style.cssText = 'position:relative;z-index:2;min-width:0;margin:0;pointer-events:none';
     const available = state.state && !['unknown', 'unavailable', 'off'].includes(state.state) && this._hass?.connected !== false && this._hass?.connection?.connected !== false;
-    const poster = available ? state.attributes?.entity_picture : '';
+    const detail = this._config.tap_action?.action === 'fullscreen';
+    const poster = available ? cameraPoster(state, entity, !detail) : '';
     slot.innerHTML = `<div style="position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#000">${poster ? `<img src="${esc(poster)}" alt="${esc(label)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">` : ''}<div role="status" style="position:absolute;inset:auto 0 0;box-sizing:border-box;max-height:100%;overflow:auto;padding:8px;overflow-wrap:anywhere;background:var(--ha-card-background);color:var(--primary-text-color);pointer-events:auto">${esc(available ? localize('camera.loading', this._hass, {}, 'Starting live video…') : localize(!this._hass?.states ? 'common.loading' : state.state === 'unknown' ? 'common.unknown' : 'common.unavailable', this._hass))}</div></div>`;
     surface.append(slot);
     import(new URL(`./MaraoCamera.js${new URL(import.meta.url).search}`, import.meta.url).href).then(async ({ CameraPlayback }) => {
@@ -1546,7 +1554,7 @@ export class MaraoCard extends BaseElement {
         localize: key => localize(key, this._hass, {}, fallback[key] || (key === 'common.retry' ? 'Retry' : key)), haptic,
         problem: reason => { if (this._cameraError !== reason) { this._cameraError = reason; this._render(); } },
       };
-      this._camera = preload?.claimCameraPreload(this, slot, callbacks) || new CameraPlayback(this, slot, callbacks);
+      this._camera = preload?.claimCameraPreload(this, slot, callbacks) || new CameraPlayback(this, slot, { ...callbacks, detail, options: this._config.variables });
       this._cameraLoading = false;
       this._camera.update(this._hass, entity, this._label(entity, this._config, stateOf(this._hass, entity)));
     }).catch(() => {

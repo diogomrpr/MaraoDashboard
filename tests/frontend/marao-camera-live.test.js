@@ -467,7 +467,7 @@ test('startup and Retry honor the configured camera exactly, without registry di
   globalThis.document={createElement:tag=>({localName:tag,setAttribute(){},remove(){}})};
   globalThis.customElements={get:()=>true};
   globalThis.MutationObserver=class {observe(){} disconnect(){}};
-  const playback=Object.assign(Object.create(CameraPlayback.prototype),{entity:'camera.high',hass,generation:0,
+  const playback=Object.assign(Object.create(CameraPlayback.prototype),{entity:'camera.high',hass,generation:0,poster:{},
     stage:{prepend:player=>players.push(player),addEventListener(){},removeEventListener(){}},eligible:()=>true,
     problem(){},describe(){},bind(){},fail:reason=>assert.fail(reason)});
   try {
@@ -476,7 +476,7 @@ test('startup and Retry honor the configured camera exactly, without registry di
     assert.deepEqual(calls,[],'No extra discovery or speed test before native startup');
     await playback.nativeHass.callWS({type:'camera/capabilities',entity_id:'camera.high'});
     assert.deepEqual(calls,[{type:'camera/capabilities',entity_id:'camera.high'}]);
-    playback.stop();playback.resetStream();await playback.start();
+    playback.stop();await playback.start();
     assert.equal(playback.streamEntity,'camera.high');assert.equal(players.length,2);
   } finally {playback.stop();Object.assign(globalThis,previous);}
 });
