@@ -1,8 +1,10 @@
-// Prefer working HA-native playback; use authorized provider live fallback only after failure.
+const { cameraOptions, cameraPoster, validFrigateStream } = await import(new URL(`./MaraoCameraOptions.js${new URL(import.meta.url).search}`, import.meta.url));
+
 // Rechecked 2026-10-18: frontend/src/components/{ha-camera-stream,ha-hls-player,
 // ha-web-rtc-player}.ts on home-assistant/frontend (dev); older hass binding retained.
 export const CAMERA_REGISTRATION_MS = 10000;
 export const CAMERA_PLAYBACK_MS = 30000;
+export const CAMERA_ALTERNATIVE_WAIT_MS = 5000;
 const CAMERA_STREAM_FEATURE = 2; // HA CameraEntityFeature.STREAM, also used by its native host.
 let nativeRegistration;
 const ownedPosterInputs = new WeakSet();
@@ -163,32 +165,73 @@ export function cameraMseSupport(scope = globalThis) {
   const codecs = MSE_VIDEO_CODECS.filter(codec => Source?.isTypeSupported?.(`video/mp4; codecs="${codec}"`));
   return Source && scope.WebSocket && codecs.length ? {Source,codecs} : null;
 }
-export async function frigateLiveURL(hass, entity, signal) {
+export async function frigateLiveURL(hass, entity, signal, alternate, proxy = 'mse') {
   const identity = frigateLiveIdentity(hass.states?.[entity]);
-  if (signal.aborted || !identity || !cameraMseSupport() || !hass.fetchWithAuth || !hass.hassUrl) return null;
-  const instance = encodeURIComponent(identity.instance), source = encodeURIComponent(identity.camera);
+  if (signal.aborted || !identity || (alternate !== undefined && !validFrigateStream(alternate))
+    || !cameraMseSupport() || !hass.callWS || !hass.hassUrl) return null;
+  const stream = alternate ?? identity.camera;
+  const instance = encodeURIComponent(identity.instance), source = encodeURIComponent(stream);
   const base = new URL(hass.hassUrl('/'));
-  const response = await hass.fetchWithAuth(`/api/frigate/${instance}/go2rtc/api/streams?src=${source}`, {signal});
-  let path;
-  if (response.status === 404) path = `/api/frigate/${instance}/mse/api/ws`;
-  else {
-    if (!response.ok) throw new Error('failed');
-    const stream = await response.json();
-    // A src-scoped lookup must describe exactly that stream, never pick an
-    // arbitrary entry from a server-wide list (which may include other cameras).
-    if (!Array.isArray(stream?.producers)) return null;
-    path = `/api/frigate/${instance}/go2rtc/ws/api/ws`;
-  }
-  if (signal.aborted) return null;
+  const route = proxy === 'go2rtc' ? 'go2rtc/ws' : 'mse';
+  const path = `/api/frigate/${instance}/${route}/api/ws`;
   const signed = await hass.callWS({type:'auth/sign_path',path:`${path}?src=${source}`,expires:60});
   if (signal.aborted) return null;
   if (typeof signed?.path !== 'string') throw new Error('failed');
   const url = new URL(signed.path,base);
   if (url.origin !== base.origin || url.username || url.password || url.hash || url.pathname !== path
-    || url.searchParams.get('src') !== identity.camera || !url.searchParams.get('authSig')
+    || url.searchParams.get('src') !== stream || !url.searchParams.get('authSig')
     || [...url.searchParams.keys()].sort().join(',') !== 'authSig,src') throw new Error('failed');
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   return url.href;
+}
+
+const startupBySession = new WeakMap();
+const candidateKey = ({ transport, entity, instance, camera, alternate }) => JSON.stringify([transport, entity, instance, camera, alternate]);
+
+export function rememberCameraStartup(hass, candidate, duration, now) {
+  const session = hass?.connection;
+  if (!session || !candidate) return;
+  const known = startupBySession.get(session) || new Map();
+  const key = candidateKey(candidate);
+  known.delete(key);
+  known.set(key, { duration, proxy: candidate.proxy, until: now + (duration === null ? 30000 : 600000) });
+  if (known.size > 64) known.delete(known.keys().next().value);
+  startupBySession.set(session, known);
+}
+
+export function cameraCandidates(hass, owner, options, { detail = false, mse = Boolean(cameraMseSupport()), now = performance.now() } = {}) {
+  if (!cameraAvailable(hass, owner)) return [];
+  const { quality, lowEntity, lowFrigate } = cameraOptions(options);
+  const candidates = [];
+  const add = (entity, low, alternate) => {
+    if (!cameraAvailable(hass, entity)) return;
+    const state = hass.states[entity], identity = frigateLiveIdentity(state);
+    const native = !alternate && cameraSupportsStream(state) && { transport: 'native', entity, low, ...identity };
+    const frigate = mse && identity && { transport: 'frigate', entity, low, ...identity, alternate };
+    candidates.push(...(detail ? [native, frigate] : [frigate, native]).filter(Boolean));
+  };
+  if (quality !== 'high' && !detail) {
+    if (lowFrigate && validFrigateStream(lowFrigate) && lowFrigate !== frigateLiveIdentity(hass.states[owner])?.camera) add(owner, true, lowFrigate);
+    else if (lowEntity && owner !== lowEntity) add(lowEntity, true);
+  }
+  add(owner, false);
+  const known = hass.connection && startupBySession.get(hass.connection);
+  const recentStartup = candidate => {
+    const report = known?.get(candidateKey(candidate));
+    return report?.until > now ? report : undefined;
+  };
+  const rank = candidate => {
+    const recent = recentStartup(candidate);
+    const tier = recent?.duration === null && quality !== 'low' ? 2 : candidate.low ? 0 : 1;
+    return [tier, recent?.duration ?? Infinity];
+  };
+  return candidates.sort((left, right) => {
+    const [leftTier, leftTime] = rank(left), [rightTier, rightTime] = rank(right);
+    return leftTier - rightTier || leftTime - rightTime;
+  }).map(candidate => {
+    const proxy = recentStartup(candidate)?.proxy;
+    return proxy ? { ...candidate, proxy } : candidate;
+  });
 }
 
 // Small protocol adapter, not a second camera card. The shared owner decides
@@ -200,13 +243,14 @@ export class CameraMse {
     this.video = video; this.failed = failed; this.queue = []; this.bytes = 0; this.closed = false;
     this.source = new support.Source();
     this.socket = new WebSocket(url); this.socket.binaryType = 'arraybuffer';
-    this.fail = () => { if (!this.closed) { this.close(); failed(); } };
+    this.fail = () => { if (!this.closed) { this.close(); failed(!this.opened); } };
     this.openSource = () => {
       if (!this.closed && this.socket.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify({type:'mse',value:support.codecs.join(',')}));
     };
     this.source.addEventListener('sourceopen',this.openSource,{once:true});
     this.socket.onopen = () => {
       if (this.closed) return;
+      this.opened = true;
       try {
         video.disableRemotePlayback = true;
         if (globalThis.ManagedMediaSource && this.source instanceof ManagedMediaSource) video.srcObject = this.source;
@@ -261,11 +305,13 @@ export class CameraMse {
 }
 
 export class CameraPlayback {
-  constructor(card, slot, { localize, haptic, problem, eligible }) {
+  constructor(card, slot, { localize, haptic, problem, eligible, options, detail }) {
     this.backgroundEligible = eligible;
+    this.options = options; this.detail = detail;
     this.card = card; this.slot = slot; this.localize = localize; this.haptic = haptic; this.problem = problem;
     this.generation = 0; this.streamRequests = 0; this.visible = !globalThis.IntersectionObserver; this.state = 'idle';
     slot.className = 'camera-live';
+    const initialPoster = slot.querySelector('img');
     slot.innerHTML = `<style>
       .camera-live{position:relative;z-index:2;min-width:0;margin:0;pointer-events:none}
       .camera-stage{position:relative;box-sizing:border-box;width:100%;max-width:none;aspect-ratio:16/9;overflow:hidden;background:#000;color:#fff;border:0;padding:0;margin:0;outline:none}
@@ -278,6 +324,14 @@ export class CameraPlayback {
       .camera-feedback span{flex:1 1 9em;min-width:0}.camera-feedback button{position:relative;z-index:3;box-sizing:border-box;min-width:48px;min-height:48px;max-width:100%;white-space:normal;overflow-wrap:anywhere;pointer-events:auto}
       </style><dialog open role="presentation" class="camera-stage"><img class="camera-poster" alt="" hidden><div class="camera-feedback" role="status"><span></span></div></dialog>`;
     this.stage = slot.querySelector('.camera-stage'); this.poster = slot.querySelector('.camera-poster'); this.feedback = slot.querySelector('.camera-feedback');
+    if (initialPoster) {
+      initialPoster.className = 'camera-poster';
+      initialPoster.removeAttribute('style');
+      this.picture = initialPoster.getAttribute('src');
+      this.poster.replaceWith(initialPoster);
+      this.poster = initialPoster;
+      this.posterFailed = initialPoster.complete && initialPoster.naturalWidth === 0;
+    }
     this.stage.addEventListener('keydown', event => { if (this.stage.matches(':modal')) event.stopPropagation(); });
     // Retain a touch target if playback removes its recovery button mid-gesture.
     this.feedback.addEventListener('pointerdown', () => { this.feedbackPressed = true; this.feedback.style.minHeight = `${this.feedback.getBoundingClientRect().height}px`; }, true);
@@ -309,11 +363,12 @@ export class CameraPlayback {
     return true;
   }
   update(hass, entity, label) {
-    const identity = JSON.stringify(frigateLiveIdentity(hass?.states?.[entity]));
+    const { lowEntity } = cameraOptions(this.options);
+    const identity = JSON.stringify([entity, lowEntity].map(id => frigateLiveIdentity(hass?.states?.[id])));
     const replaced = this.entity !== entity || this.liveIdentity !== undefined && this.liveIdentity !== identity;
     this.liveIdentity = identity;
     this.hass = hass; this.entity = entity; this.label = label;
-    if (replaced) { this.stop(); this.resetStream(); this.state = 'idle'; this.problem(''); }
+    if (replaced) { this.stop(); this.state = 'idle'; this.problem(''); }
     const eligible = this.eligible();
     if (!eligible) {
       this.stop();
@@ -321,7 +376,7 @@ export class CameraPlayback {
       this.describe(); return;
     }
     this.poster.alt = label || entity;
-    const picture = hass.states[entity].attributes?.entity_picture || '';
+    const picture = cameraPoster(hass.states[entity], entity, !this.detail);
     if (this.picture !== picture) {
       this.picture = picture; this.posterFailed = false;
       const next = document.createElement('img'); next.className = 'camera-poster'; next.alt = label || entity;
@@ -333,33 +388,36 @@ export class CameraPlayback {
     this.streamSupported = supported;
     if (capabilityChanged) { this.stop(); this.state = 'idle'; this.problem(''); }
     this.poster.hidden = this.state === 'live' || this.state === 'buffering' || !picture || this.posterFailed;
-    if (!this.attempt && !['error', 'snapshot', 'blocked'].includes(this.state)) this.resetStream();
+    if (this.attempt && !cameraAvailable(hass, this.streamEntity)) { this.fail('failed'); return; }
     if (this.player && !this.mse) {
       this.updateNativeHass(); this.player.stateObj = hass.states[this.streamEntity];
-      if (!cameraAvailable(hass, this.streamEntity)) { this.fail('failed'); return; }
       if (!clearNativeCameraPoster(this.player)) { this.fail('compatibility'); return; }
     }
     if (!this.attempt && !['error', 'snapshot', 'blocked'].includes(this.state)) this.start();
     this.describe();
   }
-  resetStream() {
-    this.streamEntity = this.entity; this.fallbackTried = false;
+  start() {
+    this.candidates = cameraCandidates(this.hass, this.entity, this.options, { detail: this.detail });
+    this.tileStartedAt = performance.now();
+    const candidate = this.candidates.shift();
+    if (!candidate) { this.fail('unsupported', true); return; }
+    return this.startCandidate(candidate);
   }
-  canUseFrigate() {
-    return !this.fallbackTried && frigateLiveIdentity(this.hass?.states?.[this.streamEntity]) && cameraMseSupport();
-  }
-  async start() {
-    // A still-only entity must not start HA's MJPEG fallback or a native session.
-    if (!this.streamEntity) this.resetStream();
-    if (!cameraSupportsStream(this.hass?.states?.[this.entity])) { this.fail('unsupported', !this.canUseFrigate()); return; }
+  startCandidate(candidate) {
     const generation = ++this.generation;
-    this.lastProgressAt = performance.now();
+    this.candidate = candidate; this.streamEntity = candidate.entity;
+    this.startedAt = this.lastProgressAt = performance.now();
+    this.firstFrameAt = undefined;
+    this.poster.hidden = !this.picture || this.posterFailed;
     this.attempt = true; this.state = 'loading'; this.reason = ''; this.nativeError = ''; this.problem(''); this.describe();
     this.timer = setTimeout(() => {
       if (generation !== this.generation) return;
       this.fail(this.nativeError ? 'failed' : this.video ? 'timeout' : 'compatibility', false, this.nativeError);
-    }, CAMERA_PLAYBACK_MS);
+    }, this.candidates?.length ? CAMERA_ALTERNATIVE_WAIT_MS : CAMERA_PLAYBACK_MS);
     this.monitor = setInterval(() => this.observeProgress(generation), 500);
+    return candidate.transport === 'frigate' ? this.startFrigate(generation) : this.startNative(generation);
+  }
+  async startNative(generation) {
     try {
       await loadNativeCamera();
       if (generation !== this.generation || !this.eligible()) return;
@@ -417,7 +475,7 @@ export class CameraPlayback {
     if (!video) {
       const nativeError = roots.map(root => root.querySelector('ha-alert')?.textContent?.trim()).filter(Boolean).join(' · ');
       if (nativeError) {
-        if (this.canUseFrigate()) { this.fail('failed', false, nativeError); return; }
+        if (this.candidates?.length) { this.fail('failed', false, nativeError); return; }
         this.nativeError = nativeError; this.problem(nativeError); this.describe();
       }
       // Snapshot-only entities never start a host; its image fallback means streaming failed.
@@ -430,13 +488,18 @@ export class CameraPlayback {
       timeupdate: () => this.progress(generation), playing: () => this.progress(generation),
       waiting: () => this.waiting(), stalled: () => this.waiting(), pause: () => this.waiting(),
       error: () => {
-        if (this.mse || this.canUseFrigate()) { this.fail('failed'); return; }
+        if (this.mse || this.candidates?.length) { this.fail('failed'); return; }
         this.nativeError = video.error?.message || this.message('failed');
         this.problem(this.nativeError); this.waiting(); this.describe();
       },
       canplay: () => this.autoplay(generation), loadeddata: () => this.autoplay(generation),
     };
     for (const [type, handler] of Object.entries(this.mediaHandlers)) video.addEventListener(type, handler);
+    this.frameRequest = video.requestVideoFrameCallback?.(now => {
+      if (generation !== this.generation || video !== this.video) return;
+      this.firstFrameAt ??= now;
+      this.progress(generation);
+    });
     if (video.readyState >= 2) this.autoplay(generation);
   }
   autoplay(generation) {
@@ -455,7 +518,13 @@ export class CameraPlayback {
     const video = this.video;
     if (generation !== this.generation || !video || video.paused || video.readyState < 2) return;
     const frames = decodedFrames(video);
-    if (video.currentTime > this.lastTime && (frames === undefined || frames > this.lastFrames)) {
+    if (video.currentTime > this.lastTime && (frames === undefined || this.lastFrames === undefined || frames > this.lastFrames)) {
+      if (!this.advanced && this.candidate) {
+        const now = performance.now();
+        const firstFrame = this.firstFrameAt ?? now;
+        rememberCameraStartup(this.hass, this.candidate, firstFrame - this.startedAt, now);
+        this.slot.dataset.cameraFirstFrameMs = String(Math.round(firstFrame - this.tileStartedAt));
+      }
       this.lastFrames = frames;
       this.advanced = true; this.state = 'live'; this.lastProgressAt = performance.now(); this.reason = ''; this.nativeError = ''; clearTimeout(this.timer); this.poster.hidden = true; this.problem(''); this.describe();
     }
@@ -474,28 +543,40 @@ export class CameraPlayback {
     const generation = this.generation;
     this.timer = setTimeout(() => { if (generation === this.generation) this.fail('timeout', false, this.nativeError); }, CAMERA_PLAYBACK_MS);
   }
-  async startFrigate() {
-    const generation = ++this.generation;
-    this.attempt = true; this.state = 'loading'; this.reason = ''; this.nativeError = ''; this.problem(''); this.describe();
+  async startFrigate(generation) {
     this.discovery = new AbortController();
-    this.timer = setTimeout(() => { if (generation === this.generation) this.fail('timeout'); }, CAMERA_PLAYBACK_MS);
+    const video = document.createElement('video');
+    video.muted = true; video.defaultMuted = true; video.autoplay = true; video.playsInline = true; video.controls = false;
+    video.setAttribute('muted',''); video.setAttribute('autoplay',''); video.setAttribute('playsinline','');
+    await this.openFrigate(generation, video, this.candidate.proxy || 'mse');
+  }
+  async openFrigate(generation, video, proxy) {
     try {
-      const url = await frigateLiveURL(this.hass,this.streamEntity,this.discovery.signal);
+      const url = await frigateLiveURL(this.hass, this.streamEntity, this.discovery.signal, this.candidate.alternate, proxy);
       if (generation !== this.generation || !this.eligible()) return;
       if (!url) { this.fail('failed'); return; }
-      const video = document.createElement('video');
-      video.muted = true; video.defaultMuted = true; video.autoplay = true; video.playsInline = true; video.controls = false;
-      video.setAttribute('muted',''); video.setAttribute('autoplay',''); video.setAttribute('playsinline','');
-      this.player = video;
-      this.mse = new CameraMse(video,url,() => { if (generation === this.generation) this.fail('failed'); });
-      this.stage.prepend(video); this.mediaObserver = new MutationObserver(() => this.bind(generation));
-      this.lastProgressAt = performance.now(); this.monitor = setInterval(() => this.observeProgress(generation),500); this.bind(generation);
+      this.candidate.proxy = proxy;
+      this.mse = new CameraMse(video, url, refused => {
+        if (generation !== this.generation) return;
+        if (refused && proxy === 'mse') this.openFrigate(generation, video, 'go2rtc');
+        else this.fail('failed');
+      });
+      if (!this.player) {
+        this.player = video;
+        this.stage.prepend(video); this.mediaObserver = new MutationObserver(() => this.bind(generation));
+        this.bind(generation);
+      }
     } catch { if (generation === this.generation) this.fail('failed'); }
   }
   fail(reason, snapshot = false, nativeError = "") {
-    const fallback = !snapshot && this.canUseFrigate() && this.eligible?.();
+    if (this.candidate) rememberCameraStartup(this.hass, this.candidate, null, performance.now());
     this.stop();
-    if (fallback) { this.fallbackTried = true; this.startFrigate(); return; }
+    if (!snapshot && this.eligible?.()) {
+      while (this.candidates?.length) {
+        const next = this.candidates.shift();
+        if (cameraAvailable(this.hass, next.entity)) { this.startCandidate(next); return; }
+      }
+    }
     if (snapshot && this.posterFailed) { snapshot = false; reason = 'poster_failed'; }
     this.nativeError = nativeError; this.reason = reason; this.state = snapshot ? 'snapshot' : 'error';
     this.poster.hidden = !this.picture || this.posterFailed;
@@ -522,7 +603,7 @@ export class CameraPlayback {
         this.state = 'loading'; this.reason = ''; this.lastProgressAt = performance.now(); this.problem(''); this.describe();
         this.timer = setTimeout(() => { if (generation === this.generation) this.fail('timeout', false, this.nativeError); }, CAMERA_PLAYBACK_MS);
         try { this.video.play()?.catch(error => this.playRejected(error, generation)); } catch (error) { this.playRejected(error, generation); }
-      } else if (this.state === 'error') { this.stop(); this.resetStream(); this.picture = ''; this.posterFailed = false; this.state = 'idle'; this.update(this.hass, this.entity, this.label); }
+      } else if (this.state === 'error') { this.stop(); this.picture = ''; this.posterFailed = false; this.state = 'idle'; this.update(this.hass, this.entity, this.label); }
     }); }
     button.textContent = action === 'start' ? this.message('start') : this.localize('common.retry');
     button.setAttribute('aria-label', `${button.textContent} ${this.label || this.entity}`);
@@ -598,6 +679,8 @@ export class CameraPlayback {
   }
 
   unbind() {
+    if (this.frameRequest !== undefined) this.video?.cancelVideoFrameCallback?.(this.frameRequest);
+    this.frameRequest = undefined;
     if (this.video) for (const [type, handler] of Object.entries(this.mediaHandlers || {})) this.video.removeEventListener(type, handler);
     this.video = null; this.mediaHandlers = null;
   }
@@ -610,6 +693,8 @@ export class CameraPlayback {
     this.signaling?.close(); this.signaling = null;
     this.stage?.removeEventListener('context-request', this.contextRequest); this.contextRequest = null; this.contexts?.clear();
     this.player?.remove(); this.player = null; this.attempt = false;
+    this.candidate = null;
+    if (this.slot?.dataset) delete this.slot.dataset.cameraFirstFrameMs;
     if (['loading', 'live', 'buffering', 'blocked'].includes(this.state)) this.state = 'idle';
   }
   dispose() {

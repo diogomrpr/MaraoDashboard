@@ -1,3 +1,4 @@
+import { dashboardConnectionStatus } from './MaraoConnection.js';
 const [{ sliderStyles, sliderMarkup, bindSlider }, { lightColorCapabilities }] = await Promise.all([
   import(new URL(`./MaraoSlider.js${new URL(import.meta.url).search}`, import.meta.url)),
   import(new URL(`./MaraoLightCapabilities.js${new URL(import.meta.url).search}`, import.meta.url)),
@@ -41,7 +42,7 @@ export function createLightColorPicker(host, initialOptions) {
   const state = () => options.hass?.states?.[options.entity];
   const capabilities = () => lightColorCapabilities(state());
   const unavailable = () => !options.hass?.states ? 'loading'
-    : !options.hass.callService || options.hass.connected === false || options.hass.connection?.connected === false ? 'disconnected'
+    : !options.hass.callService || dashboardConnectionStatus(options.hass) !== 'online' ? 'disconnected'
     : !state() || state().state === 'unavailable' ? 'unavailable'
     : state().state === 'unknown' ? 'unknown' : '';
   const initialCapabilities = capabilities();

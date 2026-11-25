@@ -53,3 +53,69 @@ test('weather metrics adapt to available values and round without changing repor
   const rows=forecastRows([{datetime:'2026-11-07T12:00:00Z',temperature:19.6,templow:-2.6,precipitation_probability:61.7}],'daily',{language:'en'},'°C');
   assert.match(rows,/-3 °C–20 °C/);assert.match(rows,/Precipitation 62%/);
 });
+
+test('downloaded forecasts keep their dates across November 24–25, expire, and refresh on reconnect',async t=>{
+  const browser=new EventTarget();
+  let backend='offline';
+  Object.defineProperty(browser,'__dashboardConnection',{get:()=>backend});
+  t.mock.method(Date,'now',()=>Date.parse('2026-11-24T23:30:00Z'));
+  const originalWindow=globalThis.window;
+  globalThis.window=browser;
+  t.after(()=>{globalThis.window=originalWindow;});
+  const view=new MaraoWeatherForecast(), responses={
+    hourly:['2026-11-24T23:00:00Z','2026-11-25T00:00:00Z'],
+    daily:['2026-11-24T00:00:00Z','2026-11-25T00:00:00Z']
+  };
+  let reads=0,failure=null;
+  const hass={connected:true,language:'en-GB',states:{'weather.fixture':{state:'cloudy',last_updated:'2026-11-24T22:50:00Z',attributes:{temperature:12}}},
+    config:{time_zone:'Europe/Lisbon'},connection:{connected:true,subscribeMessage:async(receive,{forecast_type})=>{
+      reads++;
+      if(failure)throw failure;
+      if(responses[forecast_type])receive({forecast:responses[forecast_type].map(datetime=>({datetime,temperature:14}))});
+      return ()=>{};
+    }}};
+  view.shadowRoot={querySelector:()=>null,querySelectorAll:()=>[]};
+  view.setConfig({entity:'weather.fixture',features:3,unit:'°C'});
+  view.hass=hass;
+  view.isConnected=true;
+  t.after(()=>{view.isConnected=false;view.disconnectedCallback();});
+  view.connectedCallback();
+  await new Promise(setImmediate);
+  const rows=()=>view.shadowRoot.innerHTML.match(/<li>/g)?.length||0;
+  assert.equal(rows(),2);
+  assert.match(view.shadowRoot.innerHTML,/<time datetime="2026-11-24T22:50:00.000Z">/);
+  assert.match(view.shadowRoot.innerHTML,/24 Nov.*23:00/);
+  assert.match(view.shadowRoot.innerHTML,/25 Nov.*0:00/);
+  Date.now.mock.mockImplementation(()=>Date.parse('2026-11-25T00:01:00Z'));
+  view.hass=hass;
+  assert.equal(rows(),1);
+  assert.match(view.shadowRoot.innerHTML,/25 Nov.*0:00/);
+  view._type='daily';
+  await view._load();
+  assert.equal(rows(),1);
+  assert.match(view.shadowRoot.innerHTML,/25 Nov/);
+  Date.now.mock.mockImplementation(()=>Date.parse('2026-12-02T23:30:00Z'));
+  view.hass=hass;
+  assert.equal(rows(),0);
+  assert.match(view.shadowRoot.innerHTML,/Forecast unavailable offline/);
+  responses.daily=null;
+  await view._load(); // An acknowledged offline subscription may never receive a forecast event.
+  assert.match(view.shadowRoot.innerHTML,/Forecast unavailable offline/);
+  failure={code:'dashboard_offline',message:'backend failure detail'};
+  await view._load();
+  assert.doesNotMatch(view.shadowRoot.innerHTML,/role="alert"|backend failure detail|>Loading</);
+  const before=reads;
+  view.hass=hass;
+  assert.equal(reads,before);
+  responses.daily=['2026-12-03T00:00:00Z'];
+  failure=null;
+  backend='online';
+  browser.dispatchEvent(new CustomEvent('dashboard-connection-changed',{detail:backend}));
+  await new Promise(setImmediate);
+  assert.equal(rows(),1);
+  assert.equal(reads,before+1);
+  assert.match(view.shadowRoot.innerHTML,/3 Dec/);
+  failure={message:'Forecast provider denied access'};
+  await view._load();
+  assert.match(view.shadowRoot.innerHTML,/role="alert"[^>]*>[^<]*<small>Forecast provider denied access/);
+});

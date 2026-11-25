@@ -7,11 +7,16 @@ const repoRoot = path.resolve(__dirname, "..");
 const frontendRoot = path.join(repoRoot, "custom_components", "marao_dashboard", "frontend");
 const check = process.argv.includes("--check");
 const {buildAuthoring,authoringFiles}=require('./build-authoring.cjs');
+const {nativeCardDataPlugin} = require('./native-card-data-plugin.cjs');
 const entries = {
+  MaraoCardRendering: 'card-rendering.js',
   MaraoSchedules: 'schedules-card.js',
   MaraoNativeModel: 'legacy-model.js',
   MaraoNativeDashboard: 'native-strategy.js',
   MaraoNativeBootstrap: 'native-bootstrap.js',
+  MaraoErrorLabels: 'editor-labels.js',
+  MaraoPopupSync: 'popup-sync.js',
+  MaraoPopupManagement: 'popup-management.js',
   MaraoNativeCards: 'native-cards.js',
   MaraoNativeCardMetadata: 'native-card-metadata.js',
   MaraoNativeCardEditor: 'native-card-editor.js',
@@ -52,7 +57,7 @@ async function build() {
       entryPoints: Object.fromEntries(Object.entries(entries).map(([name, file]) => [name, path.join(repoRoot, 'frontend_src', file)])),
       bundle: true, entryNames: '[name]', assetNames: 'assets/[name]-[hash]', format: 'esm', legalComments: 'eof',
       loader: {'.ttf': 'file'}, minify: true, metafile: true, outdir: outputRoot, platform: 'browser', target: 'es2022',
-      plugins: [{
+      plugins: [nativeCardDataPlugin, {
         name: 'marao-owned-assets',
         setup(build) {
           build.onLoad({filter: /[/\\]marao-owned-assets\.json$/}, () => ({contents: JSON.stringify(ownedAssets), loader: 'json'}));
@@ -71,6 +76,9 @@ async function build() {
       }
       if (!file.endsWith('MaraoHistoryChart.js') && inputs.some(input => /node_modules\/(chart\.js|@kurkle\/color)\//.test(input))) {
         throw new Error('Chart.js must remain in the on-demand numeric detail bundle.');
+      }
+      if (['MaraoNativeBootstrap.js', 'MaraoNativeCards.js'].includes(path.basename(file)) && inputs.some(input => /node_modules\/yaml\//.test(input))) {
+        throw new Error('The YAML parser must stay out of ordinary dashboard startup: ' + path.basename(file));
       }
     }
     fs.copyFileSync(path.join(repoRoot, 'node_modules', 'yaml', 'LICENSE'), path.join(outputRoot, 'YAML.LICENSE.txt'));

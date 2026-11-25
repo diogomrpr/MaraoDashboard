@@ -112,6 +112,7 @@ test('native section actions follow their containing section, refresh targets an
   const source={type:'sections',path:'popup-test',title:'Lights',sections:[{cards:[{type:'tile',entity:'light.a'}]},{cards:[{type:'tile',entity:'light.b'}]}]},root={localName:'hui-root',lovelace:{config:{views:[source]},editMode:false}};
   const section={localName:'hui-section',index:0,viewIndex:0,parentNode:root},button={setAttribute(){}},scope={entities:[],buttons:[{button,on:true,text:{}}]},owner=Object.assign(Object.create(Actions.prototype),{parentNode:section,isConnected:true,shadowRoot:{},_config:{popup_view:'popup-test',scope:'section',entity_type:'light'},_scope:scope,_hass:{callService(){},states:{'light.a':{state:'off',attributes:{}},'light.b':{state:'off',attributes:{}}}}});
   owner._render();assert.deepEqual(scope.entities,['light.a']);assert.equal(button.disabled,false);
+  section.parentNode={localName:'hui-view',parentNode:root};
   section.index=1;owner._render();assert.deepEqual(scope.entities,['light.b']);
   source.sections[1].cards=[];owner._render();assert.deepEqual(scope.entities,[]);assert.equal(button.disabled,true);
   owner._config.scope='all';owner._render();assert.deepEqual(scope.entities,['light.a']);
@@ -119,6 +120,49 @@ test('native section actions follow their containing section, refresh targets an
   root.lovelace.editMode=false;const embedded={type:'sections',sections:[{cards:[{type:'tile',entity:'light.b',visibility:[{condition:'state',entity:'light.b',state:'on'}]}]},{cards:[]}]};
   section.parentNode={parentNode:root,_maraoEmbeddedPopup:{view:embedded,index:1}};section.index=0;section.viewIndex=1;owner._config={popup_scope:'embedded',scope:'all',entity_type:'light'};owner._render();assert.deepEqual(scope.entities,['light.b']);
   owner._config.scope='section';section.index=1;owner._render();assert.deepEqual(scope.entities,[]);assert.equal(button.disabled,true);
+});
+
+test('native section actions resolve an unindexed climate section only inside its linked view', t => {
+  const previous = {customElements: globalThis.customElements, document: globalThis.document};
+  t.after(() => Object.assign(globalThis, previous));
+  let Actions;
+  globalThis.customElements = {get: () => undefined, define: (_name, value) => { Actions = value; }};
+  const element = () => ({dataset: {}, children: [], setAttribute() {},
+    append(...children) { this.children.push(...children); }, replaceChildren(...children) { this.children = children; }});
+  globalThis.document = {createElement: element};
+  registerPopupActions({isAccessCover: () => false});
+
+  const sectionConfig = {type: 'grid', cards: [{type: 'tile', entity: 'climate.test'}]};
+  const climateView = {path: 'clima', type: 'sections', sections: [{cards: []}, sectionConfig]};
+  const root = {localName: 'hui-root', lovelace: {config: {views: [{path: 'home'}, climateView]}}};
+  const home = {localName: 'hui-view', index: 0, parentNode: root};
+  const view = {localName: 'hui-view', index: 1, parentNode: root};
+  const section = {localName: 'hui-section', config: sectionConfig, parentNode: view};
+  const actions = Object.assign(Object.create(Actions.prototype), {
+    parentNode: section, isConnected: true, shadowRoot: element(),
+    _config: {popup_view: 'clima', scope: 'section', entity_type: 'climate'},
+    _hass: {states: {'climate.test': {state: 'off', attributes: {hvac_modes: ['off', 'heat']}}}, callService: assert.fail},
+  });
+
+  actions._render();
+  assert.deepEqual(actions._scope.entities, ['climate.test']);
+  assert.deepEqual(actions._scope.buttons.map(({button}) => button.disabled), [false, false]);
+  // The linked popup on Home has its own hui-view inside the outer view.
+  view.parentNode = home;
+  section.config = structuredClone(sectionConfig);
+  actions._render();
+  assert.equal(actions._scope.id, 'section-1');
+  assert.equal(actions._scope.buttons.length, 2);
+
+  view.index = 0;
+  actions._render();
+  assert.equal(actions._scope, null);
+  assert.match(actions.shadowRoot.children[0].textContent, /must belong/);
+  view.index = 1;
+  climateView.sections.push(structuredClone(sectionConfig));
+  actions._render();
+  assert.equal(actions._scope, null);
+  assert.match(actions.shadowRoot.children[0].textContent, /must belong/);
 });
 
 test('native editor choices accept HA dashboard documents and wrapped runtime contexts',()=>{

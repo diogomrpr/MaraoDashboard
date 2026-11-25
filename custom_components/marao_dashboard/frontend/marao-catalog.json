@@ -580,6 +580,39 @@
       "description": "Automatic camera preview to live video with a generated Frigate, UniFi Protect or Netatmo events popup.",
       "variables": [
         {
+          "key": "stream_quality",
+          "label": "Dashboard video quality",
+          "kind": "select",
+          "selector": "select",
+          "advanced": false,
+          "description": "",
+          "default": "auto",
+          "options": [
+            "auto",
+            "low",
+            "high"
+          ]
+        },
+        {
+          "key": "low_stream_entity",
+          "label": "Low-quality camera entity",
+          "kind": "entity",
+          "selector": "entity",
+          "advanced": false,
+          "description": "Select a second entity for the same camera's low-resolution feed.",
+          "domains": [
+            "camera"
+          ]
+        },
+        {
+          "key": "frigate_low_stream",
+          "label": "Frigate low-quality stream name",
+          "kind": "text",
+          "selector": "text",
+          "advanced": false,
+          "description": "Enter a low-resolution go2rtc stream name on this camera's Frigate instance."
+        },
+        {
           "key": "popup_stream_entity",
           "label": "Popup stream",
           "kind": "entity",

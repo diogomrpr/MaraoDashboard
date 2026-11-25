@@ -39,16 +39,38 @@ async function buildFrontend(destination = path.join(root,'ha-test/.cache/native
   const digest = crypto.createHash('sha256');
   digest.update('package_version\0'+version+'\0');
   digest.update(fs.readFileSync(__filename));
-  for (const file of files) digest.update(file+'\0').update(fs.readFileSync(sourceFile(file)));
+  const mediaHashes = new Map();
+  for (const file of files) {
+    const bytes = fs.readFileSync(sourceFile(file));
+    digest.update(file+'\0').update(bytes);
+    if (/\.(?:svg|png|jpe?g|webp|gif|ttf|woff2?|ico)$/i.test(file)) {
+      mediaHashes.set(file, crypto.createHash('sha256').update(bytes).digest('hex'));
+    }
+  }
   const identity = digest.digest('hex');
   fs.rmSync(destination,{recursive:true,force:true});
   // Any attached release asset makes HACS prefer assets: upload the entire flat graph together.
   const dist = path.join(destination,'dist');
   fs.mkdirSync(dist,{recursive:true});
-  const names = Object.fromEntries(files.map(file=>[file,`${identity}--${file.replaceAll('/','--')}`]));
-  if (new Set(Object.values(names)).size !== files.length) throw new Error('Ambiguous flat asset names.');
+  // Executable dependencies share a release identity. Media can be reused by
+  // any graph that references the exact same file contents.
+  const names = Object.fromEntries(files.map(file=>[file,`${mediaHashes.get(file) || identity}--${file.replaceAll('/','--')}`]));
+  if (new Set(files.map(file=>file.replaceAll('/','--'))).size !== files.length) throw new Error('Ambiguous flat asset names.');
   const resolver = `${identity}--MaraoAssetURL.js`;
-  fs.writeFileSync(path.join(dist,resolver),`const files=${JSON.stringify(names)},root=new globalThis.URL('./',import.meta.url);export function AssetURL(input,base){const url=new globalThis.URL(input,base);if(url.origin===root.origin&&url.pathname.startsWith(root.pathname)){const mapped=files[url.pathname.slice(root.pathname.length)];if(mapped)url.pathname=root.pathname+mapped;}return url;}AssetURL.prototype=globalThis.URL.prototype;Object.setPrototypeOf(AssetURL,globalThis.URL);\n`);
+  const resolverEntries = files.map(file => mediaHashes.has(file) ? [file, mediaHashes.get(file)] : [file]);
+  fs.writeFileSync(path.join(dist,resolver),`const files = new Map(${JSON.stringify(resolverEntries)});
+const root = new globalThis.URL('./', import.meta.url);
+export function AssetURL(input, base) {
+  const url = new globalThis.URL(input, base);
+  if (url.origin === root.origin && url.pathname.startsWith(root.pathname)) {
+    const file = url.pathname.slice(root.pathname.length);
+    if (files.has(file)) url.pathname = root.pathname + (files.get(file) || '${identity}') + '--' + file.replaceAll('/', '--');
+  }
+  return url;
+}
+AssetURL.prototype = globalThis.URL.prototype;
+Object.setPrototypeOf(AssetURL, globalThis.URL);
+`);
   const temporary = fs.mkdtempSync(path.join(require('node:os').tmpdir(),'marao-flat-build-'));
   try {
     const inject = path.join(temporary,'url.js');
@@ -67,10 +89,60 @@ async function buildFrontend(destination = path.join(root,'ha-test/.cache/native
   }
   // Persisted ordinary HA picture cards cannot follow our graph URL resolver.
   // Give owned images/fonts a stable flat address across package identities.
-  for (const file of files.filter(file=>/\.(?:svg|png|jpe?g|webp|gif|ttf|woff2?|ico)$/i.test(file))) {
+  for (const file of mediaHashes.keys()) {
     fs.copyFileSync(path.join(frontend,file),path.join(dist,'MaraoAsset--'+file.replaceAll('/','--')));
   }
-  const loader = `const root=new URL('./',import.meta.url);const manifestURL=new URL('MaraoFrontend.release.json',root);const response=await fetch(manifestURL,{cache:'no-store',credentials:'same-origin'});if(!response.ok)throw new Error('Marao frontend installation is incomplete.');const meta=await response.json();if(meta.compiler_contract!==1||!/^[a-f0-9]{64}$/.test(meta.identity||''))throw new Error('Invalid Marao frontend identity.');window.MaraoInstalledFrontendPackage={identity:meta.identity,package_version:meta.package_version,entryURL:import.meta.url,rootURL:root.href,baseURL:root.href,manifestURL:manifestURL.href};window.MaraoFrontendPackage ||= window.MaraoInstalledFrontendPackage;await import(new URL(meta.identity+'--MaraoNativeDashboard.js',root));await import(new URL(meta.identity+'--MaraoDashboard.js',root));\n`;
+  // Every HACS version installs the same entry name. A cached loader can read
+  // this public record from the current installation, including after rollback.
+  const releaseMarker = '// MaraoFrontend.release ';
+  const preloadFiles = ['MaraoAssetURL.js', 'MaraoNavigation.js', 'MaraoNativeBootstrap.js',
+    'MaraoCards.js', 'MaraoCardRendering.js', 'MaraoNativeCards.js'];
+  const descriptor = {compiler_contract:1, identity, package_version:version,
+    preload:preloadFiles.filter(file => fs.existsSync(path.join(dist,identity+'--'+file)))};
+  const loader = `${releaseMarker}${JSON.stringify(descriptor)}
+const root = new URL('./', import.meta.url);
+const manifestURL = new URL('MaraoFrontend.release.json', root);
+const preloadFiles = ${JSON.stringify(preloadFiles)};
+async function readRelease() {
+  const options = {cache:'no-store', credentials:'same-origin'};
+  const entry = await fetch(new URL('MaraoFrontend.js', root), options);
+  if (!entry.ok) throw new Error('Marao frontend installation is incomplete.');
+  const firstLine = (await entry.text()).split('\\n', 1)[0];
+  const marker = ${JSON.stringify(releaseMarker)};
+  let meta;
+  if (firstLine.startsWith(marker)) {
+    meta = JSON.parse(firstLine.slice(marker.length));
+    if (!Array.isArray(meta.preload)) throw new Error('Invalid Marao release descriptor.');
+  } else {
+    // Older entries have no record. Their full manifest is authoritative.
+    const response = await fetch(manifestURL, options);
+    if (!response.ok) throw new Error('Marao frontend installation is incomplete.');
+    meta = await response.json();
+    meta.preload = preloadFiles.filter(file => Object.hasOwn(meta.files || {}, meta.identity+'--'+file));
+  }
+  if (meta.compiler_contract !== 1 || typeof meta.identity !== 'string' || !/^[a-f0-9]{64}$/.test(meta.identity)) throw new Error('Invalid Marao frontend identity.');
+  return meta;
+}
+// A full network response already delivered this exact entry. Cached, worker
+// and unobservable responses still discover the installed release explicitly.
+const transfer = globalThis.performance?.getEntriesByName?.(import.meta.url, 'resource').at(-1);
+const freshEntry = transfer?.responseStatus === 200 && transfer.transferSize > 300 &&
+  transfer.encodedBodySize > 0 && !transfer.workerStart && !transfer.deliveryType;
+const meta = freshEntry ? ${JSON.stringify(descriptor)} : await readRelease();
+const fileURL = file => new URL(meta.identity + '--' + file, root);
+window.MaraoInstalledFrontendPackage = {identity:meta.identity, package_version:meta.package_version, preload:meta.preload, entryURL:import.meta.url, rootURL:root.href, baseURL:root.href, manifestURL:manifestURL.href, manifestCheckedAt:performance.now(), readRelease};
+window.MaraoFrontendPackage ||= window.MaraoInstalledFrontendPackage;
+if (!window.MaraoDashboardRuntime && globalThis.document?.head) {
+  for (const file of preloadFiles) {
+    if (!meta.preload.includes(file)) continue;
+    const link = document.createElement('link');
+    link.rel = 'modulepreload';
+    link.href = fileURL(file).href;
+    document.head.append(link);
+  }
+}
+await Promise.all(['MaraoNativeDashboard.js', 'MaraoDashboard.js'].map(file => import(fileURL(file))));
+`;
   fs.writeFileSync(path.join(dist,'MaraoFrontend.js'),loader);
   fs.writeFileSync(path.join(dist,'MaraoAuthoring.json'),JSON.stringify({authoring_contract:1,package_version:version,identity,assets:{metadata:names['MaraoAuthoring.metadata.json'],schema:names['MaraoAuthoring.schema.json'],guide:names['MaraoAuthoring.md'],module:names['MaraoAuthoring.js'],cli:names['MaraoAuthoringCLI.mjs']}})+'\n');
   const hashes = Object.fromEntries(fs.readdirSync(dist).sort().map(file=>[file,crypto.createHash('sha256').update(fs.readFileSync(path.join(dist,file))).digest('hex')]));

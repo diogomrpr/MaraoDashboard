@@ -32,6 +32,7 @@ test('activity reads bounded days, reports partial failure and discards late acc
 });
 
 test('timeline dropdowns synchronize selection/reset and dispose replaced or closed controls',async t=>{
+ t.mock.timers.enable({apis:['Date','setTimeout'],now:Date.parse('2026-11-24T23:59:00Z')});
  const previous={document:globalThis.document,window:globalThis.window};t.after(()=>Object.assign(globalThis,previous));
  class Node extends EventTarget {
   constructor(tag='div'){super();this.tag=tag;this.children=[];this.attributes={};this.style={};this.className='';}
@@ -50,9 +51,12 @@ test('timeline dropdowns synchronize selection/reset and dispose replaced or clo
  const {readFile}=await import('node:fs/promises'),{bindDropdown,dropdownStyles}=await import('../../custom_components/marao_dashboard/frontend/MaraoDropdown.js');
  const {dateKey}=await import('../../custom_components/marao_dashboard/frontend/MaraoActivityModel.js');
  const {languageCode,formatLocale}=await import('../../custom_components/marao_dashboard/frontend/MaraoLocale.js');
- const source=(await readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoActivity.js',import.meta.url),'utf8')).replace(/^const \{.*?\}\s*=\s*await import.*\n/gm,'').replace('export function','function');
+ const source=(await readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoActivity.js',import.meta.url),'utf8')).replace(/^const \{.*?\}\s*=\s*await import.*\n/gm,'').replaceAll('export function','function');
+ window.__dashboardConnection='offline';
+ let responseErrors=[], requestedRange;
  let records=[{time:Date.now()-1000,source:'light.a',kind:'state',origin:'user',initiator:'alex',before:'off',after:'on'}],queries=0,haptics=0;
- const create=new Function('activityRange','dateKey','filterActivity','loadActivity','bindDropdown','dropdownStyles','languageCode','formatLocale',source+';return createActivity;')(activityRange,dateKey,filterActivity,async()=>{queries++;return {records,errors:[]};},bindDropdown,dropdownStyles,languageCode,formatLocale);
+ const {observeDashboardConnection}=await import('../../custom_components/marao_dashboard/frontend/MaraoConnection.js');
+ const [create,createDetail]=new Function('observeDashboardConnection','activityRange','dateKey','filterActivity','loadActivity','bindDropdown','dropdownStyles','languageCode','formatLocale',source+';return [createActivity,createActivityDetail];')(observeDashboardConnection,activityRange,dateKey,filterActivity,async(_hass,_sources,range)=>{queries++;requestedRange=range;return {records,errors:responseErrors};},bindDropdown,dropdownStyles,languageCode,formatLocale);
  const host=new Node(),activity=create(host,{hass:{language:'en',config:{time_zone:'UTC'},states:{}},sources:['light.a'],haptic(){haptics++;}}),flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();
  const field=label=>host.querySelectorAll('.marao-activity-field').find(node=>node.children[0].textContent===label),trigger=field=>field.children[1].children[0],menu=field=>field.children[1].children[1],selected=field=>trigger(field).children[0].textContent,choose=(field,label)=>menu(field).children.find(node=>node.children[0].textContent===label).dispatchEvent(new Event('click'));
  const date=field('Date');assert.equal(selected(date),'Today');assert.equal(queries,1);choose(date,'Today');assert.equal(queries,1);
@@ -62,5 +66,72 @@ test('timeline dropdowns synchronize selection/reset and dispose replaced or clo
  choose(field('Origin'),'User');assert.equal(selected(field('Origin')),'User');records=[];choose(date,'Yesterday');await flush();assert.equal(field('Origin'),undefined);assert.equal(selected(date),'Yesterday');
  const reset=host.querySelector('.marao-activity-filters').children.find(node=>node.tag==='button');const before=queries;reset.onclick();await flush();assert.equal(queries,before+1);assert.equal(selected(date),'Today');assert.equal(host.querySelector('.marao-activity-custom-dates').hidden,true);
  const type=field('Event type');trigger(type).dispatchEvent(new Event('click'));host.querySelector('.marao-activity-filter-toggle').onclick();assert.equal(menu(type).hidden,true,'Hiding the panel closes its menus');
+ const beforeMidnight=queries;
+ t.mock.timers.tick(60000);await flush();
+ assert.equal(queries,beforeMidnight+1);
+ assert.equal(new Date(requestedRange.start).toISOString(),'2026-11-25T00:00:00.000Z');
+ const status=host.querySelector('[role=status]');
+ records=[];responseErrors=[{reason:'offline'}];
+ choose(date,'Yesterday');await flush();
+ assert.equal(status.textContent,'This period is unavailable offline.');
+ assert.equal(host.querySelector('.marao-activity-list').getAttribute('aria-busy'),undefined);
+ responseErrors=[];
+ const offlineQueries=queries;
+ window.__dashboardConnection='connecting';
+ window.dispatchEvent(new CustomEvent('dashboard-connection-changed',{detail:'connecting'}));
+ assert.equal(queries,offlineQueries);
+ window.__dashboardConnection='online';
+ window.dispatchEvent(new CustomEvent('dashboard-connection-changed',{detail:'online'}));await flush();
+ assert.equal(queries,offlineQueries+1);
+ assert.equal(selected(date),'Yesterday');
+ assert.equal(status.textContent,'No recorded events for these filters.');
  trigger(date).dispatchEvent(new Event('click'));const pressed=haptics;activity.destroy();assert.equal(menu(date).hidden,true);trigger(date).dispatchEvent(new Event('click'));assert.equal(haptics,pressed);assert.equal(host.children.length,0);
+ const detailHost = new Node(), late = Promise.withResolvers();
+ let active = true, attempts = 0, charts = 0, closed = 0;
+ const chartFeature = {createHistoryChart(){charts++;return {destroy(){closed++;},update(){}};}};
+ const detail = createDetail(detailHost,{hass:{language:'en',config:{time_zone:'UTC'},states:{}},sources:['light.a']},{
+   owner:{_graphEntity:()=>'sensor.test',_historyOptions:()=>({}),_config:{template:'md_sensor_card'}},
+   scroll:new Node(), current:()=>active, label:(_key,fallback)=>fallback, haptic(){},
+   async loadHistoryChart(){attempts++;if(attempts===1)throw Error('unavailable');return attempts===2?chartFeature:late.promise;},
+ });
+ const chart = detailHost.querySelector('header').children.find(button=>button.textContent==='Chart');
+ assert.equal(attempts,0);
+ await chart.onclick(); assert.ok(detailHost.children.some(node=>node.attributes.role==='alert'));
+ await chart.onclick(); assert.equal(charts,1); assert.equal(detailHost.querySelector('.marao-activity').hidden,true);
+ assert.ok(!detailHost.children.some(node=>node.attributes.role==='alert'));
+ await chart.onclick(); assert.equal(closed,1); assert.equal(detailHost.querySelector('.marao-activity').hidden,false);
+ const opening=chart.onclick();active=false;detail.destroy();late.resolve(chartFeature);
+ await opening;assert.equal(charts,1);assert.equal(detailHost.children.length,0);
+
+});
+
+test('activity reads distinguish saved, missing and mixed days with the original dates and recover the requested range', async () => {
+  const entity = 'lock.fixture', zone = 'Europe/Lisbon', captured = '2026-11-24T20:00:00Z';
+  let online = false;
+  const hass = {states:{},config:{time_zone:zone},async callApi(method,path) {
+    assert.equal(method,'GET');
+    const day = path.match(/\d{4}-\d{2}-\d{2}/)[0];
+    if (!online && day !== '2026-11-24') throw new Response('{"code":"dashboard_offline"}',{status:503});
+    if (path.startsWith('history/')) return [];
+    return [{entity_id:entity,when:day+'T20:00:00Z',state:'locked'}];
+  }};
+  const read = range => loadActivity(hass,[entity],range);
+  const fresh = await read(activityRange('today',zone,Date.parse(captured)));
+  assert.deepEqual(fresh.records.map(row=>row.time),[Date.parse(captured)]);
+  assert.deepEqual(fresh.errors,[]);
+  const aged = Date.parse('2026-12-02T22:00:00Z');
+  for (const now of [Date.parse('2026-11-25T00:05:00Z'),aged]) {
+    const missing = await read(activityRange('today',zone,now));
+    assert.equal(missing.readCount,0);
+    assert.deepEqual(missing.errors.map(error=>error.reason),['offline','offline']);
+  }
+  const selection = activityRange('custom',zone,aged,{start:'2026-11-24',end:'2026-11-25'});
+  const mixed = await read(selection);
+  assert.deepEqual(mixed.records.map(row=>row.time),[Date.parse(captured)]);
+  assert.equal(mixed.readCount,2);
+  assert.equal(mixed.errors.length,2);
+  online = true;
+  const restored = await read(selection);
+  assert.equal(restored.records.length,2);
+  assert.deepEqual(restored.errors,[]);
 });

@@ -1,18 +1,8 @@
-const { canonicalCard } = await import(new URL(`./MaraoNames.js${new URL(import.meta.url).search}`, import.meta.url));
+const { preloadCameras } = await import(new URL(`./MaraoCameraPreloadConfig.js${new URL(import.meta.url).search}`, import.meta.url));
+export {preloadCameras};
 const { CameraPlayback } = await import(new URL(`./MaraoCamera.js${new URL(import.meta.url).search}`, import.meta.url));
+const { cameraPlaybackKey } = await import(new URL(`./MaraoCameraOptions.js${new URL(import.meta.url).search}`, import.meta.url));
 const owners = new WeakMap();
-
-export function preloadCameras(config) {
-  const cameras = new Map();
-  const visit = card => {
-    card = canonicalCard(card);
-    if (!card || typeof card !== 'object' || ['custom:marao-popup-card', 'custom:marao-native-popup-card'].includes(card.type) || card.template === 'md_popup_card') return;
-    if ((card.template === 'md_camera_card' || card.type === 'custom:marao-native-camera-card') && card.variables?.preload_stream === true && /^camera\.[a-z0-9_]+$/.test(card.entity)) cameras.set(card.entity, card);
-    for (const child of [...(card.cards || []), ...(card.sections || []), ...(card.card ? [card.card] : [])]) visit(child);
-  };
-  for (const view of config?.views || []) visit(view);
-  return cameras;
-}
 
 function ancestors(node) {
   const result = [];
@@ -40,34 +30,38 @@ export class CameraPreload {
     this.hass = hass; this.callbacks = callbacks;
     const config = this.root.lovelace?.config || this.root.lovelace?.rawConfig;
     if (config !== this.config) { this.config = config; this.configured = preloadCameras(config); }
-    for (const [entity, entry] of this.sessions) if (!this.configured.has(entity)) {
+    for (const [key, entry] of this.sessions) if (!this.configured.has(key)) {
       entry.background = false;
-      if (!entry.lease) this.remove(entity, entry);
+      if (!entry.lease) this.remove(key, entry);
     }
-    if (this.active()) for (const entity of this.configured.keys()) if (!this.sessions.has(entity)) this.create(entity);
-    for (const [entity, entry] of this.sessions) {
-      entry.background = this.configured.has(entity);
+    if (this.active()) for (const [key, card] of this.configured) if (!this.sessions.has(key)) this.create(key, card);
+    for (const [key, entry] of this.sessions) {
+      const entity = entry.entity;
+      entry.background = this.configured.has(key);
       entry.playback.update(hass, entity, entry.lease?.label || hass?.states?.[entity]?.attributes?.friendly_name || entity);
     }
     this.position();
   }
-  create(entity) {
+  create(key, card = this.configured.get(key)) {
+    const entity = card.entity;
     const host = document.createElement('div'); host.setAttribute('data-marao-camera-preload', entity);
     host.attachShadow({mode: 'open'}); const slot = document.createElement('div'); host.shadowRoot.append(slot);
     host.style.cssText = 'position:fixed;left:-10000px;top:0;width:320px;height:180px;opacity:0;pointer-events:none;z-index:2;overflow:hidden';
     host.setAttribute('aria-hidden', 'true'); this.root.shadowRoot.append(host);
-    const entry = {host, background: true};
+    const entry = {host, entity, background: true};
     entry.playback = new CameraPlayback(host, slot, {
       localize: key => this.callbacks.localize(key, this.hass), haptic: value => this.callbacks.haptic(value),
       problem: reason => { entry.problem = reason; entry.lease?.problem(reason); },
       eligible: () => this.active() && (entry.background || Boolean(entry.lease && visible(entry.lease.card))),
+      options: card.variables,
     });
-    this.sessions.set(entity, entry); return entry;
+    this.sessions.set(key, entry); return entry;
   }
   claim(card, slot, callbacks) {
-    const entity = card._config.entity;
-    if (!this.configured?.has(entity)) return null;
-    const entry = this.sessions.get(entity) || this.create(entity);
+    const { entity, variables, tap_action } = card._config;
+    const key = cameraPlaybackKey(entity, variables);
+    if (tap_action?.action === 'fullscreen' || !this.configured?.has(key)) return null;
+    const entry = this.sessions.get(key) || this.create(key);
     if (entry.lease) return null;
     const lease = {card, slot, label: '', problem: callbacks.problem}; entry.lease = lease;
     const binding = {
@@ -79,14 +73,14 @@ export class CameraPreload {
       get streamEntity() { return entry.playback.streamEntity; },
       update: (hass, current, label) => {
         lease.label = label;
-        if (this.disposed || !this.sessions.has(entity)) return;
+        if (this.disposed || !this.sessions.has(key)) return;
         this.hass = hass; entry.playback.update(hass, current, label); this.position();
       },
       fullscreen: () => entry.playback.fullscreen(),
       dispose: () => {
         if (entry.lease !== lease) return;
         entry.lease = null; this.park(entry);
-        if (!entry.background) this.remove(entity, entry);
+        if (!entry.background) this.remove(key, entry);
         if (![...this.sessions.values()].some(item => item.lease)) { cancelAnimationFrame(this.frame); this.frame = null; }
       },
     };
@@ -119,11 +113,11 @@ export class CameraPreload {
     }
     if (this.active() && !this.frame && [...this.sessions.values()].some(entry => entry.lease)) this.frame = requestAnimationFrame(() => { this.frame = null; this.position(); });
   }
-  remove(entity, entry) { entry.playback.dispose(); entry.host.remove(); this.sessions.delete(entity); }
+  remove(key, entry) { entry.playback.dispose(); entry.host.remove(); this.sessions.delete(key); }
   dispose() {
     if (this.disposed) return;
     this.disposed = true; cancelAnimationFrame(this.frame);
-    for (const [entity, entry] of this.sessions) this.remove(entity, entry);
+    for (const [key, entry] of this.sessions) this.remove(key, entry);
     document.removeEventListener('visibilitychange', this.lifecycle);
     for (const type of ['location-changed', 'popstate']) window.removeEventListener(type, this.lifecycle);
     owners.delete(this.root);

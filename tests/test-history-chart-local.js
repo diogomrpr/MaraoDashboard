@@ -6,6 +6,8 @@ const path=require('node:path');
 const {chromium}=require('playwright');
 const {artifactDirectory,capture}=require('./verification-browser');
 const frontend=path.resolve(__dirname,'../custom_components/marao_dashboard/frontend');
+const ownedModules=new Set(require('../custom_components/marao_dashboard/frontend/marao-owned-assets.json')
+ .filter(name=>/^Marao\w+\.js$/.test(name)).map(name=>'/'+name));
 const html=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 :root{--primary-text-color:#142e50;--secondary-text-color:#425571;--primary-color:#235b9c;--divider-color:#667085;--card-background-color:#eef4fc;--ha-card-background:#eef4fc;--text-primary-color:#fff}
 *{box-sizing:border-box}body{margin:0;padding:8px;background:var(--ha-card-background);font-family:Montserrat,system-ui,sans-serif;color:var(--primary-text-color)}button{font:inherit;min-width:48px;min-height:48px}#sheet{max-width:600px;margin:auto;height:calc(80vh - 16px);overflow:auto;overscroll-behavior:contain;padding:8px}header{display:flex;gap:8px;align-items:center}h1{font-size:1.2em;flex:1;overflow-wrap:anywhere}
@@ -74,7 +76,7 @@ async function run(){
   const pathname=new URL(request.url,'http://127.0.0.1').pathname;
   if(pathname==='/'){response.setHeader('Content-Type','text/html');response.end(html);return;}
   if(pathname==='/favicon.ico'){response.statusCode=204;response.end();return;}
-  if(!['/MaraoHistoryLayout.js','/MaraoDropdown.js','/MaraoHistoryChart.js','/MaraoHistoryData.js','/MaraoCards.js','/MaraoFrontendRefresh.js','/MaraoFrontendUpdates.js','/MaraoNavigation.js','/MaraoSlider.js','/MaraoLightCapabilities.js'].includes(pathname)){response.statusCode=404;response.end();return;}
+  if(!ownedModules.has(pathname)){response.statusCode=404;response.end();return;}
   response.setHeader('Content-Type','text/javascript');response.end(fs.readFileSync(path.join(frontend,path.basename(pathname))));
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));

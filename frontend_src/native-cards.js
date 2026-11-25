@@ -1,10 +1,9 @@
 import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {findNativeHost,nativeDashboardConfig,nativeEditing} from '../custom_components/marao_dashboard/frontend/MaraoNativeContext.js';
-import { catalog } from './native-model.js';
-import { editorLabel } from './editor-labels.js';
+import { energyUnits, nativeCardEntries } from './native-card-data.js';
 import { uid } from './schedule-model.js';
 import { composeNativeCard, nativeCardDescriptor, nativeCardType, validateNativeCardConfig } from './card-composition.js';
-import {nativeCandidates, registerCardMetadata, refreshCardMetadata} from './native-card-metadata.js';
+import {nativeCandidates, nativeCardLabel, registerCardMetadata, refreshCardMetadata} from './native-card-metadata.js';
 import {isAccess} from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
 
 const copy = value => structuredClone(value);
@@ -18,7 +17,7 @@ let nextInstance = 0;
 const sessionId = globalThis.crypto?.randomUUID?.().replaceAll('-', '') || Date.now().toString(36);
 
 export function nativeCardStub(template, hass = {}, entities = [], entitiesFallback = []) {
-  const entry = catalog.cards.find(card => card.id === template);
+  const entry = nativeCardEntries.find(card => card.id === template);
   if (!entry) throw new Error('Choose a supported Marao card type.');
   const compatible = id => {
     const domain = id.split('.')[0], attributes = hass.states[id].attributes || {};
@@ -35,9 +34,8 @@ export function nativeCardStub(template, hass = {}, entities = [], entitiesFallb
   const entity = nativeCandidates(hass, entities, entitiesFallback).find(compatible);
   const config = { type: nativeCardType(template), template };
   if (entity && !entry.entity_optional) config.entity_id = entity;
-  if (!entry.domains.length || entry.entity_optional) config.name = editorLabel(entry.label, hass);
-  const variables = Object.fromEntries(entry.variables.filter(variable => Object.hasOwn(variable, 'default')).map(variable => [variable.key, copy(variable.default)]));
-  if (Object.keys(variables).length) config.variables = variables;
+  if (!entry.domains.length || entry.entity_optional) config.name = nativeCardLabel(entry.label, hass);
+  if (entry.defaults) config.variables = copy(entry.defaults);
   if (['md_navigation_card', 'md_room_card'].includes(template)) config.tap_action = { action: 'none' };
   if (template === 'md_entity_group_card') Object.assign(config, { id: 'group', entity_type: 'light', entities: [], popup_filter: 'active' });
   if (['md_scene_collection_card','md_people_card'].includes(template)) config.entities = [];
@@ -52,7 +50,7 @@ export function nativeCardStub(template, hass = {}, entities = [], entitiesFallb
 }
 
 export function nativeCardSetup(config) {
-  const descriptor = nativeCardDescriptor(config), entry = catalog.cards.find(card => card.id === descriptor.template);
+  const descriptor = nativeCardDescriptor(config), entry = nativeCardEntries.find(card => card.id === descriptor.template);
   const probe = copy(config);
   let message;
   // Validate all authored options, supplying only missing setup fields in this private probe.
@@ -84,7 +82,7 @@ export function nativeCardDefaults(template) {
 function roleApplies(template, state) {
   const a = state.attributes || {}, numeric = String(state.state ?? '').trim() !== '' && Number.isFinite(Number(state.state));
   const unit = a.unit_of_measurement, deviceClass = a.device_class;
-  if (template === 'md_energy_period_card') return numeric && catalog.energy_units[unit]?.[0] === 'energy' && (!deviceClass || deviceClass === 'energy');
+  if (template === 'md_energy_period_card') return numeric && energyUnits[unit]?.[0] === 'energy' && (!deviceClass || deviceClass === 'energy');
   if (template === 'md_battery_card') return numeric && deviceClass === 'battery' && unit === '%' && Number(state.state) >= 0 && Number(state.state) <= 100;
   if (template === 'md_graph_card') return numeric;
   // No standard HA metadata proves an appliance status or a weather sensor role.
@@ -95,7 +93,7 @@ function roleApplies(template, state) {
 }
 
 export function nativeEntitySuggestion(template,hass,entityId) {
-  const entry=catalog.cards.find(card=>card.id===template),state=hass?.states?.[entityId],domain=entityId?.split('.')[0];
+  const entry=nativeCardEntries.find(card=>card.id===template),state=hass?.states?.[entityId],domain=entityId?.split('.')[0];
   if(!entry||entry.hidden||!nativeCandidates(hass,[entityId]).length)return null;
   if(template === 'md_people_card') {
     if(domain !== 'person') return null;
@@ -135,9 +133,13 @@ export function nativeCardGridOptions(config) {
 const nativeHost = findNativeHost;
 
 function metadata(hass) {
-  return Object.values(hass?.states || {}).map(state => ({ entity_id: state.entity_id,
+  return Object.values(hass?.states || {}).map(entityMetadata);
+}
+
+function entityMetadata(state) {
+  return { entity_id: state.entity_id,
     name: state.attributes?.friendly_name, unit_of_measurement: state.attributes?.unit_of_measurement,
-    device_class: state.attributes?.device_class, supported_features: state.attributes?.supported_features }));
+    device_class: state.attributes?.device_class, supported_features: state.attributes?.supported_features };
 }
 
 /** One ordinary HA card. Runtime controls and detail sheets keep their shared owners. */
@@ -165,10 +167,12 @@ export class MaraoNativeCard extends HTMLElementBase {
 
   setConfig(config) {
     this._setup = nativeCardSetup(config);
-    if (!this._setup) validateNativeCardConfig(config, metadata(this._hass));
+    const entities = metadata(this._hass);
+    if (!this._setup) validateNativeCardConfig(config, entities);
     this._config = copy(config);
     this._compositionKey = null;
-    this._refresh();
+    // HA creates a card with its config before assigning hass or attaching it.
+    if (this._hass || this.isConnected) this._refresh(entities);
   }
 
   set hass(value) { this._hass = value; refreshCardMetadata(value); this._refresh(); }
@@ -231,24 +235,36 @@ export class MaraoNativeCard extends HTMLElementBase {
     }
   }
 
-  _refresh() {
+  _refresh(entities) {
     if (!this._config) return;
     this._bindHost();
-    const entities = metadata(this._hass);
-    // State updates only reach existing controls; configuration metadata can recompose.
-    const bound = new Set([this._config.entity_id, ...(Array.isArray(this._config.entities) ? this._config.entities : []).map(entity => typeof entity === 'string' ? entity : entity.entity_id)]);
     const dashboardRoot = this._host?.panel?.url_path || globalThis.location?.pathname.split('/')[1] || 'marao-dashboard';
     const language = languageCode(this._hass);
     const dashboard=nativeDashboardConfig(this._host?.lovelace);
     let viewHost=this;while(viewHost&&viewHost.localName!=='hui-view')viewHost=viewHost.parentNode||viewHost.host||viewHost.getRootNode?.()?.host;
     const currentView=dashboard?.views?.[viewHost?.index ?? this._host?.lovelace?.current_view];
     this._climateDetail=currentView?.marao_popup?.family==='md_climate_card' && currentView.marao_popup.settings.entity_id===(this._config.entity_id||this._config.entity);
-    const source=dashboard?.views?.filter((view,index)=>String(view.path ?? index)===this._config.popup_view);
-    if(this._config.popup_view)for(const entity of entities)bound.add(entity.entity_id);
-    const key = JSON.stringify([dashboardRoot, language, source, entities.filter(entity => bound.has(entity.entity_id))]);
+    let keyEntities, source;
+    if (this._config.popup_view) {
+      // A linked view can supply members outside this card's entity list.
+      entities ??= metadata(this._hass);
+      keyEntities = entities;
+      source = dashboard?.views?.filter((view, index) => String(view.path ?? index) === this._config.popup_view);
+    } else {
+      const ids = new Set([this._config.entity_id || this._config.entity]);
+      if (Array.isArray(this._config.entities)) {
+        for (const member of this._config.entities) ids.add(typeof member === 'string' ? member : member.entity_id);
+      }
+      keyEntities = [];
+      for (const id of ids) {
+        const state = this._hass?.states?.[id];
+        if (state) keyEntities.push(entityMetadata(state));
+      }
+    }
+    const key = JSON.stringify([dashboardRoot, language, source, keyEntities]);
     if (this._compositionKey === key) { this._forward(); return; }
     this._compositionKey = key;
-    this._mount({ entities, dashboardRoot, language, dashboard });
+    this._mount({ entities: entities ?? metadata(this._hass), dashboardRoot, language, dashboard });
   }
 
   async _mount(context) {
@@ -260,21 +276,23 @@ export class MaraoNativeCard extends HTMLElementBase {
         this._children = []; this._details.replaceChildren();
         const surface = document.createElement('ha-card'), message = document.createElement('p');
         surface.style.cssText = 'padding:16px;box-sizing:border-box;height:100%;font-family:var(--primary-font-family,inherit);background:var(--ha-card-background);border-radius:var(--ha-card-border-radius,24px)';
-        message.textContent = editorLabel(this._setup, this._hass); surface.append(message);
-        this._content.replaceChildren(surface); this._forward(); return;
+        message.textContent = nativeCardLabel(this._setup, this._hass); surface.append(message);
+        this._content.replaceChildren(surface); this._forward();
+        globalThis.window?.MaraoDashboardRuntime?.observeCard?.(surface);
+        return;
       }
       const { card, popups } = composeNativeCard(this._config, { ...context, instanceId: this._instanceId });
       if (this._config.apple_tv?.plex && typeof this._config.apple_tv.plex === 'object') await import(new URL(`./MaraoPlex.js${query}`,import.meta.url));
       const configs = [card, ...popups];
       if (configs.some(config => config.type.startsWith('custom:marao-') && !customElements.get(config.type.slice(7))) && window.MaraoDashboardRuntime?.ready) {
         this._content.innerHTML = '<ha-card role="status" style="display:grid;place-items:center;height:100%;min-height:56px"><ha-circular-progress active></ha-circular-progress></ha-card>';
-        this._content.querySelector('[role="status"]').setAttribute('aria-label',editorLabel('Loading Home Assistant cards…',this._hass));
-        await window.MaraoDashboardRuntime.ready;
+        this._content.querySelector('[role="status"]').setAttribute('aria-label',nativeCardLabel('Loading Home Assistant cards…',this._hass));
+        await (window.MaraoDashboardRuntime.requestContent?.(configs.map(config => config.type), this._content.firstElementChild) || window.MaraoDashboardRuntime.ready);
         if (version !== this._renderVersion) return;
       }
       const local = configs.every(config => config.type.startsWith('custom:') && customElements.get(config.type.slice(7)));
       const helpers = local ? { createCardElement(config) { const child = document.createElement(config.type.slice(7)); child.setConfig(config); return child; } } : await globalThis.loadCardHelpers?.();
-      if (!helpers?.createCardElement) throw new Error(editorLabel('Loading Home Assistant cards…', this._hass));
+      if (!helpers?.createCardElement) throw new Error(nativeCardLabel('Loading Home Assistant cards…', this._hass));
       if (version !== this._renderVersion) return;
       const children = configs.map(config => {
         const child = helpers.createCardElement(config);
@@ -286,12 +304,24 @@ export class MaraoNativeCard extends HTMLElementBase {
       this._content.replaceChildren(children[0]);
       this._details.replaceChildren(...children.slice(1));
       this._forward();
+      // A dedicated renderer can paint without using the generic card surface.
+      const first = children[0];
+      globalThis.window?.MaraoDashboardRuntime?.observeCard?.(first.shadowRoot?.querySelector('ha-card') || first);
     } catch (error) {
       if (version !== this._renderVersion) return;
       this._children = []; this._details.replaceChildren();
       const message = document.createElement('p'); message.setAttribute('role', 'alert');
-      message.textContent = editorLabel(error.message, this._hass);
+      message.textContent = nativeCardLabel(error.message, this._hass);
       this._content.replaceChildren(message);
+      if (languageCode(this._hass) === 'pt' && message.textContent === error.message) {
+        // Arbitrary validation/renderer errors may need the complete dictionary.
+        try {
+          const {editorLabel} = await import(new URL(`./MaraoErrorLabels.js${query}`, import.meta.url));
+          if (version === this._renderVersion) message.textContent = editorLabel(error.message, this._hass);
+        } catch (translationError) {
+          if (version === this._renderVersion) message.textContent += ' ' + translationError.message;
+        }
+      }
     }
   }
 }
@@ -299,7 +329,7 @@ export class MaraoNativeCard extends HTMLElementBase {
 export function registerNativeCards() {
   if (!globalThis.customElements) return;
   const picker = globalThis.window && (window.customCards ||= []);
-  for (const entry of catalog.cards) {
+  for (const entry of nativeCardEntries) {
     const type = nativeCardType(entry.id).slice(7);
     if (!customElements.get(type)) {
       class CatalogCard extends MaraoNativeCard {

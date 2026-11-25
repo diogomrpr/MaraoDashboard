@@ -48,11 +48,11 @@ export function createHistoryChart(container, initial) {
   const renderBreakdown = () => {
     const selected = visible.find(sample => sample.time === selectedTime);
     let detail = monthly() && options.breakdownForSample ? options.breakdownForSample(selected) : options.breakdown;
-    if (detail && (options.unavailable || options.loading || options.error)) detail = { ...detail, items: (detail.items || []).map(item => ({ ...item, value:null, energyLabel:'—', costLabel:'—', problem:text('No data') })) };
+    if (detail && (options.unavailable || options.loading || options.error)) detail = { ...detail, items: (detail.items || []).map(item => ({ ...item, value:null, energyLabel:'—', costLabel:'—', problem:typeof options.unavailable === 'string' ? options.unavailable : text('No data') })) };
     renderHistoryBreakdown({ make, breakdown }, detail, { text, color: seriesColor, language: language() });
   };
   const draw = () => {
-    if (destroyed || !inViewport || options.unavailable || options.loading || options.error || drawError || plot.hidden || !visible.length) return;
+    if (destroyed || !inViewport || drawError || plot.hidden || canvas.hidden) return;
     const bounds=plot.getBoundingClientRect();if(bounds.width<=0||bounds.height<=0)return;
     const computed=getComputedStyle(root), tone=computed.color || '#263338', grid=computed.getPropertyValue('--divider-color').trim() || '#7B8C91';
     const color=options.color || options.series?.[0]?.color || computed.getPropertyValue('--primary-color').trim() || '#506F79';
@@ -62,7 +62,7 @@ export function createHistoryChart(container, initial) {
     const holdLastState=points=>{
       const last=points.at(-1),end=Math.min(range().end,options.recordedUntil??Date.now());
       // Extend the drawn step only; retained readings and selected timestamps stay untouched.
-      if(options.power&&Number.isFinite(last?.y)&&last.x<end)points.push({x:end,y:last.y});
+      if(options.power&&options.extendLastState!==false&&Number.isFinite(last?.y)&&last.x<end)points.push({x:end,y:last.y});
       return points;
     };
     holdLastState(data);
@@ -100,7 +100,7 @@ export function createHistoryChart(container, initial) {
       drawError=null;
     } catch (error) { (chart||Chart.getChart(canvas))?.destroy();chart=null;drawError=error; }
     status.hidden=!drawError; if(drawError){status.textContent=text('Could not draw history.');status.setAttribute('role','alert');}
-    retry.hidden=!drawError;
+    retry.hidden=!drawError&&!options.partialError;
   };
   const render = () => {
     if(destroyed)return;
@@ -115,7 +115,7 @@ export function createHistoryChart(container, initial) {
     const selected=choices.find(sample=>sample.time===selectedTime), index=choices.indexOf(selected);
     reading.hidden=monthly();
     value.textContent=selected&&Number.isFinite(selected.value)?format(selected.value):'—';
-    value.setAttribute('aria-label',`${text(options.bars?(options.interval==='day'?'Selected day':'Selected hour'):'Selected reading')}: ${selected&&!Number.isFinite(selected.value)?text('No readings for this interval.'):value.textContent}`);
+    value.setAttribute('aria-label',`${text(options.bars?(options.interval==='day'?'Selected day':'Selected hour'):'Selected reading')}: ${selected&&!Number.isFinite(selected.value)?options.offlineCoverage || text('No readings for this interval.'):value.textContent}`);
     if(options.bars)root.setAttribute('data-bars','');else root.removeAttribute('data-bars');
     timestamp.textContent=selected?formatter().format(new Date(selected.time)):'';
     if(selected)timestamp.dateTime=new Date(selected.time).toISOString();else timestamp.removeAttribute('datetime');
@@ -147,8 +147,8 @@ export function createHistoryChart(container, initial) {
       item.item.hidden=index===2&&(options.power||options.stateClass!=='measurement');item.term.textContent=text(item.label);item.value.textContent=number==null?'—':format(number);
     }
     status.setAttribute('role',!options.unavailable&&(options.error||drawError)?'alert':'status');
-    status.textContent=options.unavailable?(typeof options.unavailable==='string'?options.unavailable:text('History unavailable')):options.error?String(options.error):drawError?text('Could not draw history.'):options.loading?text('Loading history…'):!valid.length?text('No readings in this period.'):' ';status.hidden=!options.unavailable&&!options.error&&!drawError&&!options.loading&&valid.length>0;
-    coverage.textContent=text('Recorded coverage may be limited.');coverage.hidden=true;
+    status.textContent=options.unavailable?(typeof options.unavailable==='string'?options.unavailable:text('History unavailable')):options.error?String(options.error):drawError?text('Could not draw history.'):options.loading?text('Loading history…'):!valid.length?(options.offlineCoverage || text('No readings in this period.')):' ';status.hidden=!options.unavailable&&!options.error&&!drawError&&!options.loading&&valid.length>0;
+    coverage.textContent=options.offlineCoverage || '';coverage.hidden=!valid.length || !options.offlineCoverage;
     retry.textContent=text('Retry');retry.hidden=Boolean(options.unavailable)||(!options.error&&!drawError&&!options.partialError);
     plot.hidden=false;
     canvas.hidden=Boolean(options.unavailable||options.error||options.loading||!valid.length);
@@ -164,7 +164,8 @@ export function createHistoryChart(container, initial) {
         const sample=Number.isFinite(selectedTime)?powerStateAt(item.samples||[],selectedTime):null;
         const reading=make('span',item.problem?'history-item-problem':'',row);
         const exact=options.selection && options.selection.time===selectedTime ? options.selection.values?.[item.id] : undefined;
-        reading.textContent=item.problem||exact?.problem||(Number.isFinite(exact?.value)?format(exact.value):options.onSelect&&index>0?text('No data'):Number.isFinite(sample?.value)?format(sample.value):text('No data'));
+        const missing = options.offlineCoverage || text('No data');
+        reading.textContent=item.problem||exact?.problem||(Number.isFinite(exact?.value)?format(exact.value):options.onSelect&&index>0?missing:Number.isFinite(sample?.value)?format(sample.value):missing);
         rows.push(row);
       }
       comparison.replaceChildren(...rows);

@@ -9,8 +9,10 @@ const uri='data:text/javascript;base64,'+Buffer.from(source).toString('base64');
 const {energyUnits,energyValue,energyFormatting,energyHistoryValue,energyLabel,formatEnergyNumber,MaraoCard}=await import(uri);
 globalThis.navigationTranslations = (await import('../../custom_components/marao_dashboard/frontend/MaraoNavigation.js')).navigationTranslations;
 const dashboard=await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoRuntime.js', import.meta.url), 'utf8');
+const connectionModule = new URL('../../custom_components/marao_dashboard/frontend/MaraoConnection.js', import.meta.url).href;
+const historyData = new URL('../../frontend_src/history-data.js', import.meta.url).href;
 const classes=dashboard.slice(dashboard.indexOf('function escapeHtml('),dashboard.indexOf('if (!customElements.get("marao-energy-period-card"))'));
-const {MaraoEnergyPeriodCard,energyTariff}=await import('data:text/javascript;base64,'+Buffer.from(`import {nativeEditing,bindNativeEditing,energyBuckets,statisticsBuckets,energyTotal,historyPeriodRange,historySamples,loadHistoryChart,energyFormatting,energyValue,energyHistoryValue,energyLabel,formatEnergyNumber,binaryState,cardProblem,problemStyle,problemLabel,showCardDetails,createHistoryPlaceholder,layoutState,focusRestorer,controlGridStyles,updateCardSurface, formatLocale} from "${uri}";const localize=key=>key;${classes};export {MaraoEnergyPeriodCard,energyTariff};`).toString('base64'));
+const {MaraoEnergyPeriodCard,energyTariff}=await import('data:text/javascript;base64,'+Buffer.from(`import { dashboardConnectionStatus, isDashboardOfflineError, observeDashboardConnection } from "${connectionModule}";\nimport {energyBuckets, statisticsBuckets, energyTotal, periodRange as historyPeriodRange} from "${historyData}";\nimport {nativeEditing,bindNativeEditing,historySamples,loadHistoryChart,energyFormatting,energyValue,energyHistoryValue,energyLabel,formatEnergyNumber,binaryState,cardProblem,problemStyle,problemLabel,showCardDetails,createHistoryPlaceholder,layoutState,focusRestorer,controlGridStyles,updateCardSurface, formatLocale} from "${uri}";const localize=key=>key;${classes};export {MaraoEnergyPeriodCard,energyTariff};`).toString('base64'));
 const sample=(value,unit,time=Date.now()-1000)=>({entity_id:'sensor.energy',state:String(value),attributes:{unit_of_measurement:unit,friendly_name:'Reading'},last_changed:new Date(time).toISOString()});
 const tick=()=>new Promise(resolve=>setTimeout(resolve, 10));
 const waitFor=async condition=>{
@@ -166,8 +168,8 @@ test('period summaries and consumption bars share formatting without resetting s
   assert.deepEqual(period._detailOptions.samples.map(record=>period._detailOptions.format(record.value)),['1.00 kWh','0.00 kWh']);
   assert.ok(Math.abs(period._detailOptions.samples[0].value-1.000001)<1e-12);
   assert.ok(Math.abs(period._detailOptions.samples[1].value-.000001)<1e-12);
-  period._offset=-1;await period._load();const count=calls;const key=period._loadedKey;const raw=period._history;
-  period.setConfig({...config,display_precision:6});await tick();assert.equal(period._offset,-1);assert.equal(period._loadedKey,key);assert.equal(period._history,raw);assert.equal(calls,count);
+  period._selectedStart=period._range(-1).start;await period._load();const count=calls;const key=period._loadedKey;const raw=period._history;
+  period.setConfig({...config,display_precision:6});await tick();assert.equal(period._selectedStart.toISOString(),key);assert.equal(period._loadedKey,key);assert.equal(period._history,raw);assert.equal(calls,count);
   assert.deepEqual(period._detailOptions.samples.map(record=>period._detailOptions.format(record.value)),['1.000001 kWh','0.000001 kWh']);
   period._history=[sample('4')];period._render();assert.match(period.shadowRoot.innerHTML,/energy.format_error/);assert.doesNotMatch(period.shadowRoot.innerHTML,/<polyline/);
   const summary=new MaraoEnergyPeriodCard();summary.setConfig({...config,popup:false});summary._range=period._range;summary.hass=hass(states,async()=>[records]);await tick();assert.match(summary.shadowRoot.innerHTML,/1.00 kWh/);

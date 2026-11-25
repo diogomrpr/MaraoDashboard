@@ -1,7 +1,7 @@
 import { MAIN_PAGE_BUTTONS } from './editor-model.js';
 import { copy, domain, object } from '../custom_components/marao_dashboard/frontend/MaraoSource.js';
 import { catalog, normalizeSource, validateSource } from './native-model.js';
-import { parseCardsYaml } from './lovelace-model.js';
+import { parseCardYaml, parseCardsYaml } from './lovelace-model.js';
 import {rewriteOwnedAssets} from './native-dependencies.js';
 
 import { createCardComposition, resolveSource } from './card-composition.js';
@@ -16,6 +16,12 @@ export function compileDashboard(input, { entities = [], areas = [], roomEntitie
   const root = dashboardRoot || `marao-${config.slug}`;
   if (!/^[a-z0-9][a-z0-9_-]*-[a-z0-9_-]+$/.test(root)) throw new Error('Choose a valid dashboard address.');
   const { name, rawCards, pageCard, popups, grid, owned, structural } = createCardComposition({ root, language });
+  const renderPageCard = item => {
+    if (item.template !== 'ha_card') return pageCard(item);
+    const card = parseCardYaml(item.yaml);
+    rawCards.add(card);
+    return card;
+  };
   const available = new Map(config.pages.map(page => [page.path, page]));
   const routes = (config.navigation || []).map(entry => {
     const path = typeof entry === 'string' ? entry : entry.page;
@@ -32,7 +38,7 @@ export function compileDashboard(input, { entities = [], areas = [], roomEntitie
   const views = [...config.pages.filter(page => page.path === config.landing_page), ...config.pages.filter(page => page.path !== config.landing_page)].map(page => {
     const cards = [], sheets = [];
     for (const section of page._sections) {
-      const rendered = section.ordered_cards.map(pageCard), sourceRaw = (section.cards || []).map(copy);
+      const rendered = section.ordered_cards.map(renderPageCard), sourceRaw = (section.cards || []).map(copy);
       sheets.push(...sourceRaw.filter(structural));
       const ordinary = sourceRaw.filter(card => !structural(card));
       if (section.columns) {

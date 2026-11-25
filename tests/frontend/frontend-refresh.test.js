@@ -23,7 +23,7 @@ function environment(t, overrides = {}) {
 }
 const request = url => ({ url });
 
-function automatic(t, { version = 'one', storage = new Map(), native = false } = {}) {
+function automatic(t, { version = 'one', storage = new Map(), native = false, loaderSample } = {}) {
   const host = new EventTarget(), doc = new EventTarget();
   doc.visibilityState = 'visible'; host.document = doc; host.navigator = { onLine: true };
   host.setTimeout = setTimeout; host.console = { warn() {} };
@@ -33,7 +33,11 @@ function automatic(t, { version = 'one', storage = new Map(), native = false } =
   const connection = { subscribeMessage: async callback => { receive = callback; return () => { removed++; }; } };
   let installedVersion = version, checks = 0;
   if (native) {
-    host.MaraoFrontendPackage={manifestURL:'http://ha.invalid/hacsfiles/example/MaraoFrontend.release.json'};
+    host.MaraoFrontendPackage={identity:version,manifestURL:'http://ha.invalid/hacsfiles/example/MaraoFrontend.release.json'};
+    if (loaderSample) {
+      host.performance = {now:() => 10000};
+      host.MaraoInstalledFrontendPackage = {...host.MaraoFrontendPackage, ...loaderSample};
+    }
     host.fetch=async()=>{checks++;return {ok:true,json:async()=>({identity:installedVersion})};};
     connection.subscribeEvents=async(callback,type)=>{assert.equal(type,'lovelace_updated');receive=callback;return()=>{removed++;};};
     delete connection.subscribeMessage;
@@ -51,6 +55,40 @@ function automatic(t, { version = 'one', storage = new Map(), native = false } =
     reject: code => { reject = code; }, removed: () => removed,
     install: identity => {installedVersion=identity;}, checks:()=>checks, nativeEvent: data=>receive({data}) };
 }
+
+test('only the initial native subscription reuses a fresh check for the same installed graph', async t => {
+  const version = 'a'.repeat(64), next = 'b'.repeat(64);
+  const options = {native:true, version, loaderSample:{manifestCheckedAt:7400}};
+  const e = automatic(t, options);
+  await flush();assert.equal(e.checks(),0);
+  e.host.dispatchEvent(new Event('focus'));await flush();assert.equal(e.checks(),1);
+  e.install(next);e.nativeEvent({url_path:'marao-dashboard'});await flush();
+  assert.equal(e.checks(),2);assert.equal(e.refreshes.length,1);
+
+  for (const loaderSample of [{manifestCheckedAt:4000}, {manifestCheckedAt:7400,identity:next},
+    {manifestCheckedAt:7400,manifestURL:'http://ha.invalid/other/MaraoFrontend.release.json'}]) {
+    const different = automatic(t, {...options,loaderSample});
+    different.install(next);await flush();
+    assert.equal(different.checks(),1);assert.equal(different.refreshes.length,1);
+  }
+  const reconnecting = automatic(t, options);
+  reconnecting.host.dispatchEvent(new Event('online'));
+  await flush();assert.equal(reconnecting.checks(),1);
+});
+
+test('native update events use the installed loader’s fresh release check', async t => {
+  const version='a'.repeat(64), next='b'.repeat(64);
+  const e=automatic(t,{native:true,version,loaderSample:{manifestCheckedAt:10000}});
+  let reads=0;
+  e.host.MaraoInstalledFrontendPackage.readRelease=async()=>{reads++;return {identity:next};};
+  await flush();
+  assert.equal(reads,0,'Startup consumes the validated loader sample');
+  e.nativeEvent({url_path:'marao-dashboard'});
+  await flush();
+  assert.equal(reads,1);
+  assert.equal(e.checks(),0,'Matching loader and active root use the compact record');
+  assert.equal(e.refreshes.length,1);
+});
 
 test('native configuration events use HA rendering while graph changes defer and refresh once', async t => {
   const e=automatic(t,{native:true,version:'a'.repeat(64)});await flush();assert.equal(e.checks(),1);

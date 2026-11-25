@@ -1,3 +1,4 @@
+const {dashboardConnectionStatus,isDashboardOfflineError,observeDashboardConnection}=await import(new URL(`./MaraoConnection.js${new URL(import.meta.url).search}`,import.meta.url));
 const { navigationTranslations, maraoDashboardActive } = await import(new URL(`./MaraoNavigation.js${new URL(import.meta.url).search}`, import.meta.url));
 const MARAO_RESOURCE_QUERY = new URL(import.meta.url).search;
 async function waitForHomeAssistantRegistry() {
@@ -10,11 +11,15 @@ async function waitForHomeAssistantRegistry() {
 }
 await waitForHomeAssistantRegistry();
 const cardsModule = await import(new URL(`./MaraoCards.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
-const { nativeEditing, bindNativeEditing, loadHistoryChart, createHistoryPlaceholder, historyPeriodRange, historySamples, energyBuckets, statisticsBuckets, energyTotal, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, fitNativeGrid, updateCardSurface, problemLabel, showCardDetails, layoutState, registerMaraoCards } = cardsModule;
+const { nativeEditing, bindNativeEditing, loadHistoryChart, createHistoryPlaceholder, historySamples, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, serviceOutcome, callServiceWithNotification, serviceConnectionReady, serviceTargetReady, accessOpenerService, focusRestorer, haptic, controlGridStyles, fitNativeGrid, updateCardSurface, problemLabel, showCardDetails, layoutState, registerMaraoCards } = cardsModule;
+const {periodRange:historyPeriodRange, energyBuckets, statisticsBuckets, energyTotal} =
+  await import(new URL(`./MaraoHistoryData.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
 registerMaraoCards();
-await import(new URL(`./MaraoFloorPlanCard.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
-await import(new URL(`./MaraoSchedules.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
-await import(new URL(`./MaraoNativeCards.js${MARAO_RESOURCE_QUERY}`, import.meta.url));
+// Older installations can register this file directly as their resource.
+if (!window.MaraoDashboardRuntime) {
+  await Promise.all(['MaraoFloorPlanCard.js','MaraoSchedules.js','MaraoNativeCards.js'].map(file =>
+    import(new URL(`./${file}${MARAO_RESOURCE_QUERY}`, import.meta.url))));
+}
 
 const MARAO_FONT_URL = new URL(`./MaraoFonts.css${MARAO_RESOURCE_QUERY}`,import.meta.url).href;
 const { languageCode, formatLocale } = await import(new URL(`./MaraoLocale.js${new URL(import.meta.url).search}`, import.meta.url));
@@ -584,6 +589,8 @@ const TRANSLATIONS = {
     "timeline.loading": "Loading history...",
     "timeline.no_history": "No history in the last 24 hours",
     "timeline.history_unavailable": "History unavailable",
+    "history.offline_range": "This period is unavailable offline.",
+    "history.offline_partial": "Part of this period is unavailable offline.",
     "energy.previous_period": "Previous period",
     "energy.next_period": "Next period",
     "energy.current_period": "Current period",
@@ -945,6 +952,8 @@ const TRANSLATIONS = {
     "timeline.loading": "A carregar histórico...",
     "timeline.no_history": "Sem histórico nas últimas 24 horas",
     "timeline.history_unavailable": "Histórico indisponível",
+    "history.offline_range": "Este período está indisponível offline.",
+    "history.offline_partial": "Parte deste período está indisponível offline.",
     "energy.previous_period": "Período anterior",
     "energy.next_period": "Período seguinte",
     "energy.current_period": "Período atual",
@@ -1131,6 +1140,8 @@ class MaraoSlideToOpen extends HTMLElement {
       this._hass = this.hass;
       delete this.hass;
     }
+    this._stopConnection?.();
+    this._stopConnection = observeDashboardConnection(() => this._hassInstance(), () => { this.hass = this._hassInstance(); });
     this._actionLive = true;
     this._fitAccessGrid();
     this._cancelHiddenSlide ||= event => {
@@ -1149,6 +1160,7 @@ class MaraoSlideToOpen extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this._stopConnection?.();
     this._stopNativeEditing?.(); this._stopNativeEditing = null;
     this._detailsPopup?._close(false);
     this._accessGridItem?.removeAttribute('data-marao-grid-144'); this._accessGridItem = null;
@@ -1579,6 +1591,10 @@ class MaraoStateTimelineCard extends HTMLElement {
   set preview(value) { this._preview = Boolean(value); }
 
   connectedCallback() {
+    this._stopConnection?.();
+    this._stopConnection = observeDashboardConnection(() => this._hass, status => {
+      if (status === 'online') { this._loadedKey = ''; this._loadHistory(); }
+    });
     this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => { this._detailsPopup?._close(false); this._render(); });
     this._resizeObserver ??= new ResizeObserver(() => this._spaceTicks());
     this._resizeObserver.observe(this);
@@ -1595,6 +1611,7 @@ class MaraoStateTimelineCard extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this._stopConnection?.(); this._stopConnection = null;
     this._stopNativeEditing?.(); this._stopNativeEditing = null;
     this._detailsPopup?._close(false);
     this._resizeObserver?.disconnect();
@@ -1608,7 +1625,7 @@ class MaraoStateTimelineCard extends HTMLElement {
     this._loadedKey = "";
     this._loadId += 1;
     this._loading = false;
-    this._error = false;
+    this._error = false; this._offline = false;
     this._render();
     this._loadHistory();
   }
@@ -1622,12 +1639,12 @@ class MaraoStateTimelineCard extends HTMLElement {
     this._stateMarker = marker;
     const unavailable = historyEntityState(hass, this._config);
     this._availabilityState = unavailable;
-    if (unavailable !== wasUnavailable) {
+    if (unavailable !== wasUnavailable || this._range && Date.now() - this._range.end >= 86400000) {
       this._loadId += 1;
       this._loading = false;
       this._loadedKey = "";
-      this._history = null;
-      this._error = false;
+      this._history = null; this._range = null;
+      this._error = false; this._offline = false;
     } else if (!unavailable && changed && this._history?.length && !this._error) {
       this._history.push(entity);
       const end = Date.now();
@@ -1667,10 +1684,14 @@ class MaraoStateTimelineCard extends HTMLElement {
       if (loadId === this._loadId && this.isConnected !== false) {
         this._history = Array.isArray(response?.[0]) ? response[0] : [];
         this._range = { start: start.getTime(), end: end.getTime() };
-        this._error = false;
+        this._error = false; this._offline = false;
       }
-    } catch (_error) {
-      if (loadId === this._loadId && this.isConnected !== false) this._error = true;
+    } catch (error) {
+      const offline = await isDashboardOfflineError(error);
+      if (loadId === this._loadId && this.isConnected !== false) {
+        this._offline = offline; this._error = !offline;
+        this._history = null; this._range = null;
+      }
     } finally {
       if (loadId === this._loadId) {
         this._loading = false;
@@ -1755,12 +1776,12 @@ class MaraoStateTimelineCard extends HTMLElement {
     const duration = range ? range.end - range.start : 1;
     const status = !this._hass?.states ? localize("common.loading", this._hass) : unavailable
       ? localize(`common.${unavailable}`, this._hass)
-      : this._error
+      : this._offline ? localize('history.offline_range', this._hass) : this._error
       ? localize("timeline.history_unavailable", this._hass)
       : this._loading && !this._history
         ? localize("timeline.loading", this._hass)
         : localize("timeline.no_history", this._hass);
-    const historyState = !this._hass?.states ? "loading" : unavailable || (this._error ? "error" : this._loading ? "loading" : segments.length ? "ready" : "empty");
+    const historyState = !this._hass?.states ? "loading" : unavailable || (this._offline ? "offline" : this._error ? "error" : this._loading ? "loading" : segments.length ? "ready" : "empty");
     const segmentMarkup = segments.map((segment) => {
       const left = ((segment.from - range.start) / duration) * 100;
       const width = ((segment.to - segment.from) / duration) * 100;
@@ -1818,7 +1839,7 @@ class MaraoStateTimelineCard extends HTMLElement {
     this.shadowRoot.querySelector('[data-history-retry]')?.addEventListener('click', () => {
       if (!this._error || historyEntityState(this._hass, this._config) || this._loading) return;
       this._loadedKey = "";
-      this._error = false;
+      this._error = false; this._offline = false;
       this._history = null;
       window.MaraoDashboard?.haptic?.("heavy");
       this._loadHistory();
@@ -1911,7 +1932,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this._offset = 0;
+    this._selectedStart = null;
     this._history = []; this._series = {};
     this._loadId = 0;
     this._clearPeriodCache();
@@ -1933,13 +1954,13 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     if (changed) {
       this._detailGeneration = (this._detailGeneration || 0) + 1;
       this._detailChart?.destroy(); this._detailChart = null; this._detailLoading = false; this._detailFailed = false;
-      this._offset = 0;
+      this._selectedStart = null;
       this._clearPeriodCache();
       this._loadId += 1;
       this._loading = false;
       this._loadedKey = "";
       this._history = []; this._series = {};
-      this._error = false; this._preferences = null; this._priceError = false;
+      this._error = false; this._preferences = null; this._priceError = false; this._priceOffline = false;
     }
     this._render();
     this._load();
@@ -1959,7 +1980,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
       this._loading = false;
       this._loadedKey = "";
       this._history = []; this._series = {};
-      this._error = false; this._preferences = null; this._priceError = false;
+      this._error = false; this._preferences = null; this._priceError = false; this._priceOffline = false;
     }
     const sources = [this._config?.entity, ...(this._config?.sub_entities || []).flatMap(item => [item.entity_id, item.cost_entity]).filter(Boolean)];
     const renderKey = JSON.stringify([this._availabilityState, this._sourceAvailability,
@@ -1978,20 +1999,20 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     if (this.preview) { clearTimeout(this._refreshTimer); this._detailsPopup?._close(false); this._detailGeneration = (this._detailGeneration || 0) + 1; this._detailChart?.destroy(); this._detailChart = null; this._detailLoading = false; }
     this._render(); this._load(); this._scheduleRefresh();
   }
-  connectedCallback() { this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => this._nativeModeChanged()); this._load(); this._scheduleRefresh(); }
+  connectedCallback() {
+    this._stopConnection?.();
+    this._stopConnection = observeDashboardConnection(() => this._hass, status => {
+      if (status === 'online') {
+        this._clearPeriodCache(); this._loadedKey = ''; this._load();
+      }
+    });
+    this._stopNativeEditing?.(); this._stopNativeEditing = bindNativeEditing(this, () => this._nativeModeChanged()); this._load(); this._scheduleRefresh(); }
 
   _scheduleRefresh() {
     clearTimeout(this._refreshTimer);
     if (!this.isConnected || this.preview) return;
     this._refreshTimer = setTimeout(() => {
-      if (!this.preview && document.visibilityState !== 'hidden' && !historyEntityState(this._hass, this._config) && !this._loading) {
-        const key = this._range().start.toISOString();
-        const cached = this._periodCache.get(key)?.result;
-        if (key !== this._loadedKey || cached && !cached.failed && Date.now() - cached.loadedAt >= 60000) {
-          this._loadedKey = '';
-          this._load();
-        }
-      }
+      this._load();
       this._scheduleRefresh();
     }, 60000);
   }
@@ -1999,6 +2020,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
   getCardSize() { return this._config?.popup ? 5 : 2; }
 
   disconnectedCallback() {
+    this._stopConnection?.(); this._stopConnection = null;
     this._stopNativeEditing?.(); this._stopNativeEditing = null;
     clearTimeout(this._refreshTimer);
     this._detailsPopup?._close(false);
@@ -2029,8 +2051,8 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     } finally { if (generation === (this._detailGeneration || 0)) this._detailLoading = false; }
   }
 
-  _range(offset = this._offset) {
-    return historyPeriodRange(new Date(), offset, this._config.period, this._hass?.config?.time_zone || 'UTC');
+  _range(offset = 0) {
+    return historyPeriodRange(this._selectedStart ?? Date.now(), offset, this._config.period, this._hass?.config?.time_zone || 'UTC');
   }
 
   _periodLabel() {
@@ -2049,15 +2071,14 @@ class MaraoEnergyPeriodCard extends HTMLElement {
 
   _nearbyPeriods() {
     return [0, -1, 1, -2, 2, -3, 3, -4, 4]
-      .map(distance => this._offset + distance).filter(offset => offset <= 0)
-      .map(offset => this._range(offset));
+      .map(distance => this._range(distance)).filter(range => +range.start <= Date.now());
   }
 
   _requestPeriod(range) {
     const key = range.start.toISOString();
     let entry = this._periodCache.get(key);
     if (!entry) {
-      entry = {};
+      entry = { requestedAt: Date.now() };
       this._periodCache.set(key, entry);
       entry.promise = this._fetchPeriod(range).then(result => (entry.result = { ...result, loadedAt: Date.now() }));
     }
@@ -2066,13 +2087,13 @@ class MaraoEnergyPeriodCard extends HTMLElement {
 
   async _prefetchPeriods() {
     const cache = this._periodCache;
-    if (!this._config.popup || this._prefetching === cache) return;
+    if (dashboardConnectionStatus(this._hass) !== 'online' || !this._config.popup || this._prefetching === cache) return;
     this._prefetching = cache;
     try {
       // Yield past the selected period's paint before starting background work.
       await new Promise(resolve => (globalThis.requestAnimationFrame || globalThis.setTimeout)(resolve));
       await new Promise(resolve => setTimeout(resolve, 0));
-      while (cache === this._periodCache && this.isConnected !== false && !this._loading) {
+      while (cache === this._periodCache && this.isConnected !== false && !this._loading && dashboardConnectionStatus(this._hass) === 'online') {
         const range = this._nearbyPeriods().find(range => !cache.has(range.start.toISOString()));
         if (!range) break;
         await this._requestPeriod(range).promise;
@@ -2088,30 +2109,41 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const loadPrice = async () => {
       if (!needsPrice || config.cost_per_kwh !== undefined || !hass.callWS) return {};
       try { return { preferences: await (context.price ||= hass.callWS({ type: 'energy/get_prefs' })) }; }
-      catch (error) { context.price = null; return { priceError: error?.code !== 'not_found' }; }
+      catch (error) { context.price = null; return await isDashboardOfflineError(error) ? { priceOffline: true } : { priceError: error?.code !== 'not_found' }; }
     };
     const loadHistory = async () => {
-      const metadata = hass.callWS ? await (context.metadata ||= hass.callWS({ type: 'recorder/get_statistics_metadata', statistic_ids: usable })) : [];
-      if (context !== this._periodContext || this.isConnected === false) return {};
-      const meters = metadata.filter(item => item.has_sum).map(item => item.statistic_id);
-      const statistics = meters.length ? await hass.callWS({ type: 'recorder/statistics_during_period', statistic_ids: meters,
-        start_time: start.toISOString(), end_time: end.toISOString(), period: config.period === 'month' ? 'day' : 'hour', units: { energy: 'kWh' }, types: ['change'] }) : {};
+      let metadata = [], statistics = {}, statisticsOffline = false;
+      try {
+        if (hass.callWS) metadata = await (context.metadata ||= hass.callWS({ type: 'recorder/get_statistics_metadata', statistic_ids: usable }));
+        if (context !== this._periodContext || this.isConnected === false) return {};
+        const meters = metadata.filter(item => item.has_sum).map(item => item.statistic_id);
+        if (meters.length) statistics = await hass.callWS({ type: 'recorder/statistics_during_period', statistic_ids: meters,
+          start_time: start.toISOString(), end_time: end.toISOString(), period: config.period === 'month' ? 'day' : 'hour', units: { energy: 'kWh' }, types: ['change'] });
+      } catch (error) {
+        if (!await isDashboardOfflineError(error)) throw error;
+        statisticsOffline = true;
+      }
       if (context !== this._periodContext || this.isConnected === false) return {};
       const missing = usable.filter(entity => !statistics[entity]?.length);
-      let records = {}, historyFailed = false;
+      let records = {}, historyFailed = false, historyOffline = false;
       if (missing.length) {
         const query = new URLSearchParams({ filter_entity_id: missing.join(','), end_time: end.toISOString() });
         try {
           const response = await hass.callApi('GET', `history/period/${start.toISOString()}?${query}`);
           records = Object.fromEntries((response || []).filter(items => items?.[0]?.entity_id).map(items => [items[0].entity_id, items]));
-        } catch { historyFailed = true; }
+        } catch (error) {
+          historyOffline = await isDashboardOfflineError(error);
+          historyFailed = !historyOffline;
+        }
       }
       return Object.fromEntries(usable.map(entity => {
         if (statistics[entity]?.length) {
           const unit = metadata.find(item => item.statistic_id === entity)?.statistics_unit_of_measurement;
           return [entity, { statistics: statistics[entity], unit: energyValue(1, unit, { display_unit: 'kWh' })?.error ? unit : 'kWh' }];
         }
-        return [entity, historyFailed ? { error: true } : { records: records[entity] || [] }];
+        if (historyFailed) return [entity, { error: true }];
+        if (historyOffline || statisticsOffline && !records[entity]?.length) return [entity, { offline: true }];
+        return [entity, { records: records[entity] || [] }];
       }));
     };
     try {
@@ -2126,16 +2158,18 @@ class MaraoEnergyPeriodCard extends HTMLElement {
   async _load() {
     if (this.isConnected === false || this.preview || globalThis.document?.visibilityState === "hidden" || !this._config || historyEntityState(this._hass, this._config)) return;
     const range = this._range(), key = range.start.toISOString();
-    if (this._loadedKey === key) return;
+    const cached = this._periodCache.get(key), now = Date.now();
+    // Only a read issued after the boundary can cover the complete day or month.
+    const expired = dashboardConnectionStatus(this._hass) === 'online' && (now >= +range.end ? cached?.requestedAt < +range.end
+      : cached?.result && !cached.result.failed && now - cached.result.loadedAt >= 60000);
+    if (this._loadedKey === key && !expired) return;
     this._loadedKey = key;
     const loadId = ++this._loadId;
     if (this._periodCache.size) {
       const nearby = new Set(this._nearbyPeriods().map(range => range.start.toISOString()));
       for (const cachedKey of this._periodCache.keys()) if (!nearby.has(cachedKey)) this._periodCache.delete(cachedKey);
     }
-    const cached = this._periodCache.get(key)?.result;
-    // The open period is still accumulating; refresh it on return after a minute.
-    if (cached?.failed || cached && key === this._range(0).start.toISOString() && Date.now() - cached.loadedAt >= 60000) this._periodCache.delete(key);
+    if (expired || cached?.result?.failed) this._periodCache.delete(key);
     const entry = this._requestPeriod(range);
     if (!entry.result) {
       this._loading = true;
@@ -2145,10 +2179,13 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     }
     const result = entry.result || await entry.promise;
     if (loadId !== this._loadId || this.isConnected === false) return;
+    const needsFinalRead = dashboardConnectionStatus(this._hass) === 'online'
+      && entry.requestedAt < +range.end && Date.now() >= +range.end;
+    if (key !== this._range().start.toISOString() || needsFinalRead) return this._load();
     this._series = result.series;
     this._history = result.series[this._config.entity]?.records || [];
     this._error = Boolean(result.error || result.series[this._config.entity]?.error);
-    this._preferences = result.preferences; this._priceError = result.priceError;
+    this._preferences = result.preferences; this._priceError = result.priceError; this._priceOffline = result.priceOffline;
     this._loading = false;
     this._render();
     if (!result.failed) this._prefetchPeriods();
@@ -2158,6 +2195,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const state = this._hass?.states?.[entityId], series = this._series?.[entityId] || {};
     const unavailable = historyEntityState(this._hass, { entity: entityId });
     if (unavailable) return { samples: [], total: null, reason: `common.${unavailable}` };
+    if (series.offline) return { samples: [], total: null, reason: 'history.offline_range' };
     if (series.error) return { samples: [], total: null, reason: 'timeline.history_unavailable' };
     const records = series.statistics || (entityId === this._config.entity ? this._history : series.records);
     const key = JSON.stringify([entityId, +range.start, +range.end, this._config.period,
@@ -2202,7 +2240,7 @@ class MaraoEnergyPeriodCard extends HTMLElement {
         problem: reason ? localize(reason, this._hass) : energy.total == null || costValue == null ? localize('energy.incomplete', this._hass) : '' };
     });
     const derived = this._config.calculate_cost || this._config.sub_entities.some(item => !item.cost_entity);
-    const note = derived ? this._priceError ? localize('energy.price_error', this._hass)
+    const note = derived ? this._priceOffline ? localize('history.offline_range', this._hass) : this._priceError ? localize('energy.price_error', this._hass)
       : tariff.reason ? localize(tariff.reason, this._hass)
         : `${localize('energy.estimated_cost', this._hass)} · ${format(tariff.value, `${tariff.currency}/kWh`)}` : '';
     return { items, metric, note };
@@ -2232,7 +2270,9 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const tariff = energyTariff(this._config, this._hass, this._preferences);
     const costMode = this._config.calculate_cost;
     const costValue = value => { const kwh = energyValue(value, consumption.unit || entity?.attributes?.unit_of_measurement, { display_unit: 'kWh' }); return kwh && !kwh.error && tariff.value != null ? kwh.value * tariff.value : null; };
-    const priceProblem = costMode && !this._loading ? this._priceError ? localize('energy.price_error', this._hass) : tariff.reason ? localize(tariff.reason, this._hass) : '' : '';
+    const offline = consumption.reason === 'history.offline_range' || costMode && this._priceOffline;
+    const offlineLabel = offline ? localize('history.offline_range', this._hass) : '';
+    const priceProblem = costMode && !this._loading && !this._priceOffline ? this._priceError ? localize('energy.price_error', this._hass) : tariff.reason ? localize(tariff.reason, this._hass) : '' : '';
     const formatError = reading?.error || history.error || consumption.reason === "energy.format_error" || costMode && energyValue(1, entity?.attributes?.unit_of_measurement, { display_unit: 'kWh' })?.error ? localize("energy.format_error", this._hass) : "";
     const problem = cardProblem(this._config, this._hass, { contentError: formatError || priceProblem || (this._error ? localize("timeline.history_unavailable", this._hass) : ""), loading: this._loading });
     const values = consumption.samples.filter(record => Number.isFinite(record.value));
@@ -2251,19 +2291,20 @@ class MaraoEnergyPeriodCard extends HTMLElement {
     const previous = localize("energy.previous_period", this._hass);
     const next = localize("energy.next_period", this._hass);
     const disabled = unavailable || this._loading;
-    const status = formatError || priceProblem || (!this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass)
+    const status = formatError || priceProblem || offlineLabel || (!this._hass?.states ? localize("common.loading", this._hass) : unavailable ? localize(`common.${unavailable}`, this._hass)
       : this._loading ? localize("timeline.loading", this._hass)
         : this._error ? localize("timeline.history_unavailable", this._hass) : localize("energy.no_data", this._hass));
-    const historyState = !this._hass?.states ? "loading" : unavailable || (this._loading ? "loading" : this._error || formatError || priceProblem ? "error" : values.length ? "ready" : "empty");
+    const historyState = !this._hass?.states ? "loading" : unavailable || (this._loading ? "loading" : this._error || formatError || priceProblem ? "error" : offline ? "offline" : values.length ? "ready" : "empty");
     const body = this._config.popup
-      ? `<h2>${escapeHtml(title)}</h2><div class="period-nav"><button data-period="previous" aria-label="${escapeHtml(previous)}"${disabled ? " disabled" : ""}><ha-icon icon="mdi:chevron-left" aria-hidden="true"></ha-icon></button><strong>${escapeHtml(period)}</strong><button data-period="next" aria-label="${escapeHtml(next)}"${disabled || this._offset >= 0 ? " disabled" : ""}><ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon></button></div><div class="chart" aria-label="${escapeHtml(`${title} ${period}`)}"><span class="empty" role="status">${escapeHtml(status)}</span></div>`
-      : `<span class="value${problem && problem.kind !== "loading" ? " placeholder" : ""}">${escapeHtml(problem ? "—" : String(current))}</span><span class="period">${escapeHtml(problem && problem.kind !== "loading" ? problemLabel(problem, this._hass) : !this._loading && consumption.total == null ? localize("energy.no_data", this._hass) : period)}</span>`;
+      ? `<h2>${escapeHtml(title)}</h2><div class="period-nav"><button data-period="previous" aria-label="${escapeHtml(previous)}"${disabled ? " disabled" : ""}><ha-icon icon="mdi:chevron-left" aria-hidden="true"></ha-icon></button><strong>${escapeHtml(period)}</strong><button data-period="next" aria-label="${escapeHtml(next)}"${disabled || this._selectedStart == null ? " disabled" : ""}><ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon></button></div><div class="chart" aria-label="${escapeHtml(`${title} ${period}`)}"><span class="empty" role="status">${escapeHtml(status)}</span></div>`
+      : `<span class="value${problem && problem.kind !== "loading" ? " placeholder" : ""}">${escapeHtml(problem ? "—" : String(current))}</span><span class="period">${escapeHtml(problem && problem.kind !== "loading" ? problemLabel(problem, this._hass) : offlineLabel || (!this._loading && consumption.total == null ? localize("energy.no_data", this._hass) : period))}</span>`;
     const surfaceTag = this._config.popup ? "div" : "button";
     const surfaceAttributes = this._config.popup ? "" : ` type="button" aria-label="${escapeHtml(`${title}${formatting ? ` ${current}` : ""}`)}"${this.preview || unavailable ? ' disabled aria-disabled="true"' : ""}`;
     const markup = `<style>
       :host{display:block;width:100%;container:marao-energy / inline-size;}:host([data-marao-control-cell]){display:grid;min-width:0}:host([data-marao-control-cell])>.surface{height:100%} .surface{display:flex;min-height:112px;min-width:0;max-width:100%;width:100%;box-sizing:border-box;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:18px 20px;border:0;border-radius:var(--ha-card-border-radius,18px);background:var(--ha-card-background);color:var(--primary-text-color);font:inherit;text-align:left;cursor:pointer;} .surface:focus{outline:none;} .surface:disabled{cursor:default;color:var(--secondary-text-color);} .surface>*{min-width:0;max-width:100%;overflow-wrap:anywhere;} h2{width:100%;margin:0;font-size:var(--font-size-primary,18px);font-weight:var(--font-weight-primary,700);} .value{font-size:clamp(var(--font-size-primary,18px),9cqi,calc(var(--font-size-primary,18px) * 1.78));font-weight:800;line-height:1.25;} .period{color:var(--secondary-text-color);font-size:var(--font-size-secondary,14px);} .period-nav{position:sticky;top:var(--marao-popup-header-height,0px);z-index:1;background:var(--ha-card-background,var(--card-background-color));display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;width:100%;gap:8px;padding:8px 0 12px;text-align:center;} .period-nav strong{font-size:var(--font-size-primary,18px);} .surface>[data-history-retry]{min-width:48px;min-height:48px;padding:10px 12px;border:0;border-radius:12px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);overflow-wrap:anywhere;} .surface>[data-history-retry]:focus{outline:none;} .period-nav button{display:grid;place-items:center;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:var(--secondary-background-color);color:var(--primary-text-color);} .period-nav ha-icon{--mdc-icon-size:24px;width:24px;height:24px;pointer-events:none;} .period-nav button:focus{outline:none;} .period-nav button:disabled{opacity:.35;} .chart{display:grid;position:relative;width:100%;min-height:190px;overflow:hidden;} svg{grid-area:1/1;display:block;width:100%;height:100%;min-height:190px;} polyline{fill:none;stroke:var(--primary-color);stroke-width:2.5;vector-effect:non-scaling-stroke;} .scale{grid-area:1/1;position:relative;margin:8px;min-height:174px;display:flex;flex-direction:column;gap:8px;align-items:flex-start;justify-content:space-between;color:var(--secondary-text-color);font-size:var(--font-size-caption,14px);} .scale span{max-width:100%;overflow-wrap:anywhere;}.scale span:last-child{align-self:flex-end;} .empty{display:grid;min-height:190px;place-items:center;padding:16px;color:var(--secondary-text-color);font-size:var(--font-size-primary,18px);text-align:center;} @container marao-energy (max-width:240px){.surface{padding:12px 8px}.period-nav{grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center}.period-nav strong{grid-column:1/-1;grid-row:1}}
       div.surface{padding:var(--marao-popup-card-padding,18px 20px);padding-top:0;cursor:default} div.surface>h2{display:var(--marao-popup-detail-title-display,block)} @container marao-energy (max-width:240px){div.surface{padding:var(--marao-popup-card-padding,12px 8px);padding-top:0}}
       .value{height:1.25em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.period{height:1.25em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.placeholder{visibility:hidden}
+      [data-history-state="offline"] .period{height:auto;white-space:normal}
       .problem{font-family:var(--primary-font-family);font-size:var(--font-size-secondary,1rem);font-weight:var(--font-weight-secondary,500);line-height:1.25;}
     </style><${surfaceTag} class="surface"${problem ? ` data-problem="${problem.kind}" style="${problemStyle(problem)}"` : ""} data-history-state="${historyState}"${surfaceAttributes}>${this._config.popup ? body : `<h2>${escapeHtml(title)}</h2>${body}`}</${surfaceTag}>`;
     if (!this._config.popup && markup === this._renderedMarkup && this.shadowRoot.querySelector('.surface')) return;
@@ -2281,15 +2322,16 @@ class MaraoEnergyPeriodCard extends HTMLElement {
       breakdown: this._breakdown(tariff, metric), hass: this._hass, stateClass: entity?.attributes?.state_class,
       breakdownForSample: this._config.period === 'month' && !this._loading && !unavailable
         ? sample => this._breakdown(tariff, metric, sample ? { start: new Date(sample.time), end: new Date(sample.end) } : undefined) : undefined,
-      format: bound, unavailable: unavailable ? localize(`common.${unavailable}`, this._hass) : "", loading: Boolean(this._loading), error: formatError || priceProblem || (this._error ? localize("timeline.history_unavailable", this._hass) : ""),
+      format: bound, offlineCoverage: offlineLabel, unavailable: unavailable ? localize(`common.${unavailable}`, this._hass) : "", loading: Boolean(this._loading), error: formatError || priceProblem || (this._error ? localize("timeline.history_unavailable", this._hass) : ""),
       localize: key => localize(key, this._hass), onRetry: () => { this._loadedKey = ''; this._load(); },
       coverageLimited: Boolean(consumption.limited),
     });
     if (this._config.popup) {
       this.shadowRoot.querySelectorAll("[data-period]").forEach((button) => button.addEventListener("click", (event) => {
         event.stopPropagation();
-        if (button.disabled || historyEntityState(this._hass, this._config) || this._loading || (button.dataset.period === "next" && this._offset >= 0)) return;
-        this._offset += button.dataset.period === "previous" ? -1 : 1;
+        if (button.disabled || historyEntityState(this._hass, this._config) || this._loading || (button.dataset.period === "next" && this._selectedStart == null)) return;
+        const selected = this._range(button.dataset.period === "previous" ? -1 : 1);
+        this._selectedStart = +selected.end > Date.now() ? null : selected.start;
         window.MaraoDashboard?.haptic?.("heavy");
         this._history = [];
         this._load();
@@ -2406,11 +2448,41 @@ window.MaraoDashboard = {
 window.dispatchEvent(new Event('marao-runtime-ready'));
 console.info("%c Marao Dashboard loaded", "color: #d4b392; font-weight: 700;");
 
-// Optional content must not delay registration of basic dashboard cards.
-await Promise.all([
-  import(new URL(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`, import.meta.url)).then(module => module.registerMaraoCameraEventCards()),
-  Promise.all([
+let preloadRegistration;
+export function startCameraPreloading() {
+  return preloadRegistration ||= Promise.all([
     import(new URL(`./MaraoNavigation.js${MARAO_RESOURCE_QUERY}`, import.meta.url)),
-    import(new URL(`./MaraoCameraPreload.js${MARAO_RESOURCE_QUERY}`, import.meta.url)),
-  ]).then(([navigation, camera]) => navigation.registerCameraPreloader(record => camera.syncCameraPreload(record, {localize, haptic}))),
-]);
+    import(new URL(`./MaraoCameraPreloadConfig.js${MARAO_RESOURCE_QUERY}`, import.meta.url)),
+  ]).then(([navigation, {preloadCameras}]) => {
+    // HA reuses the Lovelace config object across state updates. Evaluate the
+    // opt-in once per document and load playback only when a camera requests it.
+    const checked = new WeakSet();
+    let loading;
+    navigation.registerCameraPreloader(record => {
+      const config = record.root.lovelace?.config || record.root.lovelace?.rawConfig;
+      if (loading || !config || checked.has(config)) return;
+      checked.add(config);
+      if (!preloadCameras(config).size) return;
+      loading = import(new URL(`./MaraoCameraPreload.js${MARAO_RESOURCE_QUERY}`, import.meta.url)).then(camera => {
+        // Registration revisits the current live records after async import.
+        navigation.registerCameraPreloader(active => camera.syncCameraPreload(active, {localize, haptic}));
+      }).catch(error => {
+        loading = null;
+        console.error('Marao camera preload could not initialize', error);
+        if (!record.released) record.root.dispatchEvent(new CustomEvent('hass-notification', {
+          bubbles:true, composed:true, detail:{message:localize('camera.failed', record.root.hass) + ' ' + error.message},
+        }));
+      });
+    });
+  }).catch(error => {
+    preloadRegistration = null;
+    throw error;
+  });
+}
+
+if (!window.MaraoDashboardRuntime) {
+  await Promise.all([
+    import(new URL(`./MaraoFrigateEventsCard.js${MARAO_RESOURCE_QUERY}`, import.meta.url)).then(module => module.registerMaraoCameraEventCards()),
+    startCameraPreloading(),
+  ]);
+}

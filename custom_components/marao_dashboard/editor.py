@@ -139,6 +139,11 @@ EDITOR_CATALOG: dict[str, Any] = {
             "domains": ["camera"],
             "description": "Automatic camera preview to live video with a generated Frigate, UniFi Protect or Netatmo events popup.",
             "variables": [
+                {**_field("stream_quality", "Dashboard video quality", "select", default="auto"), "options": ["auto", "low", "high"]},
+                _field("low_stream_entity", "Low-quality camera entity", "entity", domains=["camera"],
+                       description="Select a second entity for the same camera's low-resolution feed."),
+                _field("frigate_low_stream", "Frigate low-quality stream name", "text",
+                       description="Enter a low-resolution go2rtc stream name on this camera's Frigate instance."),
                 _field("popup_stream_entity", "Popup stream", "entity", domains=["camera"]),
                 _field("preload_stream", "Preload stream in background", "boolean", default=False,
                        description="Uses bandwidth and device resources on other dashboard pages. Popup video stays on demand."),

@@ -1,4 +1,5 @@
 import {climateConfigError} from '../custom_components/marao_dashboard/frontend/MaraoClimate.js';
+import {cameraOptionsError} from '../custom_components/marao_dashboard/frontend/MaraoCameraOptions.js';
 import {peopleError,sectionsError} from '../custom_components/marao_dashboard/frontend/MaraoCollections.js';
 import { floorPlanErrors, floorPageErrors } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlan.js';
 import { canonicalCard, canonicalTemplate, legacyTemplates } from '../custom_components/marao_dashboard/frontend/MaraoNames.js';
@@ -741,6 +742,7 @@ export function validatePages(config, catalog, entities = []) {
         if(card.template==='md_camera_card' && Object.hasOwn(options,'event_columns') && (!Number.isSafeInteger(options.event_columns)||options.event_columns<1))errors.push('Event columns must be a positive integer.');
         if (card.template === 'md_camera_card' && Object.hasOwn(options, 'preload_stream') && typeof options.preload_stream !== 'boolean') errors.push('Preload stream must be a boolean.');
         if (card.template === 'md_camera_card' && options.popup_stream_entity != null && options.popup_stream_entity !== '' && (!entityId(options.popup_stream_entity) || !options.popup_stream_entity.startsWith('camera.'))) errors.push('Choose a camera entity for the popup stream.');
+        if (card.template === 'md_camera_card') { const error = cameraOptionsError(options); if (error) errors.push(error); }
         if (Object.hasOwn(options,'activity_entities') && (!Array.isArray(options.activity_entities) || options.activity_entities.some(value=>!entityId(value)))) errors.push('Related activity entities must be an explicit list of entity IDs.');
         if (card.template === 'md_climate_card') {const error=climateConfigError(options);if(error)errors.push(error);}
         if (card.template === 'md_room_card' && options.climate_entity != null && options.climate_entity !== '' && (typeof options.climate_entity !== 'string' || !/^climate\.[a-z0-9_]+$/.test(options.climate_entity))) errors.push('Room climate must be a climate entity.');

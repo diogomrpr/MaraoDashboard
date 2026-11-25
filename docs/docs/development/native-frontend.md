@@ -104,7 +104,9 @@ outside normal dashboard startup and do not add a writer or backend.
 
 `npm run build:editor` regenerates source-owned frontend bundles. `npm run build:hacs` stages the Dashboard package and replaces root `dist/` and `hacs.json`. `npm run build:converter` creates the standalone offline HTML converter. Do not edit generated distribution files.
 
-The flat graph contains the stable loader, release manifest and content-identified modules/assets. An injected graph-local URL resolver preserves relative assets without changing the browser's global URL constructor. Manifest hashes support readiness checks. A document-level gate prevents competing registrations from duplicate entry loads.
+The stable HACS entry carries the current release identity in a first-line JSON comment. Startup and later update checks fetch the entry as fresh text so a cached loader can discover the installed graph. Older entries resolve through the full release manifest, which continues to list every release file and its hash.
+
+JavaScript and CSS use the package identity. Font and image URLs use a SHA-256 of the individual file followed by its flat path, so browsers reuse identical bytes across releases. Saved picture cards retain their stable aliases. The graph-local URL resolver handles relative asset references, and a document-level gate prevents duplicate registration.
 
 Commit the complete graph when publishing an immutable tag. If any release asset is attached, including the converter, attach **every file in `dist/`** too: HACS prefers release assets once any exist. Converter-only or entry-only releases are incomplete. Compare filenames/hashes against the manifest; do not use integration ZIP packaging.
 

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {cards as documentedCards} from '../../docs/examples/manifest.js';
 import {cameraEventsStub, refreshCardMetadata} from '../../frontend_src/native-card-metadata.js';
+import {editorLabel} from '../../frontend_src/editor-labels.js';
 import { catalog } from '../../frontend_src/native-model.js';
 import { composeNativeCard, createCardComposition, nativeCardDescriptor, nativeCardType, NATIVE_CARD_TYPES, resolveSource, templateForNativeType, validateNativeCardConfig } from '../../frontend_src/card-composition.js';
 import { MaraoNativeCard, nativeCardGridOptions, nativeCardSetup, nativeCardStub, nativeEntitySuggestion, nativeCardDefaults, registerNativeCards } from '../../frontend_src/native-cards.js';
@@ -46,6 +47,12 @@ test('native registration retains existing generic renderers and hides only cata
   assert.equal(window.customCards.length, catalog.cards.filter(card => !card.hidden).length+2);
   assert.equal(window.customCards.filter(card=>card.type==='marao-camera-events-card').length,1);
   assert.equal(window.customCards[0],thirdParty);
+  refreshCardMetadata({language:'pt'});
+  for (const entry of catalog.cards.filter(card => !card.hidden)) {
+    const card = window.customCards.find(card => card.type === nativeCardType(entry.id).slice(7));
+    assert.equal(card.name, 'Marao ' + editorLabel(entry.label, 'pt'));
+    assert.equal(card.description, editorLabel(entry.description || entry.label, 'pt'));
+  }
   for(const registration of window.customCards.slice(1)){assert.equal(typeof registration.getEntitySuggestion,'function');assert.ok(documentedCards.some(card=>registration.documentationURL===`https://diogomrpr.github.io/MaraoDashboard/cards/${card.slug}/`),registration.type);}
   assert.deepEqual(window.customCards.find(card=>card.type==='marao-light-card').getEntitySuggestion(hass,'light.test'),{config:{type:'custom:marao-light-card',template:'md_light_card',entity_id:'light.test',variables:{enable_slider:true,use_light_color:false}}});
   const events=window.customCards.find(card=>card.type==='marao-camera-events-card');assert.deepEqual(events.getEntitySuggestion(hass,'camera.test'),{config:{type:'custom:marao-camera-events-card',cameras:[{entity:'camera.test'}]}});assert.equal(events.getEntitySuggestion(hass,'light.test'),null);
@@ -180,26 +187,71 @@ test('native preview and live native editing forward inert state before hass and
   assert.equal(order.at(-1)[0], 'preview');
 });
 
+test('native wrappers compose once on first state, forward readings and recompose on referenced metadata changes', () => {
+  const state = id => ({entity_id:id, state:'off', attributes:{friendly_name:id}});
+  const states = {'light.bound':state('light.bound'), 'light.other':state('light.other')};
+  const mounts = [];
+  const owner = Object.assign(Object.create(MaraoNativeCard.prototype), {
+    _children:[], _content:{}, _bindHost(){}, _mount(context){mounts.push(context);},
+  });
+  owner.setConfig(config('md_light_card', {entity:'light.bound'}));
+  assert.equal(mounts.length, 0);
+  owner.hass = {states, language:'en'};
+  owner._refresh();
+  assert.equal(mounts.length, 1);
+  assert.deepEqual(mounts[0].entities.map(entity => entity.entity_id), Object.keys(states));
+  states['light.bound'].state = 'on';
+  states['light.other'].attributes.friendly_name = 'Other lamp';
+  owner._refresh();
+  assert.equal(mounts.length, 1);
+  states['light.bound'].attributes.friendly_name = 'Bound lamp';
+  owner._refresh();
+  assert.equal(mounts.length, 2);
+  assert.deepEqual(mounts[1].entities.map(entity => entity.name), ['Bound lamp', 'Other lamp']);
+
+  owner.setConfig(config('md_entity_group_card', {id:'lights', name:'Lights', entity_type:'light', entities:['light.bound'], popup_view:'other-lights'}));
+  assert.equal(mounts.length, 3);
+  delete states['light.other'];
+  owner._refresh();
+  assert.equal(mounts.length, 4);
+  assert.deepEqual(mounts[3].entities.map(entity => entity.entity_id), ['light.bound']);
+});
+
 test('invalid access actions and mismatched native identities fail before composition', () => {
   assert.throws(() => validateNativeCardConfig(config('md_access_slide_action_card', { entity_id: 'lock.test', tap_action: { action: 'toggle' } })), /strict slide/);
   assert.throws(() => validateNativeCardConfig({ type: 'custom:marao-light-card', template: 'md_access_card', entity_id: 'lock.test' }), /card type/);
   assert.throws(() => composeNativeCard(config('md_light_card', { entity_id: 'light.test' })), /occurrence identity/);
 });
 
-test('registered native cards wait for delayed content before calling Home Assistant card helpers', async t => {
+test('native cards wait only for their requested renderer, including the older whole-runtime fallback', async t => {
   const previous={customElements:globalThis.customElements,document:globalThis.document,window:globalThis.window,loadCardHelpers:globalThis.loadCardHelpers};
   t.after(()=>Object.assign(globalThis,previous));
-  const ready=Promise.withResolvers();let available=false,helperCalls=0;
+  let available=false,helperCalls=0;
   globalThis.customElements={get:name=>name!=='marao-energy-period-card'||available};
-  globalThis.window={MaraoDashboardRuntime:{ready:ready.promise}};
   globalThis.loadCardHelpers=()=>{helperCalls++;throw Error('A missing custom element would become a native error card');};
   globalThis.document={createElement:()=>({setConfig(config){this.config=config;}})};
-  const content={querySelector:()=>({setAttribute(){}}),replaceChildren(...children){this.children=children;}};
-  const owner=Object.assign(Object.create(MaraoNativeCard.prototype),{_config:config('md_energy_period_card',{entity_id:'sensor.test'}),_instanceId:'delayed',_renderVersion:0,_children:[],_content:content,_details:{replaceChildren(){}},_forward(){}});
-  const rendering=owner._mount({dashboardRoot:'test-home',entities:[],language:'en'});
-  assert.match(content.innerHTML,/ha-circular-progress active/);assert.equal(helperCalls,0);assert.equal(content.children,undefined);
-  available=true;ready.resolve();await rendering;
-  assert.equal(helperCalls,0);assert.equal(content.children[0].config.type,'custom:marao-energy-period-card');
+  for (const supportsDemand of [true, false]) {
+    available = false;
+    const feature = Promise.withResolvers(), whole = Promise.withResolvers(), requests = [], observed = [];
+    globalThis.window = {MaraoDashboardRuntime:{ready:whole.promise, observeCard:surface => observed.push(surface)}};
+    if (supportsDemand) window.MaraoDashboardRuntime.requestContent = types => {
+      requests.push(types);
+      return feature.promise;
+    };
+    const content={querySelector:()=>({setAttribute(){}}),replaceChildren(...children){this.children=children;}};
+    const owner=Object.assign(Object.create(MaraoNativeCard.prototype),{_config:config('md_energy_period_card',{entity_id:'sensor.test'}),_instanceId:'delayed',_renderVersion:0,_children:[],_content:content,_details:{replaceChildren(){}},_forward(){}});
+    const rendering=owner._mount({dashboardRoot:'test-home',entities:[],language:'en'});
+    assert.match(content.innerHTML,/ha-circular-progress active/);
+    assert.equal(helperCalls,0);
+    assert.equal(content.children,undefined);
+    assert.deepEqual(requests,supportsDemand ? [['custom:marao-energy-period-card','custom:marao-popup-card']] : []);
+    available=true;
+    (supportsDemand ? feature : whole).resolve();
+    await rendering;
+    assert.equal(helperCalls,0);
+    assert.equal(content.children[0].config.type,'custom:marao-energy-period-card');
+    assert.deepEqual(observed, [content.children[0]]);
+  }
 });
 
 test('camera popup columns forward explicitly while omission retains released output',async()=>{

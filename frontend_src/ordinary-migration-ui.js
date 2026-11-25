@@ -127,7 +127,10 @@ export class MaraoMigrationCard extends HTMLElement {
     this._q('staged').hidden = !this._session?.recovery;
     this._q('open').hidden = !this._converted; this._q('open').disabled = this._busy;
     for (const name of ['recovery', 'proposed', 'inspect', 'resume']) this._q(name).disabled = this._busy;
-    this._q('apply').disabled = this._busy || this._converted || !this._exported || !this._proposedExported || !this._q('backup').checked || !this._q('privacy').checked || this._session?._uncertain;
+    const restoreArchive = this._converted && this._session?.canRestoreArchive;
+    this._q('apply').textContent = restoreArchive
+      ? (languageCode(this._hass) === 'pt' ? 'Restaurar arquivo de migração' : 'Restore migration archive') : this._t('apply');
+    this._q('apply').disabled = this._busy || (this._converted && !restoreArchive) || !this._exported || !this._proposedExported || !this._q('backup').checked || !this._q('privacy').checked || this._session?._uncertain;
   }
   _download(text, filename) {
     if (typeof text !== 'string' || !this._hass.user?.is_admin) return;

@@ -83,7 +83,7 @@ const cardsSource = (await fs.readFile(new URL('../../custom_components/marao_da
 const instrumentedSource = `
 const MARAO_RESOURCE_QUERY = '';
 const maraoDashboardActive = globalThis.maraoDashboardActive;
-import { nativeEditing, bindNativeEditing, cardProblem, problemStyle, problemLabel, showCardDetails, serviceOutcome, serviceConnectionReady, serviceTargetReady, accessOpenerService } from "data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}";
+import { nativeEditing, bindNativeEditing, observeDashboardConnection, cardProblem, problemStyle, problemLabel, showCardDetails, serviceOutcome, serviceConnectionReady, serviceTargetReady, accessOpenerService } from "data:text/javascript;base64,${Buffer.from(cardsSource).toString('base64')}";
 const haptic = (value) => globalThis.__maraoTestHaptics.push(value);
 const callServiceWithNotification = (hass, domain, service, data, onOutcome) => {
   try {
@@ -141,7 +141,7 @@ test("loads the bundled Montserrat stylesheet without a runtime font CDN", async
   assert.doesNotMatch(source,/fonts\.googleapis\.com|fonts\.gstatic\.com/);
   const font=await fs.readFile(new URL('../../custom_components/marao_dashboard/frontend/MaraoFonts.css',import.meta.url),'utf8');
   assert.match(font,/font-weight:\s*100 900/);
-  assert.match(font,/\.\/fonts\/Montserrat\.ttf/);
+  assert.match(font,/\.\/fonts\/Montserrat\.woff2/);
   assert.match(source, /data-marao-font/);
 });
 

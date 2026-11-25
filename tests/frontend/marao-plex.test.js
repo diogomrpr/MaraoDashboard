@@ -257,3 +257,61 @@ test('Plex target discovery includes standalone libraries without requiring a Me
   assert.deepEqual(plexTargets(dashboard,first).map(target=>target.entity_id),[first.entity_id,second.entity_id]);
   assert.deepEqual(dashboard,before);
 });
+
+test('downloaded Plex keeps four saved folders navigable and refreshes an unread series on reconnect',async t=>{
+  const {MaraoPlexWatchCard}=await import('../../custom_components/marao_dashboard/frontend/MaraoPlex.js');
+  const browser=new EventTarget(),previous=globalThis.window;
+  let backend='offline';
+  Object.defineProperty(browser,'__dashboardConnection',{get:()=>backend});
+  globalThis.window=browser;
+  t.after(()=>{globalThis.window=previous;});
+  const directory=(id,title,type)=>({media_content_id:`plex://safe-server/${id}`,media_content_type:type,title,can_expand:true});
+  const folders=Array.from({length:4},(_,i)=>directory(String(i+1),`Library ${i+1}`,'library'));
+  const show=directory('100','Fixture series','show'),season=directory('101','First season','season');
+  const saved=new Map([[root.media_content_id,{...root,children:folders}],
+    ...folders.map(folder=>[folder.media_content_id,{...folder,children:[show]}])]);
+  const card=Object.create(MaraoPlexWatchCard.prototype);
+  const f=launcher({warm:true});
+  card._draw=()=>{};
+  card._mount=()=>{};
+  card._launch=f.launch;
+  card.setConfig({parent:parent(),full:true});
+  card._epoch=0;
+  card._generation=0;
+  card._hass={...f.hass,callWS:async command=>{
+    const result=saved.get(command.media_content_id);
+    if(result)return result;
+    if(backend!=='online')throw {code:'dashboard_offline',message:'Data unavailable'};
+    throw new Error('Live library access denied');
+  }};
+  card.isConnected=true;
+  t.after(()=>{card.isConnected=false;card.disconnectedCallback();});
+  card.connectedCallback();
+  await tick();
+  assert.equal(card._home.libraries.length,4);
+  for(const folder of folders){
+    await card._navigate(folder,true);
+    assert.equal(card._folder.children[0].title,show.title);
+  }
+  await card._navigate(folders[0]);
+  await card._navigate(show);
+  assert.deepEqual(card._history,[folders[0],show]);
+  assert.equal(card._contentError,'This folder is unavailable offline.');
+  assert.equal(card._loading,false);
+  assert.equal(await f.launch.start(item()),false);
+  assert.deepEqual(f.calls,[]);
+  card._history.pop();
+  await card._navigate(card._history.at(-1),true);
+  assert.equal(card._contentError,'');
+  assert.equal(card._folder.children[0].title,show.title);
+  await card._navigate(show);
+  saved.set(show.media_content_id,{...show,children:[season]});
+  backend='online';
+  browser.dispatchEvent(new CustomEvent('dashboard-connection-changed',{detail:backend}));
+  await tick();
+  assert.equal(card._folder.children[0].title,season.title);
+  assert.deepEqual(card._history,[folders[0],show]);
+  assert.equal(card._contentError,'');
+  await card._navigate(season);
+  assert.equal(card._contentError,'Live library access denied');
+});

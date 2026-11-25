@@ -1,15 +1,44 @@
 import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
 import {nativeDashboardConfig,nativeDashboardHasDraft} from '../custom_components/marao_dashboard/frontend/MaraoNativeContext.js';
-import {popupCanonical,managedPopupIssue} from '../custom_components/marao_dashboard/frontend/MaraoPopupManaged.js';
-import {popupAuthoringAllowed,commitPopupDocument,reconcilePopupTransaction} from '../custom_components/marao_dashboard/frontend/MaraoPopupTransaction.js';
-import {popupLabel} from '../custom_components/marao_dashboard/frontend/MaraoPopupLayout.js';
-import {planManagedPopups} from './popup-management.js';
-const same=(a,b)=>popupCanonical(a)===popupCanonical(b);
+
+let plannerModule, plannerAttempt = 0;
+function loadPopupPlanner() {
+  if (!plannerModule) {
+    const params = new URL(import.meta.url).searchParams;
+    if (plannerAttempt) params.set('marao_retry', String(plannerAttempt));
+    const query = params.size ? '?' + params : '';
+    plannerModule = import(new URL(`./MaraoPopupManagement.js${query}`, import.meta.url)).catch(error => {
+      plannerModule = undefined;
+      plannerAttempt++;
+      throw error;
+    });
+  }
+  return plannerModule;
+}
 
 // Observes confirmed HA saves. Loading a dashboard never repairs or writes it.
 export function createPopupCoordinator(root,options={}) {
   const route=options.route||(()=>globalThis.location?.pathname.split('/')[1]);
   const dirty=options.dirty||(()=>nativeDashboardHasDraft(root));
+  const loadPlanner = options.loadPlanner || loadPopupPlanner;
+  let support, loadingSupport, supportFailed = false, supportAttempt = 0;
+  const loadSupport = options.loadSupport || (() => {
+    const url = new URL(`./MaraoPopupSync.js${new URL(import.meta.url).search}`, import.meta.url);
+    if (supportAttempt) url.searchParams.set('marao_retry', String(supportAttempt));
+    return import(url);
+  });
+  function getSupport() {
+    loadingSupport ||= loadSupport().then(module => {
+      support = module;
+      if (!disposed) protect();
+      return module;
+    }, error => {
+      loadingSupport = null; supportFailed = true; supportAttempt++;
+      if (!disposed) protect();
+      throw error;
+    });
+    return loadingSupport;
+  }
   let subscription,unsubscribe,identity,epoch=0,pending=false,running=false,disposed=false;
   let blockedView,wasInert,notice;
   const config=()=>nativeDashboardConfig(root.lovelace);
@@ -21,12 +50,17 @@ export function createPopupCoordinator(root,options={}) {
   function protect() {
     const document=config(),host=root.shadowRoot?.querySelector?.('hui-view');
     const index=root.lovelace?.current_view??host?.index,view=document?.views?.[index];
-    const path=view&&String(view.path??index),issue=view?.marao_popup&&managedPopupIssue(document,path,root._maraoPopupSync?.get(path));
-    if(!issue||root.lovelace?.editMode||!host){releaseView();return;}
+    if(!view?.marao_popup||root.lovelace?.editMode||!host){supportFailed=false;releaseView();return;}
+    const path=String(view.path??index);
+    if(!support && !loadingSupport && !supportFailed) getSupport().catch(() => {}); // protect() reports the error on the view.
+    const issue=support?.managedPopupIssue(document,path,root._maraoPopupSync?.get(path));
+    if(support && !issue){releaseView();return;}
     if(host!==blockedView){releaseView();blockedView=host;wasInert=Boolean(host.inert);}
     host.inert=true;
     if(!notice){notice=globalThis.document.createElement('p');notice.setAttribute('role','alert');root.shadowRoot.append(notice);}
-    notice.textContent=popupLabel(issue,root.hass);
+    if(support)notice.textContent=support.popupLabel(issue,root.hass);
+    else if(languageCode(root.hass)==='pt') notice.textContent=supportFailed?'Não foi possível verificar este popup.':'A verificar o popup…';
+    else notice.textContent=supportFailed?'Could not verify this popup.':'Checking popup…';
   }
   async function drain() {
     if(running||!pending||!identity)return;
@@ -34,6 +68,9 @@ export function createPopupCoordinator(root,options={}) {
     if(!current(token)||root._maraoPopupWrite)return;
     running=true;pending=false;let busy=false,waitHost=false;
     try {
+      const {popupCanonical, popupAuthoringAllowed, reconcilePopupTransaction, commitPopupDocument}=await getSupport();
+      if(!current(token))return;
+      const same=(a,b)=>popupCanonical(a)===popupCanonical(b);
       const hass=root.hass,path=identity.path,context={hass,root,path,journal:options.journal,isCurrent:()=>current(token)};
       if(!popupAuthoringAllowed(context))return;
       const original=await hass.callWS({type:'lovelace/config',url_path:path,force:true});
@@ -42,6 +79,10 @@ export function createPopupCoordinator(root,options={}) {
       // a host update; do not mistake a draft for a saved parent change.
       if(!same(config(),original)){pending=true;waitHost=true;return;}
       await reconcilePopupTransaction(context,original);if(!current(token))return;
+      const {planManagedPopups} = await loadPlanner();
+      if (!current(token)) return;
+      // Another save may have completed while the planner was downloading.
+      if (!same(config(), original)) { pending = true; return; }
       const entities=Object.values(hass.states||{}).map(state=>({...state.attributes,entity_id:state.entity_id}));
       const proposed=planManagedPopups(original,{entities,hass,dashboardRoot:path,language:languageCode(hass)});
       if(same(original,proposed)){root._maraoPopupSync=new Map();notify();return;}
@@ -50,7 +91,7 @@ export function createPopupCoordinator(root,options={}) {
       if(current(token)){root._maraoPopupSync=new Map();notify();}
     }catch(error){
       if(current(token)){root._maraoPopupSync=new Map(paths().map(source=>[source,{error:error.message}]));notify();}
-    }finally{running=false;if(busy)protect();if(pending&&!waitHost&&current(token))queueMicrotask(()=>{if(!root._maraoPopupWrite)drain();});}
+    }finally{running=false;if(busy)protect();if(pending&&!waitHost&&current(epoch))queueMicrotask(()=>{if(!root._maraoPopupWrite)drain();});}
   }
   function stop(){epoch++;unsubscribe?.();unsubscribe=null;subscription=null;identity=null;pending=false;root._maraoPopupSync=new Map();releaseView();}
   return {
@@ -67,6 +108,6 @@ export function createPopupCoordinator(root,options={}) {
     },
     dispose(){disposed=true;stop();},
     // Kept observable for the narrow host-lifecycle tests, not a save API.
-    async settled(){await subscription;while(running)await new Promise(resolve=>setTimeout(resolve,0));},
+    async settled(){await subscription;await loadingSupport?.catch(()=>{});while(running)await new Promise(resolve=>setTimeout(resolve,0));},
   };
 }

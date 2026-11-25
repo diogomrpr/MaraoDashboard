@@ -1,3 +1,4 @@
+import {dashboardConnectionStatus,observeDashboardConnection} from '../custom_components/marao_dashboard/frontend/MaraoConnection.js';
 import {bindDropdown,dropdownStyles} from '../custom_components/marao_dashboard/frontend/MaraoDropdown.js';
 import {nativeEditing,bindNativeEditing} from '../custom_components/marao_dashboard/frontend/MaraoNativeContext.js';
 import {schedulesSession} from './schedule-api.js';
@@ -14,15 +15,21 @@ export class MaraoSchedulesCard extends Base {
   set hass(value){const records=Object.values(value?.states||{}).filter(state=>state.entity_id?.startsWith('automation.')&&state.attributes?.id?.startsWith('marao_schedules_')).map(state=>[state.entity_id,state.state,state.last_updated,state.attributes.id]);const signature=JSON.stringify(records);if(this._automationSignature!==signature||this._hass?.connected===false&&value?.connected!==false)this._loaded=false;this._automationSignature=signature;this._hass=value;if(this._session)this._session.hass=value;this._refresh();}
   get hass(){return this._hass;}
   l(value){return scheduleLabel(value,this._hass);}
-  connectedCallback(){this._stopEditing=bindNativeEditing(this,()=>{if(this.preview)this._dialog?.close();this._refresh();});this._refresh();}
-  disconnectedCallback(){this._stopEditing?.();this._stopEditing=null;clearTimeout(this._autosaveTimer);this._version++;this._loading=false;this._unsubscribe?.();this._unsubscribe=null;this._dialog?.close();}
+  connectedCallback(){
+    this._stopConnection=observeDashboardConnection(()=>this._hass,status=>{
+      if(status==='online')this._loaded=false;
+      else clearTimeout(this._autosaveTimer);
+      this._refresh();
+    });
+    this._stopEditing=bindNativeEditing(this,()=>{if(this.preview)this._dialog?.close();this._refresh();});this._refresh();}
+  disconnectedCallback(){this._stopConnection?.();this._stopEditing?.();this._stopEditing=null;clearTimeout(this._autosaveTimer);this._version++;this._loading=false;this._unsubscribe?.();this._unsubscribe=null;this._dialog?.close();}
   getCardSize(){return 5;}
   async _refresh(){
     if(!this._config||!this._hass)return;
     if(this._busy||this._session?.busy)return;
     if(!this._hass.user?.is_admin||this.preview){this._render();return;}
     if(!this._session||this._session.id!==this._config.group_id){this._session=schedulesSession(this._hass,this._config.group_id);this._loaded=false;}
-    if(this.isConnected&&!this._loaded&&!this._loading){this._loading=true;const version=this._version;try{await this._session.read();if(version!==this._version)return;this._loaded=true;this._error='';if(!this._unsubscribe){const stop=await this._hass.connection.subscribeEvents(()=>{this._loaded=false;this._refresh();},'automation_reloaded');if(version===this._version&&this.isConnected)this._unsubscribe=stop;else stop();}}catch(error){this._error=error.message;}finally{if(version===this._version){this._loading=false;this._render();}}}
+    if(this.isConnected&&!this._loaded&&!this._loading){this._loading=true;const version=this._version;try{await this._session.read();if(version!==this._version)return;this._loaded=true;this._error='';if(!this._unsubscribe){const stop=await this._hass.connection.subscribeEvents(()=>{this._loaded=false;this._refresh();},'automation_reloaded');if(version===this._version&&this.isConnected)this._unsubscribe=stop;else stop();}}catch(error){this._error=error.message;if(dashboardConnectionStatus(this._hass)!=='online')this._loaded=true;}finally{if(version===this._version){this._loading=false;this._render();}}}
     else this._render();
   }
   _haptic(){this.dispatchEvent(new CustomEvent('haptic',{detail:'heavy',bubbles:true,composed:true}));}
@@ -30,9 +37,10 @@ export class MaraoSchedulesCard extends Base {
   _button(action,label,disabled=false){return `<button type="button" data-action="${e(action)}"${disabled?' disabled':''}>${e(this.l(label))}</button>`;}
   _render(){
     if(!this.shadowRoot||!this._config||this._dialog?.open)return;
-    const session=this._session,m=session?.manifest,states=this._hass?.states||{},disabled=this._busy||this.preview||this._hass?.connected===false||this._hass?.connection?.connected===false;
+    const session=this._session,m=session?.manifest,states=this._hass?.states||{},disabled=this._busy||this.preview||dashboardConnectionStatus(this._hass)!=='online';
     let body='';
     if(!this._hass?.user?.is_admin)body=e(this.l('Administrator access is required.'));
+    else if(!m&&dashboardConnectionStatus(this._hass)!=='online')body=e(this.l('Disconnected'));
     else if(!m)body=`<p>${e(this.l(this._loading?'Loading':'Set up schedules'))}</p><label><input type="checkbox" data-ack>${e(this.l('Dedicated devices and private HA backup confirmed'))}</label>${this._button('setup','Set up schedules',disabled||!this._ack)}`;
     else {
       const selected=states[m.selection?.entity_id]?.state || session.selected;

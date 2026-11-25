@@ -63,14 +63,14 @@ class Element extends EventTarget {
   setAttribute(name,value){this.attributes[name]=value;}
   focus(){let root=this;while(root.parent)root=root.parent;root.activeElement=this;}
 }
-function controller(api){
+function controller(api, overrides={}){
   const previous=globalThis.document;globalThis.document=Object.assign(new EventTarget(),{createElement:tag=>new Element(tag)});
   const previousFrame=globalThis.requestAnimationFrame, previousCancel=globalThis.cancelAnimationFrame, frames=new Map();let frameId=0;
   globalThis.requestAnimationFrame=callback=>{frames.set(++frameId,callback);return frameId;};
   globalThis.cancelAnimationFrame=id=>frames.delete(id);
   const host=new Element('host'), updates=[];
   const hass={connected:true,config:{time_zone:'Europe/Lisbon'},locale:{language:'en'},states:{'sensor.house':{state:'100',attributes:{unit_of_measurement:'W'}},'sensor.fridge':{state:'20',attributes:{unit_of_measurement:'W'}}},callApi:api};
-  const options={entity:'sensor.house',name:'House',power_devices:[{entity_id:'sensor.fridge',name:'Fridge'}],hass,now:()=>Date.parse(stamp),convert,format:value=>String(value),localize:key=>key};
+  const options={entity:'sensor.house',name:'House',power_devices:[{entity_id:'sensor.fridge',name:'Fridge'}],hass,now:()=>Date.parse(stamp),convert,format:value=>String(value),localize:key=>key,...overrides};
   const instance=createPowerHistory(host,options,(_container,initial)=>({update:next=>updates.push(next),destroy(){updates.push({destroyed:true});}}));
   const toolbar=host.children[1],picker=toolbar.children[0],select=picker.children[0],menu=picker.children[1],navigation=toolbar.children[1];
   return {instance,options,updates,select,picker,menu,host,document:globalThis.document,choose(unit){menu.children[['day','week','month'].indexOf(unit)].dispatchEvent(new Event('click'));},previous:navigation.children[0],title:navigation.children[1],next:navigation.children[2],
@@ -81,6 +81,86 @@ const response=url=>{
   const time=Date.parse(url.split('/period/')[1].split('?')[0]);
   return [[record('sensor.house',time,100),record('sensor.house',time+1,300)], [record('sensor.fridge',time,20),record('sensor.fridge',time+1,40)]];
 };
+
+test('downloaded power history retains November 24 readings across rollover, unrecorded days and reconnect', async t => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  const oldWindow = globalThis.window;
+  const bridge = Object.assign(new EventTarget(), {__dashboardConnection: 'offline'});
+  globalThis.window = bridge;
+  t.after(() => { globalThis.window = oldWindow; });
+  let now = Date.parse('2026-11-24T23:00:00Z'), onlineFailure = false;
+  const observed = Date.parse('2026-11-24T22:45:00Z');
+  const f = controller(async (_method, url) => {
+    const query = new URL(url, 'http://example/');
+    if (bridge.__dashboardConnection === 'online') {
+      if (onlineFailure) throw new Error('Recorder failure');
+      return response(url);
+    }
+    if (query.pathname.endsWith('2026-11-24T00:00:00.000Z') && query.searchParams.get('filter_entity_id').includes('sensor.fridge')) {
+      return [[record('sensor.house', observed, 52)], [record('sensor.fridge', observed, 8)]];
+    }
+    throw Response.json({code: 'dashboard_offline'}, {status: 503});
+  }, {now: () => now});
+  t.after(() => f.cleanup());
+  await settle();
+  let update = f.updates.at(-1);
+  assert.deepEqual(update.samples, [{time: observed, value: 52}]);
+  assert.equal(update.extendLastState, false);
+  update.onSelect(observed);
+  await settle();
+  assert.deepEqual(f.updates.at(-1).selection.values['sensor.fridge'], {value: 8, failed: false, problem: ''});
+
+  now = Date.parse('2026-11-25T00:15:00Z');
+  t.mock.timers.tick(75 * 60000);
+  await settle();
+  update = f.updates.at(-1);
+  assert.equal(update.range.start.toISOString(), '2026-11-25T00:00:00.000Z');
+  assert.equal(update.offlineCoverage, 'history.offline_range');
+  assert.equal(update.loading, false);
+  assert.equal(update.error, '');
+  assert.ok(update.samples.every(sample => sample.value === null));
+  assert.equal(f.previous.disabled, false);
+  f.previous.dispatchEvent(new Event('click'));
+  await settle();
+  assert.deepEqual(f.updates.at(-1).samples, [{time: observed, value: 52}]);
+  const snapshotReading = Date.parse('2026-11-24T22:57:00Z');
+  f.options.hass.states['sensor.house'] = record('sensor.house', snapshotReading, 57);
+  f.instance.update({power_devices: []});  // This query has no recorder response in the download.
+  await settle();
+  update = f.updates.at(-1);
+  assert.deepEqual(update.samples.filter(s => Number.isFinite(s.value)), [{time: snapshotReading, value: 57}]);
+  assert.equal(update.extendLastState, false);
+  assert.equal(update.offlineCoverage, 'history.offline_partial');
+  const fixedDayUpdates = f.updates.length;
+  t.mock.timers.tick(86400000);
+  assert.equal(f.updates.length, fixedDayUpdates);
+  delete f.options.hass.states['sensor.house'].last_updated;
+  f.instance.update({power_devices: f.options.power_devices});
+  await settle();
+  f.choose('week');
+  await settle();
+  update = f.updates.at(-1);
+  assert.equal(update.offlineCoverage, 'history.offline_partial');
+  assert.deepEqual(update.samples.filter(s => Number.isFinite(s.value)), [{time: observed, value: 52}]);
+  assert.equal(powerStateAt(update.samples, now).value, null);
+
+  now = Date.parse('2026-12-02T23:00:00Z');
+  f.choose('day');
+  await settle();
+  assert.equal(f.updates.at(-1).offlineCoverage, 'history.offline_range');
+  bridge.__dashboardConnection = 'online';
+  bridge.dispatchEvent(new CustomEvent('dashboard-connection-changed', {detail: 'online'}));
+  await settle();
+  update = f.updates.at(-1);
+  assert.equal(update.range.start.toISOString(), '2026-12-02T00:00:00.000Z');
+  assert.equal(update.offlineCoverage, '');
+  assert.deepEqual(update.samples.map(s => s.value), [100, 300]);
+  onlineFailure = true;
+  f.previous.dispatchEvent(new Event('click'));
+  await settle();
+  assert.equal(f.updates.at(-1).error, 'power.load_error');
+  assert.equal(f.updates.at(-1).offlineCoverage, '');
+});
 
 test('controller retains its controls across calendar navigation, reuses formatting data and does not retry failures', async () => {
   const calls=[];

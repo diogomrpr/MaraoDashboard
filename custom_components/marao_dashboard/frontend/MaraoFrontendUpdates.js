@@ -1,9 +1,11 @@
 const { refreshFrontend, frontendRefreshInProgress } = await import(new URL(`./MaraoFrontendRefresh.js${new URL(import.meta.url).search}`, import.meta.url));
+const STARTUP_MANIFEST_MAX_AGE_MS = 5000;
 
 // One document owns the subscription, even when HA replaces its navbar or view.
 export function createFrontendUpdates({ host = window, loadedVersion, context, refresh = refreshFrontend }) {
   let hass, connection, unsubscribe, subscribing = false, stopped = false, busy = false, attempted = false;
   let current, terminal = '', offline = false, generation = 0, subscriptionFailed = false, connected = false, updateCheckFailed = false;
+  let startupManifest = host.MaraoInstalledFrontendPackage;
   const pending = new Map(), pointers = new Set();
   const storageKey = dashboard => `marao:frontend-refresh:${dashboard}`;
   const read = dashboard => JSON.parse(host.sessionStorage.getItem(storageKey(dashboard)) || '{"requests":[]}');
@@ -86,17 +88,39 @@ export function createFrontendUpdates({ host = window, loadedVersion, context, r
       if (host.MaraoFrontendPackage) {
         const installed = async event => {
           if (event?.data?.url_path && event.data.url_path !== context().dashboard) return;
+          startupManifest = undefined;
           const dashboard = context().dashboard;
-          const response = await host.fetch(host.MaraoFrontendPackage.manifestURL,{cache:'no-store',credentials:'same-origin'});
-          if (!response.ok) throw new Error('Could not read the installed Marao frontend identity.');
-          const info = await response.json();
+          const {manifestURL} = host.MaraoFrontendPackage;
+          const loader = host.MaraoInstalledFrontendPackage;
+          let info;
+          if (loader?.manifestURL === manifestURL && typeof loader.readRelease === 'function') {
+            info = await loader.readRelease();
+          } else {
+            // Cached legacy entry points only publish the full manifest URL.
+            const response = await host.fetch(manifestURL,{cache:'no-store',credentials:'same-origin'});
+            if (!response.ok) throw new Error('Could not read the installed Marao frontend identity.');
+            info = await response.json();
+          }
           if (!/^[a-f0-9]{64}$/.test(info.identity || '')) throw new Error('Invalid installed Marao frontend identity.');
           if (token !== generation || stopped || context().dashboard !== dashboard) return;
           // HA regenerates the strategy after native saves; reload only when the installed graph changes.
           receive({dashboard,fingerprint:info.identity});
         };
         remove = await connection.subscribeEvents(event => { void installed(event).catch(error => {if (stopped || token !== generation) return;updateCheckFailed=true;terminal='failed';report(terminal);host.console?.warn('Marao native update check failed',error);}); },'lovelace_updated');
-        try { await installed(); } catch (error) {await remove();throw error;}
+        try {
+          if (token === generation && !stopped) {
+            const sample = startupManifest;
+            startupManifest = undefined;
+            const age = host.performance?.now?.() - sample?.manifestCheckedAt;
+            const activePackage = host.MaraoFrontendPackage;
+            if (!renew && sample && sample === host.MaraoInstalledFrontendPackage &&
+                sample.identity === loadedVersion && activePackage?.identity === loadedVersion &&
+                sample.manifestURL === activePackage.manifestURL && Number.isFinite(sample.manifestCheckedAt) &&
+                age >= 0 && age <= STARTUP_MANIFEST_MAX_AGE_MS) {
+              receive({dashboard:context().dashboard, fingerprint:sample.identity});
+            } else await installed();
+          }
+        } catch (error) {await remove();throw error;}
       } else remove = await connection.subscribeMessage(payload => { if (token === generation) receive(payload); }, { type: 'marao_dashboard/frontend/subscribe' });
       if (stopped || token !== generation) await remove();
       else {
@@ -115,6 +139,7 @@ export function createFrontendUpdates({ host = window, loadedVersion, context, r
     }
   };
   const resume = () => {
+    startupManifest = undefined;
     if (host.document.visibilityState === 'hidden') return;
     if (subscriptionFailed) terminal = '';
     offline = false; subscriptionFailed = false;
@@ -147,6 +172,7 @@ export function createFrontendUpdates({ host = window, loadedVersion, context, r
   host.addEventListener('pagehide', pagehide);
   return { update(value) {
     hass = value;
+    if (!value?.connected || (connection && connection !== value.connection)) startupManifest = undefined;
     if (connection !== value?.connection) { disconnect(); connection = value?.connection; subscriptionFailed = false; }
     if (value?.connected && !connected) { subscriptionFailed = false; offline = false; }
     connected = Boolean(value?.connected);

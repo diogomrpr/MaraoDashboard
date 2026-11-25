@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import nativeChecks from '../camera-live-native-checks.js';
-const source = fs.readFileSync(new URL('../../custom_components/marao_dashboard/frontend/MaraoCamera.js', import.meta.url),'utf8');
+const sourceURL = new URL('../../custom_components/marao_dashboard/frontend/MaraoCamera.js', import.meta.url);
+const source = fs.readFileSync(sourceURL,'utf8').replaceAll('import.meta.url', JSON.stringify(sourceURL.href));
 const {loadNativeCamera,cameraAvailable,cameraSupportsStream,clearNativeCameraPoster,CameraPlayback,CameraSignaling,CAMERA_PLAYBACK_MS,CAMERA_REGISTRATION_MS} = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 
 function signalingFixture(createSocket) {
@@ -415,7 +416,7 @@ test('native image fallback remains recoverable even when the player supplies no
     };
     Object.assign(playback, {
       generation: 1, state: 'loading', attempt: true, player, picture: 'synthetic-still', posterFailed: false, poster: { hidden: false },
-      mediaObserver: { observe() {}, disconnect() {} }, message: key => key, problem: value => problems.push(value), describe() {},
+      mediaObserver: { observe() {}, disconnect() {} }, message: key => key, problem: value => problems.push(value), describe() {}, eligible: () => true,
     });
     playback.bind(1);
     assert.equal(playback.state, 'error', 'A failed stream must retain explicit Retry rather than latch a snapshot-only state');
@@ -467,7 +468,7 @@ test('startup and Retry honor the configured camera exactly, without registry di
   globalThis.document={createElement:tag=>({localName:tag,setAttribute(){},remove(){}})};
   globalThis.customElements={get:()=>true};
   globalThis.MutationObserver=class {observe(){} disconnect(){}};
-  const playback=Object.assign(Object.create(CameraPlayback.prototype),{entity:'camera.high',hass,generation:0,
+  const playback=Object.assign(Object.create(CameraPlayback.prototype),{entity:'camera.high',hass,generation:0,poster:{},
     stage:{prepend:player=>players.push(player),addEventListener(){},removeEventListener(){}},eligible:()=>true,
     problem(){},describe(){},bind(){},fail:reason=>assert.fail(reason)});
   try {
@@ -476,7 +477,7 @@ test('startup and Retry honor the configured camera exactly, without registry di
     assert.deepEqual(calls,[],'No extra discovery or speed test before native startup');
     await playback.nativeHass.callWS({type:'camera/capabilities',entity_id:'camera.high'});
     assert.deepEqual(calls,[{type:'camera/capabilities',entity_id:'camera.high'}]);
-    playback.stop();playback.resetStream();await playback.start();
+    playback.stop();await playback.start();
     assert.equal(playback.streamEntity,'camera.high');assert.equal(players.length,2);
   } finally {playback.stop();Object.assign(globalThis,previous);}
 });

@@ -146,8 +146,8 @@ test("loading and route/visibility changes cannot dispatch or retain alarm codes
 });
 
 test("strict slide routes every native opener once and rejects incompatible overrides", async () => {
-  const names = ["HTMLElement", "MARAO_SLIDE_INTENT_PX", "MARAO_SLIDE_COMPLETE_AT", "serviceConnectionReady", "serviceTargetReady", "accessOpenerService", "haptic", "callServiceWithNotification", "serviceOutcome", "fitNativeGrid", "nativeEditing", "bindNativeEditing"];
-  const values = [globalThis.HTMLElement, 10, Number(dashboard.match(/const MARAO_SLIDE_COMPLETE_AT = ([\d.]+);/)[1]), runtime.serviceConnectionReady, runtime.serviceTargetReady, accessOpenerService, () => {}, runtime.callServiceWithNotification, runtime.serviceOutcome, runtime.fitNativeGrid, runtime.nativeEditing, runtime.bindNativeEditing];
+  const names = ["HTMLElement", "MARAO_SLIDE_INTENT_PX", "MARAO_SLIDE_COMPLETE_AT", "serviceConnectionReady", "serviceTargetReady", "accessOpenerService", "haptic", "callServiceWithNotification", "serviceOutcome", "fitNativeGrid", "nativeEditing", "bindNativeEditing", "observeDashboardConnection"];
+  const values = [globalThis.HTMLElement, 10, Number(dashboard.match(/const MARAO_SLIDE_COMPLETE_AT = ([\d.]+);/)[1]), runtime.serviceConnectionReady, runtime.serviceTargetReady, accessOpenerService, () => {}, runtime.callServiceWithNotification, runtime.serviceOutcome, runtime.fitNativeGrid, runtime.nativeEditing, runtime.bindNativeEditing, runtime.observeDashboardConnection];
   const Slide = new Function(...names, dashboard.slice(dashboard.indexOf("class MaraoSlideToOpen"), dashboard.indexOf('if (!customElements.get("marao-slide-to-open"))')) + "; return MaraoSlideToOpen;")(...values);
   for (const [domain, service, state] of [["alarm_control_panel", "alarm_disarm", "armed_away"], ["lock", "unlock", "locked"], ["cover", "open_cover", "closed"], ["button", "press", "2026-01-01"], ["switch", "turn_on", "off"], ["script", "turn_on", "off"]]) {
     const id = domain + ".safe", calls = [];
@@ -378,4 +378,65 @@ test('held Lock creation uses only lock.lock and rejects alternate targets or op
     const bypasses=[{variables:{access_mode,action_service:'lock.unlock'}},{tap_action:{action:'toggle'}},{tap_action:{action:'perform-action',perform_action:'lock.unlock',target:{entity_id:'lock.safe'}}},{tap_action:{action:'call-service',service:'lock.lock',target:{entity_id:'lock.other'}}},{tap_action:{action:'call-service',service:'lock.lock',entity_id:'lock.safe',service_data:{entity_id:'lock.other'}}},{hold_action:{action:'toggle'}},{double_tap_action:{action:'toggle'}}];
     for(const patch of bypasses){const config={...original,...patch};assert.throws(()=>runtime.accessCardConfig(config),/slide/);assert.ok(validate(config).length,'Source must reject the same unsafe held Lock configuration');}
   }
+});
+
+test('downloaded dashboard gates device actions on backend status and restores controls on reconnect', async t => {
+  const target = new EventTarget();
+  let backend = 'connecting';
+  Object.defineProperty(target, '__dashboardConnection', {get: () => backend});
+  const original = globalThis.window;
+  globalThis.window = target;
+  t.after(() => { globalThis.window = original; });
+  const setBackend = value => {
+    backend = value;
+    target.dispatchEvent(new CustomEvent('dashboard-connection-changed', {detail: value}));
+  };
+
+  const outcomes = [];
+  let calls = 0, finish;
+  const hass = {connected: true, connection: {connected: true}, states: {[entity]: reported('disarmed')},
+    callService: async () => { calls++; await new Promise(resolve => { finish = resolve; }); }};
+  const card = alarm(t, hass);
+  const send = () => runtime.callServiceWithNotification(hass, 'alarm_control_panel', 'alarm_arm_away',
+    {entity_id: entity}, result => outcomes.push(result));
+
+  for (const status of ['connecting', 'offline']) {
+    setBackend(status);
+    await send();
+    assert.equal(calls, 0);
+    assert.equal(outcomes.at(-1), 'skipped');
+    assert.match(card.shadowRoot.innerHTML, /data-scene-select[^>]* disabled/);
+  }
+  const light = new MaraoCard();
+  const lightId = 'light.fixture';
+  light.setConfig({template:'md_light_card', entity:lightId});
+  light.hass = {...hass, states:{[lightId]:{state:'on',attributes:{supported_color_modes:['hs'],hs_color:[40,50]}}}};
+  let opened = false;
+  light._detailPopup = () => ({openLightColor(){ opened = true; }});
+  light._openLightColor({});
+  assert.equal(opened, true);
+  assert.doesNotMatch(light.shadowRoot.innerHTML, /data-light-color[^>]* disabled/);
+  assert.equal(runtime.serviceConnectionReady(light.hass), false);
+
+  const dishwasher = new MaraoCard();
+  dishwasher.setConfig({template:'md_dishwasher_card',entity:'sensor.fixture'});
+  dishwasher.hass = {...hass, states:{'sensor.fixture':{state:'run',attributes:{}}}};
+  assert.match(dishwasher.shadowRoot.innerHTML, /data-dishwasher-open aria-haspopup="dialog">/);
+
+  setBackend('online');
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /data-scene-select[^>]* disabled/);
+  const pending = send();
+  assert.equal(calls, 1);
+  setBackend('offline');
+  finish();
+  await pending;
+  assert.deepEqual(outcomes.slice(-2), ['sent', 'skipped']);
+  setBackend('online');
+  const retry = send();
+  finish();
+  await retry;
+  assert.equal(calls, 2);
+  assert.deepEqual(outcomes.slice(-2), ['sent', 'success']);
+  assert.equal(hass.states[entity].state, 'disarmed');
+  assert.equal(runtime.serviceConnectionReady({...hass, connected: false}), false);
 });

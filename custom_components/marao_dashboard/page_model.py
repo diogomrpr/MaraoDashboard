@@ -84,6 +84,16 @@ def camera_popup_stream(entity: str, options: dict[str, Any]) -> str:
         raise ValueError("Preload stream must be a boolean.")
     if "event_columns" in options and (type(options["event_columns"]) is not int or options["event_columns"] < 1 or options["event_columns"] > 9007199254740991):
         raise ValueError("Event columns must be a positive integer.")
+    if options.get("stream_quality") not in (None, "auto", "low", "high"):
+        raise ValueError("Choose Auto, Low or High for camera quality.")
+    low_entity = options.get("low_stream_entity")
+    if low_entity not in (None, "") and (not isinstance(low_entity, str) or not re.fullmatch(r"camera\.[a-z0-9_]+", low_entity)):
+        raise ValueError("Choose a camera entity for the low-quality stream.")
+    low_frigate = options.get("frigate_low_stream")
+    if low_frigate not in (None, "") and (not isinstance(low_frigate, str) or not re.fullmatch(r"[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}", low_frigate)):
+        raise ValueError("Enter a Frigate stream name.")
+    if low_entity and low_frigate:
+        raise ValueError("Choose one low-quality source for this camera.")
     stream = options.get("popup_stream_entity")
     if stream in (None, ""):
         return entity

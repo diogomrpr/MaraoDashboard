@@ -33,11 +33,11 @@ variables:
 
 Compatible entity domains: `camera`.
 
-The summary uses the bound camera; popup_stream_entity optionally selects a different camera for popup video. Event metadata stays associated with the configured event camera.
+The tile displays a lightweight Home Assistant snapshot during startup. It can start Frigate video directly through the authenticated go2rtc proxy. A recent successful transport is preferred for the same source.
 
-The card opens video and recent events. If Home Assistant's native stream fails, the selected Frigate camera can play through the Frigate integration's authenticated go2rtc proxy. This requires a go2rtc stream named for the Frigate camera and a browser with Media Source support for its video codec. Use the existing Frigate camera entity. Authentication stays in the Frigate integration.
+Auto and Low prefer the configured low-quality source. Set `frigate_low_stream` to a go2rtc stream name on this camera’s Frigate instance, or select `low_stream_entity` for a second Home Assistant entity of the same camera. Select one low source. With no available low source, the tile uses its primary entity. High always uses the primary entity.
 
-Inline and popup video apply this fallback to their own selected camera. Preloading is optional and uses resources while viewing other pages.
+`entity_id` remains the event source. `popup_stream_entity` selects video in the detail popup and fullscreen. If omitted, the popup uses the primary entity. Preloading is optional and uses resources while viewing other pages.
 
 ## Settings
 
@@ -59,6 +59,9 @@ The table lists the shared catalog fields and this card’s structured options. 
 | `variables.md_label_prefix` | State label prefix | text | Not set | State label prefix for this card. |
 | `variables.card_color` | Card color | color | Not set | Optional card background color. |
 | `variables.active_color` | Active color | color | Not set | Active color for this card. |
+| `variables.stream_quality` | Dashboard video quality | select | `auto` | Dashboard video quality for this card. Choices: `auto`, `low`, `high`. |
+| `variables.low_stream_entity` | Low-quality camera entity | entity | Not set | Select a second entity for the same camera's low-resolution feed. Searchable suggestions are available. |
+| `variables.frigate_low_stream` | Frigate low-quality stream name | text | Not set | Enter a low-resolution go2rtc stream name on this camera's Frigate instance. |
 | `variables.popup_stream_entity` | Popup stream | entity | Not set | Popup stream for this card. Searchable suggestions are available. |
 | `variables.preload_stream` | Preload stream in background | boolean | `false` | Uses bandwidth and device resources on other dashboard pages. Popup video stays on demand. |
 | `variables.popup_hash` | Popup hash | text | Not set | Optional link to an existing external popup hash. Omit it to use this card’s automatic details. |
@@ -77,6 +80,7 @@ Select **Open playground**, then choose a scenario to inspect its configuration 
 | Scenario | What it demonstrates |
 | --- | --- |
 | Default | Try the configured card with fictional devices. |
+| Low-quality Frigate tile | Choose the named low-resolution stream and keep the original event camera. |
 | Separate popup stream | Use another camera entity for popup video. |
 | UniFi Protect events | Choose the native Protect media provider. |
 | Netatmo recordings | Choose native Netatmo recordings without inventing detection labels. |

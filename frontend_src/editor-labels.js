@@ -1,8 +1,10 @@
 import { languageCode } from '../custom_components/marao_dashboard/frontend/MaraoLocale.js';
+import { cameraOptionLabels } from '../custom_components/marao_dashboard/frontend/MaraoCameraOptions.js';
 import { FLOOR_PT_LABELS } from '../custom_components/marao_dashboard/frontend/MaraoFloorPlanText.js';
 import { EVENT_CONFIG_PT } from '../custom_components/marao_dashboard/frontend/MaraoEventModel.js';
 import {PLEX_PT} from '../custom_components/marao_dashboard/frontend/MaraoPlexModel.js';
 export const PT_LABELS = {
+  ...cameraOptionLabels,
   "Event provider": "Fornecedor de eventos",
   "Frigate camera name": "Nome da câmara no Frigate",
   "Frigate instance ID": "ID da instância do Frigate",
@@ -328,6 +330,13 @@ export const PT_LABELS = {
   "Full screen": "Ecrã inteiro",
   "Dashboard stream": "Vídeo no painel",
   "Popup stream": "Vídeo na janela",
+  "Dashboard video quality": "Qualidade do vídeo no painel",
+  "Low": "Baixa",
+  "High": "Alta",
+  "Low-quality camera entity": "Entidade de câmara de qualidade baixa",
+  "Select a second entity for the same camera's low-resolution feed.": "Selecione uma segunda entidade para o vídeo de baixa resolução da mesma câmara.",
+  "Frigate low-quality stream name": "Nome do fluxo Frigate de qualidade baixa",
+  "Enter a low-resolution go2rtc stream name on this camera's Frigate instance.": "Introduza o nome de um fluxo go2rtc de baixa resolução na instância Frigate desta câmara.",
   "Preload stream in background": "Pré-carregar vídeo em segundo plano",
   "Preload stream must be a boolean.": "A opção de pré-carregamento tem de ser verdadeira ou falsa.",
   "Uses bandwidth and device resources on other dashboard pages. Popup video stays on demand.": "Utiliza largura de banda e recursos do dispositivo noutras páginas do painel. O vídeo na janela só carrega ao abrir.",

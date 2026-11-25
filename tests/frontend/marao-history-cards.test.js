@@ -42,8 +42,10 @@ const source = await fs.readFile(new URL("../../custom_components/marao_dashboar
 const cardsSource = (await fs.readFile(new URL("../../custom_components/marao_dashboard/frontend/MaraoCards.js", import.meta.url), "utf8")).replaceAll('import.meta.url', JSON.stringify(new URL('../../custom_components/marao_dashboard/frontend/MaraoCards.js', import.meta.url).href));
 const cardsModule = `data:text/javascript;base64,${Buffer.from(cardsSource).toString("base64")}`;
 const { MaraoCard } = await import(cardsModule);
+const connectionModule = new URL('../../custom_components/marao_dashboard/frontend/MaraoConnection.js', import.meta.url).href;
+const historyData = new URL('../../frontend_src/history-data.js', import.meta.url).href;
 const classes = source.slice(source.indexOf("function escapeHtml("), source.indexOf('if (!customElements.get("marao-energy-period-card"))'));
-const { MaraoStateTimelineCard, MaraoEnergyPeriodCard } = await import(`data:text/javascript;base64,${Buffer.from(`import { nativeEditing, bindNativeEditing, energyBuckets, statisticsBuckets, energyTotal, historyPeriodRange, historySamples, loadHistoryChart, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, problemLabel, showCardDetails, createHistoryPlaceholder, layoutState, focusRestorer, controlGridStyles, updateCardSurface, formatLocale } from "${cardsModule}";\nconst localize = (key) => key;\n${classes}\nexport { MaraoStateTimelineCard, MaraoEnergyPeriodCard };`).toString("base64")}`);
+const { MaraoStateTimelineCard, MaraoEnergyPeriodCard } = await import(`data:text/javascript;base64,${Buffer.from(`import { dashboardConnectionStatus, isDashboardOfflineError, observeDashboardConnection } from "${connectionModule}";\nimport {energyBuckets, statisticsBuckets, energyTotal, periodRange as historyPeriodRange} from "${historyData}";\nimport { nativeEditing, bindNativeEditing, historySamples, loadHistoryChart, energyFormatting, energyValue, energyHistoryValue, energyLabel, formatEnergyNumber, binaryState, cardProblem, problemStyle, problemLabel, showCardDetails, createHistoryPlaceholder, layoutState, focusRestorer, controlGridStyles, updateCardSurface, formatLocale } from "${cardsModule}";\nconst localize = (key) => key;\n${classes}\nexport { MaraoStateTimelineCard, MaraoEnergyPeriodCard };`).toString("base64")}`);
 const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
 const waitFor = async condition => {
   const deadline = Date.now() + 3000;
@@ -175,7 +177,7 @@ test('energy periods retain legacy entity aliases and day-summary defaults', () 
   assert.equal(card._config.entity, 'sensor.history');
   assert.equal(card._config.period, 'day');
   assert.equal(card._config.popup, false);
-  assert.equal(card._offset, 0);
+  assert.equal(card._selectedStart, null);
 });
 
 for (const Card of [MaraoStateTimelineCard, MaraoEnergyPeriodCard]) {
@@ -304,15 +306,16 @@ test('energy prefetch waits for the first period to load and paint', async () =>
 for (const period of ['month', 'day']) test(`energy ${period} prefetches four periods in both directions and navigates cached data immediately`, async () => {
   const card = create(MaraoEnergyPeriodCard);
   card.setConfig({ ...card._config, period });
-  card._offset = -6;
+  card._selectedStart = card._range(-6).start;
   const urls = [];
   card.hass = { config: { time_zone: 'Europe/Lisbon' }, states: { 'sensor.history': state() }, callApi: async (_method, url) => { urls.push(url); return [[state()]]; } };
   await waitFor(() => urls.length === 9);
-  const expected = [0, -1, 1, -2, 2, -3, 3, -4, 4].map(distance => card._range(-6 + distance).start.toISOString());
+  const expected = [0, -1, 1, -2, 2, -3, 3, -4, 4].map(distance => card._range(distance).start.toISOString());
   assert.deepEqual(urls.map(url => url.split('?')[0].slice('history/period/'.length)), expected);
-  const cached = card._periodCache.get(card._range(-7).start.toISOString()).result.series;
+  const previousKey = card._range(-1).start.toISOString();
+  const cached = card._periodCache.get(previousKey).result.series;
   card.shadowRoot.buttons.find(button => button.dataset.period === 'previous').click();
-  assert.equal(card._offset, -7);
+  assert.equal(card._selectedStart.toISOString(), previousKey);
   assert.equal(card._loading, false, 'cached navigation has no loading frame');
   assert.equal(card._series, cached, 'chart and breakdown use the prefetched period');
   await waitFor(() => !card._prefetching);
@@ -321,14 +324,58 @@ for (const period of ['month', 'day']) test(`energy ${period} prefetches four pe
   card.shadowRoot.buttons.find(button => button.dataset.period === 'next').click();
   assert.equal(card._loading, false);
   await waitFor(() => !card._prefetching);
-  card._offset = 0; await card._load(); await waitFor(() => !card._prefetching);
+  card._selectedStart = null; await card._load(); await waitFor(() => !card._prefetching);
   assert.equal(card._periodCache.size, 5, 'future periods are excluded');
   const currentKey = card._range().start.toISOString();
   const count = urls.filter(url => url.includes(currentKey)).length;
   card._periodCache.get(currentKey).result.loadedAt -= 61000;
-  card._offset = -1; await card._load();
-  card._offset = 0; await card._load(); await waitFor(() => !card._prefetching);
+  card._selectedStart = card._range(-1).start; await card._load();
+  card._selectedStart = null; await card._load(); await waitFor(() => !card._prefetching);
   assert.equal(urls.filter(url => url.includes(currentKey)).length, count + 1, 'returning to a stale current period refreshes it');
+});
+
+for (const period of ['day', 'month']) test(`energy fetches the final ${period} once after the calendar boundary`, async t => {
+  t.mock.timers.enable({apis:['Date'], now:Date.parse('2026-10-31T23:59:59.900Z')});
+  const card = create(MaraoEnergyPeriodCard, false);
+  card.setConfig({...card._config, period});
+  let value = '100';
+  const reads = [];
+  card._hass = {states:{'sensor.history':state()}, config:{time_zone:'UTC'}, callApi:async (_method, url) => {
+    reads.push(url);
+    return [[{...state(value), entity_id:'sensor.history'}]];
+  }};
+  await card._load();
+  const original = reads[0];
+  value = '105';
+  t.mock.timers.tick(200);
+  await card._load();
+  card._selectedStart = card._range(-1).start; await card._load();
+  assert.equal(card._history[0].state, '105');
+  assert.equal(reads.filter(url => url === original).length, 2, 'A partial interval needs one final query even within the freshness minute');
+  t.mock.timers.tick(61000);
+  card._selectedStart = null; await card._load();
+  card._selectedStart = card._range(-1).start; await card._load();
+  assert.equal(reads.filter(url => url === original).length, 2, 'The finalized interval is reusable on later visits');
+});
+
+test('an energy read spanning midnight cannot replace the final history for the selected day', async t => {
+  t.mock.timers.enable({apis:['Date'], now:Date.parse('2026-10-31T23:59:59.900Z')});
+  const card = create(MaraoEnergyPeriodCard, false);
+  const partial = Promise.withResolvers();
+  let reads = 0;
+  const records = value => [[{...state(value), entity_id:'sensor.history'}]];
+  card._hass = {states:{'sensor.history':state()}, config:{time_zone:'UTC'}, callApi:async () =>
+    ++reads === 1 ? partial.promise : records('105')};
+  const startedBeforeMidnight = card._load();
+  t.mock.timers.tick(200);
+  card._offset = -1;
+  await card._load();
+  assert.equal(card._history[0].state, '105', 'The selected day can start its final read while the partial read is pending');
+  partial.resolve(records('100'));
+  await startedBeforeMidnight;
+  await card._load();
+  assert.equal(card._history[0].state, '105');
+  assert.equal(reads, 2);
 });
 
 test('energy navigation shares pending background requests and retries failed cached periods', async () => {
@@ -346,7 +393,7 @@ test('energy navigation shares pending background requests and retries failed ca
   assert.equal(urls.length, 2, 'foreground joins the pending prefetch');
   fail = true; finish([]); await waitFor(() => !card._loading && !card._prefetching);
   assert.equal(card._error, false, 'background failures do not replace the selected period');
-  const key = card._range(-2).start.toISOString();
+  const key = card._range(-1).start.toISOString();
   assert.equal(card._periodCache.get(key).result.failed, true);
   const before = urls.filter(url => url.includes(key)).length;
   fail = false;
@@ -506,4 +553,110 @@ test('energy summary refresh is bounded, rolls periods over and stops in hidden 
     card.isConnected=false;card.disconnectedCallback();
     t.mock.timers.tick(60000);assert.equal(calls,3);
   } finally {card.isConnected=false;card.disconnectedCallback();globalThis.document=previousDocument;}
+});
+
+test('downloaded daily consumption and cost retain saved dates, report a missing day, and refresh the selected date on reconnect', async t => {
+  const savedDay = '2026-11-24', nextDay = '2026-11-25';
+  t.mock.timers.enable({apis:['Date'], now:Date.parse(savedDay + 'T23:55:00Z')});
+  const previousWindow = globalThis.window;
+  globalThis.window = Object.assign(new EventTarget(), {__dashboardConnection:'offline'});
+  const cards = [];
+  t.after(() => {
+    for (const card of cards) { card.isConnected = false; card.disconnectedCallback(); }
+    globalThis.window = previousWindow;
+  });
+
+  const entity = 'sensor.history', states = {[entity]:{state:'123',attributes:{unit_of_measurement:'kWh',state_class:'total_increasing'}}};
+  const hass = {
+    connected:true, states, config:{time_zone:'Europe/Lisbon',currency:'EUR'},
+    async callWS(query) {
+      if (query.type === 'recorder/get_statistics_metadata') return [{statistic_id:entity,has_sum:true,statistics_unit_of_measurement:'kWh'}];
+      if (query.start_time.startsWith(savedDay) || window.__dashboardConnection === 'online') {
+        const start = Date.parse(query.start_time);
+        return {[entity]:[{start,end:start+3600000,change:4}]};
+      }
+      throw {code:'dashboard_offline'};
+    },
+    async callApi() { throw new Response('{"code":"dashboard_offline"}',{status:503}); },
+  };
+  for (const cost of [false,true]) {
+    const card = create(MaraoEnergyPeriodCard);
+    cards.push(card);
+    card.setConfig({entity,period:'day',popup:true,calculate_cost:cost,cost_per_kwh:0.5});
+    card.isConnected = true; card.connectedCallback(); card.hass = hass;
+  }
+  await tick();
+  assert.match(cards[0]._detailOptions.summaryLabel, /4.*kWh/);
+  assert.match(cards[1]._detailOptions.summaryLabel, /2.*EUR/);
+
+  t.mock.timers.setTime(Date.parse(nextDay + 'T00:10:00Z'));
+  for (const card of cards) card.hass = hass;
+  await tick();
+  for (const card of cards) {
+    assert.equal(card._loadedKey, nextDay+'T00:00:00.000Z');
+    assert.equal(card._loading,false);
+    assert.equal(card._detailOptions.offlineCoverage,'history.offline_range');
+    assert.equal(card._detailOptions.error,'');
+    assert.equal(card._detailOptions.summaryLabel,'');
+    assert.deepEqual(card._detailOptions.samples,[]);
+    card.shadowRoot.buttons.find(button=>button.dataset.period==='previous').click();
+    assert.match(card._detailOptions.summaryLabel, /[24]/);
+    card.shadowRoot.buttons.find(button=>button.dataset.period==='next').click();
+    assert.equal(card._detailOptions.offlineCoverage,'history.offline_range');
+  }
+  cards[0].shadowRoot.buttons.find(button=>button.dataset.period==='previous').click();
+  t.mock.timers.setTime(Date.parse('2026-11-26T00:05:00Z'));
+  for (const card of cards) card.hass = hass;
+  await tick();
+  assert.equal(cards[0]._loadedKey,savedDay+'T00:00:00.000Z');
+  assert.match(cards[0]._detailOptions.summaryLabel,/4.*kWh/);
+  assert.equal(cards[1]._loadedKey,'2026-11-26T00:00:00.000Z');
+  assert.equal(cards[1]._detailOptions.offlineCoverage,'history.offline_range');
+  window.__dashboardConnection='online';
+  window.dispatchEvent(new CustomEvent('dashboard-connection-changed',{detail:'online'}));
+  await tick();
+  assert.equal(cards[0]._detailOptions.offlineCoverage,'');
+  assert.match(cards[0]._detailOptions.summaryLabel,/4.*kWh/);
+  assert.match(cards[1]._detailOptions.summaryLabel,/2.*EUR/);
+});
+
+test('graph reads keep November 24 timestamps, retire an eight-day-old range, and recover on reconnect', async t => {
+  const saved = '2026-11-24T20:15:00.000Z', entity = 'sensor.history';
+  t.mock.timers.enable({apis:['Date'], now:Date.parse(saved)+60000});
+  const previousWindow = globalThis.window;
+  globalThis.window = Object.assign(new EventTarget(), {__dashboardConnection:'offline'});
+  t.after(() => { globalThis.window = previousWindow; });
+  const card = new MaraoCard();
+  card._config = {template:'md_graph_card',entity};
+  card._subscribeClimate = () => {};
+  card._render = () => card._loadGraphHistory(entity);
+  card._stateEntities = [entity];
+  const measurement = time => ({state:'21',last_updated:time,attributes:{unit_of_measurement:'°C'}});
+  const hass = {
+    states:{[entity]:measurement(saved)}, connected:true, callService() {},
+    async callApi(_method, path) {
+      const end = new URL(path,'http://fixture').searchParams.get('end_time');
+      if (window.__dashboardConnection === 'online') return [[measurement(end)]];
+      if (end.startsWith('2026-11-24')) return [[measurement(saved)]];
+      throw {status_code:503,body:{code:'dashboard_offline'}};
+    },
+  };
+  card.hass = hass; await tick();
+  assert.equal(card._graphStatus(entity),'ready');
+  assert.equal(card._historyOptions().samples[0].time,Date.parse(saved));
+  t.mock.timers.setTime(Date.parse('2026-12-02T20:16:00Z'));
+  card.hass = hass; await tick();
+  assert.equal(card._graphStatus(entity),'offline');
+  assert.equal(card._historyOptions().error,'');
+  assert.match(card._historyOptions().unavailable,/offline/);
+  assert.deepEqual(card._historyOptions().samples,[]);
+  const withinRange = measurement('2026-12-02T18:00:00Z');
+  card.hass = {...hass, states:{[entity]:withinRange}}; await tick();
+  assert.equal(card._historyOptions().unavailable,'');
+  assert.match(card._historyOptions().offlineCoverage,/offline/);
+  assert.deepEqual(card._historyOptions().samples.map(sample=>sample.time),[Date.parse(withinRange.last_updated)]);
+  window.__dashboardConnection='online';
+  card.hass = hass; await tick();
+  assert.equal(card._graphStatus(entity),'ready');
+  assert.equal(card._historyOptions().samples[0].time,Date.now());
 });

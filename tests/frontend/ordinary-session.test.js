@@ -7,15 +7,17 @@ const source = '{\n "config_version":2,"name":"Safe","landing_page":"home","navi
 const metadata = { entities: [], areas: [] };
 function fixture() {
   let document = createEnvelope(source, 'marao-dashboard', { extension: { keep: [] } });
-  const calls = [];
+  const calls = [], archiveStore = new Map();
   const hass = { config: { version: '2025.12.0' }, user: { is_admin: true }, language: 'en', async callWS(message) {
     calls.push(message);
     if (message.type === 'lovelace/config') return structuredClone(document);
     if (message.type === 'lovelace/config/save') { document = structuredClone(message.config); return null; }
+    if (message.type === 'frontend/get_system_data') return {value:archiveStore.get(message.key) ?? null};
+    if (message.type === 'frontend/set_system_data') { archiveStore.set(message.key, message.value); return null; }
     assert.fail('Unexpected request ' + message.type);
   } };
   const session = new OrdinaryConversionSession(hass, 'marao-dashboard', { compatibility: () => true, packageVersion: 'test' });
-  return { hass, session, calls, get document() { return document; }, replace(value) { document = structuredClone(value); }, writes() { return calls.filter(call => call.type === 'lovelace/config/save'); } };
+  return { hass, session, calls, archiveStore, get document() { return document; }, replace(value) { document = structuredClone(value); }, writes() { return calls.filter(call => call.type === 'lovelace/config/save'); } };
 }
 const acknowledge = session => session.acknowledge({ recovery: session.recovery, exported: true, backupConfirmed: true, visibilityReviewed: true });
 
@@ -99,4 +101,46 @@ test('a changed UI identity invalidates an in-flight pre-save read before any wr
   f.hass.callWS=async message=>{if(message.type==='lovelace/config'){started();await pending;}return native(message);};
   const saving=f.session.save();await reading;f.session.invalidate();release();
   await assert.rejects(saving,/native_conversion_stale/);assert.equal(f.writes().length,0);
+});
+
+test('archive publication precedes pointer promotion and a portable receipt repairs a missing archive', async () => {
+  const f = fixture();
+  const {recovery} = await f.session.stage(undefined, metadata);
+  assert.equal(f.archiveStore.size, 0);
+  assert.equal(recovery.version, 2);
+  await acknowledge(f.session);
+  await f.session.save();
+  assert.deepEqual(f.calls.slice(-5).map(call => call.type), ['frontend/get_system_data','frontend/set_system_data',
+    'frontend/get_system_data','lovelace/config','lovelace/config/save']);
+  assert.equal(f.document.marao.migration.version, 3);
+  assert.equal(f.archiveStore.size, 1);
+  const other = fixture();
+  other.replace(f.document);
+  const resumed = other.session;
+  assert.equal(await resumed.resume(recovery), 'converted');
+  assert.equal(other.archiveStore.size, 0);
+  await acknowledge(resumed);
+  assert.equal((await resumed.save()).written, false);
+  assert.deepEqual([...other.archiveStore], [...f.archiveStore]);
+  assert.equal(other.writes().length, 0);
+});
+
+test('a bad archive readback or a concurrent native edit during publication cannot promote the pointer', async () => {
+  for (const reason of ['readback', 'concurrent edit']) {
+    const f = fixture(), original = f.document;
+    await f.session.stage(undefined, metadata);
+    await acknowledge(f.session);
+    const native = f.hass.callWS;
+    f.hass.callWS = async command => {
+      const result = await native(command);
+      if (command.type === 'frontend/set_system_data') {
+        if (reason === 'readback') f.archiveStore.set(command.key, '{}');
+        else f.replace({...original, title:'Another editor'});
+      }
+      return result;
+    };
+    await assert.rejects(f.session.save());
+    assert.equal(f.writes().length, 0);
+    assert.deepEqual(f.document, reason === 'readback' ? original : {...original, title:'Another editor'});
+  }
 });

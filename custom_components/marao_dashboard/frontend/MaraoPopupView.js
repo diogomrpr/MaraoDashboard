@@ -2,8 +2,9 @@ import {customPopup,validatePopupContent,embeddedPopupContext} from './MaraoPopu
 import {findNativeHost,nativeEditing,bindNativeEditing,nativeDashboardConfig} from './MaraoNativeContext.js';
 import {resolvePopupView,popupGroupFromView,popupViewError,popupLabel as label} from './MaraoPopupLayout.js';
 import {createGroupScope,updateGroupScope,groupActionStyles} from './MaraoGroupDetails.js';
-import {managedPopupIssue,popupCardEntries,popupTemplate} from './MaraoPopupManaged.js';
+import {managedPopupIssue,popupCanonical,popupCardEntries,popupTemplate} from './MaraoPopupManaged.js';
 import {canonicalTemplate} from './MaraoNames.js';
+import {observeDashboardConnection} from './MaraoConnection.js';
 const parent=node=>node?.parentNode || node?.host || node?.getRootNode?.()?.host;
 const metadata=hass=>Object.values(hass?.states || {}).map(state=>({entity_id:state.entity_id,device_class:state.attributes?.device_class}));
 export const dashboardConfig=root=>nativeDashboardConfig(root?.lovelace);
@@ -36,6 +37,25 @@ export function accessPopupTarget(owner) {
 }
 function failure(host,error,hass) {const p=document.createElement('p');p.setAttribute('role','alert');p.textContent=label(error.message,hass);host.replaceChildren(p);}
 function ownsFocus(view){let node=globalThis.document?.activeElement;while(node?.shadowRoot?.activeElement)node=node.shadowRoot.activeElement;for(;node;node=parent(node))if(node===view)return true;return false;}
+
+function ownedSectionIndex(owner, source) {
+  let section, view;
+  for (let node = parent(owner); node; node = parent(node)) {
+    if (!section && node.localName === 'hui-section') section = node;
+    if (node.localName === 'hui-view') { view = node; break; }
+  }
+  if (!section || (section.viewIndex ?? view?.index) !== source.index || (view?.index != null && view.index !== source.index)) return -1;
+  const sections = source.view.sections || [];
+  if (section.index != null) return Number.isInteger(section.index) && sections[section.index] ? section.index : -1;
+
+  // Current HA supplies the section configuration and puts the view index on hui-view.
+  if (!section.config) return -1;
+  const index = sections.indexOf(section.config);
+  if (index >= 0) return index;
+  const rendered = popupCanonical(section.config);
+  const matches = sections.filter(candidate => popupCanonical(candidate) === rendered);
+  return matches.length === 1 ? sections.indexOf(matches[0]) : -1;
+}
 
 /** Compatibility boundary: use HA's registered view host; never import or patch HA classes. */
 export function mountPopupView(owner,host) {
@@ -79,8 +99,20 @@ export function registerPopupActions(api) {
     set hass(value){this._hass=value;this._render();}
     get preview(){const root=findNativeHost(this);return Boolean(!this.isConnected||this._preview||nativeEditing(this)||this._config&&managedPopupIssue(dashboardConfig(root),this._config.popup_view,root?._maraoPopupSync?.get(this._config.popup_view)));}
     set preview(value){this._preview=Boolean(value);this._render();}
-    connectedCallback(){this._release=bindNativeEditing(this,()=>this._render());this._root=findNativeHost(this);this._controller={hostUpdated:()=>this._render()};this._root?.addController?.(this._controller);this._render();}
-    disconnectedCallback(){this._release?.();this._root?.removeController?.(this._controller);}
+    connectedCallback(){
+      const render=()=>this._render();
+      this._release=bindNativeEditing(this,render);
+      this._releaseConnection=observeDashboardConnection(()=>this._hass,render);
+      this._root=findNativeHost(this);
+      this._controller={hostUpdated:render};
+      this._root?.addController?.(this._controller);
+      this._render();
+    }
+    disconnectedCallback(){
+      this._release?.();
+      this._releaseConnection?.();
+      this._root?.removeController?.(this._controller);
+    }
     getGridOptions(){return {columns:12,rows:'auto',min_columns:6};}
     getCardSize(){return 2;}
     _render() {
@@ -90,9 +122,9 @@ export function registerPopupActions(api) {
         if(this._config.popup_scope==='embedded'&&!embedded)throw new Error('Popup source is missing or ambiguous.');
         const source=embedded||resolvePopupView(dashboardConfig(root),this._config.popup_view);
         const issue=!embedded&&managedPopupIssue(dashboardConfig(root),this._config.popup_view,root?._maraoPopupSync?.get(this._config.popup_view));if(issue)throw new Error(issue);
-        let section;for(let node=this;node;node=parent(node))if(node.localName==='hui-section'){section=node;break;}
-        if(!section||section.viewIndex!==source.index||!Number.isInteger(section.index)||!source.view.sections?.[section.index])throw new Error('Section action must belong to its linked Sections view.');
-        const group=popupGroupFromView(this._config,source.view,metadata(this._hass)),part=this._config.scope==='all'?{id:'__all',name:source.view.title,entities:group.entities}:group.summary_sections[section.index];
+        const index=ownedSectionIndex(this,source);
+        if(index<0)throw new Error('Section action must belong to its linked Sections view.');
+        const group=popupGroupFromView(this._config,source.view,metadata(this._hass)),part=this._config.scope==='all'?{id:'__all',name:source.view.title,entities:group.entities}:group.summary_sections[index];
         if(!this._scope) {
           this.shadowRoot.replaceChildren();const style=document.createElement('style');style.textContent=':host{display:block;min-width:0;font-family:var(--primary-font-family,inherit)}'+groupActionStyles;this.shadowRoot.append(style);
           this._scope=createGroupScope(this,{...part,name:''},group,api,this.shadowRoot,()=>this._render());
